@@ -1,0 +1,420 @@
+/* ============================================================
+   Reset & base
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #e2e8f0;
+    background: #0f1117;
+    min-height: 100vh;
+}
+
+a { color: #a78bfa; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ============================================================
+   Navbar
+   ============================================================ */
+.navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 56px;
+    background: #1a1d27;
+    border-bottom: 1px solid #2d2f3e;
+}
+
+.nav-brand {
+    font-size: 18px;
+    font-weight: 700;
+    color: #a78bfa;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.nav-links a {
+    color: #94a3b8;
+    font-size: 14px;
+    text-decoration: none;
+    padding: 4px 0;
+    border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+}
+
+.nav-links a:hover, .nav-links a.active {
+    color: #e2e8f0;
+    border-bottom-color: #a78bfa;
+}
+
+/* ============================================================
+   Banner
+   ============================================================ */
+.banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 24px;
+    font-size: 13px;
+}
+
+.banner-danger {
+    background: #3b1219;
+    border-bottom: 1px solid #7f1d1d;
+    color: #fca5a5;
+}
+
+/* ============================================================
+   Container
+   ============================================================ */
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+h2 { font-size: 22px; font-weight: 700; margin-bottom: 24px; color: #f1f5f9; }
+h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #e2e8f0; }
+h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #cbd5e1; }
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.card {
+    background: #1a1d27;
+    border: 1px solid #2d2f3e;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.card-danger {
+    border-color: #7f1d1d;
+    background: #1a0d0e;
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: opacity .15s, background .15s;
+    background: #2d2f3e;
+    color: #e2e8f0;
+}
+
+.btn:hover { opacity: .85; text-decoration: none; }
+
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+.btn-primary { background: #7c3aed; color: #fff; }
+.btn-danger  { background: #b91c1c; color: #fff; }
+.btn-outline { background: transparent; border: 1px solid #475569; color: #94a3b8; }
+.btn-outline:hover { border-color: #a78bfa; color: #a78bfa; }
+
+.btn-link {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #94a3b8;
+    font-size: 14px;
+    padding: 0;
+    font-family: inherit;
+}
+
+.btn-link:hover { color: #e2e8f0; }
+
+/* ============================================================
+   Badges
+   ============================================================ */
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #2d2f3e;
+    color: #94a3b8;
+}
+
+.badge-connected    { background: #14532d; color: #86efac; }
+.badge-disconnected { background: #3b1219; color: #fca5a5; }
+.badge-warning      { background: #422006; color: #fcd34d; }
+.badge-default      { background: #1e293b; color: #94a3b8; }
+.badge-ccl          { background: #312e81; color: #c4b5fd; margin-right: 4px; }
+
+/* ============================================================
+   Provider grid (settings)
+   ============================================================ */
+.provider-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.provider-card {
+    background: #0f1117;
+    border: 1px solid #2d2f3e;
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* ============================================================
+   Toggle
+   ============================================================ */
+.toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    margin-bottom: 12px;
+    color: #e2e8f0;
+}
+
+.toggle input[type="checkbox"] { accent-color: #7c3aed; width: 16px; height: 16px; }
+
+/* ============================================================
+   Getter list
+   ============================================================ */
+.getter-list { margin-top: 16px; }
+
+.getter-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #2d2f3e;
+}
+
+.getter-item:last-child { border-bottom: none; }
+
+/* ============================================================
+   Table
+   ============================================================ */
+.table-container {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid #2d2f3e;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.table th {
+    background: #1a1d27;
+    padding: 10px 14px;
+    text-align: left;
+    color: #94a3b8;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    border-bottom: 1px solid #2d2f3e;
+}
+
+.table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #1e2130;
+    vertical-align: middle;
+}
+
+.table tr:last-child td { border-bottom: none; }
+.table tbody tr:hover { background: #1a1d27; }
+
+/* ============================================================
+   Filters
+   ============================================================ */
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+/* ============================================================
+   Pagination
+   ============================================================ */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+/* ============================================================
+   Modal
+   ============================================================ */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal-content {
+    background: #1a1d27;
+    border: 1px solid #2d2f3e;
+    border-radius: 12px;
+    padding: 28px;
+    width: 100%;
+    max-width: 440px;
+}
+
+.modal-content h3 { margin-bottom: 8px; }
+.modal-content p  { color: #94a3b8; margin-bottom: 16px; }
+
+.modal-content input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    background: #0f1117;
+    border: 1px solid #2d2f3e;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 13px;
+    margin-bottom: 12px;
+    outline: none;
+}
+
+.modal-content input[type="text"]:focus { border-color: #7c3aed; }
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+/* ============================================================
+   CCL checkboxes
+   ============================================================ */
+.ccl-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.ccl-checkboxes label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+/* ============================================================
+   Login page
+   ============================================================ */
+.login-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+}
+
+.login-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+    width: 100%;
+}
+
+.login-card {
+    background: #1a1d27;
+    border: 1px solid #2d2f3e;
+    border-radius: 12px;
+    padding: 40px;
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+}
+
+.login-card h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+.login-card p, .login-card .subtitle { color: #64748b; margin-bottom: 28px; }
+
+.btn-twitch { background: #9146ff; color: #fff; width: 100%; justify-content: center; padding: 10px 16px; font-size: 14px; }
+.btn-twitch:hover { background: #7d2ff7; opacity: 1; }
+
+/* ============================================================
+   Status indicator
+   ============================================================ */
+.status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #64748b;
+}
+
+.status-active .status-dot  { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.status-inactive .status-dot { background: #64748b; }
+.status-active  { color: #86efac; }
+.status-inactive { color: #64748b; }
+
+/* ============================================================
+   Dashboard
+   ============================================================ */
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.status-card {
+    background: #0f1117;
+    border: 1px solid #2d2f3e;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.status-card .label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: .05em; }
+.status-card .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+.text-muted { color: #64748b; }
+.text-sm    { font-size: 12px; }
+
+label { display: block; margin-bottom: 6px; color: #94a3b8; font-size: 13px; }
