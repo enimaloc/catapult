@@ -8,6 +8,22 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: catapult_test
+          POSTGRES_USER: catapult
+          POSTGRES_PASSWORD: catapult
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - uses: actions/checkout@v4
 
@@ -20,3 +36,15 @@ jobs:
 
       - name: Run tests
         run: ./gradlew test
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/catapult_test
+          DB_USERNAME: catapult
+          DB_PASSWORD: catapult
+          TOKEN_ENCRYPTION_KEY: test-encryption-key-32-bytes-long!
+          TWITCH_CLIENT_ID: test
+          TWITCH_CLIENT_SECRET: test
+          DISCORD_CLIENT_ID: test
+          DISCORD_CLIENT_SECRET: test
+          STEAM_CLIENT_ID: test
+          STEAM_CLIENT_SECRET: test
+          IGDB_CLIENT_ID: test
