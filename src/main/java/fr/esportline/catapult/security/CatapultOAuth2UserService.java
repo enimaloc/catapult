@@ -15,11 +15,9 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-
 @Service
 @RequiredArgsConstructor
-public class OAuth2UserService implements org.springframework.security.oauth2.client.userinfo.OAuth2UserService<OAuth2UserRequest, OAuth2User> {
+public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
 
     private final UserAccountRepository userAccountRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
@@ -50,12 +48,10 @@ public class OAuth2UserService implements org.springframework.security.oauth2.cl
         UserAccount account = userAccountRepository.findByTwitchId(twitchId)
             .orElseGet(() -> createNewAccount(twitchId, twitchUsername));
 
-        // Mise à jour du username si changé
         if (!account.getTwitchUsername().equals(twitchUsername)) {
             account.setTwitchUsername(twitchUsername);
         }
 
-        // Si compte PENDING_DELETION → annulation de la suppression
         if (account.getStatus() == UserAccount.Status.PENDING_DELETION) {
             account.setStatus(UserAccount.Status.ACTIVE);
             account.setDeletionRequestedAt(null);
@@ -89,8 +85,7 @@ public class OAuth2UserService implements org.springframework.security.oauth2.cl
                 return t;
             });
 
-        String rawAccessToken = userRequest.getAccessToken().getTokenValue();
-        token.setAccessToken(tokenEncryptionService.encrypt(rawAccessToken));
+        token.setAccessToken(tokenEncryptionService.encrypt(userRequest.getAccessToken().getTokenValue()));
 
         if (userRequest.getAccessToken().getExpiresAt() != null) {
             token.setExpiresAt(userRequest.getAccessToken().getExpiresAt());

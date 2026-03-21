@@ -2,7 +2,6 @@ package fr.esportline.catapult.service;
 
 import fr.esportline.catapult.domain.OAuthToken;
 import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.repository.GameBindingRepository;
 import fr.esportline.catapult.repository.OAuthTokenRepository;
 import fr.esportline.catapult.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,8 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClient;
-
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -24,7 +21,6 @@ public class AccountService {
 
     private final UserAccountRepository userAccountRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
-    private final GameBindingRepository gameBindingRepository;
 
     @Value("${app.account.deletion-delay-days:7}")
     private int deletionDelayDays;
