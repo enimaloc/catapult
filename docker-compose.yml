@@ -1,5 +1,6 @@
 services:
   app:
+    build: .
     image: ghcr.io/enimaloc/catapult:latest
     ports:
       - "8080:8080"
