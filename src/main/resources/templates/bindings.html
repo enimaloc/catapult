@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catapult — Bindings</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+    <!-- Bandeau PENDING_DELETION -->
+    <div th:if="${isPendingDeletion}" class="banner banner-danger">
+        <strong>⚠ Suppression de compte en cours.</strong>
+    </div>
+
+    <nav class="navbar">
+        <a th:href="@{/dashboard}" class="nav-brand">🚀 Catapult</a>
+        <div class="nav-links">
+            <a th:href="@{/dashboard}">Dashboard</a>
+            <a th:href="@{/bindings}" class="active">Bindings</a>
+            <a th:href="@{/settings}">Settings</a>
+            <form th:action="@{/logout}" method="post" style="display:inline">
+                <button type="submit" class="btn-link">Déconnexion</button>
+            </form>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h2>Bindings</h2>
+
+        <!-- Filtres -->
+        <div class="filters">
+            <a th:href="@{/bindings}" class="btn btn-sm btn-outline">Tous</a>
+            <a th:href="@{/bindings(status='AUTO')}" class="btn btn-sm btn-outline">AUTO</a>
+            <a th:href="@{/bindings(status='MANUAL')}" class="btn btn-sm btn-outline">MANUAL</a>
+            <a th:href="@{/bindings(status='INCOMPLETE')}" class="btn btn-sm btn-outline">INCOMPLETE</a>
+            <a th:href="@{/bindings(source='STEAM')}" class="btn btn-sm btn-outline">Steam</a>
+            <a th:href="@{/bindings(source='DISCORD')}" class="btn btn-sm btn-outline">Discord</a>
+        </div>
+
+        <!-- Tableau des bindings -->
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Jeu (source)</th>
+                        <th>Catégorie Twitch</th>
+                        <th>CCLs</th>
+                        <th>Statut</th>
+                        <th>Ignoré</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="binding : ${bindings.content}">
+                        <td>
+                            <span class="badge" th:text="${binding.sourceType}"></span>
+                            <span th:text="${binding.sourceName}"></span>
+                        </td>
+                        <td>
+                            <span th:if="${binding.twitchGameName}" th:text="${binding.twitchGameName}"></span>
+                            <span th:unless="${binding.twitchGameName}" class="text-muted">—</span>
+                        </td>
+                        <td>
+                            <span th:each="ccl : ${binding.ccls}" class="badge badge-ccl" th:text="${ccl}"></span>
+                        </td>
+                        <td>
+                            <span class="badge"
+                                  th:classappend="${binding.status.name() == 'INCOMPLETE'} ? 'badge-warning' : 'badge-default'"
+                                  th:text="${binding.status}"></span>
+                        </td>
+                        <td>
+                            <span th:if="${binding.ignored}">✓</span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline"
+                                    th:onclick="|openEditModal('${binding.id}', '${binding.twitchGameId}', '${binding.twitchGameName}', ${binding.ignored})|">
+                                Modifier
+                            </button>
+                            <form th:action="@{/bindings/{id}/delete(id=${binding.id})}" method="post" style="display:inline">
+                                <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div th:if="${bindings.totalPages > 1}" class="pagination">
+            <a th:if="${!bindings.first}" th:href="@{/bindings(page=${bindings.number - 1})}" class="btn btn-sm">Précédent</a>
+            <span th:text="${bindings.number + 1} + ' / ' + ${bindings.totalPages}"></span>
+            <a th:if="${!bindings.last}" th:href="@{/bindings(page=${bindings.number + 1})}" class="btn btn-sm">Suivant</a>
+        </div>
+    </main>
+
+    <!-- Modal d'édition -->
+    <div id="editModal" class="modal" style="display:none">
+        <div class="modal-content">
+            <h3>Modifier le binding</h3>
+            <form id="editForm" method="post">
+                <label>Catégorie Twitch (IGDB)</label>
+                <input type="text" id="editTwitchGameId" name="twitchGameId">
+                <input type="text" id="editTwitchGameName" name="twitchGameName">
+
+                <label>CCLs</label>
+                <div class="ccl-checkboxes">
+                    <div th:each="ccl : ${availableCcls}">
+                        <label>
+                            <input type="checkbox" name="ccls" th:value="${ccl.name()}" th:id="${ccl.name()}">
+                            <span th:text="${ccl.name()}"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <label>
+                    <input type="checkbox" id="editIgnored" name="ignored">
+                    Ignorer ce jeu
+                </label>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="closeEditModal()" class="btn btn-outline">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openEditModal(id, twitchGameId, twitchGameName, ignored) {
+            document.getElementById('editForm').action = '/bindings/' + id;
+            document.getElementById('editTwitchGameId').value = twitchGameId || '';
+            document.getElementById('editTwitchGameName').value = twitchGameName || '';
+            document.getElementById('editIgnored').checked = ignored;
+            document.getElementById('editModal').style.display = 'flex';
+        }
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
