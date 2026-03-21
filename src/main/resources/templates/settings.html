@@ -39,7 +39,7 @@
                     <span class="badge badge-connected">Connecté</span>
                     <p class="text-muted text-sm">Provider principal — déconnexion via logout</p>
                 </div>
-                <div class="provider-card">
+                <div th:if="${hasSteamProvider}" class="provider-card">
                     <strong>Steam</strong>
                     <span th:if="${hasSteam}" class="badge badge-connected">Connecté</span>
                     <span th:unless="${hasSteam}" class="badge badge-disconnected">Non connecté</span>
@@ -53,7 +53,7 @@
                         <a th:href="@{/oauth2/authorization/steam}" class="btn btn-sm">Connecter</a>
                     </div>
                 </div>
-                <div class="provider-card">
+                <div th:if="${hasDiscordProvider}" class="provider-card">
                     <strong>Discord</strong>
                     <span th:if="${hasDiscord}" class="badge badge-connected">Connecté</span>
                     <span th:unless="${hasDiscord}" class="badge badge-disconnected">Non connecté</span>
