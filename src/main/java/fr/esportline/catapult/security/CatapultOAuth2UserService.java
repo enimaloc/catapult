@@ -7,6 +7,7 @@ import fr.esportline.catapult.repository.OAuthTokenRepository;
 import fr.esportline.catapult.repository.UserAccountRepository;
 import fr.esportline.catapult.repository.UserSettingsRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -22,6 +23,7 @@ import org.springframework.web.client.RestClient;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
@@ -38,12 +40,19 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     @Transactional
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
-
-        if ("twitch".equals(registrationId)) {
-            return handleTwitchLogin(userRequest, fetchTwitchUser(userRequest));
+        try {
+            if ("twitch".equals(registrationId)) {
+                return handleTwitchLogin(userRequest, fetchTwitchUser(userRequest));
+            }
+            return delegate.loadUser(userRequest);
+        } catch (OAuth2AuthenticationException e) {
+            log.error("OAuth2 authentication failed for provider '{}': {} — {}",
+                registrationId, e.getError().getErrorCode(), e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during OAuth2 login for provider '{}'", registrationId, e);
+            throw new OAuth2AuthenticationException(new OAuth2Error("server_error"), e);
         }
-
-        return delegate.loadUser(userRequest);
     }
 
     /**
