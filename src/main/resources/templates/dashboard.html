@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catapult — Dashboard</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+    <!-- Bandeau PENDING_DELETION -->
+    <div th:if="${isPendingDeletion}" class="banner banner-danger">
+        <strong>⚠ Suppression de compte en cours.</strong>
+        Ton compte sera supprimé définitivement le
+        <strong th:text="${#temporals.format(user.deletionRequestedAt, 'dd/MM/yyyy')}"></strong>.
+        <a th:href="@{/settings/cancel-deletion}" class="btn btn-sm btn-outline">Annuler la suppression</a>
+    </div>
+
+    <nav class="navbar">
+        <a th:href="@{/dashboard}" class="nav-brand">🚀 Catapult</a>
+        <div class="nav-links">
+            <a th:href="@{/dashboard}" class="active">Dashboard</a>
+            <a th:href="@{/bindings}">Bindings</a>
+            <a th:href="@{/settings}">Settings</a>
+            <form th:action="@{/logout}" method="post" style="display:inline">
+                <button type="submit" class="btn-link">Déconnexion</button>
+            </form>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h2>Dashboard</h2>
+
+        <!-- État du bot -->
+        <div class="card">
+            <h3>État du bot</h3>
+            <div th:if="${botEnabled}" class="status status-active">
+                <span class="status-dot"></span> Actif
+            </div>
+            <div th:unless="${botEnabled}" class="status status-inactive">
+                <span class="status-dot"></span> Inactif
+            </div>
+        </div>
+
+        <!-- Jeu en cours -->
+        <div class="card">
+            <h3>Jeu en cours</h3>
+            <div th:if="${currentGame != null}">
+                <p>
+                    <strong th:text="${currentGame.sourceName}"></strong>
+                    <span class="badge" th:text="${currentGame.sourceType}"></span>
+                </p>
+            </div>
+            <div th:unless="${currentGame != null}">
+                <p class="text-muted">Aucun jeu détecté</p>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

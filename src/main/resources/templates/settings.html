@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catapult — Settings</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+    <!-- Bandeau PENDING_DELETION -->
+    <div th:if="${isPendingDeletion}" class="banner banner-danger">
+        <strong>⚠ Suppression de compte en cours.</strong>
+        <form th:action="@{/settings/cancel-deletion}" method="post" style="display:inline">
+            <button type="submit" class="btn btn-sm btn-outline">Annuler la suppression</button>
+        </form>
+    </div>
+
+    <nav class="navbar">
+        <a th:href="@{/dashboard}" class="nav-brand">🚀 Catapult</a>
+        <div class="nav-links">
+            <a th:href="@{/dashboard}">Dashboard</a>
+            <a th:href="@{/bindings}">Bindings</a>
+            <a th:href="@{/settings}" class="active">Settings</a>
+            <form th:action="@{/logout}" method="post" style="display:inline">
+                <button type="submit" class="btn-link">Déconnexion</button>
+            </form>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h2>Settings</h2>
+
+        <!-- Connexions -->
+        <section class="card">
+            <h3>Connexions</h3>
+            <div class="provider-grid">
+                <div class="provider-card">
+                    <strong>Twitch</strong>
+                    <span class="badge badge-connected">Connecté</span>
+                    <p class="text-muted text-sm">Provider principal — déconnexion via logout</p>
+                </div>
+                <div class="provider-card">
+                    <strong>Steam</strong>
+                    <span th:if="${hasSteam}" class="badge badge-connected">Connecté</span>
+                    <span th:unless="${hasSteam}" class="badge badge-disconnected">Non connecté</span>
+                    <div th:if="${hasSteam}">
+                        <form th:action="@{/settings/disconnect}" method="post">
+                            <input type="hidden" name="provider" value="steam">
+                            <button type="submit" class="btn btn-sm btn-danger">Déconnecter</button>
+                        </form>
+                    </div>
+                    <div th:unless="${hasSteam}">
+                        <a th:href="@{/oauth2/authorization/steam}" class="btn btn-sm">Connecter</a>
+                    </div>
+                </div>
+                <div class="provider-card">
+                    <strong>Discord</strong>
+                    <span th:if="${hasDiscord}" class="badge badge-connected">Connecté</span>
+                    <span th:unless="${hasDiscord}" class="badge badge-disconnected">Non connecté</span>
+                    <div th:if="${hasDiscord}">
+                        <form th:action="@{/settings/disconnect}" method="post">
+                            <input type="hidden" name="provider" value="discord">
+                            <button type="submit" class="btn btn-sm btn-danger">Déconnecter</button>
+                        </form>
+                    </div>
+                    <div th:unless="${hasDiscord}">
+                        <a th:href="@{/oauth2/authorization/discord}" class="btn btn-sm">Connecter</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bot & Game Getters -->
+        <section class="card">
+            <h3>Bot &amp; Game Getters</h3>
+            <form th:action="@{/settings/bot}" method="post">
+                <label class="toggle">
+                    <input type="checkbox" name="enabled" th:checked="${user.botEnabled}">
+                    <span>Activer le bot</span>
+                </label>
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+            </form>
+
+            <div th:if="${!getterConfigs.isEmpty()}" class="getter-list">
+                <h4>Ordre des getters</h4>
+                <div th:each="config : ${getterConfigs}" class="getter-item">
+                    <span th:text="${config.provider}"></span>
+                    <span th:if="${config.enabled}" class="badge badge-connected">Actif</span>
+                    <span th:unless="${config.enabled}" class="badge badge-disconnected">Inactif</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Suppression de compte -->
+        <section th:unless="${isPendingDeletion}" class="card card-danger">
+            <h3>Zone danger</h3>
+            <p>La suppression de compte est irréversible après <strong>7 jours</strong>.</p>
+            <button type="button" class="btn btn-danger" onclick="document.getElementById('deleteModal').style.display='flex'">
+                Supprimer mon compte
+            </button>
+        </section>
+
+        <section th:if="${isPendingDeletion}" class="card card-danger">
+            <h3>Suppression en cours</h3>
+            <p>Ton compte sera supprimé définitivement le
+                <strong th:text="${#temporals.format(user.deletionRequestedAt, 'dd/MM/yyyy')}"></strong>.
+            </p>
+            <form th:action="@{/settings/cancel-deletion}" method="post">
+                <button type="submit" class="btn btn-outline">Annuler la suppression</button>
+            </form>
+        </section>
+    </main>
+
+    <!-- Modal de confirmation de suppression -->
+    <div id="deleteModal" class="modal" style="display:none">
+        <div class="modal-content">
+            <h3>Confirmer la suppression</h3>
+            <p>Saisis ton nom d'utilisateur Twitch pour confirmer :</p>
+            <form th:action="@{/settings/delete-account}" method="post">
+                <input type="text" name="confirmUsername" placeholder="Ton username Twitch" required>
+                <div class="modal-actions">
+                    <button type="button" onclick="document.getElementById('deleteModal').style.display='none'" class="btn btn-outline">Annuler</button>
+                    <button type="submit" class="btn btn-danger">Supprimer définitivement</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
