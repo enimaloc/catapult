@@ -9,6 +9,7 @@ import fr.esportline.catapult.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
+@DependsOn("flyway")
 @RequiredArgsConstructor
 public class SchedulerService {
 
