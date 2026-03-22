@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Arrays;
 
 /**
  * Service d'intégration Twitch — découplé du système d'événements Spring.
@@ -60,11 +61,11 @@ public class TwitchService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("game_id", binding.getTwitchGameId());
 
-        boolean cclEnabled = userSettingsRepository.findById(user.getId())
+        boolean globalCclEnabled = userSettingsRepository.findById(user.getId())
             .map(UserSettings::isCclFeatureEnabled)
             .orElse(true);
 
-        if (cclEnabled && !binding.getCcls().isEmpty()) {
+        if (globalCclEnabled && binding.isCclEnabled()) {
             body.put("content_classification_labels", buildCclPayload(binding.getCcls()));
         }
 
@@ -166,9 +167,9 @@ public class TwitchService {
     public record TwitchCategory(String id, String name) {}
 
     private List<Map<String, Object>> buildCclPayload(Set<TwitchCcl> ccls) {
-        return ccls.stream()
+        return Arrays.stream(TwitchCcl.values())
             .filter(ccl -> ccl.editable)
-            .map(ccl -> Map.<String, Object>of("id", ccl.name(), "is_enabled", true))
+            .map(ccl -> Map.<String, Object>of("id", ccl.name(), "is_enabled", ccls.contains(ccl)))
             .collect(Collectors.toList());
     }
 }
