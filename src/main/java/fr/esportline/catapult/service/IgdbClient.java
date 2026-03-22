@@ -13,6 +13,7 @@ import proto.ExternalGameSource;
 import proto.Game;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -39,24 +40,51 @@ public class IgdbClient {
     }
 
     /**
-     * Cherche un jeu externe par son uid (Steam appId).
-     * sourceId >= 0 → filtre par external_game_source ; sinon fallback category=1.
+     * Cherche un jeu externe par son uid (Steam appId) — lookup unitaire.
+     * sourceId >= 0 → filtre par external_game_source ; sinon pas de filtre source.
      */
-    public List<ExternalGame> findExternalGamesByUid(String uid, long sourceId, String token) {
+    public List<ExternalGame> findExternalGameByUid(String uid, long sourceId, String token) {
         String where = sourceId >= 0
             ? "external_game_source=" + sourceId + " & uid=\"" + uid + "\""
-            : "category=1 & uid=\"" + uid + "\"";
+            : "uid=\"" + uid + "\"";
         APICalypse query = new APICalypse().fields("uid,game.id,game.name").where(where).limit(1);
-        log.debug("[IGDB] /external_games — query: {}", query.buildQuery());
+        log.debug("[IGDB] /external_games uid={} — query: {}", uid, query.buildQuery());
         try {
             synchronized (IGDBWrapper.INSTANCE) {
                 setCredentialsIfChanged(token);
                 List<ExternalGame> results = ProtoRequestKt.externalGames(IGDBWrapper.INSTANCE, query);
-                log.debug("[IGDB] /external_games — {} result(s)", results.size());
+                log.debug("[IGDB] /external_games uid={} — {} result(s)", uid, results.size());
                 return results;
             }
         } catch (RequestException e) {
-            log.error("[IGDB] /external_games failed: {}", e.getMessage());
+            log.error("[IGDB] /external_games uid={} failed: {}", uid, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Cherche plusieurs jeux externes par leurs uids — batch (max 500 par appel).
+     * sourceId >= 0 → filtre par external_game_source ; sinon pas de filtre source.
+     */
+    public List<ExternalGame> findExternalGamesByUids(List<String> uids, long sourceId, String token) {
+        if (uids.isEmpty()) return List.of();
+        String uidList = uids.stream()
+            .map(u -> "\"" + u + "\"")
+            .collect(Collectors.joining(",", "(", ")"));
+        String where = sourceId >= 0
+            ? "external_game_source=" + sourceId + " & uid=" + uidList
+            : "uid=" + uidList;
+        APICalypse query = new APICalypse().fields("uid,game.id,game.name").where(where).limit(uids.size());
+        log.debug("[IGDB] /external_games batch ({}) — query: {}", uids.size(), query.buildQuery());
+        try {
+            synchronized (IGDBWrapper.INSTANCE) {
+                setCredentialsIfChanged(token);
+                List<ExternalGame> results = ProtoRequestKt.externalGames(IGDBWrapper.INSTANCE, query);
+                log.debug("[IGDB] /external_games batch — {} result(s)", results.size());
+                return results;
+            }
+        } catch (RequestException e) {
+            log.error("[IGDB] /external_games batch failed: {}", e.getMessage());
             return List.of();
         }
     }

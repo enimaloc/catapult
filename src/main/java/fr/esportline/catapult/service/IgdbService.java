@@ -113,7 +113,7 @@ public class IgdbService {
         String token = getOrRefreshAppToken();
         if (token.isBlank()) return Optional.empty();
 
-        List<proto.ExternalGame> results = igdbClient.findExternalGamesByUid(appId, steamSourceId, token);
+        List<proto.ExternalGame> results = igdbClient.findExternalGameByUid(appId, steamSourceId, token);
         if (results.isEmpty()) return Optional.empty();
 
         Game game = results.get(0).getGame();
@@ -122,6 +122,45 @@ public class IgdbService {
         igdbNameIndex.put(normalise(resolved.name()), resolved);
         saveToDb(key, resolved);
         return Optional.of(resolved);
+    }
+
+    /**
+     * Pré-chauffe le cache pour une liste de Steam appIds en batch (max 500 par appel IGDB).
+     * Les jeux déjà en cache DB ou mémoire sont ignorés.
+     */
+    public void prewarmSteamAppIds(List<String> appIds) {
+        if (clientId.isBlank() || appIds.isEmpty()) return;
+
+        // Filtrer ceux déjà en cache mémoire (via external ID table ou igdbGameCache)
+        List<String> uncached = appIds.stream()
+            .filter(id -> externalIdRepository.findBySourceIdAndUid(steamSourceId, id).isEmpty())
+            .filter(id -> lookupInDb(KEY_STEAM_PREFIX + id).isEmpty())
+            .toList();
+
+        if (uncached.isEmpty()) {
+            log.debug("All {} Steam appIds already cached", appIds.size());
+            return;
+        }
+
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return;
+
+        int batchSize = 500;
+        int resolved = 0;
+        for (int i = 0; i < uncached.size(); i += batchSize) {
+            List<String> chunk = uncached.subList(i, Math.min(i + batchSize, uncached.size()));
+            List<proto.ExternalGame> results = igdbClient.findExternalGamesByUids(chunk, steamSourceId, token);
+            for (proto.ExternalGame ext : results) {
+                Game game = ext.getGame();
+                IgdbGame igdbGame = new IgdbGame(String.valueOf(game.getId()), game.getName());
+                igdbGameCache.put(igdbGame.id(), igdbGame.name());
+                igdbNameIndex.put(normalise(igdbGame.name()), igdbGame);
+                saveToDb(KEY_STEAM_PREFIX + ext.getUid(), igdbGame);
+                resolved++;
+            }
+        }
+        log.info("Steam batch prewarm: {}/{} resolved ({} already cached)",
+            resolved, appIds.size(), appIds.size() - uncached.size());
     }
 
     public Optional<IgdbGame> findByName(String gameName) {
