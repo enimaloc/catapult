@@ -90,6 +90,22 @@ public class BindingService {
     }
 
     @Transactional
+    public void toggleCclEnabled(UUID bindingId, boolean enabled) {
+        gameBindingRepository.findById(bindingId).ifPresent(binding -> {
+            binding.setCclEnabled(enabled);
+            gameBindingRepository.save(binding);
+        });
+    }
+
+    @Transactional
+    public void toggleIgnored(UUID bindingId, boolean ignored) {
+        gameBindingRepository.findById(bindingId).ifPresent(binding -> {
+            binding.setIgnored(ignored);
+            gameBindingRepository.save(binding);
+        });
+    }
+
+    @Transactional
     public void deleteBinding(UUID bindingId) {
         gameBindingRepository.deleteById(bindingId);
     }
