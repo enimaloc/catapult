@@ -109,6 +109,27 @@ public class IgdbClient {
     }
 
     /**
+     * Récupère les détails de plusieurs jeux par leurs IDs IGDB en un seul appel (batch).
+     */
+    public List<Game> fetchGamesByIds(List<String> igdbIds, String fields, String token) {
+        if (igdbIds.isEmpty()) return List.of();
+        String idList = igdbIds.stream().collect(Collectors.joining(",", "(", ")"));
+        APICalypse query = new APICalypse().fields(fields).where("id=" + idList).limit(igdbIds.size());
+        log.debug("[IGDB] /games batch ({}) — query: {}", igdbIds.size(), query.buildQuery());
+        try {
+            synchronized (IGDBWrapper.INSTANCE) {
+                setCredentialsIfChanged(token);
+                List<Game> results = ProtoRequestKt.games(IGDBWrapper.INSTANCE, query);
+                log.debug("[IGDB] /games batch — {} result(s)", results.size());
+                return results;
+            }
+        } catch (RequestException e) {
+            log.error("[IGDB] /games batch failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
      * Récupère les détails d'un jeu par son ID IGDB.
      */
     public List<Game> fetchGameById(String igdbId, String fields, String token) {

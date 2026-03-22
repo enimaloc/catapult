@@ -55,6 +55,11 @@ public class IgdbService {
     private static final Set<String> DESC_GAMBLING_KW  = Set.of("gambling");
     private static final Set<String> DESC_LANGUAGE_KW  = Set.of("language", "lyrics", "profanity", "crude humor", "bad language");
 
+    private static final String CCL_FIELDS =
+        "age_ratings.rating_category.organization.name," +
+        "age_ratings.rating_category.rating," +
+        "age_ratings.rating_content_descriptions.description";
+
     // L1 cache: igdbId → name
     private final Map<String, String> igdbGameCache = new ConcurrentHashMap<>();
 
@@ -189,8 +194,7 @@ public class IgdbService {
 
     /**
      * Pré-chauffe le cache CCL pour tous les jeux déjà connus (igdb_game_cache) mais
-     * pas encore dans igdb_game_ccl_cache. Destiné à être appelé en tâche de fond
-     * au démarrage et après l'ajout d'un game getter.
+     * pas encore dans igdb_game_ccl_cache. Utilise des appels batch IGDB (max 500 par requête).
      */
     public void prewarmCclCache() {
         if (clientId.isBlank()) return;
@@ -211,11 +215,21 @@ public class IgdbService {
             return;
         }
 
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return;
+
         log.info("CCL prewarm: loading {} / {} games", toLoad.size(), knownIds.size());
-        for (String igdbId : toLoad) {
-            suggestCcls(igdbId);
+        int batchSize = 500;
+        int resolved = 0;
+        for (int i = 0; i < toLoad.size(); i += batchSize) {
+            List<String> chunk = toLoad.subList(i, Math.min(i + batchSize, toLoad.size()));
+            List<Game> games = igdbClient.fetchGamesByIds(chunk, CCL_FIELDS, token);
+            for (Game game : games) {
+                storeCcls(String.valueOf(game.getId()), game);
+                resolved++;
+            }
         }
-        log.info("CCL prewarm complete");
+        log.info("CCL prewarm complete: {} / {} fetched", resolved, toLoad.size());
     }
 
     public Optional<String> findTwitchGameId(String igdbGameId) {
@@ -240,30 +254,38 @@ public class IgdbService {
             return dbCcls;
         }
 
-        Set<TwitchCcl> suggested = new HashSet<>();
-        if (clientId.isBlank()) return suggested;
-
+        if (clientId.isBlank()) return Set.of();
         String token = getOrRefreshAppToken();
-        if (token.isBlank()) return suggested;
+        if (token.isBlank()) return Set.of();
 
-        List<Game> results = igdbClient.fetchGameById(
-            igdbGameId,
-            "age_ratings.rating_category.organization.name,age_ratings.rating_category.rating," +
-            "age_ratings.rating_content_descriptions.description",
-            token);
-        if (results.isEmpty()) return suggested;
+        List<Game> results = igdbClient.fetchGameById(igdbGameId, CCL_FIELDS, token);
+        if (results.isEmpty()) return Set.of();
 
-        Game game = results.get(0);
+        return storeCcls(igdbGameId, results.get(0));
+    }
 
-        Set<String> ageRatingLabels = new LinkedHashSet<>();
+    // -------------------------------------------------------------------------
+    // CCL helpers
+    // -------------------------------------------------------------------------
+
+    private Set<TwitchCcl> storeCcls(String igdbGameId, Game game) {
+        Set<TwitchCcl> suggested = extractCcls(game);
+        String ageRatingsLabel   = extractAgeRatingsLabel(game);
+        log.debug("IGDB CCL for {}: ratings={}, suggested={}", igdbGameId, ageRatingsLabel, suggested);
+        Set<TwitchCcl> immutable = Collections.unmodifiableSet(suggested);
+        cclCache.put(igdbGameId, immutable);
+        cclRepository.save(new IgdbGameCcl(igdbGameId, suggested, ageRatingsLabel));
+        return immutable;
+    }
+
+    private Set<TwitchCcl> extractCcls(Game game) {
+        Set<TwitchCcl> suggested = new HashSet<>();
         for (proto.AgeRating ar : game.getAgeRatingsList()) {
             proto.AgeRatingCategory rc = ar.getRatingCategory();
             String org    = rc.getOrganization().getName();
             String rating = rc.getRating();
             if (!org.isBlank() && !rating.isBlank()) {
-                ageRatingLabels.add(org + " " + rating);
                 String orgUc = org.toUpperCase(java.util.Locale.ROOT);
-                // MatureGame: ESRB M / AO or PEGI 18
                 if ((orgUc.contains("ESRB") && (rating.equals("M") || rating.equals("AO")))
                     || (orgUc.contains("PEGI") && rating.equals("18"))) {
                     suggested.add(TwitchCcl.MatureGame);
@@ -278,13 +300,20 @@ public class IgdbService {
                 if (DESC_LANGUAGE_KW.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ProfanityVulgarity);
             }
         }
+        return suggested;
+    }
 
-        String ageRatingsLabel = String.join(", ", ageRatingLabels);
-        log.debug("IGDB CCL suggestion for {}: ratings={}, suggested={}", igdbGameId, ageRatingsLabel, suggested);
-        Set<TwitchCcl> immutable = Collections.unmodifiableSet(suggested);
-        cclCache.put(igdbGameId, immutable);
-        cclRepository.save(new IgdbGameCcl(igdbGameId, suggested, ageRatingsLabel));
-        return immutable;
+    private String extractAgeRatingsLabel(Game game) {
+        Set<String> labels = new LinkedHashSet<>();
+        for (proto.AgeRating ar : game.getAgeRatingsList()) {
+            proto.AgeRatingCategory rc = ar.getRatingCategory();
+            String org    = rc.getOrganization().getName();
+            String rating = rc.getRating();
+            if (!org.isBlank() && !rating.isBlank()) {
+                labels.add(org + " " + rating);
+            }
+        }
+        return String.join(", ", labels);
     }
 
     // -------------------------------------------------------------------------
