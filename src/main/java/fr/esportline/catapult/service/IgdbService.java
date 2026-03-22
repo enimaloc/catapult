@@ -46,61 +46,13 @@ public class IgdbService {
     @Value("${app.igdb.cache-ttl-hours:24}")
     private int cacheTtlHours;
 
-    // IGDB AgeRatingContentDescriptionEnum values → TwitchCcl mapping
-    // See: https://api-docs.igdb.com/#age-rating-content-description-enums
-    private static final Set<Integer> DESC_VIOLENCE = Set.of(
-        1,  // ANIMATED_BLOOD
-        2,  // BLOOD
-        3,  // BLOOD_AND_GORE
-        4,  // CARTOON_VIOLENCE
-        8,  // FANTASY_VIOLENCE
-        9,  // INTENSE_VIOLENCE
-        28, // VIOLENCE
-        29, // VIOLENT_REFERENCES
-        32, // MILD_BLOOD
-        33, // MILD_CARTOON_VIOLENCE
-        34, // MILD_FANTASY_VIOLENCE
-        39, // MILD_VIOLENCE
-        48  // HORROR_VIOLENCE
-    );
-    private static final Set<Integer> DESC_SEXUAL = Set.of(
-        13, // NUDITY
-        14, // PARTIAL_NUDITY
-        16, // SEXUAL_CONTENT
-        17, // SEXUAL_THEMES
-        18, // SEXUAL_VIOLENCE
-        22, // STRONG_SEXUAL_CONTENT
-        23, // SUGGESTIVE_THEMES
-        37, // MILD_SEXUAL_THEMES
-        38, // MILD_SUGGESTIVE_THEMES
-        51  // SEX
-    );
-    private static final Set<Integer> DESC_DRUGS = Set.of(
-        7,  // DRUG_REFERENCE
-        24, // TOBACCO_REFERENCE
-        25, // USE_OF_ALCOHOL
-        26, // USE_OF_DRUGS
-        27, // USE_OF_TOBACCO
-        30, // ALCOHOL_REFERENCE
-        31, // DRUG_AND_ALCOHOL_REFERENCE
-        45  // DRUGS
-    );
-    private static final Set<Integer> DESC_GAMBLING = Set.of(
-        15, // REAL_GAMBLING
-        19, // SIMULATED_GAMBLING
-        47  // GAMBLING
-    );
-    private static final Set<Integer> DESC_LANGUAGE = Set.of(
-        6,  // CRUDE_HUMOR
-        10, // LANGUAGE
-        11, // LYRICS
-        12, // MATURE_HUMOR
-        20, // STRONG_LANGUAGE
-        21, // STRONG_LYRICS
-        35, // MILD_LANGUAGE
-        36, // MILD_LYRICS
-        43  // BAD_LANGUAGE
-    );
+    // IGDB content_descriptions.description is a plain String (e.g. "Blood and Gore").
+    // These keyword sets match substrings of that string (case-insensitive).
+    private static final Set<String> DESC_VIOLENCE_KW  = Set.of("blood", "gore", "violence", "violent");
+    private static final Set<String> DESC_SEXUAL_KW    = Set.of("nudity", "sexual", "sex", "suggestive", "erotic");
+    private static final Set<String> DESC_DRUGS_KW     = Set.of("drug", "alcohol", "tobacco");
+    private static final Set<String> DESC_GAMBLING_KW  = Set.of("gambling");
+    private static final Set<String> DESC_LANGUAGE_KW  = Set.of("language", "lyrics", "profanity", "crude humor", "bad language");
 
     // L1 cache: igdbId → name
     private final Map<String, String> igdbGameCache = new ConcurrentHashMap<>();
@@ -263,34 +215,43 @@ public class IgdbService {
         if (token.isBlank()) return suggested;
 
         List<Game> results = igdbClient.fetchGameById(
-            igdbGameId, "age_ratings.category,age_ratings.rating,age_ratings.content_descriptions.description", token);
+            igdbGameId,
+            "age_ratings.rating_category.organization.name,age_ratings.rating_category.rating," +
+            "age_ratings.rating_content_descriptions.description",
+            token);
         if (results.isEmpty()) return suggested;
 
         Game game = results.get(0);
 
+        Set<String> ageRatingLabels = new LinkedHashSet<>();
         for (proto.AgeRating ar : game.getAgeRatingsList()) {
-            int cat    = ar.getCategoryValue(); // 1=ESRB, 2=PEGI
-            int rating = ar.getRatingValue();
-
-            // MatureGame: ESRB M (11) or AO (12), PEGI 18 (5)
-            if ((cat == 1 && (rating == 11 || rating == 12)) || (cat == 2 && rating == 5)) {
-                suggested.add(TwitchCcl.MatureGame);
+            proto.AgeRatingCategory rc = ar.getRatingCategory();
+            String org    = rc.getOrganization().getName();
+            String rating = rc.getRating();
+            if (!org.isBlank() && !rating.isBlank()) {
+                ageRatingLabels.add(org + " " + rating);
+                String orgUc = org.toUpperCase(java.util.Locale.ROOT);
+                // MatureGame: ESRB M / AO or PEGI 18
+                if ((orgUc.contains("ESRB") && (rating.equals("M") || rating.equals("AO")))
+                    || (orgUc.contains("PEGI") && rating.equals("18"))) {
+                    suggested.add(TwitchCcl.MatureGame);
+                }
             }
-
-            for (proto.AgeRatingContentDescription desc : ar.getContentDescriptionsList()) {
-                int d = desc.getDescriptionValue();
-                if (DESC_VIOLENCE.contains(d))  suggested.add(TwitchCcl.ViolentGraphic);
-                if (DESC_SEXUAL.contains(d))    suggested.add(TwitchCcl.SexualThemes);
-                if (DESC_DRUGS.contains(d))     suggested.add(TwitchCcl.DrugUse);
-                if (DESC_GAMBLING.contains(d))  suggested.add(TwitchCcl.Gambling);
-                if (DESC_LANGUAGE.contains(d))  suggested.add(TwitchCcl.ProfanityVulgarity);
+            for (proto.AgeRatingContentDescriptionV2 desc : ar.getRatingContentDescriptionsList()) {
+                String d = desc.getDescription().toLowerCase(java.util.Locale.ROOT);
+                if (DESC_VIOLENCE_KW.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ViolentGraphic);
+                if (DESC_SEXUAL_KW.stream().anyMatch(d::contains))    suggested.add(TwitchCcl.SexualThemes);
+                if (DESC_DRUGS_KW.stream().anyMatch(d::contains))     suggested.add(TwitchCcl.DrugUse);
+                if (DESC_GAMBLING_KW.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.Gambling);
+                if (DESC_LANGUAGE_KW.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ProfanityVulgarity);
             }
         }
 
-        log.debug("IGDB CCL suggestion for {}: suggested={}", igdbGameId, suggested);
+        String ageRatingsLabel = String.join(", ", ageRatingLabels);
+        log.debug("IGDB CCL suggestion for {}: ratings={}, suggested={}", igdbGameId, ageRatingsLabel, suggested);
         Set<TwitchCcl> immutable = Collections.unmodifiableSet(suggested);
         cclCache.put(igdbGameId, immutable);
-        cclRepository.save(new IgdbGameCcl(igdbGameId, suggested));
+        cclRepository.save(new IgdbGameCcl(igdbGameId, suggested, ageRatingsLabel));
         return immutable;
     }
 
