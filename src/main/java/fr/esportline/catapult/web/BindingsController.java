@@ -67,21 +67,23 @@ public class BindingsController {
         Set<TwitchCcl> cclSet = ccls == null ? Set.of() :
             ccls.stream().map(TwitchCcl::valueOf).collect(Collectors.toSet());
 
-        bindingService.updateBinding(id, twitchGameId, twitchGameName, cclSet, ignored);
+        bindingService.updateBinding(principal.getUserAccount(), id, twitchGameId, twitchGameName, cclSet, ignored);
         return "redirect:/bindings";
     }
 
     @PostMapping("/bindings/{id}/ccl-toggle")
-    public String toggleCcl(@PathVariable UUID id,
+    public String toggleCcl(@AuthenticationPrincipal CatapultOAuth2User principal,
+                            @PathVariable UUID id,
                             @RequestParam(defaultValue = "false") boolean enabled) {
-        bindingService.toggleCclEnabled(id, enabled);
+        bindingService.toggleCclEnabled(principal.getUserAccount(), id, enabled);
         return "redirect:/bindings";
     }
 
     @PostMapping("/bindings/{id}/ignored-toggle")
-    public String toggleIgnored(@PathVariable UUID id,
+    public String toggleIgnored(@AuthenticationPrincipal CatapultOAuth2User principal,
+                                @PathVariable UUID id,
                                 @RequestParam(defaultValue = "false") boolean ignored) {
-        bindingService.toggleIgnored(id, ignored);
+        bindingService.toggleIgnored(principal.getUserAccount(), id, ignored);
         return "redirect:/bindings";
     }
 
