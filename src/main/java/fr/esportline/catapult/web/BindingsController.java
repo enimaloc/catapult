@@ -6,14 +6,17 @@ import fr.esportline.catapult.domain.UserAccount;
 import fr.esportline.catapult.repository.GameBindingRepository;
 import fr.esportline.catapult.security.CatapultOAuth2User;
 import fr.esportline.catapult.service.BindingService;
+import fr.esportline.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -24,6 +27,7 @@ public class BindingsController {
 
     private final GameBindingRepository gameBindingRepository;
     private final BindingService bindingService;
+    private final TwitchService twitchService;
 
     @GetMapping("/bindings")
     public String bindings(@AuthenticationPrincipal CatapultOAuth2User principal,
@@ -67,10 +71,33 @@ public class BindingsController {
         return "redirect:/bindings";
     }
 
+    @PostMapping("/bindings/{id}/ccl-toggle")
+    public String toggleCcl(@PathVariable UUID id,
+                            @RequestParam(defaultValue = "false") boolean enabled) {
+        bindingService.toggleCclEnabled(id, enabled);
+        return "redirect:/bindings";
+    }
+
+    @PostMapping("/bindings/{id}/ignored-toggle")
+    public String toggleIgnored(@PathVariable UUID id,
+                                @RequestParam(defaultValue = "false") boolean ignored) {
+        bindingService.toggleIgnored(id, ignored);
+        return "redirect:/bindings";
+    }
+
     @PostMapping("/bindings/{id}/delete")
     public String deleteBinding(@AuthenticationPrincipal CatapultOAuth2User principal,
                                 @PathVariable UUID id) {
         bindingService.deleteBinding(id);
         return "redirect:/bindings";
+    }
+
+    @GetMapping(value = "/api/games/search", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public List<TwitchService.TwitchCategory> searchGames(
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            @RequestParam String q) {
+        if (q.isBlank()) return List.of();
+        return twitchService.searchCategories(principal.getUserAccount(), q);
     }
 }
