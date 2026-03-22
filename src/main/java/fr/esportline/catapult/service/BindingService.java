@@ -1,12 +1,9 @@
 package fr.esportline.catapult.service;
 
 import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.OAuthToken;
 import fr.esportline.catapult.domain.UserAccount;
 import fr.esportline.catapult.getter.DetectedGame;
 import fr.esportline.catapult.repository.GameBindingRepository;
-import fr.esportline.catapult.repository.OAuthTokenRepository;
-import fr.esportline.catapult.security.TokenEncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,24 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Gestion des bindings jeu ↔ catégorie Twitch.
- * Résolution automatique via IGDB si aucun binding existant.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class BindingService {
 
     private final GameBindingRepository gameBindingRepository;
-    private final OAuthTokenRepository oAuthTokenRepository;
     private final IgdbService igdbService;
-    private final TokenEncryptionService tokenEncryptionService;
 
-    /**
-     * Résout ou crée le binding pour un jeu détecté.
-     * Si aucun binding n'existe, tente la résolution IGDB automatique.
-     */
     @Transactional
     public GameBinding resolveOrCreate(UserAccount user, DetectedGame detectedGame) {
         Optional<GameBinding> existing = gameBindingRepository.findByUserAndSourceIdAndSourceType(
@@ -53,18 +40,14 @@ public class BindingService {
         binding.setSourceType(detectedGame.getSourceType());
         binding.setSourceName(detectedGame.getSourceName());
 
-        String twitchAccessToken = getTwitchAccessToken(user);
-
-        // Résolution IGDB
-        Optional<IgdbService.IgdbGame> igdbGame = resolveViaIgdb(detectedGame, twitchAccessToken);
+        Optional<IgdbService.IgdbGame> igdbGame = resolveViaIgdb(detectedGame);
 
         if (igdbGame.isPresent()) {
             binding.setTwitchGameId(igdbGame.get().id());
             binding.setTwitchGameName(igdbGame.get().name());
             binding.setStatus(GameBinding.Status.AUTO);
 
-            // Suggestion CCLs
-            var ccls = igdbService.suggestCcls(igdbGame.get().id(), twitchAccessToken);
+            var ccls = igdbService.suggestCcls(igdbGame.get().id());
             binding.setCcls(ccls);
 
             log.info("Binding created for user {} — game '{}' resolved to IGDB '{}'",
@@ -78,22 +61,14 @@ public class BindingService {
         return gameBindingRepository.save(binding);
     }
 
-    private Optional<IgdbService.IgdbGame> resolveViaIgdb(DetectedGame detectedGame, String twitchAccessToken) {
-        // Étape 1 : recherche par external_games (Steam uniquement)
-        if (detectedGame.getSourceType() == fr.esportline.catapult.domain.GameBinding.SourceType.STEAM
+    private Optional<IgdbService.IgdbGame> resolveViaIgdb(DetectedGame detectedGame) {
+        if (detectedGame.getSourceType() == GameBinding.SourceType.STEAM
             && detectedGame.getSourceId() != null) {
-            Optional<IgdbService.IgdbGame> byAppId = igdbService.findBySteamAppId(detectedGame.getSourceId(), twitchAccessToken);
+            Optional<IgdbService.IgdbGame> byAppId = igdbService.findBySteamAppId(detectedGame.getSourceId());
             if (byAppId.isPresent()) return byAppId;
         }
 
-        // Étape 2 : fallback textuel par nom
-        return igdbService.findByName(detectedGame.getSourceName(), twitchAccessToken);
-    }
-
-    private String getTwitchAccessToken(UserAccount user) {
-        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .map(t -> tokenEncryptionService.decrypt(t.getAccessToken()))
-            .orElse("");
+        return igdbService.findByName(detectedGame.getSourceName());
     }
 
     @Transactional
