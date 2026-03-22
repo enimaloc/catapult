@@ -16,6 +16,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -63,15 +64,13 @@ public class SteamLibraryCacheService {
             return;
         }
 
-        int resolved = 0;
-        for (Map<String, Object> game : games) {
-            Object appId = game.get("appid");
-            if (appId == null) continue;
-            if (igdbService.findBySteamAppId(String.valueOf(appId)).isPresent()) resolved++;
-        }
+        List<String> appIds = games.stream()
+            .map(g -> g.get("appid"))
+            .filter(id -> id != null)
+            .map(String::valueOf)
+            .collect(Collectors.toList());
 
-        log.info("Steam library pre-cache done for user {} — {}/{} games resolved via IGDB",
-            user.getId(), resolved, games.size());
+        igdbService.prewarmSteamAppIds(appIds);
     }
 
     @SuppressWarnings("unchecked")
