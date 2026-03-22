@@ -7,7 +7,6 @@ public enum TwitchCcl {
     MatureGame(false),
     ViolentGraphic(true),
     SexualThemes(true),
-    LanguageBarrier(true),
     DrugsIntoxication(true),
     Gambling(true),
     ProfanityVulgarity(true);
