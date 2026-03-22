@@ -89,11 +89,13 @@ public class IgdbService {
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
 
     // Steam ExternalGameSource ID (-1 = not resolved → fallback category=1)
+    private volatile long twitchSourceId = -1;
     private volatile long steamSourceId = -1;
 
     @PostConstruct
     public void init() {
-        loadSteamSourceId();
+        twitchSourceId = loadSourceId("Twitch");
+        steamSourceId = loadSourceId("Steam");
         warmInMemoryCacheFromDb();
         preloadGameList();
     }
@@ -231,6 +233,12 @@ public class IgdbService {
         return Optional.of(resolved);
     }
 
+    public Optional<String> findTwitchGameId(String igdbGameId) {
+        if (twitchSourceId < 0) return Optional.empty();
+        return externalIdRepository.findByIgdbIdAndSourceId(igdbGameId, twitchSourceId)
+            .map(IgdbGameExternalId::getUid);
+    }
+
     public Set<TwitchCcl> suggestCcls(String igdbGameId) {
         Set<TwitchCcl> suggested = new HashSet<>();
         if (clientId.isBlank()) return suggested;
@@ -262,23 +270,25 @@ public class IgdbService {
     // Internals
     // -------------------------------------------------------------------------
 
-    private void loadSteamSourceId() {
-        if (clientId.isBlank() || clientSecret.isBlank()) return;
+    private long loadSourceId(String name) {
+        if (clientId.isBlank() || clientSecret.isBlank()) return -1;
         String token = getOrRefreshAppToken();
-        if (token.isBlank()) return;
+        if (token.isBlank()) return -1;
 
         try {
-            List<ExternalGameSource> sources = igdbClient.findSourcesByName("Steam", token);
+            List<ExternalGameSource> sources = igdbClient.findSourcesByName(name, token);
             if (!sources.isEmpty()) {
-                steamSourceId = sources.get(0).getId();
-                log.info("Steam ExternalGameSource ID resolved: {}", steamSourceId);
+                long id = sources.get(0).getId();
+                log.info("{} ExternalGameSource ID resolved: {}", name, id);
+                return id;
             } else {
-                log.warn("Steam ExternalGameSource not found — falling back to category=1");
+                log.warn("{} ExternalGameSource not found", name);
             }
         } catch (Exception e) {
-            log.warn("Failed to resolve Steam ExternalGameSource ID: {} — falling back to category=1",
+            log.warn("Failed to resolve Steam ExternalGameSource ID: {}",
                 e.getMessage());
         }
+        return -1;
     }
 
     private void warmInMemoryCacheFromDb() {

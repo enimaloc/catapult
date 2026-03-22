@@ -26,11 +26,8 @@ public class BindingService {
             user, detectedGame.getSourceId(), detectedGame.getSourceType()
         );
 
-        if (existing.isPresent()) {
-            return existing.get();
-        }
+        return existing.orElseGet(() -> createWithIgdbResolution(user, detectedGame));
 
-        return createWithIgdbResolution(user, detectedGame);
     }
 
     private GameBinding createWithIgdbResolution(UserAccount user, DetectedGame detectedGame) {
@@ -43,15 +40,17 @@ public class BindingService {
         Optional<IgdbService.IgdbGame> igdbGame = resolveViaIgdb(detectedGame);
 
         if (igdbGame.isPresent()) {
-            binding.setTwitchGameId(igdbGame.get().id());
+            String igdbId = igdbGame.get().id();
+            String twitchId = igdbService.findTwitchGameId(igdbId).orElse(igdbId);
+            binding.setTwitchGameId(twitchId);
             binding.setTwitchGameName(igdbGame.get().name());
             binding.setStatus(GameBinding.Status.AUTO);
 
-            var ccls = igdbService.suggestCcls(igdbGame.get().id());
+            var ccls = igdbService.suggestCcls(igdbId);
             binding.setCcls(ccls);
 
-            log.info("Binding created for user {} — game '{}' resolved to IGDB '{}'",
-                user.getId(), detectedGame.getSourceName(), igdbGame.get().name());
+            log.info("Binding created for user {} — game '{}' resolved to IGDB '{}' (twitchId={})",
+                user.getId(), detectedGame.getSourceName(), igdbGame.get().name(), twitchId);
         } else {
             binding.setStatus(GameBinding.Status.INCOMPLETE);
             log.info("Binding created as INCOMPLETE for user {} — game '{}' not found in IGDB",
