@@ -83,7 +83,7 @@ public class TwitchService {
 
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                log.warn("Twitch token invalid for user {} — pausing bot", user.getId(), e);
+                log.warn("Twitch token invalid for user {} — pausing bot", user.getId());
                 user.setBotEnabled(false);
                 userAccountRepository.save(user);
             } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
@@ -167,6 +167,7 @@ public class TwitchService {
 
     private List<Map<String, Object>> buildCclPayload(Set<TwitchCcl> ccls) {
         return ccls.stream()
+            .filter(ccl -> ccl.editable)
             .map(ccl -> Map.<String, Object>of("id", ccl.name(), "is_enabled", true))
             .collect(Collectors.toList());
     }

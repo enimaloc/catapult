@@ -20,6 +20,7 @@ import proto.Game;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -184,6 +185,37 @@ public class IgdbService {
         igdbNameIndex.put(normalized, resolved);
         saveToDb(key, resolved);
         return Optional.of(resolved);
+    }
+
+    /**
+     * Pré-chauffe le cache CCL pour tous les jeux déjà connus (igdb_game_cache) mais
+     * pas encore dans igdb_game_ccl_cache. Destiné à être appelé en tâche de fond
+     * au démarrage et après l'ajout d'un game getter.
+     */
+    public void prewarmCclCache() {
+        if (clientId.isBlank()) return;
+
+        Instant since = Instant.now().minusSeconds(cacheTtlHours * 3600L);
+        Set<String> knownIds = cacheRepository.findByCachedAtAfter(since).stream()
+            .map(IgdbGameCacheEntry::getIgdbId)
+            .collect(Collectors.toSet());
+        if (knownIds.isEmpty()) return;
+
+        Set<String> alreadyCached = cclRepository.findAllIgdbIds();
+        List<String> toLoad = knownIds.stream()
+            .filter(id -> !alreadyCached.contains(id) && !cclCache.containsKey(id))
+            .collect(Collectors.toList());
+
+        if (toLoad.isEmpty()) {
+            log.info("CCL cache already warm for all {} cached games", knownIds.size());
+            return;
+        }
+
+        log.info("CCL prewarm: loading {} / {} games", toLoad.size(), knownIds.size());
+        for (String igdbId : toLoad) {
+            suggestCcls(igdbId);
+        }
+        log.info("CCL prewarm complete");
     }
 
     public Optional<String> findTwitchGameId(String igdbGameId) {
