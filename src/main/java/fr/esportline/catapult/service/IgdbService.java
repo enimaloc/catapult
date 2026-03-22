@@ -1,9 +1,11 @@
 package fr.esportline.catapult.service;
 
 import fr.esportline.catapult.domain.IgdbGameCacheEntry;
+import fr.esportline.catapult.domain.IgdbGameCcl;
 import fr.esportline.catapult.domain.IgdbGameExternalId;
 import fr.esportline.catapult.domain.TwitchCcl;
 import fr.esportline.catapult.repository.IgdbGameCacheRepository;
+import fr.esportline.catapult.repository.IgdbGameCclRepository;
 import fr.esportline.catapult.repository.IgdbGameExternalIdRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,7 @@ public class IgdbService {
     private final IgdbClient igdbClient;
     private final IgdbGameCacheRepository cacheRepository;
     private final IgdbGameExternalIdRepository externalIdRepository;
+    private final IgdbGameCclRepository cclRepository;
     private final RestClient restClient;
 
     @Value("${app.igdb.client-id:}")
@@ -203,10 +206,19 @@ public class IgdbService {
     }
 
     public Set<TwitchCcl> suggestCcls(String igdbGameId) {
+        // L1: in-memory
         Set<TwitchCcl> cached = cclCache.get(igdbGameId);
         if (cached != null) {
-            log.debug("CCL cache hit for igdbId={}", igdbGameId);
+            log.debug("CCL L1 cache hit for igdbId={}", igdbGameId);
             return cached;
+        }
+        // L2: DB
+        var fromDb = cclRepository.findById(igdbGameId);
+        if (fromDb.isPresent()) {
+            Set<TwitchCcl> dbCcls = Collections.unmodifiableSet(fromDb.get().getCcls());
+            cclCache.put(igdbGameId, dbCcls);
+            log.debug("CCL L2 (DB) cache hit for igdbId={}", igdbGameId);
+            return dbCcls;
         }
 
         Set<TwitchCcl> suggested = new HashSet<>();
@@ -256,8 +268,10 @@ public class IgdbService {
         mapTermToCcl(terms, cclLanguageBarrier, "language barrier", TwitchCcl.LanguageBarrier, suggested);
 
         log.debug("IGDB CCL suggestion for {}: terms={}, suggested={}", igdbGameId, terms, suggested);
-        cclCache.put(igdbGameId, Collections.unmodifiableSet(suggested));
-        return suggested;
+        Set<TwitchCcl> immutable = Collections.unmodifiableSet(suggested);
+        cclCache.put(igdbGameId, immutable);
+        cclRepository.save(new IgdbGameCcl(igdbGameId, suggested));
+        return immutable;
     }
 
     // -------------------------------------------------------------------------
