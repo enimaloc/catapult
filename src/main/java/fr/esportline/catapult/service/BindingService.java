@@ -75,7 +75,7 @@ public class BindingService {
     }
 
     @Transactional
-    public void updateBinding(UUID bindingId, String twitchGameId, String twitchGameName,
+    public void updateBinding(UserAccount user, UUID bindingId, String twitchGameId, String twitchGameName,
                               java.util.Set<fr.esportline.catapult.domain.TwitchCcl> ccls, boolean ignored) {
         gameBindingRepository.findById(bindingId).ifPresent(binding -> {
             binding.setTwitchGameId(twitchGameId);
@@ -87,22 +87,25 @@ public class BindingService {
                 binding.setStatus(GameBinding.Status.MANUAL);
             }
             gameBindingRepository.save(binding);
+            twitchService.updateChannel(user, binding);
         });
     }
 
     @Transactional
-    public void toggleCclEnabled(UUID bindingId, boolean enabled) {
+    public void toggleCclEnabled(UserAccount user, UUID bindingId, boolean enabled) {
         gameBindingRepository.findById(bindingId).ifPresent(binding -> {
             binding.setCclEnabled(enabled);
             gameBindingRepository.save(binding);
+            twitchService.updateChannel(user, binding);
         });
     }
 
     @Transactional
-    public void toggleIgnored(UUID bindingId, boolean ignored) {
+    public void toggleIgnored(UserAccount user, UUID bindingId, boolean ignored) {
         gameBindingRepository.findById(bindingId).ifPresent(binding -> {
             binding.setIgnored(ignored);
             gameBindingRepository.save(binding);
+            twitchService.updateChannel(user, binding);
         });
     }
 
