@@ -1,8 +1,14 @@
 package fr.esportline.catapult.service;
 
+import fr.esportline.catapult.domain.IgdbAgeRating;
+import fr.esportline.catapult.domain.IgdbGameAgeRating;
 import fr.esportline.catapult.domain.IgdbGameCacheEntry;
+import fr.esportline.catapult.domain.IgdbGameExternalId;
 import fr.esportline.catapult.domain.TwitchCcl;
+import fr.esportline.catapult.repository.IgdbAgeRatingRepository;
+import fr.esportline.catapult.repository.IgdbGameAgeRatingRepository;
 import fr.esportline.catapult.repository.IgdbGameCacheRepository;
+import fr.esportline.catapult.repository.IgdbGameExternalIdRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +37,9 @@ public class IgdbService {
 
     private final IgdbClient igdbClient;
     private final IgdbGameCacheRepository cacheRepository;
+    private final IgdbGameExternalIdRepository externalIdRepository;
+    private final IgdbAgeRatingRepository ageRatingRepository;
+    private final IgdbGameAgeRatingRepository gameAgeRatingRepository;
     private final RestClient restClient;
 
     @Value("${app.igdb.client-id:}")
@@ -102,6 +111,9 @@ public class IgdbService {
         log.info("Preloading IGDB game list (limit={})...", preloadLimit);
         Map<String, String> newCache = new HashMap<>();
         Map<String, IgdbGame> newIndex = new HashMap<>();
+        List<IgdbGameExternalId> newExternalIds = new ArrayList<>();
+        List<IgdbAgeRating> newAgeRatings = new ArrayList<>();
+        List<IgdbGameAgeRating> newGameAgeRatings = new ArrayList<>();
 
         int pageSize = 500;
         int offset = 0;
@@ -115,6 +127,20 @@ public class IgdbService {
                 String id = String.valueOf(game.getId());
                 newCache.put(id, game.getName());
                 newIndex.put(normalise(game.getName()), new IgdbGame(id, game.getName()));
+
+                for (proto.ExternalGame ext : game.getExternalGamesList()) {
+                    long sourceId = ext.getExternalGameSource().getId();
+                    if (sourceId > 0 && !ext.getUid().isBlank()) {
+                        newExternalIds.add(new IgdbGameExternalId(id, sourceId, ext.getUid()));
+                    }
+                }
+
+                for (proto.AgeRating ar : game.getAgeRatingsList()) {
+                    if (ar.getId() > 0) {
+                        newAgeRatings.add(new IgdbAgeRating(ar.getId(), ar.getCategoryValue(), ar.getRatingValue()));
+                        newGameAgeRatings.add(new IgdbGameAgeRating(id, ar.getId()));
+                    }
+                }
             }
 
             offset += page.size();
@@ -130,8 +156,12 @@ public class IgdbService {
             .map(e -> new IgdbGameCacheEntry(KEY_NAME_PREFIX + e.getKey(), e.getValue().id(), e.getValue().name()))
             .toList();
         cacheRepository.saveAll(entries);
+        externalIdRepository.saveAll(newExternalIds);
+        ageRatingRepository.saveAll(newAgeRatings);
+        gameAgeRatingRepository.saveAll(newGameAgeRatings);
 
-        log.info("IGDB preload complete: {} games cached (DB updated)", igdbGameCache.size());
+        log.info("IGDB preload complete: {} games, {} external IDs, {} age ratings (DB updated)",
+            igdbGameCache.size(), newExternalIds.size(), newAgeRatings.size());
     }
 
     public Map<String, String> getGameCache() {
@@ -141,6 +171,20 @@ public class IgdbService {
     public Optional<IgdbGame> findBySteamAppId(String appId) {
         if (clientId.isBlank()) return Optional.empty();
 
+        // Check external ID table populated during preload
+        if (steamSourceId >= 0) {
+            Optional<IgdbGameExternalId> extId = externalIdRepository.findBySourceIdAndUid(steamSourceId, appId);
+            if (extId.isPresent()) {
+                String igdbId = extId.get().getIgdbId();
+                String name = igdbGameCache.get(igdbId);
+                if (name != null) {
+                    log.debug("IGDB external ID cache hit for Steam appId={}", appId);
+                    return Optional.of(new IgdbGame(igdbId, name));
+                }
+            }
+        }
+
+        // Legacy steam: key lookup in igdb_game_cache
         String key = KEY_STEAM_PREFIX + appId;
         Optional<IgdbGame> fromDb = lookupInDb(key);
         if (fromDb.isPresent()) return fromDb;

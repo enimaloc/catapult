@@ -104,7 +104,7 @@ public class IgdbClient {
      */
     public List<Game> fetchGamePage(int limit, int offset, String token) {
         APICalypse query = new APICalypse()
-            .fields("id,name")
+            .fields("id,name,external_games.uid,external_games.external_game_source,age_ratings.id,age_ratings.category,age_ratings.rating")
             .sort("aggregated_rating", Sort.DESCENDING)
             .limit(limit)
             .offset(offset);
