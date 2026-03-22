@@ -80,7 +80,8 @@ public class BindingService {
         gameBindingRepository.findById(bindingId).ifPresent(binding -> {
             binding.setTwitchGameId(twitchGameId);
             binding.setTwitchGameName(twitchGameName);
-            binding.setCcls(ccls);
+            binding.getCcls().clear();
+            binding.getCcls().addAll(ccls);
             binding.setIgnored(ignored);
             if (twitchGameId != null && !twitchGameId.isBlank()) {
                 binding.setStatus(GameBinding.Status.MANUAL);
