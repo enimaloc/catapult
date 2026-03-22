@@ -117,7 +117,8 @@
                         </td>
                         <td>
                             <button class="btn btn-sm btn-outline"
-                                    th:onclick="'toggleEdit(\'' + ${binding.id} + '\')'">
+                                    th:data-id="${binding.id}"
+                                    onclick="toggleEdit(this.dataset.id)">
                                 Modifier
                             </button>
                             <form th:action="@{/bindings/{id}/delete(id=${binding.id})}" method="post"
@@ -136,10 +137,11 @@
                                         <div class="search-wrapper">
                                             <input type="text"
                                                    th:id="'gameSearch-' + ${binding.id}"
+                                                   th:data-id="${binding.id}"
                                                    th:value="${binding.twitchGameName}"
                                                    placeholder="Rechercher…"
                                                    autocomplete="off"
-                                                   th:onInput="'debouncedSearch(event, \'' + ${binding.id} + '\')'">
+                                                   oninput="debouncedSearch(event, this.dataset.id)">
                                             <ul th:id="'gameResults-' + ${binding.id}" class="game-results"></ul>
                                         </div>
                                         <input type="hidden" th:id="'twitchGameId-' + ${binding.id}"
@@ -163,7 +165,8 @@
                                 </div>
                                 <div class="inline-edit-actions">
                                     <button type="button"
-                                            th:onclick="'toggleEdit(\'' + ${binding.id} + '\')'"
+                                            th:data-id="${binding.id}"
+                                            onclick="toggleEdit(this.dataset.id)"
                                             class="btn btn-sm btn-outline">Annuler</button>
                                     <button type="submit" class="btn btn-sm btn-primary">Enregistrer</button>
                                 </div>
