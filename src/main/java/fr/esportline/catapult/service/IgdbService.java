@@ -70,6 +70,9 @@ public class IgdbService {
     // L1 index: normalized name → IgdbGame
     private final Map<String, IgdbGame> igdbNameIndex = new ConcurrentHashMap<>();
 
+    // CCL cache: igdbId → suggested CCLs (stable, no TTL needed)
+    private final Map<String, Set<TwitchCcl>> cclCache = new ConcurrentHashMap<>();
+
     // App-level Twitch token
     private volatile String appAccessToken;
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
@@ -200,6 +203,12 @@ public class IgdbService {
     }
 
     public Set<TwitchCcl> suggestCcls(String igdbGameId) {
+        Set<TwitchCcl> cached = cclCache.get(igdbGameId);
+        if (cached != null) {
+            log.debug("CCL cache hit for igdbId={}", igdbGameId);
+            return cached;
+        }
+
         Set<TwitchCcl> suggested = new HashSet<>();
         if (clientId.isBlank()) return suggested;
 
@@ -247,6 +256,7 @@ public class IgdbService {
         mapTermToCcl(terms, cclLanguageBarrier, "language barrier", TwitchCcl.LanguageBarrier, suggested);
 
         log.debug("IGDB CCL suggestion for {}: terms={}, suggested={}", igdbGameId, terms, suggested);
+        cclCache.put(igdbGameId, Collections.unmodifiableSet(suggested));
         return suggested;
     }
 
