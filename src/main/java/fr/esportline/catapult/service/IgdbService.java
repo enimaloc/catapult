@@ -168,22 +168,46 @@ public class IgdbService {
         if (token.isBlank()) return suggested;
 
         List<Game> results = igdbClient.fetchGameById(
-            igdbGameId, "themes.name,keywords.name,age_ratings.rating", token);
+            igdbGameId, "themes.name,keywords.name,age_ratings.category,age_ratings.rating", token);
         if (results.isEmpty()) return suggested;
 
         Game game = results.get(0);
+
+        // Age-rating based detection (primary signal)
+        for (proto.AgeRating ar : game.getAgeRatingsList()) {
+            int cat    = ar.getCategoryValue(); // 1=ESRB, 2=PEGI, 3=CERO, 4=USK
+            int rating = ar.getRatingValue();
+            // ESRB M (11) or AO (12)
+            if (cat == 1 && (rating == 11 || rating == 12)) {
+                if (!cclMature.isBlank())   suggested.add(TwitchCcl.MatureGame);
+                if (!cclViolence.isBlank()) suggested.add(TwitchCcl.ViolentGraphic);
+            }
+            // ESRB AO only → also sexual
+            if (cat == 1 && rating == 12 && !cclSexualContent.isBlank()) {
+                suggested.add(TwitchCcl.SexualThemes);
+            }
+            // PEGI 18 (rating=5)
+            if (cat == 2 && rating == 5) {
+                if (!cclMature.isBlank())   suggested.add(TwitchCcl.MatureGame);
+                if (!cclViolence.isBlank()) suggested.add(TwitchCcl.ViolentGraphic);
+            }
+        }
+
+        // Keyword/theme based detection (supplementary)
         Set<String> terms = new HashSet<>();
         game.getThemesList().forEach(t -> terms.add(t.getName().toLowerCase()));
         game.getKeywordsList().forEach(k -> terms.add(k.getName().toLowerCase()));
 
-        mapTermToCcl(terms, cclViolence,        "violence",  TwitchCcl.ViolentGraphic,    suggested);
-        mapTermToCcl(terms, cclMature,          "mature",    TwitchCcl.MatureGame,         suggested);
-        mapTermToCcl(terms, cclSexualContent,   "sexual",    TwitchCcl.SexualThemes,       suggested);
-        mapTermToCcl(terms, cclDrugs,           "drug",      TwitchCcl.DrugUse,            suggested);
-        mapTermToCcl(terms, cclGambling,        "gambling",  TwitchCcl.Gambling,           suggested);
-        mapTermToCcl(terms, cclProfanity,       "profanity", TwitchCcl.ProfanityVulgarity, suggested);
-        mapTermToCcl(terms, cclLanguageBarrier, "language",  TwitchCcl.LanguageBarrier,    suggested);
+        // Themes: "Erotic" → SexualThemes
+        mapTermToCcl(terms, cclSexualContent, "erotic",    TwitchCcl.SexualThemes,       suggested);
+        mapTermToCcl(terms, cclSexualContent, "sexual",    TwitchCcl.SexualThemes,       suggested);
+        mapTermToCcl(terms, cclDrugs,         "drug",      TwitchCcl.DrugUse,            suggested);
+        mapTermToCcl(terms, cclGambling,      "gambling",  TwitchCcl.Gambling,           suggested);
+        mapTermToCcl(terms, cclProfanity,     "profanity", TwitchCcl.ProfanityVulgarity, suggested);
+        mapTermToCcl(terms, cclProfanity,     "vulgar",    TwitchCcl.ProfanityVulgarity, suggested);
+        mapTermToCcl(terms, cclLanguageBarrier, "language barrier", TwitchCcl.LanguageBarrier, suggested);
 
+        log.debug("IGDB CCL suggestion for {}: terms={}, suggested={}", igdbGameId, terms, suggested);
         return suggested;
     }
 
