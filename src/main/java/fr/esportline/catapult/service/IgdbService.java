@@ -1,12 +1,8 @@
 package fr.esportline.catapult.service;
 
-import fr.esportline.catapult.domain.IgdbAgeRating;
-import fr.esportline.catapult.domain.IgdbGameAgeRating;
 import fr.esportline.catapult.domain.IgdbGameCacheEntry;
 import fr.esportline.catapult.domain.IgdbGameExternalId;
 import fr.esportline.catapult.domain.TwitchCcl;
-import fr.esportline.catapult.repository.IgdbAgeRatingRepository;
-import fr.esportline.catapult.repository.IgdbGameAgeRatingRepository;
 import fr.esportline.catapult.repository.IgdbGameCacheRepository;
 import fr.esportline.catapult.repository.IgdbGameExternalIdRepository;
 import jakarta.annotation.PostConstruct;
@@ -14,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import proto.ExternalGameSource;
@@ -23,7 +18,6 @@ import proto.Game;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -38,8 +32,6 @@ public class IgdbService {
     private final IgdbClient igdbClient;
     private final IgdbGameCacheRepository cacheRepository;
     private final IgdbGameExternalIdRepository externalIdRepository;
-    private final IgdbAgeRatingRepository ageRatingRepository;
-    private final IgdbGameAgeRatingRepository gameAgeRatingRepository;
     private final RestClient restClient;
 
     @Value("${app.igdb.client-id:}")
@@ -48,14 +40,8 @@ public class IgdbService {
     @Value("${twitch.client-secret:}")
     private String clientSecret;
 
-    @Value("${app.igdb.preload-ttl-hours:24}")
-    private int preloadTtlHours;
-
     @Value("${app.igdb.cache-ttl-hours:24}")
     private int cacheTtlHours;
-
-    @Value("${app.igdb.preload-limit:500}")
-    private int preloadLimit;
 
     @Value("${app.mapping.ccl.violence:}")
     private String cclViolence;
@@ -88,82 +74,15 @@ public class IgdbService {
     private volatile String appAccessToken;
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
 
-    // Steam ExternalGameSource ID (-1 = not resolved → fallback category=1)
-    private volatile long twitchSourceId = -1;
+    // ExternalGameSource IDs (-1 = not resolved)
     private volatile long steamSourceId = -1;
+    private volatile long twitchSourceId = -1;
 
     @PostConstruct
     public void init() {
+        steamSourceId  = loadSourceId("Steam");
         twitchSourceId = loadSourceId("Twitch");
-        steamSourceId = loadSourceId("Steam");
         warmInMemoryCacheFromDb();
-        preloadGameList();
-    }
-
-    @Scheduled(fixedRateString = "${app.igdb.preload-ttl-hours:24}", timeUnit = TimeUnit.HOURS)
-    public void preloadGameList() {
-        if (clientId.isBlank() || clientSecret.isBlank()) {
-            log.warn("IGDB credentials not configured — skipping preload");
-            return;
-        }
-
-        String token = getOrRefreshAppToken();
-        if (token.isBlank()) return;
-
-        log.info("Preloading IGDB game list (limit={})...", preloadLimit);
-        Map<String, String> newCache = new HashMap<>();
-        Map<String, IgdbGame> newIndex = new HashMap<>();
-        List<IgdbGameExternalId> newExternalIds = new ArrayList<>();
-        List<IgdbAgeRating> newAgeRatings = new ArrayList<>();
-        List<IgdbGameAgeRating> newGameAgeRatings = new ArrayList<>();
-
-        int pageSize = 500;
-        int offset = 0;
-
-        while (offset < preloadLimit) {
-            int limit = Math.min(pageSize, preloadLimit - offset);
-            List<Game> page = igdbClient.fetchGamePage(limit, offset, token);
-            if (page.isEmpty()) break;
-
-            for (Game game : page) {
-                String id = String.valueOf(game.getId());
-                newCache.put(id, game.getName());
-                newIndex.put(normalise(game.getName()), new IgdbGame(id, game.getName()));
-
-                for (proto.ExternalGame ext : game.getExternalGamesList()) {
-                    long sourceId = ext.getExternalGameSource().getId();
-                    if (sourceId > 0 && !ext.getUid().isBlank()) {
-                        newExternalIds.add(new IgdbGameExternalId(id, sourceId, ext.getUid()));
-                    }
-                }
-
-                for (proto.AgeRating ar : game.getAgeRatingsList()) {
-                    if (ar.getId() > 0) {
-                        newAgeRatings.add(new IgdbAgeRating(ar.getId(), ar.getCategoryValue(), ar.getRatingValue()));
-                        newGameAgeRatings.add(new IgdbGameAgeRating(id, ar.getId()));
-                    }
-                }
-            }
-
-            offset += page.size();
-            if (page.size() < limit) break;
-        }
-
-        igdbGameCache.clear();
-        igdbGameCache.putAll(newCache);
-        igdbNameIndex.clear();
-        igdbNameIndex.putAll(newIndex);
-
-        List<IgdbGameCacheEntry> entries = newIndex.entrySet().stream()
-            .map(e -> new IgdbGameCacheEntry(KEY_NAME_PREFIX + e.getKey(), e.getValue().id(), e.getValue().name()))
-            .toList();
-        cacheRepository.saveAll(entries);
-        externalIdRepository.saveAll(newExternalIds);
-        ageRatingRepository.saveAll(newAgeRatings);
-        gameAgeRatingRepository.saveAll(newGameAgeRatings);
-
-        log.info("IGDB preload complete: {} games, {} external IDs, {} age ratings (DB updated)",
-            igdbGameCache.size(), newExternalIds.size(), newAgeRatings.size());
     }
 
     public Map<String, String> getGameCache() {
@@ -199,6 +118,8 @@ public class IgdbService {
 
         Game game = results.get(0).getGame();
         IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
+        igdbGameCache.put(resolved.id(), resolved.name());
+        igdbNameIndex.put(normalise(resolved.name()), resolved);
         saveToDb(key, resolved);
         return Optional.of(resolved);
     }
@@ -285,8 +206,7 @@ public class IgdbService {
                 log.warn("{} ExternalGameSource not found", name);
             }
         } catch (Exception e) {
-            log.warn("Failed to resolve Steam ExternalGameSource ID: {}",
-                e.getMessage());
+            log.warn("Failed to resolve {} ExternalGameSource ID: {}", name, e.getMessage());
         }
         return -1;
     }
@@ -316,7 +236,7 @@ public class IgdbService {
     }
 
     @SuppressWarnings("unchecked")
-    private synchronized String getOrRefreshAppToken() {
+    synchronized String getOrRefreshAppToken() {
         if (appAccessToken != null && Instant.now().isBefore(tokenExpiresAt.minusSeconds(60))) {
             return appAccessToken;
         }
