@@ -10,4 +10,7 @@ public interface IgdbGameExternalIdRepository extends JpaRepository<IgdbGameExte
 
     /** Lookup inverse : trouve le jeu IGDB correspondant à un uid sur une plateforme. */
     Optional<IgdbGameExternalId> findBySourceIdAndUid(long sourceId, String uid);
+
+    /** Lookup direct : trouve l'entrée externe d'une plateforme pour un jeu IGDB donné. */
+    Optional<IgdbGameExternalId> findByIgdbIdAndSourceId(String igdbId, long sourceId);
 }
