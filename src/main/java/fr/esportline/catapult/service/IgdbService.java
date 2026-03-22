@@ -126,7 +126,12 @@ public class IgdbService {
         igdbNameIndex.clear();
         igdbNameIndex.putAll(newIndex);
 
-        log.info("IGDB preload complete: {} games cached", igdbGameCache.size());
+        List<IgdbGameCacheEntry> entries = newIndex.entrySet().stream()
+            .map(e -> new IgdbGameCacheEntry(KEY_NAME_PREFIX + e.getKey(), e.getValue().id(), e.getValue().name()))
+            .toList();
+        cacheRepository.saveAll(entries);
+
+        log.info("IGDB preload complete: {} games cached (DB updated)", igdbGameCache.size());
     }
 
     public Map<String, String> getGameCache() {
