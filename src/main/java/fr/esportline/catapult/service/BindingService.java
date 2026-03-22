@@ -19,6 +19,7 @@ public class BindingService {
 
     private final GameBindingRepository gameBindingRepository;
     private final IgdbService igdbService;
+    private final TwitchService twitchService;
 
     @Transactional
     public GameBinding resolveOrCreate(UserAccount user, DetectedGame detectedGame) {
@@ -41,9 +42,12 @@ public class BindingService {
 
         if (igdbGame.isPresent()) {
             String igdbId = igdbGame.get().id();
-            String twitchId = igdbService.findTwitchGameId(igdbId).orElse(igdbId);
+            String gameName = igdbGame.get().name();
+            String twitchId = igdbService.findTwitchGameId(igdbId)
+                .or(() -> twitchService.findCategoryIdByName(user, gameName))
+                .orElse(igdbId);
             binding.setTwitchGameId(twitchId);
-            binding.setTwitchGameName(igdbGame.get().name());
+            binding.setTwitchGameName(gameName);
             binding.setStatus(GameBinding.Status.AUTO);
 
             var ccls = igdbService.suggestCcls(igdbId);
