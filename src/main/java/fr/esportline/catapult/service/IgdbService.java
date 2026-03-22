@@ -46,26 +46,61 @@ public class IgdbService {
     @Value("${app.igdb.cache-ttl-hours:24}")
     private int cacheTtlHours;
 
-    @Value("${app.mapping.ccl.violence:}")
-    private String cclViolence;
-
-    @Value("${app.mapping.ccl.mature:}")
-    private String cclMature;
-
-    @Value("${app.mapping.ccl.sexual_content:}")
-    private String cclSexualContent;
-
-    @Value("${app.mapping.ccl.drugs:}")
-    private String cclDrugs;
-
-    @Value("${app.mapping.ccl.gambling:}")
-    private String cclGambling;
-
-    @Value("${app.mapping.ccl.profanity:}")
-    private String cclProfanity;
-
-    @Value("${app.mapping.ccl.language_barrier:}")
-    private String cclLanguageBarrier;
+    // IGDB AgeRatingContentDescriptionEnum values → TwitchCcl mapping
+    // See: https://api-docs.igdb.com/#age-rating-content-description-enums
+    private static final Set<Integer> DESC_VIOLENCE = Set.of(
+        1,  // ANIMATED_BLOOD
+        2,  // BLOOD
+        3,  // BLOOD_AND_GORE
+        4,  // CARTOON_VIOLENCE
+        8,  // FANTASY_VIOLENCE
+        9,  // INTENSE_VIOLENCE
+        28, // VIOLENCE
+        29, // VIOLENT_REFERENCES
+        32, // MILD_BLOOD
+        33, // MILD_CARTOON_VIOLENCE
+        34, // MILD_FANTASY_VIOLENCE
+        39, // MILD_VIOLENCE
+        48  // HORROR_VIOLENCE
+    );
+    private static final Set<Integer> DESC_SEXUAL = Set.of(
+        13, // NUDITY
+        14, // PARTIAL_NUDITY
+        16, // SEXUAL_CONTENT
+        17, // SEXUAL_THEMES
+        18, // SEXUAL_VIOLENCE
+        22, // STRONG_SEXUAL_CONTENT
+        23, // SUGGESTIVE_THEMES
+        37, // MILD_SEXUAL_THEMES
+        38, // MILD_SUGGESTIVE_THEMES
+        51  // SEX
+    );
+    private static final Set<Integer> DESC_DRUGS = Set.of(
+        7,  // DRUG_REFERENCE
+        24, // TOBACCO_REFERENCE
+        25, // USE_OF_ALCOHOL
+        26, // USE_OF_DRUGS
+        27, // USE_OF_TOBACCO
+        30, // ALCOHOL_REFERENCE
+        31, // DRUG_AND_ALCOHOL_REFERENCE
+        45  // DRUGS
+    );
+    private static final Set<Integer> DESC_GAMBLING = Set.of(
+        15, // REAL_GAMBLING
+        19, // SIMULATED_GAMBLING
+        47  // GAMBLING
+    );
+    private static final Set<Integer> DESC_LANGUAGE = Set.of(
+        6,  // CRUDE_HUMOR
+        10, // LANGUAGE
+        11, // LYRICS
+        12, // MATURE_HUMOR
+        20, // STRONG_LANGUAGE
+        21, // STRONG_LYRICS
+        35, // MILD_LANGUAGE
+        36, // MILD_LYRICS
+        43  // BAD_LANGUAGE
+    );
 
     // L1 cache: igdbId → name
     private final Map<String, String> igdbGameCache = new ConcurrentHashMap<>();
@@ -228,46 +263,31 @@ public class IgdbService {
         if (token.isBlank()) return suggested;
 
         List<Game> results = igdbClient.fetchGameById(
-            igdbGameId, "themes.name,keywords.name,age_ratings.category,age_ratings.rating", token);
+            igdbGameId, "age_ratings.category,age_ratings.rating,age_ratings.content_descriptions.description", token);
         if (results.isEmpty()) return suggested;
 
         Game game = results.get(0);
 
-        // Age-rating based detection (primary signal)
         for (proto.AgeRating ar : game.getAgeRatingsList()) {
-            int cat    = ar.getCategoryValue(); // 1=ESRB, 2=PEGI, 3=CERO, 4=USK
+            int cat    = ar.getCategoryValue(); // 1=ESRB, 2=PEGI
             int rating = ar.getRatingValue();
-            // ESRB M (11) or AO (12)
-            if (cat == 1 && (rating == 11 || rating == 12)) {
-                if (!cclMature.isBlank())   suggested.add(TwitchCcl.MatureGame);
-                if (!cclViolence.isBlank()) suggested.add(TwitchCcl.ViolentGraphic);
+
+            // MatureGame: ESRB M (11) or AO (12), PEGI 18 (5)
+            if ((cat == 1 && (rating == 11 || rating == 12)) || (cat == 2 && rating == 5)) {
+                suggested.add(TwitchCcl.MatureGame);
             }
-            // ESRB AO only → also sexual
-            if (cat == 1 && rating == 12 && !cclSexualContent.isBlank()) {
-                suggested.add(TwitchCcl.SexualThemes);
-            }
-            // PEGI 18 (rating=5)
-            if (cat == 2 && rating == 5) {
-                if (!cclMature.isBlank())   suggested.add(TwitchCcl.MatureGame);
-                if (!cclViolence.isBlank()) suggested.add(TwitchCcl.ViolentGraphic);
+
+            for (proto.AgeRatingContentDescription desc : ar.getContentDescriptionsList()) {
+                int d = desc.getDescriptionValue();
+                if (DESC_VIOLENCE.contains(d))  suggested.add(TwitchCcl.ViolentGraphic);
+                if (DESC_SEXUAL.contains(d))    suggested.add(TwitchCcl.SexualThemes);
+                if (DESC_DRUGS.contains(d))     suggested.add(TwitchCcl.DrugUse);
+                if (DESC_GAMBLING.contains(d))  suggested.add(TwitchCcl.Gambling);
+                if (DESC_LANGUAGE.contains(d))  suggested.add(TwitchCcl.ProfanityVulgarity);
             }
         }
 
-        // Keyword/theme based detection (supplementary)
-        Set<String> terms = new HashSet<>();
-        game.getThemesList().forEach(t -> terms.add(t.getName().toLowerCase()));
-        game.getKeywordsList().forEach(k -> terms.add(k.getName().toLowerCase()));
-
-        // Themes: "Erotic" → SexualThemes
-        mapTermToCcl(terms, cclSexualContent, "erotic",    TwitchCcl.SexualThemes,       suggested);
-        mapTermToCcl(terms, cclSexualContent, "sexual",    TwitchCcl.SexualThemes,       suggested);
-        mapTermToCcl(terms, cclDrugs,         "drug",      TwitchCcl.DrugUse,            suggested);
-        mapTermToCcl(terms, cclGambling,      "gambling",  TwitchCcl.Gambling,           suggested);
-        mapTermToCcl(terms, cclProfanity,     "profanity", TwitchCcl.ProfanityVulgarity, suggested);
-        mapTermToCcl(terms, cclProfanity,     "vulgar",    TwitchCcl.ProfanityVulgarity, suggested);
-        mapTermToCcl(terms, cclLanguageBarrier, "language barrier", TwitchCcl.LanguageBarrier, suggested);
-
-        log.debug("IGDB CCL suggestion for {}: terms={}, suggested={}", igdbGameId, terms, suggested);
+        log.debug("IGDB CCL suggestion for {}: suggested={}", igdbGameId, suggested);
         Set<TwitchCcl> immutable = Collections.unmodifiableSet(suggested);
         cclCache.put(igdbGameId, immutable);
         cclRepository.save(new IgdbGameCcl(igdbGameId, suggested));
@@ -356,13 +376,6 @@ public class IgdbService {
 
     private static String normalise(String name) {
         return name == null ? "" : name.trim().toLowerCase(java.util.Locale.ROOT);
-    }
-
-    private void mapTermToCcl(Set<String> terms, String igdbKey, String keyword,
-                               TwitchCcl ccl, Set<TwitchCcl> result) {
-        if (!igdbKey.isBlank() && terms.stream().anyMatch(t -> t.contains(keyword))) {
-            result.add(ccl);
-        }
     }
 
     public record IgdbGame(String id, String name) {}
