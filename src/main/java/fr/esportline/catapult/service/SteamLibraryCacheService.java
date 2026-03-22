@@ -40,18 +40,20 @@ public class SteamLibraryCacheService {
         List<UserAccount> users = userAccountRepository.findBySteamIdNotNull();
         if (users.isEmpty()) {
             log.info("No users with Steam linked — skipping library preload");
-            return;
+        } else {
+            log.info("Pre-caching Steam libraries for {} user(s) at startup", users.size());
+            for (UserAccount user : users) {
+                cacheLibrary(user);
+            }
         }
-        log.info("Pre-caching Steam libraries for {} user(s) at startup", users.size());
-        for (UserAccount user : users) {
-            cacheLibrary(user);
-        }
+        igdbService.prewarmCclCache();
     }
 
     @Async
     @EventListener
     public void onSteamLinked(SteamLinkedEvent event) {
         cacheLibrary(event.getUser());
+        igdbService.prewarmCclCache();
     }
 
     private void cacheLibrary(UserAccount user) {
