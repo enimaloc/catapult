@@ -40,4 +40,9 @@ out/
 .env
 .env.*
 !.env.example
+
+### Local dev config ###
 src/main/resources/application-dev.properties
+
+### Tools ###
+.playwright-mcp/
