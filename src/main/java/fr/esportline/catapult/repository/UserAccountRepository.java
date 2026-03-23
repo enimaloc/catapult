@@ -14,5 +14,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     List<UserAccount> findByBotEnabledTrueAndStatus(UserAccount.Status status);
 
+    List<UserAccount> findBySteamIdNotNull();
+
     List<UserAccount> findByStatusAndDeletionRequestedAtBefore(UserAccount.Status status, Instant cutoff);
 }

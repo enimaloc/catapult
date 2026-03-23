@@ -1,9 +1,6 @@
 package fr.esportline.catapult.service;
 
-import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.OAuthToken;
-import fr.esportline.catapult.domain.TwitchCcl;
-import fr.esportline.catapult.domain.UserAccount;
+import fr.esportline.catapult.domain.*;
 import fr.esportline.catapult.repository.OAuthTokenRepository;
 import fr.esportline.catapult.repository.UserAccountRepository;
 import fr.esportline.catapult.repository.UserSettingsRepository;
@@ -18,6 +15,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Arrays;
 
 /**
  * Service d'intégration Twitch — découplé du système d'événements Spring.
@@ -36,7 +34,7 @@ public class TwitchService {
     private final TokenEncryptionService tokenEncryptionService;
     private final RestClient restClient;
 
-    @Value("${spring.security.oauth2.client.registration.twitch.client-id:}")
+    @Value("${twitch.client-id:}")
     private String twitchClientId;
 
     /**
@@ -63,11 +61,11 @@ public class TwitchService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("game_id", binding.getTwitchGameId());
 
-        boolean cclEnabled = userSettingsRepository.findById(user.getId())
-            .map(s -> s.isCclFeatureEnabled())
+        boolean globalCclEnabled = userSettingsRepository.findById(user.getId())
+            .map(UserSettings::isCclFeatureEnabled)
             .orElse(true);
 
-        if (cclEnabled && !binding.getCcls().isEmpty()) {
+        if (globalCclEnabled && binding.isCclEnabled()) {
             body.put("content_classification_labels", buildCclPayload(binding.getCcls()));
         }
 
@@ -75,7 +73,7 @@ public class TwitchService {
             restClient.patch()
                 .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
                 .header("Authorization", "Bearer " + accessToken)
-                .header("Client-Id", twitchClientId)
+                .header("Client-ID", twitchClientId)
                 .header("Content-Type", "application/json")
                 .body(body)
                 .retrieve()
@@ -99,9 +97,79 @@ public class TwitchService {
         }
     }
 
+    /**
+     * Résout l'ID catégorie Twitch par nom exact (GET /helix/games?name=...).
+     * Utilisé en fallback quand l'ID IGDB externe n'est pas disponible.
+     */
+    @SuppressWarnings("unchecked")
+    public Optional<String> findCategoryIdByName(UserAccount user, String gameName) {
+        String accessToken = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+            .map(t -> tokenEncryptionService.decrypt(t.getAccessToken()))
+            .orElse("");
+
+        if (accessToken.isBlank() || twitchClientId.isBlank()) return Optional.empty();
+
+        try {
+            Map<String, Object> response = restClient.get()
+                .uri(TWITCH_API_URL + "/games?name=" +
+                     java.net.URLEncoder.encode(gameName, java.nio.charset.StandardCharsets.UTF_8))
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Client-Id", twitchClientId)
+                .retrieve()
+                .body(Map.class);
+
+            if (response == null) return Optional.empty();
+            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+            if (data == null || data.isEmpty()) return Optional.empty();
+
+            return Optional.ofNullable((String) data.get(0).get("id"));
+        } catch (Exception e) {
+            log.warn("Twitch game lookup failed for '{}': {}", gameName, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Recherche des catégories Twitch par nom (pour l'autocomplete des bindings).
+     */
+    @SuppressWarnings("unchecked")
+    public List<TwitchCategory> searchCategories(UserAccount user, String query) {
+        String accessToken = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+            .map(t -> tokenEncryptionService.decrypt(t.getAccessToken()))
+            .orElse("");
+
+        if (accessToken.isBlank() || twitchClientId.isBlank()) return List.of();
+
+        try {
+            Map<String, Object> response = restClient.get()
+                .uri(TWITCH_API_URL + "/search/categories?query=" +
+                     java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8) + "&first=8")
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Client-Id", twitchClientId)
+                .retrieve()
+                .body(Map.class);
+
+            if (response == null) return List.of();
+
+            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+            if (data == null) return List.of();
+
+            return data.stream()
+                .map(g -> new TwitchCategory((String) g.get("id"), (String) g.get("name")))
+                .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            log.warn("Twitch category search failed for query '{}': {}", query, e.getMessage());
+            return List.of();
+        }
+    }
+
+    public record TwitchCategory(String id, String name) {}
+
     private List<Map<String, Object>> buildCclPayload(Set<TwitchCcl> ccls) {
-        return ccls.stream()
-            .map(ccl -> Map.<String, Object>of("id", ccl.name(), "is_enabled", true))
+        return Arrays.stream(TwitchCcl.values())
+            .filter(ccl -> ccl.editable)
+            .map(ccl -> Map.<String, Object>of("id", ccl.name(), "is_enabled", ccls.contains(ccl)))
             .collect(Collectors.toList());
     }
 }

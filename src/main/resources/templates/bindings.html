@@ -5,9 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Catapult — Bindings</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <style>
+        .toggle-label { display:inline-flex; align-items:center; cursor:pointer; gap:6px; }
+        .toggle-label input[type=checkbox] { display:none; }
+        .toggle-slider {
+            width:36px; height:20px; background:#ccc; border-radius:10px;
+            position:relative; transition:background .2s;
+        }
+        .toggle-slider::after {
+            content:''; position:absolute; top:2px; left:2px;
+            width:16px; height:16px; background:#fff; border-radius:50%;
+            transition:left .2s;
+        }
+        .toggle-label input:checked + .toggle-slider { background:var(--color-primary, #7c3aed); }
+        .toggle-label input:checked + .toggle-slider::after { left:18px; }
+        .edit-row td { background:#f9f9f9; padding:12px 16px; }
+        .inline-edit-fields { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
+        .inline-edit-field { display:flex; flex-direction:column; gap:4px; }
+        .inline-edit-field label { font-size:.8em; font-weight:600; color:#555; }
+        .ccl-checkboxes { display:flex; flex-wrap:wrap; gap:8px; }
+        .inline-edit-actions { display:flex; gap:8px; margin-top:12px; }
+        .game-results {
+            list-style:none; padding:0; margin:0; border:1px solid #ccc;
+            display:none; max-height:180px; overflow-y:auto; background:#fff;
+            position:absolute; z-index:1000; width:100%; box-shadow:0 2px 8px rgba(0,0,0,.15);
+        }
+        .game-results li { padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee; }
+        .game-results li:hover { background:#f5f5f5; }
+        .search-wrapper { position:relative; }
+    </style>
 </head>
 <body>
-    <!-- Bandeau PENDING_DELETION -->
     <div th:if="${isPendingDeletion}" class="banner banner-danger">
         <strong>⚠ Suppression de compte en cours.</strong>
     </div>
@@ -27,17 +55,14 @@
     <main class="container">
         <h2>Bindings</h2>
 
-        <!-- Filtres -->
         <div class="filters">
             <a th:href="@{/bindings}" class="btn btn-sm btn-outline">Tous</a>
             <a th:href="@{/bindings(status='AUTO')}" class="btn btn-sm btn-outline">AUTO</a>
             <a th:href="@{/bindings(status='MANUAL')}" class="btn btn-sm btn-outline">MANUAL</a>
             <a th:href="@{/bindings(status='INCOMPLETE')}" class="btn btn-sm btn-outline">INCOMPLETE</a>
             <a th:href="@{/bindings(source='STEAM')}" class="btn btn-sm btn-outline">Steam</a>
-            <a th:href="@{/bindings(source='DISCORD')}" class="btn btn-sm btn-outline">Discord</a>
         </div>
 
-        <!-- Tableau des bindings -->
         <div class="table-container">
             <table class="table">
                 <thead>
@@ -46,12 +71,14 @@
                         <th>Catégorie Twitch</th>
                         <th>CCLs</th>
                         <th>Statut</th>
+                        <th>CCL</th>
                         <th>Ignoré</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr th:each="binding : ${bindings.content}">
+                <tbody th:each="binding : ${bindings.content}">
+                    <!-- Vue -->
+                    <tr>
                         <td>
                             <span class="badge" th:text="${binding.sourceType}"></span>
                             <span th:text="${binding.sourceName}"></span>
@@ -61,7 +88,7 @@
                             <span th:unless="${binding.twitchGameName}" class="text-muted">—</span>
                         </td>
                         <td>
-                            <span th:each="ccl : ${binding.ccls}" class="badge badge-ccl" th:text="${ccl}"></span>
+                            <span th:each="ccl : ${binding.ccls}" class="badge badge-ccl" th:text="${ccl.name()}"></span>
                         </td>
                         <td>
                             <span class="badge"
@@ -69,15 +96,80 @@
                                   th:text="${binding.status}"></span>
                         </td>
                         <td>
-                            <span th:if="${binding.ignored}">✓</span>
+                            <form th:action="@{/bindings/{id}/ccl-toggle(id=${binding.id})}" method="post">
+                                <label class="toggle-label">
+                                    <input type="checkbox" name="enabled"
+                                           th:checked="${binding.cclEnabled}"
+                                           onchange="this.form.submit()">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </form>
+                        </td>
+                        <td>
+                            <form th:action="@{/bindings/{id}/ignored-toggle(id=${binding.id})}" method="post">
+                                <label class="toggle-label">
+                                    <input type="checkbox" name="ignored"
+                                           th:checked="${binding.ignored}"
+                                           onchange="this.form.submit()">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </form>
                         </td>
                         <td>
                             <button class="btn btn-sm btn-outline"
-                                    th:onclick="|openEditModal('${binding.id}', '${binding.twitchGameId}', '${binding.twitchGameName}', ${binding.ignored})|">
+                                    th:data-id="${binding.id}"
+                                    onclick="toggleEdit(this.dataset.id)">
                                 Modifier
                             </button>
-                            <form th:action="@{/bindings/{id}/delete(id=${binding.id})}" method="post" style="display:inline">
+                            <form th:action="@{/bindings/{id}/delete(id=${binding.id})}" method="post"
+                                  style="display:inline">
                                 <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <!-- Édition inline -->
+                    <tr th:id="'edit-row-' + ${binding.id}" class="edit-row" style="display:none">
+                        <td colspan="7">
+                            <form th:action="@{/bindings/{id}(id=${binding.id})}" method="post">
+                                <div class="inline-edit-fields">
+                                    <div class="inline-edit-field">
+                                        <label>Catégorie Twitch</label>
+                                        <div class="search-wrapper">
+                                            <input type="text"
+                                                   th:id="'gameSearch-' + ${binding.id}"
+                                                   th:data-id="${binding.id}"
+                                                   th:value="${binding.twitchGameName}"
+                                                   placeholder="Rechercher…"
+                                                   autocomplete="off"
+                                                   oninput="debouncedSearch(event, this.dataset.id)">
+                                            <ul th:id="'gameResults-' + ${binding.id}" class="game-results"></ul>
+                                        </div>
+                                        <input type="hidden" th:id="'twitchGameId-' + ${binding.id}"
+                                               name="twitchGameId" th:value="${binding.twitchGameId}">
+                                        <input type="hidden" th:id="'twitchGameName-' + ${binding.id}"
+                                               name="twitchGameName" th:value="${binding.twitchGameName}">
+                                    </div>
+                                    <div class="inline-edit-field">
+                                        <label>CCLs</label>
+                                        <div class="ccl-checkboxes">
+                                            <div th:each="ccl : ${availableCcls}">
+                                                <label>
+                                                    <input type="checkbox" name="ccls"
+                                                           th:value="${ccl.name()}"
+                                                           th:checked="${binding.ccls.contains(ccl)}">
+                                                    <span th:text="${ccl.name()}"></span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="inline-edit-actions">
+                                    <button type="button"
+                                            th:data-id="${binding.id}"
+                                            onclick="toggleEdit(this.dataset.id)"
+                                            class="btn btn-sm btn-outline">Annuler</button>
+                                    <button type="submit" class="btn btn-sm btn-primary">Enregistrer</button>
+                                </div>
                             </form>
                         </td>
                     </tr>
@@ -85,57 +177,58 @@
             </table>
         </div>
 
-        <!-- Pagination -->
         <div th:if="${bindings.totalPages > 1}" class="pagination">
-            <a th:if="${!bindings.first}" th:href="@{/bindings(page=${bindings.number - 1})}" class="btn btn-sm">Précédent</a>
+            <a th:if="${!bindings.first}" th:href="@{/bindings(page=${bindings.number - 1})}"
+               class="btn btn-sm">Précédent</a>
             <span th:text="${bindings.number + 1} + ' / ' + ${bindings.totalPages}"></span>
-            <a th:if="${!bindings.last}" th:href="@{/bindings(page=${bindings.number + 1})}" class="btn btn-sm">Suivant</a>
+            <a th:if="${!bindings.last}" th:href="@{/bindings(page=${bindings.number + 1})}"
+               class="btn btn-sm">Suivant</a>
         </div>
     </main>
 
-    <!-- Modal d'édition -->
-    <div id="editModal" class="modal" style="display:none">
-        <div class="modal-content">
-            <h3>Modifier le binding</h3>
-            <form id="editForm" method="post">
-                <label>Catégorie Twitch (IGDB)</label>
-                <input type="text" id="editTwitchGameId" name="twitchGameId">
-                <input type="text" id="editTwitchGameName" name="twitchGameName">
-
-                <label>CCLs</label>
-                <div class="ccl-checkboxes">
-                    <div th:each="ccl : ${availableCcls}">
-                        <label>
-                            <input type="checkbox" name="ccls" th:value="${ccl.name()}" th:id="${ccl.name()}">
-                            <span th:text="${ccl.name()}"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <label>
-                    <input type="checkbox" id="editIgnored" name="ignored">
-                    Ignorer ce jeu
-                </label>
-
-                <div class="modal-actions">
-                    <button type="button" onclick="closeEditModal()" class="btn btn-outline">Annuler</button>
-                    <button type="submit" class="btn btn-primary">Enregistrer</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <script>
-        function openEditModal(id, twitchGameId, twitchGameName, ignored) {
-            document.getElementById('editForm').action = '/bindings/' + id;
-            document.getElementById('editTwitchGameId').value = twitchGameId || '';
-            document.getElementById('editTwitchGameName').value = twitchGameName || '';
-            document.getElementById('editIgnored').checked = ignored;
-            document.getElementById('editModal').style.display = 'flex';
+        function toggleEdit(id) {
+            const row = document.getElementById('edit-row-' + id);
+            row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
         }
-        function closeEditModal() {
-            document.getElementById('editModal').style.display = 'none';
+
+        const debounceTimers = {};
+        function debouncedSearch(event, id) {
+            clearTimeout(debounceTimers[id]);
+            const q = event.target.value.trim();
+            const results = document.getElementById('gameResults-' + id);
+            if (q.length < 2) { results.style.display = 'none'; return; }
+            debounceTimers[id] = setTimeout(() => fetchSuggestions(q, id), 300);
         }
+
+        function fetchSuggestions(q, id) {
+            fetch('/api/games/search?q=' + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(data => {
+                    const results = document.getElementById('gameResults-' + id);
+                    results.replaceChildren();
+                    if (!data.length) { results.style.display = 'none'; return; }
+                    data.forEach(game => {
+                        const li = document.createElement('li');
+                        li.textContent = game.name;
+                        li.addEventListener('click', () => {
+                            document.getElementById('twitchGameId-' + id).value = game.id;
+                            document.getElementById('twitchGameName-' + id).value = game.name;
+                            document.getElementById('gameSearch-' + id).value = game.name;
+                            results.style.display = 'none';
+                        });
+                        results.appendChild(li);
+                    });
+                    results.style.display = 'block';
+                })
+                .catch(() => document.getElementById('gameResults-' + id).style.display = 'none');
+        }
+
+        document.addEventListener('click', e => {
+            document.querySelectorAll('.game-results').forEach(el => {
+                if (!el.previousElementSibling?.contains(e.target)) el.style.display = 'none';
+            });
+        });
     </script>
 </body>
 </html>

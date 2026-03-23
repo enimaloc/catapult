@@ -18,7 +18,7 @@ import java.util.UUID;
 public class GameBinding {
 
     public enum SourceType {
-        STEAM, DISCORD, MANUAL
+        STEAM, XBOX, BATTLENET, MANUAL
     }
 
     public enum Status {
@@ -55,6 +55,9 @@ public class GameBinding {
 
     @Column(nullable = false)
     private boolean ignored = false;
+
+    @Column(name = "ccl_enabled", nullable = false)
+    private boolean cclEnabled = true;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
