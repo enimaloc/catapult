@@ -1,185 +1,432 @@
 package fr.esportline.catapult.service;
 
+import fr.esportline.catapult.domain.IgdbGameCacheEntry;
+import fr.esportline.catapult.domain.IgdbGameCcl;
+import fr.esportline.catapult.domain.IgdbGameExternalId;
 import fr.esportline.catapult.domain.TwitchCcl;
+import fr.esportline.catapult.repository.IgdbGameCacheRepository;
+import fr.esportline.catapult.repository.IgdbGameCclRepository;
+import fr.esportline.catapult.repository.IgdbGameExternalIdRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import proto.ExternalGameSource;
+import proto.Game;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.Objects;
 
-/**
- * Service IGDB — résolution automatique de bindings et preload de la liste de jeux.
- * IGDB partage l'authentification avec Twitch (même client ID).
- */
 @Slf4j
 @Service
+@DependsOn("flyway")
 @RequiredArgsConstructor
 public class IgdbService {
 
-    private static final String IGDB_API_URL = "https://api.igdb.com/v4";
+    private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
+    private static final String KEY_STEAM_PREFIX = "steam:";
+    private static final String KEY_NAME_PREFIX  = "name:";
 
+    private final IgdbClient igdbClient;
+    private final IgdbGameCacheRepository cacheRepository;
+    private final IgdbGameExternalIdRepository externalIdRepository;
+    private final IgdbGameCclRepository cclRepository;
+    private final SteamStoreService steamStoreService;
     private final RestClient restClient;
 
     @Value("${app.igdb.client-id:}")
     private String clientId;
 
-    @Value("${app.igdb.preload-ttl-hours:24}")
-    private int preloadTtlHours;
+    @Value("${twitch.client-secret:}")
+    private String clientSecret;
 
-    @Value("${app.mapping.ccl.violence:}")
-    private String cclViolence;
+    @Value("${app.igdb.cache-ttl-hours:24}")
+    private int cacheTtlHours;
 
-    @Value("${app.mapping.ccl.mature:}")
-    private String cclMature;
+    // Keyword sets live in TwitchCcl (shared with SteamStoreService).
 
-    @Value("${app.mapping.ccl.sexual_content:}")
-    private String cclSexualContent;
+    private static final String CCL_FIELDS =
+        "age_ratings.rating_category.organization.name," +
+        "age_ratings.rating_category.rating," +
+        "age_ratings.rating_content_descriptions.description";
 
-    @Value("${app.mapping.ccl.drugs:}")
-    private String cclDrugs;
-
-    @Value("${app.mapping.ccl.gambling:}")
-    private String cclGambling;
-
-    @Value("${app.mapping.ccl.profanity:}")
-    private String cclProfanity;
-
-    @Value("${app.mapping.ccl.language_barrier:}")
-    private String cclLanguageBarrier;
-
-    // Cache de la liste IGDB : igdbId → {id, name}
+    // L1 cache: igdbId → name
     private final Map<String, String> igdbGameCache = new ConcurrentHashMap<>();
+
+    // L1 index: normalized name → IgdbGame
+    private final Map<String, IgdbGame> igdbNameIndex = new ConcurrentHashMap<>();
+
+    // CCL cache: igdbId → suggested CCLs (stable, no TTL needed)
+    private final Map<String, Set<TwitchCcl>> cclCache = new ConcurrentHashMap<>();
+
+    // App-level Twitch token
+    private volatile String appAccessToken;
+    private volatile Instant tokenExpiresAt = Instant.EPOCH;
+
+    // ExternalGameSource IDs (-1 = not resolved)
+    private volatile long steamSourceId = -1;
+    private volatile long twitchSourceId = -1;
 
     @PostConstruct
     public void init() {
-        preloadGameList();
-    }
-
-    @Scheduled(fixedRateString = "${app.igdb.preload-ttl-hours:24}",
-               timeUnit = TimeUnit.HOURS)
-    public void preloadGameList() {
-        // Preload basique — en production, paginer pour couvrir toute la liste
-        log.info("Preloading IGDB game list...");
-        igdbGameCache.clear();
-        log.info("IGDB game list preloaded ({} entries)", igdbGameCache.size());
+        steamSourceId  = loadSourceId("Steam");
+        twitchSourceId = loadSourceId("Twitch");
+        warmInMemoryCacheFromDb();
     }
 
     public Map<String, String> getGameCache() {
         return Collections.unmodifiableMap(igdbGameCache);
     }
 
-    /**
-     * Résolution par external_games (Steam appId → IGDB game).
-     */
-    @SuppressWarnings("unchecked")
-    public Optional<IgdbGame> findBySteamAppId(String appId, String twitchAccessToken) {
-        if (clientId.isBlank() || twitchAccessToken.isBlank()) return Optional.empty();
+    public Optional<IgdbGame> findBySteamAppId(String appId) {
+        if (clientId.isBlank()) return Optional.empty();
 
-        try {
-            List<Map<String, Object>> results = restClient.post()
-                .uri(IGDB_API_URL + "/external_games")
-                .header("Client-ID", clientId)
-                .header("Authorization", "Bearer " + twitchAccessToken)
-                .body("fields game.name,game.id,game.cover; where category=1 & uid=\"" + appId + "\"; limit 1;")
-                .retrieve()
-                .body(List.class);
-
-            if (results == null || results.isEmpty()) return Optional.empty();
-
-            Map<String, Object> externalGame = results.get(0);
-            Map<String, Object> game = (Map<String, Object>) externalGame.get("game");
-            if (game == null) return Optional.empty();
-
-            return Optional.of(new IgdbGame(
-                String.valueOf(game.get("id")),
-                (String) game.get("name")
-            ));
-        } catch (Exception e) {
-            log.warn("IGDB external_games lookup failed for appId {}: {}", appId, e.getMessage());
-            return Optional.empty();
+        // Check external ID table populated during preload
+        if (steamSourceId >= 0) {
+            Optional<IgdbGameExternalId> extId = externalIdRepository.findBySourceIdAndUid(steamSourceId, appId);
+            if (extId.isPresent()) {
+                String igdbId = extId.get().getIgdbId();
+                String name = igdbGameCache.get(igdbId);
+                if (name != null) {
+                    log.debug("IGDB external ID cache hit for Steam appId={}", appId);
+                    return Optional.of(new IgdbGame(igdbId, name));
+                }
+            }
         }
+
+        // Legacy steam: key lookup in igdb_game_cache
+        String key = KEY_STEAM_PREFIX + appId;
+        Optional<IgdbGame> fromDb = lookupInDb(key);
+        if (fromDb.isPresent()) return fromDb;
+
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return Optional.empty();
+
+        List<proto.ExternalGame> results = igdbClient.findExternalGameByUid(appId, steamSourceId, token);
+        if (results.isEmpty()) return Optional.empty();
+
+        Game game = results.get(0).getGame();
+        IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
+        igdbGameCache.put(resolved.id(), resolved.name());
+        igdbNameIndex.put(normalise(resolved.name()), resolved);
+        saveToDb(key, resolved);
+        return Optional.of(resolved);
     }
 
     /**
-     * Résolution par nom (fallback textuel).
+     * Pré-chauffe le cache pour une liste de Steam appIds en batch (max 500 par appel IGDB).
+     * Les jeux déjà en cache DB ou mémoire sont ignorés.
      */
-    @SuppressWarnings("unchecked")
-    public Optional<IgdbGame> findByName(String gameName, String twitchAccessToken) {
-        if (clientId.isBlank() || twitchAccessToken.isBlank()) return Optional.empty();
+    public void prewarmSteamAppIds(List<String> appIds) {
+        if (clientId.isBlank() || appIds.isEmpty()) return;
 
-        try {
-            List<Map<String, Object>> results = restClient.post()
-                .uri(IGDB_API_URL + "/games")
-                .header("Client-ID", clientId)
-                .header("Authorization", "Bearer " + twitchAccessToken)
-                .body("fields id,name; search \"" + gameName.replace("\"", "") + "\"; limit 1;")
-                .retrieve()
-                .body(List.class);
+        // Filtrer ceux déjà en cache mémoire (via external ID table ou igdbGameCache)
+        List<String> uncached = appIds.stream()
+            .filter(id -> externalIdRepository.findBySourceIdAndUid(steamSourceId, id).isEmpty())
+            .filter(id -> lookupInDb(KEY_STEAM_PREFIX + id).isEmpty())
+            .toList();
 
-            if (results == null || results.isEmpty()) return Optional.empty();
-
-            Map<String, Object> game = results.get(0);
-            return Optional.of(new IgdbGame(
-                String.valueOf(game.get("id")),
-                (String) game.get("name")
-            ));
-        } catch (Exception e) {
-            log.warn("IGDB name lookup failed for '{}': {}", gameName, e.getMessage());
-            return Optional.empty();
+        if (uncached.isEmpty()) {
+            log.debug("All {} Steam appIds already cached", appIds.size());
+            return;
         }
+
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return;
+
+        int batchSize = 500;
+        int resolved = 0;
+        for (int i = 0; i < uncached.size(); i += batchSize) {
+            List<String> chunk = uncached.subList(i, Math.min(i + batchSize, uncached.size()));
+            List<proto.ExternalGame> results = igdbClient.findExternalGamesByUids(chunk, steamSourceId, token);
+            for (proto.ExternalGame ext : results) {
+                Game game = ext.getGame();
+                IgdbGame igdbGame = new IgdbGame(String.valueOf(game.getId()), game.getName());
+                igdbGameCache.put(igdbGame.id(), igdbGame.name());
+                igdbNameIndex.put(normalise(igdbGame.name()), igdbGame);
+                saveToDb(KEY_STEAM_PREFIX + ext.getUid(), igdbGame);
+                resolved++;
+            }
+        }
+        log.info("Steam batch prewarm: {}/{} resolved ({} already cached)",
+            resolved, appIds.size(), appIds.size() - uncached.size());
+    }
+
+    public Optional<IgdbGame> findByName(String gameName) {
+        if (clientId.isBlank()) return Optional.empty();
+
+        String normalized = normalise(gameName);
+        IgdbGame cached = igdbNameIndex.get(normalized);
+        if (cached != null) {
+            log.debug("IGDB in-memory cache hit for '{}'", gameName);
+            return Optional.of(cached);
+        }
+
+        String key = KEY_NAME_PREFIX + normalized;
+        Optional<IgdbGame> fromDb = lookupInDb(key);
+        if (fromDb.isPresent()) {
+            igdbNameIndex.put(normalized, fromDb.get());
+            return fromDb;
+        }
+
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return Optional.empty();
+
+        List<Game> results = igdbClient.searchByName(gameName, token);
+        if (results.isEmpty()) return Optional.empty();
+
+        Game game = results.get(0);
+        IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
+        igdbNameIndex.put(normalized, resolved);
+        saveToDb(key, resolved);
+        return Optional.of(resolved);
     }
 
     /**
-     * Suggère des CCLs à partir des métadonnées IGDB d'un jeu.
+     * Pré-chauffe le cache CCL pour tous les jeux déjà connus (igdb_game_cache) mais
+     * pas encore dans igdb_game_ccl_cache. Utilise des appels batch IGDB (max 500 par requête).
      */
-    @SuppressWarnings("unchecked")
-    public Set<TwitchCcl> suggestCcls(String igdbGameId, String twitchAccessToken) {
+    public void prewarmCclCache() {
+        if (clientId.isBlank()) return;
+
+        Instant since = Instant.now().minusSeconds(cacheTtlHours * 3600L);
+        Set<String> knownIds = cacheRepository.findByCachedAtAfter(since).stream()
+            .map(IgdbGameCacheEntry::getIgdbId)
+            .collect(Collectors.toSet());
+        if (knownIds.isEmpty()) return;
+
+        Set<String> alreadyCached = cclRepository.findAllIgdbIds();
+        List<String> toLoad = knownIds.stream()
+            .filter(id -> !alreadyCached.contains(id) && !cclCache.containsKey(id))
+            .collect(Collectors.toList());
+
+        if (toLoad.isEmpty()) {
+            log.info("CCL cache already warm for all {} cached games", knownIds.size());
+            return;
+        }
+
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return;
+
+        // Build igdbId → steamAppId map for the batch
+        Map<String, String> igdbToSteam = new HashMap<>();
+        if (steamSourceId >= 0) {
+            externalIdRepository.findBySourceIdAndIgdbIdIn(steamSourceId, toLoad)
+                .forEach(e -> igdbToSteam.put(e.getIgdbId(), e.getUid()));
+        }
+
+        log.info("CCL prewarm: loading {} / {} games ({} with Steam data)",
+            toLoad.size(), knownIds.size(), igdbToSteam.size());
+
+        int batchSize = 500;
+        int resolved = 0;
+        for (int i = 0; i < toLoad.size(); i += batchSize) {
+            List<String> chunk = toLoad.subList(i, Math.min(i + batchSize, toLoad.size()));
+
+            // Batch IGDB fetch
+            List<Game> games = igdbClient.fetchGamesByIds(chunk, CCL_FIELDS, token);
+
+            // Batch Steam fetch for the chunk
+            List<String> steamIds = chunk.stream()
+                .map(igdbToSteam::get).filter(Objects::nonNull).toList();
+            Map<String, Set<TwitchCcl>> steamCcls = steamStoreService.fetchCcls(steamIds);
+
+            for (Game game : games) {
+                String igdbId   = String.valueOf(game.getId());
+                String steamId  = igdbToSteam.get(igdbId);
+                Set<TwitchCcl> fromSteam = steamId != null ? steamCcls.getOrDefault(steamId, Set.of()) : Set.of();
+                storeCcls(igdbId, game, fromSteam);
+                resolved++;
+            }
+        }
+        log.info("CCL prewarm complete: {} / {} fetched", resolved, toLoad.size());
+    }
+
+    public Optional<String> findTwitchGameId(String igdbGameId) {
+        if (twitchSourceId < 0) return Optional.empty();
+        return externalIdRepository.findByIgdbIdAndSourceId(igdbGameId, twitchSourceId)
+            .map(IgdbGameExternalId::getUid);
+    }
+
+    public Set<TwitchCcl> suggestCcls(String igdbGameId) {
+        // L1: in-memory
+        Set<TwitchCcl> cached = cclCache.get(igdbGameId);
+        if (cached != null) {
+            log.debug("CCL L1 cache hit for igdbId={}", igdbGameId);
+            return cached;
+        }
+        // L2: DB
+        var fromDb = cclRepository.findById(igdbGameId);
+        if (fromDb.isPresent()) {
+            Set<TwitchCcl> dbCcls = Collections.unmodifiableSet(fromDb.get().getCcls());
+            cclCache.put(igdbGameId, dbCcls);
+            log.debug("CCL L2 (DB) cache hit for igdbId={}", igdbGameId);
+            return dbCcls;
+        }
+
+        if (clientId.isBlank()) return Set.of();
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return Set.of();
+
+        List<Game> results = igdbClient.fetchGameById(igdbGameId, CCL_FIELDS, token);
+        if (results.isEmpty()) return Set.of();
+
+        // Steam enrichment for single-game lookup
+        Set<TwitchCcl> steamCcls = Set.of();
+        if (steamSourceId >= 0) {
+            Optional<String> steamAppId = externalIdRepository
+                .findByIgdbIdAndSourceId(igdbGameId, steamSourceId)
+                .map(IgdbGameExternalId::getUid);
+            if (steamAppId.isPresent()) {
+                steamCcls = steamStoreService.fetchCcls(List.of(steamAppId.get()))
+                    .getOrDefault(steamAppId.get(), Set.of());
+            }
+        }
+
+        return storeCcls(igdbGameId, results.get(0), steamCcls);
+    }
+
+    // -------------------------------------------------------------------------
+    // CCL helpers
+    // -------------------------------------------------------------------------
+
+    private Set<TwitchCcl> storeCcls(String igdbGameId, Game game, Set<TwitchCcl> steamCcls) {
+        Set<TwitchCcl> suggested = extractCcls(game);
+        suggested.addAll(steamCcls);
+        String ageRatingsLabel = extractAgeRatingsLabel(game);
+        log.debug("IGDB+Steam CCL for {}: ratings={}, suggested={}", igdbGameId, ageRatingsLabel, suggested);
+        Set<TwitchCcl> immutable = Collections.unmodifiableSet(suggested);
+        cclCache.put(igdbGameId, immutable);
+        cclRepository.save(new IgdbGameCcl(igdbGameId, suggested, ageRatingsLabel));
+        return immutable;
+    }
+
+    private Set<TwitchCcl> extractCcls(Game game) {
         Set<TwitchCcl> suggested = new HashSet<>();
-        if (clientId.isBlank() || twitchAccessToken.isBlank()) return suggested;
-
-        try {
-            List<Map<String, Object>> results = restClient.post()
-                .uri(IGDB_API_URL + "/games")
-                .header("Client-ID", clientId)
-                .header("Authorization", "Bearer " + twitchAccessToken)
-                .body("fields themes.name,keywords.name,age_ratings.rating; where id=" + igdbGameId + ";")
-                .retrieve()
-                .body(List.class);
-
-            if (results == null || results.isEmpty()) return suggested;
-
-            Map<String, Object> game = results.get(0);
-            List<Map<String, Object>> themes = (List<Map<String, Object>>) game.getOrDefault("themes", List.of());
-            List<Map<String, Object>> keywords = (List<Map<String, Object>>) game.getOrDefault("keywords", List.of());
-
-            Set<String> terms = new HashSet<>();
-            themes.forEach(t -> terms.add(String.valueOf(t.get("name")).toLowerCase()));
-            keywords.forEach(k -> terms.add(String.valueOf(k.get("name")).toLowerCase()));
-
-            mapTermToCcl(terms, cclViolence, "violence", TwitchCcl.ViolentGraphic, suggested);
-            mapTermToCcl(terms, cclMature, "mature", TwitchCcl.MatureGame, suggested);
-            mapTermToCcl(terms, cclSexualContent, "sexual", TwitchCcl.SexualThemes, suggested);
-            mapTermToCcl(terms, cclDrugs, "drug", TwitchCcl.DrugUse, suggested);
-            mapTermToCcl(terms, cclGambling, "gambling", TwitchCcl.Gambling, suggested);
-            mapTermToCcl(terms, cclProfanity, "profanity", TwitchCcl.ProfanityVulgarity, suggested);
-            mapTermToCcl(terms, cclLanguageBarrier, "language", TwitchCcl.LanguageBarrier, suggested);
-        } catch (Exception e) {
-            log.warn("IGDB CCL suggestion failed for game {}: {}", igdbGameId, e.getMessage());
+        for (proto.AgeRating ar : game.getAgeRatingsList()) {
+            proto.AgeRatingCategory rc = ar.getRatingCategory();
+            String org    = rc.getOrganization().getName();
+            String rating = rc.getRating();
+            if (!org.isBlank() && !rating.isBlank()) {
+                String orgUc = org.toUpperCase(java.util.Locale.ROOT);
+                if ((orgUc.contains("ESRB") && (rating.equals("M") || rating.equals("AO")))
+                    || (orgUc.contains("PEGI") && rating.equals("18"))) {
+                    suggested.add(TwitchCcl.MatureGame);
+                }
+            }
+            for (proto.AgeRatingContentDescriptionV2 desc : ar.getRatingContentDescriptionsList()) {
+                String d = desc.getDescription().toLowerCase(java.util.Locale.ROOT);
+                if (TwitchCcl.KW_VIOLENCE.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ViolentGraphic);
+                if (TwitchCcl.KW_SEXUAL.stream().anyMatch(d::contains))    suggested.add(TwitchCcl.SexualThemes);
+                if (TwitchCcl.KW_DRUGS.stream().anyMatch(d::contains))     suggested.add(TwitchCcl.DrugsIntoxication);
+                if (TwitchCcl.KW_GAMBLING.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.Gambling);
+                if (TwitchCcl.KW_LANGUAGE.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ProfanityVulgarity);
+            }
         }
-
         return suggested;
     }
 
-    private void mapTermToCcl(Set<String> terms, String igdbKey, String keyword, TwitchCcl ccl, Set<TwitchCcl> result) {
-        if (!igdbKey.isBlank() && terms.stream().anyMatch(t -> t.contains(keyword))) {
-            result.add(ccl);
+    private String extractAgeRatingsLabel(Game game) {
+        Set<String> labels = new LinkedHashSet<>();
+        for (proto.AgeRating ar : game.getAgeRatingsList()) {
+            proto.AgeRatingCategory rc = ar.getRatingCategory();
+            String org    = rc.getOrganization().getName();
+            String rating = rc.getRating();
+            if (!org.isBlank() && !rating.isBlank()) {
+                labels.add(org + " " + rating);
+            }
         }
+        return String.join(", ", labels);
+    }
+
+    // -------------------------------------------------------------------------
+    // Internals
+    // -------------------------------------------------------------------------
+
+    private long loadSourceId(String name) {
+        if (clientId.isBlank() || clientSecret.isBlank()) return -1;
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return -1;
+
+        try {
+            List<ExternalGameSource> sources = igdbClient.findSourcesByName(name, token);
+            if (!sources.isEmpty()) {
+                long id = sources.get(0).getId();
+                log.info("{} ExternalGameSource ID resolved: {}", name, id);
+                return id;
+            } else {
+                log.warn("{} ExternalGameSource not found", name);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve {} ExternalGameSource ID: {}", name, e.getMessage());
+        }
+        return -1;
+    }
+
+    private void warmInMemoryCacheFromDb() {
+        Instant since = Instant.now().minusSeconds(cacheTtlHours * 3600L);
+        List<IgdbGameCacheEntry> entries = cacheRepository.findByCachedAtAfter(since);
+        for (IgdbGameCacheEntry entry : entries) {
+            IgdbGame game = new IgdbGame(entry.getIgdbId(), entry.getName());
+            if (entry.getLookupKey().startsWith(KEY_NAME_PREFIX)) {
+                String normalizedName = entry.getLookupKey().substring(KEY_NAME_PREFIX.length());
+                igdbNameIndex.put(normalizedName, game);
+            }
+            igdbGameCache.putIfAbsent(entry.getIgdbId(), entry.getName());
+        }
+        log.info("IGDB DB cache warmed: {} entries loaded", entries.size());
+    }
+
+    private Optional<IgdbGame> lookupInDb(String key) {
+        return cacheRepository.findById(key)
+            .filter(e -> e.getCachedAt().isAfter(Instant.now().minusSeconds(cacheTtlHours * 3600L)))
+            .map(e -> new IgdbGame(e.getIgdbId(), e.getName()));
+    }
+
+    private void saveToDb(String key, IgdbGame game) {
+        cacheRepository.save(new IgdbGameCacheEntry(key, game.id(), game.name()));
+    }
+
+    @SuppressWarnings("unchecked")
+    synchronized String getOrRefreshAppToken() {
+        if (appAccessToken != null && Instant.now().isBefore(tokenExpiresAt.minusSeconds(60))) {
+            return appAccessToken;
+        }
+        try {
+            Map<String, Object> response = restClient.post()
+                .uri(TWITCH_TOKEN_URL + "?client_id=" + clientId
+                     + "&client_secret=" + clientSecret
+                     + "&grant_type=client_credentials")
+                .retrieve()
+                .body(Map.class);
+
+            if (response == null) {
+                log.error("IGDB app token request returned null");
+                return "";
+            }
+
+            appAccessToken = (String) response.get("access_token");
+            Number expiresIn = (Number) response.get("expires_in");
+            tokenExpiresAt = expiresIn != null
+                ? Instant.now().plusSeconds(expiresIn.longValue())
+                : Instant.now().plusSeconds(3600);
+
+            log.debug("IGDB app access token refreshed, expires in {}s", expiresIn);
+            return appAccessToken != null ? appAccessToken : "";
+        } catch (Exception e) {
+            log.error("Failed to fetch IGDB app access token: {}", e.getMessage());
+            return "";
+        }
+    }
+
+    private static String normalise(String name) {
+        return name == null ? "" : name.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     public record IgdbGame(String id, String name) {}

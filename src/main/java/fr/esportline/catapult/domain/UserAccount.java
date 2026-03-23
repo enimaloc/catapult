@@ -29,6 +29,9 @@ public class UserAccount {
     @Column(name = "twitch_username", nullable = false)
     private String twitchUsername;
 
+    @Column(name = "steam_id", unique = true)
+    private String steamId;
+
     @Column(name = "bot_enabled", nullable = false)
     private boolean botEnabled = true;
 
