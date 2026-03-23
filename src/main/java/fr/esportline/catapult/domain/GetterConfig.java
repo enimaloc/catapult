@@ -16,7 +16,7 @@ import java.util.UUID;
 public class GetterConfig {
 
     public enum Provider {
-        STEAM, DISCORD
+        STEAM, XBOX, BATTLENET
     }
 
     @Id

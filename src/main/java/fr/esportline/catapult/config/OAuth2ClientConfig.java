@@ -15,23 +15,23 @@ import java.util.List;
 @Configuration
 public class OAuth2ClientConfig {
 
-    @Value("${TWITCH_CLIENT_ID:}")
+    @Value("${twitch.client-id:}")
     private String twitchClientId;
 
-    @Value("${TWITCH_CLIENT_SECRET:}")
+    @Value("${twitch.client-secret:}")
     private String twitchClientSecret;
 
-    @Value("${STEAM_CLIENT_ID:}")
-    private String steamClientId;
+    @Value("${xbox.client-id:}")
+    private String xboxClientId;
 
-    @Value("${STEAM_CLIENT_SECRET:}")
-    private String steamClientSecret;
+    @Value("${xbox.client-secret:}")
+    private String xboxClientSecret;
 
-    @Value("${DISCORD_CLIENT_ID:}")
-    private String discordClientId;
+    @Value("${battlenet.client-id:}")
+    private String battleNetClientId;
 
-    @Value("${DISCORD_CLIENT_SECRET:}")
-    private String discordClientSecret;
+    @Value("${battlenet.client-secret:}")
+    private String battleNetClientSecret;
 
     @Bean
     public ClientRegistrationRepository clientRegistrationRepository() {
@@ -50,30 +50,31 @@ public class OAuth2ClientConfig {
             .userNameAttributeName("id")
             .build());
 
-        if (!steamClientId.isBlank() && !steamClientSecret.isBlank()) {
-            registrations.add(ClientRegistration.withRegistrationId("steam")
-                .clientId(steamClientId)
-                .clientSecret(steamClientSecret)
+        if (!xboxClientId.isBlank() && !xboxClientSecret.isBlank()) {
+            registrations.add(ClientRegistration.withRegistrationId("xbox")
+                .clientId(xboxClientId)
+                .clientSecret(xboxClientSecret)
+                .scope("openid", "XboxLive.signin", "XboxLive.offline_access")
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
-                .authorizationUri("https://steamcommunity.com/openid/login")
-                .tokenUri("https://steamcommunity.com/openid/login")
-                .userInfoUri("https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/")
-                .userNameAttributeName("steamid")
+                .authorizationUri("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize")
+                .tokenUri("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+                .userInfoUri("https://graph.microsoft.com/v1.0/me")
+                .userNameAttributeName("id")
                 .build());
         }
 
-        if (!discordClientId.isBlank() && !discordClientSecret.isBlank()) {
-            registrations.add(ClientRegistration.withRegistrationId("discord")
-                .clientId(discordClientId)
-                .clientSecret(discordClientSecret)
-                .scope("identify", "activities.read")
+        if (!battleNetClientId.isBlank() && !battleNetClientSecret.isBlank()) {
+            registrations.add(ClientRegistration.withRegistrationId("battlenet")
+                .clientId(battleNetClientId)
+                .clientSecret(battleNetClientSecret)
+                .scope("openid")
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
-                .authorizationUri("https://discord.com/oauth2/authorize")
-                .tokenUri("https://discord.com/api/oauth2/token")
-                .userInfoUri("https://discord.com/api/users/@me")
-                .userNameAttributeName("id")
+                .authorizationUri("https://oauth.battle.net/authorize")
+                .tokenUri("https://oauth.battle.net/token")
+                .userInfoUri("https://oauth.battle.net/userinfo")
+                .userNameAttributeName("sub")
                 .build());
         }
 
