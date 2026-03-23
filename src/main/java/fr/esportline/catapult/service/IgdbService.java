@@ -63,7 +63,7 @@ public class IgdbService {
     private final Map<String, IgdbGame> igdbNameIndex = new ConcurrentHashMap<>();
 
     // CCL cache: igdbId → suggested CCLs (stable, no TTL needed)
-    private final Map<String, Set<TwitchCcl>> cclCache = new ConcurrentHashMap<>();
+    private final Map<String, Set<String>> cclCache = new ConcurrentHashMap<>();
 
     // App-level Twitch token
     private volatile String appAccessToken;
@@ -254,9 +254,9 @@ public class IgdbService {
             .map(IgdbGameExternalId::getUid);
     }
 
-    public Set<TwitchCcl> suggestCcls(String igdbGameId) {
+    public Set<String> suggestCcls(String igdbGameId) {
         // L1: in-memory
-        Set<TwitchCcl> cached = cclCache.get(igdbGameId);
+        Set<String> cached = cclCache.get(igdbGameId);
         if (cached != null) {
             log.debug("CCL L1 cache hit for igdbId={}", igdbGameId);
             return cached;
@@ -264,7 +264,9 @@ public class IgdbService {
         // L2: DB
         var fromDb = cclRepository.findById(igdbGameId);
         if (fromDb.isPresent()) {
-            Set<TwitchCcl> dbCcls = Collections.unmodifiableSet(fromDb.get().getCcls());
+            Set<String> dbCcls = Collections.unmodifiableSet(
+                fromDb.get().getCcls().stream().map(Enum::name).collect(Collectors.toSet())
+            );
             cclCache.put(igdbGameId, dbCcls);
             log.debug("CCL L2 (DB) cache hit for igdbId={}", igdbGameId);
             return dbCcls;
@@ -296,15 +298,17 @@ public class IgdbService {
     // CCL helpers
     // -------------------------------------------------------------------------
 
-    private Set<TwitchCcl> storeCcls(String igdbGameId, Game game, Set<TwitchCcl> steamCcls) {
+    private Set<String> storeCcls(String igdbGameId, Game game, Set<TwitchCcl> steamCcls) {
         Set<TwitchCcl> suggested = extractCcls(game);
         suggested.addAll(steamCcls);
         String ageRatingsLabel = extractAgeRatingsLabel(game);
         log.debug("IGDB+Steam CCL for {}: ratings={}, suggested={}", igdbGameId, ageRatingsLabel, suggested);
-        Set<TwitchCcl> immutable = Collections.unmodifiableSet(suggested);
-        cclCache.put(igdbGameId, immutable);
         cclRepository.save(new IgdbGameCcl(igdbGameId, suggested, ageRatingsLabel));
-        return immutable;
+        Set<String> result = Collections.unmodifiableSet(
+            suggested.stream().map(Enum::name).collect(Collectors.toSet())
+        );
+        cclCache.put(igdbGameId, result);
+        return result;
     }
 
     private Set<TwitchCcl> extractCcls(Game game) {

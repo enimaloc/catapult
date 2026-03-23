@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/springsecurity6">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -46,6 +46,7 @@
             <a th:href="@{/dashboard}">Dashboard</a>
             <a th:href="@{/bindings}" class="active">Bindings</a>
             <a th:href="@{/settings}">Settings</a>
+            <a th:href="@{/admin/ccl}" sec:authorize="hasRole('ADMIN')">Admin CCL</a>
             <form th:action="@{/logout}" method="post" style="display:inline">
                 <button type="submit" class="btn-link">Déconnexion</button>
             </form>
@@ -88,7 +89,7 @@
                             <span th:unless="${binding.twitchGameName}" class="text-muted">—</span>
                         </td>
                         <td>
-                            <span th:each="ccl : ${binding.ccls}" class="badge badge-ccl" th:text="${ccl.name()}"></span>
+                            <span th:each="ccl : ${binding.ccls}" class="badge badge-ccl" th:text="${ccl}"></span>
                         </td>
                         <td>
                             <span class="badge"
@@ -155,9 +156,9 @@
                                             <div th:each="ccl : ${availableCcls}">
                                                 <label>
                                                     <input type="checkbox" name="ccls"
-                                                           th:value="${ccl.name()}"
-                                                           th:checked="${binding.ccls.contains(ccl)}">
-                                                    <span th:text="${ccl.name()}"></span>
+                                                           th:value="${ccl.id}"
+                                                           th:checked="${binding.ccls.contains(ccl.id)}">
+                                                    <span th:text="${ccl.name}"></span>
                                                 </label>
                                             </div>
                                         </div>

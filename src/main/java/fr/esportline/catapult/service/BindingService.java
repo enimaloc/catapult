@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -28,7 +29,6 @@ public class BindingService {
         );
 
         return existing.orElseGet(() -> createWithIgdbResolution(user, detectedGame));
-
     }
 
     private GameBinding createWithIgdbResolution(UserAccount user, DetectedGame detectedGame) {
@@ -50,8 +50,8 @@ public class BindingService {
             binding.setTwitchGameName(gameName);
             binding.setStatus(GameBinding.Status.AUTO);
 
-            var ccls = igdbService.suggestCcls(igdbId);
-            binding.setCcls(ccls);
+            Set<String> ccls = igdbService.suggestCcls(igdbId);
+            binding.getCcls().addAll(ccls);
 
             log.info("Binding created for user {} — game '{}' resolved to IGDB '{}' (twitchId={})",
                 user.getId(), detectedGame.getSourceName(), igdbGame.get().name(), twitchId);
@@ -75,8 +75,8 @@ public class BindingService {
     }
 
     @Transactional
-    public void updateBinding(UserAccount user, UUID bindingId, String twitchGameId, String twitchGameName,
-                              java.util.Set<fr.esportline.catapult.domain.TwitchCcl> ccls, boolean ignored) {
+    public void updateBinding(UserAccount user, UUID bindingId, String twitchGameId,
+                              String twitchGameName, Set<String> ccls, boolean ignored) {
         gameBindingRepository.findById(bindingId).ifPresent(binding -> {
             binding.setTwitchGameId(twitchGameId);
             binding.setTwitchGameName(twitchGameName);
