@@ -8,6 +8,7 @@ import fr.esportline.catapult.repository.UserSettingsRepository;
 import fr.esportline.catapult.security.CatapultOAuth2User;
 import fr.esportline.catapult.service.AccountService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.stereotype.Controller;
@@ -20,6 +21,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequiredArgsConstructor
 public class SettingsController {
 
+    @Value("${steam.api-key:}")
+    private String steamApiKey;
+
     private final OAuthTokenRepository oAuthTokenRepository;
     private final GetterConfigRepository getterConfigRepository;
     private final UserSettingsRepository userSettingsRepository;
@@ -30,14 +34,17 @@ public class SettingsController {
     public String settings(@AuthenticationPrincipal CatapultOAuth2User principal, Model model) {
         UserAccount user = principal.getUserAccount();
 
-        boolean hasSteamProvider = clientRegistrationRepository.findByRegistrationId("steam") != null;
-        boolean hasDiscordProvider = clientRegistrationRepository.findByRegistrationId("discord") != null;
+        boolean hasSteamProvider = !steamApiKey.isBlank();
+        boolean hasXboxProvider = clientRegistrationRepository.findByRegistrationId("xbox") != null;
+        boolean hasBattleNetProvider = clientRegistrationRepository.findByRegistrationId("battlenet") != null;
 
         model.addAttribute("user", user);
         model.addAttribute("hasSteamProvider", hasSteamProvider);
-        model.addAttribute("hasDiscordProvider", hasDiscordProvider);
-        model.addAttribute("hasSteam", hasSteamProvider && oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.STEAM).isPresent());
-        model.addAttribute("hasDiscord", hasDiscordProvider && oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.DISCORD).isPresent());
+        model.addAttribute("hasXboxProvider", hasXboxProvider);
+        model.addAttribute("hasBattleNetProvider", hasBattleNetProvider);
+        model.addAttribute("hasSteam", hasSteamProvider && user.getSteamId() != null);
+        model.addAttribute("hasXbox", hasXboxProvider && oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.XBOX).isPresent());
+        model.addAttribute("hasBattleNet", hasBattleNetProvider && oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.BATTLENET).isPresent());
         model.addAttribute("getterConfigs", getterConfigRepository.findByUserOrderByPriorityAsc(user));
         model.addAttribute("settings", userSettingsRepository.findById(user.getId()).orElse(null));
         model.addAttribute("isPendingDeletion", user.getStatus() == UserAccount.Status.PENDING_DELETION);
