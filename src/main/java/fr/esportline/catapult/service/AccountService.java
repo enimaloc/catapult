@@ -65,10 +65,11 @@ public class AccountService {
 
     private void deleteAccountPermanently(UserAccount account) {
         revokeToken(account, OAuthToken.Provider.TWITCH);
-        revokeToken(account, OAuthToken.Provider.DISCORD);
-        // Steam : pas d'endpoint de révocation officiel, suppression en base uniquement
-        oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.STEAM)
-            .ifPresent(oAuthTokenRepository::delete);
+        // Pas d'endpoint de révocation officiel pour ces providers — suppression en base uniquement
+        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
+            oAuthTokenRepository.findByUserAndProvider(account, p)
+                .ifPresent(oAuthTokenRepository::delete);
+        }
 
         userAccountRepository.delete(account);
         log.info("Account {} permanently deleted", account.getId());
