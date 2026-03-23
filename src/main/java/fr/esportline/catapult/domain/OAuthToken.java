@@ -17,7 +17,7 @@ import java.util.UUID;
 public class OAuthToken {
 
     public enum Provider {
-        TWITCH, STEAM, DISCORD
+        TWITCH, XBOX, BATTLENET
     }
 
     @Id
