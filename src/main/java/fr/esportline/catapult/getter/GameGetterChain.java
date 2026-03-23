@@ -23,12 +23,10 @@ public class GameGetterChain {
 
     private final GetterConfigRepository getterConfigRepository;
     private final SteamGameGetter steamGameGetter;
-    private final DiscordGameGetter discordGameGetter;
 
     public Optional<DetectedGame> resolve(UserAccount user) {
         Map<GetterConfig.Provider, GameGetter> getterByProvider = Map.of(
-            GetterConfig.Provider.STEAM, steamGameGetter,
-            GetterConfig.Provider.DISCORD, discordGameGetter
+            GetterConfig.Provider.STEAM, steamGameGetter
         );
 
         List<GetterConfig> configs = getterConfigRepository.findByUserOrderByPriorityAsc(user);
