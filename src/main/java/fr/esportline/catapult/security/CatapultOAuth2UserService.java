@@ -10,6 +10,7 @@ import fr.esportline.catapult.repository.UserAccountRepository;
 import fr.esportline.catapult.repository.UserSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -38,6 +39,9 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private final GetterConfigRepository getterConfigRepository;
     private final TokenEncryptionService tokenEncryptionService;
     private final RestClient restClient;
+
+    @Value("${app.owner-id:}")
+    private String ownerId;
 
     private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
 
@@ -133,7 +137,8 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         userAccountRepository.save(account);
         saveToken(account, OAuthToken.Provider.TWITCH, userRequest);
 
-        return new CatapultOAuth2User(oAuth2User, account);
+        boolean isAdmin = !ownerId.isBlank() && ownerId.equals(twitchId);
+        return new CatapultOAuth2User(oAuth2User, account, isAdmin);
     }
 
     private UserAccount createNewAccount(String twitchId, String twitchUsername) {
