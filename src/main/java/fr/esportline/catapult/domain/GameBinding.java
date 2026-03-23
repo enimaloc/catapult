@@ -64,9 +64,8 @@ public class GameBinding {
         name = "binding_ccl",
         joinColumns = @JoinColumn(name = "binding_id")
     )
-    @Enumerated(EnumType.STRING)
     @Column(name = "ccl")
-    private Set<TwitchCcl> ccls = new HashSet<>();
+    private Set<String> ccls = new HashSet<>();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
