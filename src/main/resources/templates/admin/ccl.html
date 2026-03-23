@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catapult — Admin CCL</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+    <nav class="navbar">
+        <a th:href="@{/dashboard}" class="nav-brand">🚀 Catapult</a>
+        <div class="nav-links">
+            <a th:href="@{/dashboard}">Dashboard</a>
+            <a th:href="@{/bindings}">Bindings</a>
+            <a th:href="@{/settings}">Settings</a>
+            <a th:href="@{/admin/ccl}" class="active">Admin CCL</a>
+            <form th:action="@{/logout}" method="post" style="display:inline">
+                <button type="submit" class="btn-link">Déconnexion</button>
+            </form>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+            <h2>Administration — CCL</h2>
+            <form th:action="@{/admin/ccl/refresh}" method="post">
+                <button type="submit" class="btn btn-outline">Actualiser depuis les APIs</button>
+            </form>
+        </div>
+
+        <div th:if="${#lists.isEmpty(ccls)}" class="text-muted">
+            <p>Aucune CCL Twitch trouvée. Cliquez sur "Actualiser depuis les APIs" pour synchroniser.</p>
+        </div>
+
+        <div th:unless="${#lists.isEmpty(ccls)}" class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>CCL Twitch</th>
+                        <th>Description</th>
+                        <th>Catégories IGDB associées</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="ccl : ${ccls}">
+                        <td>
+                            <strong th:text="${ccl.name}"></strong><br>
+                            <span class="badge" th:text="${ccl.id}"></span>
+                        </td>
+                        <td class="text-muted" th:text="${ccl.description}"></td>
+                        <td>
+                            <form th:action="@{/admin/ccl/{id}/mappings(id=${ccl.id})}" method="post">
+                                <select name="igdbCategoryIds" multiple size="5" style="width:100%; min-width:200px;">
+                                    <option th:each="cat : ${igdbCategories}"
+                                            th:value="${cat.id}"
+                                            th:text="${cat.displayName}"
+                                            th:selected="${ccl.igdbMappings.contains(cat)}">
+                                    </option>
+                                </select>
+                                <div style="margin-top:0.5rem;">
+                                    <button type="submit" class="btn btn-sm btn-primary">Enregistrer</button>
+                                </div>
+                            </form>
+                        </td>
+                        <td>
+                            <span th:each="cat : ${ccl.igdbMappings}" class="badge badge-ccl" th:text="${cat.displayName}"></span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>
