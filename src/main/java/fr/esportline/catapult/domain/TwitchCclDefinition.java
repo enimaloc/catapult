@@ -25,7 +25,7 @@ public class TwitchCclDefinition {
     @JoinTable(
         name = "ccl_igdb_mapping",
         joinColumns = @JoinColumn(name = "twitch_ccl_id"),
-        inverseJoinColumns = @JoinColumn(name = "igdb_age_rating_category_id")
+        inverseJoinColumns = @JoinColumn(name = "igdb_rating_descriptor_id")
     )
-    private Set<IgdbAgeRatingCategory> igdbMappings = new HashSet<>();
+    private Set<IgdbRatingDescriptor> igdbMappings = new HashSet<>();
 }

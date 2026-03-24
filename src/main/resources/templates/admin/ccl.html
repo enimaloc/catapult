@@ -38,7 +38,7 @@
                     <tr>
                         <th>CCL Twitch</th>
                         <th>Description</th>
-                        <th>Catégories IGDB associées</th>
+                        <th>Descripteurs de contenu IGDB associés</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -51,11 +51,11 @@
                         <td class="text-muted" th:text="${ccl.description}"></td>
                         <td>
                             <form th:action="@{/admin/ccl/{id}/mappings(id=${ccl.id})}" method="post">
-                                <select name="igdbCategoryIds" multiple size="5" style="width:100%; min-width:200px;">
-                                    <option th:each="cat : ${igdbCategories}"
-                                            th:value="${cat.id}"
-                                            th:text="${cat.displayName}"
-                                            th:selected="${ccl.igdbMappings.contains(cat)}">
+                                <select name="igdbCategoryIds" multiple size="8" style="width:100%; min-width:250px;">
+                                    <option th:each="desc : ${igdbDescriptors}"
+                                            th:value="${desc.id}"
+                                            th:text="${desc.displayName}"
+                                            th:selected="${ccl.igdbMappings.contains(desc)}">
                                     </option>
                                 </select>
                                 <div style="margin-top:0.5rem;">

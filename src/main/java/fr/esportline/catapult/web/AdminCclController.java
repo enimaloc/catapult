@@ -18,7 +18,7 @@ public class AdminCclController {
     @GetMapping
     public String index(Model model) {
         model.addAttribute("ccls", adminCclService.getAllCcls());
-        model.addAttribute("igdbCategories", adminCclService.getAllIgdbCategories());
+        model.addAttribute("igdbDescriptors", adminCclService.getAllIgdbDescriptors());
         return "admin/ccl";
     }
 
