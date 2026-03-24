@@ -1,10 +1,10 @@
 package fr.esportline.catapult.web;
 
 import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.TwitchCcl;
 import fr.esportline.catapult.domain.UserAccount;
 import fr.esportline.catapult.repository.GameBindingRepository;
 import fr.esportline.catapult.security.CatapultOAuth2User;
+import fr.esportline.catapult.service.AdminCclService;
 import fr.esportline.catapult.service.BindingService;
 import fr.esportline.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
@@ -16,10 +16,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Controller
 @RequiredArgsConstructor
@@ -28,6 +28,7 @@ public class BindingsController {
     private final GameBindingRepository gameBindingRepository;
     private final BindingService bindingService;
     private final TwitchService twitchService;
+    private final AdminCclService adminCclService;
 
     @GetMapping("/bindings")
     public String bindings(@AuthenticationPrincipal CatapultOAuth2User principal,
@@ -51,7 +52,7 @@ public class BindingsController {
 
         model.addAttribute("user", user);
         model.addAttribute("bindings", bindings);
-        model.addAttribute("availableCcls", TwitchCcl.values());
+        model.addAttribute("availableCcls", adminCclService.getAllCcls());
         model.addAttribute("isPendingDeletion", user.getStatus() == UserAccount.Status.PENDING_DELETION);
 
         return "bindings";
@@ -64,17 +65,15 @@ public class BindingsController {
                                 @RequestParam(required = false) String twitchGameName,
                                 @RequestParam(required = false, defaultValue = "false") boolean ignored,
                                 @RequestParam(required = false) Set<String> ccls) {
-        Set<TwitchCcl> cclSet = ccls == null ? Set.of() :
-            ccls.stream().map(TwitchCcl::valueOf).collect(Collectors.toSet());
-
+        Set<String> cclSet = ccls == null ? Set.of() : new HashSet<>(ccls);
         bindingService.updateBinding(principal.getUserAccount(), id, twitchGameId, twitchGameName, cclSet, ignored);
         return "redirect:/bindings";
     }
 
     @PostMapping("/bindings/{id}/ccl-toggle")
-    public String toggleCcl(@AuthenticationPrincipal CatapultOAuth2User principal,
-                            @PathVariable UUID id,
-                            @RequestParam(defaultValue = "false") boolean enabled) {
+    public String toggleCclEnabled(@AuthenticationPrincipal CatapultOAuth2User principal,
+                                   @PathVariable UUID id,
+                                   @RequestParam(defaultValue = "false") boolean enabled) {
         bindingService.toggleCclEnabled(principal.getUserAccount(), id, enabled);
         return "redirect:/bindings";
     }

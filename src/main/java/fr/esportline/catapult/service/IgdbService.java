@@ -3,10 +3,11 @@ package fr.esportline.catapult.service;
 import fr.esportline.catapult.domain.IgdbGameCacheEntry;
 import fr.esportline.catapult.domain.IgdbGameCcl;
 import fr.esportline.catapult.domain.IgdbGameExternalId;
-import fr.esportline.catapult.domain.TwitchCcl;
+import fr.esportline.catapult.domain.TwitchCclDefinition;
 import fr.esportline.catapult.repository.IgdbGameCacheRepository;
 import fr.esportline.catapult.repository.IgdbGameCclRepository;
 import fr.esportline.catapult.repository.IgdbGameExternalIdRepository;
+import fr.esportline.catapult.repository.TwitchCclDefinitionRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,7 @@ public class IgdbService {
     private final IgdbGameCacheRepository cacheRepository;
     private final IgdbGameExternalIdRepository externalIdRepository;
     private final IgdbGameCclRepository cclRepository;
+    private final TwitchCclDefinitionRepository twitchCclRepo;
     private final SteamStoreService steamStoreService;
     private final RestClient restClient;
 
@@ -49,11 +51,17 @@ public class IgdbService {
     @Value("${app.igdb.cache-ttl-hours:24}")
     private int cacheTtlHours;
 
-    // Keyword sets live in TwitchCcl (shared with SteamStoreService).
+    // Keyword fallback used when no admin DB mappings are configured yet.
+    private static final Map<String, Set<String>> FALLBACK_KEYWORDS = Map.of(
+        "ViolentGraphic",    Set.of("blood", "gore", "violence", "violent", "killing", "combat", "death", "injury"),
+        "SexualThemes",      Set.of("nudity", "sexual", "sex", "suggestive", "erotic", "partial nudity"),
+        "DrugsIntoxication", Set.of("drug", "alcohol", "tobacco", "substance", "intoxication"),
+        "Gambling",          Set.of("gambling", "simulated gambling", "betting"),
+        "ProfanityVulgarity",Set.of("language", "profanity", "crude", "bad language", "strong language", "lyrics")
+    );
 
     private static final String CCL_FIELDS =
-        "age_ratings.rating_category.organization.name," +
-        "age_ratings.rating_category.rating," +
+        "age_ratings.rating_content_descriptions.id," +
         "age_ratings.rating_content_descriptions.description";
 
     // L1 cache: igdbId → name
@@ -63,7 +71,7 @@ public class IgdbService {
     private final Map<String, IgdbGame> igdbNameIndex = new ConcurrentHashMap<>();
 
     // CCL cache: igdbId → suggested CCLs (stable, no TTL needed)
-    private final Map<String, Set<TwitchCcl>> cclCache = new ConcurrentHashMap<>();
+    private final Map<String, Set<String>> cclCache = new ConcurrentHashMap<>();
 
     // App-level Twitch token
     private volatile String appAccessToken;
@@ -235,12 +243,12 @@ public class IgdbService {
             // Batch Steam fetch for the chunk
             List<String> steamIds = chunk.stream()
                 .map(igdbToSteam::get).filter(Objects::nonNull).toList();
-            Map<String, Set<TwitchCcl>> steamCcls = steamStoreService.fetchCcls(steamIds);
+            Map<String, Set<String>> steamCcls = steamStoreService.fetchCcls(steamIds);
 
             for (Game game : games) {
                 String igdbId   = String.valueOf(game.getId());
                 String steamId  = igdbToSteam.get(igdbId);
-                Set<TwitchCcl> fromSteam = steamId != null ? steamCcls.getOrDefault(steamId, Set.of()) : Set.of();
+                Set<String> fromSteam = steamId != null ? steamCcls.getOrDefault(steamId, Set.of()) : Set.of();
                 storeCcls(igdbId, game, fromSteam);
                 resolved++;
             }
@@ -254,9 +262,9 @@ public class IgdbService {
             .map(IgdbGameExternalId::getUid);
     }
 
-    public Set<TwitchCcl> suggestCcls(String igdbGameId) {
+    public Set<String> suggestCcls(String igdbGameId) {
         // L1: in-memory
-        Set<TwitchCcl> cached = cclCache.get(igdbGameId);
+        Set<String> cached = cclCache.get(igdbGameId);
         if (cached != null) {
             log.debug("CCL L1 cache hit for igdbId={}", igdbGameId);
             return cached;
@@ -264,7 +272,7 @@ public class IgdbService {
         // L2: DB
         var fromDb = cclRepository.findById(igdbGameId);
         if (fromDb.isPresent()) {
-            Set<TwitchCcl> dbCcls = Collections.unmodifiableSet(fromDb.get().getCcls());
+            Set<String> dbCcls = Collections.unmodifiableSet(fromDb.get().getCcls());
             cclCache.put(igdbGameId, dbCcls);
             log.debug("CCL L2 (DB) cache hit for igdbId={}", igdbGameId);
             return dbCcls;
@@ -278,7 +286,7 @@ public class IgdbService {
         if (results.isEmpty()) return Set.of();
 
         // Steam enrichment for single-game lookup
-        Set<TwitchCcl> steamCcls = Set.of();
+        Set<String> steamCcls = Set.of();
         if (steamSourceId >= 0) {
             Optional<String> steamAppId = externalIdRepository
                 .findByIgdbIdAndSourceId(igdbGameId, steamSourceId)
@@ -296,39 +304,48 @@ public class IgdbService {
     // CCL helpers
     // -------------------------------------------------------------------------
 
-    private Set<TwitchCcl> storeCcls(String igdbGameId, Game game, Set<TwitchCcl> steamCcls) {
-        Set<TwitchCcl> suggested = extractCcls(game);
+    private Set<String> storeCcls(String igdbGameId, Game game, Set<String> steamCcls) {
+        Set<String> suggested = extractCcls(game);
         suggested.addAll(steamCcls);
         String ageRatingsLabel = extractAgeRatingsLabel(game);
         log.debug("IGDB+Steam CCL for {}: ratings={}, suggested={}", igdbGameId, ageRatingsLabel, suggested);
-        Set<TwitchCcl> immutable = Collections.unmodifiableSet(suggested);
-        cclCache.put(igdbGameId, immutable);
         cclRepository.save(new IgdbGameCcl(igdbGameId, suggested, ageRatingsLabel));
-        return immutable;
+        Set<String> result = Collections.unmodifiableSet(suggested);
+        cclCache.put(igdbGameId, result);
+        return result;
     }
 
-    private Set<TwitchCcl> extractCcls(Game game) {
-        Set<TwitchCcl> suggested = new HashSet<>();
+    private Set<String> extractCcls(Game game) {
+        // Collect all descriptor IDs present on this game's age ratings
+        Set<Long> descriptorIds = new HashSet<>();
         for (proto.AgeRating ar : game.getAgeRatingsList()) {
-            proto.AgeRatingCategory rc = ar.getRatingCategory();
-            String org    = rc.getOrganization().getName();
-            String rating = rc.getRating();
-            if (!org.isBlank() && !rating.isBlank()) {
-                String orgUc = org.toUpperCase(java.util.Locale.ROOT);
-                if ((orgUc.contains("ESRB") && (rating.equals("M") || rating.equals("AO")))
-                    || (orgUc.contains("PEGI") && rating.equals("18"))) {
-                    suggested.add(TwitchCcl.MatureGame);
-                }
-            }
             for (proto.AgeRatingContentDescriptionV2 desc : ar.getRatingContentDescriptionsList()) {
-                String d = desc.getDescription().toLowerCase(java.util.Locale.ROOT);
-                if (TwitchCcl.KW_VIOLENCE.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ViolentGraphic);
-                if (TwitchCcl.KW_SEXUAL.stream().anyMatch(d::contains))    suggested.add(TwitchCcl.SexualThemes);
-                if (TwitchCcl.KW_DRUGS.stream().anyMatch(d::contains))     suggested.add(TwitchCcl.DrugsIntoxication);
-                if (TwitchCcl.KW_GAMBLING.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.Gambling);
-                if (TwitchCcl.KW_LANGUAGE.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ProfanityVulgarity);
+                if (desc.getId() > 0) descriptorIds.add(desc.getId());
             }
         }
+
+        if (descriptorIds.isEmpty()) return Set.of();
+
+        // DB-driven: find which Twitch CCLs have any of these descriptors mapped
+        Set<String> suggested = new HashSet<>();
+        for (TwitchCclDefinition cclDef : twitchCclRepo.findAll()) {
+            boolean matched = cclDef.getIgdbMappings().stream()
+                .anyMatch(d -> descriptorIds.contains(d.getId()));
+            if (matched) suggested.add(cclDef.getId());
+        }
+
+        // Keyword fallback when no admin mappings have been configured yet
+        if (suggested.isEmpty()) {
+            for (proto.AgeRating ar : game.getAgeRatingsList()) {
+                for (proto.AgeRatingContentDescriptionV2 desc : ar.getRatingContentDescriptionsList()) {
+                    String d = desc.getDescription().toLowerCase(java.util.Locale.ROOT);
+                    FALLBACK_KEYWORDS.forEach((cclId, keywords) -> {
+                        if (keywords.stream().anyMatch(d::contains)) suggested.add(cclId);
+                    });
+                }
+            }
+        }
+
         return suggested;
     }
 
