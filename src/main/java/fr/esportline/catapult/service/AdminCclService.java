@@ -14,6 +14,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Gestion de la configuration admin des CCLs.
@@ -66,17 +67,37 @@ public class AdminCclService {
         return twitchCclRepo.findAll();
     }
 
+    /**
+     * Returns one representative descriptor per unique description text,
+     * sorted alphabetically — used to de-duplicate the admin select list.
+     */
     public List<IgdbRatingDescriptor> getAllIgdbDescriptors() {
-        return igdbDescriptorRepo.findAll();
+        return igdbDescriptorRepo.findAll().stream()
+            .collect(Collectors.toMap(
+                IgdbRatingDescriptor::getDescription,
+                d -> d,
+                (a, b) -> a.getId() < b.getId() ? a : b  // keep lowest ID as representative
+            ))
+            .values()
+            .stream()
+            .sorted(Comparator.comparing(IgdbRatingDescriptor::getDescription))
+            .collect(Collectors.toList());
     }
 
+    /**
+     * Maps the CCL to all descriptors whose description text matches any of the
+     * selected representative IDs — so selecting "Violence" once covers both
+     * "ESRB — Violence" (id=29) and "PEGI — Violence" (id=50).
+     */
     @Transactional
-    public void saveMappings(String cclId, Set<Long> descriptorIds) {
+    public void saveMappings(String cclId, Set<Long> representativeIds) {
         twitchCclRepo.findById(cclId).ifPresent(ccl -> {
-            Set<IgdbRatingDescriptor> mappings = descriptorIds.stream()
-                .map(id -> igdbDescriptorRepo.findById(id).orElseThrow())
+            Set<IgdbRatingDescriptor> expanded = representativeIds.stream()
+                .flatMap(id -> igdbDescriptorRepo.findById(id)
+                    .map(d -> igdbDescriptorRepo.findByDescription(d.getDescription()).stream())
+                    .orElse(Stream.empty()))
                 .collect(Collectors.toSet());
-            ccl.setIgdbMappings(mappings);
+            ccl.setIgdbMappings(expanded);
             twitchCclRepo.save(ccl);
         });
     }
