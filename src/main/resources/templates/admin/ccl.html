@@ -54,8 +54,8 @@
                                 <select name="igdbCategoryIds" multiple size="8" style="width:100%; min-width:250px;">
                                     <option th:each="desc : ${igdbDescriptors}"
                                             th:value="${desc.id}"
-                                            th:text="${desc.displayName}"
-                                            th:selected="${ccl.igdbMappings.contains(desc)}">
+                                            th:text="${desc.description}"
+                                            th:selected="${ccl.mappedDescriptions.contains(desc.description)}">
                                     </option>
                                 </select>
                                 <div style="margin-top:0.5rem;">
@@ -64,7 +64,7 @@
                             </form>
                         </td>
                         <td>
-                            <span th:each="cat : ${ccl.igdbMappings}" class="badge badge-ccl" th:text="${cat.displayName}"></span>
+                            <span th:each="desc : ${ccl.mappedDescriptions}" class="badge badge-ccl" th:text="${desc}"></span>
                         </td>
                     </tr>
                 </tbody>

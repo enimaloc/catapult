@@ -6,6 +6,7 @@ import lombok.Setter;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "twitch_ccl_definition")
@@ -20,6 +21,13 @@ public class TwitchCclDefinition {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    /** Returns the set of description texts currently mapped — used by the admin template. */
+    public Set<String> getMappedDescriptions() {
+        return igdbMappings.stream()
+            .map(IgdbRatingDescriptor::getDescription)
+            .collect(Collectors.toSet());
+    }
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
