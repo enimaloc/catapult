@@ -1,10 +1,6 @@
 -- ============================================================
--- V2 — Admin CCL management
+-- V11 — Admin CCL management
 -- ============================================================
-
--- Add per-binding CCL enabled toggle
-ALTER TABLE game_binding
-    ADD COLUMN ccl_enabled BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- Twitch CCL definitions (fetched from Twitch API at startup)
 CREATE TABLE twitch_ccl_definition (
