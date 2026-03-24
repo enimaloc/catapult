@@ -9,19 +9,20 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Converter
-public class TwitchCclSetConverter implements AttributeConverter<Set<TwitchCcl>, String> {
+public class StringSetConverter implements AttributeConverter<Set<String>, String> {
 
     @Override
-    public String convertToDatabaseColumn(Set<TwitchCcl> ccls) {
-        if (ccls == null || ccls.isEmpty()) return "";
-        return ccls.stream().map(Enum::name).collect(Collectors.joining(","));
+    public String convertToDatabaseColumn(Set<String> values) {
+        if (values == null || values.isEmpty()) return "";
+        return String.join(",", values);
     }
 
     @Override
-    public Set<TwitchCcl> convertToEntityAttribute(String dbData) {
+    public Set<String> convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.isBlank()) return Collections.emptySet();
         return Arrays.stream(dbData.split(","))
-            .map(TwitchCcl::valueOf)
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
             .collect(Collectors.toSet());
     }
 }

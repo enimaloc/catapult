@@ -23,9 +23,9 @@ public class IgdbGameCcl {
     @Column(name = "igdb_id")
     private String igdbId;
 
-    @Convert(converter = TwitchCclSetConverter.class)
+    @Convert(converter = StringSetConverter.class)
     @Column(nullable = false, length = 500)
-    private Set<TwitchCcl> ccls;
+    private Set<String> ccls;
 
     /** Comma-separated age rating labels, e.g. "ESRB M, PEGI 18". May be blank if unknown. */
     @Column(name = "age_ratings", nullable = false, length = 200)
@@ -34,10 +34,10 @@ public class IgdbGameCcl {
     @Column(name = "cached_at", nullable = false)
     private Instant cachedAt;
 
-    public IgdbGameCcl(String igdbId, Set<TwitchCcl> ccls, String ageRatings) {
-        this.igdbId      = igdbId;
-        this.ccls        = ccls;
-        this.ageRatings  = ageRatings;
-        this.cachedAt    = Instant.now();
+    public IgdbGameCcl(String igdbId, Set<String> ccls, String ageRatings) {
+        this.igdbId     = igdbId;
+        this.ccls       = ccls;
+        this.ageRatings = ageRatings;
+        this.cachedAt   = Instant.now();
     }
 }
