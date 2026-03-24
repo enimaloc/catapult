@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="connections" class="card"
+         hx-get="/fragments/connections"
+         hx-trigger="every 30s"
+         hx-swap="outerHTML">
+    <h3>Connexions</h3>
+    <div class="provider-grid">
+        <div class="provider-card">
+            <strong>Twitch</strong>
+            <span class="badge badge-connected">Connecté</span>
+            <p class="text-muted text-sm">Provider principal — déconnexion via logout</p>
+        </div>
+        <div th:if="${hasSteamProvider}" class="provider-card">
+            <strong>Steam</strong>
+            <span th:if="${hasSteam}" class="badge badge-connected">Connecté</span>
+            <span th:unless="${hasSteam}" class="badge badge-disconnected">Non connecté</span>
+            <div th:if="${hasSteam}">
+                <form th:action="@{/connect/steam/disconnect}" method="post">
+                    <button type="submit" class="btn btn-sm btn-danger">Déconnecter</button>
+                </form>
+            </div>
+            <div th:unless="${hasSteam}">
+                <a th:href="@{/connect/steam}" class="btn btn-sm">Connecter</a>
+            </div>
+        </div>
+    </div>
+</section>
+</body>
+</html>

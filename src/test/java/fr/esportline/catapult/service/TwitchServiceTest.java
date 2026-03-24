@@ -2,7 +2,6 @@ package fr.esportline.catapult.service;
 
 import fr.esportline.catapult.domain.GameBinding;
 import fr.esportline.catapult.domain.OAuthToken;
-import fr.esportline.catapult.domain.TwitchCcl;
 import fr.esportline.catapult.domain.UserAccount;
 import fr.esportline.catapult.domain.UserSettings;
 import fr.esportline.catapult.repository.OAuthTokenRepository;
@@ -76,7 +75,7 @@ class TwitchServiceTest {
         doReturn(responseSpec).when(bodySpec).retrieve();
     }
 
-    private GameBinding binding(GameBinding.Status status, boolean ignored, boolean cclEnabled, Set<TwitchCcl> ccls) {
+    private GameBinding binding(GameBinding.Status status, boolean ignored, boolean cclEnabled, Set<String> ccls) {
         GameBinding b = new GameBinding();
         b.setStatus(status);
         b.setIgnored(ignored);
@@ -130,7 +129,7 @@ class TwitchServiceTest {
     @Test
     void updateChannel_withSomeCcls_enablesOnlyMatching() {
         twitchService.updateChannel(user,
-            binding(GameBinding.Status.AUTO, false, true, Set.of(TwitchCcl.ViolentGraphic, TwitchCcl.Gambling)));
+            binding(GameBinding.Status.AUTO, false, true, Set.of("ViolentGraphic", "Gambling")));
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());
@@ -150,7 +149,7 @@ class TwitchServiceTest {
     @Test
     void updateChannel_matureGameNotInCclPayload() {
         twitchService.updateChannel(user,
-            binding(GameBinding.Status.AUTO, false, true, Set.of(TwitchCcl.MatureGame)));
+            binding(GameBinding.Status.AUTO, false, true, Set.of("MatureGame")));
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());
@@ -164,7 +163,7 @@ class TwitchServiceTest {
 
     @Test
     void updateChannel_cclDisabledOnBinding_doesNotSendCclPayload() {
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, false, Set.of(TwitchCcl.ViolentGraphic)));
+        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, false, Set.of("ViolentGraphic")));
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());

@@ -1,12 +1,15 @@
 package fr.esportline.catapult.web;
 
 import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.TwitchCcl;
 import fr.esportline.catapult.domain.UserAccount;
 import fr.esportline.catapult.repository.GameBindingRepository;
 import fr.esportline.catapult.security.CatapultOAuth2User;
 import fr.esportline.catapult.security.CatapultOAuth2UserService;
+import fr.esportline.catapult.service.AccountService;
+import fr.esportline.catapult.service.ActivityLogService;
+import fr.esportline.catapult.service.AdminCclService;
 import fr.esportline.catapult.service.BindingService;
+import fr.esportline.catapult.service.GameStateService;
 import fr.esportline.catapult.service.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -31,15 +35,19 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(BindingsController.class)
-class BindingsControllerTest {
+@WebMvcTest(AppController.class)
+class AppControllerTest {
 
     @Autowired MockMvc mockMvc;
 
     @MockitoBean GameBindingRepository gameBindingRepository;
     @MockitoBean BindingService bindingService;
     @MockitoBean TwitchService twitchService;
-    @MockitoBean CatapultOAuth2UserService oAuth2UserService;  // needed by SecurityConfig
+    @MockitoBean CatapultOAuth2UserService oAuth2UserService;
+    @MockitoBean GameStateService gameStateService;
+    @MockitoBean ActivityLogService activityLogService;
+    @MockitoBean AdminCclService adminCclService;
+    @MockitoBean AccountService accountService;
 
     private UserAccount userAccount;
     private UsernamePasswordAuthenticationToken auth;
@@ -52,7 +60,7 @@ class BindingsControllerTest {
 
         var oAuth2User = mock(OAuth2User.class);
         when(oAuth2User.getAttributes()).thenReturn(Map.of());
-        var catapultUser = new CatapultOAuth2User(oAuth2User, userAccount);
+        var catapultUser = new CatapultOAuth2User(oAuth2User, userAccount, false);
 
         auth = new UsernamePasswordAuthenticationToken(
             catapultUser, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
@@ -60,18 +68,27 @@ class BindingsControllerTest {
 
         when(gameBindingRepository.findByUser(any(), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of()));
+        when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.empty());
+        when(adminCclService.getAllCcls()).thenReturn(List.of());
     }
 
     @Test
-    void getBindings_rendersPage() throws Exception {
-        mockMvc.perform(get("/bindings").with(authentication(auth)))
+    void getApp_rendersPage() throws Exception {
+        mockMvc.perform(get("/app").with(authentication(auth)))
             .andExpect(status().isOk())
-            .andExpect(view().name("bindings"))
+            .andExpect(view().name("app"))
             .andExpect(model().attributeExists("bindings", "availableCcls"));
     }
 
     @Test
-    void postUpdateBinding_redirectsToBindings() throws Exception {
+    void getBindings_redirectsToApp() throws Exception {
+        mockMvc.perform(get("/bindings").with(authentication(auth)))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/app"));
+    }
+
+    @Test
+    void postUpdateBinding_redirectsToApp() throws Exception {
         UUID id = UUID.randomUUID();
 
         mockMvc.perform(post("/bindings/{id}", id)
@@ -79,12 +96,12 @@ class BindingsControllerTest {
                 .with(authentication(auth))
                 .param("twitchGameId", "game-123")
                 .param("twitchGameName", "My Game")
-                .param("ccls", TwitchCcl.ViolentGraphic.name()))
+                .param("ccls", "ViolentGraphic"))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/bindings"));
+            .andExpect(redirectedUrl("/app"));
 
         verify(bindingService).updateBinding(eq(userAccount), eq(id),
-            eq("game-123"), eq("My Game"), eq(Set.of(TwitchCcl.ViolentGraphic)), eq(false));
+            eq("game-123"), eq("My Game"), eq(Set.of("ViolentGraphic")), eq(false));
     }
 
     @Test
@@ -103,7 +120,7 @@ class BindingsControllerTest {
     }
 
     @Test
-    void postCclToggle_redirectsToBindings() throws Exception {
+    void postCclToggle_redirectsToApp() throws Exception {
         UUID id = UUID.randomUUID();
 
         mockMvc.perform(post("/bindings/{id}/ccl-toggle", id)
@@ -111,13 +128,13 @@ class BindingsControllerTest {
                 .with(authentication(auth))
                 .param("enabled", "true"))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/bindings"));
+            .andExpect(redirectedUrl("/app"));
 
         verify(bindingService).toggleCclEnabled(userAccount, id, true);
     }
 
     @Test
-    void postIgnoredToggle_redirectsToBindings() throws Exception {
+    void postIgnoredToggle_redirectsToApp() throws Exception {
         UUID id = UUID.randomUUID();
 
         mockMvc.perform(post("/bindings/{id}/ignored-toggle", id)
@@ -125,20 +142,20 @@ class BindingsControllerTest {
                 .with(authentication(auth))
                 .param("ignored", "true"))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/bindings"));
+            .andExpect(redirectedUrl("/app"));
 
         verify(bindingService).toggleIgnored(userAccount, id, true);
     }
 
     @Test
-    void postDelete_redirectsToBindings() throws Exception {
+    void postDelete_redirectsToApp() throws Exception {
         UUID id = UUID.randomUUID();
 
         mockMvc.perform(post("/bindings/{id}/delete", id)
                 .with(csrf())
                 .with(authentication(auth)))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/bindings"));
+            .andExpect(redirectedUrl("/app"));
 
         verify(bindingService).deleteBinding(id);
     }

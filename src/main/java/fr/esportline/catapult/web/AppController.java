@@ -5,7 +5,6 @@ import fr.esportline.catapult.domain.OAuthToken;
 import fr.esportline.catapult.domain.UserAccount;
 import fr.esportline.catapult.getter.DetectedGame;
 import fr.esportline.catapult.repository.GameBindingRepository;
-import fr.esportline.catapult.repository.UserSettingsRepository;
 import fr.esportline.catapult.security.CatapultOAuth2User;
 import fr.esportline.catapult.service.AccountService;
 import fr.esportline.catapult.service.ActivityLogService;
@@ -39,7 +38,6 @@ public class AppController {
     private final BindingService bindingService;
     private final TwitchService twitchService;
     private final AdminCclService adminCclService;
-    private final UserSettingsRepository userSettingsRepository;
     private final AccountService accountService;
 
     // -------------------------------------------------------------------------
@@ -110,6 +108,56 @@ public class AppController {
         model.addAttribute("isPendingDeletion", user.getStatus() == UserAccount.Status.PENDING_DELETION);
 
         return "app";
+    }
+
+    // -------------------------------------------------------------------------
+    // Fragment endpoints (HTMX polling)
+    // -------------------------------------------------------------------------
+
+    @GetMapping("/fragments/status")
+    public String fragmentStatus(
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            Model model) {
+        UserAccount user = principal.getUserAccount();
+        model.addAttribute("currentGame", gameStateService.getLastKnownGame(user).orElse(null));
+        model.addAttribute("botEnabled", user.isBotEnabled());
+        return "fragments/status :: status";
+    }
+
+    @GetMapping("/fragments/bindings")
+    public String fragmentBindings(
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String source,
+            Model model) {
+        UserAccount user = principal.getUserAccount();
+        PageRequest pageRequest = PageRequest.of(page, 20);
+        Page<GameBinding> bindings;
+        if (status != null && !status.isBlank()) {
+            bindings = gameBindingRepository.findByUserAndStatus(
+                user, GameBinding.Status.valueOf(status.toUpperCase()), pageRequest);
+        } else if (source != null && !source.isBlank()) {
+            bindings = gameBindingRepository.findByUserAndSourceType(
+                user, GameBinding.SourceType.valueOf(source.toUpperCase()), pageRequest);
+        } else {
+            bindings = gameBindingRepository.findByUser(user, pageRequest);
+        }
+        model.addAttribute("bindings", bindings);
+        model.addAttribute("availableCcls", adminCclService.getAllCcls());
+        model.addAttribute("filterStatus", status);
+        model.addAttribute("filterSource", source);
+        return "fragments/bindings :: bindings";
+    }
+
+    @GetMapping("/fragments/connections")
+    public String fragmentConnections(
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            Model model) {
+        UserAccount user = principal.getUserAccount();
+        model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
+        model.addAttribute("hasSteam", !steamApiKey.isBlank() && user.getSteamId() != null);
+        return "fragments/connections :: connections";
     }
 
     // -------------------------------------------------------------------------

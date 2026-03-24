@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="status"
+     hx-get="/fragments/status"
+     hx-trigger="every 3s"
+     hx-swap="outerHTML">
+    <div class="card">
+        <h3>État du bot</h3>
+        <div th:if="${botEnabled}" class="status status-active">
+            <span class="status-dot"></span> Actif
+        </div>
+        <div th:unless="${botEnabled}" class="status status-inactive">
+            <span class="status-dot"></span> Inactif
+        </div>
+    </div>
+    <div class="card">
+        <h3>Jeu en cours</h3>
+        <div th:if="${currentGame != null}">
+            <p>
+                <strong th:text="${currentGame.sourceName}"></strong>
+                <span class="badge" th:text="${currentGame.sourceType}"></span>
+            </p>
+        </div>
+        <div th:unless="${currentGame != null}">
+            <p class="text-muted">Aucun jeu détecté</p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

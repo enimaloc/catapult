@@ -1,6 +1,5 @@
 package fr.esportline.catapult.service;
 
-import fr.esportline.catapult.domain.TwitchCcl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,69 +48,54 @@ class SteamStoreServiceTest {
     }
 
     @Test
-    void fetchCcls_esrbM_addsMatureGame() {
+    void fetchCcls_esrbM_noDescriptors_returnsNoEntry() {
         givenSteamResponse(Map.of("100", steamEntry("esrb", "m", "")));
 
-        var result = service.fetchCcls(List.of("100"));
-
-        assertThat(result.get("100")).contains(TwitchCcl.MatureGame);
-    }
-
-    @Test
-    void fetchCcls_esrbAO_addsMatureGame() {
-        givenSteamResponse(Map.of("100", steamEntry("esrb", "ao", "")));
-
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains(TwitchCcl.MatureGame);
-    }
-
-    @Test
-    void fetchCcls_pegi18_addsMatureGame() {
-        givenSteamResponse(Map.of("100", steamEntry("pegi", "18", "")));
-
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains(TwitchCcl.MatureGame);
+        // MatureGame is handled automatically by Twitch, not suggested by this service
+        assertThat(service.fetchCcls(List.of("100"))).doesNotContainKey("100");
     }
 
     @Test
     void fetchCcls_bloodDescriptor_addsViolentGraphic() {
         givenSteamResponse(Map.of("100", steamEntry("esrb", "t", "Blood and Gore")));
 
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains(TwitchCcl.ViolentGraphic);
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("ViolentGraphic");
     }
 
     @Test
     void fetchCcls_nudityDescriptor_addsSexualThemes() {
         givenSteamResponse(Map.of("100", steamEntry("esrb", "t", "Nudity")));
 
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains(TwitchCcl.SexualThemes);
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("SexualThemes");
     }
 
     @Test
     void fetchCcls_drugDescriptor_addsDrugsIntoxication() {
         givenSteamResponse(Map.of("100", steamEntry("esrb", "t", "Drug Reference")));
 
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains(TwitchCcl.DrugsIntoxication);
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("DrugsIntoxication");
     }
 
     @Test
     void fetchCcls_gamblingDescriptor_addsGambling() {
         givenSteamResponse(Map.of("100", steamEntry("esrb", "t", "Simulated Gambling")));
 
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains(TwitchCcl.Gambling);
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("Gambling");
     }
 
     @Test
     void fetchCcls_profanityDescriptor_addsProfanityVulgarity() {
         givenSteamResponse(Map.of("100", steamEntry("esrb", "t", "Strong Language")));
 
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains(TwitchCcl.ProfanityVulgarity);
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("ProfanityVulgarity");
     }
 
     @Test
     void fetchCcls_multipleDescriptors_addsMultipleCcls() {
         givenSteamResponse(Map.of("100", steamEntry("esrb", "m", "Blood and Gore\nDrug Reference")));
 
-        Set<TwitchCcl> ccls = service.fetchCcls(List.of("100")).get("100");
-        assertThat(ccls).contains(TwitchCcl.MatureGame, TwitchCcl.ViolentGraphic, TwitchCcl.DrugsIntoxication);
+        Set<String> ccls = service.fetchCcls(List.of("100")).get("100");
+        assertThat(ccls).contains("ViolentGraphic", "DrugsIntoxication");
     }
 
     @Test
@@ -137,7 +121,6 @@ class SteamStoreServiceTest {
 
     @Test
     void fetchCcls_emptyAppIds_returnsImmediately() {
-        // Should not call RestClient at all
         assertThat(service.fetchCcls(List.of())).isEmpty();
     }
 }

@@ -1,6 +1,6 @@
 package fr.esportline.catapult.web;
 
-import fr.esportline.catapult.domain.IgdbAgeRatingCategory;
+import fr.esportline.catapult.domain.IgdbRatingDescriptor;
 import fr.esportline.catapult.domain.TwitchCclDefinition;
 import fr.esportline.catapult.service.AdminCclService;
 import org.junit.jupiter.api.Test;
@@ -27,24 +27,24 @@ class AdminCclControllerTest {
     AdminCclController controller;
 
     @Test
-    void index_addsAllCclsAndIgdbCategoriesToModel() {
+    void index_addsAllCclsAndIgdbDescriptorsToModel() {
         TwitchCclDefinition ccl = new TwitchCclDefinition();
         ccl.setId("MatureGame");
         ccl.setName("Mature Game");
 
-        IgdbAgeRatingCategory cat = new IgdbAgeRatingCategory();
-        cat.setId(1L);
-        cat.setDisplayName("PEGI 18");
+        IgdbRatingDescriptor descriptor = new IgdbRatingDescriptor();
+        descriptor.setId(1L);
+        descriptor.setDisplayName("ESRB — Violence");
 
         when(adminCclService.getAllCcls()).thenReturn(List.of(ccl));
-        when(adminCclService.getAllIgdbCategories()).thenReturn(List.of(cat));
+        when(adminCclService.getAllIgdbDescriptors()).thenReturn(List.of(descriptor));
 
         Model model = new ExtendedModelMap();
         String view = controller.index(model);
 
         assertThat(view).isEqualTo("admin/ccl");
         assertThat(model.getAttribute("ccls")).isEqualTo(List.of(ccl));
-        assertThat(model.getAttribute("igdbCategories")).isEqualTo(List.of(cat));
+        assertThat(model.getAttribute("igdbDescriptors")).isEqualTo(List.of(descriptor));
     }
 
     @Test

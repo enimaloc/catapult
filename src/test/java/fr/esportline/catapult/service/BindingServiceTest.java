@@ -1,7 +1,6 @@
 package fr.esportline.catapult.service;
 
 import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.TwitchCcl;
 import fr.esportline.catapult.domain.UserAccount;
 import fr.esportline.catapult.repository.GameBindingRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +12,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -46,8 +44,8 @@ class BindingServiceTest {
         binding.setStatus(GameBinding.Status.AUTO);
         binding.setTwitchGameId("old-game-id");
         binding.setTwitchGameName("Old Game");
-        binding.getCcls().add(TwitchCcl.ViolentGraphic);
-        binding.getCcls().add(TwitchCcl.Gambling);
+        binding.getCcls().add("ViolentGraphic");
+        binding.getCcls().add("Gambling");
 
         when(gameBindingRepository.findById(bindingId)).thenReturn(Optional.of(binding));
         when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -55,11 +53,11 @@ class BindingServiceTest {
 
     @Test
     void updateBinding_replacesCclsInPlace() {
-        Set<TwitchCcl> newCcls = Set.of(TwitchCcl.SexualThemes);
+        Set<String> newCcls = Set.of("SexualThemes");
 
         bindingService.updateBinding(user, bindingId, "new-id", "New Game", newCcls, false);
 
-        assertThat(binding.getCcls()).containsExactly(TwitchCcl.SexualThemes);
+        assertThat(binding.getCcls()).containsExactly("SexualThemes");
     }
 
     @Test

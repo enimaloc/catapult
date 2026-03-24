@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="bindings" class="card"
+     th:attr="hx-get=@{/fragments/bindings(page=${bindings.number},status=${filterStatus},source=${filterSource})}"
+     hx-trigger="every 10s"
+     hx-swap="outerHTML">
+
+    <h3>Bindings</h3>
+
+    <div class="filters" style="margin-bottom:1rem">
+        <a th:href="@{/app}" class="btn btn-sm btn-outline">Tous</a>
+        <a th:href="@{/app(status='AUTO')}" class="btn btn-sm btn-outline">AUTO</a>
+        <a th:href="@{/app(status='MANUAL')}" class="btn btn-sm btn-outline">MANUAL</a>
+        <a th:href="@{/app(status='INCOMPLETE')}" class="btn btn-sm btn-outline">INCOMPLETE</a>
+        <a th:href="@{/app(source='STEAM')}" class="btn btn-sm btn-outline">Steam</a>
+    </div>
+
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Jeu (source)</th>
+                    <th>Catégorie Twitch</th>
+                    <th>CCLs</th>
+                    <th>Statut</th>
+                    <th>CCL</th>
+                    <th>Ignoré</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody th:each="binding : ${bindings.content}">
+                <tr>
+                    <td>
+                        <span class="badge" th:text="${binding.sourceType}"></span>
+                        <span th:text="${binding.sourceName}"></span>
+                    </td>
+                    <td>
+                        <span th:if="${binding.twitchGameName}" th:text="${binding.twitchGameName}"></span>
+                        <span th:unless="${binding.twitchGameName}" class="text-muted">—</span>
+                    </td>
+                    <td>
+                        <span th:each="ccl : ${binding.ccls}" class="badge badge-ccl" th:text="${ccl}"></span>
+                    </td>
+                    <td>
+                        <span class="badge"
+                              th:classappend="${binding.status.name() == 'INCOMPLETE'} ? 'badge-warning' : 'badge-default'"
+                              th:text="${binding.status}"></span>
+                    </td>
+                    <td>
+                        <form th:action="@{/bindings/{id}/ccl-toggle(id=${binding.id})}" method="post">
+                            <label class="toggle-label">
+                                <input type="checkbox" name="enabled"
+                                       th:checked="${binding.cclEnabled}"
+                                       onchange="this.form.submit()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </form>
+                    </td>
+                    <td>
+                        <form th:action="@{/bindings/{id}/ignored-toggle(id=${binding.id})}" method="post">
+                            <label class="toggle-label">
+                                <input type="checkbox" name="ignored"
+                                       th:checked="${binding.ignored}"
+                                       onchange="this.form.submit()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </form>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline"
+                                th:data-id="${binding.id}"
+                                onclick="toggleEdit(this.dataset.id)">
+                            Modifier
+                        </button>
+                        <form th:action="@{/bindings/{id}/delete(id=${binding.id})}" method="post"
+                              style="display:inline">
+                            <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr th:id="'edit-row-' + ${binding.id}" class="edit-row" style="display:none">
+                    <td colspan="7">
+                        <form th:action="@{/bindings/{id}(id=${binding.id})}" method="post">
+                            <div class="inline-edit-fields">
+                                <div class="inline-edit-field">
+                                    <label>Catégorie Twitch</label>
+                                    <div class="search-wrapper">
+                                        <input type="text"
+                                               th:id="'gameSearch-' + ${binding.id}"
+                                               th:data-id="${binding.id}"
+                                               th:value="${binding.twitchGameName}"
+                                               placeholder="Rechercher…"
+                                               autocomplete="off"
+                                               oninput="debouncedSearch(event, this.dataset.id)">
+                                        <ul th:id="'gameResults-' + ${binding.id}" class="game-results"></ul>
+                                    </div>
+                                    <input type="hidden" th:id="'twitchGameId-' + ${binding.id}"
+                                           name="twitchGameId" th:value="${binding.twitchGameId}">
+                                    <input type="hidden" th:id="'twitchGameName-' + ${binding.id}"
+                                           name="twitchGameName" th:value="${binding.twitchGameName}">
+                                </div>
+                                <div class="inline-edit-field">
+                                    <label>CCLs</label>
+                                    <div class="ccl-checkboxes">
+                                        <div th:each="ccl : ${availableCcls}">
+                                            <label>
+                                                <input type="checkbox" name="ccls"
+                                                       th:value="${ccl.id}"
+                                                       th:checked="${binding.ccls.contains(ccl.id)}">
+                                                <span th:text="${ccl.name}"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inline-edit-actions">
+                                <button type="button"
+                                        th:data-id="${binding.id}"
+                                        onclick="toggleEdit(this.dataset.id)"
+                                        class="btn btn-sm btn-outline">Annuler</button>
+                                <button type="submit" class="btn btn-sm btn-primary">Enregistrer</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div th:if="${bindings.totalPages > 1}" class="pagination">
+        <a th:if="${!bindings.first}"
+           th:href="@{/app(page=${bindings.number - 1},status=${filterStatus},source=${filterSource})}"
+           class="btn btn-sm">Précédent</a>
+        <span th:text="${bindings.number + 1} + ' / ' + ${bindings.totalPages}"></span>
+        <a th:if="${!bindings.last}"
+           th:href="@{/app(page=${bindings.number + 1},status=${filterStatus},source=${filterSource})}"
+           class="btn btn-sm">Suivant</a>
+    </div>
+</div>
+</body>
+</html>

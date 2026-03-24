@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="danger-zone">
+    <section th:unless="${isPendingDeletion}" class="card card-danger">
+        <h3>Zone danger</h3>
+        <p>La suppression de compte est irréversible après <strong>7 jours</strong>.</p>
+        <button type="button" class="btn btn-danger"
+                onclick="document.getElementById('deleteModal').style.display='flex'">
+            Supprimer mon compte
+        </button>
+    </section>
+
+    <section th:if="${isPendingDeletion}" class="card card-danger">
+        <h3>Suppression en cours</h3>
+        <p>Ton compte sera supprimé définitivement le
+            <strong th:text="${#temporals.format(user.deletionRequestedAt, 'dd/MM/yyyy')}"></strong>.
+        </p>
+        <form th:action="@{/settings/cancel-deletion}" method="post">
+            <button type="submit" class="btn btn-outline">Annuler la suppression</button>
+        </form>
+    </section>
+</div>
+</body>
+</html>
