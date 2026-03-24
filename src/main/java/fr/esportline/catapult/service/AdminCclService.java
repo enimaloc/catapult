@@ -46,6 +46,18 @@ public class AdminCclService {
     @Value("${app.igdb.client-id:}")
     private String igdbClientId;
 
+    /**
+     * Mots-clés partagés entre les descriptions IGDB et les CCL Twitch.
+     * Utilisés pour le seeding automatique des mappings au premier démarrage.
+     */
+    private static final Map<String, Set<String>> DEFAULT_KEYWORDS = Map.of(
+        "ViolentGraphic",    Set.of("blood", "gore", "violence", "violent", "killing", "combat", "death", "injury"),
+        "SexualThemes",      Set.of("nudity", "sexual", "sex", "suggestive", "erotic", "partial nudity"),
+        "DrugsIntoxication", Set.of("drug", "alcohol", "tobacco", "substance", "intoxication", "narcotic"),
+        "Gambling",          Set.of("gambling", "simulated gambling", "betting"),
+        "ProfanityVulgarity",Set.of("language", "profanity", "crude", "bad language", "strong language", "lyrics", "vulgarity")
+    );
+
     @PostConstruct
     public void init() {
         try {
@@ -53,6 +65,7 @@ public class AdminCclService {
             if (appToken != null) {
                 syncTwitchCcls(appToken);
                 syncIgdbDescriptors(appToken);
+                applyDefaultMappings();
             }
         } catch (Exception e) {
             log.warn("AdminCclService startup sync failed — admin CCL data may be stale: {}", e.getMessage());
@@ -191,6 +204,41 @@ public class AdminCclService {
             }
         }
         log.info("Synced {} new IGDB rating descriptors", newCount);
+    }
+
+    /**
+     * Seeds default CCL → descriptor mappings on first startup using keyword matching.
+     * Only runs when all CCLs have empty mappings (i.e. never configured before).
+     * Safe to re-run — skips CCLs that already have mappings.
+     */
+    @Transactional
+    void applyDefaultMappings() {
+        List<TwitchCclDefinition> ccls = twitchCclRepo.findAll();
+        List<IgdbRatingDescriptor> allDescriptors = igdbDescriptorRepo.findAll();
+        if (ccls.isEmpty() || allDescriptors.isEmpty()) return;
+
+        boolean anyMapped = ccls.stream().anyMatch(c -> !c.getIgdbMappings().isEmpty());
+        if (anyMapped) return; // admin has already configured mappings
+
+        int seeded = 0;
+        for (TwitchCclDefinition ccl : ccls) {
+            Set<String> keywords = DEFAULT_KEYWORDS.get(ccl.getId());
+            if (keywords == null) continue;
+
+            Set<IgdbRatingDescriptor> matched = allDescriptors.stream()
+                .filter(d -> {
+                    String desc = d.getDescription().toLowerCase(java.util.Locale.ROOT);
+                    return keywords.stream().anyMatch(desc::contains);
+                })
+                .collect(Collectors.toSet());
+
+            if (!matched.isEmpty()) {
+                ccl.setIgdbMappings(matched);
+                twitchCclRepo.save(ccl);
+                seeded += matched.size();
+            }
+        }
+        if (seeded > 0) log.info("Applied {} default CCL→descriptor mappings by keyword matching", seeded);
     }
 
     private String buildDisplayName(Integer orgId, String description) {
