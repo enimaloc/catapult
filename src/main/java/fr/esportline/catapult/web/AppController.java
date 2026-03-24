@@ -5,7 +5,6 @@ import fr.esportline.catapult.domain.OAuthToken;
 import fr.esportline.catapult.domain.UserAccount;
 import fr.esportline.catapult.getter.DetectedGame;
 import fr.esportline.catapult.repository.GameBindingRepository;
-import fr.esportline.catapult.repository.GetterConfigRepository;
 import fr.esportline.catapult.repository.UserSettingsRepository;
 import fr.esportline.catapult.security.CatapultOAuth2User;
 import fr.esportline.catapult.service.AccountService;
@@ -40,7 +39,6 @@ public class AppController {
     private final BindingService bindingService;
     private final TwitchService twitchService;
     private final AdminCclService adminCclService;
-    private final GetterConfigRepository getterConfigRepository;
     private final UserSettingsRepository userSettingsRepository;
     private final AccountService accountService;
 
@@ -48,9 +46,9 @@ public class AppController {
     // Old URL redirects
     // -------------------------------------------------------------------------
 
-    @GetMapping("/dashboard")
-    public String redirectDashboard() {
-        return "redirect:/app?tab=dashboard";
+    @GetMapping({"/dashboard", "/settings"})
+    public String redirectToApp() {
+        return "redirect:/app";
     }
 
     @GetMapping("/bindings")
@@ -58,16 +56,13 @@ public class AppController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String source) {
-        StringBuilder url = new StringBuilder("redirect:/app?tab=bindings");
-        if (page > 0)        url.append("&page=").append(page);
-        if (status != null)  url.append("&status=").append(status);
-        if (source != null)  url.append("&source=").append(source);
+        StringBuilder url = new StringBuilder("redirect:/app");
+        List<String> params = new ArrayList<>();
+        if (page > 0)       params.add("page=" + page);
+        if (status != null) params.add("status=" + status);
+        if (source != null) params.add("source=" + source);
+        if (!params.isEmpty()) url.append("?").append(String.join("&", params));
         return url.toString();
-    }
-
-    @GetMapping("/settings")
-    public String redirectSettings() {
-        return "redirect:/app?tab=settings";
     }
 
     // -------------------------------------------------------------------------
@@ -77,7 +72,6 @@ public class AppController {
     @GetMapping("/app")
     public String app(
             @AuthenticationPrincipal CatapultOAuth2User principal,
-            @RequestParam(defaultValue = "dashboard") String tab,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String source,
@@ -85,12 +79,12 @@ public class AppController {
 
         UserAccount user = principal.getUserAccount();
 
-        // Dashboard data
+        // Status
         Optional<DetectedGame> currentGame = gameStateService.getLastKnownGame(user);
         model.addAttribute("currentGame", currentGame.orElse(null));
         model.addAttribute("botEnabled", user.isBotEnabled());
 
-        // Bindings data
+        // Bindings
         PageRequest pageRequest = PageRequest.of(page, 20);
         Page<GameBinding> bindings;
         if (status != null && !status.isBlank()) {
@@ -107,16 +101,13 @@ public class AppController {
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterSource", source);
 
-        // Settings data
+        // Settings
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
         model.addAttribute("hasSteam", !steamApiKey.isBlank() && user.getSteamId() != null);
-        model.addAttribute("getterConfigs", getterConfigRepository.findByUserOrderByPriorityAsc(user));
-        model.addAttribute("settings", userSettingsRepository.findById(user.getId()).orElse(null));
 
         // Common
         model.addAttribute("user", user);
         model.addAttribute("isPendingDeletion", user.getStatus() == UserAccount.Status.PENDING_DELETION);
-        model.addAttribute("activeTab", tab);
 
         return "app";
     }
@@ -144,7 +135,7 @@ public class AppController {
                                 @RequestParam(required = false) Set<String> ccls) {
         Set<String> cclSet = ccls == null ? Set.of() : new HashSet<>(ccls);
         bindingService.updateBinding(principal.getUserAccount(), id, twitchGameId, twitchGameName, cclSet, ignored);
-        return "redirect:/app?tab=bindings";
+        return "redirect:/app";
     }
 
     @PostMapping("/bindings/{id}/ccl-toggle")
@@ -152,7 +143,7 @@ public class AppController {
                                    @PathVariable UUID id,
                                    @RequestParam(defaultValue = "false") boolean enabled) {
         bindingService.toggleCclEnabled(principal.getUserAccount(), id, enabled);
-        return "redirect:/app?tab=bindings";
+        return "redirect:/app";
     }
 
     @PostMapping("/bindings/{id}/ignored-toggle")
@@ -160,13 +151,13 @@ public class AppController {
                                 @PathVariable UUID id,
                                 @RequestParam(defaultValue = "false") boolean ignored) {
         bindingService.toggleIgnored(principal.getUserAccount(), id, ignored);
-        return "redirect:/app?tab=bindings";
+        return "redirect:/app";
     }
 
     @PostMapping("/bindings/{id}/delete")
     public String deleteBinding(@PathVariable UUID id) {
         bindingService.deleteBinding(id);
-        return "redirect:/app?tab=bindings";
+        return "redirect:/app";
     }
 
     @GetMapping(value = "/api/games/search", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -187,7 +178,7 @@ public class AppController {
                             @RequestParam boolean enabled) {
         UserAccount user = principal.getUserAccount();
         user.setBotEnabled(enabled);
-        return "redirect:/app?tab=settings";
+        return "redirect:/app";
     }
 
     @PostMapping("/settings/delete-account")
@@ -197,13 +188,13 @@ public class AppController {
         if (user.getTwitchUsername().equalsIgnoreCase(confirmUsername)) {
             accountService.initiateAccountDeletion(user);
         }
-        return "redirect:/app?tab=settings";
+        return "redirect:/app";
     }
 
     @PostMapping("/settings/cancel-deletion")
     public String cancelDeletion(@AuthenticationPrincipal CatapultOAuth2User principal) {
         accountService.cancelAccountDeletion(principal.getUserAccount());
-        return "redirect:/app?tab=settings";
+        return "redirect:/app";
     }
 
     @PostMapping("/settings/disconnect")
@@ -211,6 +202,6 @@ public class AppController {
                                      @RequestParam String provider) {
         OAuthToken.Provider p = OAuthToken.Provider.valueOf(provider.toUpperCase());
         accountService.disconnectProvider(principal.getUserAccount(), p);
-        return "redirect:/app?tab=settings";
+        return "redirect:/app";
     }
 }

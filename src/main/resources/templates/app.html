@@ -3,22 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:text="'Catapult — ' + ${activeTab == 'dashboard' ? 'Dashboard' : activeTab == 'bindings' ? 'Bindings' : 'Réglages'}">Catapult</title>
+    <title>Catapult</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
     <style>
-        /* ---- Onglets ---- */
-        .tabs { display:flex; gap:4px; border-bottom:2px solid #e5e7eb; margin-bottom:1.5rem; }
-        .tabs a {
-            padding:8px 18px; text-decoration:none; color:#555; border-radius:6px 6px 0 0;
-            border:1px solid transparent; border-bottom:none; font-weight:500;
-        }
-        .tabs a.active {
-            color:var(--color-primary,#7c3aed); border-color:#e5e7eb;
-            background:#fff; margin-bottom:-2px; border-bottom:2px solid #fff;
-        }
-        .tabs a:hover:not(.active) { background:#f3f4f6; }
-
-        /* ---- Bindings ---- */
         .toggle-label { display:inline-flex; align-items:center; cursor:pointer; gap:6px; }
         .toggle-label input[type=checkbox] { display:none; }
         .toggle-slider {
@@ -50,7 +37,6 @@
 </head>
 <body>
 
-    <!-- Bandeau PENDING_DELETION -->
     <div th:if="${isPendingDeletion}" class="banner banner-danger">
         <strong>⚠ Suppression de compte en cours.</strong>
         Ton compte sera supprimé définitivement le
@@ -72,83 +58,44 @@
 
     <main class="container">
 
-        <!-- Onglets -->
-        <div class="tabs">
-            <a th:href="@{/app(tab='dashboard')}"
-               th:classappend="${activeTab == 'dashboard'} ? ' active'">Dashboard</a>
-            <a th:href="@{/app(tab='bindings')}"
-               th:classappend="${activeTab == 'bindings'} ? ' active'">Bindings</a>
-            <a th:href="@{/app(tab='settings')}"
-               th:classappend="${activeTab == 'settings'} ? ' active'">Réglages</a>
+        <!-- ================================================================ -->
+        <!-- Statut                                                            -->
+        <!-- ================================================================ -->
+        <div class="card">
+            <h3>État du bot</h3>
+            <div th:if="${botEnabled}" class="status status-active">
+                <span class="status-dot"></span> Actif
+            </div>
+            <div th:unless="${botEnabled}" class="status status-inactive">
+                <span class="status-dot"></span> Inactif
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Jeu en cours</h3>
+            <div th:if="${currentGame != null}">
+                <p>
+                    <strong th:text="${currentGame.sourceName}"></strong>
+                    <span class="badge" th:text="${currentGame.sourceType}"></span>
+                </p>
+            </div>
+            <div th:unless="${currentGame != null}">
+                <p class="text-muted">Aucun jeu détecté</p>
+            </div>
         </div>
 
         <!-- ================================================================ -->
-        <!-- DASHBOARD                                                         -->
+        <!-- Bindings                                                          -->
         <!-- ================================================================ -->
-        <div th:if="${activeTab == 'dashboard'}">
+        <div class="card">
+            <h3>Bindings</h3>
 
-            <div class="card">
-                <h3>État du bot</h3>
-                <div th:if="${botEnabled}" class="status status-active">
-                    <span class="status-dot"></span> Actif
-                </div>
-                <div th:unless="${botEnabled}" class="status status-inactive">
-                    <span class="status-dot"></span> Inactif
-                </div>
-            </div>
-
-            <div class="card">
-                <h3>Jeu en cours</h3>
-                <div th:if="${currentGame != null}">
-                    <p>
-                        <strong th:text="${currentGame.sourceName}"></strong>
-                        <span class="badge" th:text="${currentGame.sourceType}"></span>
-                    </p>
-                </div>
-                <div th:unless="${currentGame != null}">
-                    <p class="text-muted">Aucun jeu détecté</p>
-                </div>
-            </div>
-
-            <div class="card">
-                <h3>Activité récente</h3>
-                <ul id="log-list" style="list-style:none;padding:0;margin:0;font-family:monospace;font-size:0.85em">
-                    <li id="log-placeholder" class="text-muted">En attente d'activité…</li>
-                </ul>
-            </div>
-
-            <script>
-                (function () {
-                    const list = document.getElementById('log-list');
-                    const placeholder = document.getElementById('log-placeholder');
-                    const MAX_LINES = 50;
-                    const es = new EventSource('/app/logs');
-                    es.onmessage = function (e) {
-                        if (placeholder) placeholder.remove();
-                        const li = document.createElement('li');
-                        li.textContent = e.data;
-                        li.style.borderBottom = '1px solid #eee';
-                        li.style.padding = '2px 0';
-                        list.appendChild(li);
-                        while (list.children.length > MAX_LINES) list.removeChild(list.firstChild);
-                        list.scrollTop = list.scrollHeight;
-                    };
-                    es.onerror = function () { es.close(); };
-                })();
-            </script>
-        </div>
-
-        <!-- ================================================================ -->
-        <!-- BINDINGS                                                          -->
-        <!-- ================================================================ -->
-        <div th:if="${activeTab == 'bindings'}">
-
-            <div class="filters">
-                <a th:href="@{/app(tab='bindings')}" class="btn btn-sm btn-outline">Tous</a>
-                <a th:href="@{/app(tab='bindings',status='AUTO')}" class="btn btn-sm btn-outline">AUTO</a>
-                <a th:href="@{/app(tab='bindings',status='MANUAL')}" class="btn btn-sm btn-outline">MANUAL</a>
-                <a th:href="@{/app(tab='bindings',status='INCOMPLETE')}" class="btn btn-sm btn-outline">INCOMPLETE</a>
-                <a th:href="@{/app(tab='bindings',source='STEAM')}" class="btn btn-sm btn-outline">Steam</a>
+            <div class="filters" style="margin-bottom:1rem">
+                <a th:href="@{/app}" class="btn btn-sm btn-outline">Tous</a>
+                <a th:href="@{/app(status='AUTO')}" class="btn btn-sm btn-outline">AUTO</a>
+                <a th:href="@{/app(status='MANUAL')}" class="btn btn-sm btn-outline">MANUAL</a>
+                <a th:href="@{/app(status='INCOMPLETE')}" class="btn btn-sm btn-outline">INCOMPLETE</a>
+                <a th:href="@{/app(source='STEAM')}" class="btn btn-sm btn-outline">Steam</a>
             </div>
 
             <div class="table-container">
@@ -265,141 +212,166 @@
 
             <div th:if="${bindings.totalPages > 1}" class="pagination">
                 <a th:if="${!bindings.first}"
-                   th:href="@{/app(tab='bindings',page=${bindings.number - 1},status=${filterStatus},source=${filterSource})}"
+                   th:href="@{/app(page=${bindings.number - 1},status=${filterStatus},source=${filterSource})}"
                    class="btn btn-sm">Précédent</a>
                 <span th:text="${bindings.number + 1} + ' / ' + ${bindings.totalPages}"></span>
                 <a th:if="${!bindings.last}"
-                   th:href="@{/app(tab='bindings',page=${bindings.number + 1},status=${filterStatus},source=${filterSource})}"
+                   th:href="@{/app(page=${bindings.number + 1},status=${filterStatus},source=${filterSource})}"
                    class="btn btn-sm">Suivant</a>
             </div>
-
-            <script>
-                function toggleEdit(id) {
-                    const row = document.getElementById('edit-row-' + id);
-                    row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
-                }
-                const debounceTimers = {};
-                function debouncedSearch(event, id) {
-                    clearTimeout(debounceTimers[id]);
-                    const q = event.target.value.trim();
-                    const results = document.getElementById('gameResults-' + id);
-                    if (q.length < 2) { results.style.display = 'none'; return; }
-                    debounceTimers[id] = setTimeout(() => fetchSuggestions(q, id), 300);
-                }
-                function fetchSuggestions(q, id) {
-                    fetch('/api/games/search?q=' + encodeURIComponent(q))
-                        .then(r => r.json())
-                        .then(data => {
-                            const results = document.getElementById('gameResults-' + id);
-                            results.replaceChildren();
-                            if (!data.length) { results.style.display = 'none'; return; }
-                            data.forEach(game => {
-                                const li = document.createElement('li');
-                                li.textContent = game.name;
-                                li.addEventListener('click', () => {
-                                    document.getElementById('twitchGameId-' + id).value = game.id;
-                                    document.getElementById('twitchGameName-' + id).value = game.name;
-                                    document.getElementById('gameSearch-' + id).value = game.name;
-                                    results.style.display = 'none';
-                                });
-                                results.appendChild(li);
-                            });
-                            results.style.display = 'block';
-                        })
-                        .catch(() => document.getElementById('gameResults-' + id).style.display = 'none');
-                }
-                document.addEventListener('click', e => {
-                    document.querySelectorAll('.game-results').forEach(el => {
-                        if (!el.previousElementSibling?.contains(e.target)) el.style.display = 'none';
-                    });
-                });
-            </script>
         </div>
 
         <!-- ================================================================ -->
-        <!-- RÉGLAGES                                                          -->
+        <!-- Activité récente                                                  -->
         <!-- ================================================================ -->
-        <div th:if="${activeTab == 'settings'}">
+        <div class="card">
+            <h3>Activité récente</h3>
+            <ul id="log-list" style="list-style:none;padding:0;margin:0;font-family:monospace;font-size:0.85em">
+                <li id="log-placeholder" class="text-muted">En attente d'activité…</li>
+            </ul>
+        </div>
 
-            <section class="card">
-                <h3>Connexions</h3>
-                <div class="provider-grid">
-                    <div class="provider-card">
-                        <strong>Twitch</strong>
-                        <span class="badge badge-connected">Connecté</span>
-                        <p class="text-muted text-sm">Provider principal — déconnexion via logout</p>
-                    </div>
-                    <div th:if="${hasSteamProvider}" class="provider-card">
-                        <strong>Steam</strong>
-                        <span th:if="${hasSteam}" class="badge badge-connected">Connecté</span>
-                        <span th:unless="${hasSteam}" class="badge badge-disconnected">Non connecté</span>
-                        <div th:if="${hasSteam}">
-                            <form th:action="@{/connect/steam/disconnect}" method="post">
-                                <button type="submit" class="btn btn-sm btn-danger">Déconnecter</button>
-                            </form>
-                        </div>
-                        <div th:unless="${hasSteam}">
-                            <a th:href="@{/connect/steam}" class="btn btn-sm">Connecter</a>
-                        </div>
-                    </div>
+        <!-- ================================================================ -->
+        <!-- Connexions                                                        -->
+        <!-- ================================================================ -->
+        <section class="card">
+            <h3>Connexions</h3>
+            <div class="provider-grid">
+                <div class="provider-card">
+                    <strong>Twitch</strong>
+                    <span class="badge badge-connected">Connecté</span>
+                    <p class="text-muted text-sm">Provider principal — déconnexion via logout</p>
                 </div>
-            </section>
-
-            <section class="card">
-                <h3>Bot &amp; Game Getters</h3>
-                <form th:action="@{/settings/bot}" method="post">
-                    <label class="toggle">
-                        <input type="checkbox" name="enabled" th:checked="${user.botEnabled}">
-                        <span>Activer le bot</span>
-                    </label>
-                    <button type="submit" class="btn btn-primary">Enregistrer</button>
-                </form>
-                <div th:if="${!getterConfigs.isEmpty()}" class="getter-list">
-                    <h4>Ordre des getters</h4>
-                    <div th:each="config : ${getterConfigs}" class="getter-item">
-                        <span th:text="${config.provider}"></span>
-                        <span th:if="${config.enabled}" class="badge badge-connected">Actif</span>
-                        <span th:unless="${config.enabled}" class="badge badge-disconnected">Inactif</span>
+                <div th:if="${hasSteamProvider}" class="provider-card">
+                    <strong>Steam</strong>
+                    <span th:if="${hasSteam}" class="badge badge-connected">Connecté</span>
+                    <span th:unless="${hasSteam}" class="badge badge-disconnected">Non connecté</span>
+                    <div th:if="${hasSteam}">
+                        <form th:action="@{/connect/steam/disconnect}" method="post">
+                            <button type="submit" class="btn btn-sm btn-danger">Déconnecter</button>
+                        </form>
                     </div>
-                </div>
-            </section>
-
-            <section th:unless="${isPendingDeletion}" class="card card-danger">
-                <h3>Zone danger</h3>
-                <p>La suppression de compte est irréversible après <strong>7 jours</strong>.</p>
-                <button type="button" class="btn btn-danger"
-                        onclick="document.getElementById('deleteModal').style.display='flex'">
-                    Supprimer mon compte
-                </button>
-            </section>
-
-            <section th:if="${isPendingDeletion}" class="card card-danger">
-                <h3>Suppression en cours</h3>
-                <p>Ton compte sera supprimé définitivement le
-                    <strong th:text="${#temporals.format(user.deletionRequestedAt, 'dd/MM/yyyy')}"></strong>.
-                </p>
-                <form th:action="@{/settings/cancel-deletion}" method="post">
-                    <button type="submit" class="btn btn-outline">Annuler la suppression</button>
-                </form>
-            </section>
-
-            <div id="deleteModal" class="modal" style="display:none">
-                <div class="modal-content">
-                    <h3>Confirmer la suppression</h3>
-                    <p>Saisis ton nom d'utilisateur Twitch pour confirmer :</p>
-                    <form th:action="@{/settings/delete-account}" method="post">
-                        <input type="text" name="confirmUsername" placeholder="Ton username Twitch" required>
-                        <div class="modal-actions">
-                            <button type="button"
-                                    onclick="document.getElementById('deleteModal').style.display='none'"
-                                    class="btn btn-outline">Annuler</button>
-                            <button type="submit" class="btn btn-danger">Supprimer définitivement</button>
-                        </div>
-                    </form>
+                    <div th:unless="${hasSteam}">
+                        <a th:href="@{/connect/steam}" class="btn btn-sm">Connecter</a>
+                    </div>
                 </div>
             </div>
-        </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- Bot                                                               -->
+        <!-- ================================================================ -->
+        <section class="card">
+            <h3>Bot</h3>
+            <form th:action="@{/settings/bot}" method="post">
+                <label class="toggle">
+                    <input type="checkbox" name="enabled" th:checked="${user.botEnabled}">
+                    <span>Activer le bot</span>
+                </label>
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+            </form>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- Zone danger                                                       -->
+        <!-- ================================================================ -->
+        <section th:unless="${isPendingDeletion}" class="card card-danger">
+            <h3>Zone danger</h3>
+            <p>La suppression de compte est irréversible après <strong>7 jours</strong>.</p>
+            <button type="button" class="btn btn-danger"
+                    onclick="document.getElementById('deleteModal').style.display='flex'">
+                Supprimer mon compte
+            </button>
+        </section>
+
+        <section th:if="${isPendingDeletion}" class="card card-danger">
+            <h3>Suppression en cours</h3>
+            <p>Ton compte sera supprimé définitivement le
+                <strong th:text="${#temporals.format(user.deletionRequestedAt, 'dd/MM/yyyy')}"></strong>.
+            </p>
+            <form th:action="@{/settings/cancel-deletion}" method="post">
+                <button type="submit" class="btn btn-outline">Annuler la suppression</button>
+            </form>
+        </section>
 
     </main>
+
+    <!-- Modal suppression -->
+    <div id="deleteModal" class="modal" style="display:none">
+        <div class="modal-content">
+            <h3>Confirmer la suppression</h3>
+            <p>Saisis ton nom d'utilisateur Twitch pour confirmer :</p>
+            <form th:action="@{/settings/delete-account}" method="post">
+                <input type="text" name="confirmUsername" placeholder="Ton username Twitch" required>
+                <div class="modal-actions">
+                    <button type="button"
+                            onclick="document.getElementById('deleteModal').style.display='none'"
+                            class="btn btn-outline">Annuler</button>
+                    <button type="submit" class="btn btn-danger">Supprimer définitivement</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Bindings inline edit
+        function toggleEdit(id) {
+            const row = document.getElementById('edit-row-' + id);
+            row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+        }
+        const debounceTimers = {};
+        function debouncedSearch(event, id) {
+            clearTimeout(debounceTimers[id]);
+            const q = event.target.value.trim();
+            const results = document.getElementById('gameResults-' + id);
+            if (q.length < 2) { results.style.display = 'none'; return; }
+            debounceTimers[id] = setTimeout(() => fetchSuggestions(q, id), 300);
+        }
+        function fetchSuggestions(q, id) {
+            fetch('/api/games/search?q=' + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(data => {
+                    const results = document.getElementById('gameResults-' + id);
+                    results.replaceChildren();
+                    if (!data.length) { results.style.display = 'none'; return; }
+                    data.forEach(game => {
+                        const li = document.createElement('li');
+                        li.textContent = game.name;
+                        li.addEventListener('click', () => {
+                            document.getElementById('twitchGameId-' + id).value = game.id;
+                            document.getElementById('twitchGameName-' + id).value = game.name;
+                            document.getElementById('gameSearch-' + id).value = game.name;
+                            results.style.display = 'none';
+                        });
+                        results.appendChild(li);
+                    });
+                    results.style.display = 'block';
+                })
+                .catch(() => document.getElementById('gameResults-' + id).style.display = 'none');
+        }
+        document.addEventListener('click', e => {
+            document.querySelectorAll('.game-results').forEach(el => {
+                if (!el.previousElementSibling?.contains(e.target)) el.style.display = 'none';
+            });
+        });
+
+        // Activity log SSE
+        (function () {
+            const list = document.getElementById('log-list');
+            const placeholder = document.getElementById('log-placeholder');
+            const MAX_LINES = 50;
+            const es = new EventSource('/app/logs');
+            es.onmessage = function (e) {
+                if (placeholder) placeholder.remove();
+                const li = document.createElement('li');
+                li.textContent = e.data;
+                li.style.borderBottom = '1px solid #eee';
+                li.style.padding = '2px 0';
+                list.appendChild(li);
+                while (list.children.length > MAX_LINES) list.removeChild(list.firstChild);
+            };
+            es.onerror = function () { es.close(); };
+        })();
+    </script>
 </body>
 </html>
