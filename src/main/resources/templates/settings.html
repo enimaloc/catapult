@@ -53,34 +53,6 @@
                         <a th:href="@{/connect/steam}" class="btn btn-sm">Connecter</a>
                     </div>
                 </div>
-                <div th:if="${hasXboxProvider}" class="provider-card">
-                    <strong>Xbox</strong>
-                    <span th:if="${hasXbox}" class="badge badge-connected">Connecté</span>
-                    <span th:unless="${hasXbox}" class="badge badge-disconnected">Non connecté</span>
-                    <div th:if="${hasXbox}">
-                        <form th:action="@{/settings/disconnect}" method="post">
-                            <input type="hidden" name="provider" value="xbox">
-                            <button type="submit" class="btn btn-sm btn-danger">Déconnecter</button>
-                        </form>
-                    </div>
-                    <div th:unless="${hasXbox}">
-                        <a th:href="@{/oauth2/authorization/xbox}" class="btn btn-sm">Connecter</a>
-                    </div>
-                </div>
-                <div th:if="${hasBattleNetProvider}" class="provider-card">
-                    <strong>Battle.net</strong>
-                    <span th:if="${hasBattleNet}" class="badge badge-connected">Connecté</span>
-                    <span th:unless="${hasBattleNet}" class="badge badge-disconnected">Non connecté</span>
-                    <div th:if="${hasBattleNet}">
-                        <form th:action="@{/settings/disconnect}" method="post">
-                            <input type="hidden" name="provider" value="battlenet">
-                            <button type="submit" class="btn btn-sm btn-danger">Déconnecter</button>
-                        </form>
-                    </div>
-                    <div th:unless="${hasBattleNet}">
-                        <a th:href="@{/oauth2/authorization/battlenet}" class="btn btn-sm">Connecter</a>
-                    </div>
-                </div>
             </div>
         </section>
 
