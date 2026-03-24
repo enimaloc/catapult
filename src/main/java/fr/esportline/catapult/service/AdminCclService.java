@@ -122,6 +122,10 @@ public class AdminCclService {
         log.info("Synced {} Twitch CCL definitions", data.size());
     }
 
+    /**
+     * Fetches age_ratings entries from IGDB and extracts all unique
+     * rating_content_descriptions (with their organization context) for display.
+     */
     @SuppressWarnings("unchecked")
     @Transactional
     void syncIgdbDescriptors(String appToken) {
@@ -129,36 +133,48 @@ public class AdminCclService {
         if (clientIdToUse.isBlank()) return;
 
         List<Map<String, Object>> results = restClient.post()
-            .uri(IGDB_API_URL + "/age_rating_content_descriptions")
+            .uri(IGDB_API_URL + "/age_ratings")
             .header("Client-ID", clientIdToUse)
             .header("Authorization", "Bearer " + appToken)
-            .body("fields id,description,organization; limit 500;")
+            .body("fields rating_content_descriptions.id," +
+                  "rating_content_descriptions.description," +
+                  "rating_content_descriptions.organization;" +
+                  " where rating_content_descriptions != null; limit 500;")
             .retrieve()
             .body(List.class);
 
         if (results == null) return;
 
-        for (Map<String, Object> item : results) {
-            Long id = ((Number) item.get("id")).longValue();
-            String description = (String) item.get("description");
-            Integer orgId = item.get("organization") != null
-                ? ((Number) item.get("organization")).intValue()
-                : null;
+        int newCount = 0;
+        for (Map<String, Object> ageRating : results) {
+            List<Map<String, Object>> descs =
+                (List<Map<String, Object>>) ageRating.get("rating_content_descriptions");
+            if (descs == null) continue;
 
-            if (!igdbDescriptorRepo.existsById(id)) {
+            for (Map<String, Object> item : descs) {
+                Long id = ((Number) item.get("id")).longValue();
+                if (igdbDescriptorRepo.existsById(id)) continue;
+
+                String description = (String) item.get("description");
+                Integer orgId = item.get("organization") != null
+                    ? ((Number) item.get("organization")).intValue()
+                    : null;
+
                 IgdbRatingDescriptor d = new IgdbRatingDescriptor();
                 d.setId(id);
                 d.setDescription(description);
                 d.setOrganizationId(orgId);
                 d.setDisplayName(buildDisplayName(orgId, description));
                 igdbDescriptorRepo.save(d);
+                newCount++;
             }
         }
-        log.info("Synced {} IGDB rating descriptors", results.size());
+        log.info("Synced {} new IGDB rating descriptors", newCount);
     }
 
     private String buildDisplayName(Integer orgId, String description) {
         String org = orgId != null ? ORG_NAMES.getOrDefault(orgId, "Org" + orgId) : "Unknown";
         return org + " — " + description;
     }
+
 }
