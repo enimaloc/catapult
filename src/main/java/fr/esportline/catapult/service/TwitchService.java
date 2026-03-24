@@ -9,10 +9,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,6 +40,9 @@ public class TwitchService {
     @Value("${twitch.client-id:}")
     private String twitchClientId;
 
+    @Value("${twitch.client-secret:}")
+    private String twitchClientSecret;
+
     /**
      * Met à jour la catégorie et les CCLs de la chaîne Twitch.
      * Ne fait rien si le binding est INCOMPLETE ou ignored.
@@ -56,7 +63,41 @@ public class TwitchService {
 
     private void doUpdateChannel(UserAccount user, GameBinding binding, OAuthToken token) {
         String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+        try {
+            callPatchChannel(user, binding, accessToken);
+            log.info("Twitch channel updated for user {} — game_id={}, ccls={}",
+                user.getId(), binding.getTwitchGameId(), binding.getCcls());
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                refreshToken(user, token).ifPresentOrElse(
+                    newAccess -> retryAfterRefresh(user, binding, newAccess),
+                    () -> {
+                        log.warn("Twitch token invalid and refresh failed for user {} — pausing bot", user.getId());
+                        pauseBot(user);
+                    }
+                );
+            } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                log.warn("Twitch rate limit hit for user {} — will retry next cycle", user.getId());
+            } else {
+                log.error("Twitch API error for user {}: {} {}", user.getId(), e.getStatusCode(), e.getMessage());
+            }
+        } catch (Exception e) {
+            log.error("Unexpected error updating Twitch channel for user {}", user.getId(), e);
+        }
+    }
 
+    private void retryAfterRefresh(UserAccount user, GameBinding binding, String accessToken) {
+        try {
+            callPatchChannel(user, binding, accessToken);
+            log.info("Twitch channel updated after token refresh for user {}", user.getId());
+        } catch (HttpClientErrorException e) {
+            log.warn("Twitch channel update failed after refresh for user {}: {} — pausing bot",
+                user.getId(), e.getStatusCode());
+            pauseBot(user);
+        }
+    }
+
+    private void callPatchChannel(UserAccount user, GameBinding binding, String accessToken) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("game_id", binding.getTwitchGameId());
 
@@ -68,31 +109,71 @@ public class TwitchService {
             body.put("content_classification_labels", buildCclPayload(binding.getCcls()));
         }
 
+        restClient.patch()
+            .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
+            .header("Authorization", "Bearer " + accessToken)
+            .header("Client-ID", twitchClientId)
+            .header("Content-Type", "application/json")
+            .body(body)
+            .retrieve()
+            .toBodilessEntity();
+    }
+
+    private void pauseBot(UserAccount user) {
+        user.setBotEnabled(false);
+        userAccountRepository.save(user);
+    }
+
+    /**
+     * Calls POST /oauth2/token with grant_type=refresh_token.
+     * Persists the new access + refresh tokens on success.
+     * Returns the new access token, or empty if refresh failed.
+     */
+    @SuppressWarnings("unchecked")
+    private Optional<String> refreshToken(UserAccount user, OAuthToken token) {
+        if (token.getRefreshToken() == null || token.getRefreshToken().isBlank()) {
+            log.warn("No refresh token stored for user {} — cannot refresh Twitch token", user.getId());
+            return Optional.empty();
+        }
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("grant_type", "refresh_token");
+        params.add("refresh_token", tokenEncryptionService.decrypt(token.getRefreshToken()));
+        params.add("client_id", twitchClientId);
+        params.add("client_secret", twitchClientSecret);
+
         try {
-            restClient.patch()
-                .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
-                .header("Authorization", "Bearer " + accessToken)
-                .header("Client-ID", twitchClientId)
-                .header("Content-Type", "application/json")
-                .body(body)
+            Map<String, Object> response = restClient.post()
+                .uri("https://id.twitch.tv/oauth2/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(params)
                 .retrieve()
-                .toBodilessEntity();
+                .body(Map.class);
 
-            log.info("Twitch channel updated for user {} — game_id={}, ccls={}",
-                user.getId(), binding.getTwitchGameId(), binding.getCcls());
-
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                log.warn("Twitch token invalid for user {} — pausing bot", user.getId());
-                user.setBotEnabled(false);
-                userAccountRepository.save(user);
-            } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
-                log.warn("Twitch rate limit hit for user {} — will retry next cycle", user.getId());
-            } else {
-                log.error("Twitch API error for user {}: {} {}", user.getId(), e.getStatusCode(), e.getMessage());
+            if (response == null || !response.containsKey("access_token")) {
+                log.warn("Twitch token refresh returned empty response for user {}", user.getId());
+                return Optional.empty();
             }
+
+            String newAccess  = (String) response.get("access_token");
+            String newRefresh = (String) response.get("refresh_token");
+            Number expiresIn  = (Number) response.get("expires_in");
+
+            token.setAccessToken(tokenEncryptionService.encrypt(newAccess));
+            if (newRefresh != null) {
+                token.setRefreshToken(tokenEncryptionService.encrypt(newRefresh));
+            }
+            if (expiresIn != null) {
+                token.setExpiresAt(Instant.now().plusSeconds(expiresIn.longValue()));
+            }
+            oAuthTokenRepository.save(token);
+
+            log.info("Twitch token refreshed for user {}", user.getId());
+            return Optional.of(newAccess);
+
         } catch (Exception e) {
-            log.error("Unexpected error updating Twitch channel for user {}", user.getId(), e);
+            log.warn("Twitch token refresh failed for user {}: {}", user.getId(), e.getMessage());
+            return Optional.empty();
         }
     }
 
