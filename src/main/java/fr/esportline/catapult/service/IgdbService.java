@@ -4,9 +4,11 @@ import fr.esportline.catapult.domain.IgdbGameCacheEntry;
 import fr.esportline.catapult.domain.IgdbGameCcl;
 import fr.esportline.catapult.domain.IgdbGameExternalId;
 import fr.esportline.catapult.domain.TwitchCcl;
+import fr.esportline.catapult.domain.TwitchCclDefinition;
 import fr.esportline.catapult.repository.IgdbGameCacheRepository;
 import fr.esportline.catapult.repository.IgdbGameCclRepository;
 import fr.esportline.catapult.repository.IgdbGameExternalIdRepository;
+import fr.esportline.catapult.repository.TwitchCclDefinitionRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,7 @@ public class IgdbService {
     private final IgdbGameCacheRepository cacheRepository;
     private final IgdbGameExternalIdRepository externalIdRepository;
     private final IgdbGameCclRepository cclRepository;
+    private final TwitchCclDefinitionRepository twitchCclRepo;
     private final SteamStoreService steamStoreService;
     private final RestClient restClient;
 
@@ -52,8 +55,7 @@ public class IgdbService {
     // Keyword sets live in TwitchCcl (shared with SteamStoreService).
 
     private static final String CCL_FIELDS =
-        "age_ratings.rating_category.organization.name," +
-        "age_ratings.rating_category.rating," +
+        "age_ratings.rating_content_descriptions.id," +
         "age_ratings.rating_content_descriptions.description";
 
     // L1 cache: igdbId → name
@@ -312,27 +314,44 @@ public class IgdbService {
     }
 
     private Set<TwitchCcl> extractCcls(Game game) {
-        Set<TwitchCcl> suggested = new HashSet<>();
+        // Collect all descriptor IDs present on this game's age ratings
+        Set<Long> descriptorIds = new HashSet<>();
         for (proto.AgeRating ar : game.getAgeRatingsList()) {
-            proto.AgeRatingCategory rc = ar.getRatingCategory();
-            String org    = rc.getOrganization().getName();
-            String rating = rc.getRating();
-            if (!org.isBlank() && !rating.isBlank()) {
-                String orgUc = org.toUpperCase(java.util.Locale.ROOT);
-                if ((orgUc.contains("ESRB") && (rating.equals("M") || rating.equals("AO")))
-                    || (orgUc.contains("PEGI") && rating.equals("18"))) {
-                    suggested.add(TwitchCcl.MatureGame);
-                }
-            }
             for (proto.AgeRatingContentDescriptionV2 desc : ar.getRatingContentDescriptionsList()) {
-                String d = desc.getDescription().toLowerCase(java.util.Locale.ROOT);
-                if (TwitchCcl.KW_VIOLENCE.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ViolentGraphic);
-                if (TwitchCcl.KW_SEXUAL.stream().anyMatch(d::contains))    suggested.add(TwitchCcl.SexualThemes);
-                if (TwitchCcl.KW_DRUGS.stream().anyMatch(d::contains))     suggested.add(TwitchCcl.DrugsIntoxication);
-                if (TwitchCcl.KW_GAMBLING.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.Gambling);
-                if (TwitchCcl.KW_LANGUAGE.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ProfanityVulgarity);
+                if (desc.getId() > 0) descriptorIds.add(desc.getId());
             }
         }
+
+        if (descriptorIds.isEmpty()) return Set.of();
+
+        // DB-driven: find which Twitch CCLs have any of these descriptors mapped
+        Set<TwitchCcl> suggested = new HashSet<>();
+        for (TwitchCclDefinition cclDef : twitchCclRepo.findAll()) {
+            boolean matched = cclDef.getIgdbMappings().stream()
+                .anyMatch(d -> descriptorIds.contains(d.getId()));
+            if (matched) {
+                try {
+                    suggested.add(TwitchCcl.valueOf(cclDef.getId()));
+                } catch (IllegalArgumentException ignored) {
+                    // CCL from Twitch API not in local enum (e.g. future CCL) — skip
+                }
+            }
+        }
+
+        // Keyword fallback when no admin mappings have been configured yet
+        if (suggested.isEmpty()) {
+            for (proto.AgeRating ar : game.getAgeRatingsList()) {
+                for (proto.AgeRatingContentDescriptionV2 desc : ar.getRatingContentDescriptionsList()) {
+                    String d = desc.getDescription().toLowerCase(java.util.Locale.ROOT);
+                    if (TwitchCcl.KW_VIOLENCE.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ViolentGraphic);
+                    if (TwitchCcl.KW_SEXUAL.stream().anyMatch(d::contains))    suggested.add(TwitchCcl.SexualThemes);
+                    if (TwitchCcl.KW_DRUGS.stream().anyMatch(d::contains))     suggested.add(TwitchCcl.DrugsIntoxication);
+                    if (TwitchCcl.KW_GAMBLING.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.Gambling);
+                    if (TwitchCcl.KW_LANGUAGE.stream().anyMatch(d::contains))  suggested.add(TwitchCcl.ProfanityVulgarity);
+                }
+            }
+        }
+
         return suggested;
     }
 

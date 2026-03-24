@@ -1,8 +1,8 @@
 package fr.esportline.catapult.service;
 
-import fr.esportline.catapult.domain.IgdbAgeRatingCategory;
+import fr.esportline.catapult.domain.IgdbRatingDescriptor;
 import fr.esportline.catapult.domain.TwitchCclDefinition;
-import fr.esportline.catapult.repository.IgdbAgeRatingCategoryRepository;
+import fr.esportline.catapult.repository.IgdbRatingDescriptorRepository;
 import fr.esportline.catapult.repository.TwitchCclDefinitionRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 /**
  * Gestion de la configuration admin des CCLs.
- * Au démarrage, synchronise les CCLs Twitch et les catégories d'âge IGDB depuis leurs APIs.
+ * Au démarrage, synchronise les CCLs Twitch et les descripteurs de contenu IGDB depuis leurs APIs.
  */
 @Slf4j
 @Service
@@ -28,24 +28,18 @@ public class AdminCclService {
     private static final String TWITCH_CCL_URL = "https://api.twitch.tv/helix/content_classification_labels";
     private static final String IGDB_API_URL = "https://api.igdb.com/v4";
 
-    private static final Map<Integer, String> CATEGORY_NAMES = Map.of(
+    private static final Map<Integer, String> ORG_NAMES = Map.of(
         1, "ESRB", 2, "PEGI", 3, "CERO", 4, "USK", 5, "GRAC", 6, "CLASS_IND", 7, "ACB"
-    );
-    private static final Map<Integer, String> ESRB_LABELS = Map.of(
-        12, "E", 3, "E10+", 10, "T", 11, "M", 8, "AO"
-    );
-    private static final Map<Integer, String> PEGI_LABELS = Map.of(
-        1, "3", 2, "7", 3, "12", 4, "16", 5, "18"
     );
 
     private final RestClient restClient;
     private final TwitchCclDefinitionRepository twitchCclRepo;
-    private final IgdbAgeRatingCategoryRepository igdbRatingRepo;
+    private final IgdbRatingDescriptorRepository igdbDescriptorRepo;
 
-    @Value("${spring.security.oauth2.client.registration.twitch.client-id:}")
+    @Value("${twitch.client-id:}")
     private String twitchClientId;
 
-    @Value("${spring.security.oauth2.client.registration.twitch.client-secret:}")
+    @Value("${twitch.client-secret:}")
     private String twitchClientSecret;
 
     @Value("${app.igdb.client-id:}")
@@ -57,7 +51,7 @@ public class AdminCclService {
             String appToken = fetchAppToken();
             if (appToken != null) {
                 syncTwitchCcls(appToken);
-                syncIgdbCategories(appToken);
+                syncIgdbDescriptors(appToken);
             }
         } catch (Exception e) {
             log.warn("AdminCclService startup sync failed — admin CCL data may be stale: {}", e.getMessage());
@@ -72,15 +66,15 @@ public class AdminCclService {
         return twitchCclRepo.findAll();
     }
 
-    public List<IgdbAgeRatingCategory> getAllIgdbCategories() {
-        return igdbRatingRepo.findAll();
+    public List<IgdbRatingDescriptor> getAllIgdbDescriptors() {
+        return igdbDescriptorRepo.findAll();
     }
 
     @Transactional
-    public void saveMappings(String cclId, Set<Long> igdbCategoryIds) {
+    public void saveMappings(String cclId, Set<Long> descriptorIds) {
         twitchCclRepo.findById(cclId).ifPresent(ccl -> {
-            Set<IgdbAgeRatingCategory> mappings = igdbCategoryIds.stream()
-                .map(id -> igdbRatingRepo.findById(id).orElseThrow())
+            Set<IgdbRatingDescriptor> mappings = descriptorIds.stream()
+                .map(id -> igdbDescriptorRepo.findById(id).orElseThrow())
                 .collect(Collectors.toSet());
             ccl.setIgdbMappings(mappings);
             twitchCclRepo.save(ccl);
@@ -130,46 +124,41 @@ public class AdminCclService {
 
     @SuppressWarnings("unchecked")
     @Transactional
-    void syncIgdbCategories(String appToken) {
+    void syncIgdbDescriptors(String appToken) {
         String clientIdToUse = igdbClientId.isBlank() ? twitchClientId : igdbClientId;
         if (clientIdToUse.isBlank()) return;
 
         List<Map<String, Object>> results = restClient.post()
-            .uri(IGDB_API_URL + "/age_ratings")
+            .uri(IGDB_API_URL + "/age_rating_content_descriptions")
             .header("Client-ID", clientIdToUse)
             .header("Authorization", "Bearer " + appToken)
-            .body("fields category,rating; limit 500; sort category asc;")
+            .body("fields id,description,organization; limit 500;")
             .retrieve()
             .body(List.class);
 
         if (results == null) return;
 
-        Set<String> seen = new HashSet<>();
         for (Map<String, Object> item : results) {
-            Integer categoryId = ((Number) item.get("category")).intValue();
-            Integer rating = ((Number) item.get("rating")).intValue();
-            String key = categoryId + ":" + rating;
-            if (!seen.add(key)) continue;
+            Long id = ((Number) item.get("id")).longValue();
+            String description = (String) item.get("description");
+            Integer orgId = item.get("organization") != null
+                ? ((Number) item.get("organization")).intValue()
+                : null;
 
-            igdbRatingRepo.findByCategoryIdAndRating(categoryId, rating)
-                .orElseGet(() -> {
-                    var cat = new IgdbAgeRatingCategory();
-                    cat.setCategoryId(categoryId);
-                    cat.setRating(rating);
-                    cat.setDisplayName(buildDisplayName(categoryId, rating));
-                    return igdbRatingRepo.save(cat);
-                });
+            if (!igdbDescriptorRepo.existsById(id)) {
+                IgdbRatingDescriptor d = new IgdbRatingDescriptor();
+                d.setId(id);
+                d.setDescription(description);
+                d.setOrganizationId(orgId);
+                d.setDisplayName(buildDisplayName(orgId, description));
+                igdbDescriptorRepo.save(d);
+            }
         }
-        log.info("Synced {} unique IGDB age rating categories", seen.size());
+        log.info("Synced {} IGDB rating descriptors", results.size());
     }
 
-    private String buildDisplayName(int categoryId, int ratingInt) {
-        String catName = CATEGORY_NAMES.getOrDefault(categoryId, "CAT" + categoryId);
-        String ratingLabel = switch (categoryId) {
-            case 1 -> ESRB_LABELS.getOrDefault(ratingInt, String.valueOf(ratingInt));
-            case 2 -> "PEGI " + PEGI_LABELS.getOrDefault(ratingInt, String.valueOf(ratingInt));
-            default -> String.valueOf(ratingInt);
-        };
-        return catName + " " + ratingLabel;
+    private String buildDisplayName(Integer orgId, String description) {
+        String org = orgId != null ? ORG_NAMES.getOrDefault(orgId, "Org" + orgId) : "Unknown";
+        return org + " — " + description;
     }
 }
