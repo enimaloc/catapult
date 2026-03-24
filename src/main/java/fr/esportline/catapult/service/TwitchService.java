@@ -165,10 +165,14 @@ public class TwitchService {
 
     public record TwitchCategory(String id, String name) {}
 
+    // Twitch broadcaster-settable CCLs (MatureGame is set automatically by Twitch, not included)
+    private static final List<String> EDITABLE_CCL_IDS = List.of(
+        "ViolentGraphic", "SexualThemes", "DrugsIntoxication", "Gambling", "ProfanityVulgarity"
+    );
+
     private List<Map<String, Object>> buildCclPayload(Set<String> cclIds) {
-        return Arrays.stream(TwitchCcl.values())
-            .filter(ccl -> ccl.editable)
-            .map(ccl -> Map.<String, Object>of("id", ccl.name(), "is_enabled", cclIds.contains(ccl.name())))
+        return EDITABLE_CCL_IDS.stream()
+            .map(id -> Map.<String, Object>of("id", id, "is_enabled", cclIds.contains(id)))
             .collect(Collectors.toList());
     }
 }
