@@ -23,14 +23,10 @@ public class GameGetterChain {
 
     private final GetterConfigRepository getterConfigRepository;
     private final SteamGameGetter steamGameGetter;
-    private final XboxGameGetter xboxGameGetter;
-    private final BattleNetGameGetter battleNetGameGetter;
 
     public Optional<DetectedGame> resolve(UserAccount user) {
         Map<GetterConfig.Provider, GameGetter> getterByProvider = Map.of(
-            GetterConfig.Provider.STEAM, steamGameGetter,
-            GetterConfig.Provider.XBOX, xboxGameGetter,
-            GetterConfig.Provider.BATTLENET, battleNetGameGetter
+            GetterConfig.Provider.STEAM, steamGameGetter
         );
 
         List<GetterConfig> configs = getterConfigRepository.findByUserOrderByPriorityAsc(user);
