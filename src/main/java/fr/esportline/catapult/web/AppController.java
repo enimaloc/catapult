@@ -1,0 +1,216 @@
+package fr.esportline.catapult.web;
+
+import fr.esportline.catapult.domain.GameBinding;
+import fr.esportline.catapult.domain.OAuthToken;
+import fr.esportline.catapult.domain.UserAccount;
+import fr.esportline.catapult.getter.DetectedGame;
+import fr.esportline.catapult.repository.GameBindingRepository;
+import fr.esportline.catapult.repository.GetterConfigRepository;
+import fr.esportline.catapult.repository.UserSettingsRepository;
+import fr.esportline.catapult.security.CatapultOAuth2User;
+import fr.esportline.catapult.service.AccountService;
+import fr.esportline.catapult.service.ActivityLogService;
+import fr.esportline.catapult.service.AdminCclService;
+import fr.esportline.catapult.service.BindingService;
+import fr.esportline.catapult.service.GameStateService;
+import fr.esportline.catapult.service.TwitchService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.*;
+
+@Controller
+@RequiredArgsConstructor
+public class AppController {
+
+    @Value("${steam.api-key:}")
+    private String steamApiKey;
+
+    private final GameStateService gameStateService;
+    private final ActivityLogService activityLogService;
+    private final GameBindingRepository gameBindingRepository;
+    private final BindingService bindingService;
+    private final TwitchService twitchService;
+    private final AdminCclService adminCclService;
+    private final GetterConfigRepository getterConfigRepository;
+    private final UserSettingsRepository userSettingsRepository;
+    private final AccountService accountService;
+
+    // -------------------------------------------------------------------------
+    // Old URL redirects
+    // -------------------------------------------------------------------------
+
+    @GetMapping("/dashboard")
+    public String redirectDashboard() {
+        return "redirect:/app?tab=dashboard";
+    }
+
+    @GetMapping("/bindings")
+    public String redirectBindings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String source) {
+        StringBuilder url = new StringBuilder("redirect:/app?tab=bindings");
+        if (page > 0)        url.append("&page=").append(page);
+        if (status != null)  url.append("&status=").append(status);
+        if (source != null)  url.append("&source=").append(source);
+        return url.toString();
+    }
+
+    @GetMapping("/settings")
+    public String redirectSettings() {
+        return "redirect:/app?tab=settings";
+    }
+
+    // -------------------------------------------------------------------------
+    // Main unified page
+    // -------------------------------------------------------------------------
+
+    @GetMapping("/app")
+    public String app(
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            @RequestParam(defaultValue = "dashboard") String tab,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String source,
+            Model model) {
+
+        UserAccount user = principal.getUserAccount();
+
+        // Dashboard data
+        Optional<DetectedGame> currentGame = gameStateService.getLastKnownGame(user);
+        model.addAttribute("currentGame", currentGame.orElse(null));
+        model.addAttribute("botEnabled", user.isBotEnabled());
+
+        // Bindings data
+        PageRequest pageRequest = PageRequest.of(page, 20);
+        Page<GameBinding> bindings;
+        if (status != null && !status.isBlank()) {
+            bindings = gameBindingRepository.findByUserAndStatus(
+                user, GameBinding.Status.valueOf(status.toUpperCase()), pageRequest);
+        } else if (source != null && !source.isBlank()) {
+            bindings = gameBindingRepository.findByUserAndSourceType(
+                user, GameBinding.SourceType.valueOf(source.toUpperCase()), pageRequest);
+        } else {
+            bindings = gameBindingRepository.findByUser(user, pageRequest);
+        }
+        model.addAttribute("bindings", bindings);
+        model.addAttribute("availableCcls", adminCclService.getAllCcls());
+        model.addAttribute("filterStatus", status);
+        model.addAttribute("filterSource", source);
+
+        // Settings data
+        model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
+        model.addAttribute("hasSteam", !steamApiKey.isBlank() && user.getSteamId() != null);
+        model.addAttribute("getterConfigs", getterConfigRepository.findByUserOrderByPriorityAsc(user));
+        model.addAttribute("settings", userSettingsRepository.findById(user.getId()).orElse(null));
+
+        // Common
+        model.addAttribute("user", user);
+        model.addAttribute("isPendingDeletion", user.getStatus() == UserAccount.Status.PENDING_DELETION);
+        model.addAttribute("activeTab", tab);
+
+        return "app";
+    }
+
+    // -------------------------------------------------------------------------
+    // SSE (activity log)
+    // -------------------------------------------------------------------------
+
+    @GetMapping(value = "/app/logs", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @ResponseBody
+    public SseEmitter streamLogs(@AuthenticationPrincipal CatapultOAuth2User principal) {
+        return activityLogService.subscribe(principal.getUserAccount().getId());
+    }
+
+    // -------------------------------------------------------------------------
+    // Bindings actions
+    // -------------------------------------------------------------------------
+
+    @PostMapping("/bindings/{id}")
+    public String updateBinding(@AuthenticationPrincipal CatapultOAuth2User principal,
+                                @PathVariable UUID id,
+                                @RequestParam(required = false) String twitchGameId,
+                                @RequestParam(required = false) String twitchGameName,
+                                @RequestParam(required = false, defaultValue = "false") boolean ignored,
+                                @RequestParam(required = false) Set<String> ccls) {
+        Set<String> cclSet = ccls == null ? Set.of() : new HashSet<>(ccls);
+        bindingService.updateBinding(principal.getUserAccount(), id, twitchGameId, twitchGameName, cclSet, ignored);
+        return "redirect:/app?tab=bindings";
+    }
+
+    @PostMapping("/bindings/{id}/ccl-toggle")
+    public String toggleCclEnabled(@AuthenticationPrincipal CatapultOAuth2User principal,
+                                   @PathVariable UUID id,
+                                   @RequestParam(defaultValue = "false") boolean enabled) {
+        bindingService.toggleCclEnabled(principal.getUserAccount(), id, enabled);
+        return "redirect:/app?tab=bindings";
+    }
+
+    @PostMapping("/bindings/{id}/ignored-toggle")
+    public String toggleIgnored(@AuthenticationPrincipal CatapultOAuth2User principal,
+                                @PathVariable UUID id,
+                                @RequestParam(defaultValue = "false") boolean ignored) {
+        bindingService.toggleIgnored(principal.getUserAccount(), id, ignored);
+        return "redirect:/app?tab=bindings";
+    }
+
+    @PostMapping("/bindings/{id}/delete")
+    public String deleteBinding(@PathVariable UUID id) {
+        bindingService.deleteBinding(id);
+        return "redirect:/app?tab=bindings";
+    }
+
+    @GetMapping(value = "/api/games/search", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public List<TwitchService.TwitchCategory> searchGames(
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            @RequestParam String q) {
+        if (q.isBlank()) return List.of();
+        return twitchService.searchCategories(principal.getUserAccount(), q);
+    }
+
+    // -------------------------------------------------------------------------
+    // Settings actions
+    // -------------------------------------------------------------------------
+
+    @PostMapping("/settings/bot")
+    public String toggleBot(@AuthenticationPrincipal CatapultOAuth2User principal,
+                            @RequestParam boolean enabled) {
+        UserAccount user = principal.getUserAccount();
+        user.setBotEnabled(enabled);
+        return "redirect:/app?tab=settings";
+    }
+
+    @PostMapping("/settings/delete-account")
+    public String deleteAccount(@AuthenticationPrincipal CatapultOAuth2User principal,
+                                @RequestParam String confirmUsername) {
+        UserAccount user = principal.getUserAccount();
+        if (user.getTwitchUsername().equalsIgnoreCase(confirmUsername)) {
+            accountService.initiateAccountDeletion(user);
+        }
+        return "redirect:/app?tab=settings";
+    }
+
+    @PostMapping("/settings/cancel-deletion")
+    public String cancelDeletion(@AuthenticationPrincipal CatapultOAuth2User principal) {
+        accountService.cancelAccountDeletion(principal.getUserAccount());
+        return "redirect:/app?tab=settings";
+    }
+
+    @PostMapping("/settings/disconnect")
+    public String disconnectProvider(@AuthenticationPrincipal CatapultOAuth2User principal,
+                                     @RequestParam String provider) {
+        OAuthToken.Provider p = OAuthToken.Provider.valueOf(provider.toUpperCase());
+        accountService.disconnectProvider(principal.getUserAccount(), p);
+        return "redirect:/app?tab=settings";
+    }
+}
