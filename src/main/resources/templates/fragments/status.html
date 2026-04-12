@@ -15,6 +15,15 @@
         </div>
     </div>
     <div class="card">
+        <h3>Stream</h3>
+        <div th:if="${isLive}" class="status status-active">
+            <span class="status-dot"></span> En live
+        </div>
+        <div th:unless="${isLive}" class="status status-inactive">
+            <span class="status-dot"></span> Hors ligne
+        </div>
+    </div>
+    <div class="card">
         <h3>Jeu en cours</h3>
         <div th:if="${currentGame != null}">
             <p>

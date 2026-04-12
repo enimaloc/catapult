@@ -11,6 +11,8 @@ import fr.esportline.catapult.service.ActivityLogService;
 import fr.esportline.catapult.service.AdminCclService;
 import fr.esportline.catapult.service.BindingService;
 import fr.esportline.catapult.service.GameStateService;
+import fr.esportline.catapult.service.StreamStateService;
+import fr.esportline.catapult.service.TwitchEventSubService;
 import fr.esportline.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,6 +41,8 @@ public class AppController {
     private final TwitchService twitchService;
     private final AdminCclService adminCclService;
     private final AccountService accountService;
+    private final StreamStateService streamStateService;
+    private final TwitchEventSubService twitchEventSubService;
 
     // -------------------------------------------------------------------------
     // Old URL redirects
@@ -81,6 +85,7 @@ public class AppController {
         Optional<DetectedGame> currentGame = gameStateService.getLastKnownGame(user);
         model.addAttribute("currentGame", currentGame.orElse(null));
         model.addAttribute("botEnabled", user.isBotEnabled());
+        model.addAttribute("isLive", streamStateService.isLive(user));
 
         // Bindings
         PageRequest pageRequest = PageRequest.of(page, 20);
@@ -121,6 +126,7 @@ public class AppController {
         UserAccount user = principal.getUserAccount();
         model.addAttribute("currentGame", gameStateService.getLastKnownGame(user).orElse(null));
         model.addAttribute("botEnabled", user.isBotEnabled());
+        model.addAttribute("isLive", streamStateService.isLive(user));
         return "fragments/status :: status";
     }
 
@@ -226,6 +232,11 @@ public class AppController {
                             @RequestParam boolean enabled) {
         UserAccount user = principal.getUserAccount();
         user.setBotEnabled(enabled);
+        if (enabled) {
+            twitchEventSubService.connect(user);
+        } else {
+            twitchEventSubService.disconnect(user);
+        }
         return "redirect:/app";
     }
 
