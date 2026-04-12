@@ -10,6 +10,8 @@ import fr.esportline.catapult.service.ActivityLogService;
 import fr.esportline.catapult.service.AdminCclService;
 import fr.esportline.catapult.service.BindingService;
 import fr.esportline.catapult.service.GameStateService;
+import fr.esportline.catapult.service.StreamStateService;
+import fr.esportline.catapult.service.TwitchEventSubService;
 import fr.esportline.catapult.service.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +50,8 @@ class AppControllerTest {
     @MockitoBean ActivityLogService activityLogService;
     @MockitoBean AdminCclService adminCclService;
     @MockitoBean AccountService accountService;
+    @MockitoBean StreamStateService streamStateService;
+    @MockitoBean TwitchEventSubService twitchEventSubService;
 
     private UserAccount userAccount;
     private UsernamePasswordAuthenticationToken auth;
