@@ -58,10 +58,10 @@
     </nav>
 
     <main class="container">
-        <div th:replace="~{fragments/status :: status}"></div>
-        <div th:replace="~{fragments/bindings :: bindings}"></div>
-        <div th:replace="~{fragments/activity-log :: activity-log}"></div>
         <div th:replace="~{fragments/connections :: connections}"></div>
+        <div th:replace="~{fragments/status :: status}"></div>
+        <div th:replace="~{fragments/activity-log :: activity-log}"></div>
+        <div th:replace="~{fragments/bindings :: bindings}"></div>
         <div th:replace="~{fragments/bot :: bot}"></div>
         <div th:replace="~{fragments/danger-zone :: danger-zone}"></div>
     </main>
