@@ -4,16 +4,13 @@ import fr.esportline.catapult.domain.GameBinding;
 import fr.esportline.catapult.domain.UserAccount;
 import fr.esportline.catapult.repository.UserSettingsRepository;
 import fr.esportline.catapult.service.BindingService;
+import fr.esportline.catapult.service.StreamStateService;
 import fr.esportline.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Listener principal des événements de détection de jeu.
- * Résout le binding et délègue à TwitchService pour la mise à jour de la chaîne.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -22,6 +19,7 @@ public class GameEventListener {
     private final BindingService bindingService;
     private final TwitchService twitchService;
     private final UserSettingsRepository userSettingsRepository;
+    private final StreamStateService streamStateService;
 
     @EventListener
     public void onGameDetected(GameDetectedEvent event) {
@@ -31,11 +29,17 @@ public class GameEventListener {
         GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
 
         if (binding.getStatus() == GameBinding.Status.INCOMPLETE || binding.isIgnored()) {
-            log.debug("Binding is {} — skipping Twitch update for user {}", binding.getStatus(), user.getId());
+            log.debug("Binding is {} — skipping update for user {}", binding.getStatus(), user.getId());
             return;
         }
 
-        twitchService.updateChannel(user, binding);
+        if (streamStateService.isLive(user)) {
+            twitchService.updateChannel(user, binding);
+        } else {
+            streamStateService.storePending(user, binding);
+            log.debug("User {} not live — stored pending binding for game {}",
+                user.getId(), binding.getSourceName());
+        }
     }
 
     @EventListener
@@ -43,9 +47,13 @@ public class GameEventListener {
         UserAccount user = event.getUser();
         log.debug("NoGameDetectedEvent for user {}", user.getId());
 
+        if (!streamStateService.isLive(user)) {
+            log.debug("User {} not live — skipping no-game fallback", user.getId());
+            return;
+        }
+
         userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
             if (settings.getNoGameTwitchGameId() != null && !settings.getNoGameTwitchGameId().isBlank()) {
-                // Appliquer la catégorie de fallback
                 GameBinding fallbackBinding = new GameBinding();
                 fallbackBinding.setUser(user);
                 fallbackBinding.setSourceType(GameBinding.SourceType.MANUAL);
@@ -57,5 +65,23 @@ public class GameEventListener {
                 twitchService.updateChannel(user, fallbackBinding);
             }
         });
+    }
+
+    @EventListener
+    public void onStreamOnline(StreamOnlineEvent event) {
+        UserAccount user = event.getUser();
+        log.debug("StreamOnlineEvent for user {}", user.getId());
+        streamStateService.getPending(user).ifPresent(binding -> {
+            twitchService.updateChannel(user, binding);
+            streamStateService.clearPending(user);
+        });
+    }
+
+    @EventListener
+    public void onStreamOffline(StreamOfflineEvent event) {
+        UserAccount user = event.getUser();
+        log.debug("StreamOfflineEvent for user {}", user.getId());
+        twitchService.resetToDefault(user);
+        streamStateService.clearPending(user);
     }
 }
