@@ -213,6 +213,8 @@ public class TwitchService {
                 log.warn("Twitch token invalid for user {} during reset — pausing bot", user.getId());
                 user.setBotEnabled(false);
                 userAccountRepository.save(user);
+            } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                log.warn("Twitch rate limit hit for user {} during reset — skipping", user.getId());
             } else {
                 log.error("Twitch API error during reset for user {}: {} {}",
                     user.getId(), e.getStatusCode(), e.getMessage());
