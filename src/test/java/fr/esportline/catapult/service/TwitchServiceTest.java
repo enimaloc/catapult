@@ -181,4 +181,45 @@ class TwitchServiceTest {
         assertThat(user.isBotEnabled()).isFalse();
         verify(userAccountRepository).save(user);
     }
+
+    @Test
+    void resetToDefault_noSettings_doesNotCallApi() {
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        twitchService.resetToDefault(user);
+
+        verify(restClient, never()).patch();
+    }
+
+    @Test
+    void resetToDefault_noGameIdConfigured_doesNotCallApi() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId(null);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        twitchService.resetToDefault(user);
+
+        verify(restClient, never()).patch();
+    }
+
+    @Test
+    void resetToDefault_gameIdConfigured_patchesTwitchChannel() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        when(restClient.patch()).thenReturn(patchSpec);
+        when(patchSpec.uri(anyString())).thenReturn(bodySpec);
+        when(bodySpec.header(anyString(), anyString())).thenReturn(bodySpec);
+        when(bodySpec.body(any())).thenReturn(bodySpec);
+        when(bodySpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.toBodilessEntity()).thenReturn(null);
+
+        twitchService.resetToDefault(user);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).containsEntry("game_id", "12345");
+    }
 }

@@ -175,4 +175,50 @@ public class TwitchService {
             .map(id -> Map.<String, Object>of("id", id, "is_enabled", cclIds.contains(id)))
             .collect(Collectors.toList());
     }
+
+    /**
+     * Réinitialise la catégorie Twitch à la catégorie par défaut configurée.
+     * Ne fait rien si aucune catégorie par défaut n'est configurée.
+     */
+    public void resetToDefault(UserAccount user) {
+        userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+            if (settings.getNoGameTwitchGameId() == null || settings.getNoGameTwitchGameId().isBlank()) {
+                log.debug("No default category configured for user {} — skipping reset", user.getId());
+                return;
+            }
+            oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+                .ifPresentOrElse(
+                    token -> doResetToDefault(user, settings, token),
+                    () -> log.warn("No Twitch token for user {} during reset", user.getId())
+                );
+        });
+    }
+
+    private void doResetToDefault(UserAccount user, UserSettings settings, OAuthToken token) {
+        String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+        Map<String, Object> body = Map.of("game_id", settings.getNoGameTwitchGameId());
+        try {
+            restClient.patch()
+                .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Client-ID", twitchClientId)
+                .header("Content-Type", "application/json")
+                .body(body)
+                .retrieve()
+                .toBodilessEntity();
+            log.info("Twitch channel reset to default for user {} — game_id={}",
+                user.getId(), settings.getNoGameTwitchGameId());
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                log.warn("Twitch token invalid for user {} during reset — pausing bot", user.getId());
+                user.setBotEnabled(false);
+                userAccountRepository.save(user);
+            } else {
+                log.error("Twitch API error during reset for user {}: {} {}",
+                    user.getId(), e.getStatusCode(), e.getMessage());
+            }
+        } catch (Exception e) {
+            log.error("Unexpected error resetting Twitch channel for user {}", user.getId(), e);
+        }
+    }
 }
