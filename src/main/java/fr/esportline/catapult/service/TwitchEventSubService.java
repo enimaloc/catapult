@@ -10,6 +10,7 @@ import fr.esportline.catapult.repository.OAuthTokenRepository;
 import fr.esportline.catapult.repository.UserAccountRepository;
 import fr.esportline.catapult.security.TokenEncryptionService;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,11 +50,18 @@ public class TwitchEventSubService {
     private String twitchClientId;
 
     private final Map<UUID, WebSocket> connections = new ConcurrentHashMap<>();
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @PostConstruct
     public void init() {
         userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)
             .forEach(this::connect);
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        connections.forEach((userId, ws) -> ws.sendClose(WebSocket.NORMAL_CLOSURE, "application shutdown"));
+        connections.clear();
     }
 
     public void connect(UserAccount user) {
@@ -74,7 +82,7 @@ public class TwitchEventSubService {
     }
 
     private void openConnection(UserAccount user, OAuthToken token, String wsUrl, long retryDelaySeconds) {
-        HttpClient.newHttpClient()
+        httpClient
             .newWebSocketBuilder()
             .buildAsync(URI.create(wsUrl), new EventSubListener(user, token, wsUrl, retryDelaySeconds))
             .whenComplete((ws, ex) -> {
