@@ -2,7 +2,9 @@ package fr.esportline.catapult.event;
 
 import fr.esportline.catapult.domain.GameBinding;
 import fr.esportline.catapult.domain.UserAccount;
+import fr.esportline.catapult.domain.UserSettings;
 import fr.esportline.catapult.getter.DetectedGame;
+import fr.esportline.catapult.repository.UserSettingsRepository;
 import fr.esportline.catapult.service.BindingService;
 import fr.esportline.catapult.service.StreamStateService;
 import fr.esportline.catapult.service.TwitchService;
@@ -26,6 +28,7 @@ class GameEventListenerLiveCheckTest {
     @Mock private BindingService bindingService;
     @Mock private TwitchService twitchService;
     @Mock private StreamStateService streamStateService;
+    @Mock private UserSettingsRepository userSettingsRepository;
 
     @InjectMocks private GameEventListener listener;
 
@@ -90,5 +93,29 @@ class GameEventListenerLiveCheckTest {
 
         verify(twitchService).resetToDefault(user);
         verify(streamStateService).clearPending(user);
+    }
+
+    @Test
+    void onNoGameDetected_whenNotLive_skipsRepository() {
+        when(streamStateService.isLive(user)).thenReturn(false);
+
+        listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
+
+        verify(userSettingsRepository, never()).findById(any());
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void onNoGameDetected_whenLive_withFallbackConfigured_callsUpdateChannel() {
+        when(streamStateService.isLive(user)).thenReturn(true);
+
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("fallback-id");
+        settings.setNoGameTwitchGameName("Just Chatting");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
+
+        verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
     }
 }
