@@ -1,4 +1,4 @@
-package fr.esportline.catapult.domain;
+package fr.enimaloc.catapult.domain;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -16,7 +16,7 @@ import java.util.UUID;
 public class GetterConfig {
 
     public enum Provider {
-        STEAM, XBOX, BATTLENET
+        STEAM, XBOX, BATTLENET, OBS
     }
 
     @Id
