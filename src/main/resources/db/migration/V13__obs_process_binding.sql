@@ -1,3 +1,7 @@
+-- ============================================================
+-- V13 — OBS Process Getter : association processus → jeu Twitch
+-- ============================================================
+
 CREATE TABLE process_binding (
     id              UUID        NOT NULL PRIMARY KEY,
     user_id         UUID        NOT NULL REFERENCES user_account(id) ON DELETE CASCADE,
