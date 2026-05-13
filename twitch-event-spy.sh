@@ -39,7 +39,8 @@ Options:
   --help       Show this message and exit
 
 Dependencies: twitch-cli, websocat, jq
-Pre-requisite: run 'twitch token -c' before first use
+Pre-requisite: run 'twitch token -u -s user:read:email' before first use
+               (WebSocket EventSub requires a user access token, not app token)
 EOF
 }
 
@@ -165,6 +166,9 @@ subscribe_events() {
       echo -e "  ${CYAN}↳ subscribed:${RESET} ${event_type} v${version}"
     else
       echo -e "  ${RED}✗ failed:${RESET} ${event_type} — ${out}" >&2
+      if echo "$out" | grep -q "invalid transport and auth combination"; then
+        echo -e "  ${YELLOW}→ Hint: run 'twitch token -u -s user:read:email' to get a user access token${RESET}" >&2
+      fi
     fi
   done
 }
