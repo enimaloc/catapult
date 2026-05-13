@@ -1,18 +1,18 @@
-package fr.esportline.catapult.web;
+package fr.enimaloc.catapult.web;
 
-import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.repository.GameBindingRepository;
-import fr.esportline.catapult.security.CatapultOAuth2User;
-import fr.esportline.catapult.security.CatapultOAuth2UserService;
-import fr.esportline.catapult.service.AccountService;
-import fr.esportline.catapult.service.ActivityLogService;
-import fr.esportline.catapult.service.AdminCclService;
-import fr.esportline.catapult.service.BindingService;
-import fr.esportline.catapult.service.GameStateService;
-import fr.esportline.catapult.service.StreamStateService;
-import fr.esportline.catapult.service.TwitchEventSubService;
-import fr.esportline.catapult.service.TwitchService;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.security.CatapultOAuth2User;
+import fr.enimaloc.catapult.security.CatapultOAuth2UserService;
+import fr.enimaloc.catapult.service.AccountService;
+import fr.enimaloc.catapult.service.ActivityLogService;
+import fr.enimaloc.catapult.service.AdminCclService;
+import fr.enimaloc.catapult.service.BindingService;
+import fr.enimaloc.catapult.service.GameStateService;
+import fr.enimaloc.catapult.service.StreamStateService;
+import fr.enimaloc.catapult.service.EventSubService;
+import fr.enimaloc.catapult.service.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +43,7 @@ class AppControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean GameBindingRepository gameBindingRepository;
+    @MockitoBean UserAccountRepository userAccountRepository;
     @MockitoBean BindingService bindingService;
     @MockitoBean TwitchService twitchService;
     @MockitoBean CatapultOAuth2UserService oAuth2UserService;
@@ -51,7 +52,7 @@ class AppControllerTest {
     @MockitoBean AdminCclService adminCclService;
     @MockitoBean AccountService accountService;
     @MockitoBean StreamStateService streamStateService;
-    @MockitoBean TwitchEventSubService twitchEventSubService;
+    @MockitoBean EventSubService twitchEventSubService;
 
     private UserAccount userAccount;
     private UsernamePasswordAuthenticationToken auth;
