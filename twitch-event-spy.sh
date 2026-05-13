@@ -84,7 +84,7 @@ cleanup() {
 # ── Resolve broadcaster ID ─────────────────────────────────────────────────
 get_broadcaster_id() {
   local response
-  response=$(twitch api get /helix/users -q "login=$CHANNEL" 2>/dev/null)
+  response=$(twitch api get /users -q "login=$CHANNEL" 2>/dev/null)
   local id
   id=$(echo "$response" | jq -r '.data[0].id // empty')
   if [[ -z "$id" ]]; then
@@ -98,7 +98,7 @@ get_broadcaster_id() {
 fetch_initial_state() {
   local broadcaster_id="$1"
   local response
-  response=$(twitch api get /helix/channels -q "broadcaster_id=$broadcaster_id" 2>/dev/null)
+  response=$(twitch api get /channels -q "broadcaster_id=$broadcaster_id" 2>/dev/null)
   PREV_GAME=$(echo "$response" | jq -r '.data[0].game_name // ""')
   PREV_TITLE=$(echo "$response" | jq -r '.data[0].title // ""')
 }
@@ -160,7 +160,7 @@ subscribe_events() {
       --arg bid     "$broadcaster_id" \
       --arg sid     "$session_id" \
       '{"type":$type,"version":$version,"condition":{"broadcaster_user_id":$bid},"transport":{"method":"websocket","session_id":$sid}}')
-    twitch api post /helix/eventsub/subscriptions -b "$body" &>/dev/null
+    twitch api post /eventsub/subscriptions -b "$body" &>/dev/null
     echo -e "  ${CYAN}↳ subscribed:${RESET} ${event_type} v${version}"
   done
 }
@@ -179,7 +179,7 @@ main() {
   mkfifo "$FIFO"
   trap cleanup SIGINT SIGTERM EXIT
 
-  websocat "$WS_URL" < /dev/null > "$FIFO" &
+  websocat --no-close "$WS_URL" < /dev/null > "$FIFO" &
   WS_PID=$!
 
   echo -e "${CYAN}Connecting to EventSub WebSocket...${RESET}"
@@ -204,7 +204,7 @@ main() {
         new_url=$(echo "$line" | jq -r '.payload.session.reconnect_url')
         echo -e "${YELLOW}⚠ Reconnect requested — switching URL...${RESET}"
         kill "$WS_PID" 2>/dev/null || true
-        websocat "$new_url" < /dev/null > "$FIFO" &
+        websocat --no-close "$new_url" < /dev/null > "$FIFO" &
         WS_PID=$!
         ;;
       "notification")
