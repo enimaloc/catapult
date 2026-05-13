@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -16,6 +17,11 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationFa
 public class SecurityConfig {
 
     private final CatapultOAuth2UserService oAuth2UserService;
+
+    @Bean
+    public ApiKeyAuthFilter apiKeyAuthFilter(UserAccountRepository userAccountRepository) {
+        return new ApiKeyAuthFilter(userAccountRepository);
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, ApiKeyAuthFilter apiKeyAuthFilter) throws Exception {
