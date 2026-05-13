@@ -1,4 +1,4 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

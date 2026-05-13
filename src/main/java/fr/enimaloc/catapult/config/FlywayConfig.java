@@ -1,4 +1,4 @@
-package fr.esportline.catapult.config;
+package fr.enimaloc.catapult.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;

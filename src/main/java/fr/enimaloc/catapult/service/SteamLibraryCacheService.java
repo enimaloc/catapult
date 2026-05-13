@@ -1,8 +1,8 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.event.SteamLinkedEvent;
-import fr.esportline.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.event.SteamLinkedEvent;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

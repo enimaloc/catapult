@@ -1,4 +1,4 @@
-package fr.esportline.catapult.config;
+package fr.enimaloc.catapult.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

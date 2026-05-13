@@ -1,6 +1,7 @@
-package fr.esportline.catapult.getter;
+package fr.enimaloc.catapult.getter;
 
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserAccount;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -12,6 +13,7 @@ import java.util.Optional;
  *   - Endpoint : https://titlehub.xboxlive.com/users/xuid({xuid})/titles/titleHistory/decoration/detail
  */
 @Component
+@ConditionalOnBooleanProperty("xbox.enabled")
 public class XboxGameGetter implements GameGetter {
 
     @Override

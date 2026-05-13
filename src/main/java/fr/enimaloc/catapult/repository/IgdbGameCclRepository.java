@@ -1,6 +1,6 @@
-package fr.esportline.catapult.repository;
+package fr.enimaloc.catapult.repository;
 
-import fr.esportline.catapult.domain.IgdbGameCcl;
+import fr.enimaloc.catapult.domain.IgdbGameCcl;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 

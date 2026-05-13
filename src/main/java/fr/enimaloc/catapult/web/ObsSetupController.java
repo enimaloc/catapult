@@ -39,9 +39,13 @@ public class ObsSetupController {
     @GetMapping("/fragments/obs-setup")
     public String fragment(@AuthenticationPrincipal CatapultOAuth2User principal, Model model) {
         UserAccount user = principal.getUserAccount();
-        model.addAttribute("apiKey", user.getApiKey());
+        String apiKey = user.getApiKey();
+        model.addAttribute("apiKey", apiKey);
         model.addAttribute("publicUrl", publicUrl);
         model.addAttribute("processBindings", processBindingRepository.findByUserOrderByProcessNameAsc(user));
+        if (apiKey != null) {
+            model.addAttribute("obsScript", buildObsScript(apiKey));
+        }
         return "fragments/obs-setup :: obs-setup";
     }
 
@@ -67,8 +71,8 @@ public class ObsSetupController {
     @PostMapping("/obs/process-bindings")
     public String addProcessBinding(@AuthenticationPrincipal CatapultOAuth2User principal,
                                     @RequestParam @NotBlank @Size(max = 255) String processName,
-                                    @RequestParam String twitchGameId,
-                                    @RequestParam String twitchGameName) {
+                                    @RequestParam @NotBlank @Size(max = 50) String twitchGameId,
+                                    @RequestParam @Size(max = 255) String twitchGameName) {
         UserAccount user = principal.getUserAccount();
         ProcessBinding binding = new ProcessBinding();
         binding.setUser(user);
@@ -88,6 +92,34 @@ public class ObsSetupController {
             }
         });
         return "redirect:/app";
+    }
+
+    private String buildObsScript(String apiKey) {
+        return "# catapult_obs.py — Catapult OBS integration\n" +
+               "import obspython as obs\n" +
+               "import psutil\n" +
+               "import requests\n" +
+               "\n" +
+               "CATAPULT_URL = \"" + publicUrl + "/api/obs/processes\"\n" +
+               "API_KEY      = \"" + apiKey + "\"\n" +
+               "INTERVAL_MS  = 10_000  # toutes les 10 secondes\n" +
+               "\n" +
+               "def _send():\n" +
+               "    try:\n" +
+               "        procs = list({p.name() for p in psutil.process_iter([\"name\"])})\n" +
+               "        requests.post(CATAPULT_URL, json={\"processes\": procs},\n" +
+               "                      headers={\"X-Api-Key\": API_KEY}, timeout=5)\n" +
+               "    except Exception as e:\n" +
+               "        print(f\"[Catapult] {e}\")\n" +
+               "\n" +
+               "def script_load(settings):\n" +
+               "    obs.timer_add(_send, INTERVAL_MS)\n" +
+               "\n" +
+               "def script_unload():\n" +
+               "    obs.timer_remove(_send)\n" +
+               "\n" +
+               "def script_description():\n" +
+               "    return \"Catapult — détection de jeu par processus.\"";
     }
 
     private void ensureObsGetterConfig(UserAccount user) {

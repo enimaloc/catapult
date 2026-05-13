@@ -1,13 +1,13 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.esportline.catapult.domain.OAuthToken;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.event.StreamOfflineEvent;
-import fr.esportline.catapult.event.StreamOnlineEvent;
-import fr.esportline.catapult.repository.OAuthTokenRepository;
-import fr.esportline.catapult.repository.UserAccountRepository;
-import fr.esportline.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.domain.OAuthToken;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.event.StreamOfflineEvent;
+import fr.enimaloc.catapult.event.StreamOnlineEvent;
+import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

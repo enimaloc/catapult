@@ -1,9 +1,9 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
-import fr.esportline.catapult.domain.OAuthToken;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.repository.OAuthTokenRepository;
-import fr.esportline.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.OAuthToken;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

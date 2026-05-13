@@ -1,4 +1,4 @@
-package fr.esportline.catapult.domain;
+package fr.enimaloc.catapult.domain;
 
 import jakarta.persistence.*;
 import lombok.Getter;

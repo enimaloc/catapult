@@ -1,4 +1,4 @@
-package fr.esportline.catapult;
+package fr.enimaloc.catapult;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

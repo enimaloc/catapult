@@ -1,7 +1,7 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
-import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.UserAccount;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;

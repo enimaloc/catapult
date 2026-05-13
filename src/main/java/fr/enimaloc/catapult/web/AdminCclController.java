@@ -1,6 +1,6 @@
-package fr.esportline.catapult.web;
+package fr.enimaloc.catapult.web;
 
-import fr.esportline.catapult.service.AdminCclService;
+import fr.enimaloc.catapult.service.AdminCclService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;

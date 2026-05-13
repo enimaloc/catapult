@@ -1,6 +1,6 @@
-package fr.esportline.catapult.repository;
+package fr.enimaloc.catapult.repository;
 
-import fr.esportline.catapult.domain.IgdbRatingDescriptor;
+import fr.enimaloc.catapult.domain.IgdbRatingDescriptor;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

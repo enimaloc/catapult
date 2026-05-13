@@ -1,4 +1,4 @@
-package fr.esportline.catapult.chat;
+package fr.enimaloc.catapult.chat;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;

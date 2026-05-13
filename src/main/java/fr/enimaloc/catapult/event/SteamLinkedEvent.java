@@ -1,6 +1,6 @@
-package fr.esportline.catapult.event;
+package fr.enimaloc.catapult.event;
 
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserAccount;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 

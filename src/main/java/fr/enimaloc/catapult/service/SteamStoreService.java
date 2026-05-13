@@ -1,4 +1,4 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

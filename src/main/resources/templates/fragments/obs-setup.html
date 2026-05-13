@@ -47,7 +47,7 @@
                         onclick="navigator.clipboard.writeText(document.getElementById('obs-script').textContent)"
                         style="position:absolute;top:6px;right:6px;font-size:.75em"
                         class="btn btn-sm btn-outline">Copier</button>
-                <pre id="obs-script" style="background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:6px;overflow-x:auto;font-size:.82em;line-height:1.5"><code th:utext="'# catapult_obs.py — Catapult OBS integration&#10;import obspython as obs&#10;import psutil&#10;import requests&#10;&#10;CATAPULT_URL = &quot;' + ${publicUrl} + '/api/obs/processes&quot;&#10;API_KEY      = &quot;' + ${apiKey} + '&quot;&#10;INTERVAL_MS  = 10_000  # toutes les 10 secondes&#10;&#10;def _send():&#10;    try:&#10;        procs = list({p.name() for p in psutil.process_iter([&quot;name&quot;])})&#10;        requests.post(CATAPULT_URL, json={&quot;processes&quot;: procs},&#10;                      headers={&quot;X-Api-Key&quot;: API_KEY}, timeout=5)&#10;    except Exception as e:&#10;        print(f&quot;[Catapult] {e}&quot;)&#10;&#10;def script_load(settings):&#10;    obs.timer_add(_send, INTERVAL_MS)&#10;&#10;def script_unload():&#10;    obs.timer_remove(_send)&#10;&#10;def script_description():&#10;    return &quot;Catapult — détection de jeu par processus.&quot;'"></code></pre>
+                <pre id="obs-script" style="background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:6px;overflow-x:auto;font-size:.82em;line-height:1.5"><code th:text="${obsScript}" style="white-space:pre;display:block"></code></pre>
             </div>
         </details>
 
@@ -90,7 +90,7 @@
                 <label style="font-size:.8em;font-weight:600;color:#555">Jeu Twitch</label>
                 <div class="search-wrapper">
                     <input type="text" id="obsGameSearch" placeholder="Rechercher un jeu…"
-                           oninput="obsSearch(event)"
+                           oninput="obsSearch(event)" autocomplete="off"
                            style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:.9em;width:220px">
                     <ul id="gameResults-obs" class="game-results"></ul>
                 </div>

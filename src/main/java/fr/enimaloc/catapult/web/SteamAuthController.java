@@ -1,9 +1,9 @@
-package fr.esportline.catapult.web;
+package fr.enimaloc.catapult.web;
 
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.event.SteamLinkedEvent;
-import fr.esportline.catapult.repository.UserAccountRepository;
-import fr.esportline.catapult.security.CatapultOAuth2User;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.event.SteamLinkedEvent;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import org.springframework.context.ApplicationEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
