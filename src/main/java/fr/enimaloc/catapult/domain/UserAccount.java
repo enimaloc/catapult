@@ -42,7 +42,7 @@ public class UserAccount {
     @Column(name = "deletion_requested_at")
     private Instant deletionRequestedAt;
 
-    @Column(name = "api_key", unique = true)
+    @Column(name = "api_key", unique = true, length = 64)
     private String apiKey;
 
     @CreationTimestamp
