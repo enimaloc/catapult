@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="obs-setup" class="card">
+    <h3>OBS — Détection par processus</h3>
+
+    <!-- API Key -->
+    <div th:if="${apiKey == null}">
+        <p class="text-muted">Génère une clé API pour connecter le script OBS à Catapult.</p>
+        <form th:action="@{/obs/generate-key}" method="post">
+            <button type="submit" class="btn btn-primary">Générer une clé API</button>
+        </form>
+    </div>
+
+    <div th:unless="${apiKey == null}">
+        <div style="margin-bottom:12px">
+            <label style="font-size:.85em;font-weight:600;color:#555">Clé API</label>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+                <code th:text="${apiKey}" style="background:#f4f4f4;padding:6px 10px;border-radius:4px;font-size:.9em;flex:1;word-break:break-all"></code>
+                <form th:action="@{/obs/generate-key}" method="post" style="margin:0">
+                    <button type="submit" class="btn btn-sm btn-outline" title="Régénérer">↺ Régénérer</button>
+                </form>
+                <form th:action="@{/obs/revoke-key}" method="post" style="margin:0">
+                    <button type="submit" class="btn btn-sm btn-danger">Révoquer</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Installation Steps -->
+        <details style="margin-bottom:16px">
+            <summary style="cursor:pointer;font-weight:600">📋 Guide d'installation</summary>
+            <ol style="margin-top:12px;line-height:2">
+                <li>Installe Python et OBS Studio (v28+).</li>
+                <li>Dans un terminal, installe les dépendances :<br>
+                    <code style="background:#f4f4f4;padding:2px 6px;border-radius:3px">pip install psutil requests</code>
+                </li>
+                <li>Dans OBS : <strong>Outils → Scripts → +</strong>, sélectionne le fichier <code>catapult_obs.py</code> ci-dessous.</li>
+                <li>Le script s'exécute automatiquement — aucune configuration supplémentaire.</li>
+            </ol>
+        </details>
+
+        <!-- Script -->
+        <details style="margin-bottom:16px">
+            <summary style="cursor:pointer;font-weight:600">📄 Script OBS Python</summary>
+            <div style="position:relative;margin-top:8px">
+                <button type="button"
+                        onclick="navigator.clipboard.writeText(document.getElementById('obs-script').textContent)"
+                        style="position:absolute;top:6px;right:6px;font-size:.75em"
+                        class="btn btn-sm btn-outline">Copier</button>
+                <pre id="obs-script" style="background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:6px;overflow-x:auto;font-size:.82em;line-height:1.5"><code th:utext="'# catapult_obs.py — Catapult OBS integration&#10;import obspython as obs&#10;import psutil&#10;import requests&#10;&#10;CATAPULT_URL = &quot;' + ${publicUrl} + '/api/obs/processes&quot;&#10;API_KEY      = &quot;' + ${apiKey} + '&quot;&#10;INTERVAL_MS  = 10_000  # toutes les 10 secondes&#10;&#10;def _send():&#10;    try:&#10;        procs = list({p.name() for p in psutil.process_iter([&quot;name&quot;])})&#10;        requests.post(CATAPULT_URL, json={&quot;processes&quot;: procs},&#10;                      headers={&quot;X-Api-Key&quot;: API_KEY}, timeout=5)&#10;    except Exception as e:&#10;        print(f&quot;[Catapult] {e}&quot;)&#10;&#10;def script_load(settings):&#10;    obs.timer_add(_send, INTERVAL_MS)&#10;&#10;def script_unload():&#10;    obs.timer_remove(_send)&#10;&#10;def script_description():&#10;    return &quot;Catapult — détection de jeu par processus.&quot;'"></code></pre>
+            </div>
+        </details>
+
+        <!-- Process Bindings Table -->
+        <h4 style="margin-bottom:8px">Associations processus → jeu</h4>
+
+        <div th:if="${processBindings.empty}" class="text-muted" style="margin-bottom:12px">
+            Aucune association configurée.
+        </div>
+
+        <table th:unless="${processBindings.empty}" style="width:100%;border-collapse:collapse;margin-bottom:12px">
+            <thead>
+                <tr style="border-bottom:2px solid #eee;text-align:left">
+                    <th style="padding:8px">Processus</th>
+                    <th style="padding:8px">Jeu Twitch</th>
+                    <th style="padding:8px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="pb : ${processBindings}" style="border-bottom:1px solid #f0f0f0">
+                    <td style="padding:8px"><code th:text="${pb.processName}"></code></td>
+                    <td style="padding:8px" th:text="${pb.twitchGameName}"></td>
+                    <td style="padding:8px;text-align:right">
+                        <form th:action="@{/obs/process-bindings/{id}/delete(id=${pb.id})}" method="post">
+                            <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Add new binding -->
+        <form th:action="@{/obs/process-bindings}" method="post" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+            <div style="display:flex;flex-direction:column;gap:4px">
+                <label style="font-size:.8em;font-weight:600;color:#555">Nom du processus</label>
+                <input type="text" name="processName" placeholder="ex: hl2.exe" required
+                       style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:.9em">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;position:relative">
+                <label style="font-size:.8em;font-weight:600;color:#555">Jeu Twitch</label>
+                <div class="search-wrapper">
+                    <input type="text" id="obsGameSearch" placeholder="Rechercher un jeu…"
+                           oninput="obsSearch(event)"
+                           style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:.9em;width:220px">
+                    <ul id="gameResults-obs" class="game-results"></ul>
+                </div>
+                <input type="hidden" name="twitchGameId" id="twitchGameId-obs" required>
+                <input type="hidden" name="twitchGameName" id="twitchGameName-obs" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Ajouter</button>
+        </form>
+
+        <script>
+        (function() {
+            var _obsTimer = null;
+            window.obsSearch = function(event) {
+                var q = event.target.value.trim();
+                var results = document.getElementById('gameResults-obs');
+                if (q.length < 2) { results.style.display = 'none'; return; }
+                clearTimeout(_obsTimer);
+                _obsTimer = setTimeout(function() {
+                    fetch('/api/games/search?q=' + encodeURIComponent(q))
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            results.replaceChildren();
+                            if (!data.length) { results.style.display = 'none'; return; }
+                            data.forEach(function(game) {
+                                var li = document.createElement('li');
+                                li.textContent = game.name;
+                                li.addEventListener('click', function() {
+                                    document.getElementById('twitchGameId-obs').value = game.id;
+                                    document.getElementById('twitchGameName-obs').value = game.name;
+                                    document.getElementById('obsGameSearch').value = game.name;
+                                    results.style.display = 'none';
+                                });
+                                results.appendChild(li);
+                            });
+                            results.style.display = 'block';
+                        })
+                        .catch(function() { results.style.display = 'none'; });
+                }, 300);
+            };
+        })();
+        </script>
+    </div>
+</section>
+</body>
+</html>
