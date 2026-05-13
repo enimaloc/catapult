@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -8,13 +9,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
 
-@Component
 @RequiredArgsConstructor
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
@@ -26,10 +25,12 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String apiKey = request.getHeader("X-Api-Key");
         if (apiKey != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            userAccountRepository.findByApiKey(apiKey).ifPresent(user -> {
-                var auth = new UsernamePasswordAuthenticationToken(user, null, List.of());
-                SecurityContextHolder.getContext().setAuthentication(auth);
-            });
+            userAccountRepository.findByApiKey(apiKey)
+                    .filter(u -> u.getStatus() == UserAccount.Status.ACTIVE)
+                    .ifPresent(user -> {
+                        var auth = new UsernamePasswordAuthenticationToken(user, null, List.of());
+                        SecurityContextHolder.getContext().setAuthentication(auth);
+                    });
         }
         filterChain.doFilter(request, response);
     }
