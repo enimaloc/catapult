@@ -1,9 +1,9 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
-import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.getter.DetectedGame;
-import fr.esportline.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.repository.GameBindingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

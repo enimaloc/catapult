@@ -1,6 +1,6 @@
-package fr.esportline.catapult.repository;
+package fr.enimaloc.catapult.repository;
 
-import fr.esportline.catapult.domain.IgdbGameCacheEntry;
+import fr.enimaloc.catapult.domain.IgdbGameCacheEntry;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.Instant;

@@ -1,4 +1,4 @@
-package fr.esportline.catapult.domain;
+package fr.enimaloc.catapult.domain;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

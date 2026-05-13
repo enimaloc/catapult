@@ -1,6 +1,6 @@
-package fr.esportline.catapult.getter;
+package fr.enimaloc.catapult.getter;
 
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserAccount;
 
 import java.util.Optional;
 

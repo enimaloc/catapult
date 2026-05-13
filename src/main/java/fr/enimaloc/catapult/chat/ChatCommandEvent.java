@@ -1,6 +1,6 @@
-package fr.esportline.catapult.chat;
+package fr.enimaloc.catapult.chat;
 
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserAccount;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 

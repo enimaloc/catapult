@@ -1,9 +1,9 @@
-package fr.esportline.catapult.chat.command;
+package fr.enimaloc.catapult.chat.command;
 
-import fr.esportline.catapult.chat.ChatCommand;
-import fr.esportline.catapult.chat.ChatCommandEvent;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.service.GameStateService;
+import fr.enimaloc.catapult.chat.ChatCommand;
+import fr.enimaloc.catapult.chat.ChatCommandEvent;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.service.GameStateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

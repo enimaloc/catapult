@@ -1,4 +1,4 @@
-package fr.esportline.catapult.web;
+package fr.enimaloc.catapult.web;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;

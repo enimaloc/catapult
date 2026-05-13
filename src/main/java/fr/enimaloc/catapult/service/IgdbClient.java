@@ -1,4 +1,4 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
 import com.api.igdb.apicalypse.APICalypse;
 import com.api.igdb.apicalypse.Sort;

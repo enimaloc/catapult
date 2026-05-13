@@ -1,6 +1,6 @@
-package fr.esportline.catapult.event;
+package fr.enimaloc.catapult.event;
 
-import fr.esportline.catapult.service.ActivityLogService;
+import fr.enimaloc.catapult.service.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;

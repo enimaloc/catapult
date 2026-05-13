@@ -59,6 +59,9 @@
 
     <main class="container">
         <div th:replace="~{fragments/connections :: connections}"></div>
+        <div hx-get="/fragments/obs-setup" hx-trigger="load" hx-swap="outerHTML">
+            <div class="card"><p class="text-muted" style="padding:16px">Chargement OBS…</p></div>
+        </div>
         <div th:replace="~{fragments/status :: status}"></div>
         <div th:replace="~{fragments/activity-log :: activity-log}"></div>
         <div th:replace="~{fragments/bindings :: bindings}"></div>

@@ -1,12 +1,13 @@
-package fr.esportline.catapult.getter;
+package fr.enimaloc.catapult.getter;
 
-import fr.esportline.catapult.domain.GetterConfig;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.repository.GetterConfigRepository;
+import fr.enimaloc.catapult.domain.GetterConfig;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,16 +23,13 @@ import java.util.Optional;
 public class GameGetterChain {
 
     private final GetterConfigRepository getterConfigRepository;
-    private final SteamGameGetter steamGameGetter;
-    private final XboxGameGetter xboxGameGetter;
-    private final BattleNetGameGetter battleNetGameGetter;
+    private final Optional<SteamGameGetter> steamGameGetter;
+    private final Optional<XboxGameGetter> xboxGameGetter;
+    private final Optional<BattleNetGameGetter> battleNetGameGetter;
+    private final Optional<ObsGameGetter> obsGameGetter;
 
     public Optional<DetectedGame> resolve(UserAccount user) {
-        Map<GetterConfig.Provider, GameGetter> getterByProvider = Map.of(
-            GetterConfig.Provider.STEAM, steamGameGetter
-//            GetterConfig.Provider.XBOX, xboxGameGetter,
-//            GetterConfig.Provider.BATTLENET, battleNetGameGetter
-        );
+        Map<GetterConfig.Provider, GameGetter> getterByProvider = buildGetterMap();
 
         List<GetterConfig> configs = getterConfigRepository.findByUserOrderByPriorityAsc(user);
 
@@ -53,5 +51,14 @@ public class GameGetterChain {
         }
 
         return Optional.empty();
+    }
+
+    private Map<GetterConfig.Provider, GameGetter> buildGetterMap() {
+        Map<GetterConfig.Provider, GameGetter> map = new EnumMap<>(GetterConfig.Provider.class);
+        steamGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.STEAM, g));
+        xboxGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.XBOX, g));
+        battleNetGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.BATTLENET, g));
+        obsGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.OBS, g));
+        return map;
     }
 }

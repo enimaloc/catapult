@@ -1,6 +1,6 @@
-package fr.esportline.catapult.security;
+package fr.enimaloc.catapult.security;
 
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserAccount;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

@@ -1,10 +1,10 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
-import fr.esportline.catapult.domain.*;
-import fr.esportline.catapult.repository.OAuthTokenRepository;
-import fr.esportline.catapult.repository.UserAccountRepository;
-import fr.esportline.catapult.repository.UserSettingsRepository;
-import fr.esportline.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.domain.*;
+import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

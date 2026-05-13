@@ -1,6 +1,7 @@
-package fr.esportline.catapult.getter;
+package fr.enimaloc.catapult.getter;
 
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserAccount;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -13,6 +14,7 @@ import java.util.Optional;
  *   - Détection du jeu actif nécessite les APIs par jeu (WoW, Overwatch, etc.)
  */
 @Component
+@ConditionalOnBooleanProperty("battlenet.enabled")
 public class BattleNetGameGetter implements GameGetter {
 
     @Override

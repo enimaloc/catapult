@@ -1,8 +1,8 @@
-package fr.esportline.catapult.web;
+package fr.enimaloc.catapult.web;
 
-import fr.esportline.catapult.domain.IgdbRatingDescriptor;
-import fr.esportline.catapult.domain.TwitchCclDefinition;
-import fr.esportline.catapult.service.AdminCclService;
+import fr.enimaloc.catapult.domain.IgdbRatingDescriptor;
+import fr.enimaloc.catapult.domain.TwitchCclDefinition;
+import fr.enimaloc.catapult.service.AdminCclService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

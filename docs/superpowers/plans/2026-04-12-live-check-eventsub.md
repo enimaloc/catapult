@@ -39,10 +39,10 @@
 
 ```java
 // src/test/java/fr/esportline/catapult/service/StreamStateServiceTest.java
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
-import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.UserAccount;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -117,10 +117,10 @@ Expected: compilation error — `StreamStateService` does not exist.
 
 ```java
 // src/main/java/fr/esportline/catapult/service/StreamStateService.java
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
-import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.UserAccount;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -191,9 +191,9 @@ No unit test needed — these are simple value objects following the same patter
 
 ```java
 // src/main/java/fr/esportline/catapult/event/StreamOnlineEvent.java
-package fr.esportline.catapult.event;
+package fr.enimaloc.catapult.event;
 
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserAccount;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
@@ -213,9 +213,9 @@ public class StreamOnlineEvent extends ApplicationEvent {
 
 ```java
 // src/main/java/fr/esportline/catapult/event/StreamOfflineEvent.java
-package fr.esportline.catapult.event;
+package fr.enimaloc.catapult.event;
 
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserAccount;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
@@ -366,7 +366,7 @@ private void doResetToDefault(UserAccount user, UserSettings settings, OAuthToke
 Also add this import at the top of `TwitchService.java` if not already present:
 
 ```java
-import fr.esportline.catapult.domain.UserSettings;
+import fr.enimaloc.catapult.domain.UserSettings;
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -397,16 +397,16 @@ git commit -m "feat: add TwitchService.resetToDefault() to reset channel categor
 
 ```java
 // src/test/java/fr/esportline/catapult/service/TwitchEventSubServiceTest.java
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.esportline.catapult.domain.OAuthToken;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.event.StreamOfflineEvent;
-import fr.esportline.catapult.event.StreamOnlineEvent;
-import fr.esportline.catapult.repository.OAuthTokenRepository;
-import fr.esportline.catapult.repository.UserAccountRepository;
-import fr.esportline.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.domain.OAuthToken;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.event.StreamOfflineEvent;
+import fr.enimaloc.catapult.event.StreamOnlineEvent;
+import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -461,7 +461,7 @@ class TwitchEventSubServiceTest {
 
         when(tokenEncryptionService.decrypt("encrypted")).thenReturn("decrypted-token");
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
-            .thenReturn(Optional.of(token));
+                .thenReturn(Optional.of(token));
 
         when(restClient.post()).thenReturn(postUriSpec);
         when(postUriSpec.uri(anyString())).thenReturn(postBodySpec);
@@ -476,11 +476,11 @@ class TwitchEventSubServiceTest {
     @Test
     void handleMessage_streamOnline_setsLiveTrueAndPublishesEvent() {
         String message = """
-            {
-              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
-              "payload": { "event": {} }
-            }
-            """;
+                {
+                  "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+                  "payload": { "event": {} }
+                }
+                """;
 
         service.handleMessage(user, token, message);
 
@@ -493,11 +493,11 @@ class TwitchEventSubServiceTest {
     @Test
     void handleMessage_streamOffline_setsLiveFalseAndPublishesEvent() {
         String message = """
-            {
-              "metadata": { "message_type": "notification", "subscription_type": "stream.offline" },
-              "payload": { "event": {} }
-            }
-            """;
+                {
+                  "metadata": { "message_type": "notification", "subscription_type": "stream.offline" },
+                  "payload": { "event": {} }
+                }
+                """;
 
         service.handleMessage(user, token, message);
 
@@ -510,11 +510,11 @@ class TwitchEventSubServiceTest {
     @Test
     void handleMessage_sessionWelcome_subscribesToStreamOnlineAndOffline() {
         String message = """
-            {
-              "metadata": { "message_type": "session_welcome" },
-              "payload": { "session": { "id": "session-abc" } }
-            }
-            """;
+                {
+                  "metadata": { "message_type": "session_welcome" },
+                  "payload": { "session": { "id": "session-abc" } }
+                }
+                """;
 
         service.handleMessage(user, token, message);
 
@@ -525,18 +525,18 @@ class TwitchEventSubServiceTest {
     @Test
     void handleMessage_invalidJson_doesNotThrow() {
         assertThatNoException().isThrownBy(
-            () -> service.handleMessage(user, token, "not-json")
+                () -> service.handleMessage(user, token, "not-json")
         );
     }
 
     @Test
     void handleMessage_unknownMessageType_doesNotThrow() {
         String message = """
-            { "metadata": { "message_type": "session_keepalive" }, "payload": {} }
-            """;
+                { "metadata": { "message_type": "session_keepalive" }, "payload": {} }
+                """;
 
         assertThatNoException().isThrownBy(
-            () -> service.handleMessage(user, token, message)
+                () -> service.handleMessage(user, token, message)
         );
     }
 }
@@ -554,17 +554,17 @@ Expected: compilation error — `TwitchEventSubService` does not exist.
 
 ```java
 // src/main/java/fr/esportline/catapult/service/TwitchEventSubService.java
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.esportline.catapult.domain.OAuthToken;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.event.StreamOfflineEvent;
-import fr.esportline.catapult.event.StreamOnlineEvent;
-import fr.esportline.catapult.repository.OAuthTokenRepository;
-import fr.esportline.catapult.repository.UserAccountRepository;
-import fr.esportline.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.domain.OAuthToken;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.event.StreamOfflineEvent;
+import fr.enimaloc.catapult.event.StreamOnlineEvent;
+import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -609,16 +609,16 @@ public class TwitchEventSubService {
     @PostConstruct
     public void init() {
         userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)
-            .forEach(this::connect);
+                .forEach(this::connect);
     }
 
     public void connect(UserAccount user) {
         disconnect(user);
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .ifPresentOrElse(
-                token -> openConnection(user, token, WS_URL, 1L),
-                () -> log.debug("No Twitch token for user {} — skipping EventSub connect", user.getId())
-            );
+                .ifPresentOrElse(
+                        token -> openConnection(user, token, WS_URL, 1L),
+                        () -> log.debug("No Twitch token for user {} — skipping EventSub connect", user.getId())
+                );
     }
 
     public void disconnect(UserAccount user) {
@@ -631,16 +631,16 @@ public class TwitchEventSubService {
 
     private void openConnection(UserAccount user, OAuthToken token, String wsUrl, long retryDelaySeconds) {
         HttpClient.newHttpClient()
-            .newWebSocketBuilder()
-            .buildAsync(URI.create(wsUrl), new EventSubListener(user, token, wsUrl, retryDelaySeconds))
-            .whenComplete((ws, ex) -> {
-                if (ex != null) {
-                    log.warn("Failed to open EventSub WebSocket for user {}: {}", user.getId(), ex.getMessage());
-                    scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
-                } else {
-                    connections.put(user.getId(), ws);
-                }
-            });
+                .newWebSocketBuilder()
+                .buildAsync(URI.create(wsUrl), new EventSubListener(user, token, wsUrl, retryDelaySeconds))
+                .whenComplete((ws, ex) -> {
+                    if (ex != null) {
+                        log.warn("Failed to open EventSub WebSocket for user {}: {}", user.getId(), ex.getMessage());
+                        scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
+                    } else {
+                        connections.put(user.getId(), ws);
+                    }
+                });
     }
 
     private void scheduleReconnect(UserAccount user, OAuthToken token, String wsUrl, long delaySeconds) {
@@ -690,18 +690,18 @@ public class TwitchEventSubService {
         for (String eventType : List.of("stream.online", "stream.offline")) {
             try {
                 restClient.post()
-                    .uri(EVENTSUB_API)
-                    .header("Authorization", "Bearer " + accessToken)
-                    .header("Client-ID", twitchClientId)
-                    .header("Content-Type", "application/json")
-                    .body(Map.of(
-                        "type", eventType,
-                        "version", "1",
-                        "condition", Map.of("broadcaster_user_id", user.getTwitchId()),
-                        "transport", Map.of("method", "websocket", "session_id", sessionId)
-                    ))
-                    .retrieve()
-                    .toBodilessEntity();
+                        .uri(EVENTSUB_API)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .header("Client-ID", twitchClientId)
+                        .header("Content-Type", "application/json")
+                        .body(Map.of(
+                                "type", eventType,
+                                "version", "1",
+                                "condition", Map.of("broadcaster_user_id", user.getTwitchId()),
+                                "transport", Map.of("method", "websocket", "session_id", sessionId)
+                        ))
+                        .retrieve()
+                        .toBodilessEntity();
                 log.debug("Subscribed to {} for user {}", eventType, user.getId());
             } catch (Exception e) {
                 log.warn("Failed to subscribe to {} for user {}: {}", eventType, user.getId(), e.getMessage());
@@ -789,14 +789,14 @@ git commit -m "feat: add TwitchEventSubService with WebSocket EventSub connectio
 
 ```java
 // src/test/java/fr/esportline/catapult/event/GameEventListenerLiveCheckTest.java
-package fr.esportline.catapult.event;
+package fr.enimaloc.catapult.event;
 
-import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.getter.DetectedGame;
-import fr.esportline.catapult.service.BindingService;
-import fr.esportline.catapult.service.StreamStateService;
-import fr.esportline.catapult.service.TwitchService;
+import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.service.BindingService;
+import fr.enimaloc.catapult.service.StreamStateService;
+import fr.enimaloc.catapult.service.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -899,14 +899,14 @@ Replace the entire file content with:
 
 ```java
 // src/main/java/fr/esportline/catapult/event/GameEventListener.java
-package fr.esportline.catapult.event;
+package fr.enimaloc.catapult.event;
 
-import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.repository.UserSettingsRepository;
-import fr.esportline.catapult.service.BindingService;
-import fr.esportline.catapult.service.StreamStateService;
-import fr.esportline.catapult.service.TwitchService;
+import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.service.BindingService;
+import fr.enimaloc.catapult.service.StreamStateService;
+import fr.enimaloc.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -939,7 +939,7 @@ public class GameEventListener {
         } else {
             streamStateService.storePending(user, binding);
             log.debug("User {} not live — stored pending binding for game {}",
-                user.getId(), binding.getSourceName());
+                    user.getId(), binding.getSourceName());
         }
     }
 

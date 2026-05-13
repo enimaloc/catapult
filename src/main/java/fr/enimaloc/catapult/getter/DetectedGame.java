@@ -1,6 +1,6 @@
-package fr.esportline.catapult.getter;
+package fr.enimaloc.catapult.getter;
 
-import fr.esportline.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.GameBinding;
 import lombok.Value;
 
 /**

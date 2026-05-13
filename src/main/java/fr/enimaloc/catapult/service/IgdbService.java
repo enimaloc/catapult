@@ -1,13 +1,13 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
-import fr.esportline.catapult.domain.IgdbGameCacheEntry;
-import fr.esportline.catapult.domain.IgdbGameCcl;
-import fr.esportline.catapult.domain.IgdbGameExternalId;
-import fr.esportline.catapult.domain.TwitchCclDefinition;
-import fr.esportline.catapult.repository.IgdbGameCacheRepository;
-import fr.esportline.catapult.repository.IgdbGameCclRepository;
-import fr.esportline.catapult.repository.IgdbGameExternalIdRepository;
-import fr.esportline.catapult.repository.TwitchCclDefinitionRepository;
+import fr.enimaloc.catapult.domain.IgdbGameCacheEntry;
+import fr.enimaloc.catapult.domain.IgdbGameCcl;
+import fr.enimaloc.catapult.domain.IgdbGameExternalId;
+import fr.enimaloc.catapult.domain.TwitchCclDefinition;
+import fr.enimaloc.catapult.repository.IgdbGameCacheRepository;
+import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
+import fr.enimaloc.catapult.repository.IgdbGameExternalIdRepository;
+import fr.enimaloc.catapult.repository.TwitchCclDefinitionRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -324,7 +324,7 @@ public class IgdbService {
             }
         }
 
-        if (descriptorIds.isEmpty()) return Set.of();
+        if (descriptorIds.isEmpty()) return new HashSet<>(Set.of());
 
         // DB-driven: find which Twitch CCLs have any of these descriptors mapped
         Set<String> suggested = new HashSet<>();

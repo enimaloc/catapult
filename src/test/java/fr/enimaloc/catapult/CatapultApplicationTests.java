@@ -1,6 +1,6 @@
-package fr.esportline.catapult;
+package fr.enimaloc.catapult;
 
-import fr.esportline.catapult.service.AdminCclService;
+import fr.enimaloc.catapult.service.AdminCclService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;

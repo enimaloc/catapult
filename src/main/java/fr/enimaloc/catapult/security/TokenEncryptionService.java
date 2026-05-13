@@ -1,4 +1,4 @@
-package fr.esportline.catapult.security;
+package fr.enimaloc.catapult.security;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

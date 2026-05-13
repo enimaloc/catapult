@@ -1,7 +1,7 @@
-package fr.esportline.catapult.repository;
+package fr.enimaloc.catapult.repository;
 
-import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.UserAccount;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

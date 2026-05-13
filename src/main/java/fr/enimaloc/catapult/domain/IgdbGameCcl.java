@@ -1,4 +1,4 @@
-package fr.esportline.catapult.domain;
+package fr.enimaloc.catapult.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;

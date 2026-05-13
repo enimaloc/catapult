@@ -1,5 +1,6 @@
-package fr.esportline.catapult.security;
+package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -18,10 +19,18 @@ public class SecurityConfig {
     private final CatapultOAuth2UserService oAuth2UserService;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public ApiKeyAuthFilter apiKeyAuthFilter(UserAccountRepository userAccountRepository) {
+        return new ApiKeyAuthFilter(userAccountRepository);
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, ApiKeyAuthFilter apiKeyAuthFilter) throws Exception {
         http
+            .addFilterBefore(apiKeyAuthFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/obs/**"))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/error", "/css/**", "/js/**", "/images/**").permitAll()
+                .requestMatchers("/api/obs/**").authenticated()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )

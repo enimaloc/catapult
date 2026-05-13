@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Mock Steam API</title>
+    <style>
+        body { font-family: monospace; max-width: 700px; margin: 40px auto; padding: 0 16px; background: #1a1a2e; color: #eee; }
+        h1 { color: #66c0f4; border-bottom: 1px solid #333; padding-bottom: 8px; }
+        h2 { color: #a9c8e8; margin-top: 32px; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: .85em; }
+        .badge-on  { background: #4caf50; color: #fff; }
+        .badge-off { background: #555; color: #ccc; }
+        .card { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 20px; margin: 16px 0; }
+        label { display: block; font-size: .8em; color: #a0a0c0; margin-bottom: 4px; margin-top: 12px; }
+        input[type=text] { width: 100%; box-sizing: border-box; padding: 8px; background: #0d0d1a; border: 1px solid #0f3460; color: #eee; border-radius: 4px; font-family: monospace; }
+        button { margin-top: 14px; padding: 8px 18px; border: none; border-radius: 4px; cursor: pointer; font-family: monospace; font-size: .9em; }
+        .btn-primary { background: #66c0f4; color: #000; }
+        .btn-danger  { background: #c0392b; color: #fff; margin-left: 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: .9em; }
+        th, td { padding: 8px 10px; border-bottom: 1px solid #333; text-align: left; }
+        th { color: #a9c8e8; }
+        .empty { color: #555; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<h1>🎮 Mock Steam API</h1>
+<p style="color:#888">Profile <code>mock</code> actif — les appels à Steam sont interceptés en mémoire.</p>
+
+<!-- ── Global game ── -->
+<h2>Jeu global</h2>
+<p style="color:#aaa;font-size:.85em">Appliqué à tous les utilisateurs Steam sauf override individuel.</p>
+<div class="card">
+    <div th:if="${globalGame != null}">
+        Actuellement : <span class="badge badge-on" th:text="${globalGame.gameName()}">—</span>
+        <span style="color:#888;font-size:.85em" th:text="'  appId ' + ${globalGame.gameId()}"></span>
+        <form th:action="@{/mock/steam/global/clear}" method="post" style="display:inline"> <!-- nosemgrep -->
+            <button type="submit" class="btn-danger">Effacer</button>
+        </form>
+    </div>
+    <div th:if="${globalGame == null}" class="empty">Aucun jeu en cours</div>
+
+    <form th:action="@{/mock/steam/global/set}" method="post"> <!-- nosemgrep -->
+        <label>App ID (ex: 730)</label>
+        <input type="text" name="gameId" placeholder="730" required>
+        <label>Nom du jeu (ex: Counter-Strike 2)</label>
+        <input type="text" name="gameName" placeholder="Counter-Strike 2" required>
+        <button type="submit" class="btn-primary">Définir</button>
+    </form>
+</div>
+
+<!-- ── Per-user overrides ── -->
+<h2>Overrides par SteamID</h2>
+<div class="card">
+    <table th:if="${!gameByUser.isEmpty()}">
+        <thead><tr><th>SteamID</th><th>Jeu</th><th>App ID</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="entry : ${gameByUser}">
+            <td th:text="${entry.key}"></td>
+            <td th:text="${entry.value.gameName()}"></td>
+            <td th:text="${entry.value.gameId()}"></td>
+            <td>
+                <form th:action="@{/mock/steam/user/clear}" method="post" style="display:inline"> <!-- nosemgrep -->
+                    <input type="hidden" name="steamId" th:value="${entry.key}">
+                    <button type="submit" class="btn-danger" style="padding:4px 10px">✕</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+    <p th:if="${gameByUser.isEmpty()}" class="empty">Aucun override individuel</p>
+
+    <form th:action="@{/mock/steam/user/set}" method="post" style="margin-top:16px"> <!-- nosemgrep -->
+        <label>SteamID</label>
+        <input type="text" name="steamId" placeholder="76561198xxxxxxxxx" required>
+        <label>App ID</label>
+        <input type="text" name="gameId" placeholder="730" required>
+        <label>Nom du jeu</label>
+        <input type="text" name="gameName" placeholder="Counter-Strike 2" required>
+        <button type="submit" class="btn-primary">Ajouter</button>
+    </form>
+</div>
+
+</body>
+</html>

@@ -1,7 +1,7 @@
-package fr.esportline.catapult.repository;
+package fr.enimaloc.catapult.repository;
 
-import fr.esportline.catapult.domain.IgdbGameExternalId;
-import fr.esportline.catapult.domain.IgdbGameExternalIdPk;
+import fr.enimaloc.catapult.domain.IgdbGameExternalId;
+import fr.enimaloc.catapult.domain.IgdbGameExternalIdPk;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;

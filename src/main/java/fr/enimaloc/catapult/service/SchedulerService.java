@@ -1,11 +1,11 @@
-package fr.esportline.catapult.service;
+package fr.enimaloc.catapult.service;
 
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.event.GameDetectedEvent;
-import fr.esportline.catapult.event.NoGameDetectedEvent;
-import fr.esportline.catapult.getter.DetectedGame;
-import fr.esportline.catapult.getter.GameGetterChain;
-import fr.esportline.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.event.GameDetectedEvent;
+import fr.enimaloc.catapult.event.NoGameDetectedEvent;
+import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.getter.GameGetterChain;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

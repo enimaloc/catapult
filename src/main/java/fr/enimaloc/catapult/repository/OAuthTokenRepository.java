@@ -1,7 +1,7 @@
-package fr.esportline.catapult.repository;
+package fr.enimaloc.catapult.repository;
 
-import fr.esportline.catapult.domain.OAuthToken;
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.OAuthToken;
+import fr.enimaloc.catapult.domain.UserAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

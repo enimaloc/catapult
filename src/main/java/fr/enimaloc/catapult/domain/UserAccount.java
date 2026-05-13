@@ -1,4 +1,4 @@
-package fr.esportline.catapult.domain;
+package fr.enimaloc.catapult.domain;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -41,6 +41,9 @@ public class UserAccount {
 
     @Column(name = "deletion_requested_at")
     private Instant deletionRequestedAt;
+
+    @Column(name = "api_key", unique = true, length = 64)
+    private String apiKey;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

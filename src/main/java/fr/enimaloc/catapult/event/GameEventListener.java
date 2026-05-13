@@ -1,11 +1,11 @@
-package fr.esportline.catapult.event;
+package fr.enimaloc.catapult.event;
 
-import fr.esportline.catapult.domain.GameBinding;
-import fr.esportline.catapult.domain.UserAccount;
-import fr.esportline.catapult.repository.UserSettingsRepository;
-import fr.esportline.catapult.service.BindingService;
-import fr.esportline.catapult.service.StreamStateService;
-import fr.esportline.catapult.service.TwitchService;
+import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.service.BindingService;
+import fr.enimaloc.catapult.service.StreamStateService;
+import fr.enimaloc.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
