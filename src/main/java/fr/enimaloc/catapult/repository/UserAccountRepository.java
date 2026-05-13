@@ -1,6 +1,6 @@
-package fr.esportline.catapult.repository;
+package fr.enimaloc.catapult.repository;
 
-import fr.esportline.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.Instant;
@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> {
 
     Optional<UserAccount> findByTwitchId(String twitchId);
+
+    Optional<UserAccount> findByApiKey(String apiKey);
 
     List<UserAccount> findByBotEnabledTrueAndStatus(UserAccount.Status status);
 
