@@ -160,8 +160,12 @@ subscribe_events() {
       --arg bid     "$broadcaster_id" \
       --arg sid     "$session_id" \
       '{"type":$type,"version":$version,"condition":{"broadcaster_user_id":$bid},"transport":{"method":"websocket","session_id":$sid}}')
-    twitch api post /eventsub/subscriptions -b "$body" &>/dev/null
-    echo -e "  ${CYAN}↳ subscribed:${RESET} ${event_type} v${version}"
+    local out
+    if out=$(twitch api post /eventsub/subscriptions -b "$body" 2>&1); then
+      echo -e "  ${CYAN}↳ subscribed:${RESET} ${event_type} v${version}"
+    else
+      echo -e "  ${RED}✗ failed:${RESET} ${event_type} — ${out}" >&2
+    fi
   done
 }
 
