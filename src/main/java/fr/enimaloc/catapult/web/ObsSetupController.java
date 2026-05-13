@@ -7,11 +7,15 @@ import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.ProcessBindingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.SecureRandom;
@@ -21,6 +25,8 @@ import java.util.UUID;
 
 @Controller
 @RequiredArgsConstructor
+@Validated
+@Slf4j
 public class ObsSetupController {
 
     private final UserAccountRepository userAccountRepository;
@@ -44,6 +50,7 @@ public class ObsSetupController {
         UserAccount user = principal.getUserAccount();
         user.setApiKey(generateSecureKey());
         userAccountRepository.save(user);
+        log.info("API key generated for user {}", user.getId());
         ensureObsGetterConfig(user);
         return "redirect:/app";
     }
@@ -53,12 +60,13 @@ public class ObsSetupController {
         UserAccount user = principal.getUserAccount();
         user.setApiKey(null);
         userAccountRepository.save(user);
+        log.info("API key revoked for user {}", user.getId());
         return "redirect:/app";
     }
 
     @PostMapping("/obs/process-bindings")
     public String addProcessBinding(@AuthenticationPrincipal CatapultOAuth2User principal,
-                                    @RequestParam String processName,
+                                    @RequestParam @NotBlank @Size(max = 255) String processName,
                                     @RequestParam String twitchGameId,
                                     @RequestParam String twitchGameName) {
         UserAccount user = principal.getUserAccount();
