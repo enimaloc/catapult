@@ -14,4 +14,8 @@ public interface ProcessBindingRepository extends JpaRepository<ProcessBinding, 
     List<ProcessBinding> findByUserOrderByProcessNameAsc(UserAccount user);
 
     Optional<ProcessBinding> findFirstByUserAndProcessNameIn(UserAccount user, Collection<String> processNames);
+
+    List<ProcessBinding> findByUserAndProcessNameIn(UserAccount user, Collection<String> processNames);
+
+    List<ProcessBinding> findByUserIsNull();
 }
