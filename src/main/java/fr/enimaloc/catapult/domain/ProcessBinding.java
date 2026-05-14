@@ -7,13 +7,12 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(
-    name = "process_binding",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "process_name"})
-)
+@Table(name = "process_binding")
 @Getter
 @Setter
 public class ProcessBinding {
@@ -22,12 +21,15 @@ public class ProcessBinding {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "user_id")
     private UserAccount user;
 
     @Column(name = "process_name", nullable = false)
     private String processName;
+
+    @Column(name = "is_regex", nullable = false)
+    private boolean regex = false;
 
     @Column(name = "twitch_game_id")
     private String twitchGameId;
@@ -42,4 +44,12 @@ public class ProcessBinding {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @OneToMany(mappedBy = "binding", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderBy("position ASC, id ASC")
+    private List<ProcessPredicate> predicates = new ArrayList<>();
+
+    public boolean isGlobal() {
+        return user == null;
+    }
 }
