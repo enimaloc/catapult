@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
-      xmlns:sec="">
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <body>
 <th:block th:fragment="nav(active)">
     <div sec:authorize="hasAuthority('ROLE_PREVIOUS_ADMINISTRATOR')"

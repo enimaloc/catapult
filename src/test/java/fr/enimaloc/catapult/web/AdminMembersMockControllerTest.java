@@ -56,6 +56,33 @@ class AdminMembersMockControllerTest {
     }
 
     @Test
+    void setTwitchOffline_userNotFound_throws404() {
+        UUID id = UUID.randomUUID();
+        when(userAccountRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.setTwitchOffline(id))
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void setSteamGame_userNotFound_throws404() {
+        UUID id = UUID.randomUUID();
+        when(userAccountRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.setSteamGame(id, "570", "Dota 2"))
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void clearSteamGame_userNotFound_throws404() {
+        UUID id = UUID.randomUUID();
+        when(userAccountRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.clearSteamGame(id))
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
     void setTwitchOffline_delegatesToService_andRedirects() {
         UUID id = UUID.randomUUID();
         UserAccount user = new UserAccount(); user.setId(id);
