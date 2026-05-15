@@ -718,3 +718,33 @@ details summary { cursor: pointer; font-weight: 600; }
 .igdb-result--ok { color: var(--success-text); }
 .igdb-result--error { color: #f87171; }
 .placeholder { color: var(--muted); font-size: 13px; }
+
+/* ============================================================
+   Theme switcher (floating, fixed bottom-right)
+   ============================================================ */
+.theme-switcher {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    gap: 4px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    z-index: 200;
+}
+
+.theme-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    opacity: 0.5;
+    transition: opacity .15s, background .15s;
+}
+
+.theme-btn:hover { opacity: 1; }
+.theme-btn.active { background: var(--border); opacity: 1; }
