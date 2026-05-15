@@ -83,6 +83,118 @@
 }
 
 /* ============================================================
+   Theme: nord
+   ============================================================ */
+[data-theme="nord"] {
+    --bg-base:       #2e3440;
+    --bg-surface:    #3b4252;
+    --bg-elevated:   #434c5e;
+    --border:        #4c566a;
+    --border-subtle: #3b4252;
+    --text:          #eceff4;
+    --text-muted:    #d8dee9;
+    --text-dim:      #aeb3bb;
+    --text-bright:   #ffffff;
+    --text-subtle:   #e5e9f0;
+    --accent:        #88c0d0;
+    --accent-strong: #5e81ac;
+    --accent-deep:   #4c6f93;
+    --muted:         #4c566a;
+    --danger:        #bf616a;
+    --danger-bg:     #3b1219;
+    --danger-border: #7f1d1d;
+    --danger-text:   #d08770;
+    --success:       #a3be8c;
+    --success-text:  #8fbcbb;
+    --twitch:        #9146ff;
+    --twitch-dark:   #7d2ff7;
+}
+
+/* ============================================================
+   Theme: dracula
+   ============================================================ */
+[data-theme="dracula"] {
+    --bg-base:       #282a36;
+    --bg-surface:    #343746;
+    --bg-elevated:   #2f3240;
+    --border:        #44475a;
+    --border-subtle: #3a3d4e;
+    --text:          #f8f8f2;
+    --text-muted:    #6272a4;
+    --text-dim:      #4d5369;
+    --text-bright:   #ffffff;
+    --text-subtle:   #cdd6f4;
+    --accent:        #bd93f9;
+    --accent-strong: #8be9fd;
+    --accent-deep:   #6272a4;
+    --muted:         #44475a;
+    --danger:        #ff5555;
+    --danger-bg:     #3b1219;
+    --danger-border: #7f1d1d;
+    --danger-text:   #ffb86c;
+    --success:       #50fa7b;
+    --success-text:  #69ff94;
+    --twitch:        #9146ff;
+    --twitch-dark:   #7d2ff7;
+}
+
+/* ============================================================
+   Theme: catppuccin  (Mocha)
+   ============================================================ */
+[data-theme="catppuccin"] {
+    --bg-base:       #1e1e2e;
+    --bg-surface:    #313244;
+    --bg-elevated:   #181825;
+    --border:        #45475a;
+    --border-subtle: #313244;
+    --text:          #cdd6f4;
+    --text-muted:    #a6adc8;
+    --text-dim:      #7f849c;
+    --text-bright:   #ffffff;
+    --text-subtle:   #bac2de;
+    --accent:        #cba6f7;
+    --accent-strong: #89b4fa;
+    --accent-deep:   #74c7ec;
+    --muted:         #585b70;
+    --danger:        #f38ba8;
+    --danger-bg:     #3b1219;
+    --danger-border: #7f1d1d;
+    --danger-text:   #fab387;
+    --success:       #a6e3a1;
+    --success-text:  #94e2d5;
+    --twitch:        #9146ff;
+    --twitch-dark:   #7d2ff7;
+}
+
+/* ============================================================
+   Theme: tokyo-night
+   ============================================================ */
+[data-theme="tokyo-night"] {
+    --bg-base:       #1a1b26;
+    --bg-surface:    #24283b;
+    --bg-elevated:   #16161e;
+    --border:        #414868;
+    --border-subtle: #24283b;
+    --text:          #c0caf5;
+    --text-muted:    #565f89;
+    --text-dim:      #414868;
+    --text-bright:   #ffffff;
+    --text-subtle:   #a9b1d6;
+    --accent:        #7aa2f7;
+    --accent-strong: #bb9af7;
+    --accent-deep:   #9d7cd8;
+    --muted:         #414868;
+    --danger:        #f7768e;
+    --danger-bg:     #3b1219;
+    --danger-border: #7f1d1d;
+    --danger-text:   #ff9e64;
+    --success:       #9ece6a;
+    --success-text:  #73daca;
+    --twitch:        #9146ff;
+    --twitch-dark:   #7d2ff7;
+}
+
+/* ============================================================
    Reset & base
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
