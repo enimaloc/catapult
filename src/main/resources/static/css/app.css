@@ -352,6 +352,46 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
 .btn-link:hover { color: var(--text); }
 
 /* ============================================================
+   Pill toggle (status + action in one element)
+   ============================================================ */
+.pill-toggle {
+    display: inline-flex;
+    border-radius: 9999px;
+    overflow: hidden;
+    border: 1px solid transparent;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.pill-toggle__label {
+    padding: 4px 12px;
+    display: flex;
+    align-items: center;
+}
+
+.pill-toggle__btn {
+    padding: 4px 12px;
+    border: none;
+    border-left: 1px solid rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    font-size: inherit;
+    font-weight: inherit;
+    font-family: inherit;
+    background: inherit;
+    filter: brightness(0.85);
+    color: inherit;
+    transition: opacity .15s;
+}
+
+.pill-toggle__btn:hover { opacity: .85; }
+
+.pill-toggle--active  { background: var(--success); color: var(--success-text); border-color: var(--success); }
+.pill-toggle--inactive { background: var(--muted);  color: var(--text-muted);   border-color: var(--muted); }
+.pill-toggle--live    { background: var(--danger);  color: #fff;                border-color: var(--danger); }
+.pill-toggle--offline { background: var(--muted);   color: var(--text-muted);   border-color: var(--muted); }
+
+/* ============================================================
    Badges
    ============================================================ */
 .badge {
@@ -883,6 +923,8 @@ details summary { cursor: pointer; font-weight: 600; }
 [data-theme="old-steam"] .query-textarea,
 [data-theme="old-steam"] .endpoint-input,
 [data-theme="old-steam"] .btn-run { border-radius: 0; }
+[data-theme="old-steam"] .pill-toggle,
+[data-theme="old-steam"] .pill-toggle__btn { border-radius: 0; }
 
 [data-theme="old-steam"] .badge { border-radius: 2px; }
 
