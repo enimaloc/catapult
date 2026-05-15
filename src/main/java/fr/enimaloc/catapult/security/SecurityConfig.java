@@ -5,10 +5,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
+import org.springframework.security.web.authentication.switchuser.SwitchUserFilter;
 
 @Slf4j
 @Configuration
@@ -24,13 +28,45 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, ApiKeyAuthFilter apiKeyAuthFilter) throws Exception {
+    public SwitchUserFilter switchUserFilter(ImpersonationUserDetailsService impersonationUserDetailsService) {
+        SwitchUserFilter filter = new SwitchUserFilter();
+        filter.setUserDetailsService(impersonationUserDetailsService);
+        filter.setSwitchUserUrl("/admin/impersonate");
+        filter.setExitUserUrl("/admin/impersonate/exit");
+        filter.setSuccessHandler((req, res, auth) -> {
+            // If the resulting authentication has ROLE_PREVIOUS_ADMINISTRATOR it is a
+            // switch-in; if not (i.e. we just exited back to the original admin) redirect
+            // to the members page instead.
+            boolean isSwitched = auth.getAuthorities().stream()
+                    .anyMatch(a -> SwitchUserFilter.ROLE_PREVIOUS_ADMINISTRATOR.equals(a.getAuthority()));
+            res.sendRedirect(isSwitched ? "/app" : "/admin/members");
+        });
+        filter.setFailureHandler((req, res, ex) -> {
+            log.warn("Impersonation failed: {}", ex.getMessage());
+            res.sendRedirect("/admin/members?error=impersonateFailed");
+        });
+        filter.setUserDetailsChecker(details -> {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof CatapultOAuth2User admin
+                && admin.getUserAccount().getTwitchUsername().equals(details.getUsername())) {
+                throw new LockedException("Cannot impersonate yourself");
+            }
+        });
+        return filter;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                    ApiKeyAuthFilter apiKeyAuthFilter,
+                                                    SwitchUserFilter switchUserFilter) throws Exception {
         http
             .addFilterBefore(apiKeyAuthFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(switchUserFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .csrf(csrf -> csrf.ignoringRequestMatchers("/api/obs/**"))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/error", "/css/**", "/js/**", "/images/**").permitAll()
                 .requestMatchers("/api/obs/**").authenticated()
+                .requestMatchers("/admin/impersonate/exit").authenticated()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
