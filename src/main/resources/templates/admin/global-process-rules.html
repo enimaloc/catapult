@@ -58,81 +58,74 @@
                         <td style="padding:8px" th:text="${rule.twitchGameName}"></td>
 
                         <!-- Prédicats -->
-                        <td style="padding:8px;min-width:260px">
-                            <details>
-                                <summary style="cursor:pointer;font-size:.85em;color:#555">
-                                    <span th:if="${rule.predicates.empty}">Aucun prédicat</span>
-                                    <span th:unless="${rule.predicates.empty}" th:text="${rule.predicates.size()} + ' prédicat(s)'"></span>
-                                </summary>
+                        <td style="padding:8px;min-width:320px">
+                            <div th:unless="${rule.predicates.empty}" style="margin-bottom:6px">
+                                <table style="width:100%;font-size:.8em;border-collapse:collapse">
+                                    <thead>
+                                        <tr style="border-bottom:1px solid #eee;color:#888">
+                                            <th style="padding:4px">Lien</th>
+                                            <th style="padding:4px">Type</th>
+                                            <th style="padding:4px">Clé</th>
+                                            <th style="padding:4px">Valeur</th>
+                                            <th style="padding:4px">OS</th>
+                                            <th style="padding:4px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr th:each="pred, iterStat : ${rule.predicates}" style="border-bottom:1px solid #f5f5f5">
+                                            <td style="padding:4px;color:#888">
+                                                <span th:if="${iterStat.first}">—</span>
+                                                <span th:unless="${iterStat.first}" th:text="${pred.connector}"></span>
+                                            </td>
+                                            <td style="padding:4px" th:text="${pred.type}"></td>
+                                            <td style="padding:4px"><code th:text="${pred.key}"></code></td>
+                                            <td style="padding:4px"><code th:text="${pred.value}"></code></td>
+                                            <td style="padding:4px" th:text="${pred.osTarget}"></td>
+                                            <td style="padding:4px">
+                                                <form th:action="@{/admin/process-rules/{id}/predicates/{predId}/delete(id=${rule.id},predId=${pred.id})}" method="post">
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                    <button type="submit" class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:.75em">✕</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
 
-                                <div th:unless="${rule.predicates.empty}" style="margin-top:6px">
-                                    <table style="width:100%;font-size:.8em;border-collapse:collapse">
-                                        <thead>
-                                            <tr style="border-bottom:1px solid #eee;color:#888">
-                                                <th style="padding:4px">Lien</th>
-                                                <th style="padding:4px">Type</th>
-                                                <th style="padding:4px">Clé</th>
-                                                <th style="padding:4px">Valeur</th>
-                                                <th style="padding:4px">OS</th>
-                                                <th style="padding:4px"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr th:each="pred, iterStat : ${rule.predicates}" style="border-bottom:1px solid #f5f5f5">
-                                                <td style="padding:4px;color:#888">
-                                                    <span th:if="${iterStat.first}">—</span>
-                                                    <span th:unless="${iterStat.first}" th:text="${pred.connector}"></span>
-                                                </td>
-                                                <td style="padding:4px" th:text="${pred.type}"></td>
-                                                <td style="padding:4px"><code th:text="${pred.key}"></code></td>
-                                                <td style="padding:4px"><code th:text="${pred.value}"></code></td>
-                                                <td style="padding:4px" th:text="${pred.osTarget}"></td>
-                                                <td style="padding:4px">
-                                                    <form th:action="@{/admin/process-rules/{id}/predicates/{predId}/delete(id=${rule.id},predId=${pred.id})}" method="post">
-                                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                                        <button type="submit" class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:.75em">✕</button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                            <!-- Formulaire ajout prédicat -->
+                            <form th:action="@{/admin/process-rules/{id}/predicates(id=${rule.id})}" method="post"
+                                  style="display:grid;grid-template-columns:auto auto 1fr auto auto;gap:4px;align-items:end;font-size:.82em">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <div style="display:flex;flex-direction:column;gap:2px">
+                                    <label style="color:#777;font-weight:600">Lien</label>
+                                    <select name="connector" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
+                                        <option th:each="c : ${connectors}" th:value="${c}" th:text="${c}"></option>
+                                    </select>
                                 </div>
-
-                                <!-- Formulaire ajout prédicat -->
-                                <form th:action="@{/admin/process-rules/{id}/predicates(id=${rule.id})}" method="post"
-                                      style="margin-top:8px;display:grid;grid-template-columns:auto auto 1fr auto auto auto;gap:6px;align-items:end;font-size:.82em">
-                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <div style="display:flex;flex-direction:column;gap:2px">
-                                        <label style="color:#777;font-weight:600">Lien</label>
-                                        <select name="connector" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
-                                            <option th:each="c : ${connectors}" th:value="${c}" th:text="${c}"></option>
-                                        </select>
-                                    </div>
-                                    <div style="display:flex;flex-direction:column;gap:2px">
-                                        <label style="color:#777;font-weight:600">Type</label>
-                                        <select name="type" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
-                                            <option th:each="t : ${predicateTypes}" th:value="${t}" th:text="${t}"></option>
-                                        </select>
-                                    </div>
-                                    <div style="display:flex;flex-direction:column;gap:2px">
-                                        <label style="color:#777;font-weight:600">Valeur</label>
-                                        <input type="text" name="value" required placeholder="ex: %APPDATA%\MonApp"
-                                               style="padding:4px 8px;border:1px solid #ccc;border-radius:4px">
-                                    </div>
-                                    <div style="display:flex;flex-direction:column;gap:2px">
-                                        <label style="color:#777;font-weight:600">Clé (ENV_VAR)</label>
-                                        <input type="text" name="key" placeholder="ex: STEAM_APPID"
-                                               style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;width:100px">
-                                    </div>
-                                    <div style="display:flex;flex-direction:column;gap:2px">
-                                        <label style="color:#777;font-weight:600">OS</label>
-                                        <select name="osTarget" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
-                                            <option th:each="o : ${osTargets}" th:value="${o}" th:text="${o}"></option>
-                                        </select>
-                                    </div>
-                                    <button type="submit" class="btn btn-sm btn-primary" style="align-self:end">+ Ajouter</button>
-                                </form>
-                            </details>
+                                <div style="display:flex;flex-direction:column;gap:2px">
+                                    <label style="color:#777;font-weight:600">Type</label>
+                                    <select name="type" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
+                                        <option th:each="t : ${predicateTypes}" th:value="${t}" th:text="${t}"></option>
+                                    </select>
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:2px">
+                                    <label style="color:#777;font-weight:600">Valeur</label>
+                                    <input type="text" name="value" required placeholder="ex: %APPDATA%\MonApp"
+                                           style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;width:100%">
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:2px">
+                                    <label style="color:#777;font-weight:600">Clé (ENV_VAR)</label>
+                                    <input type="text" name="key" placeholder="ex: STEAM_APPID"
+                                           style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;width:90px">
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:2px">
+                                    <label style="color:#777;font-weight:600">OS</label>
+                                    <select name="osTarget" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
+                                        <option th:each="o : ${osTargets}" th:value="${o}" th:text="${o}"></option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-primary" style="align-self:end">+ Ajouter</button>
+                            </form>
                         </td>
 
                         <td style="padding:8px;text-align:right">
