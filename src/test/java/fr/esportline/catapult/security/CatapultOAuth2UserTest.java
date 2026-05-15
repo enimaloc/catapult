@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
-import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -60,6 +59,17 @@ class CatapultOAuth2UserTest {
     void isEnabled_trueWhenActive() {
         CatapultOAuth2User user = buildUser(false);
         assertThat(user.isEnabled()).isTrue();
+    }
+
+    @Test
+    void isEnabled_falseWhenPendingDeletion() {
+        OAuth2User delegate = mock(OAuth2User.class);
+        UserAccount account = new UserAccount();
+        account.setTwitchId("456");
+        account.setTwitchUsername("deleteme");
+        account.setStatus(UserAccount.Status.PENDING_DELETION);
+        CatapultOAuth2User user = new CatapultOAuth2User(delegate, account, false);
+        assertThat(user.isEnabled()).isFalse();
     }
 
     @Test
