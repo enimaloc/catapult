@@ -45,18 +45,28 @@
                                 </form>
                             </td>
                             <td>
-                                <span th:if="${member.status.name() == 'ACTIVE'}" class="badge badge-live" th:text="${member.status}"></span>
-                                <span th:unless="${member.status.name() == 'ACTIVE'}" class="badge" th:text="${member.status}"></span>
-                                <div th:if="${isMockProfile}" style="display:flex;gap:6px;margin-top:4px">
-                                    <form th:action="@{/admin/members/{id}/twitch/online(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                <th:block th:unless="${isMockProfile}">
+                                    <span th:if="${member.status.name() == 'ACTIVE'}" class="badge badge-live" th:text="${member.status}"></span>
+                                    <span th:unless="${member.status.name() == 'ACTIVE'}" class="badge" th:text="${member.status}"></span>
+                                </th:block>
+                                <th:block th:if="${isMockProfile}">
+                                    <form th:if="${liveStatus[member.id]}"
+                                          th:action="@{/admin/members/{id}/twitch/offline(id=${member.id})}" method="post"> <!-- nosemgrep -->
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <button type="submit" class="btn btn-danger btn-sm" th:disabled="${liveStatus[member.id]}">▶ Online</button>
+                                        <div class="pill-toggle pill-toggle--live">
+                                            <span class="pill-toggle__label">🔴 Live</span>
+                                            <button type="submit" class="pill-toggle__btn">■ Offline</button>
+                                        </div>
                                     </form>
-                                    <form th:action="@{/admin/members/{id}/twitch/offline(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                    <form th:unless="${liveStatus[member.id]}"
+                                          th:action="@{/admin/members/{id}/twitch/online(id=${member.id})}" method="post"> <!-- nosemgrep -->
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <button type="submit" class="btn btn-sm" th:disabled="${!liveStatus[member.id]}">■ Offline</button>
+                                        <div class="pill-toggle pill-toggle--offline">
+                                            <span class="pill-toggle__label">⬛ Offline</span>
+                                            <button type="submit" class="pill-toggle__btn">▶ Online</button>
+                                        </div>
                                     </form>
-                                </div>
+                                </th:block>
                             </td>
                             <td th:text="${member.createdAt}"></td>
                             <td th:if="${isMockProfile}">
