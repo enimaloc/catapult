@@ -81,10 +81,6 @@
 
     <script>
         // Bindings inline edit
-        function toggleEdit(id) {
-            const row = document.getElementById('edit-row-' + id);
-            row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
-        }
         const debounceTimers = {};
         function debouncedSearch(event, id) {
             clearTimeout(debounceTimers[id]);
