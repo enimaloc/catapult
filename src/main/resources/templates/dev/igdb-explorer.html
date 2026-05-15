@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <title>Catapult — IGDB Explorer</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <style>
+        .explorer-layout {
+            display: flex;
+            gap: 0;
+            height: calc(100vh - 56px);
+            overflow: hidden;
+        }
+        .endpoint-sidebar {
+            width: 200px;
+            flex-shrink: 0;
+            border-right: 1px solid #2d2f3e;
+            background: #13151f;
+            overflow-y: auto;
+            padding: 12px 0;
+        }
+        .endpoint-sidebar h3 {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #64748b;
+            padding: 0 12px 8px;
+        }
+        .endpoint-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-family: ui-monospace, monospace;
+            font-size: 12px;
+            padding: 5px 12px;
+            cursor: pointer;
+            transition: background .1s, color .1s;
+        }
+        .endpoint-btn:hover { background: #1e2133; color: #e2e8f0; }
+        .endpoint-btn.active { background: #2d1f5e; color: #a78bfa; font-weight: 600; }
+
+        .query-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #0f1117;
+        }
+        .query-editor {
+            border-bottom: 1px solid #2d2f3e;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #13151f;
+        }
+        .endpoint-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .endpoint-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #64748b;
+            white-space: nowrap;
+        }
+        .endpoint-input {
+            font-family: ui-monospace, monospace;
+            font-size: 13px;
+            padding: 4px 10px;
+            background: #0f1117;
+            border: 1px solid #2d2f3e;
+            border-radius: 4px;
+            color: #a78bfa;
+            width: 220px;
+        }
+        .endpoint-input:focus { outline: none; border-color: #7c3aed; }
+        .query-textarea {
+            font-family: ui-monospace, monospace;
+            font-size: 13px;
+            padding: 10px 12px;
+            background: #0f1117;
+            border: 1px solid #2d2f3e;
+            border-radius: 4px;
+            color: #e2e8f0;
+            resize: vertical;
+            min-height: 110px;
+            line-height: 1.6;
+        }
+        .query-textarea:focus { outline: none; border-color: #7c3aed; }
+        .editor-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-run {
+            background: #7c3aed;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .15s;
+        }
+        .btn-run:hover { background: #6d28d9; }
+        .htmx-indicator { color: #64748b; font-size: 12px; display: none; }
+        .htmx-request .htmx-indicator { display: inline; }
+        .results-panel {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+        }
+        .igdb-result {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: ui-monospace, monospace;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+        .igdb-result--ok { color: #86efac; }
+        .igdb-result--error { color: #f87171; }
+        .placeholder { color: #475569; font-size: 13px; }
+    </style>
+    <script th:src="@{/js/app.js}"></script>
+</head>
+<body>
+<div th:replace="~{fragments/nav :: nav('igdb')}"></div>
+
+<div class="explorer-layout">
+    <aside class="endpoint-sidebar">
+        <h3>Endpoints</h3>
+        <button class="endpoint-btn active"
+                th:each="ep, stat : ${endpoints}"
+                th:classappend="${stat.first} ? 'active' : ''"
+                th:data-endpoint="${ep}"
+                th:text="${ep}"
+                th:onclick="|selectEndpoint(this)|">
+        </button>
+    </aside>
+
+    <div class="query-panel">
+        <form class="query-editor"
+              id="query-form"
+              hx-post="/dev/igdb/query"
+              hx-target="#results"
+              hx-indicator="#spinner">
+            <div class="endpoint-row">
+                <span class="endpoint-label">POST /v4/</span>
+                <input type="text" name="endpoint" id="endpoint-input"
+                       class="endpoint-input"
+                       value="games"
+                       autocomplete="off"
+                       spellcheck="false"/>
+            </div>
+            <textarea name="query" id="query-input" class="query-textarea"
+                      spellcheck="false">fields id, name, summary, rating;
+limit 5;</textarea>
+            <div class="editor-actions">
+                <button type="submit" class="btn-run">▶ Exécuter</button>
+                <span id="spinner" class="htmx-indicator">Chargement…</span>
+            </div>
+        </form>
+
+        <div class="results-panel" id="results">
+            <span class="placeholder">← Sélectionne un endpoint et exécute une requête</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const EXAMPLE_QUERIES = {
+        games:                       'fields id, name, summary, rating;\nlimit 5;',
+        platforms:                   'fields id, name, abbreviation;\nlimit 10;',
+        genres:                      'fields id, name;\nlimit 20;',
+        themes:                      'fields id, name;\nlimit 20;',
+        keywords:                    'fields id, name;\nlimit 10;',
+        external_games:              'fields uid, game.name, external_game_source.name;\nlimit 5;',
+        external_game_sources:       'fields id, name;\nlimit 50;',
+        involved_companies:          'fields company.name, developer, publisher;\nlimit 10;',
+        companies:                   'fields id, name, country;\nlimit 10;',
+        age_ratings:                 'fields id, category, rating, rating_content_descriptions.description;\nlimit 5;',
+        age_rating_content_descriptions: 'fields id, description;\nlimit 20;',
+        game_modes:                  'fields id, name;\nlimit 20;',
+        player_perspectives:         'fields id, name;\nlimit 20;',
+        covers:                      'fields id, url, game.name;\nlimit 5;',
+        artworks:                    'fields id, url, game.name;\nlimit 5;',
+        screenshots:                 'fields id, url, game.name;\nlimit 5;',
+        websites:                    'fields id, url, category, game.name;\nlimit 5;',
+        franchises:                  'fields id, name;\nlimit 10;',
+        collections:                 'fields id, name, games.name;\nlimit 5;',
+        characters:                  'fields id, name, games.name;\nlimit 5;',
+        game_engines:                'fields id, name, companies.name;\nlimit 10;',
+        languages:                   'fields id, name, native_name;\nlimit 20;',
+        language_supports:           'fields id, game.name, language.name;\nlimit 5;',
+        multiplayer_modes:           'fields id, game.name, onlinemax, offlinemax;\nlimit 5;',
+        platform_families:           'fields id, name;\nlimit 20;',
+        release_dates:               'fields id, game.name, platform.name, date;\nlimit 5;',
+        videos:                      'fields id, name, video_id, game.name;\nlimit 5;',
+    };
+
+    function selectEndpoint(btn) {
+        document.querySelectorAll('.endpoint-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const ep = btn.dataset.endpoint;
+        document.getElementById('endpoint-input').value = ep;
+        document.getElementById('query-input').value =
+            EXAMPLE_QUERIES[ep] || 'fields *;\nlimit 5;';
+    }
+
+    document.addEventListener('htmx:configRequest', function(e) {
+        const token = document.querySelector('meta[name="_csrf"]')?.content;
+        const header = document.querySelector('meta[name="_csrf_header"]')?.content;
+        if (token && header) e.detail.headers[header] = token;
+    });
+
+    document.getElementById('query-form').addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            htmx.trigger(this, 'submit');
+        }
+    });
+</script>
+</body>
+</html>

@@ -15,9 +15,10 @@
         .game-results li:hover { background:#f5f5f5; }
         .search-wrapper { position:relative; }
     </style>
+    <script th:src="@{/js/app.js}"></script>
 </head>
 <body>
-    <div th:replace="~{fragments/admin-nav :: admin-nav('process-rules')}"></div>
+    <div th:replace="~{fragments/nav :: nav('process-rules')}"></div>
 
     <main class="container">
         <h2>Administration — Règles processus globales</h2>
