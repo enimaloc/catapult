@@ -170,6 +170,10 @@ public class ObsSetupController {
                                 entry["workingDirectory"] = p.cwd()
                             except (psutil.AccessDenied, psutil.ZombieProcess):
                                 pass
+                            try:
+                                entry["cmdline"] = " ".join(p.cmdline())
+                            except (psutil.AccessDenied, psutil.ZombieProcess):
+                                pass
                             procs.append(entry)
                         except (psutil.NoSuchProcess, psutil.AccessDenied):
                             pass

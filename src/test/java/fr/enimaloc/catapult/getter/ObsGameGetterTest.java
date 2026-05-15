@@ -135,7 +135,7 @@ class ObsGameGetterTest {
 
     private static ObsSession session(String processName, String workingDirectory) {
         return new ObsSession("WINDOWS", Map.of(),
-                Set.of(new ObsSession.ProcessSnapshot(processName, workingDirectory)));
+                Set.of(new ObsSession.ProcessSnapshot(processName, workingDirectory, null)));
     }
 
     private static ProcessBinding binding(String processName, String gameName) {
