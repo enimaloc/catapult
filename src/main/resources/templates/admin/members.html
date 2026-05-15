@@ -21,7 +21,6 @@
                             <th>Bot</th>
                             <th>Statut</th>
                             <th>Créé le</th>
-                            <th th:if="${isMockProfile}">Mock Twitch</th>
                             <th th:if="${isMockProfile}">Mock Steam</th>
                             <th>Actions</th>
                         </tr>
@@ -34,16 +33,21 @@
                             </td>
                             <td th:text="${member.steamId != null ? member.steamId : '—'}"></td>
                             <td>
-                                <span th:if="${member.botEnabled}" class="badge badge-live">✓</span>
-                                <span th:unless="${member.botEnabled}" class="badge">✗</span>
+                                <form th:action="@{/admin/members/{id}/bot/toggle(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <div class="pill-toggle"
+                                         th:classappend="${member.botEnabled ? 'pill-toggle--active' : 'pill-toggle--inactive'}">
+                                        <span class="pill-toggle__label"
+                                              th:text="${member.botEnabled ? '✓ Actif' : '✗ Inactif'}"></span>
+                                        <button type="submit" class="pill-toggle__btn"
+                                                th:text="${member.botEnabled ? 'Désactiver' : 'Activer'}"></button>
+                                    </div>
+                                </form>
                             </td>
                             <td>
                                 <span th:if="${member.status.name() == 'ACTIVE'}" class="badge badge-live" th:text="${member.status}"></span>
                                 <span th:unless="${member.status.name() == 'ACTIVE'}" class="badge" th:text="${member.status}"></span>
-                            </td>
-                            <td th:text="${member.createdAt}"></td>
-                            <td th:if="${isMockProfile}">
-                                <div style="display:flex;gap:6px">
+                                <div th:if="${isMockProfile}" style="display:flex;gap:6px;margin-top:4px">
                                     <form th:action="@{/admin/members/{id}/twitch/online(id=${member.id})}" method="post"> <!-- nosemgrep -->
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <button type="submit" class="btn btn-danger btn-sm" th:disabled="${liveStatus[member.id]}">▶ Online</button>
@@ -54,6 +58,7 @@
                                     </form>
                                 </div>
                             </td>
+                            <td th:text="${member.createdAt}"></td>
                             <td th:if="${isMockProfile}">
                                 <div th:if="${member.steamId != null}" style="display:flex;gap:6px">
                                     <form th:action="@{/admin/members/{id}/steam/set(id=${member.id})}" method="post"> <!-- nosemgrep -->
