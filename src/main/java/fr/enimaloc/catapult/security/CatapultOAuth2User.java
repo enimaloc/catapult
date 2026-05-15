@@ -19,6 +19,8 @@ import java.util.Map;
 @Getter
 public class CatapultOAuth2User implements OAuth2User, UserDetails {
 
+    private static final long serialVersionUID = 1L;
+
     private final OAuth2User delegate; // null pour les sessions impersonifiées
     private final UserAccount userAccount;
     private final boolean admin;
