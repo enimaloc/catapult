@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Catapult — Membres')}"></head>
+<body>
+    <div th:replace="~{fragments/nav :: nav('members')}"></div>
+
+    <main class="container">
+        <h2>Administration — Membres</h2>
+
+        <div th:if="${#lists.isEmpty(members)}" class="text-muted">
+            <p>Aucun membre en base.</p>
+        </div>
+
+        <div th:unless="${#lists.isEmpty(members)}" class="card">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Utilisateur Twitch</th>
+                            <th>Steam ID</th>
+                            <th>Bot</th>
+                            <th>Statut</th>
+                            <th>Créé le</th>
+                            <th th:if="${isMockProfile}">Mock Steam</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="member : ${members}">
+                            <td>
+                                <strong th:text="${member.twitchUsername}"></strong><br>
+                                <span class="badge" th:text="${member.twitchId}"></span>
+                            </td>
+                            <td th:text="${member.steamId != null ? member.steamId : '—'}"></td>
+                            <td>
+                                <form th:action="@{/admin/members/{id}/bot/toggle(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <div class="pill-toggle"
+                                         th:classappend="${member.botEnabled ? 'pill-toggle--active' : 'pill-toggle--inactive'}">
+                                        <span class="pill-toggle__label"
+                                              th:text="${member.botEnabled ? '✓ Actif' : '✗ Inactif'}"></span>
+                                        <button type="submit" class="pill-toggle__btn"
+                                                th:text="${member.botEnabled ? 'Désactiver' : 'Activer'}"></button>
+                                    </div>
+                                </form>
+                            </td>
+                            <td>
+                                <th:block th:unless="${isMockProfile}">
+                                    <span th:if="${member.status.name() == 'ACTIVE'}" class="badge badge-live" th:text="${member.status}"></span>
+                                    <span th:unless="${member.status.name() == 'ACTIVE'}" class="badge" th:text="${member.status}"></span>
+                                </th:block>
+                                <th:block th:if="${isMockProfile}">
+                                    <form th:if="${liveStatus[member.id]}"
+                                          th:action="@{/admin/members/{id}/twitch/offline(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <div class="pill-toggle pill-toggle--live">
+                                            <span class="pill-toggle__label">🔴 Live</span>
+                                            <button type="submit" class="pill-toggle__btn">■ Offline</button>
+                                        </div>
+                                    </form>
+                                    <form th:unless="${liveStatus[member.id]}"
+                                          th:action="@{/admin/members/{id}/twitch/online(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <div class="pill-toggle pill-toggle--offline">
+                                            <span class="pill-toggle__label">⬛ Offline</span>
+                                            <button type="submit" class="pill-toggle__btn">▶ Online</button>
+                                        </div>
+                                    </form>
+                                </th:block>
+                            </td>
+                            <td th:text="${member.createdAt}"></td>
+                            <td th:if="${isMockProfile}">
+                                <div th:if="${member.steamId != null}" style="display:flex;gap:6px">
+                                    <form th:action="@{/admin/members/{id}/steam/set(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <input type="text" name="gameId" placeholder="Game ID" style="width:80px;padding:2px 4px">
+                                        <input type="text" name="gameName" placeholder="Nom du jeu" style="width:100px;padding:2px 4px">
+                                        <button type="submit" class="btn btn-sm btn-primary">Set</button>
+                                    </form>
+                                    <form th:action="@{/admin/members/{id}/steam/clear(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="btn btn-sm">Clear</button>
+                                    </form>
+                                </div>
+                                <span th:if="${member.steamId == null}">—</span>
+                            </td>
+                            <td>
+                                <form th:action="@{/admin/impersonate}" method="post"> <!-- nosemgrep -->
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="username" th:value="${member.twitchUsername}"/>
+                                    <button type="submit" class="btn btn-sm" th:disabled="${member.twitchId == currentUserTwitchId}">Impersonate</button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
