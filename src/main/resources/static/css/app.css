@@ -750,3 +750,28 @@ details summary { cursor: pointer; font-weight: 600; }
 
 .theme-btn:hover { opacity: 1; }
 .theme-btn.active { background: var(--border); opacity: 1; }
+
+/* ============================================================
+   Theme: old-steam — border style overrides (sharp edges)
+   ============================================================ */
+[data-theme="old-steam"] .card,
+[data-theme="old-steam"] .card-danger,
+[data-theme="old-steam"] .status-card,
+[data-theme="old-steam"] .provider-card,
+[data-theme="old-steam"] .modal-content,
+[data-theme="old-steam"] .login-card,
+[data-theme="old-steam"] .table-container,
+[data-theme="old-steam"] .game-results,
+[data-theme="old-steam"] .theme-switcher,
+[data-theme="old-steam"] .theme-btn,
+[data-theme="old-steam"] .btn,
+[data-theme="old-steam"] .btn-twitch,
+[data-theme="old-steam"] .form-input,
+[data-theme="old-steam"] .modal-content input[type="text"],
+[data-theme="old-steam"] .query-textarea,
+[data-theme="old-steam"] .endpoint-input,
+[data-theme="old-steam"] .btn-run { border-radius: 0; }
+
+[data-theme="old-steam"] .badge { border-radius: 2px; }
+
+[data-theme="old-steam"] .navbar { border-bottom-width: 2px; }
