@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="">
+<body>
+<nav th:fragment="nav(active)" class="navbar">
+    <a th:href="@{/app}" class="nav-brand">🚀 Catapult</a>
+    <div class="nav-links">
+        <a th:href="@{/app}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'app'} ? ' active'">App</a>
+        <a th:href="@{/admin/ccl}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'ccl'} ? ' active'">Admin CCL</a>
+        <a th:href="@{/admin/process-rules}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'process-rules'} ? ' active'">Règles processus</a>
+        <a th:href="@{/dev/igdb}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'igdb'} ? ' active'" th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
+        <a th:href="@{/mock/twitch}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'twitch'} ? ' active'" th:if="${#arrays.contains(@environment.getActiveProfiles(), 'mock')}">Twitch Mock</a>
+        <a th:href="@{/mock/steam}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'steam'} ? ' active'" th:if="${#arrays.contains(@environment.getActiveProfiles(), 'mock')}">Steam Mock</a>
+        <form th:action="@{/logout}" method="post" style="display:inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn-link">Déconnexion</button>
+        </form>
+    </div>
+    <div class="theme-switcher">
+        <button class="theme-btn" data-theme="dark"      onclick="setTheme('dark')"      title="Dark">🌙</button>
+        <button class="theme-btn" data-theme="blanc"     onclick="setTheme('blanc')"     title="Blanc">☀️</button>
+        <button class="theme-btn" data-theme="old-steam" onclick="setTheme('old-steam')" title="Old Steam">🎮</button>
+    </div>
+</nav>
+</body>
+</html>
