@@ -7,16 +7,7 @@
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
 <body>
-    <nav class="navbar">
-        <a th:href="@{/app}" class="nav-brand">🚀 Catapult</a>
-        <div class="nav-links">
-            <a th:href="@{/app}">App</a>
-            <a th:href="@{/admin/ccl}" class="active">Admin CCL</a>
-            <form th:action="@{/logout}" method="post" style="display:inline">
-                <button type="submit" class="btn-link">Déconnexion</button>
-            </form>
-        </div>
-    </nav>
+    <div th:replace="~{fragments/admin-nav :: admin-nav('ccl')}"></div>
 
     <main class="container">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">

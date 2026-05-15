@@ -5,20 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Catapult — Règles globales processus</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <style>
+        .game-results {
+            list-style:none; padding:0; margin:0; border:1px solid #ccc;
+            display:none; max-height:180px; overflow-y:auto; background:#fff;
+            position:absolute; z-index:1000; width:100%; box-shadow:0 2px 8px rgba(0,0,0,.15);
+        }
+        .game-results li { padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee; }
+        .game-results li:hover { background:#f5f5f5; }
+        .search-wrapper { position:relative; }
+    </style>
 </head>
 <body>
-    <nav class="navbar">
-        <a th:href="@{/app}" class="nav-brand">🚀 Catapult</a>
-        <div class="nav-links">
-            <a th:href="@{/app}">App</a>
-            <a th:href="@{/admin/ccl}">Admin CCL</a>
-            <a th:href="@{/admin/process-rules}" class="active">Règles processus</a>
-            <form th:action="@{/logout}" method="post" style="display:inline">
-                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                <button type="submit" class="btn-link">Déconnexion</button>
-            </form>
-        </div>
-    </nav>
+    <div th:replace="~{fragments/admin-nav :: admin-nav('process-rules')}"></div>
 
     <main class="container">
         <h2>Administration — Règles processus globales</h2>

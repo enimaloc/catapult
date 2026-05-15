@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="admin-nav(active)" class="navbar">
+    <a th:href="@{/app}" class="nav-brand">🚀 Catapult</a>
+    <div class="nav-links">
+        <a th:href="@{/app}">App</a>
+        <a th:href="@{/admin/ccl}" th:classappend="${active == 'ccl'} ? ' active'">Admin CCL</a>
+        <a th:href="@{/admin/process-rules}" th:classappend="${active == 'process-rules'} ? ' active'">Règles processus</a>
+        <form th:action="@{/logout}" method="post" style="display:inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn-link">Déconnexion</button>
+        </form>
+    </div>
+</nav>
+</body>
+</html>
