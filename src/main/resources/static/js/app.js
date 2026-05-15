@@ -53,14 +53,14 @@ function setTheme(name) {
         document.documentElement.setAttribute('data-theme', name);
         localStorage.setItem('theme', name);
     }
-    document.querySelectorAll('.theme-btn').forEach(function(b) {
+    document.querySelectorAll('.theme-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.theme === name);
     });
 }
 
 function initThemeUI() {
-    var current = localStorage.getItem('theme') || 'dark';
-    document.querySelectorAll('.theme-btn').forEach(function(b) {
+    const current = localStorage.getItem('theme') || 'dark';
+    document.querySelectorAll('.theme-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.theme === current);
     });
 }
