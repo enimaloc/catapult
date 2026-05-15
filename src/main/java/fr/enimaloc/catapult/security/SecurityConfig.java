@@ -5,12 +5,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.security.web.authentication.switchuser.SwitchUserFilter;
 
@@ -45,7 +47,9 @@ public class SecurityConfig {
             log.warn("Impersonation failed: {}", ex.getMessage());
             res.sendRedirect("/admin/members?error=impersonateFailed");
         });
+        AccountStatusUserDetailsChecker statusChecker = new AccountStatusUserDetailsChecker();
         filter.setUserDetailsChecker(details -> {
+            statusChecker.check(details);
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.getPrincipal() instanceof CatapultOAuth2User admin
                 && admin.getUserAccount().getTwitchUsername().equals(details.getUsername())) {
@@ -61,7 +65,7 @@ public class SecurityConfig {
                                                     SwitchUserFilter switchUserFilter) throws Exception {
         http
             .addFilterBefore(apiKeyAuthFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(switchUserFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(switchUserFilter, AuthorizationFilter.class)
             .csrf(csrf -> csrf.ignoringRequestMatchers("/api/obs/**"))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/error", "/css/**", "/js/**", "/images/**").permitAll()
