@@ -168,7 +168,7 @@ class TwitchCategoryServiceTest {
     }
 
     @Test
-    void prewarmBySweep_populatesIgdbId() {
+    void prewarmCategoryCache_sweepPopulatesIgdbId() {
         ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.SWEEP);
 
         doReturn(Map.of(
@@ -180,7 +180,7 @@ class TwitchCategoryServiceTest {
 
         service.prewarmCategoryCache();
 
-        verify(cacheRepo).saveAll(argThat(list -> {
+        verify(cacheRepo, times(1)).saveAll(argThat(list -> {
             List<TwitchCategoryCache> l = (List<TwitchCategoryCache>) list;
             return l.size() == 1 && "1905".equals(l.get(0).getIgdbId());
         }));
