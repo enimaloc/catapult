@@ -124,9 +124,12 @@ public class TwitchCategoryService {
         }
 
         log.info("Twitch category sweep started (/helix/games sequential ID sweep)");
-        int offset = 0;
+        int offset = 1;
         int total  = 0;
 
+        // Twitch omits missing IDs from the response rather than returning an error.
+        // The sweep terminates on the first batch that yields zero results, meaning
+        // 100 consecutive IDs were all unknown — a reliable end-of-range signal.
         while (true) {
             StringBuilder uri = new StringBuilder(TWITCH_API_URL + "/games");
             for (int i = offset; i < offset + BATCH_SIZE; i++) {
