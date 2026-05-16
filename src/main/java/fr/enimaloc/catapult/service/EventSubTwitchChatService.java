@@ -94,9 +94,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private void scheduleReconnect(UserAccount user, OAuthToken token, String wsUrl, long delaySeconds) {
         long nextDelay = Math.min(delaySeconds * 2, MAX_RETRY_SECONDS);
         CompletableFuture.delayedExecutor(delaySeconds, TimeUnit.SECONDS).execute(() -> {
-            if (!connections.containsKey(user.getId())) {
-                openConnection(user, token, wsUrl, nextDelay);
-            }
+            if (connections.containsKey(user.getId())) return;
+            OAuthToken freshToken = oAuthTokenRepository
+                .findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+                .orElse(token);
+            openConnection(user, freshToken, wsUrl, nextDelay);
         });
     }
 
@@ -136,7 +138,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
             String[] parts = text.substring(1).split(" ", 2);
             String command = "!" + parts[0];
             List<String> args = parts.length > 1 ? List.of(parts[1].split(" ")) : List.of();
-            ChatCommandEvent.SenderRole role = extractRoleFromBadges(event.path("badges"));
+            ChatCommandEvent.SenderRole role = extractRole(event);
 
             eventPublisher.publishEvent(new ChatCommandEvent(this, user, command, args, role));
 
@@ -148,13 +150,13 @@ public class EventSubTwitchChatService implements TwitchChatService {
         }
     }
 
-    private ChatCommandEvent.SenderRole extractRoleFromBadges(JsonNode badges) {
-        for (JsonNode badge : badges) {
-            String setId = badge.path("set_id").asText();
-            if ("broadcaster".equals(setId)) return ChatCommandEvent.SenderRole.BROADCASTER;
-            if ("moderator".equals(setId)) return ChatCommandEvent.SenderRole.MODERATOR;
-        }
-        return ChatCommandEvent.SenderRole.EVERYONE;
+    private ChatCommandEvent.SenderRole extractRole(JsonNode event) {
+        String chatterType = event.path("chatter_type").asText("");
+        return switch (chatterType) {
+            case "broadcaster" -> ChatCommandEvent.SenderRole.BROADCASTER;
+            case "mod"         -> ChatCommandEvent.SenderRole.MODERATOR;
+            default            -> ChatCommandEvent.SenderRole.EVERYONE;
+        };
     }
 
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
