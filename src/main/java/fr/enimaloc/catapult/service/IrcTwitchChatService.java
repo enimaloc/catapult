@@ -46,6 +46,7 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     private final Map<UUID, PrintWriter> writers = new ConcurrentHashMap<>();
     private final Map<UUID, Socket> sockets = new ConcurrentHashMap<>();
+    private final Set<UUID> intentionallyDisconnected = ConcurrentHashMap.newKeySet();
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     @PostConstruct
@@ -64,7 +65,8 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     @Override
     public void connect(UserAccount user) {
-        disconnect(user);
+        intentionallyDisconnected.remove(user.getId());
+        doDisconnect(user);
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
             .ifPresentOrElse(
                 token -> openConnection(user, token, 1L),
@@ -74,6 +76,11 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     @Override
     public void disconnect(UserAccount user) {
+        intentionallyDisconnected.add(user.getId());
+        doDisconnect(user);
+    }
+
+    private void doDisconnect(UserAccount user) {
         writers.remove(user.getId());
         Socket socket = sockets.remove(user.getId());
         if (socket != null) {
@@ -121,7 +128,7 @@ public class IrcTwitchChatService implements TwitchChatService {
     private void scheduleReconnect(UserAccount user, OAuthToken token, long delaySeconds) {
         long nextDelay = Math.min(delaySeconds * 2, MAX_RETRY_SECONDS);
         CompletableFuture.delayedExecutor(delaySeconds, TimeUnit.SECONDS).execute(() -> {
-            if (!sockets.containsKey(user.getId())) {
+            if (!sockets.containsKey(user.getId()) && !intentionallyDisconnected.contains(user.getId())) {
                 openConnection(user, token, nextDelay);
             }
         });
@@ -187,6 +194,7 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     @Override
     public void timeout(UserAccount user, String targetLogin, int durationSeconds, String reason) {
+        if (durationSeconds <= 0) return;
         moderate(user, targetLogin, durationSeconds, reason);
     }
 
@@ -252,7 +260,7 @@ public class IrcTwitchChatService implements TwitchChatService {
     private String resolveUserId(String accessToken, String login) {
         try {
             Map<String, Object> response = restClient.get()
-                .uri(HELIX_USERS_URL + "?login=" + login)
+                .uri(HELIX_USERS_URL + "?login=" + java.net.URLEncoder.encode(login, java.nio.charset.StandardCharsets.UTF_8))
                 .header("Authorization", "Bearer " + accessToken)
                 .header("Client-Id", twitchClientId)
                 .retrieve()
