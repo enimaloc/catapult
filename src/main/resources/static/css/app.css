@@ -729,7 +729,8 @@ label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size:
     position: absolute; z-index: 1000; width: 100%;
     box-shadow: 0 4px 12px rgba(0,0,0,.5); border-radius: 0 0 6px 6px;
 }
-.game-results li { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border-subtle); color: var(--text); }
+.game-results li { display: flex; align-items: center; gap: 8px; padding: 6px 12px; cursor: pointer; border-bottom: 1px solid var(--border-subtle); color: var(--text); }
+.game-results li img { width: 30px; height: 40px; object-fit: cover; border-radius: 2px; }
 .game-results li:hover { background: var(--bg-base); }
 
 /* ============================================================
