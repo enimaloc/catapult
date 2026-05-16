@@ -190,19 +190,18 @@ class TwitchCategoryServiceTest {
     void prewarmCategoryCache_bothModeCallsTopGamesThenSweep() {
         ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.BOTH);
 
-        // TOP games: one page with 1 game, then empty (stop top-games loop)
-        // SWEEP: one batch with 1 game, then empty (stop sweep loop)
+        // TOP games: one page (no cursor → loop exits after one batch)
+        // SWEEP: one batch with 1 game, then empty → stop
         doReturn(Map.of(
             "data", List.of(
                 Map.of("id", "10", "name", "TopGame", "box_art_url", "https://img/top.jpg")
             ),
-            "pagination", Map.of()
-        )).doReturn(Map.of("data", List.of(), "pagination", Map.of()))
-          .doReturn(Map.of(
+            "pagination", Map.of()   // no cursor key → cursor stays null → do-while exits
+        )).doReturn(Map.of(
             "data", List.of(
                 Map.of("id", "200", "name", "SweepGame", "box_art_url", "https://img/sweep.jpg", "igdb_id", "42")
             )
-          )).doReturn(Map.of("data", List.of()))
+        )).doReturn(Map.of("data", List.of()))
           .when(responseSpec).body(Map.class);
 
         service.prewarmCategoryCache();
