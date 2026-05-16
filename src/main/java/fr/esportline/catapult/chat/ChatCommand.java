@@ -14,5 +14,5 @@ public interface ChatCommand {
 
     ChatCommandEvent.SenderRole getRequiredPermission();
 
-    void execute(UserAccount user, List<String> args);
+    Object execute(UserAccount user, List<String> args);
 }
