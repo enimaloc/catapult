@@ -106,11 +106,14 @@ class TwitchCategoryServiceTest {
 
     @Test
     void prewarmCategoryCache_fetchesBatchesAndStopsOnEmpty() {
-        // First batch (IDs 0-99) returns 2 games; second batch returns empty → stop
-        doReturn(Map.of("data", List.of(
-            Map.of("id", "1", "name", "Game A", "box_art_url", "https://img/a.jpg"),
-            Map.of("id", "2", "name", "Game B", "box_art_url", "https://img/b.jpg")
-        ))).doReturn(Map.of("data", List.of()))
+        // First page returns 2 games with a cursor; second page returns empty data → stop
+        doReturn(Map.of(
+            "data", List.of(
+                Map.of("id", "1", "name", "Game A", "box_art_url", "https://img/a.jpg"),
+                Map.of("id", "2", "name", "Game B", "box_art_url", "https://img/b.jpg")
+            ),
+            "pagination", Map.of("cursor", "abc123")
+        )).doReturn(Map.of("data", List.of(), "pagination", Map.of()))
            .when(responseSpec).body(Map.class);
 
         service.prewarmCategoryCache();

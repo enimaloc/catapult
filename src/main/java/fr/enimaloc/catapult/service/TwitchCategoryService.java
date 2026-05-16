@@ -16,7 +16,6 @@ import org.springframework.web.client.RestClient;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.LongStream;
 
 @Slf4j
 @Service
@@ -50,6 +49,7 @@ public class TwitchCategoryService {
 
     @Async
     @EventListener(ApplicationReadyEvent.class)
+    @SuppressWarnings("unchecked")
     public void prewarmCategoryCache() {
         String token = getOrRefreshAppToken();
         if (token.isBlank() || twitchClientId.isBlank()) {
@@ -57,50 +57,47 @@ public class TwitchCategoryService {
             return;
         }
 
-        log.info("Twitch category prewarm started (sequential ID sweep)");
-        long offset = 0;
-        int  total  = 0;
+        log.info("Twitch category prewarm started (/helix/games/top pagination)");
+        String cursor = null;
+        int total = 0;
 
-        while (true) {
-            String idParams = LongStream.range(offset, offset + BATCH_SIZE)
-                    .mapToObj(id -> "id=" + id)
-                    .collect(Collectors.joining("&"));
+        do {
+            String uri = TWITCH_API_URL + "/games/top?first=" + BATCH_SIZE
+                    + (cursor != null ? "&after=" + cursor : "");
+            cursor = null;
 
-            List<TwitchCategoryCache> batch = fetchBatchByIds(idParams, token);
-            if (batch.isEmpty()) {
-                log.info("Twitch category prewarm complete: {} categories cached", total);
+            try {
+                Map<String, Object> response = restClient.get()
+                        .uri(uri)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Client-Id", twitchClientId)
+                        .retrieve()
+                        .body(Map.class);
+
+                if (response == null) break;
+                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                if (data == null || data.isEmpty()) break;
+
+                List<TwitchCategoryCache> batch = data.stream()
+                        .map(g -> new TwitchCategoryCache(
+                                (String) g.get("id"),
+                                (String) g.get("name"),
+                                (String) g.get("box_art_url")))
+                        .collect(Collectors.toList());
+                cacheRepo.saveAll(batch);
+                total += batch.size();
+
+                Map<String, Object> pagination = (Map<String, Object>) response.get("pagination");
+                if (pagination != null) {
+                    cursor = (String) pagination.get("cursor");
+                }
+            } catch (Exception e) {
+                log.warn("Twitch category prewarm batch failed: {}", e.getMessage());
                 break;
             }
-            cacheRepo.saveAll(batch);
-            total  += batch.size();
-            offset += BATCH_SIZE;
-        }
-    }
+        } while (cursor != null);
 
-    @SuppressWarnings("unchecked")
-    private List<TwitchCategoryCache> fetchBatchByIds(String idParams, String token) {
-        try {
-            Map<String, Object> response = restClient.get()
-                    .uri(TWITCH_API_URL + "/games?" + idParams)
-                    .header("Authorization", "Bearer " + token)
-                    .header("Client-Id", twitchClientId)
-                    .retrieve()
-                    .body(Map.class);
-
-            if (response == null) return List.of();
-            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-            if (data == null) return List.of();
-
-            return data.stream()
-                    .map(g -> new TwitchCategoryCache(
-                            (String) g.get("id"),
-                            (String) g.get("name"),
-                            (String) g.get("box_art_url")))
-                    .collect(Collectors.toList());
-        } catch (Exception e) {
-            log.warn("Twitch category prewarm batch failed: {}", e.getMessage());
-            return List.of();
-        }
+        log.info("Twitch category prewarm complete: {} categories cached", total);
     }
 
     // -----------------------------------------------------------------------
