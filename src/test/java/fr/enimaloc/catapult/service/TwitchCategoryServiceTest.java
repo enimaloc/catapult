@@ -127,5 +127,6 @@ class TwitchCategoryServiceTest {
         service.prewarmCategoryCache();
 
         verifyNoInteractions(cacheRepo);
+        verify(restClient, never()).get();
     }
 }

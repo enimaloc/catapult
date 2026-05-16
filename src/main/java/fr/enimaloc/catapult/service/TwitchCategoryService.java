@@ -5,13 +5,14 @@ import fr.enimaloc.catapult.repository.TwitchCategoryCacheRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
-import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -48,7 +49,7 @@ public class TwitchCategoryService {
     // -----------------------------------------------------------------------
 
     @Async
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void prewarmCategoryCache() {
         String token = getOrRefreshAppToken();
         if (token.isBlank() || twitchClientId.isBlank()) {
