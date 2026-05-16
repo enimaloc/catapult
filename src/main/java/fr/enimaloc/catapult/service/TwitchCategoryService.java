@@ -115,8 +115,60 @@ public class TwitchCategoryService {
         log.info("Twitch category prewarm complete: {} categories cached", total);
     }
 
+    @SuppressWarnings("unchecked")
     private void prewarmBySweep() {
-        // implemented in Task 2
+        String token = getOrRefreshAppToken();
+        if (token.isBlank() || twitchClientId.isBlank()) {
+            log.info("Twitch category sweep skipped — client credentials not configured");
+            return;
+        }
+
+        log.info("Twitch category sweep started (/helix/games sequential ID sweep)");
+        int offset = 0;
+        int total  = 0;
+
+        while (true) {
+            StringBuilder uri = new StringBuilder(TWITCH_API_URL + "/games");
+            for (int i = offset; i < offset + BATCH_SIZE; i++) {
+                uri.append(i == offset ? "?id=" : "&id=").append(i);
+            }
+
+            try {
+                Map<String, Object> response = restClient.get()
+                        .uri(uri.toString())
+                        .header("Authorization", "Bearer " + token)
+                        .header("Client-Id", twitchClientId)
+                        .retrieve()
+                        .body(Map.class);
+
+                if (response == null) break;
+                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                if (data == null || data.isEmpty()) break;
+
+                List<TwitchCategoryCache> batch = data.stream()
+                        .map(g -> {
+                            TwitchCategoryCache entry = new TwitchCategoryCache(
+                                    (String) g.get("id"),
+                                    (String) g.get("name"),
+                                    (String) g.get("box_art_url"));
+                            entry.setIgdbId((String) g.get("igdb_id"));
+                            return entry;
+                        })
+                        .collect(Collectors.toList());
+                cacheRepo.saveAll(batch);
+                log.trace("Sweep batch [{}-{}]: {}", offset, offset + BATCH_SIZE - 1,
+                        batch.stream().map(c -> "%s (%s)".formatted(c.getName(), c.getId()))
+                             .collect(Collectors.joining(", ", "[", "]")));
+                total += batch.size();
+            } catch (Exception e) {
+                log.warn("Twitch category sweep batch [{}-{}] failed: {}", offset, offset + BATCH_SIZE - 1, e.getMessage());
+                break;
+            }
+
+            offset += BATCH_SIZE;
+        }
+
+        log.info("Twitch category sweep complete: {} categories cached", total);
     }
 
     // -----------------------------------------------------------------------
