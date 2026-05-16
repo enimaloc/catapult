@@ -34,17 +34,14 @@ public class SetGameCommand implements ChatCommand {
     }
 
     @Override
-    public void execute(UserAccount user, List<String> args) {
+    public Object execute(UserAccount user, List<String> args) {
         if (args.isEmpty()) {
-            log.debug("[!setgame] No game name provided for user {}", user.getTwitchUsername());
-            return;
+            return "Usage : !setgame <nom du jeu>";
         }
 
         String gameName = String.join(" ", args);
         log.info("[!setgame] User {} requested manual game: {}", user.getTwitchUsername(), gameName);
 
-        // Crée un binding temporaire pour la mise à jour immédiate
-        // La résolution IGDB correcte se fera au prochain cycle de polling
         GameBinding tempBinding = new GameBinding();
         tempBinding.setUser(user);
         tempBinding.setSourceType(GameBinding.SourceType.MANUAL);
@@ -54,5 +51,6 @@ public class SetGameCommand implements ChatCommand {
         tempBinding.setCcls(Set.of());
 
         twitchService.updateChannel(user, tempBinding);
+        return "Jeu mis à jour : " + gameName;
     }
 }

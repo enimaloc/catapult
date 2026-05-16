@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.GameStateService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,7 +13,6 @@ import java.util.List;
  * !game — Affiche dans le chat le jeu actuellement détecté.
  * Permission par défaut : EVERYONE
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class GameCommand implements ChatCommand {
@@ -32,11 +30,9 @@ public class GameCommand implements ChatCommand {
     }
 
     @Override
-    public void execute(UserAccount user, List<String> args) {
-        gameStateService.getLastKnownGame(user).ifPresentOrElse(
-            game -> log.info("[!game] User {} is playing: {}", user.getTwitchUsername(), game.getSourceName()),
-            () -> log.info("[!game] User {} is not playing anything", user.getTwitchUsername())
-        );
-        // En production : envoyer un message via EventSub/IRC au chat Twitch
+    public Object execute(UserAccount user, List<String> args) {
+        return gameStateService.getLastKnownGame(user)
+            .map(game -> "Actuellement : " + game.getSourceName())
+            .orElse("Aucun jeu détecté");
     }
 }
