@@ -26,15 +26,6 @@
         .inline-edit-field label { font-size:.8em; font-weight:600; color:#555; }
         .ccl-checkboxes { display:flex; flex-wrap:wrap; gap:8px; }
         .inline-edit-actions { display:flex; gap:8px; margin-top:12px; }
-        .game-results {
-            list-style:none; padding:0; margin:0; border:1px solid #ccc;
-            display:none; max-height:180px; overflow-y:auto; background:#fff;
-            position:absolute; z-index:1000; width:100%; box-shadow:0 2px 8px rgba(0,0,0,.15);
-        }
-        .game-results li { display:flex; align-items:center; gap:8px; padding:6px 12px; cursor:pointer; border-bottom:1px solid #eee; }
-        .game-results li img { width:30px; height:40px; object-fit:cover; border-radius:2px; }
-        .game-results li:hover { background:#f5f5f5; }
-        .search-wrapper { position:relative; }
     </style>
     <script th:src="@{/js/app.js}"></script>
 </head>
