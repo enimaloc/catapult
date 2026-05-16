@@ -58,6 +58,9 @@ class TwitchCategoryServiceTest {
 
         // Prime the app token so tests that override responseSpec don't break token fetch
         service.getOrRefreshAppToken();
+
+        // Default prewarmMode for existing TOP tests
+        ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.TOP);
     }
 
     @Test
@@ -131,5 +134,55 @@ class TwitchCategoryServiceTest {
 
         verifyNoInteractions(cacheRepo);
         verify(restClient, never()).get();
+    }
+
+    @Test
+    void prewarmCategoryCache_skipsWhenModeIsNone() {
+        ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.NONE);
+
+        service.prewarmCategoryCache();
+
+        verifyNoInteractions(cacheRepo);
+        verify(restClient, never()).get();
+    }
+
+    @Test
+    void prewarmCategoryCache_sweepStopsOnFirstEmptyBatch() {
+        ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.SWEEP);
+
+        // First sweep batch returns 1 game; second returns empty → stop
+        doReturn(Map.of(
+            "data", List.of(
+                Map.of("id", "743", "name", "Chess", "box_art_url", "https://img/chess.jpg", "igdb_id", "7")
+            )
+        )).doReturn(Map.of("data", List.of()))
+           .when(responseSpec).body(Map.class);
+
+        service.prewarmCategoryCache();
+
+        verify(cacheRepo, times(1)).saveAll(argThat(list -> {
+            List<TwitchCategoryCache> l = (List<TwitchCategoryCache>) list;
+            return l.size() == 1 && "743".equals(l.get(0).getId()) && "7".equals(l.get(0).getIgdbId());
+        }));
+        verify(cacheRepo, times(1)).saveAll(anyList());
+    }
+
+    @Test
+    void prewarmBySweep_populatesIgdbId() {
+        ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.SWEEP);
+
+        doReturn(Map.of(
+            "data", List.of(
+                Map.of("id", "33214", "name", "Fortnite", "box_art_url", "https://img/fn.jpg", "igdb_id", "1905")
+            )
+        )).doReturn(Map.of("data", List.of()))
+           .when(responseSpec).body(Map.class);
+
+        service.prewarmCategoryCache();
+
+        verify(cacheRepo).saveAll(argThat(list -> {
+            List<TwitchCategoryCache> l = (List<TwitchCategoryCache>) list;
+            return l.size() == 1 && "1905".equals(l.get(0).getIgdbId());
+        }));
     }
 }
