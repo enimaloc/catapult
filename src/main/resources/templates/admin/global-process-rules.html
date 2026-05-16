@@ -184,7 +184,15 @@
                         if (!data.length) { results.style.display = 'none'; return; }
                         data.forEach(function(game) {
                             var li = document.createElement('li');
-                            li.textContent = game.name;
+                            if (game.boxArtUrl) {
+                                var img = document.createElement('img');
+                                img.src = game.boxArtUrl.replace('{width}', '30').replace('{height}', '40');
+                                img.alt = '';
+                                li.appendChild(img);
+                            }
+                            var span = document.createElement('span');
+                            span.textContent = game.name;
+                            li.appendChild(span);
                             li.addEventListener('click', function() {
                                 document.getElementById('twitchGameId-admin').value = game.id;
                                 document.getElementById('twitchGameName-admin').value = game.name;
