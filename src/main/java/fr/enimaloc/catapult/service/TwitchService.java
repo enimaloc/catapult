@@ -32,6 +32,7 @@ public class TwitchService {
     private final UserSettingsRepository userSettingsRepository;
     private final TokenEncryptionService tokenEncryptionService;
     private final RestClient restClient;
+    private final TwitchCategoryService twitchCategoryService;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -131,36 +132,8 @@ public class TwitchService {
     /**
      * Recherche des catégories Twitch par nom (pour l'autocomplete des bindings).
      */
-    @SuppressWarnings("unchecked")
     public List<TwitchCategory> searchCategories(UserAccount user, String query) {
-        String accessToken = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .map(t -> tokenEncryptionService.decrypt(t.getAccessToken()))
-            .orElse("");
-
-        if (accessToken.isBlank() || twitchClientId.isBlank()) return List.of();
-
-        try {
-            Map<String, Object> response = restClient.get()
-                .uri(TWITCH_API_URL + "/search/categories?query=" +
-                     java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8) + "&first=8")
-                .header("Authorization", "Bearer " + accessToken)
-                .header("Client-Id", twitchClientId)
-                .retrieve()
-                .body(Map.class);
-
-            if (response == null) return List.of();
-
-            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-            if (data == null) return List.of();
-
-            return data.stream()
-                .map(g -> new TwitchCategory((String) g.get("id"), (String) g.get("name"), (String) g.get("box_art_url")))
-                .collect(Collectors.toList());
-
-        } catch (Exception e) {
-            log.warn("Twitch category search failed for query '{}': {}", query, e.getMessage());
-            return List.of();
-        }
+        return twitchCategoryService.searchCategories(query);
     }
 
     public record TwitchCategory(String id, String name, String boxArtUrl) {}

@@ -41,6 +41,7 @@ class TwitchServiceTest {
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private TokenEncryptionService tokenEncryptionService;
     @Mock private RestClient restClient;
+    @Mock private TwitchCategoryService twitchCategoryService;
 
     @Mock private RestClient.RequestBodyUriSpec patchSpec;
     @Mock private RestClient.RequestBodySpec bodySpec;
