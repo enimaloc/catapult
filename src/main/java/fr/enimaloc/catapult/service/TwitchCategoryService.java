@@ -15,6 +15,7 @@ import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 @Slf4j
 @Service
@@ -25,6 +26,7 @@ public class TwitchCategoryService {
     private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
     private static final String TWITCH_API_URL   = "https://api.twitch.tv/helix";
     private static final int    AUTOCOMPLETE_MAX = 8;
+    private static final int    BATCH_SIZE       = 100;
 
     private final TwitchCategoryCacheRepository cacheRepo;
     private final RestClient restClient;
@@ -48,7 +50,56 @@ public class TwitchCategoryService {
     @Async
     @PostConstruct
     public void prewarmCategoryCache() {
-        // implemented in Task 4
+        String token = getOrRefreshAppToken();
+        if (token.isBlank() || twitchClientId.isBlank()) {
+            log.info("Twitch category prewarm skipped — client credentials not configured");
+            return;
+        }
+
+        log.info("Twitch category prewarm started (sequential ID sweep)");
+        long offset = 0;
+        int  total  = 0;
+
+        while (true) {
+            String idParams = LongStream.range(offset, offset + BATCH_SIZE)
+                    .mapToObj(id -> "id=" + id)
+                    .collect(Collectors.joining("&"));
+
+            List<TwitchCategoryCache> batch = fetchBatchByIds(idParams, token);
+            if (batch.isEmpty()) {
+                log.info("Twitch category prewarm complete: {} categories cached", total);
+                break;
+            }
+            cacheRepo.saveAll(batch);
+            total  += batch.size();
+            offset += BATCH_SIZE;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<TwitchCategoryCache> fetchBatchByIds(String idParams, String token) {
+        try {
+            Map<String, Object> response = restClient.get()
+                    .uri(TWITCH_API_URL + "/games?" + idParams)
+                    .header("Authorization", "Bearer " + token)
+                    .header("Client-Id", twitchClientId)
+                    .retrieve()
+                    .body(Map.class);
+
+            if (response == null) return List.of();
+            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+            if (data == null) return List.of();
+
+            return data.stream()
+                    .map(g -> new TwitchCategoryCache(
+                            (String) g.get("id"),
+                            (String) g.get("name"),
+                            (String) g.get("box_art_url")))
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("Twitch category prewarm batch failed: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     // -----------------------------------------------------------------------

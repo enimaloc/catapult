@@ -103,4 +103,29 @@ class TwitchCategoryServiceTest {
 
         assertThat(results).isEmpty();
     }
+
+    @Test
+    void prewarmCategoryCache_fetchesBatchesAndStopsOnEmpty() {
+        // First batch (IDs 0-99) returns 2 games; second batch returns empty → stop
+        doReturn(Map.of("data", List.of(
+            Map.of("id", "1", "name", "Game A", "box_art_url", "https://img/a.jpg"),
+            Map.of("id", "2", "name", "Game B", "box_art_url", "https://img/b.jpg")
+        ))).doReturn(Map.of("data", List.of()))
+           .when(responseSpec).body(Map.class);
+
+        service.prewarmCategoryCache();
+
+        verify(cacheRepo, times(1)).saveAll(argThat(list ->
+            ((List<?>) list).size() == 2));
+        verify(cacheRepo, times(1)).saveAll(anyList());
+    }
+
+    @Test
+    void prewarmCategoryCache_skipsWhenClientIdBlank() {
+        ReflectionTestUtils.setField(service, "twitchClientId", "");
+
+        service.prewarmCategoryCache();
+
+        verifyNoInteractions(cacheRepo);
+    }
 }
