@@ -18,10 +18,9 @@ import java.time.Instant;
 public class TwitchCategoryCache {
 
     @Id
-    @Column(name = "id")
     private String id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
     private String name;
 
     @Column(name = "box_art_url", length = 512)

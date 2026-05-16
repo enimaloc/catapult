@@ -10,5 +10,5 @@ import java.util.List;
 public interface TwitchCategoryCacheRepository extends JpaRepository<TwitchCategoryCache, String> {
 
     List<TwitchCategoryCache> findByNameContainingIgnoreCaseAndCachedAtAfter(
-            String name, Instant since, Pageable pageable);
+            String query, Instant since, Pageable pageable);
 }
