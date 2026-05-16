@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.chat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.service.TwitchChatService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -17,10 +19,16 @@ import java.util.stream.Collectors;
 public class CommandRegistry {
 
     private final Map<String, ChatCommand> commands;
+    private final TwitchChatService twitchChatService;
+    private final ObjectMapper objectMapper;
 
-    public CommandRegistry(List<ChatCommand> commandList) {
+    public CommandRegistry(List<ChatCommand> commandList,
+                           TwitchChatService twitchChatService,
+                           ObjectMapper objectMapper) {
         this.commands = commandList.stream()
             .collect(Collectors.toMap(ChatCommand::getName, Function.identity()));
+        this.twitchChatService = twitchChatService;
+        this.objectMapper = objectMapper;
         log.info("Registered {} chat commands: {}", commands.size(), commands.keySet());
     }
 
@@ -32,18 +40,33 @@ public class CommandRegistry {
         }
 
         if (!hasPermission(event.getSenderRole(), command.getRequiredPermission())) {
-            log.debug("Permission denied for command '{}' — sender role: {}", event.getCommand(), event.getSenderRole());
+            log.debug("Permission denied for command '{}' — sender role: {}",
+                event.getCommand(), event.getSenderRole());
             return;
         }
 
         try {
-            command.execute(event.getUser(), event.getArgs());
+            Object result = command.execute(event.getUser(), event.getArgs());
+            if (result != null) {
+                twitchChatService.sendMessage(event.getUser(), serialize(result));
+            }
         } catch (Exception e) {
-            log.error("Error executing command '{}' for user {}", event.getCommand(), event.getUser().getId(), e);
+            log.error("Error executing command '{}' for user {}",
+                event.getCommand(), event.getUser().getId(), e);
         }
     }
 
-    private boolean hasPermission(ChatCommandEvent.SenderRole senderRole, ChatCommandEvent.SenderRole required) {
+    private String serialize(Object result) {
+        if (result instanceof String s) return s;
+        try {
+            return objectMapper.writeValueAsString(result);
+        } catch (Exception e) {
+            return result.toString();
+        }
+    }
+
+    private boolean hasPermission(ChatCommandEvent.SenderRole senderRole,
+                                  ChatCommandEvent.SenderRole required) {
         return switch (required) {
             case EVERYONE -> true;
             case MODERATOR -> senderRole == ChatCommandEvent.SenderRole.MODERATOR
