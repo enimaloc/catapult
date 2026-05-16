@@ -72,6 +72,7 @@ class TwitchCategoryServiceTest {
         assertThat(results).hasSize(1);
         assertThat(results.get(0).id()).isEqualTo("123");
         assertThat(results.get(0).name()).isEqualTo("Zelda");
+        assertThat(results.get(0).boxArtUrl()).isEqualTo("https://img/zelda.jpg");
         verify(restClient, never()).get(); // no live call
     }
 
@@ -88,6 +89,7 @@ class TwitchCategoryServiceTest {
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).id()).isEqualTo("456");
+        assertThat(results.get(0).boxArtUrl()).isEqualTo("https://img/fn.jpg");
         verify(cacheRepo).saveAll(anyList());
     }
 

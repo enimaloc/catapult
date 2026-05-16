@@ -65,7 +65,7 @@ public class TwitchCategoryService {
         if (!fromDb.isEmpty()) {
             log.debug("Twitch category cache hit for '{}'", query);
             return fromDb.stream()
-                    .map(e -> new TwitchService.TwitchCategory(e.getId(), e.getName()))
+                    .map(e -> new TwitchService.TwitchCategory(e.getId(), e.getName(), e.getBoxArtUrl()))
                     .toList();
         }
 
@@ -105,7 +105,7 @@ public class TwitchCategoryService {
             cacheRepo.saveAll(toStore);
 
             return toStore.stream()
-                    .map(e -> new TwitchService.TwitchCategory(e.getId(), e.getName()))
+                    .map(e -> new TwitchService.TwitchCategory(e.getId(), e.getName(), e.getBoxArtUrl()))
                     .toList();
 
         } catch (Exception e) {

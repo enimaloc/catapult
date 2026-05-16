@@ -168,7 +168,7 @@ class AppControllerTest {
     @Test
     void getGameSearch_returnsTwitchCategories() throws Exception {
         when(twitchService.searchCategories(eq(userAccount), eq("fortnite")))
-            .thenReturn(List.of(new TwitchService.TwitchCategory("1234", "Fortnite")));
+            .thenReturn(List.of(new TwitchService.TwitchCategory("1234", "Fortnite", "https://img.example.com/fn.jpg")));
 
         mockMvc.perform(get("/api/games/search")
                 .with(authentication(auth))
@@ -176,6 +176,7 @@ class AppControllerTest {
             .andExpect(status().isOk())
             .andExpect(content().contentTypeCompatibleWith("application/json"))
             .andExpect(jsonPath("$[0].id").value("1234"))
-            .andExpect(jsonPath("$[0].name").value("Fortnite"));
+            .andExpect(jsonPath("$[0].name").value("Fortnite"))
+            .andExpect(jsonPath("$[0].boxArtUrl").value("https://img.example.com/fn.jpg"));
     }
 }

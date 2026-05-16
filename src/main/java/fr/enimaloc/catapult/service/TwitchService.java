@@ -154,7 +154,7 @@ public class TwitchService {
             if (data == null) return List.of();
 
             return data.stream()
-                .map(g -> new TwitchCategory((String) g.get("id"), (String) g.get("name")))
+                .map(g -> new TwitchCategory((String) g.get("id"), (String) g.get("name"), (String) g.get("box_art_url")))
                 .collect(Collectors.toList());
 
         } catch (Exception e) {
@@ -163,7 +163,7 @@ public class TwitchService {
         }
     }
 
-    public record TwitchCategory(String id, String name) {}
+    public record TwitchCategory(String id, String name, String boxArtUrl) {}
 
     // Twitch broadcaster-settable CCLs (MatureGame is set automatically by Twitch, not included)
     private static final List<String> EDITABLE_CCL_IDS = List.of(
