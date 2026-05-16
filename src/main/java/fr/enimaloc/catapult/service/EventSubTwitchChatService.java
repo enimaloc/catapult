@@ -48,6 +48,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private String twitchClientId;
 
     private final Map<UUID, WebSocket> connections = new ConcurrentHashMap<>();
+    private final Set<UUID> intentionallyDisconnected = ConcurrentHashMap.newKeySet();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @PostConstruct
@@ -64,6 +65,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void connect(UserAccount user) {
+        intentionallyDisconnected.remove(user.getId());
         disconnect(user);
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
             .ifPresentOrElse(
@@ -74,6 +76,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void disconnect(UserAccount user) {
+        intentionallyDisconnected.add(user.getId());
         WebSocket ws = connections.remove(user.getId());
         if (ws != null) ws.sendClose(WebSocket.NORMAL_CLOSURE, "bot disabled");
     }
@@ -85,8 +88,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                 if (ex != null) {
                     log.warn("[EventSub Chat] Failed to connect for user {}: {}", user.getId(), ex.getMessage());
                     scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
-                } else {
-                    connections.put(user.getId(), ws);
+                } else if (connections.putIfAbsent(user.getId(), ws) != null) {
+                    ws.sendClose(WebSocket.NORMAL_CLOSURE, "duplicate connection");
                 }
             });
     }
@@ -95,6 +98,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         long nextDelay = Math.min(delaySeconds * 2, MAX_RETRY_SECONDS);
         CompletableFuture.delayedExecutor(delaySeconds, TimeUnit.SECONDS).execute(() -> {
             if (connections.containsKey(user.getId())) return;
+            if (intentionallyDisconnected.contains(user.getId())) return;
             OAuthToken freshToken = oAuthTokenRepository
                 .findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
                 .orElse(token);
@@ -337,7 +341,9 @@ public class EventSubTwitchChatService implements TwitchChatService {
         public void onError(WebSocket webSocket, Throwable error) {
             log.warn("[EventSub Chat] WebSocket error for user {}: {}", user.getId(), error.getMessage());
             connections.remove(user.getId());
-            scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
+            if (!intentionallyDisconnected.contains(user.getId())) {
+                scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
+            }
         }
     }
 }
