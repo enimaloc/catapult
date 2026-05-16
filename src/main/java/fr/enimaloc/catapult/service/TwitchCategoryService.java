@@ -28,6 +28,8 @@ public class TwitchCategoryService {
     private static final int    AUTOCOMPLETE_MAX = 8;
     private static final int    BATCH_SIZE       = 100;
 
+    public enum PrewarmMode { TOP, SWEEP, BOTH, NONE }
+
     private final TwitchCategoryCacheRepository cacheRepo;
     private final RestClient restClient;
 
@@ -40,17 +42,29 @@ public class TwitchCategoryService {
     @Value("${app.twitch.category-cache-ttl-hours:24}")
     private int cacheTtlHours;
 
+    @Value("${app.twitch.prewarm-mode:BOTH}")
+    private PrewarmMode prewarmMode;
+
     private volatile String appToken;
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
 
     // -----------------------------------------------------------------------
-    // Startup prewarm (implemented in Task 4)
+    // Startup prewarm
     // -----------------------------------------------------------------------
 
     @Async
     @EventListener(ApplicationReadyEvent.class)
-    @SuppressWarnings("unchecked")
     public void prewarmCategoryCache() {
+        switch (prewarmMode) {
+            case TOP   -> prewarmByTopGames();
+            case SWEEP -> prewarmBySweep();
+            case BOTH  -> { prewarmByTopGames(); prewarmBySweep(); }
+            case NONE  -> log.info("Twitch category prewarm disabled (prewarm-mode=NONE)");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void prewarmByTopGames() {
         String token = getOrRefreshAppToken();
         if (token.isBlank() || twitchClientId.isBlank()) {
             log.info("Twitch category prewarm skipped — client credentials not configured");
@@ -85,6 +99,7 @@ public class TwitchCategoryService {
                                 (String) g.get("box_art_url")))
                         .collect(Collectors.toList());
                 cacheRepo.saveAll(batch);
+                log.trace("Warm with: {}", batch.stream().map(cat -> "%s (%s)".formatted(cat.getName(), cat.getId())).collect(Collectors.joining(", ", "[", "]")));
                 total += batch.size();
 
                 Map<String, Object> pagination = (Map<String, Object>) response.get("pagination");
@@ -98,6 +113,10 @@ public class TwitchCategoryService {
         } while (cursor != null);
 
         log.info("Twitch category prewarm complete: {} categories cached", total);
+    }
+
+    private void prewarmBySweep() {
+        // implemented in Task 2
     }
 
     // -----------------------------------------------------------------------
