@@ -41,7 +41,9 @@ public class OAuth2ClientConfig {
             .clientId(twitchClientId)
             .clientSecret(twitchClientSecret)
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
-            .scope("user:read:email", "channel:manage:broadcast")
+            .scope("user:read:email", "channel:manage:broadcast",
+                   "user:read:chat", "user:write:chat",
+                   "channel:moderate", "channel:read:redemptions")
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
             .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
             .authorizationUri("https://id.twitch.tv/oauth2/authorize")
