@@ -61,6 +61,7 @@ public class CommandRegistry {
         try {
             return objectMapper.writeValueAsString(result);
         } catch (Exception e) {
+            log.warn("Could not serialize command result to JSON, falling back to toString: {}", e.getMessage());
             return result.toString();
         }
     }
