@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -29,4 +31,12 @@ public class UserSettings {
 
     @Column(name = "no_game_twitch_game_name")
     private String noGameTwitchGameName;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "user_settings_no_game_ccls",
+        joinColumns = @JoinColumn(name = "user_id")
+    )
+    @Column(name = "ccl_id")
+    private Set<String> noGameCcls = new HashSet<>();
 }
