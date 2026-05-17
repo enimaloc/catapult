@@ -9,7 +9,12 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -17,7 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Controller
-@Profile("mock")
+@Profile("mock-steam")
 @RequestMapping("/admin/members")
 @RequiredArgsConstructor
 public class AdminMembersMockController {
@@ -70,7 +75,7 @@ public class AdminMembersMockController {
     @GetMapping(value = "/igdb/search", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public List<Map<String, String>> searchIgdbGames(@RequestParam String q) {
-        if (q.isBlank() || q.length() < 2) return List.of();
+        if (q.isBlank() || q.strip().length() < 2) return List.of();
         return igdbService.searchGames(q).stream()
                 .map(g -> Map.of("id", g.id(), "name", g.name()))
                 .toList();
