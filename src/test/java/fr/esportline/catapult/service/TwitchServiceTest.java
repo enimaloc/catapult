@@ -223,4 +223,80 @@ class TwitchServiceTest {
         verify(bodySpec).body(bodyCaptor.capture());
         assertThat(bodyCaptor.getValue()).containsEntry("game_id", "12345");
     }
+
+    @Test
+    void resetToDefault_withCcls_includesCclPayloadInPatch() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        settings.setCclFeatureEnabled(true);
+        settings.setNoGameCcls(Set.of("ViolentGraphic", "Gambling"));
+
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(restClient.patch()).thenReturn(patchSpec);
+        when(patchSpec.uri(anyString())).thenReturn(bodySpec);
+        when(bodySpec.header(anyString(), anyString())).thenReturn(bodySpec);
+        when(bodySpec.body(any())).thenReturn(bodySpec);
+        when(bodySpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.toBodilessEntity()).thenReturn(null);
+
+        twitchService.resetToDefault(user);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+
+        List<Map<String, Object>> cclPayload =
+            (List<Map<String, Object>>) bodyCaptor.getValue().get("content_classification_labels");
+
+        assertThat(cclPayload).isNotNull();
+        var enabled = cclPayload.stream()
+            .filter(e -> Boolean.TRUE.equals(e.get("is_enabled")))
+            .map(e -> (String) e.get("id")).toList();
+        assertThat(enabled).containsExactlyInAnyOrder("ViolentGraphic", "Gambling");
+    }
+
+    @Test
+    void resetToDefault_withCcls_butCclFeatureDisabled_doesNotSendCclPayload() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        settings.setCclFeatureEnabled(false);
+        settings.setNoGameCcls(Set.of("ViolentGraphic"));
+
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(restClient.patch()).thenReturn(patchSpec);
+        when(patchSpec.uri(anyString())).thenReturn(bodySpec);
+        when(bodySpec.header(anyString(), anyString())).thenReturn(bodySpec);
+        when(bodySpec.body(any())).thenReturn(bodySpec);
+        when(bodySpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.toBodilessEntity()).thenReturn(null);
+
+        twitchService.resetToDefault(user);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+
+        assertThat(bodyCaptor.getValue()).doesNotContainKey("content_classification_labels");
+    }
+
+    @Test
+    void resetToDefault_withEmptyCcls_doesNotSendCclPayload() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        settings.setCclFeatureEnabled(true);
+        settings.setNoGameCcls(Set.of());
+
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(restClient.patch()).thenReturn(patchSpec);
+        when(patchSpec.uri(anyString())).thenReturn(bodySpec);
+        when(bodySpec.header(anyString(), anyString())).thenReturn(bodySpec);
+        when(bodySpec.body(any())).thenReturn(bodySpec);
+        when(bodySpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.toBodilessEntity()).thenReturn(null);
+
+        twitchService.resetToDefault(user);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+
+        assertThat(bodyCaptor.getValue()).doesNotContainKey("content_classification_labels");
+    }
 }
