@@ -100,6 +100,7 @@ public class TwitchService {
     /**
      * Résout l'ID catégorie Twitch par nom exact (GET /helix/games?name=...).
      * Utilisé en fallback quand l'ID IGDB externe n'est pas disponible.
+     * Tente d'abord avec le token user, puis via l'app token (search).
      */
     @SuppressWarnings("unchecked")
     public Optional<String> findCategoryIdByName(UserAccount user, String gameName) {
@@ -107,26 +108,37 @@ public class TwitchService {
             .map(t -> tokenEncryptionService.decrypt(t.getAccessToken()))
             .orElse("");
 
-        if (accessToken.isBlank() || twitchClientId.isBlank()) return Optional.empty();
+        if (!accessToken.isBlank() && !twitchClientId.isBlank()) {
+            try {
+                Map<String, Object> response = restClient.get()
+                    .uri(TWITCH_API_URL + "/games?name=" +
+                         java.net.URLEncoder.encode(gameName, java.nio.charset.StandardCharsets.UTF_8))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Client-Id", twitchClientId)
+                    .retrieve()
+                    .body(Map.class);
 
-        try {
-            Map<String, Object> response = restClient.get()
-                .uri(TWITCH_API_URL + "/games?name=" +
-                     java.net.URLEncoder.encode(gameName, java.nio.charset.StandardCharsets.UTF_8))
-                .header("Authorization", "Bearer " + accessToken)
-                .header("Client-Id", twitchClientId)
-                .retrieve()
-                .body(Map.class);
-
-            if (response == null) return Optional.empty();
-            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-            if (data == null || data.isEmpty()) return Optional.empty();
-
-            return Optional.ofNullable((String) data.get(0).get("id"));
-        } catch (Exception e) {
-            log.warn("Twitch game lookup failed for '{}': {}", gameName, e.getMessage());
-            return Optional.empty();
+                if (response != null) {
+                    List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                    if (data != null && !data.isEmpty()) {
+                        return Optional.ofNullable((String) data.get(0).get("id"));
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Twitch game lookup failed for '{}': {}", gameName, e.getMessage());
+            }
         }
+
+        log.debug("Twitch user-token lookup empty for '{}', falling back to app-token search", gameName);
+        String normalizedQuery = normalizeTitle(gameName);
+        return twitchCategoryService.searchCategories(gameName).stream()
+            .filter(c -> normalizeTitle(c.name()).equals(normalizedQuery))
+            .findFirst()
+            .map(TwitchCategory::id);
+    }
+
+    private static String normalizeTitle(String name) {
+        return name.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
     /**

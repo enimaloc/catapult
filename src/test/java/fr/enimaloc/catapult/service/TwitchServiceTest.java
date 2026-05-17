@@ -47,6 +47,10 @@ class TwitchServiceTest {
     @Mock private RestClient.RequestBodySpec bodySpec;
     @Mock private RestClient.ResponseSpec responseSpec;
 
+    @Mock private RestClient.RequestHeadersUriSpec getSpec;
+    @Mock private RestClient.RequestHeadersSpec headersSpec;
+    @Mock private RestClient.ResponseSpec getResponseSpec;
+
     @InjectMocks private TwitchService twitchService;
 
     private UserAccount user;
@@ -74,6 +78,11 @@ class TwitchServiceTest {
         doReturn(bodySpec).when(bodySpec).header(anyString(), anyString());
         doReturn(bodySpec).when(bodySpec).body(any(Map.class));
         doReturn(responseSpec).when(bodySpec).retrieve();
+
+        doReturn(getSpec).when(restClient).get();
+        doReturn(headersSpec).when(getSpec).uri(anyString());
+        doReturn(headersSpec).when(headersSpec).header(anyString(), anyString());
+        doReturn(getResponseSpec).when(headersSpec).retrieve();
     }
 
     private GameBinding binding(GameBinding.Status status, boolean ignored, boolean cclEnabled, Set<String> ccls) {
@@ -275,6 +284,65 @@ class TwitchServiceTest {
         verify(bodySpec).body(bodyCaptor.capture());
 
         assertThat(bodyCaptor.getValue()).doesNotContainKey("content_classification_labels");
+    }
+
+    @Test
+    void findCategoryIdByName_userTokenPresent_returnsIdFromExactMatch() {
+        doReturn(Map.of("data", List.of(Map.of("id", "999", "name", "Scribble It!"))))
+            .when(getResponseSpec).body(Map.class);
+
+        Optional<String> result = twitchService.findCategoryIdByName(user, "Scribble It!");
+
+        assertThat(result).contains("999");
+        verify(twitchCategoryService, never()).searchCategories(anyString());
+    }
+
+    @Test
+    void findCategoryIdByName_userTokenAbsent_fallsBackToSearchCategories() {
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+        when(twitchCategoryService.searchCategories("Scribble It!"))
+            .thenReturn(List.of(new TwitchService.TwitchCategory("999", "Scribble It!", "https://img/s.jpg")));
+
+        Optional<String> result = twitchService.findCategoryIdByName(user, "Scribble It!");
+
+        assertThat(result).contains("999");
+        verify(restClient, never()).get();
+    }
+
+    @Test
+    void findCategoryIdByName_userTokenPresentButNoMatch_fallsBackToSearchCategories() {
+        doReturn(Map.of("data", List.of())).when(getResponseSpec).body(Map.class);
+        when(twitchCategoryService.searchCategories("Scribble It!"))
+            .thenReturn(List.of(new TwitchService.TwitchCategory("999", "Scribble It!", "https://img/s.jpg")));
+
+        Optional<String> result = twitchService.findCategoryIdByName(user, "Scribble It!");
+
+        assertThat(result).contains("999");
+    }
+
+    @Test
+    void findCategoryIdByName_igdbNameDiffersFromTwitchByPunctuation_matchesViaSearch() {
+        // IGDB returns "Scribble It" (no !), Twitch has "Scribble It!" — normalize should bridge them
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+        when(twitchCategoryService.searchCategories("Scribble It"))
+            .thenReturn(List.of(new TwitchService.TwitchCategory("999", "Scribble It!", "https://img/s.jpg")));
+
+        Optional<String> result = twitchService.findCategoryIdByName(user, "Scribble It");
+
+        assertThat(result).contains("999");
+    }
+
+    @Test
+    void findCategoryIdByName_bothPathsEmpty_returnsEmpty() {
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+        when(twitchCategoryService.searchCategories(anyString())).thenReturn(List.of());
+
+        Optional<String> result = twitchService.findCategoryIdByName(user, "Unknown Game");
+
+        assertThat(result).isEmpty();
     }
 
     @Test
