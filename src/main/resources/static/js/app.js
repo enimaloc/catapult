@@ -12,7 +12,7 @@ function gameSearch(event) {
     if (q.length < 2) { results.style.display = 'none'; return; }
 
     _gameSearchTimers[resultsId] = setTimeout(() => {
-        fetch('/api/games/search?q=' + encodeURIComponent(q))
+        fetch((input.dataset.searchUrl || '/api/games/search') + '?q=' + encodeURIComponent(q))
             .then(r => r.json())
             .then(data => {
                 results.replaceChildren();
@@ -43,6 +43,11 @@ document.addEventListener('click', e => {
 function toggleEdit(id) {
     const row = document.getElementById('edit-row-' + id);
     row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+}
+
+function isEditing() {
+    return Array.from(document.querySelectorAll('.edit-row'))
+        .some(r => r.style.display === 'table-row');
 }
 
 function setTheme(name) {
