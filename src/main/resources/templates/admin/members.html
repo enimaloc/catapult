@@ -73,7 +73,7 @@
                                 <div th:if="${member.steamId != null}" style="display:flex;gap:6px;align-items:flex-end">
                                     <form th:action="@{/admin/members/{id}/steam/set(id=${member.id})}" method="post"> <!-- nosemgrep -->
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <div style="position:relative">
+                                        <div class="search-wrapper">
                                             <input type="text"
                                                    th:id="'steam-search-' + ${member.id}"
                                                    placeholder="Rechercher un jeu…"
