@@ -1,8 +1,10 @@
 package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.security.CatapultOAuth2UserService;
 import fr.enimaloc.catapult.service.AccountService;
@@ -15,6 +17,7 @@ import fr.enimaloc.catapult.service.EventSubService;
 import fr.enimaloc.catapult.service.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
@@ -30,6 +33,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -53,6 +58,7 @@ class AppControllerTest {
     @MockitoBean AccountService accountService;
     @MockitoBean StreamStateService streamStateService;
     @MockitoBean EventSubService twitchEventSubService;
+    @MockitoBean UserSettingsRepository userSettingsRepository;
 
     private UserAccount userAccount;
     private UsernamePasswordAuthenticationToken auth;
@@ -75,6 +81,9 @@ class AppControllerTest {
             .thenReturn(new PageImpl<>(List.of()));
         when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.empty());
         when(adminCclService.getAllCcls()).thenReturn(List.of());
+
+        UserSettings defaultSettings = new UserSettings();
+        when(userSettingsRepository.findById(any())).thenReturn(Optional.of(defaultSettings));
     }
 
     @Test
@@ -178,5 +187,71 @@ class AppControllerTest {
             .andExpect(jsonPath("$[0].id").value("1234"))
             .andExpect(jsonPath("$[0].name").value("Fortnite"))
             .andExpect(jsonPath("$[0].boxArtUrl").value("https://img.example.com/fn.jpg"));
+    }
+
+    @Test
+    void getNoGameSettings_rendersFragment() throws Exception {
+        mockMvc.perform(get("/fragments/no-game-settings").with(authentication(auth)))
+            .andExpect(status().isOk())
+            .andExpect(model().attributeExists("noGameSettings", "availableCcls"));
+    }
+
+    @Test
+    void postNoGameSettings_savesAndRedirects() throws Exception {
+        mockMvc.perform(post("/settings/no-game")
+                .with(csrf())
+                .with(authentication(auth))
+                .param("twitchGameId", "cat-123")
+                .param("twitchGameName", "Just Chatting")
+                .param("ccls", "ViolentGraphic"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/app"));
+
+        verify(userSettingsRepository).save(any(UserSettings.class));
+    }
+
+    @Test
+    void postNoGameSettings_withNoCcls_savesEmptySet() throws Exception {
+        mockMvc.perform(post("/settings/no-game")
+                .with(csrf())
+                .with(authentication(auth))
+                .param("twitchGameId", "cat-123")
+                .param("twitchGameName", "Just Chatting"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/app"));
+
+        ArgumentCaptor<UserSettings> captor = ArgumentCaptor.forClass(UserSettings.class);
+        verify(userSettingsRepository).save(captor.capture());
+        assertThat(captor.getValue().getNoGameCcls()).isEmpty();
+    }
+
+    @Test
+    void postNoGameSettings_noGameDetected_callsResetToDefault() throws Exception {
+        when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/settings/no-game")
+                .with(csrf())
+                .with(authentication(auth))
+                .param("twitchGameId", "cat-123")
+                .param("twitchGameName", "Just Chatting"))
+            .andExpect(status().is3xxRedirection());
+
+        verify(twitchService).resetToDefault(userAccount);
+    }
+
+    @Test
+    void postNoGameSettings_gameCurrentlyActive_doesNotCallReset() throws Exception {
+        fr.enimaloc.catapult.getter.DetectedGame fakeGame =
+            mock(fr.enimaloc.catapult.getter.DetectedGame.class);
+        when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.of(fakeGame));
+
+        mockMvc.perform(post("/settings/no-game")
+                .with(csrf())
+                .with(authentication(auth))
+                .param("twitchGameId", "cat-123")
+                .param("twitchGameName", "Just Chatting"))
+            .andExpect(status().is3xxRedirection());
+
+        verify(twitchService, never()).resetToDefault(any());
     }
 }

@@ -3,8 +3,10 @@ package fr.enimaloc.catapult.web;
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.ActivityLogService;
@@ -34,6 +36,9 @@ public class AppController {
     @Value("${steam.api-key:}")
     private String steamApiKey;
 
+    @Value("${obs.enabled:true}")
+    private boolean obsEnabled;
+
     private final GameStateService gameStateService;
     private final ActivityLogService activityLogService;
     private final GameBindingRepository gameBindingRepository;
@@ -43,6 +48,7 @@ public class AppController {
     private final AccountService accountService;
     private final StreamStateService streamStateService;
     private final EventSubService twitchEventSubService;
+    private final UserSettingsRepository userSettingsRepository;
 
     // -------------------------------------------------------------------------
     // Old URL redirects
@@ -107,6 +113,7 @@ public class AppController {
         // Settings
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
         model.addAttribute("hasSteam", !steamApiKey.isBlank() && user.getSteamId() != null);
+        model.addAttribute("obsEnabled", obsEnabled);
 
         // Common
         model.addAttribute("user", user);
@@ -164,6 +171,18 @@ public class AppController {
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
         model.addAttribute("hasSteam", !steamApiKey.isBlank() && user.getSteamId() != null);
         return "fragments/connections :: connections";
+    }
+
+    @GetMapping("/fragments/no-game-settings")
+    public String fragmentNoGameSettings(
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            Model model) {
+        UserAccount user = principal.getUserAccount();
+        UserSettings settings = userSettingsRepository.findById(user.getId())
+                .orElseGet(UserSettings::new);
+        model.addAttribute("noGameSettings", settings);
+        model.addAttribute("availableCcls", adminCclService.getAllCcls());
+        return "fragments/no-game-settings :: no-game-settings";
     }
 
     // -------------------------------------------------------------------------
@@ -261,6 +280,26 @@ public class AppController {
                                      @RequestParam String provider) {
         OAuthToken.Provider p = OAuthToken.Provider.valueOf(provider.toUpperCase());
         accountService.disconnectProvider(principal.getUserAccount(), p);
+        return "redirect:/app";
+    }
+
+    @PostMapping("/settings/no-game")
+    public String saveNoGameSettings(
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            @RequestParam(required = false) String twitchGameId,
+            @RequestParam(required = false) String twitchGameName,
+            @RequestParam(required = false) Set<String> ccls) {
+        UserAccount user = principal.getUserAccount();
+        UserSettings settings = userSettingsRepository.findById(user.getId())
+                .orElseGet(() -> { UserSettings s = new UserSettings(); s.setUser(user); return s; });
+        settings.setNoGameTwitchGameId(twitchGameId);
+        settings.setNoGameTwitchGameName(twitchGameName);
+        settings.getNoGameCcls().clear();
+        if (ccls != null) settings.getNoGameCcls().addAll(ccls);
+        userSettingsRepository.save(settings);
+        if (gameStateService.getLastKnownGame(user).isEmpty()) {
+            twitchService.resetToDefault(user);
+        }
         return "redirect:/app";
     }
 }

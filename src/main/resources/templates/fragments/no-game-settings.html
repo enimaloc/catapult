@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="no-game-settings" class="card">
+    <h3>Catégorie par défaut (sans jeu)</h3>
+    <p class="text-muted" style="margin-bottom:1rem">
+        Catégorie et CCLs appliquées automatiquement quand aucun jeu n'est détecté.
+    </p>
+
+    <form th:action="@{/settings/no-game}" method="post">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <div class="inline-edit-fields">
+            <div class="inline-edit-field">
+                <label>Catégorie Twitch</label>
+                <div class="search-wrapper">
+                    <input type="text"
+                           id="noGameSearch"
+                           th:value="${noGameSettings.noGameTwitchGameName}"
+                           placeholder="Rechercher…"
+                           autocomplete="off"
+                           oninput="noGameSearch(event)">
+                    <ul id="gameResults-noGame" class="game-results"></ul>
+                </div>
+                <input type="hidden" id="noGameTwitchGameId"
+                       name="twitchGameId"
+                       th:value="${noGameSettings.noGameTwitchGameId}">
+                <input type="hidden" id="noGameTwitchGameName"
+                       name="twitchGameName"
+                       th:value="${noGameSettings.noGameTwitchGameName}">
+            </div>
+            <div class="inline-edit-field">
+                <label>CCLs</label>
+                <div class="ccl-checkboxes">
+                    <div th:each="ccl : ${availableCcls}">
+                        <label>
+                            <input type="checkbox" name="ccls"
+                                   th:value="${ccl.id}"
+                                   th:checked="${noGameSettings.noGameCcls.contains(ccl.id)}">
+                            <span th:text="${ccl.name}"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="inline-edit-actions" style="margin-top:12px">
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+    </form>
+
+    <script>
+    (function() {
+        var _noGameTimer = null;
+        window.noGameSearch = function(event) {
+            var q = event.target.value.trim();
+            var results = document.getElementById('gameResults-noGame');
+            if (q.length < 2) { results.style.display = 'none'; return; }
+            clearTimeout(_noGameTimer);
+            _noGameTimer = setTimeout(function() {
+                fetch('/api/games/search?q=' + encodeURIComponent(q))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        results.replaceChildren();
+                        if (!data.length) { results.style.display = 'none'; return; }
+                        data.forEach(function(game) {
+                            var li = document.createElement('li');
+                            if (game.boxArtUrl) {
+                                var img = document.createElement('img');
+                                img.src = game.boxArtUrl.replace('{width}', '30').replace('{height}', '40');
+                                img.alt = '';
+                                li.appendChild(img);
+                            }
+                            var span = document.createElement('span');
+                            span.textContent = game.name;
+                            li.appendChild(span);
+                            li.addEventListener('click', function() {
+                                document.getElementById('noGameTwitchGameId').value = game.id;
+                                document.getElementById('noGameTwitchGameName').value = game.name;
+                                document.getElementById('noGameSearch').value = game.name;
+                                results.style.display = 'none';
+                            });
+                            results.appendChild(li);
+                        });
+                        results.style.display = 'block';
+                    })
+                    .catch(function() { results.style.display = 'none'; });
+            }, 300);
+        };
+    })();
+    </script>
+</section>
+</body>
+</html>
