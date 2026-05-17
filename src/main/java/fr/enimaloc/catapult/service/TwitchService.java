@@ -169,7 +169,11 @@ public class TwitchService {
 
     private void doResetToDefault(UserAccount user, UserSettings settings, OAuthToken token) {
         String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
-        Map<String, Object> body = Map.of("game_id", settings.getNoGameTwitchGameId());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("game_id", settings.getNoGameTwitchGameId());
+        if (settings.isCclFeatureEnabled() && !settings.getNoGameCcls().isEmpty()) {
+            body.put("content_classification_labels", buildCclPayload(settings.getNoGameCcls()));
+        }
         try {
             restClient.patch()
                 .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
@@ -179,8 +183,8 @@ public class TwitchService {
                 .body(body)
                 .retrieve()
                 .toBodilessEntity();
-            log.info("Twitch channel reset to default for user {} — game_id={}",
-                user.getId(), settings.getNoGameTwitchGameId());
+            log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}",
+                user.getId(), settings.getNoGameTwitchGameId(), settings.getNoGameCcls());
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
                 log.warn("Twitch token invalid for user {} during reset — pausing bot", user.getId());
