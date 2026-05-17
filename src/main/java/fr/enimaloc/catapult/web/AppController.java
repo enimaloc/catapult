@@ -178,6 +178,7 @@ public class AppController {
             @AuthenticationPrincipal CatapultOAuth2User principal,
             Model model) {
         UserAccount user = principal.getUserAccount();
+        // orElseGet(UserSettings::new) is safe for read-only display — userId null won't be persisted
         UserSettings settings = userSettingsRepository.findById(user.getId())
                 .orElseGet(UserSettings::new);
         model.addAttribute("noGameSettings", settings);

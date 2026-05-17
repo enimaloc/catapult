@@ -207,7 +207,11 @@ class AppControllerTest {
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/app"));
 
-        verify(userSettingsRepository).save(any(UserSettings.class));
+        ArgumentCaptor<UserSettings> captor = ArgumentCaptor.forClass(UserSettings.class);
+        verify(userSettingsRepository).save(captor.capture());
+        assertThat(captor.getValue().getNoGameTwitchGameId()).isEqualTo("cat-123");
+        assertThat(captor.getValue().getNoGameTwitchGameName()).isEqualTo("Just Chatting");
+        assertThat(captor.getValue().getNoGameCcls()).containsExactly("ViolentGraphic");
     }
 
     @Test
