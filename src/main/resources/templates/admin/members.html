@@ -86,8 +86,8 @@
                                                    style="width:180px;padding:2px 4px">
                                             <ul th:id="'steam-results-' + ${member.id}" class="game-results"></ul>
                                         </div>
-                                        <input type="hidden" name="gameId"   th:id="'steam-gameId-'   + ${member.id}">
-                                        <input type="hidden" name="gameName" th:id="'steam-gameName-' + ${member.id}">
+                                        <input type="hidden" name="gameId"   th:id="'steam-gameId-'   + ${member.id}" required>
+                                        <input type="hidden" name="gameName" th:id="'steam-gameName-' + ${member.id}" required>
                                         <button type="submit" class="btn btn-sm btn-primary">Set</button>
                                     </form>
                                     <form th:action="@{/admin/members/{id}/steam/clear(id=${member.id})}" method="post"> <!-- nosemgrep -->
