@@ -238,10 +238,11 @@ public class IgdbService {
     }
 
     public List<IgdbGame> searchGames(String query) {
-        if (clientId.isBlank() || query.length() < 2) return List.of();
+        String trimmed = query.strip();
+        if (clientId.isBlank() || trimmed.length() < 2) return List.of();
         String token = getOrRefreshAppToken();
         if (token.isBlank()) return List.of();
-        return igdbClient.searchByName(query, token).stream()
+        return igdbClient.searchByName(trimmed, token).stream()
             .map(g -> new IgdbGame(String.valueOf(g.getId()), g.getName()))
             .toList();
     }
