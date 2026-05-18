@@ -36,6 +36,8 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("io.github.husnjak:igdb-api-jvm:1.3.2")
     runtimeOnly("org.postgresql:postgresql")
+    implementation("org.webjars.npm:htmx.org:2.0.4")
+    implementation("org.webjars:webjars-locator-lite")
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
