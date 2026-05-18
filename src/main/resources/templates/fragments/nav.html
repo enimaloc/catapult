@@ -5,10 +5,10 @@
 <th:block th:fragment="nav(active)">
     <div sec:authorize="hasAuthority('ROLE_PREVIOUS_ADMINISTRATOR')"
          style="background:var(--color-warning,#f59e0b);color:#000;padding:0.5rem 1rem;display:flex;align-items:center;gap:1rem;font-size:0.9rem;">
-        <span>Connecté en tant que <strong sec:authentication="principal.username"></strong></span>
+        <span><span th:text="#{nav.impersonate_as}">Connecté en tant que</span> <strong sec:authentication="principal.username"></strong></span>
         <form th:action="@{/admin/impersonate/exit}" method="post" style="display:inline"> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-            <button type="submit" class="btn btn-sm">Retour à l'admin</button>
+            <button type="submit" class="btn btn-sm" th:text="#{nav.back_to_admin}">Retour à l'admin</button>
         </form>
     </div>
     <nav class="navbar">
@@ -16,12 +16,12 @@
         <div class="nav-links">
             <a th:href="@{/app}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'app'} ? ' active'">App</a>
             <a th:href="@{/admin/ccl}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'ccl'} ? ' active'">Admin CCL</a>
-            <a th:href="@{/admin/process-rules}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'process-rules'} ? ' active'">Règles processus</a>
-            <a th:href="@{/admin/members}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'members'} ? ' active'">Membres</a>
+            <a th:href="@{/admin/process-rules}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'process-rules'} ? ' active'" th:text="#{nav.process_rules}">Règles processus</a>
+            <a th:href="@{/admin/members}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'members'} ? ' active'" th:text="#{nav.members}">Membres</a>
             <a th:href="@{/dev/igdb}" sec:authorize="hasRole('ADMIN')" th:classappend="${active == 'igdb'} ? ' active'" th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
             <form th:action="@{/logout}" method="post" style="display:inline">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                <button type="submit" class="btn-link">Déconnexion</button>
+                <button type="submit" class="btn-link" th:text="#{nav.logout}">Déconnexion</button>
             </form>
         </div>
         <div class="theme-switcher">
