@@ -11,8 +11,8 @@
     <div th:replace="~{fragments/nav :: nav('process-rules')}"></div>
 
     <main class="container">
-        <h2>Administration — Règles processus globales</h2>
-        <p class="text-muted" style="margin-bottom:1.5rem">
+        <h2 th:text="#{admin.process_rules.title}">Administration — Règles processus globales</h2>
+        <p class="text-muted" style="margin-bottom:1.5rem" th:utext="#{admin.process_rules.description}">
             Ces règles s'appliquent à <strong>tous les utilisateurs</strong> en fallback,
             si l'utilisateur n'a pas de binding personnel pour le processus détecté.
         </p>
@@ -22,7 +22,7 @@
              th:text="${error}"></div>
 
         <!-- Tableau des règles existantes -->
-        <div th:if="${globalRules.empty}" class="text-muted" style="margin-bottom:1.5rem">
+        <div th:if="${globalRules.empty}" class="text-muted" style="margin-bottom:1.5rem" th:text="#{admin.process_rules.empty}">
             Aucune règle globale configurée.
         </div>
 
@@ -30,10 +30,10 @@
             <table style="width:100%;border-collapse:collapse">
                 <thead>
                     <tr style="border-bottom:2px solid #eee;text-align:left">
-                        <th style="padding:8px">Pattern processus</th>
-                        <th style="padding:8px">Regex</th>
-                        <th style="padding:8px">Jeu Twitch</th>
-                        <th style="padding:8px">Prédicats</th>
+                        <th style="padding:8px" th:text="#{admin.process_rules.column.pattern}">Pattern processus</th>
+                        <th style="padding:8px" th:text="#{admin.process_rules.column.regex}">Regex</th>
+                        <th style="padding:8px" th:text="#{admin.process_rules.column.game}">Jeu Twitch</th>
+                        <th style="padding:8px" th:text="#{admin.process_rules.column.predicates}">Prédicats</th>
                         <th style="padding:8px"></th>
                     </tr>
                 </thead>
@@ -53,11 +53,11 @@
                                 <table style="width:100%;font-size:.8em;border-collapse:collapse">
                                     <thead>
                                         <tr style="border-bottom:1px solid #eee;color:#888">
-                                            <th style="padding:4px">Lien</th>
-                                            <th style="padding:4px">Type</th>
-                                            <th style="padding:4px">Clé</th>
-                                            <th style="padding:4px">Valeur</th>
-                                            <th style="padding:4px">OS</th>
+                                            <th style="padding:4px" th:text="#{obs.predicate.column.link}">Lien</th>
+                                            <th style="padding:4px" th:text="#{obs.predicate.column.type}">Type</th>
+                                            <th style="padding:4px" th:text="#{obs.predicate.column.key}">Clé</th>
+                                            <th style="padding:4px" th:text="#{obs.predicate.column.value}">Valeur</th>
+                                            <th style="padding:4px" th:text="#{obs.predicate.column.os}">OS</th>
                                             <th style="padding:4px"></th>
                                         </tr>
                                     </thead>
@@ -87,41 +87,41 @@
                                   style="display:grid;grid-template-columns:auto auto 1fr auto auto;gap:4px;align-items:end;font-size:.82em">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div style="display:flex;flex-direction:column;gap:2px">
-                                    <label style="color:#777;font-weight:600">Lien</label>
+                                    <label style="color:#777;font-weight:600" th:text="#{obs.predicate.form.link}">Lien</label>
                                     <select name="connector" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
                                         <option th:each="c : ${connectors}" th:value="${c}" th:text="${c}"></option>
                                     </select>
                                 </div>
                                 <div style="display:flex;flex-direction:column;gap:2px">
-                                    <label style="color:#777;font-weight:600">Type</label>
+                                    <label style="color:#777;font-weight:600" th:text="#{obs.predicate.form.type}">Type</label>
                                     <select name="type" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
                                         <option th:each="t : ${predicateTypes}" th:value="${t}" th:text="${t}"></option>
                                     </select>
                                 </div>
                                 <div style="display:flex;flex-direction:column;gap:2px">
-                                    <label style="color:#777;font-weight:600">Valeur</label>
-                                    <input type="text" name="value" required placeholder="ex: %APPDATA%\MonApp"
+                                    <label style="color:#777;font-weight:600" th:text="#{obs.predicate.form.value_label}">Valeur</label>
+                                    <input type="text" name="value" required th:placeholder="#{obs.predicate.form.value_placeholder}"
                                            style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;width:100%">
                                 </div>
                                 <div style="display:flex;flex-direction:column;gap:2px">
-                                    <label style="color:#777;font-weight:600">Clé (ENV_VAR)</label>
-                                    <input type="text" name="key" placeholder="ex: STEAM_APPID"
+                                    <label style="color:#777;font-weight:600" th:text="#{obs.predicate.form.key_label}">Clé (ENV_VAR)</label>
+                                    <input type="text" name="key" th:placeholder="#{obs.predicate.form.key_placeholder}"
                                            style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;width:90px">
                                 </div>
                                 <div style="display:flex;flex-direction:column;gap:2px">
-                                    <label style="color:#777;font-weight:600">OS</label>
+                                    <label style="color:#777;font-weight:600" th:text="#{obs.predicate.form.os}">OS</label>
                                     <select name="osTarget" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
                                         <option th:each="o : ${osTargets}" th:value="${o}" th:text="${o}"></option>
                                     </select>
                                 </div>
-                                <button type="submit" class="btn btn-sm btn-primary" style="align-self:end">+ Ajouter</button>
+                                <button type="submit" class="btn btn-sm btn-primary" style="align-self:end" th:text="'+ ' + #{common.add}">+ Ajouter</button>
                             </form>
                         </td>
 
                         <td style="padding:8px;text-align:right">
                             <form th:action="@{/admin/process-rules/{id}/delete(id=${rule.id})}" method="post">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+                                <button type="submit" class="btn btn-sm btn-danger" th:text="#{common.delete}">Supprimer</button>
                             </form>
                         </td>
                     </tr>
@@ -131,8 +131,8 @@
 
         <!-- Formulaire ajout règle -->
         <div class="card" style="padding:1.5rem">
-            <h4 style="margin-top:0;margin-bottom:1rem">Ajouter une règle</h4>
-            <p class="text-muted" style="font-size:.85em;margin-bottom:1rem">
+            <h4 style="margin-top:0;margin-bottom:1rem" th:text="#{admin.process_rules.add.title}">Ajouter une règle</h4>
+            <p class="text-muted" style="font-size:.85em;margin-bottom:1rem" th:utext="#{admin.process_rules.add.note}">
                 <strong>Note :</strong> le pattern est comparé au nom du processus tel que reçu par OBS (ex: <code>hl2.exe</code> sur Windows).
                 Avec regex activé, <code>String.matches()</code> est utilisé — le pattern est ancré (<code>^...$</code>) :
                 utilisez <code>.*minecraft.*\.exe</code> pour un match partiel.
@@ -141,21 +141,21 @@
                   style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <div style="display:flex;flex-direction:column;gap:4px">
-                    <label style="font-size:.8em;font-weight:600;color:#555">Pattern processus</label>
-                    <input type="text" name="processName" placeholder="ex: hl2.exe ou .*minecraft.*" required
+                    <label style="font-size:.8em;font-weight:600;color:#555" th:text="#{admin.process_rules.add.process_label}">Pattern processus</label>
+                    <input type="text" name="processName" th:placeholder="#{admin.process_rules.add.process_placeholder}" required
                            style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:.9em;width:220px">
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px">
-                    <label style="font-size:.8em;font-weight:600;color:#555">Regex</label>
+                    <label style="font-size:.8em;font-weight:600;color:#555" th:text="#{admin.process_rules.add.regex_label}">Regex</label>
                     <label style="display:flex;align-items:center;gap:6px;padding:7px 0">
                         <input type="checkbox" name="isRegex" value="true">
-                        <span style="font-size:.9em">Pattern regex</span>
+                        <span style="font-size:.9em" th:text="#{admin.process_rules.add.regex_checkbox}">Pattern regex</span>
                     </label>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;position:relative">
-                    <label style="font-size:.8em;font-weight:600;color:#555">Jeu Twitch</label>
+                    <label style="font-size:.8em;font-weight:600;color:#555" th:text="#{admin.process_rules.add.game_label}">Jeu Twitch</label>
                     <div class="search-wrapper">
-                        <input type="text" id="adminGameSearch" placeholder="Rechercher un jeu…"
+                        <input type="text" id="adminGameSearch" th:placeholder="#{admin.process_rules.add.game_placeholder}"
                                oninput="adminSearch(event)" autocomplete="off"
                                style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:.9em;width:220px">
                         <ul id="gameResults-admin" class="game-results"></ul>
@@ -163,7 +163,7 @@
                     <input type="hidden" name="twitchGameId" id="twitchGameId-admin" required>
                     <input type="hidden" name="twitchGameName" id="twitchGameName-admin">
                 </div>
-                <button type="submit" class="btn btn-primary">Ajouter</button>
+                <button type="submit" class="btn btn-primary" th:text="#{common.add}">Ajouter</button>
             </form>
         </div>
     </main>
