@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/springsecurity6"
+      th:fragment="layout(title, active_page, content, additional_head, main_class)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:replace="${title}">Catapult</title>
+    <script>(function () {
+        const t = localStorage.getItem('theme');
+        if (t) document.documentElement.dataset.theme = t;
+    })();</script>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/webjars/htmx.org/dist/htmx.min.js}"></script>
+    <script th:src="@{/js/app.js}"></script>
+    <th:block th:replace="${additional_head != null} ? additional_head : ~{}"></th:block>
+</head>
+<body>
+
+<div th:if="${user != null && isPendingDeletion}" class="banner banner-danger">
+    <strong th:text="#{app.banner.pending}">⚠ Suppression de compte en cours.</strong>
+    <span th:text="#{app.banner.deletion_date}">Ton compte sera supprimé définitivement le</span>
+    <strong th:text="${#temporals.format(user.deletionRequestedAt, 'dd/MM/yyyy')}"></strong>.
+    <form th:action="@{/settings/cancel-deletion}" method="post" style="display:inline">
+        <button type="submit" class="btn btn-sm btn-outline" th:text="#{common.cancel}">Annuler</button>
+    </form>
+</div>
+
+<div th:if="${user != null}" sec:authorize="hasAuthority('ROLE_PREVIOUS_ADMINISTRATOR')"
+     style="background:var(--color-warning,#f59e0b);color:#000;padding:0.5rem 1rem;display:flex;align-items:center;gap:1rem;font-size:0.9rem;">
+    <span><span th:text="#{nav.impersonate_as}">Connecté en tant que</span> <strong
+            sec:authentication="principal.username"></strong></span>
+    <form th:action="@{/admin/impersonate/exit}" method="post" style="display:inline"> <!-- nosemgrep -->
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <button type="submit" class="btn btn-sm" th:text="#{nav.back_to_admin}">Retour à l'admin</button>
+    </form>
+</div>
+<nav class="navbar">
+    <a th:href="@{/app}" class="nav-brand">🚀 Catapult</a>
+    <div class="nav-links" th:if="${user != null}">
+        <a th:href="@{/app}" sec:authorize="hasRole('ADMIN')"
+           th:classappend="${active_page == 'app'} ? ' active'">App</a>
+        <a th:href="@{/admin/ccl}" sec:authorize="hasRole('ADMIN')"
+           th:classappend="${active_page == 'ccl'} ? ' active'">Admin CCL</a>
+        <a th:href="@{/admin/process-rules}" sec:authorize="hasRole('ADMIN')"
+           th:classappend="${active_page == 'process-rules'} ? ' active'" th:text="#{nav.process_rules}">Règles
+            processus</a>
+        <a th:href="@{/admin/members}" sec:authorize="hasRole('ADMIN')"
+           th:classappend="${active_page == 'members'} ? ' active'" th:text="#{nav.members}">Membres</a>
+        <a th:href="@{/dev/igdb}" sec:authorize="hasRole('ADMIN')" th:classappend="${active_page == 'igdb'} ? ' active'"
+           th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
+        <form th:action="@{/logout}" method="post" style="display:inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn-link" th:text="#{nav.logout}">Déconnexion</button>
+        </form>
+    </div>
+    <div class="theme-switcher">
+        <button class="theme-btn" data-theme="dark" onclick="setTheme('dark')" title="Dark">🌙</button>
+        <button class="theme-btn" data-theme="blanc" onclick="setTheme('blanc')" title="Blanc">☀️</button>
+        <button class="theme-btn" data-theme="old-steam" onclick="setTheme('old-steam')" title="Old Steam">🎮</button>
+        <button class="theme-btn" data-theme="nord" onclick="setTheme('nord')" title="Nord">❄️</button>
+        <button class="theme-btn" data-theme="dracula" onclick="setTheme('dracula')" title="Dracula">🧛</button>
+        <button class="theme-btn" data-theme="catppuccin" onclick="setTheme('catppuccin')" title="Catppuccin">🐱</button>
+        <button class="theme-btn" data-theme="tokyo-night" onclick="setTheme('tokyo-night')" title="Tokyo Night">🌃
+        </button>
+    </div>
+</nav>
+
+<th:block th:if="${main_class != null && !main_class.isEmpty()}">
+    <main th:class="${main_class}" th:include="${content}"></main>
+</th:block>
+<th:block th:unless="${main_class != null && !main_class.isEmpty()}" th:include="${content}"></th:block>
+
+</body>
+</html>
