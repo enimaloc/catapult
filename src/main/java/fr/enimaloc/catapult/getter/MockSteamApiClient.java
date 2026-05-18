@@ -11,16 +11,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
-@Profile("mock")
+@Profile("mock-steam")
 public class MockSteamApiClient implements SteamApiClient {
 
-    // Game applied to every steamId unless overridden per-user
-    private volatile PlayerSummary globalGame = null;
     private final Map<String, PlayerSummary> gameByUser = new ConcurrentHashMap<>();
 
     @Override
     public Optional<PlayerSummary> getPlayerSummary(String steamId) {
-        return Optional.ofNullable(gameByUser.getOrDefault(steamId, globalGame));
+        return Optional.ofNullable(gameByUser.get(steamId));
     }
 
     @Override
@@ -28,22 +26,8 @@ public class MockSteamApiClient implements SteamApiClient {
         return List.of();
     }
 
-    public Optional<PlayerSummary> getGlobalGame() {
-        return Optional.ofNullable(globalGame);
-    }
-
     public Map<String, PlayerSummary> getGameByUser() {
         return Map.copyOf(gameByUser);
-    }
-
-    public void setGlobalGame(String gameId, String gameName) {
-        this.globalGame = new PlayerSummary(gameId, gameName);
-        log.info("[Mock Steam] Global game → {} ({})", gameName, gameId);
-    }
-
-    public void clearGlobalGame() {
-        this.globalGame = null;
-        log.info("[Mock Steam] Global game cleared");
     }
 
     public void setGameForUser(String steamId, String gameId, String gameName) {
