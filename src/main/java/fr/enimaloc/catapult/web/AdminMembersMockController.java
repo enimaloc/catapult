@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Controller
-@Profile("mock-steam")
+@Profile("mock & mock-steam")
 @RequestMapping("/admin/members")
 @RequiredArgsConstructor
 public class AdminMembersMockController {
