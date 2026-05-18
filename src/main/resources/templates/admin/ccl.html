@@ -6,7 +6,7 @@
 
     <main class="container">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
-            <h2>Administration — CCL</h2>
+            <h2 th:text="#{admin.ccl.title}">Administration — CCL</h2>
             <form th:action="@{/admin/ccl/refresh}" method="post"> <!-- nosemgrep -->
                 <button type="submit" class="btn btn-outline" th:text="#{ccl.refresh}"></button>
             </form>
