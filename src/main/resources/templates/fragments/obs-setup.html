@@ -2,94 +2,181 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <section th:fragment="obs-setup" class="card">
-    <h3>OBS — Détection par processus</h3>
+    <h3 th:text="#{obs.title}">OBS — Détection par processus</h3>
 
     <!-- API Key -->
     <div th:if="${apiKey == null}">
-        <p class="text-muted">Génère une clé API pour connecter le script OBS à Catapult.</p>
+        <p class="text-muted" th:text="#{obs.apikey.generate_prompt}">Génère une clé API pour connecter le script OBS à Catapult.</p>
         <form th:action="@{/obs/generate-key}" method="post">
-            <button type="submit" class="btn btn-primary">Générer une clé API</button>
+            <button type="submit" class="btn btn-primary" th:text="#{obs.apikey.generate_button}">Générer une clé API</button>
         </form>
     </div>
 
     <div th:unless="${apiKey == null}">
         <div style="margin-bottom:12px">
-            <label style="font-size:.85em;font-weight:600;color:#555">Clé API</label>
+            <label style="font-size:.85em;font-weight:600;color:#555" th:text="#{obs.apikey.label}">Clé API</label>
             <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
                 <code th:text="${apiKey}" style="background:#f4f4f4;padding:6px 10px;border-radius:4px;font-size:.9em;flex:1;word-break:break-all"></code>
                 <form th:action="@{/obs/generate-key}" method="post" style="margin:0">
-                    <button type="submit" class="btn btn-sm btn-outline" title="Régénérer">↺ Régénérer</button>
+                    <button type="submit" class="btn btn-sm btn-outline" th:text="#{obs.apikey.regenerate}">↺ Régénérer</button>
                 </form>
                 <form th:action="@{/obs/revoke-key}" method="post" style="margin:0">
-                    <button type="submit" class="btn btn-sm btn-danger">Révoquer</button>
+                    <button type="submit" class="btn btn-sm btn-danger" th:text="#{obs.apikey.revoke}">Révoquer</button>
                 </form>
             </div>
         </div>
 
         <!-- Installation Steps -->
         <details style="margin-bottom:16px">
-            <summary style="cursor:pointer;font-weight:600">📋 Guide d'installation</summary>
+            <summary style="cursor:pointer;font-weight:600" th:text="#{obs.guide.title}">📋 Guide d'installation</summary>
             <ol style="margin-top:12px;line-height:2">
-                <li>Installe Python et OBS Studio (v28+).</li>
-                <li>Dans un terminal, installe les dépendances :<br>
+                <li th:text="#{obs.guide.step1}">Installe Python et OBS Studio (v28+).</li>
+                <li>
+                    <span th:text="#{obs.guide.step2}">Dans un terminal, installe les dépendances :</span><br>
                     <code style="background:#f4f4f4;padding:2px 6px;border-radius:3px">pip install psutil requests</code>
                 </li>
-                <li>Dans OBS : <strong>Outils → Scripts → +</strong>, sélectionne le fichier <code>catapult_obs.py</code> ci-dessous.</li>
-                <li>Le script s'exécute automatiquement — aucune configuration supplémentaire.</li>
+                <li th:utext="#{obs.guide.step3}">Dans OBS : <strong>Outils → Scripts → +</strong>, sélectionne le fichier <code>catapult_obs.py</code> ci-dessous.</li>
+                <li th:text="#{obs.guide.step4}">Le script s'exécute automatiquement — aucune configuration supplémentaire.</li>
             </ol>
         </details>
 
         <!-- Script -->
         <details style="margin-bottom:16px">
-            <summary style="cursor:pointer;font-weight:600">📄 Script OBS Python</summary>
+            <summary style="cursor:pointer;font-weight:600" th:text="#{obs.script.title}">📄 Script OBS Python</summary>
             <div style="position:relative;margin-top:8px">
                 <button type="button"
                         onclick="navigator.clipboard.writeText(document.getElementById('obs-script').textContent)"
                         style="position:absolute;top:6px;right:6px;font-size:.75em"
-                        class="btn btn-sm btn-outline">Copier</button>
+                        class="btn btn-sm btn-outline" th:text="#{obs.script.copy}">Copier</button>
                 <pre id="obs-script" style="background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:6px;overflow-x:auto;font-size:.82em;line-height:1.5"><code th:text="${obsScript}" style="white-space:pre;display:block"></code></pre>
             </div>
         </details>
 
-        <!-- Process Bindings Table -->
-        <h4 style="margin-bottom:8px">Associations processus → jeu</h4>
+        <!-- Process Bindings -->
+        <h4 style="margin-bottom:8px" th:text="#{obs.bindings.title}">Associations processus → jeu</h4>
 
-        <div th:if="${processBindings.empty}" class="text-muted" style="margin-bottom:12px">
+        <div th:if="${processBindings.empty}" class="text-muted" style="margin-bottom:12px" th:text="#{obs.bindings.empty}">
             Aucune association configurée.
         </div>
 
-        <table th:unless="${processBindings.empty}" style="width:100%;border-collapse:collapse;margin-bottom:12px">
-            <thead>
-                <tr style="border-bottom:2px solid #eee;text-align:left">
-                    <th style="padding:8px">Processus</th>
-                    <th style="padding:8px">Jeu Twitch</th>
-                    <th style="padding:8px"></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="pb : ${processBindings}" style="border-bottom:1px solid #f0f0f0">
-                    <td style="padding:8px"><code th:text="${pb.processName}"></code></td>
-                    <td style="padding:8px" th:text="${pb.twitchGameName}"></td>
-                    <td style="padding:8px;text-align:right">
-                        <form th:action="@{/obs/process-bindings/{id}/delete(id=${pb.id})}" method="post">
-                            <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
-                        </form>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <div th:unless="${processBindings.empty}" style="margin-bottom:12px">
+            <table style="width:100%;border-collapse:collapse">
+                <thead>
+                    <tr style="border-bottom:2px solid #eee;text-align:left">
+                        <th style="padding:8px" th:text="#{obs.bindings.column.process}">Processus</th>
+                        <th style="padding:8px" th:text="#{obs.bindings.column.game}">Jeu Twitch</th>
+                        <th style="padding:8px" th:text="#{obs.bindings.column.predicates}">Prédicats</th>
+                        <th style="padding:8px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="pb : ${processBindings}" style="border-bottom:1px solid #f0f0f0;vertical-align:top">
+                        <td style="padding:8px"><code th:text="${pb.processName}"></code></td>
+                        <td style="padding:8px" th:text="${pb.twitchGameName}"></td>
+
+                        <!-- Predicates cell -->
+                        <td style="padding:8px;min-width:260px">
+                            <details>
+                                <summary style="cursor:pointer;font-size:.85em;color:#555">
+                                    <span th:text="#{obs.predicate.count(${pb.predicates.size()})}">Aucun prédicat</span>
+                                </summary>
+
+                                <!-- Existing predicates list -->
+                                <div th:unless="${pb.predicates.empty}" style="margin-top:6px">
+                                    <table style="width:100%;font-size:.8em;border-collapse:collapse">
+                                        <thead>
+                                            <tr style="border-bottom:1px solid #eee;color:#888">
+                                                <th style="padding:4px" th:text="#{obs.predicate.column.link}">Lien</th>
+                                                <th style="padding:4px" th:text="#{obs.predicate.column.type}">Type</th>
+                                                <th style="padding:4px" th:text="#{obs.predicate.column.key}">Clé</th>
+                                                <th style="padding:4px" th:text="#{obs.predicate.column.value}">Valeur</th>
+                                                <th style="padding:4px" th:text="#{obs.predicate.column.os}">OS</th>
+                                                <th style="padding:4px"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr th:each="pred, iterStat : ${pb.predicates}" style="border-bottom:1px solid #f5f5f5">
+                                                <td style="padding:4px;color:#888">
+                                                    <span th:if="${iterStat.first}">—</span>
+                                                    <span th:unless="${iterStat.first}" th:text="${pred.connector}"></span>
+                                                </td>
+                                                <td style="padding:4px" th:text="${pred.type}"></td>
+                                                <td style="padding:4px"><code th:text="${pred.key}"></code></td>
+                                                <td style="padding:4px"><code th:text="${pred.value}"></code></td>
+                                                <td style="padding:4px" th:text="${pred.osTarget}"></td>
+                                                <td style="padding:4px">
+                                                    <form th:action="@{/obs/process-bindings/{id}/predicates/{predId}/delete(id=${pb.id},predId=${pred.id})}" method="post">
+                                                        <button type="submit" class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:.75em">✕</button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Add predicate form -->
+                                <form th:action="@{/obs/process-bindings/{id}/predicates(id=${pb.id})}" method="post"
+                                      style="margin-top:8px;display:grid;grid-template-columns:auto auto 1fr auto auto auto;gap:6px;align-items:end;font-size:.82em">
+
+                                    <div style="display:flex;flex-direction:column;gap:2px">
+                                        <label style="color:#777;font-weight:600" th:text="#{obs.predicate.form.link}">Lien</label>
+                                        <select name="connector" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
+                                            <option th:each="c : ${connectors}" th:value="${c}" th:text="${c}"></option>
+                                        </select>
+                                    </div>
+
+                                    <div style="display:flex;flex-direction:column;gap:2px">
+                                        <label style="color:#777;font-weight:600" th:text="#{obs.predicate.form.type}">Type</label>
+                                        <select name="type" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
+                                            <option th:each="t : ${predicateTypes}" th:value="${t}" th:text="${t}"></option>
+                                        </select>
+                                    </div>
+
+                                    <div style="display:flex;flex-direction:column;gap:2px">
+                                        <label style="color:#777;font-weight:600" th:text="#{obs.predicate.form.value_label}">Value (e.g.: %APPDATA%\MyGame)</label>
+                                        <input type="text" name="value" required th:placeholder="#{obs.predicate.form.value_placeholder}"
+                                               style="padding:4px 8px;border:1px solid #ccc;border-radius:4px">
+                                    </div>
+
+                                    <div style="display:flex;flex-direction:column;gap:2px">
+                                        <label style="color:#777;font-weight:600" th:text="#{obs.predicate.form.key_label}">Key (ENV_VAR)</label>
+                                        <input type="text" name="key" th:placeholder="#{obs.predicate.form.key_placeholder}"
+                                               style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;width:100px">
+                                    </div>
+
+                                    <div style="display:flex;flex-direction:column;gap:2px">
+                                        <label style="color:#777;font-weight:600" th:text="#{obs.predicate.form.os}">OS</label>
+                                        <select name="osTarget" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px">
+                                            <option th:each="o : ${osTargets}" th:value="${o}" th:text="${o}"></option>
+                                        </select>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-sm btn-primary" style="align-self:end" th:text="'+ ' + #{common.add}">+ Ajouter</button>
+                                </form>
+                            </details>
+                        </td>
+
+                        <td style="padding:8px;text-align:right">
+                            <form th:action="@{/obs/process-bindings/{id}/delete(id=${pb.id})}" method="post">
+                                <button type="submit" class="btn btn-sm btn-danger" th:text="#{common.delete}">Supprimer</button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
         <!-- Add new binding -->
         <form th:action="@{/obs/process-bindings}" method="post" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
             <div style="display:flex;flex-direction:column;gap:4px">
-                <label style="font-size:.8em;font-weight:600;color:#555">Nom du processus</label>
-                <input type="text" name="processName" placeholder="ex: hl2.exe" required
+                <label style="font-size:.8em;font-weight:600;color:#555" th:text="#{obs.binding.add.process_label}">Nom du processus</label>
+                <input type="text" name="processName" th:placeholder="#{obs.binding.add.process_placeholder}" required
                        style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:.9em">
             </div>
             <div style="display:flex;flex-direction:column;gap:4px;position:relative">
-                <label style="font-size:.8em;font-weight:600;color:#555">Jeu Twitch</label>
+                <label style="font-size:.8em;font-weight:600;color:#555" th:text="#{obs.binding.add.game_label}">Jeu Twitch</label>
                 <div class="search-wrapper">
-                    <input type="text" id="obsGameSearch" placeholder="Rechercher un jeu…"
+                    <input type="text" id="obsGameSearch" th:placeholder="#{common.search_placeholder}"
                            oninput="obsSearch(event)" autocomplete="off"
                            style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:.9em;width:220px">
                     <ul id="gameResults-obs" class="game-results"></ul>
@@ -97,7 +184,7 @@
                 <input type="hidden" name="twitchGameId" id="twitchGameId-obs" required>
                 <input type="hidden" name="twitchGameName" id="twitchGameName-obs" required>
             </div>
-            <button type="submit" class="btn btn-primary">Ajouter</button>
+            <button type="submit" class="btn btn-primary" th:text="#{common.add}">Ajouter</button>
         </form>
 
         <script>
