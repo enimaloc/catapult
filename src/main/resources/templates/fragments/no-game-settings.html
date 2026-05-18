@@ -2,21 +2,19 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <section th:fragment="no-game-settings" class="card">
-    <h3>Catégorie par défaut (sans jeu)</h3>
-    <p class="text-muted" style="margin-bottom:1rem">
-        Catégorie et CCLs appliquées automatiquement quand aucun jeu n'est détecté.
-    </p>
+    <h3 th:text="#{no_game.title}">Catégorie par défaut (sans jeu)</h3>
+    <p class="text-muted" style="margin-bottom:1rem" th:text="#{no_game.subtitle}">Catégorie et CCLs appliquées automatiquement quand aucun jeu n'est détecté.</p>
 
     <form th:action="@{/settings/no-game}" method="post">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <div class="inline-edit-fields">
             <div class="inline-edit-field">
-                <label>Catégorie Twitch</label>
+                <label th:text="#{bindings.edit.twitch_category}">Catégorie Twitch</label>
                 <div class="search-wrapper">
                     <input type="text"
                            id="gameSearch-noGame"
                            th:value="${noGameSettings.noGameTwitchGameName}"
-                           placeholder="Rechercher…"
+                           th:placeholder="#{common.search_placeholder}"
                            autocomplete="off"
                            oninput="debouncedSearch(event, 'noGame')">
                     <ul id="gameResults-noGame" class="game-results"></ul>
@@ -29,7 +27,7 @@
                        th:value="${noGameSettings.noGameTwitchGameName}">
             </div>
             <div class="inline-edit-field">
-                <label>CCLs</label>
+                <label th:text="#{bindings.edit.ccls}">CCLs</label>
                 <div class="ccl-checkboxes">
                     <div th:each="ccl : ${availableCcls}">
                         <label>
@@ -43,7 +41,7 @@
             </div>
         </div>
         <div class="inline-edit-actions" style="margin-top:12px">
-            <button type="submit" class="btn btn-primary">Enregistrer</button>
+            <button type="submit" class="btn btn-primary" th:text="#{common.save}">Enregistrer</button>
         </div>
     </form>
 

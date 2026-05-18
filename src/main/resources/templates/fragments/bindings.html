@@ -3,13 +3,13 @@
 <body>
 <div th:fragment="bindings" class="card"
      th:attr="hx-get=@{/fragments/bindings(page=${bindings.number},status=${filterStatus},source=${filterSource})}"
-     hx-trigger="every 10s"
+     hx-trigger="every 10s [!isEditing()]"
      hx-swap="outerHTML">
 
-    <h3>Bindings</h3>
+    <h3 th:text="#{bindings.title}">Bindings</h3>
 
     <div class="filters" style="margin-bottom:1rem">
-        <a th:href="@{/app}" class="btn btn-sm btn-outline">Tous</a>
+        <a th:href="@{/app}" class="btn btn-sm btn-outline" th:text="#{bindings.filter.all}">Tous</a>
         <a th:href="@{/app(status='AUTO')}" class="btn btn-sm btn-outline">AUTO</a>
         <a th:href="@{/app(status='MANUAL')}" class="btn btn-sm btn-outline">MANUAL</a>
         <a th:href="@{/app(status='INCOMPLETE')}" class="btn btn-sm btn-outline">INCOMPLETE</a>
@@ -20,13 +20,13 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>Jeu (source)</th>
-                    <th>Catégorie Twitch</th>
-                    <th>CCLs</th>
-                    <th>Statut</th>
-                    <th>CCL</th>
-                    <th>Ignoré</th>
-                    <th>Actions</th>
+                    <th th:text="#{bindings.column.game}">Jeu (source)</th>
+                    <th th:text="#{bindings.column.twitch_category}">Catégorie Twitch</th>
+                    <th th:text="#{bindings.column.ccls}">CCLs</th>
+                    <th th:text="#{bindings.column.status}">Statut</th>
+                    <th th:text="#{bindings.column.ccl}">CCL</th>
+                    <th th:text="#{bindings.column.ignored}">Ignoré</th>
+                    <th th:text="#{bindings.column.actions}">Actions</th>
                 </tr>
             </thead>
             <tbody th:each="binding : ${bindings.content}">
@@ -70,12 +70,13 @@
                     <td>
                         <button class="btn btn-sm btn-outline"
                                 th:data-id="${binding.id}"
-                                onclick="toggleEdit(this.dataset.id)">
+                                onclick="toggleEdit(this.dataset.id)"
+                                th:text="#{common.edit}">
                             Modifier
                         </button>
                         <form th:action="@{/bindings/{id}/delete(id=${binding.id})}" method="post"
                               style="display:inline">
-                            <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+                            <button type="submit" class="btn btn-sm btn-danger" th:text="#{common.delete}">Supprimer</button>
                         </form>
                     </td>
                 </tr>
@@ -84,13 +85,13 @@
                         <form th:action="@{/bindings/{id}(id=${binding.id})}" method="post">
                             <div class="inline-edit-fields">
                                 <div class="inline-edit-field">
-                                    <label>Catégorie Twitch</label>
+                                    <label th:text="#{bindings.edit.twitch_category}">Catégorie Twitch</label>
                                     <div class="search-wrapper">
                                         <input type="text"
                                                th:id="'gameSearch-' + ${binding.id}"
                                                th:data-id="${binding.id}"
                                                th:value="${binding.twitchGameName}"
-                                               placeholder="Rechercher…"
+                                               th:placeholder="#{common.search_placeholder}"
                                                autocomplete="off"
                                                oninput="debouncedSearch(event, this.dataset.id)">
                                         <ul th:id="'gameResults-' + ${binding.id}" class="game-results"></ul>
@@ -101,7 +102,7 @@
                                            name="twitchGameName" th:value="${binding.twitchGameName}">
                                 </div>
                                 <div class="inline-edit-field">
-                                    <label>CCLs</label>
+                                    <label th:text="#{bindings.edit.ccls}">CCLs</label>
                                     <div class="ccl-checkboxes">
                                         <div th:each="ccl : ${availableCcls}">
                                             <label>
@@ -118,8 +119,9 @@
                                 <button type="button"
                                         th:data-id="${binding.id}"
                                         onclick="toggleEdit(this.dataset.id)"
-                                        class="btn btn-sm btn-outline">Annuler</button>
-                                <button type="submit" class="btn btn-sm btn-primary">Enregistrer</button>
+                                        class="btn btn-sm btn-outline"
+                                        th:text="#{common.cancel}">Annuler</button>
+                                <button type="submit" class="btn btn-sm btn-primary" th:text="#{common.save}">Enregistrer</button>
                             </div>
                         </form>
                     </td>
@@ -131,11 +133,13 @@
     <div th:if="${bindings.totalPages > 1}" class="pagination">
         <a th:if="${!bindings.first}"
            th:href="@{/app(page=${bindings.number - 1},status=${filterStatus},source=${filterSource})}"
-           class="btn btn-sm">Précédent</a>
+           class="btn btn-sm"
+           th:text="#{bindings.pagination.previous}">Précédent</a>
         <span th:text="${bindings.number + 1} + ' / ' + ${bindings.totalPages}"></span>
         <a th:if="${!bindings.last}"
            th:href="@{/app(page=${bindings.number + 1},status=${filterStatus},source=${filterSource})}"
-           class="btn btn-sm">Suivant</a>
+           class="btn btn-sm"
+           th:text="#{bindings.pagination.next}">Suivant</a>
     </div>
 </div>
 </body>
