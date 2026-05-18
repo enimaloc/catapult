@@ -6,25 +6,25 @@
      hx-trigger="every 3s"
      hx-swap="outerHTML">
     <div class="card">
-        <h3>État du bot</h3>
+        <h3 th:text="#{status.bot_title}">État du bot</h3>
         <div th:if="${botEnabled}" class="status status-active">
-            <span class="status-dot"></span> Actif
+            <span class="status-dot"></span> <span th:text="#{status.active}">Actif</span>
         </div>
         <div th:unless="${botEnabled}" class="status status-inactive">
-            <span class="status-dot"></span> Inactif
+            <span class="status-dot"></span> <span th:text="#{status.inactive}">Inactif</span>
         </div>
     </div>
     <div class="card">
-        <h3>Stream</h3>
+        <h3 th:text="#{status.stream_title}">Stream</h3>
         <div th:if="${isLive}" class="status status-active">
-            <span class="status-dot"></span> En live
+            <span class="status-dot"></span> <span th:text="#{status.live}">En live</span>
         </div>
         <div th:unless="${isLive}" class="status status-inactive">
-            <span class="status-dot"></span> Hors ligne
+            <span class="status-dot"></span> <span th:text="#{status.offline}">Hors ligne</span>
         </div>
     </div>
     <div class="card">
-        <h3>Jeu en cours</h3>
+        <h3 th:text="#{status.current_game_title}">Jeu en cours</h3>
         <div th:if="${currentGame != null}">
             <p>
                 <strong th:text="${currentGame.sourceName}"></strong>
@@ -32,7 +32,7 @@
             </p>
         </div>
         <div th:unless="${currentGame != null}">
-            <p class="text-muted">Aucun jeu détecté</p>
+            <p class="text-muted" th:text="#{status.no_game}">Aucun jeu détecté</p>
         </div>
     </div>
 </div>

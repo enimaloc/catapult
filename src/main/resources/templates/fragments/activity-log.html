@@ -2,9 +2,9 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="activity-log" class="card">
-    <h3>Activité récente</h3>
+    <h3 th:text="#{activity_log.title}">Activité récente</h3>
     <ul id="log-list" style="list-style:none;padding:0;margin:0;font-family:monospace;font-size:0.85em">
-        <li id="log-placeholder" class="text-muted">En attente d'activité…</li>
+        <li id="log-placeholder" class="text-muted" th:text="#{activity_log.placeholder}">En attente d'activité…</li>
     </ul>
 </div>
 </body>

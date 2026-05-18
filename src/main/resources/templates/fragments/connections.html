@@ -5,24 +5,24 @@
          hx-get="/fragments/connections"
          hx-trigger="every 30s"
          hx-swap="outerHTML">
-    <h3>Connexions</h3>
+    <h3 th:text="#{connections.title}">Connexions</h3>
     <div class="provider-grid">
         <div class="provider-card">
             <strong>Twitch</strong>
-            <span class="badge badge-connected">Connecté</span>
-            <p class="text-muted text-sm">Provider principal — déconnexion via logout</p>
+            <span class="badge badge-connected" th:text="#{connections.connected}">Connecté</span>
+            <p class="text-muted text-sm" th:text="#{connections.twitch_note}">Provider principal — déconnexion via logout</p>
         </div>
         <div th:if="${hasSteamProvider}" class="provider-card">
             <strong>Steam</strong>
-            <span th:if="${hasSteam}" class="badge badge-connected">Connecté</span>
-            <span th:unless="${hasSteam}" class="badge badge-disconnected">Non connecté</span>
+            <span th:if="${hasSteam}" class="badge badge-connected" th:text="#{connections.connected}">Connecté</span>
+            <span th:unless="${hasSteam}" class="badge badge-disconnected" th:text="#{connections.not_connected}">Non connecté</span>
             <div th:if="${hasSteam}">
                 <form th:action="@{/connect/steam/disconnect}" method="post">
-                    <button type="submit" class="btn btn-sm btn-danger">Déconnecter</button>
+                    <button type="submit" class="btn btn-sm btn-danger" th:text="#{connections.disconnect}">Déconnecter</button>
                 </form>
             </div>
             <div th:unless="${hasSteam}">
-                <a th:href="@{/connect/steam}" class="btn btn-sm">Connecter</a>
+                <a th:href="@{/connect/steam}" class="btn btn-sm" th:text="#{connections.connect}">Connecter</a>
             </div>
         </div>
     </div>

@@ -2,13 +2,13 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <section th:fragment="bot" class="card">
-    <h3>Bot</h3>
+    <h3 th:text="#{bot.title}">Bot</h3>
     <form th:action="@{/settings/bot}" method="post">
         <label class="toggle">
             <input type="checkbox" name="enabled" th:checked="${user.botEnabled}">
-            <span>Activer le bot</span>
+            <span th:text="#{bot.enable_label}">Activer le bot</span>
         </label>
-        <button type="submit" class="btn btn-primary">Enregistrer</button>
+        <button type="submit" class="btn btn-primary" th:text="#{common.save}">Enregistrer</button>
     </form>
 </section>
 </body>
