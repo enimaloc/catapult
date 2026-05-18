@@ -109,10 +109,10 @@ public class TwitchService {
             .orElse("");
 
         if (!accessToken.isBlank() && !twitchClientId.isBlank()) {
+            log.debug("findCategoryIdByName '{}' — trying exact match via user token", gameName);
             try {
                 Map<String, Object> response = restClient.get()
-                    .uri(TWITCH_API_URL + "/games?name=" +
-                         java.net.URLEncoder.encode(gameName, java.nio.charset.StandardCharsets.UTF_8))
+                    .uri(TWITCH_API_URL + "/games?name={name}", gameName)
                     .header("Authorization", "Bearer " + accessToken)
                     .header("Client-Id", twitchClientId)
                     .retrieve()
@@ -121,20 +121,32 @@ public class TwitchService {
                 if (response != null) {
                     List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
                     if (data != null && !data.isEmpty()) {
-                        return Optional.ofNullable((String) data.get(0).get("id"));
+                        String id = (String) data.get(0).get("id");
+                        log.debug("findCategoryIdByName '{}' — exact match found: {}", gameName, id);
+                        return Optional.ofNullable(id);
                     }
+                    log.debug("findCategoryIdByName '{}' — exact match returned empty data", gameName);
                 }
             } catch (Exception e) {
-                log.warn("Twitch game lookup failed for '{}': {}", gameName, e.getMessage());
+                log.warn("findCategoryIdByName '{}' — user-token exact match failed: {}", gameName, e.getMessage());
             }
+        } else {
+            log.debug("findCategoryIdByName '{}' — no user token or client-id, skipping exact match", gameName);
         }
 
-        log.debug("Twitch user-token lookup empty for '{}', falling back to app-token search", gameName);
+        log.debug("findCategoryIdByName '{}' — falling back to app-token search", gameName);
         String normalizedQuery = normalizeTitle(gameName);
-        return twitchCategoryService.searchCategories(gameName).stream()
+        List<TwitchCategory> candidates = twitchCategoryService.searchCategories(gameName);
+        log.debug("findCategoryIdByName '{}' — search returned {} candidates: {}",
+                gameName, candidates.size(),
+                candidates.stream().map(c -> c.name() + "(" + c.id() + ")").toList());
+        return candidates.stream()
             .filter(c -> normalizeTitle(c.name()).equals(normalizedQuery))
             .findFirst()
-            .map(TwitchCategory::id);
+            .map(c -> {
+                log.debug("findCategoryIdByName '{}' — matched via normalize: {} → {}", gameName, c.name(), c.id());
+                return c.id();
+            });
     }
 
     private static String normalizeTitle(String name) {
