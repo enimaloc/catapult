@@ -170,13 +170,13 @@
                       spellcheck="false">fields id, name, summary, rating;
 limit 5;</textarea>
             <div class="editor-actions">
-                <button type="submit" class="btn-run">▶ Exécuter</button>
-                <span id="spinner" class="htmx-indicator">Chargement…</span>
+                <button type="submit" class="btn-run" th:text="#{dev.igdb.run}">▶ Exécuter</button>
+                <span id="spinner" class="htmx-indicator" th:text="#{dev.igdb.loading}">Chargement…</span>
             </div>
         </form>
 
         <div class="results-panel" id="results">
-            <span class="placeholder">← Sélectionne un endpoint et exécute une requête</span>
+            <span class="placeholder" th:text="#{dev.igdb.placeholder}">← Sélectionne un endpoint et exécute une requête</span>
         </div>
     </div>
 </div>
