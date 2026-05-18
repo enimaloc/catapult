@@ -32,11 +32,11 @@
 <body>
 
     <div th:if="${isPendingDeletion}" class="banner banner-danger">
-        <strong>⚠ Suppression de compte en cours.</strong>
-        Ton compte sera supprimé définitivement le
+        <strong th:text="#{app.banner.pending}">⚠ Suppression de compte en cours.</strong>
+        <span th:text="#{app.banner.deletion_date}">Ton compte sera supprimé définitivement le</span>
         <strong th:text="${#temporals.format(user.deletionRequestedAt, 'dd/MM/yyyy')}"></strong>.
         <form th:action="@{/settings/cancel-deletion}" method="post" style="display:inline">
-            <button type="submit" class="btn btn-sm btn-outline">Annuler</button>
+            <button type="submit" class="btn btn-sm btn-outline" th:text="#{common.cancel}">Annuler</button>
         </form>
     </div>
 
@@ -45,10 +45,10 @@
     <main class="container">
         <div th:replace="~{fragments/connections :: connections}"></div>
         <div th:if="${obsEnabled}" hx-get="/fragments/obs-setup" hx-trigger="load" hx-swap="outerHTML">
-            <div class="card"><p class="text-muted" style="padding:16px">Chargement OBS…</p></div>
+            <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading_obs}">Chargement OBS…</p></div>
         </div>
         <div hx-get="/fragments/no-game-settings" hx-trigger="load" hx-swap="outerHTML">
-            <div class="card"><p class="text-muted" style="padding:16px">Chargement…</p></div>
+            <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
         </div>
         <div th:replace="~{fragments/status :: status}"></div>
         <div th:replace="~{fragments/activity-log :: activity-log}"></div>
@@ -60,15 +60,15 @@
     <!-- Modal suppression -->
     <div id="deleteModal" class="modal" style="display:none">
         <div class="modal-content">
-            <h3>Confirmer la suppression</h3>
-            <p>Saisis ton nom d'utilisateur Twitch pour confirmer :</p>
+            <h3 th:text="#{app.modal.title}">Confirmer la suppression</h3>
+            <p th:text="#{app.modal.prompt}">Saisis ton nom d'utilisateur Twitch pour confirmer :</p>
             <form th:action="@{/settings/delete-account}" method="post">
-                <input type="text" name="confirmUsername" placeholder="Ton username Twitch" required>
+                <input type="text" name="confirmUsername" th:placeholder="#{app.modal.username_placeholder}" required>
                 <div class="modal-actions">
                     <button type="button"
                             onclick="document.getElementById('deleteModal').style.display='none'"
-                            class="btn btn-outline">Annuler</button>
-                    <button type="submit" class="btn btn-danger">Supprimer définitivement</button>
+                            class="btn btn-outline" th:text="#{common.cancel}">Annuler</button>
+                    <button type="submit" class="btn btn-danger" th:text="#{app.modal.confirm_button}">Supprimer définitivement</button>
                 </div>
             </form>
         </div>

@@ -3,21 +3,23 @@
 <body>
 <div th:fragment="danger-zone">
     <section th:unless="${isPendingDeletion}" class="card card-danger">
-        <h3>Zone danger</h3>
-        <p>La suppression de compte est irréversible après <strong>7 jours</strong>.</p>
+        <h3 th:text="#{danger_zone.title}">Zone danger</h3>
+        <p th:utext="#{danger_zone.description}">La suppression de compte est irréversible après <strong>7 jours</strong>.</p>
         <button type="button" class="btn btn-danger"
-                onclick="document.getElementById('deleteModal').style.display='flex'">
+                onclick="document.getElementById('deleteModal').style.display='flex'"
+                th:text="#{danger_zone.delete_button}">
             Supprimer mon compte
         </button>
     </section>
 
     <section th:if="${isPendingDeletion}" class="card card-danger">
-        <h3>Suppression en cours</h3>
-        <p>Ton compte sera supprimé définitivement le
+        <h3 th:text="#{danger_zone.pending_title}">Suppression en cours</h3>
+        <p>
+            <span th:text="#{danger_zone.pending_description}">Ton compte sera supprimé définitivement le</span>
             <strong th:text="${#temporals.format(user.deletionRequestedAt, 'dd/MM/yyyy')}"></strong>.
         </p>
         <form th:action="@{/settings/cancel-deletion}" method="post">
-            <button type="submit" class="btn btn-outline">Annuler la suppression</button>
+            <button type="submit" class="btn btn-outline" th:text="#{danger_zone.cancel_button}">Annuler la suppression</button>
         </form>
     </section>
 </div>
