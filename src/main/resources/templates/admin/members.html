@@ -4,11 +4,11 @@
 <body>
     <div th:replace="~{fragments/nav :: nav('members')}"></div>
 
-    <main class="container">
-        <h2>Administration — Membres</h2>
+    <main class="container" style="max-width: none">
+        <h2 th:text="#{admin.members.title}">Administration — Membres</h2>
 
         <div th:if="${#lists.isEmpty(members)}" class="text-muted">
-            <p>Aucun membre en base.</p>
+            <p th:text="#{admin.members.empty}">Aucun membre en base.</p>
         </div>
 
         <div th:unless="${#lists.isEmpty(members)}" class="card">
@@ -16,13 +16,13 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Utilisateur Twitch</th>
-                            <th>Steam ID</th>
-                            <th>Bot</th>
-                            <th>Statut</th>
-                            <th>Créé le</th>
-                            <th th:if="${canMockSteam}">Mock Steam</th>
-                            <th>Actions</th>
+                            <th th:text="#{admin.members.column.twitch_user}">Utilisateur Twitch</th>
+                            <th th:text="#{admin.members.column.steam_id}">Steam ID</th>
+                            <th th:text="#{admin.members.column.bot}">Bot</th>
+                            <th th:text="#{admin.members.column.status}">Statut</th>
+                            <th th:text="#{admin.members.column.created_at}">Créé le</th>
+                            <th th:if="${canMockSteam}" th:text="#{admin.members.column.mock_steam}">Mock Steam</th>
+                            <th th:text="#{admin.members.column.actions}">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -38,9 +38,9 @@
                                     <div class="pill-toggle"
                                          th:classappend="${member.botEnabled ? 'pill-toggle--active' : 'pill-toggle--inactive'}">
                                         <span class="pill-toggle__label"
-                                              th:text="${member.botEnabled ? '✓ Actif' : '✗ Inactif'}"></span>
+                                              th:text="${member.botEnabled ? #messages.msg('admin.members.bot.active') : #messages.msg('admin.members.bot.inactive')}"></span>
                                         <button type="submit" class="pill-toggle__btn"
-                                                th:text="${member.botEnabled ? 'Désactiver' : 'Activer'}"></button>
+                                                th:text="${member.botEnabled ? #messages.msg('admin.members.bot.disable') : #messages.msg('admin.members.bot.enable')}"></button>
                                     </div>
                                 </form>
                             </td>
@@ -76,7 +76,7 @@
                                         <div class="search-wrapper">
                                             <input type="text"
                                                    th:id="'steam-search-' + ${member.id}"
-                                                   placeholder="Rechercher un jeu…"
+                                                   th:placeholder="#{common.search_placeholder}"
                                                    oninput="gameSearch(event)"
                                                    autocomplete="off"
                                                    th:attr="data-results-id='steam-results-' + ${member.id},
