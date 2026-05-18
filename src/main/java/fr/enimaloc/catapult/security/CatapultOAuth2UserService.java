@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -42,6 +43,12 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
     @Value("${app.owner-id:}")
     private String ownerId;
+
+    @Value("${twitch.default-no-game.name:}")
+    private String defaultNoGameName;
+
+    @Value("${twitch.default-no-game.id:}")
+    private String defaultNoGameId;
 
     private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
 
@@ -149,6 +156,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
         UserSettings settings = new UserSettings();
         settings.setUser(account);
+        if (!Strings.isEmpty(defaultNoGameId) && !Strings.isEmpty(defaultNoGameName)) {
+            settings.setNoGameTwitchGameId(defaultNoGameId);
+            settings.setNoGameTwitchGameName(defaultNoGameName);
+        }
         userSettingsRepository.save(settings);
 
         int priority = 1;
