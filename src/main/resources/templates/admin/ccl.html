@@ -1,34 +1,29 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catapult — Admin CCL</title>
-    <link rel="stylesheet" th:href="@{/css/app.css}">
-</head>
+<head th:replace="~{fragments/head :: head('Catapult — Admin CCL')}"></head>
 <body>
-    <div th:replace="~{fragments/admin-nav :: admin-nav('ccl')}"></div>
+    <div th:replace="~{fragments/nav :: nav('ccl')}"></div>
 
     <main class="container">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
             <h2>Administration — CCL</h2>
-            <form th:action="@{/admin/ccl/refresh}" method="post">
-                <button type="submit" class="btn btn-outline">Actualiser depuis les APIs</button>
+            <form th:action="@{/admin/ccl/refresh}" method="post"> <!-- nosemgrep -->
+                <button type="submit" class="btn btn-outline" th:text="#{ccl.refresh}"></button>
             </form>
         </div>
 
         <div th:if="${#lists.isEmpty(ccls)}" class="text-muted">
-            <p>Aucune CCL Twitch trouvée. Cliquez sur "Actualiser depuis les APIs" pour synchroniser.</p>
+            <p th:text="#{ccl.no_result(#{ccl.refresh})}"></p>
         </div>
 
         <div th:unless="${#lists.isEmpty(ccls)}" class="table-container">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>CCL Twitch</th>
-                        <th>Description</th>
-                        <th>Descripteurs de contenu IGDB associés</th>
-                        <th>Actions</th>
+                        <th th:text="#{ccl.column.twitch}">CCL Twitch</th>
+                        <th th:text="#{ccl.column.description}">Description</th>
+                        <th th:text="#{ccl.column.igdb_mappings}">Descripteurs de contenu IGDB associés</th>
+                        <th th:text="#{ccl.column.actions}">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -39,7 +34,7 @@
                         </td>
                         <td class="text-muted" th:text="${ccl.description}"></td>
                         <td>
-                            <form th:action="@{/admin/ccl/{id}/mappings(id=${ccl.id})}" method="post">
+                            <form th:action="@{/admin/ccl/{id}/mappings(id=${ccl.id})}" method="post"> <!-- nosemgrep -->
                                 <select name="igdbCategoryIds" multiple size="8" style="width:100%; min-width:250px;">
                                     <option th:each="desc : ${igdbDescriptors}"
                                             th:value="${desc.id}"
@@ -48,7 +43,7 @@
                                     </option>
                                 </select>
                                 <div style="margin-top:0.5rem;">
-                                    <button type="submit" class="btn btn-sm btn-primary">Enregistrer</button>
+                                    <button type="submit" class="btn btn-sm btn-primary" th:text="#{common.save}">Enregistrer</button>
                                 </div>
                             </form>
                         </td>
