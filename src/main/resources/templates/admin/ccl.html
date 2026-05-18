@@ -1,59 +1,58 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/head :: head('Catapult — Admin CCL')}"></head>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'ccl', ~{::body}, null, 'container')}">
+<head>
+    <title>Catapult — Admin CCL</title>
+</head>
 <body>
-    <div th:replace="~{fragments/nav :: nav('ccl')}"></div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 th:text="#{admin.ccl.title}">Administration — CCL</h2>
+        <form th:action="@{/admin/ccl/refresh}" method="post"> <!-- nosemgrep -->
+            <button type="submit" class="btn btn-outline" th:text="#{ccl.refresh}"></button>
+        </form>
+    </div>
 
-    <main class="container">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
-            <h2 th:text="#{admin.ccl.title}">Administration — CCL</h2>
-            <form th:action="@{/admin/ccl/refresh}" method="post"> <!-- nosemgrep -->
-                <button type="submit" class="btn btn-outline" th:text="#{ccl.refresh}"></button>
-            </form>
-        </div>
+    <div th:if="${#lists.isEmpty(ccls)}" class="text-muted">
+        <p th:text="#{ccl.no_result(#{ccl.refresh})}"></p>
+    </div>
 
-        <div th:if="${#lists.isEmpty(ccls)}" class="text-muted">
-            <p th:text="#{ccl.no_result(#{ccl.refresh})}"></p>
-        </div>
-
-        <div th:unless="${#lists.isEmpty(ccls)}" class="table-container">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th th:text="#{ccl.column.twitch}">CCL Twitch</th>
-                        <th th:text="#{ccl.column.description}">Description</th>
-                        <th th:text="#{ccl.column.igdb_mappings}">Descripteurs de contenu IGDB associés</th>
-                        <th th:text="#{ccl.column.actions}">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="ccl : ${ccls}">
-                        <td>
-                            <strong th:text="${ccl.name}"></strong><br>
-                            <span class="badge" th:text="${ccl.id}"></span>
-                        </td>
-                        <td class="text-muted" th:text="${ccl.description}"></td>
-                        <td>
-                            <form th:action="@{/admin/ccl/{id}/mappings(id=${ccl.id})}" method="post"> <!-- nosemgrep -->
-                                <select name="igdbCategoryIds" multiple size="8" style="width:100%; min-width:250px;">
-                                    <option th:each="desc : ${igdbDescriptors}"
-                                            th:value="${desc.id}"
-                                            th:text="${desc.description}"
-                                            th:selected="${ccl.mappedDescriptions.contains(desc.description)}">
-                                    </option>
-                                </select>
-                                <div style="margin-top:0.5rem;">
-                                    <button type="submit" class="btn btn-sm btn-primary" th:text="#{common.save}">Enregistrer</button>
-                                </div>
-                            </form>
-                        </td>
-                        <td>
-                            <span th:each="desc : ${ccl.mappedDescriptions}" class="badge badge-ccl" th:text="${desc}"></span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </main>
+    <div th:unless="${#lists.isEmpty(ccls)}" class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th th:text="#{ccl.column.twitch}">CCL Twitch</th>
+                    <th th:text="#{ccl.column.description}">Description</th>
+                    <th th:text="#{ccl.column.igdb_mappings}">Descripteurs de contenu IGDB associés</th>
+                    <th th:text="#{ccl.column.actions}">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="ccl : ${ccls}">
+                    <td>
+                        <strong th:text="${ccl.name}"></strong><br>
+                        <span class="badge" th:text="${ccl.id}"></span>
+                    </td>
+                    <td class="text-muted" th:text="${ccl.description}"></td>
+                    <td>
+                        <form th:action="@{/admin/ccl/{id}/mappings(id=${ccl.id})}" method="post"> <!-- nosemgrep -->
+                            <select name="igdbCategoryIds" multiple size="8" style="width:100%; min-width:250px;">
+                                <option th:each="desc : ${igdbDescriptors}"
+                                        th:value="${desc.id}"
+                                        th:text="${desc.description}"
+                                        th:selected="${ccl.mappedDescriptions.contains(desc.description)}">
+                                </option>
+                            </select>
+                            <div style="margin-top:0.5rem;">
+                                <button type="submit" class="btn btn-sm btn-primary" th:text="#{common.save}">Enregistrer</button>
+                            </div>
+                        </form>
+                    </td>
+                    <td>
+                        <span th:each="desc : ${ccl.mappedDescriptions}" class="badge badge-ccl" th:text="${desc}"></span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </body>
 </html>
