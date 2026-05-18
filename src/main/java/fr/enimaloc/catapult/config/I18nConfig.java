@@ -7,7 +7,6 @@ import org.springframework.context.NoSuchMessageException;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -76,10 +75,13 @@ public class I18nConfig {
 
         @Override
         public String getMessage(MessageSourceResolvable resolvable, Locale locale) throws NoSuchMessageException {
-            for (String code : resolvable.getCodes()) {
-                String pattern = resolvePattern(code, locale);
-                if (pattern != null) {
-                    return format(pattern, resolvable.getArguments(), locale);
+            String[] codes = resolvable.getCodes();
+            if (codes != null) {
+                for (String code : codes) {
+                    String pattern = resolvePattern(code, locale);
+                    if (pattern != null) {
+                        return format(pattern, resolvable.getArguments(), locale);
+                    }
                 }
             }
             String def = resolvable.getDefaultMessage();
@@ -87,7 +89,7 @@ public class I18nConfig {
                 return format(def, resolvable.getArguments(), locale);
             }
             throw new NoSuchMessageException(
-                    resolvable.getCodes().length > 0 ? resolvable.getCodes()[0] : "(unknown)", locale);
+                    (codes != null && codes.length > 0) ? codes[0] : "(unknown)", locale);
         }
 
         // ------------------------------------------------------------------ //
