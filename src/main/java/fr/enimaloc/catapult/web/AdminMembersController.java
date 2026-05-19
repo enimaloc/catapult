@@ -36,6 +36,7 @@ public class AdminMembersController {
         model.addAttribute("members", members);
         model.addAttribute("liveStatus", liveStatus);
         model.addAttribute("isMockProfile", Arrays.asList(environment.getActiveProfiles()).contains("mock"));
+        model.addAttribute("canMockSteam", Arrays.asList(environment.getActiveProfiles()).contains("mock-steam"));
         model.addAttribute("currentUserTwitchId", currentUser.getUserAccount().getTwitchId());
         return "admin/members";
     }
