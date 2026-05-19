@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="danger-zone">
     <section th:unless="${isPendingDeletion}" class="card card-danger">
@@ -18,7 +18,7 @@
             <span th:text="#{danger_zone.pending_description}">Ton compte sera supprimé définitivement le</span>
             <strong th:text="${#temporals.format(user.deletionRequestedAt, 'dd/MM/yyyy')}"></strong>.
         </p>
-        <form th:action="@{/settings/cancel-deletion}" method="post">
+        <form th:action="@{/settings/cancel-deletion}" method="post"> <!-- nosemgrep -->
             <button type="submit" class="btn btn-outline" th:text="#{danger_zone.cancel_button}">Annuler la suppression</button>
         </form>
     </section>

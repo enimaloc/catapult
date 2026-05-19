@@ -281,6 +281,10 @@ a:hover { text-decoration: underline; }
     border-bottom: 1px solid var(--danger-border);
     color: var(--danger-text);
 }
+.banner-warning {
+    background: var(--color-warning, #f59e0b);
+    color: #000;
+}
 
 /* ============================================================
    Container
@@ -667,6 +671,12 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
    ============================================================ */
 .text-muted { color: var(--text-dim); }
 .text-sm    { font-size: 12px; }
+.mb-8           { margin-bottom: 8px; }
+.mb-12          { margin-bottom: 12px; }
+.mb-16          { margin-bottom: 16px; }
+.m-0            { margin: 0; }
+.align-self-end { align-self: end; }
+.label-muted    { font-size: .85em; font-weight: 600; color: var(--text-dim); }
 
 label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size: 13px; }
 
@@ -706,6 +716,9 @@ label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size:
 .edit-row td { background: var(--bg-elevated); padding: 12px 16px; }
 .inline-edit-fields { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
 .inline-edit-actions { display: flex; gap: 8px; margin-top: 12px; }
+.inline-edit-field       { display: flex; flex-direction: column; gap: 4px; }
+.inline-edit-field label { font-size: .8em; font-weight: 600; }
+.ccl-checkboxes          { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ============================================================
    Form field (labeled input column)
