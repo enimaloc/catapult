@@ -39,71 +39,8 @@
                     <td th:text="${rule.twitchGameName}"></td>
 
                     <td style="min-width:320px">
-                        <div th:unless="${rule.predicates.empty}" class="mb-8">
-                            <table class="predicate-table">
-                                <thead>
-                                    <tr>
-                                        <th th:text="#{obs.predicate.column.link}">Lien</th>
-                                        <th th:text="#{obs.predicate.column.type}">Type</th>
-                                        <th th:text="#{obs.predicate.column.key}">Clé</th>
-                                        <th th:text="#{obs.predicate.column.value}">Valeur</th>
-                                        <th th:text="#{obs.predicate.column.os}">OS</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr th:each="pred, iterStat : ${rule.predicates}">
-                                        <td class="text-muted">
-                                            <span th:if="${iterStat.first}">—</span>
-                                            <span th:unless="${iterStat.first}" th:text="${pred.connector}"></span>
-                                        </td>
-                                        <td th:text="${pred.type}"></td>
-                                        <td><code th:text="${pred.key}"></code></td>
-                                        <td><code th:text="${pred.value}"></code></td>
-                                        <td th:text="${pred.osTarget}"></td>
-                                        <td>
-                                            <form th:action="@{/admin/process-rules/{id}/predicates/{predId}/delete(id=${rule.id},predId=${pred.id})}" method="post"> <!-- nosemgrep -->
-                                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                                <button type="submit" class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:.75em">✕</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <form th:action="@{/admin/process-rules/{id}/predicates(id=${rule.id})}" method="post"
-                              class="predicate-form"> <!-- nosemgrep -->
-                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                            <div class="predicate-form-field">
-                                <label th:text="#{obs.predicate.form.link}">Lien</label>
-                                <select name="connector">
-                                    <option th:each="c : ${connectors}" th:value="${c}" th:text="${c}"></option>
-                                </select>
-                            </div>
-                            <div class="predicate-form-field">
-                                <label th:text="#{obs.predicate.form.type}">Type</label>
-                                <select name="type">
-                                    <option th:each="t : ${predicateTypes}" th:value="${t}" th:text="${t}"></option>
-                                </select>
-                            </div>
-                            <div class="predicate-form-field">
-                                <label th:text="#{obs.predicate.form.value_label}">Valeur</label>
-                                <input type="text" name="value" required th:placeholder="#{obs.predicate.form.value_placeholder}">
-                            </div>
-                            <div class="predicate-form-field">
-                                <label th:text="#{obs.predicate.form.key_label}">Clé (ENV_VAR)</label>
-                                <input type="text" name="key" th:placeholder="#{obs.predicate.form.key_placeholder}"
-                                       style="width:90px">
-                            </div>
-                            <div class="predicate-form-field">
-                                <label th:text="#{obs.predicate.form.os}">OS</label>
-                                <select name="osTarget">
-                                    <option th:each="o : ${osTargets}" th:value="${o}" th:text="${o}"></option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-sm btn-primary align-self-end" th:text="'+ ' + #{common.add}">+ Ajouter</button>
-                        </form>
+                        <div th:replace="~{fragments/predicates::predicate-table(${rule.predicates}, '/admin/process-rules', ${rule.id})}"></div>
+                        <th:block th:replace="~{fragments/predicates::predicate-form(${connectors}, ${predicateTypes}, ${osTargets}, '/admin/process-rules', ${rule.id})}"></th:block>
                     </td>
 
                     <td style="text-align:right">
