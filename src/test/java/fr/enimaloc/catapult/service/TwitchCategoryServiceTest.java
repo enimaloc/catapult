@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.service;
 
+import fr.enimaloc.catapult.domain.IgdbGameExternalId;
 import fr.enimaloc.catapult.domain.TwitchCategoryCache;
+import fr.enimaloc.catapult.repository.IgdbGameExternalIdRepository;
 import fr.enimaloc.catapult.repository.TwitchCategoryCacheRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +29,9 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class TwitchCategoryServiceTest {
 
-    @Mock private TwitchCategoryCacheRepository cacheRepo;
+    @Mock private TwitchCategoryCacheRepository  cacheRepo;
+    @Mock private IgdbGameExternalIdRepository   externalIdRepo;
+    @Mock private IgdbService                    igdbService;
     @Mock private RestClient restClient;
 
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
@@ -42,7 +46,7 @@ class TwitchCategoryServiceTest {
         ReflectionTestUtils.setField(service, "twitchClientSecret", "test-secret");
         ReflectionTestUtils.setField(service, "cacheTtlHours",      24);
 
-        // Stub app-token fetch used in searchCategories live fallback
+        // Stub app-token fetch
         RestClient.RequestBodyUriSpec postSpec = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpec    = mock(RestClient.RequestBodySpec.class);
         doReturn(postSpec).when(restClient).post();
@@ -58,6 +62,11 @@ class TwitchCategoryServiceTest {
 
         // Prime the app token so tests that override responseSpec don't break token fetch
         service.getOrRefreshAppToken();
+
+        // IGDB cross-fill is a no-op in most tests: twitchSourceId not resolved
+        when(igdbService.getTwitchSourceId()).thenReturn(-1L);
+        // Sweep starts from offset 1 by default
+        when(cacheRepo.findMaxNumericId()).thenReturn(0L);
 
         // Default prewarmMode for existing TOP tests
         ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.TOP);
@@ -147,6 +156,29 @@ class TwitchCategoryServiceTest {
     }
 
     @Test
+    void prewarmCategoryCache_sweepStartsFromMaxKnownId() {
+        ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.SWEEP);
+        when(cacheRepo.findMaxNumericId()).thenReturn(500L);
+
+        // First batch (IDs 501–600) returns 1 game; second batch returns empty → stop
+        doReturn(Map.of(
+            "data", List.of(
+                Map.of("id", "543", "name", "Chess", "box_art_url", "https://img/chess.jpg", "igdb_id", "7")
+            )
+        )).doReturn(Map.of("data", List.of()))
+           .when(responseSpec).body(Map.class);
+
+        service.prewarmCategoryCache();
+
+        verify(cacheRepo, times(1)).saveAll(argThat(list -> {
+            List<TwitchCategoryCache> l = (List<TwitchCategoryCache>) list;
+            return l.size() == 1 && "543".equals(l.get(0).getId());
+        }));
+        // URI for first batch must start at 501
+        verify(getSpec).uri(argThat((String uri) -> uri.contains("?id=501")));
+    }
+
+    @Test
     void prewarmCategoryCache_sweepStopsOnFirstEmptyBatch() {
         ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.SWEEP);
 
@@ -207,5 +239,53 @@ class TwitchCategoryServiceTest {
         service.prewarmCategoryCache();
 
         verify(cacheRepo, times(2)).saveAll(anyList());
+    }
+
+    @Test
+    void prewarmCategoryCache_igdbCrossFillFetchesMissingCategories() {
+        ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.TOP);
+        when(igdbService.getTwitchSourceId()).thenReturn(5L);
+
+        IgdbGameExternalId ext1 = new IgdbGameExternalId("igdb-1", 5L, "999");
+        IgdbGameExternalId ext2 = new IgdbGameExternalId("igdb-2", 5L, "888");
+        when(externalIdRepo.findBySourceId(5L)).thenReturn(List.of(ext1, ext2));
+
+        TwitchCategoryCache cachedEntry = new TwitchCategoryCache("999", "Zelda", "https://img/z.jpg");
+        when(cacheRepo.findAllById(any())).thenReturn(List.of(cachedEntry));
+
+        // Cross-fill returns "888"; TOP phase returns empty (exits immediately)
+        doReturn(Map.of(
+            "data", List.of(Map.of("id", "888", "name", "Minecraft", "box_art_url", "https://img/mc.jpg"))
+        )).doReturn(Map.of("data", List.of(), "pagination", Map.of()))
+           .when(responseSpec).body(Map.class);
+
+        service.prewarmCategoryCache();
+
+        verify(cacheRepo, atLeastOnce()).saveAll(argThat(list ->
+            ((List<TwitchCategoryCache>) list).stream().anyMatch(e -> "888".equals(e.getId()))
+        ));
+    }
+
+    @Test
+    void prewarmCategoryCache_igdbCrossFillSkipsWhenAllCached() {
+        ReflectionTestUtils.setField(service, "prewarmMode", TwitchCategoryService.PrewarmMode.TOP);
+        when(igdbService.getTwitchSourceId()).thenReturn(5L);
+
+        IgdbGameExternalId ext = new IgdbGameExternalId("igdb-1", 5L, "999");
+        when(externalIdRepo.findBySourceId(5L)).thenReturn(List.of(ext));
+
+        TwitchCategoryCache cachedEntry = new TwitchCategoryCache("999", "Zelda", "https://img/z.jpg");
+        when(cacheRepo.findAllById(any())).thenReturn(List.of(cachedEntry));
+
+        // TOP phase: empty response
+        doReturn(Map.of("data", List.of(), "pagination", Map.of()))
+            .when(responseSpec).body(Map.class);
+
+        service.prewarmCategoryCache();
+
+        // Only the TOP phase call (empty data), cross-fill makes no GET call for "999"
+        verify(cacheRepo, never()).saveAll(argThat(list ->
+            ((List<TwitchCategoryCache>) list).stream().anyMatch(e -> "999".equals(e.getId()))
+        ));
     }
 }
