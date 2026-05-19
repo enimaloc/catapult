@@ -42,9 +42,6 @@
            th:classappend="${active_page == 'app'} ? ' active'">App</a>
         <a th:href="@{/admin/ccl}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'ccl'} ? ' active'">Admin CCL</a>
-        <a th:href="@{/admin/process-rules}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'process-rules'} ? ' active'" th:text="#{nav.process_rules}">Règles
-            processus</a>
         <a th:href="@{/admin/members}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'members'} ? ' active'" th:text="#{nav.members}">Membres</a>
         <a th:href="@{/dev/igdb}" sec:authorize="hasRole('ADMIN')" th:classappend="${active_page == 'igdb'} ? ' active'"

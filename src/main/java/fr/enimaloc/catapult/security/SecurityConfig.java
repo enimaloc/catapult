@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.security;
 
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -25,11 +24,6 @@ import org.springframework.security.web.authentication.switchuser.SwitchUserFilt
 public class SecurityConfig {
 
     private final CatapultOAuth2UserService oAuth2UserService;
-
-    @Bean
-    public ApiKeyAuthFilter apiKeyAuthFilter(UserAccountRepository userAccountRepository) {
-        return new ApiKeyAuthFilter(userAccountRepository);
-    }
 
     @Bean
     public SwitchUserFilter switchUserFilter(ImpersonationUserDetailsService impersonationUserDetailsService) {
@@ -63,15 +57,11 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                    ApiKeyAuthFilter apiKeyAuthFilter,
                                                     SwitchUserFilter switchUserFilter) throws Exception {
         http
-            .addFilterBefore(apiKeyAuthFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(switchUserFilter, AuthorizationFilter.class)
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/obs/**"))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
-                .requestMatchers("/api/obs/**").authenticated()
                 .requestMatchers("/admin/impersonate/exit").authenticated()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()

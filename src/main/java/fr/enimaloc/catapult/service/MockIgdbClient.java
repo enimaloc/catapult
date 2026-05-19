@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
-import proto.AlternativeName;
 import proto.ExternalGame;
 import proto.ExternalGameSource;
 import proto.Game;
@@ -46,11 +45,6 @@ public class MockIgdbClient extends IgdbClient {
 
     @Override
     public List<Game> fetchGameById(String igdbId, String fields, String token) {
-        return List.of();
-    }
-
-    @Override
-    public List<AlternativeName> findByWindowsExecutable(String exeName, String token) {
         return List.of();
     }
 

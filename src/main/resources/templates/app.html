@@ -6,9 +6,6 @@
 </head>
 <body>
     <div th:replace="~{fragments/connections :: connections}"></div>
-    <div th:if="${obsEnabled}" hx-get="/fragments/obs-setup" hx-trigger="load" hx-swap="outerHTML">
-        <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading_obs}">Chargement OBS…</p></div>
-    </div>
     <div hx-get="/fragments/no-game-settings" hx-trigger="load" hx-swap="outerHTML">
         <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
     </div>

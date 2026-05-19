@@ -753,43 +753,6 @@ label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size:
 .game-results li:hover { background: var(--bg-base); }
 
 /* ============================================================
-   Process/binding tables
-   ============================================================ */
-.process-table { width: 100%; border-collapse: collapse; }
-.process-table th {
-    padding: 8px 12px; border-bottom: 2px solid var(--border);
-    text-align: left; color: var(--text-dim); font-size: .85em; font-weight: 600;
-}
-.process-table td { padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
-.process-table tr:last-child td { border-bottom: none; }
-
-/* ============================================================
-   Predicate sub-table
-   ============================================================ */
-.predicate-table { width: 100%; border-collapse: collapse; font-size: .8em; }
-.predicate-table th { padding: 4px 6px; color: var(--text-dim); border-bottom: 1px solid var(--border); font-weight: 600; text-align: left; }
-.predicate-table td { padding: 4px 6px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
-.predicate-table tr:last-child td { border-bottom: none; }
-
-/* ============================================================
-   Predicate add form
-   ============================================================ */
-.predicate-form {
-    display: grid;
-    grid-template-columns: auto auto 1fr auto auto auto;
-    gap: 6px; align-items: end; font-size: .82em; margin-top: 8px;
-}
-.predicate-form-field { display: flex; flex-direction: column; gap: 2px; }
-.predicate-form-field label { color: var(--text-muted); font-weight: 600; font-size: .9em; margin-bottom: 0; }
-.predicate-form-field select,
-.predicate-form-field input[type=text] {
-    padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px;
-    background: var(--bg-base); color: var(--text); font-family: inherit; font-size: 1em;
-}
-.predicate-form-field select:focus,
-.predicate-form-field input[type=text]:focus { outline: none; border-color: var(--accent-strong); }
-
-/* ============================================================
    Alert
    ============================================================ */
 .alert-error {
@@ -825,16 +788,6 @@ details summary { cursor: pointer; font-weight: 600; }
    Regex badge
    ============================================================ */
 .badge-regex { background: #1e3a5f; color: #60a5fa; }
-
-/* ============================================================
-   OBS API key display
-   ============================================================ */
-.api-key-display { display: flex; gap: 8px; align-items: center; margin-top: 4px; margin-bottom: 12px; }
-.api-key-code {
-    background: var(--bg-elevated); padding: 6px 10px; border-radius: 4px;
-    font-size: .9em; flex: 1; word-break: break-all;
-    color: var(--accent); font-family: ui-monospace, monospace;
-}
 
 /* ============================================================
    IGDB Explorer

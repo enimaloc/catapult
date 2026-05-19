@@ -26,8 +26,6 @@ public class GameGetterChain {
     private final Optional<SteamGameGetter> steamGameGetter;
     private final Optional<XboxGameGetter> xboxGameGetter;
     private final Optional<BattleNetGameGetter> battleNetGameGetter;
-    private final Optional<ObsGameGetter> obsGameGetter;
-
     public Optional<DetectedGame> resolve(UserAccount user) {
         Map<GetterConfig.Provider, GameGetter> getterByProvider = buildGetterMap();
 
@@ -58,7 +56,6 @@ public class GameGetterChain {
         steamGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.STEAM, g));
         xboxGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.XBOX, g));
         battleNetGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.BATTLENET, g));
-        obsGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.OBS, g));
         return map;
     }
 }

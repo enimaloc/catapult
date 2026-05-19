@@ -100,6 +100,7 @@ public class BindingService {
                 binding.setStatus(GameBinding.Status.MANUAL);
             }
             gameBindingRepository.save(binding);
+//          TODO: Fix category changing when updating game
             twitchService.updateChannel(user, binding);
         });
     }

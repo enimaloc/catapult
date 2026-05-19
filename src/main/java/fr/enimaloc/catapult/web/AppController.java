@@ -36,9 +36,6 @@ public class AppController {
     @Value("${steam.api-key:}")
     private String steamApiKey;
 
-    @Value("${obs.enabled:true}")
-    private boolean obsEnabled;
-
     private final GameStateService gameStateService;
     private final ActivityLogService activityLogService;
     private final GameBindingRepository gameBindingRepository;
@@ -113,7 +110,6 @@ public class AppController {
         // Settings
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
         model.addAttribute("hasSteam", !steamApiKey.isBlank() && user.getSteamId() != null);
-        model.addAttribute("obsEnabled", obsEnabled);
 
         // Common
         model.addAttribute("user", user);

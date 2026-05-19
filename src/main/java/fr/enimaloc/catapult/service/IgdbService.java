@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import proto.AlternativeName;
 import proto.ExternalGameSource;
 import proto.Game;
 
@@ -33,7 +32,6 @@ public class IgdbService {
     private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
     private static final String KEY_STEAM_PREFIX = "steam:";
     private static final String KEY_NAME_PREFIX  = "name:";
-    private static final String KEY_EXE_PREFIX   = "exe:";
 
     private final IgdbClient igdbClient;
     private final IgdbGameCacheRepository cacheRepository;
@@ -70,9 +68,6 @@ public class IgdbService {
 
     // L1 index: normalized name → IgdbGame
     private final Map<String, IgdbGame> igdbNameIndex = new ConcurrentHashMap<>();
-
-    // L1 index: lowercase exe name → IgdbGame (alternative_names lookup)
-    private final Map<String, IgdbGame> exeNameIndex = new ConcurrentHashMap<>();
 
     // CCL cache: igdbId → suggested CCLs (stable, no TTL needed)
     private final Map<String, Set<String>> cclCache = new ConcurrentHashMap<>();
@@ -196,42 +191,6 @@ public class IgdbService {
         Game game = results.get(0);
         IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
         igdbNameIndex.put(normalized, resolved);
-        saveToDb(key, resolved);
-        return Optional.of(resolved);
-    }
-
-    public Optional<IgdbGame> findByWindowsExecutable(String processName) {
-        if (clientId.isBlank()) return Optional.empty();
-
-        String exeName = processName.strip().toLowerCase(java.util.Locale.ROOT);
-        if (!exeName.endsWith(".exe")) {
-            exeName = exeName + ".exe";
-        }
-
-        IgdbGame cached = exeNameIndex.get(exeName);
-        if (cached != null) {
-            log.debug("IGDB exe L1 cache hit for '{}'", exeName);
-            return Optional.of(cached);
-        }
-
-        String key = KEY_EXE_PREFIX + exeName;
-        Optional<IgdbGame> fromDb = lookupInDb(key);
-        if (fromDb.isPresent()) {
-            exeNameIndex.put(exeName, fromDb.get());
-            return fromDb;
-        }
-
-        String token = getOrRefreshAppToken();
-        if (token.isBlank()) return Optional.empty();
-
-        List<AlternativeName> results = igdbClient.findByWindowsExecutable(exeName, token);
-        if (results.isEmpty()) return Optional.empty();
-
-        proto.Game game = results.get(0).getGame();
-        IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
-        exeNameIndex.put(exeName, resolved);
-        igdbGameCache.put(resolved.id(), resolved.name());
-        igdbNameIndex.put(normalise(resolved.name()), resolved);
         saveToDb(key, resolved);
         return Optional.of(resolved);
     }
