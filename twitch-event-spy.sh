@@ -25,6 +25,7 @@ VERBOSE=false
 WS_PID=""
 PREV_GAME=""
 PREV_TITLE=""
+PREV_CCLS=""
 
 # ── Help ───────────────────────────────────────────────────────────────────
 usage() {
@@ -102,6 +103,7 @@ fetch_initial_state() {
   response=$(twitch api get /channels -q "broadcaster_id=$broadcaster_id" 2>/dev/null)
   PREV_GAME=$(echo "$response" | jq -r '.data[0].game_name // ""')
   PREV_TITLE=$(echo "$response" | jq -r '.data[0].title // ""')
+  PREV_CCLS=$(echo "$response" | jq -r '.data[0].content_classification_labels // [] | sort | join(",")')
 }
 
 # ── Format and display notification events ─────────────────────────────────
@@ -131,9 +133,10 @@ format_event() {
       ;;
 
     "channel.update")
-      local game title
+      local game title ccls
       game=$(echo  "$event" | jq -r '.category_name // ""')
       title=$(echo "$event" | jq -r '.title // ""')
+      ccls=$(echo  "$event" | jq -r '.content_classification_labels // [] | sort | join(",")')
 
       if [[ "$game" != "$PREV_GAME" ]]; then
         echo -e "[${ts}] ${YELLOW}${BOLD}🎮 GAME CHANGE${RESET}     ${PREV_GAME:-<none>} ${BOLD}→${RESET} ${BOLD}${game}${RESET}"
@@ -142,6 +145,10 @@ format_event() {
       if [[ "$title" != "$PREV_TITLE" ]]; then
         echo -e "[${ts}]    TITLE CHANGE    \"${PREV_TITLE}\" ${BOLD}→${RESET} \"${BOLD}${title}${RESET}\""
         PREV_TITLE="$title"
+      fi
+      if [[ "$ccls" != "$PREV_CCLS" ]]; then
+        echo -e "[${ts}] ${CYAN}${BOLD}🏷  CCL CHANGE${RESET}      ${PREV_CCLS:-<none>} ${BOLD}→${RESET} ${BOLD}${ccls:-<none>}${RESET}"
+        PREV_CCLS="$ccls"
       fi
       ;;
   esac
@@ -182,7 +189,7 @@ main() {
   local broadcaster_id
   broadcaster_id=$(get_broadcaster_id)
   fetch_initial_state "$broadcaster_id"
-  echo -e "${BOLD}ID:${RESET} ${broadcaster_id} | ${BOLD}Game:${RESET} ${PREV_GAME:-<none>} | ${BOLD}Title:${RESET} ${PREV_TITLE:-<none>}"
+  echo -e "${BOLD}ID:${RESET} ${broadcaster_id} | ${BOLD}Game:${RESET} ${PREV_GAME:-<none>} | ${BOLD}Title:${RESET} ${PREV_TITLE:-<none>} | ${BOLD}CCLs:${RESET} ${PREV_CCLS:-<none>}"
 
   mkfifo "$FIFO"
   trap cleanup SIGINT SIGTERM EXIT

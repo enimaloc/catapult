@@ -18,4 +18,7 @@ public interface IgdbGameExternalIdRepository extends JpaRepository<IgdbGameExte
 
     /** Bulk lookup : toutes les entrées d'une plateforme pour une liste d'IDs IGDB. */
     List<IgdbGameExternalId> findBySourceIdAndIgdbIdIn(long sourceId, Collection<String> igdbIds);
+
+    /** Toutes les entrées externes pour une source donnée (ex : tous les Twitch IDs connus). */
+    List<IgdbGameExternalId> findBySourceId(long sourceId);
 }
