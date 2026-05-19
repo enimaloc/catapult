@@ -76,7 +76,11 @@
                 <label th:text="#{admin.process_rules.add.game_label}">Jeu Twitch</label>
                 <div class="search-wrapper">
                     <input type="text" id="adminGameSearch" th:placeholder="#{admin.process_rules.add.game_placeholder}"
-                           oninput="adminSearch(event)" autocomplete="off">
+                           oninput="gameSearch(event)"
+                           data-results-id="gameResults-admin"
+                           data-gameid-field="twitchGameId-admin"
+                           data-gamename-field="twitchGameName-admin"
+                           autocomplete="off">
                     <ul id="gameResults-admin" class="game-results"></ul>
                 </div>
                 <input type="hidden" name="twitchGameId" id="twitchGameId-admin" required>
@@ -86,45 +90,5 @@
         </form>
     </div>
 
-    <script>
-    (function() {
-        var _timer = null;
-        window.adminSearch = function(event) {
-            var q = event.target.value.trim();
-            var results = document.getElementById('gameResults-admin');
-            if (q.length < 2) { results.style.display = 'none'; return; }
-            clearTimeout(_timer);
-            _timer = setTimeout(function() {
-                fetch('/api/games/search?q=' + encodeURIComponent(q))
-                    .then(function(r) { return r.json(); })
-                    .then(function(data) {
-                        results.replaceChildren();
-                        if (!data.length) { results.style.display = 'none'; return; }
-                        data.forEach(function(game) {
-                            var li = document.createElement('li');
-                            if (game.boxArtUrl) {
-                                var img = document.createElement('img');
-                                img.src = game.boxArtUrl.replace('{width}', '30').replace('{height}', '40');
-                                img.alt = '';
-                                li.appendChild(img);
-                            }
-                            var span = document.createElement('span');
-                            span.textContent = game.name;
-                            li.appendChild(span);
-                            li.addEventListener('click', function() {
-                                document.getElementById('twitchGameId-admin').value = game.id;
-                                document.getElementById('twitchGameName-admin').value = game.name;
-                                document.getElementById('adminGameSearch').value = game.name;
-                                results.style.display = 'none';
-                            });
-                            results.appendChild(li);
-                        });
-                        results.style.display = 'block';
-                    })
-                    .catch(function() { results.style.display = 'none'; });
-            }, 300);
-        };
-    })();
-    </script>
 </body>
 </html>
