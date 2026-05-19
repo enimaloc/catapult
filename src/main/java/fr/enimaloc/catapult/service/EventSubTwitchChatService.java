@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
@@ -155,12 +156,15 @@ public class EventSubTwitchChatService implements TwitchChatService {
     }
 
     private ChatCommandEvent.SenderRole extractRole(JsonNode event) {
-        String chatterType = event.path("chatter_type").asText("");
-        return switch (chatterType) {
-            case "broadcaster" -> ChatCommandEvent.SenderRole.BROADCASTER;
-            case "mod"         -> ChatCommandEvent.SenderRole.MODERATOR;
-            default            -> ChatCommandEvent.SenderRole.EVERYONE;
-        };
+        ArrayNode badges = event.withArray("badges");
+        for (JsonNode badge : badges) {
+            String setId = badge.path("set_id").asText("");
+            switch (setId) {
+                case "broadcaster": return ChatCommandEvent.SenderRole.BROADCASTER;
+                case "mod"        : return ChatCommandEvent.SenderRole.MODERATOR;
+            }
+        }
+        return ChatCommandEvent.SenderRole.EVERYONE;
     }
 
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
