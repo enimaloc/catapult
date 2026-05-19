@@ -1,29 +1,8 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/springsecurity6"
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/springsecurity6"
       th:replace="~{template::layout(~{::title}, 'app', ~{::body}, ~{::style}, 'container')}">
 <head>
     <title>Catapult</title>
-    <style>
-        .toggle-label { display:inline-flex; align-items:center; cursor:pointer; gap:6px; }
-        .toggle-label input[type=checkbox] { display:none; }
-        .toggle-slider {
-            width:36px; height:20px; background:#ccc; border-radius:10px;
-            position:relative; transition:background .2s;
-        }
-        .toggle-slider::after {
-            content:''; position:absolute; top:2px; left:2px;
-            width:16px; height:16px; background:#fff; border-radius:50%;
-            transition:left .2s;
-        }
-        .toggle-label input:checked + .toggle-slider { background:var(--color-primary,#7c3aed); }
-        .toggle-label input:checked + .toggle-slider::after { left:18px; }
-        .edit-row td { background:#f9f9f9; padding:12px 16px; }
-        .inline-edit-fields { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
-        .inline-edit-field { display:flex; flex-direction:column; gap:4px; }
-        .inline-edit-field label { font-size:.8em; font-weight:600; color:#555; }
-        .ccl-checkboxes { display:flex; flex-wrap:wrap; gap:8px; }
-        .inline-edit-actions { display:flex; gap:8px; margin-top:12px; }
-    </style>
 </head>
 <body>
     <div th:replace="~{fragments/connections :: connections}"></div>
@@ -44,7 +23,7 @@
         <div class="modal-content">
             <h3 th:text="#{app.modal.title}">Confirmer la suppression</h3>
             <p th:text="#{app.modal.prompt}">Saisis ton nom d'utilisateur Twitch pour confirmer :</p>
-            <form th:action="@{/settings/delete-account}" method="post">
+            <form th:action="@{/settings/delete-account}" method="post"> <!-- nosemgrep -->
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <input type="text" name="confirmUsername" th:placeholder="#{app.modal.username_placeholder}" required>
                 <div class="modal-actions">
