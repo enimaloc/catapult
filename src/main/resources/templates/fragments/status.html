@@ -13,8 +13,7 @@
         <div th:unless="${botEnabled}" class="status status-inactive">
             <span class="status-dot"></span> <span th:text="#{status.inactive}">Inactif</span>
         </div>
-    </div>
-    <div class="card">
+        <div class="divider"></div>
         <h3 th:text="#{status.stream_title}">Stream</h3>
         <div th:if="${isLive}" class="status status-active">
             <span class="status-dot"></span> <span th:text="#{status.live}">En live</span>
@@ -22,8 +21,7 @@
         <div th:unless="${isLive}" class="status status-inactive">
             <span class="status-dot"></span> <span th:text="#{status.offline}">Hors ligne</span>
         </div>
-    </div>
-    <div class="card">
+        <div class="divider"></div>
         <h3 th:text="#{status.current_game_title}">Jeu en cours</h3>
         <div th:if="${currentGame != null}">
             <p>
