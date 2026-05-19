@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
+@Profile("!mock-web")
 public class OAuth2ClientConfig {
 
     @Value("${twitch.client-id:}")
@@ -33,6 +35,9 @@ public class OAuth2ClientConfig {
     @Value("${battlenet.client-secret:}")
     private String battleNetClientSecret;
 
+    @Value("${app.base-url}")
+    private String baseUrl;
+
     @Bean
     public ClientRegistrationRepository clientRegistrationRepository() {
         List<ClientRegistration> registrations = new ArrayList<>();
@@ -45,7 +50,7 @@ public class OAuth2ClientConfig {
                    "user:read:chat", "user:write:chat",
                    "channel:moderate", "channel:read:redemptions")
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-            .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+            .redirectUri(baseUrl+"/login/oauth2/code/{registrationId}")
             .authorizationUri("https://id.twitch.tv/oauth2/authorize")
             .tokenUri("https://id.twitch.tv/oauth2/token")
             .userInfoUri("https://api.twitch.tv/helix/users")

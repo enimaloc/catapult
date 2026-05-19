@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -19,6 +20,7 @@ import org.springframework.security.web.authentication.switchuser.SwitchUserFilt
 @Slf4j
 @Configuration
 @EnableWebSecurity
+@Profile("!mock-web")
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -68,7 +70,7 @@ public class SecurityConfig {
             .addFilterAfter(switchUserFilter, AuthorizationFilter.class)
             .csrf(csrf -> csrf.ignoringRequestMatchers("/api/obs/**"))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login", "/error", "/css/**", "/js/**", "/images/**").permitAll()
+                .requestMatchers("/login", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
                 .requestMatchers("/api/obs/**").authenticated()
                 .requestMatchers("/admin/impersonate/exit").authenticated()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
