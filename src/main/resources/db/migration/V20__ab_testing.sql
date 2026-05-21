@@ -62,3 +62,7 @@ CREATE TABLE experiment_feedback (
     submitted_at  TIMESTAMP   NOT NULL DEFAULT now(),
     UNIQUE (experiment_id, user_id)
 );
+
+CREATE INDEX idx_experiment_events_lookup ON experiment_events (experiment_id, variant_id, event_key);
+CREATE INDEX idx_experiment_feedback_lookup ON experiment_feedback (experiment_id, variant_id);
+CREATE INDEX idx_experiment_rules ON experiment_assignment_rules (experiment_id, priority);
