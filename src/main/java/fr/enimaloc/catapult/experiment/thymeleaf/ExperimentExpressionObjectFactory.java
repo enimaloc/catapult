@@ -26,7 +26,9 @@ class ExperimentExpressionObjectFactory implements IExpressionObjectFactory {
 
     @Override
     public boolean isCacheable(String expressionObjectName) {
-        return false;
+        // true = Thymeleaf reuses the same instance within one rendering context,
+        // letting cachedAssignments in ExperimentExpressionObject do its job
+        return true;
     }
 
     @Override
