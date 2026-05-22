@@ -1,11 +1,13 @@
 package fr.enimaloc.catapult.accessibility;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,9 +17,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ThemeContrastTest {
 
-    static Stream<Object[]> colorPairs() throws IOException {
-        String css = Files.readString(Path.of("src/main/resources/static/css/app.css"));
-        List<Object[]> params = new ArrayList<>();
+    static Stream<Arguments> colorPairs() throws IOException {
+        String css;
+        try (InputStream is = ThemeContrastTest.class.getResourceAsStream("/static/css/app.css")) {
+            Objects.requireNonNull(is, "app.css not found on classpath");
+            css = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        List<Arguments> params = new ArrayList<>();
 
         addPairs(params, "dark (default)", extractVarsFromBlock(css, ":root"));
         for (String theme : new String[]{"blanc", "old-steam", "nord", "dracula", "catppuccin", "tokyo-night"}) {
@@ -26,14 +32,14 @@ class ThemeContrastTest {
         return params.stream();
     }
 
-    private static void addPairs(List<Object[]> params, String name, Map<String, String> vars) {
+    private static void addPairs(List<Arguments> params, String name, Map<String, String> vars) {
         String text = vars.get("--text");
         String bgBase = vars.get("--bg-base");
         String bgSurface = vars.get("--bg-surface");
         if (text != null && bgBase != null)
-            params.add(new Object[]{name + " | text on bg-base", text, bgBase});
+            params.add(Arguments.of(name + " | text on bg-base", text, bgBase));
         if (text != null && bgSurface != null)
-            params.add(new Object[]{name + " | text on bg-surface", text, bgSurface});
+            params.add(Arguments.of(name + " | text on bg-surface", text, bgSurface));
     }
 
     private static Map<String, String> extractVarsFromBlock(String css, String selector) {
@@ -48,6 +54,11 @@ class ThemeContrastTest {
         Matcher m = Pattern.compile("(--.+?):\\s*(#[0-9a-fA-F]{6})").matcher(block);
         while (m.find()) vars.put(m.group(1).trim(), m.group(2));
         return vars;
+    }
+
+    @Test
+    void allThemesAndPairsArePresent() throws IOException {
+        assertThat(colorPairs().toList()).hasSize(14);
     }
 
     @ParameterizedTest(name = "{0}: text={1} bg={2}")
