@@ -14,6 +14,7 @@ import java.util.List;
 
 class HideForVariantProcessor extends AbstractAttributeTagProcessor {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(HideForVariantProcessor.class);
     private static final int PRECEDENCE = StandardDialect.PROCESSOR_PRECEDENCE + 10;
     static final String ATTR_NAME = "hide-for";
 
@@ -30,7 +31,10 @@ class HideForVariantProcessor extends AbstractAttributeTagProcessor {
                              AttributeName attributeName, String attributeValue,
                              IElementTagStructureHandler structureHandler) {
         String[] parts = attributeValue.split(":", 2);
-        if (parts.length < 2) return;
+        if (parts.length < 2) {
+            log.warn("exp:{} attribute '{}' is missing the ':variantKey' part — element will be kept", ATTR_NAME, attributeValue);
+            return;
+        }
         String experimentKey = parts[0].trim();
         String variantKey = parts[1].trim();
 

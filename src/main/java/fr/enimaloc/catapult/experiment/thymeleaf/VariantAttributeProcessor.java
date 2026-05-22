@@ -14,6 +14,7 @@ import java.util.List;
 
 class VariantAttributeProcessor extends AbstractAttributeTagProcessor {
 
+    // Lower value = higher priority; must run before show-for/hide-for/if-rolled-out on the same element
     private static final int PRECEDENCE = StandardDialect.PROCESSOR_PRECEDENCE + 5;
     static final String ATTR_NAME = "variant";
 
