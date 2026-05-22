@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.Experiment;
 import fr.enimaloc.catapult.domain.ExperimentAssignmentRule;
 import fr.enimaloc.catapult.domain.ExperimentVariant;
 import fr.enimaloc.catapult.repository.ExperimentRepository;
+import fr.enimaloc.catapult.service.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExperimentSynchronizer implements ApplicationRunner {
 
     private final ExperimentRepository experimentRepository;
+    private final ExperimentService experimentService;
     private final ApplicationContext applicationContext;
 
     @Override
@@ -32,6 +34,10 @@ public class ExperimentSynchronizer implements ApplicationRunner {
             experimentRepository.save(buildExperiment(spec));
             log.info("[Experiments] Registered '{}' ({})", spec.name(), spec.key());
         });
+
+        experimentRepository.findAll().stream()
+            .map(Experiment::getKey)
+            .forEach(experimentService::markKnown);
     }
 
     private Experiment buildExperiment(ExperimentSpec spec) {
