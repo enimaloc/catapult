@@ -91,7 +91,7 @@ class ExperimentProcessorsTest {
     @Test
     void showFor_keepsElement_whenUserIsInMatchingVariant() {
         when(context.getVariable("activeExperimentAssignments")).thenReturn(List.of(greenAssignment));
-        ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService);
+        ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService, showDefinition);
         p.doProcess(context, tag, attributeName, "my-exp:green", structureHandler);
         verify(structureHandler, never()).removeElement();
     }
@@ -99,7 +99,7 @@ class ExperimentProcessorsTest {
     @Test
     void showFor_removesElement_whenUserIsInDifferentVariant() {
         when(context.getVariable("activeExperimentAssignments")).thenReturn(List.of(greenAssignment));
-        ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService);
+        ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService, showDefinition);
         p.doProcess(context, tag, attributeName, "my-exp:blue", structureHandler);
         verify(structureHandler).removeElement();
     }
@@ -107,7 +107,7 @@ class ExperimentProcessorsTest {
     @Test
     void showFor_removesElement_whenAssignmentsAreNull() {
         when(context.getVariable("activeExperimentAssignments")).thenReturn(null);
-        ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService);
+        ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService, showDefinition);
         p.doProcess(context, tag, attributeName, "my-exp:green", structureHandler);
         verify(structureHandler).removeElement();
     }
@@ -115,7 +115,7 @@ class ExperimentProcessorsTest {
     @Test
     void showFor_callsEnsureExists_withVariantHint() {
         when(context.getVariable("activeExperimentAssignments")).thenReturn(List.of());
-        ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService);
+        ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService, showDefinition);
         p.doProcess(context, tag, attributeName, "my-exp:green", structureHandler);
         verify(experimentService).ensureExists("my-exp", "green");
     }

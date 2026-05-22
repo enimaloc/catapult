@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.experiment.thymeleaf;
 
 import fr.enimaloc.catapult.service.ExperimentService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.thymeleaf.dialect.AbstractProcessorDialect;
 import org.thymeleaf.expression.IExpressionObjectFactory;
@@ -15,6 +16,9 @@ public class ExperimentDialect extends AbstractProcessorDialect
 
     private final ExperimentService experimentService;
 
+    @Value("${app.experiment.show-definition:false}")
+    private boolean showDefinition = false;
+
     public ExperimentDialect(ExperimentService experimentService) {
         super("Experiment Dialect", "exp", StandardDialect.PROCESSOR_PRECEDENCE + 10);
         this.experimentService = experimentService;
@@ -23,7 +27,7 @@ public class ExperimentDialect extends AbstractProcessorDialect
     @Override
     public Set<IProcessor> getProcessors(String dialectPrefix) {
         return Set.of(
-            new ShowForVariantProcessor(dialectPrefix, experimentService),
+            new ShowForVariantProcessor(dialectPrefix, experimentService, showDefinition),
             new HideForVariantProcessor(dialectPrefix, experimentService),
             new IfRolledOutProcessor(dialectPrefix, experimentService),
             new VariantAttributeProcessor(dialectPrefix, experimentService)
