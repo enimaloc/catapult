@@ -12,14 +12,14 @@ import org.thymeleaf.templatemode.TemplateMode;
 
 import java.util.List;
 
-class ShowForVariantProcessor extends AbstractAttributeTagProcessor {
+class VariantAttributeProcessor extends AbstractAttributeTagProcessor {
 
-    private static final int PRECEDENCE = StandardDialect.PROCESSOR_PRECEDENCE + 10;
-    static final String ATTR_NAME = "show-for";
+    private static final int PRECEDENCE = StandardDialect.PROCESSOR_PRECEDENCE + 5;
+    static final String ATTR_NAME = "variant";
 
     private final ExperimentService experimentService;
 
-    ShowForVariantProcessor(String dialectPrefix, ExperimentService experimentService) {
+    VariantAttributeProcessor(String dialectPrefix, ExperimentService experimentService) {
         super(TemplateMode.HTML, dialectPrefix, null, false, ATTR_NAME, true, PRECEDENCE, true);
         this.experimentService = experimentService;
     }
@@ -29,22 +29,19 @@ class ShowForVariantProcessor extends AbstractAttributeTagProcessor {
     protected void doProcess(ITemplateContext context, IProcessableElementTag tag,
                              AttributeName attributeName, String attributeValue,
                              IElementTagStructureHandler structureHandler) {
-        String[] parts = attributeValue.split(":", 2);
-        if (parts.length < 2) return;
-        String experimentKey = parts[0].trim();
-        String variantKey = parts[1].trim();
+        String experimentKey = attributeValue.trim();
 
-        experimentService.ensureExists(experimentKey, variantKey);
+        experimentService.ensureExists(experimentKey);
 
         List<ExperimentAssignment> assignments =
                 (List<ExperimentAssignment>) context.getVariable("activeExperimentAssignments");
 
-        boolean show = assignments != null && assignments.stream().anyMatch(a ->
-                a.getExperiment().getKey().equals(experimentKey)
-                        && a.getVariant().getKey().equals(variantKey));
+        String variantKey = assignments == null ? null : assignments.stream()
+                .filter(a -> a.getExperiment().getKey().equals(experimentKey))
+                .findFirst()
+                .map(a -> a.getVariant().getKey())
+                .orElse(null);
 
-        if (!show) {
-            structureHandler.removeElement();
-        }
+        structureHandler.setLocalVariable("experimentVariant", variantKey);
     }
 }

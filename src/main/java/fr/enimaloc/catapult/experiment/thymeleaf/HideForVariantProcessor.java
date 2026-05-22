@@ -12,14 +12,14 @@ import org.thymeleaf.templatemode.TemplateMode;
 
 import java.util.List;
 
-class ShowForVariantProcessor extends AbstractAttributeTagProcessor {
+class HideForVariantProcessor extends AbstractAttributeTagProcessor {
 
     private static final int PRECEDENCE = StandardDialect.PROCESSOR_PRECEDENCE + 10;
-    static final String ATTR_NAME = "show-for";
+    static final String ATTR_NAME = "hide-for";
 
     private final ExperimentService experimentService;
 
-    ShowForVariantProcessor(String dialectPrefix, ExperimentService experimentService) {
+    HideForVariantProcessor(String dialectPrefix, ExperimentService experimentService) {
         super(TemplateMode.HTML, dialectPrefix, null, false, ATTR_NAME, true, PRECEDENCE, true);
         this.experimentService = experimentService;
     }
@@ -39,11 +39,11 @@ class ShowForVariantProcessor extends AbstractAttributeTagProcessor {
         List<ExperimentAssignment> assignments =
                 (List<ExperimentAssignment>) context.getVariable("activeExperimentAssignments");
 
-        boolean show = assignments != null && assignments.stream().anyMatch(a ->
+        boolean hide = assignments != null && assignments.stream().anyMatch(a ->
                 a.getExperiment().getKey().equals(experimentKey)
                         && a.getVariant().getKey().equals(variantKey));
 
-        if (!show) {
+        if (hide) {
             structureHandler.removeElement();
         }
     }
