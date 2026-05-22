@@ -111,18 +111,21 @@ class ExperimentExpressionObjectTest {
     void getVariant_returnsNull_forAnonymousUser() {
         ExperimentExpressionObject obj = new ExperimentExpressionObject(experimentService, null);
         assertThat(obj.getVariant("k")).isNull();
+        verifyNoInteractions(experimentService);
     }
 
     @Test
     void isInVariant_returnsFalse_forAnonymousUser() {
         ExperimentExpressionObject obj = new ExperimentExpressionObject(experimentService, null);
         assertThat(obj.isInVariant("k", "v")).isFalse();
+        verifyNoInteractions(experimentService);
     }
 
     @Test
     void isRolledOut_returnsFalse_forAnonymousUser() {
         ExperimentExpressionObject obj = new ExperimentExpressionObject(experimentService, null);
         assertThat(obj.isRolledOut("k")).isFalse();
+        verifyNoInteractions(experimentService);
     }
 
     @Test
