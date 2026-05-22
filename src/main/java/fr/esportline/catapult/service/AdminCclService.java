@@ -94,7 +94,7 @@ public class AdminCclService {
             .values()
             .stream()
             .sorted(Comparator.comparing(IgdbRatingDescriptor::getDescription))
-            .collect(Collectors.toList());
+            .toList();
     }
 
     /**
@@ -194,12 +194,7 @@ public class AdminCclService {
                     ? ((Number) item.get("organization")).intValue()
                     : null;
 
-                IgdbRatingDescriptor d = new IgdbRatingDescriptor();
-                d.setId(id);
-                d.setDescription(description);
-                d.setOrganizationId(orgId);
-                d.setDisplayName(buildDisplayName(orgId, description));
-                igdbDescriptorRepo.save(d);
+                igdbDescriptorRepo.save(createDescriptor(id, description, orgId));
                 newCount++;
             }
         }
@@ -239,6 +234,15 @@ public class AdminCclService {
             }
         }
         if (seeded > 0) log.info("Applied {} default CCL→descriptor mappings by keyword matching", seeded);
+    }
+
+    private IgdbRatingDescriptor createDescriptor(Long id, String description, Integer orgId) {
+        IgdbRatingDescriptor d = new IgdbRatingDescriptor();
+        d.setId(id);
+        d.setDescription(description);
+        d.setOrganizationId(orgId);
+        d.setDisplayName(buildDisplayName(orgId, description));
+        return d;
     }
 
     private String buildDisplayName(Integer orgId, String description) {
