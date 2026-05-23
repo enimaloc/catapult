@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, null, ~{::div#home-content}, null, null, null, null)}">
+<head>
+    <title th:text="#{home.hero.tagline}">Catapult</title>
+</head>
+<body>
+<div id="home-content">
+
+    <!-- Hero -->
+    <div class="home-hero">
+        <h1>🚀 Catapult</h1>
+        <p class="hero-subtitle" th:text="#{home.hero.subtitle}">
+            Catapult détecte le jeu que tu lances et met à jour ta catégorie Twitch automatiquement.
+        </p>
+        <a th:href="@{/oauth2/authorization/twitch}" class="btn btn-twitch">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+            </svg>
+            <span th:text="#{home.hero.cta}">Se connecter avec Twitch</span>
+        </a>
+    </div>
+
+    <div class="home-page">
+
+        <!-- Features -->
+        <div class="home-section">
+            <div class="home-section-title" th:text="#{home.features.title}">Ce que fait Catapult</div>
+            <div class="home-feature-grid">
+                <div class="home-feature-card">
+                    <div class="home-feature-icon">⚡</div>
+                    <h3 th:text="#{home.feature.detection.title}">Détection automatique</h3>
+                    <p th:text="#{home.feature.detection.desc}">Steam, Xbox, Battle.net — Catapult sait quel jeu tu lances.</p>
+                </div>
+                <div class="home-feature-card">
+                    <div class="home-feature-icon">🔗</div>
+                    <h3 th:text="#{home.feature.bindings.title}">Bindings personnalisés</h3>
+                    <p th:text="#{home.feature.bindings.desc}">Associe chaque jeu à la catégorie Twitch exacte que tu veux.</p>
+                </div>
+                <div class="home-feature-card">
+                    <div class="home-feature-icon">🤖</div>
+                    <h3 th:text="#{home.feature.bot.title}">Bot temps réel</h3>
+                    <p th:text="#{home.feature.bot.desc}">La catégorie se met à jour dès que tu changes de jeu, en live.</p>
+                </div>
+                <div class="home-feature-card">
+                    <div class="home-feature-icon">🏷️</div>
+                    <h3 th:text="#{home.feature.ccl.title}">CCL automatiques</h3>
+                    <p th:text="#{home.feature.ccl.desc}">Les labels de contenu sont appliqués automatiquement depuis les métadonnées IGDB.</p>
+                </div>
+                <div class="home-feature-card">
+                    <div class="home-feature-icon">🎯</div>
+                    <h3 th:text="#{home.feature.nogame.title}">Catégorie par défaut</h3>
+                    <p th:text="#{home.feature.nogame.desc}">En live sans jeu ? Catapult applique ta catégorie de secours.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sources (conditional) -->
+        <div class="home-section" th:if="${hasAnySources}">
+            <div class="home-section-title" th:text="#{home.sources.title}">Plateformes supportées</div>
+            <div class="home-sources">
+                <div class="home-source-badge" th:if="${showSteam}">🎮 Steam</div>
+                <div class="home-source-badge" th:if="${showXbox}">🎮 Xbox</div>
+                <div class="home-source-badge" th:if="${showBattlenet}">🎮 Battle.net</div>
+            </div>
+        </div>
+
+        <!-- Preview -->
+        <div class="home-section">
+            <div class="home-section-title" th:text="#{home.preview.title}">Aperçu de l'interface</div>
+            <div class="home-preview-mock">
+                <div class="home-preview-status">
+                    <div class="home-preview-status-dot"></div>
+                    <span>Live · CS2</span>
+                </div>
+                <div class="home-preview-binding">
+                    <span>CS2</span>
+                    <span class="home-preview-binding-arrow">→</span>
+                    <span>Counter-Strike 2</span>
+                </div>
+                <div class="home-preview-binding">
+                    <span>Valorant</span>
+                    <span class="home-preview-binding-arrow">→</span>
+                    <span>Valorant</span>
+                </div>
+                <div class="home-preview-binding">
+                    <span>Minecraft</span>
+                    <span class="home-preview-binding-arrow">→</span>
+                    <span>Minecraft: Java Edition</span>
+                </div>
+                <div class="home-preview-log">✓ Catégorie mise à jour : Counter-Strike 2</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+</body>
+</html>
