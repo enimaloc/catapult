@@ -74,6 +74,7 @@ class HomeTemplateTest {
     @Test
     void home_allSourceBadgesVisibleWhenAllEnabled() throws Exception {
         Document doc = renderPage();
+        assertThat(doc.select(".home-sources")).isNotEmpty();
         String body = doc.body().text();
         assertThat(body).contains("Steam");
         assertThat(body).contains("Xbox");
