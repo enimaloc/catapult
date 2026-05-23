@@ -82,6 +82,13 @@ class HomeTemplateTest {
     }
 
     @Test
+    void home_heroTaglineIsVisible() throws Exception {
+        Document doc = renderPage();
+        assertThat(doc.select(".hero-tagline")).isNotEmpty();
+        assertThat(doc.select(".hero-tagline").text()).isNotBlank();
+    }
+
+    @Test
     void home_footerIsPresent() throws Exception {
         Document doc = renderPage();
         assertThat(doc.select("footer.footer")).isNotEmpty();
