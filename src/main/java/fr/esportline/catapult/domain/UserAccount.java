@@ -29,6 +29,9 @@ public class UserAccount {
     @Column(name = "twitch_username", nullable = false)
     private String twitchUsername;
 
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
     @Column(name = "steam_id", unique = true)
     private String steamId;
 
