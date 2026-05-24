@@ -10,7 +10,7 @@ description = "catapult"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -51,4 +51,38 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+springBoot {
+    buildInfo {
+        val gitBranch = runCatching {
+            ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD")
+                .start().inputStream.bufferedReader().readLine() ?: "unknown"
+        }.getOrDefault("unknown")
+
+        val gitCommit = runCatching {
+            ProcessBuilder("git", "rev-parse", "--short", "HEAD")
+                .start().inputStream.bufferedReader().readLine() ?: "unknown"
+        }.getOrDefault("unknown")
+
+        val gitRemote = runCatching {
+            ProcessBuilder("git", "remote", "get-url", "origin")
+                .start().inputStream.bufferedReader().readLine() ?: ""
+        }.getOrDefault("")
+
+        val githubUrl = gitRemote
+            .replace(Regex("^git@github\\.com:(.+?)(\\.git)?$"), "https://github.com/$1")
+            .replace(Regex("\\.git$"), "")
+            .ifBlank { "#" }
+
+        properties {
+            additional.set(
+                mapOf(
+                    "git.branch" to gitBranch,
+                    "git.commit" to gitCommit,
+                    "git.github-url" to githubUrl
+                )
+            )
+        }
+    }
 }
