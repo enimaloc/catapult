@@ -108,6 +108,11 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             account.setTwitchUsername(twitchUsername);
         }
 
+        String profileImageUrl = oAuth2User.getAttribute("profile_image_url");
+        if (profileImageUrl != null && !profileImageUrl.equals(account.getProfileImageUrl())) {
+            account.setProfileImageUrl(profileImageUrl);
+        }
+
         if (account.getStatus() == UserAccount.Status.PENDING_DELETION) {
             account.setStatus(UserAccount.Status.ACTIVE);
             account.setDeletionRequestedAt(null);

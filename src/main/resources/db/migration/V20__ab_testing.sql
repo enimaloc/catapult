@@ -17,6 +17,7 @@ CREATE TABLE experiments (
 CREATE TABLE experiment_variants (
     id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     experiment_id UUID        NOT NULL REFERENCES experiments(id) ON DELETE CASCADE,
+    internal_id   INT          NOT NULL DEFAULT 0,
     key           VARCHAR(100) NOT NULL,
     name          VARCHAR(255) NOT NULL,
     weight        INT          NOT NULL DEFAULT 1,

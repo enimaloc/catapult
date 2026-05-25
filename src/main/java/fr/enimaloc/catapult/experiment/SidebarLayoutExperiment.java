@@ -2,7 +2,9 @@ package fr.enimaloc.catapult.experiment;
 
 import fr.enimaloc.catapult.domain.ExperimentAssignmentRule.RuleType;
 import fr.enimaloc.catapult.domain.ExperimentOverride;
+import org.springframework.context.annotation.Profile;
 
+@Profile("mock-web")
 @ExperimentSpec(
         key         = "sidebar-layout",
         name        = "Position du bot dans la sidebar",
