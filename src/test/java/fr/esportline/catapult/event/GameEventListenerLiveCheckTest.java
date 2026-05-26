@@ -170,4 +170,17 @@ class GameEventListenerLiveCheckTest {
         verify(twitchService, never()).updateChannel(any(), any());
         verify(streamStateService, never()).storePending(any(), any());
     }
+
+    @Test
+    void onGameDetected_whenBindingIncomplete_andSettingsAbsent_skipsUpdate() {
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        when(bindingService.resolveOrCreate(eq(user), any())).thenReturn(binding);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        DetectedGame game = new DetectedGame("g1", GameBinding.SourceType.STEAM, "Unknown Game");
+        listener.onGameDetected(new GameDetectedEvent(this, user, game));
+
+        verify(twitchService, never()).updateChannel(any(), any());
+        verify(streamStateService, never()).storePending(any(), any());
+    }
 }
