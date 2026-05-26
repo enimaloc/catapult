@@ -39,4 +39,18 @@ public class UserSettings {
     )
     @Column(name = "ccl_id")
     private Set<String> noGameCcls = new HashSet<>();
+
+    @Column(name = "incomplete_fallback_twitch_game_id")
+    private String incompleteFallbackTwitchGameId;
+
+    @Column(name = "incomplete_fallback_twitch_game_name")
+    private String incompleteFallbackTwitchGameName;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "user_settings_incomplete_fallback_ccls",
+        joinColumns = @JoinColumn(name = "user_id")
+    )
+    @Column(name = "ccl_id")
+    private Set<String> incompleteFallbackCcls = new HashSet<>();
 }
