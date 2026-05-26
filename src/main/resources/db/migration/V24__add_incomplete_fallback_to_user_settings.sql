@@ -1,3 +1,4 @@
+-- V24 — incomplete fallback: store fallback game/CCLs to apply when a detected game binding is INCOMPLETE
 ALTER TABLE user_settings
     ADD COLUMN incomplete_fallback_twitch_game_id   VARCHAR,
     ADD COLUMN incomplete_fallback_twitch_game_name VARCHAR;
