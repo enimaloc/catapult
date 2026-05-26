@@ -28,8 +28,14 @@ public class GameEventListener {
 
         GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
 
-        if (binding.getStatus() == GameBinding.Status.INCOMPLETE || binding.isIgnored()) {
-            log.debug("Binding is {} — skipping update for user {}", binding.getStatus(), user.getId());
+        if (binding.isIgnored()) {
+            log.debug("Binding is ignored — skipping update for user {}", user.getId());
+            return;
+        }
+
+        if (binding.getStatus() == GameBinding.Status.INCOMPLETE) {
+            log.debug("Binding is INCOMPLETE — checking fallback for user {}", user.getId());
+            applyIncompleteFallback(user);
             return;
         }
 
@@ -83,5 +89,30 @@ public class GameEventListener {
         log.debug("StreamOfflineEvent for user {}", user.getId());
         twitchService.resetToDefault(user);
         streamStateService.clearPending(user);
+    }
+
+    private void applyIncompleteFallback(UserAccount user) {
+        userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+            if (settings.getIncompleteFallbackTwitchGameId() == null
+                    || settings.getIncompleteFallbackTwitchGameId().isBlank()) {
+                log.debug("No incomplete fallback configured for user {} — skipping", user.getId());
+                return;
+            }
+            GameBinding fallback = new GameBinding();
+            fallback.setUser(user);
+            fallback.setSourceType(GameBinding.SourceType.MANUAL);
+            fallback.setSourceName("incomplete-fallback");
+            fallback.setTwitchGameId(settings.getIncompleteFallbackTwitchGameId());
+            fallback.setTwitchGameName(settings.getIncompleteFallbackTwitchGameName());
+            fallback.getCcls().addAll(settings.getIncompleteFallbackCcls());
+            fallback.setStatus(GameBinding.Status.MANUAL);
+
+            if (streamStateService.isLive(user)) {
+                twitchService.updateChannel(user, fallback);
+            } else {
+                streamStateService.storePending(user, fallback);
+                log.debug("User {} not live — stored incomplete fallback as pending", user.getId());
+            }
+        });
     }
 }

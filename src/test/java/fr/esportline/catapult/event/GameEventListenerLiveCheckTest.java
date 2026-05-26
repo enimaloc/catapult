@@ -118,4 +118,56 @@ class GameEventListenerLiveCheckTest {
 
         verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
     }
+
+    @Test
+    void onGameDetected_whenBindingIncomplete_andFallbackConfigured_andLive_appliesFallback() {
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        when(bindingService.resolveOrCreate(eq(user), any())).thenReturn(binding);
+
+        UserSettings settings = new UserSettings();
+        settings.setIncompleteFallbackTwitchGameId("fallback-id");
+        settings.setIncompleteFallbackTwitchGameName("Just Chatting");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(streamStateService.isLive(user)).thenReturn(true);
+
+        DetectedGame game = new DetectedGame("g1", GameBinding.SourceType.STEAM, "Unknown Game");
+        listener.onGameDetected(new GameDetectedEvent(this, user, game));
+
+        verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
+        verify(streamStateService, never()).storePending(any(), any());
+    }
+
+    @Test
+    void onGameDetected_whenBindingIncomplete_andFallbackConfigured_andNotLive_storesPending() {
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        when(bindingService.resolveOrCreate(eq(user), any())).thenReturn(binding);
+
+        UserSettings settings = new UserSettings();
+        settings.setIncompleteFallbackTwitchGameId("fallback-id");
+        settings.setIncompleteFallbackTwitchGameName("Just Chatting");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(streamStateService.isLive(user)).thenReturn(false);
+
+        DetectedGame game = new DetectedGame("g1", GameBinding.SourceType.STEAM, "Unknown Game");
+        listener.onGameDetected(new GameDetectedEvent(this, user, game));
+
+        verify(streamStateService).storePending(eq(user), any(GameBinding.class));
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void onGameDetected_whenBindingIncomplete_andNoFallbackConfigured_skipsUpdate() {
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        when(bindingService.resolveOrCreate(eq(user), any())).thenReturn(binding);
+
+        UserSettings settings = new UserSettings();
+        // incompleteFallbackTwitchGameId is null — no fallback configured
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        DetectedGame game = new DetectedGame("g1", GameBinding.SourceType.STEAM, "Unknown Game");
+        listener.onGameDetected(new GameDetectedEvent(this, user, game));
+
+        verify(twitchService, never()).updateChannel(any(), any());
+        verify(streamStateService, never()).storePending(any(), any());
+    }
 }
