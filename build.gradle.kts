@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "4.0.4"
     id("io.spring.dependency-management") version "1.1.7"
+    id("org.sonarqube") version "7.3.0.8198"
 }
 
 group = "fr.esportline"
@@ -84,5 +85,12 @@ springBoot {
                 )
             )
         }
+    }
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "enimaloc_catapult_11f3e5c9-5bb5-4f6f-8642-86e65a25ff69")
+        property("sonar.projectName", "catapult")
     }
 }
