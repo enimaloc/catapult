@@ -54,8 +54,8 @@ test:
     reports:
       junit: build/test-results/test/TEST-*.xml
     expire_in: 1 week
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+#  rules:
+#    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 sonar:
   stage: analyze
@@ -69,8 +69,8 @@ sonar:
     SONAR_TOKEN: $SONAR_TOKEN
   tags:
     - sonar
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+#  rules:
+#    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 release:
   stage: release
