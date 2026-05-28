@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - analyze
   - release
 
 default:
@@ -15,16 +16,6 @@ build:
   image: eclipse-temurin:21-jdk
   script:
     - ./gradlew build -x test
-
-sonar:
-  stage: build
-  image: eclipse-temurin:21-jdk
-  script:
-    - ./gradlew build sonar --info
-  variables:
-    SONAR_TOKEN: $SONAR_TOKEN
-  tags:
-    - sonar
 
 test:
   stage: test
@@ -57,10 +48,27 @@ test:
   artifacts:
     when: always
     paths:
-      - build/reports/jacoco/test/html/
+      - build/reports/jacoco/
+      - build/classes/
+      - build/test-results/test/
     reports:
       junit: build/test-results/test/TEST-*.xml
     expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+sonar:
+  stage: analyze
+  image: eclipse-temurin:21-jdk
+  needs:
+    - job: test
+      artifacts: true
+  script:
+    - ./gradlew sonar -x test -x jacocoTestReport --info
+  variables:
+    SONAR_TOKEN: $SONAR_TOKEN
+  tags:
+    - sonar
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
