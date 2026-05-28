@@ -23,7 +23,8 @@ sonar:
     - ./gradlew build sonar --info
   variables:
     SONAR_TOKEN: $SONAR_TOKEN
-    SONAR_HOST_URL: $SONAR_HOST_URL
+  tags:
+    - sonar
 
 test:
   stage: test
