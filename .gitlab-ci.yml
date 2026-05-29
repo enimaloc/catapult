@@ -65,8 +65,6 @@ sonar:
       artifacts: true
   script:
     - ./gradlew sonar -x test -x jacocoTestReport --info
-  variables:
-    SONAR_TOKEN: $SONAR_TOKEN
   tags:
     - sonar
 #  rules:
