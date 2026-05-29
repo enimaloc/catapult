@@ -100,7 +100,7 @@ springBoot {
 
 sonar {
     properties {
-        property("sonar.projectKey", "enimaloc_catapult_11f3e5c9-5bb5-4f6f-8642-86e65a25ff69")
+        property("sonar.projectKey", "enimaloc_catapult_876520ec-6736-4f21-ae81-d9ee3ec3c1ce")
         property("sonar.projectName", "catapult")
         property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml")
     }
