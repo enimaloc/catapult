@@ -6,7 +6,7 @@ plugins {
     id("org.sonarqube") version "7.3.0.8198"
 }
 
-group = "fr.esportline"
+group = "fr.enimaloc"
 version = "0.0.1-SNAPSHOT"
 description = "catapult"
 
@@ -36,6 +36,9 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("io.github.husnjak:igdb-api-jvm:1.3.2")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("io.getunleash:unleash-client-java:9.2.4")
+    implementation("io.github.growthbook:growthbook-sdk-java:1.0.0")
     runtimeOnly("org.postgresql:postgresql")
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
