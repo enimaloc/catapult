@@ -262,7 +262,7 @@ public class IgdbService {
         Set<String> alreadyCached = cclRepository.findAllIgdbIds();
         List<String> toLoad = knownIds.stream()
             .filter(id -> !alreadyCached.contains(id) && !cclCache.containsKey(id))
-            .collect(Collectors.toList());
+            .toList();
 
         if (toLoad.isEmpty()) {
             log.info("CCL cache already warm for all {} cached games", knownIds.size());
