@@ -20,6 +20,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import jakarta.servlet.http.HttpSession;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -33,6 +37,7 @@ public class SteamAuthController {
     private static final String STEAM_ID_PREFIX = "https://steamcommunity.com/openid/id/";
     private static final String OPENID_NS = "http://specs.openid.net/auth/2.0";
     private static final String OPENID_IDENTIFIER_SELECT = "http://specs.openid.net/auth/2.0/identifier_select";
+    private static final String SESSION_NONCE_KEY = "steam_link_nonce";
 
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
@@ -42,8 +47,11 @@ public class SteamAuthController {
     private final RestClient restClient;
 
     @GetMapping
-    public String redirectToSteam(@AuthenticationPrincipal CatapultOAuth2User principal) {
-        String returnTo = baseUrl + "/connect/steam/callback";
+    public String redirectToSteam(@AuthenticationPrincipal CatapultOAuth2User principal,
+                                  HttpSession session) {
+        String nonce = generateNonce();
+        session.setAttribute(SESSION_NONCE_KEY, nonce);
+        String returnTo = baseUrl + "/connect/steam/callback?nonce=" + nonce;
 
         String redirectUrl = UriComponentsBuilder.fromUriString(STEAM_OPENID_ENDPOINT)
             .queryParam("openid.ns", OPENID_NS)
@@ -59,7 +67,17 @@ public class SteamAuthController {
 
     @GetMapping("/callback")
     public String handleCallback(@AuthenticationPrincipal CatapultOAuth2User principal,
-                                 @RequestParam Map<String, String> params) {
+                                 @RequestParam Map<String, String> params,
+                                 HttpSession session) {
+        String sessionNonce = (String) session.getAttribute(SESSION_NONCE_KEY);
+        session.removeAttribute(SESSION_NONCE_KEY);
+        String callbackNonce = params.get("nonce");
+        if (sessionNonce == null || callbackNonce == null
+                || !MessageDigest.isEqual(sessionNonce.getBytes(), callbackNonce.getBytes())) {
+            log.warn("Steam OpenID nonce mismatch for user {}", principal.getUserAccount().getId());
+            return "redirect:/settings?error=steam";
+        }
+
         if (!"id_res".equals(params.get("openid.mode"))) {
             log.warn("Steam OpenID callback rejected for user {}: mode={}",
                 principal.getUserAccount().getId(), params.get("openid.mode"));
@@ -97,10 +115,12 @@ public class SteamAuthController {
         return "redirect:/settings";
     }
 
-    /**
-     * Vérifie la réponse OpenID auprès de Steam en mode check_authentication.
-     * Steam répond avec "is_valid:true" si la signature est valide.
-     */
+    private static String generateNonce() {
+        byte[] bytes = new byte[16];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
     private boolean verifyWithSteam(Map<String, String> params) {
         try {
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();

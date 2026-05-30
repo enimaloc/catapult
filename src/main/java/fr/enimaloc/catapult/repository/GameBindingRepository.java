@@ -23,4 +23,6 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
     Page<GameBinding> findByUserAndSourceType(UserAccount user, GameBinding.SourceType sourceType, Pageable pageable);
 
     List<GameBinding> findByUser(UserAccount user);
+
+    Optional<GameBinding> findByIdAndUser(UUID id, UserAccount user);
 }

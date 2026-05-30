@@ -89,7 +89,7 @@ public class BindingsController {
     @PostMapping("/bindings/{id}/delete")
     public String deleteBinding(@AuthenticationPrincipal CatapultOAuth2User principal,
                                 @PathVariable UUID id) {
-        bindingService.deleteBinding(id);
+        bindingService.deleteBinding(principal.getUserAccount(), id);
         return "redirect:/bindings";
     }
 
