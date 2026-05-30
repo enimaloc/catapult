@@ -85,7 +85,7 @@ class BindingServiceTest {
 
     @Test
     void updateBinding_unknownId_doesNothing() {
-        when(gameBindingRepository.findById(bindingId)).thenReturn(Optional.empty());
+        when(gameBindingRepository.findByIdAndUser(bindingId, user)).thenReturn(Optional.empty());
 
         bindingService.updateBinding(user, bindingId, "new-id", "New Game", Set.of(), false);
 
