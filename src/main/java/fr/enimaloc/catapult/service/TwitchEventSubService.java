@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -31,8 +32,9 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
+@ConditionalOnProperty(name = "app.mock.twitch-eventsub", havingValue = "false", matchIfMissing = true)
 @RequiredArgsConstructor
-public class TwitchEventSubService {
+public class TwitchEventSubService implements EventSubService {
 
     private static final String WS_URL = "wss://eventsub.wss.twitch.tv/ws";
     private static final String EVENTSUB_API = "https://api.twitch.tv/helix/eventsub/subscriptions";

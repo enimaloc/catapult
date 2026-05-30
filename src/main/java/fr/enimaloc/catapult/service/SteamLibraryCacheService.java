@@ -7,6 +7,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -16,12 +17,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Objects;
 
 @Slf4j
 @Service
 @DependsOn("flyway")
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "app.mock.steam", havingValue = "false", matchIfMissing = true)
 public class SteamLibraryCacheService {
 
     private static final String OWNED_GAMES_URL =
@@ -42,9 +44,7 @@ public class SteamLibraryCacheService {
             log.info("No users with Steam linked — skipping library preload");
         } else {
             log.info("Pre-caching Steam libraries for {} user(s) at startup", users.size());
-            for (UserAccount user : users) {
-                cacheLibrary(user);
-            }
+            users.forEach(this::cacheLibrary);
         }
         igdbService.prewarmCclCache();
     }
@@ -68,9 +68,9 @@ public class SteamLibraryCacheService {
 
         List<String> appIds = games.stream()
             .map(g -> g.get("appid"))
-            .filter(id -> id != null)
+            .filter(Objects::nonNull)
             .map(String::valueOf)
-            .collect(Collectors.toList());
+            .toList();
 
         igdbService.prewarmSteamAppIds(appIds);
     }

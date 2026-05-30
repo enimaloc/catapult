@@ -64,18 +64,24 @@ public class AccountService {
     }
 
     private void deleteAccountPermanently(UserAccount account) {
-        revokeToken(account, OAuthToken.Provider.TWITCH);
+        revokeTwitchToken(account);
+        // Pas d'endpoint de révocation officiel pour ces providers — suppression en base uniquement
+        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
+            oAuthTokenRepository.findByUserAndProvider(account, p)
+                .ifPresent(oAuthTokenRepository::delete);
+        }
+
         userAccountRepository.delete(account);
         log.info("Account {} permanently deleted", account.getId());
     }
 
-    private void revokeToken(UserAccount account, OAuthToken.Provider provider) {
-        oAuthTokenRepository.findByUserAndProvider(account, provider).ifPresent(token -> {
+    private void revokeTwitchToken(UserAccount account) {
+        oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.TWITCH).ifPresent(token -> {
             try {
                 // La révocation effective est gérée par TwitchService/DiscordService
                 oAuthTokenRepository.delete(token);
             } catch (Exception e) {
-                log.warn("Failed to revoke {} token for account {}", provider, account.getId(), e);
+                log.warn("Failed to revoke TWITCH token for account {}", account.getId(), e);
             }
         });
     }

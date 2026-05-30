@@ -18,7 +18,7 @@ import java.util.UUID;
 public class GameBinding {
 
     public enum SourceType {
-        STEAM, MANUAL
+        STEAM, XBOX, BATTLENET, MANUAL
     }
 
     public enum Status {

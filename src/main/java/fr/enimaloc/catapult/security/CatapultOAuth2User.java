@@ -7,6 +7,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
+import java.io.Serial;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,7 @@ import java.util.Map;
 @Getter
 public class CatapultOAuth2User implements OAuth2User, UserDetails {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private final OAuth2User delegate; // null pour les sessions impersonifiées
@@ -41,6 +43,7 @@ public class CatapultOAuth2User implements OAuth2User, UserDetails {
     }
 
     @Override
+    @SuppressWarnings("NullableProblems")
     public Collection<? extends GrantedAuthority> getAuthorities() {
         if (admin) {
             return List.of(
@@ -52,6 +55,7 @@ public class CatapultOAuth2User implements OAuth2User, UserDetails {
     }
 
     @Override
+    @SuppressWarnings("NullableProblems")
     public String getName() {
         return userAccount.getTwitchId();
     }
@@ -64,23 +68,14 @@ public class CatapultOAuth2User implements OAuth2User, UserDetails {
     }
 
     @Override
+    @SuppressWarnings("NullableProblems")
     public String getUsername() {
         return userAccount.getTwitchUsername();
     }
 
     @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
     public boolean isAccountNonLocked() {
         return userAccount.getStatus() == UserAccount.Status.ACTIVE;
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
     }
 
     @Override

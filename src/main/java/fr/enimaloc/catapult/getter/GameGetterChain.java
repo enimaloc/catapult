@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,12 +23,11 @@ import java.util.Optional;
 public class GameGetterChain {
 
     private final GetterConfigRepository getterConfigRepository;
-    private final SteamGameGetter steamGameGetter;
-
+    private final Optional<SteamGameGetter> steamGameGetter;
+    private final Optional<XboxGameGetter> xboxGameGetter;
+    private final Optional<BattleNetGameGetter> battleNetGameGetter;
     public Optional<DetectedGame> resolve(UserAccount user) {
-        Map<GetterConfig.Provider, GameGetter> getterByProvider = Map.of(
-            GetterConfig.Provider.STEAM, steamGameGetter
-        );
+        Map<GetterConfig.Provider, GameGetter> getterByProvider = buildGetterMap();
 
         List<GetterConfig> configs = getterConfigRepository.findByUserOrderByPriorityAsc(user);
 
@@ -49,5 +49,13 @@ public class GameGetterChain {
         }
 
         return Optional.empty();
+    }
+
+    private Map<GetterConfig.Provider, GameGetter> buildGetterMap() {
+        Map<GetterConfig.Provider, GameGetter> map = new EnumMap<>(GetterConfig.Provider.class);
+        steamGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.STEAM, g));
+        xboxGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.XBOX, g));
+        battleNetGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.BATTLENET, g));
+        return map;
     }
 }
