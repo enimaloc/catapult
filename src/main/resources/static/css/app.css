@@ -206,6 +206,14 @@ body {
     color: var(--text);
     background: var(--bg-base);
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.page-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 a { color: var(--accent); text-decoration: none; }
@@ -281,14 +289,88 @@ a:hover { text-decoration: underline; }
     border-bottom: 1px solid var(--danger-border);
     color: var(--danger-text);
 }
+.banner-warning {
+    background: var(--color-warning, #f59e0b);
+    color: #000;
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+.footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1.5rem;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.footer-left,
+.footer-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.footer a {
+    color: var(--text-muted);
+    text-decoration: none;
+}
+
+.footer a:hover {
+    color: var(--text);
+    text-decoration: underline;
+}
+
+.privacy-page {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
+
+.privacy-page h1 {
+    margin-bottom: 2rem;
+}
+
+.privacy-page section {
+    margin-bottom: 2rem;
+}
+
+/* ============================================================
+   Page layout (optional sidebars)
+   ============================================================ */
+.page-layout {
+    display: grid;
+    grid-template-columns: minmax(200px, 280px) minmax(0, 960px) minmax(200px, 280px);
+    justify-content: center;
+    align-items: start;
+    gap: 24px;
+    padding: 32px 24px 0;
+}
+
+.page-sidebar {
+    padding-top: 32px;
+}
+
+@media (max-width: 1300px) {
+    .page-layout {
+        grid-template-columns: 1fr;
+    }
+    .page-sidebar--left  { order: 2; }
+    .page-sidebar--right { order: 3; }
+}
 
 /* ============================================================
    Container
    ============================================================ */
 .container {
+    width: 100%;
     max-width: 960px;
     margin: 0 auto;
-    padding: 32px 24px;
+    padding: 0 24px;
 }
 
 h2 { font-size: 22px; font-weight: 700; margin-bottom: 24px; color: var(--text-bright); }
@@ -309,6 +391,107 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
 .card-danger {
     border-color: var(--danger-border);
     background: #1a0d0e;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.card-header h3 { margin-bottom: 0; }
+
+.btn-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background .15s, color .15s;
+}
+.btn-help:hover {
+    background: var(--accent);
+    color: var(--bg-base);
+    border-color: var(--accent);
+}
+
+/* ============================================================
+   Help panel (slide-in)
+   ============================================================ */
+.help-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    z-index: 150;
+    display: none;
+}
+.help-overlay.open { display: block; }
+
+.help-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 360px;
+    max-width: 90vw;
+    height: 100%;
+    background: var(--bg-surface);
+    border-left: 1px solid var(--border);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .25s ease;
+    overflow: hidden;
+}
+.help-panel.open { transform: translateX(0); }
+
+.help-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.help-panel-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--text-muted);
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.help-panel-close:hover { color: var(--text); background: var(--border); }
+
+.help-panel-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+.help-panel-body h4 { color: var(--text); margin-bottom: 8px; }
+.help-panel-body p  { margin-bottom: 12px; }
+.help-panel-body ul { padding-left: 20px; margin-bottom: 12px; }
+.help-panel-body li { margin-bottom: 4px; }
+
+.divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 12px -20px;
 }
 
 /* ============================================================
@@ -590,7 +773,7 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
+    flex: 1;
     padding: 24px;
 }
 
@@ -598,7 +781,6 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
     padding: 24px;
     width: 100%;
 }
@@ -667,6 +849,12 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
    ============================================================ */
 .text-muted { color: var(--text-dim); }
 .text-sm    { font-size: 12px; }
+.mb-8           { margin-bottom: 8px; }
+.mb-12          { margin-bottom: 12px; }
+.mb-16          { margin-bottom: 16px; }
+.m-0            { margin: 0; }
+.align-self-end { align-self: end; }
+.label-muted    { font-size: .85em; font-weight: 600; color: var(--text-dim); }
 
 label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size: 13px; }
 
@@ -706,6 +894,9 @@ label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size:
 .edit-row td { background: var(--bg-elevated); padding: 12px 16px; }
 .inline-edit-fields { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
 .inline-edit-actions { display: flex; gap: 8px; margin-top: 12px; }
+.inline-edit-field       { display: flex; flex-direction: column; gap: 4px; }
+.inline-edit-field label { font-size: .8em; font-weight: 600; }
+.ccl-checkboxes          { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ============================================================
    Form field (labeled input column)
@@ -729,45 +920,9 @@ label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size:
     position: absolute; z-index: 1000; width: 100%;
     box-shadow: 0 4px 12px rgba(0,0,0,.5); border-radius: 0 0 6px 6px;
 }
-.game-results li { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border-subtle); color: var(--text); }
+.game-results li { display: flex; align-items: center; gap: 8px; padding: 6px 12px; cursor: pointer; border-bottom: 1px solid var(--border-subtle); color: var(--text); }
+.game-results li img { width: 30px; height: 40px; object-fit: cover; border-radius: 2px; }
 .game-results li:hover { background: var(--bg-base); }
-
-/* ============================================================
-   Process/binding tables
-   ============================================================ */
-.process-table { width: 100%; border-collapse: collapse; }
-.process-table th {
-    padding: 8px 12px; border-bottom: 2px solid var(--border);
-    text-align: left; color: var(--text-dim); font-size: .85em; font-weight: 600;
-}
-.process-table td { padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
-.process-table tr:last-child td { border-bottom: none; }
-
-/* ============================================================
-   Predicate sub-table
-   ============================================================ */
-.predicate-table { width: 100%; border-collapse: collapse; font-size: .8em; }
-.predicate-table th { padding: 4px 6px; color: var(--text-dim); border-bottom: 1px solid var(--border); font-weight: 600; text-align: left; }
-.predicate-table td { padding: 4px 6px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
-.predicate-table tr:last-child td { border-bottom: none; }
-
-/* ============================================================
-   Predicate add form
-   ============================================================ */
-.predicate-form {
-    display: grid;
-    grid-template-columns: auto auto 1fr auto auto auto;
-    gap: 6px; align-items: end; font-size: .82em; margin-top: 8px;
-}
-.predicate-form-field { display: flex; flex-direction: column; gap: 2px; }
-.predicate-form-field label { color: var(--text-muted); font-weight: 600; font-size: .9em; margin-bottom: 0; }
-.predicate-form-field select,
-.predicate-form-field input[type=text] {
-    padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px;
-    background: var(--bg-base); color: var(--text); font-family: inherit; font-size: 1em;
-}
-.predicate-form-field select:focus,
-.predicate-form-field input[type=text]:focus { outline: none; border-color: var(--accent-strong); }
 
 /* ============================================================
    Alert
@@ -805,16 +960,6 @@ details summary { cursor: pointer; font-weight: 600; }
    Regex badge
    ============================================================ */
 .badge-regex { background: #1e3a5f; color: #60a5fa; }
-
-/* ============================================================
-   OBS API key display
-   ============================================================ */
-.api-key-display { display: flex; gap: 8px; align-items: center; margin-top: 4px; margin-bottom: 12px; }
-.api-key-code {
-    background: var(--bg-elevated); padding: 6px 10px; border-radius: 4px;
-    font-size: .9em; flex: 1; word-break: break-all;
-    color: var(--accent); font-family: ui-monospace, monospace;
-}
 
 /* ============================================================
    IGDB Explorer
@@ -902,6 +1047,33 @@ details summary { cursor: pointer; font-weight: 600; }
 
 .theme-btn:hover { opacity: 1; }
 .theme-btn.active { background: var(--border); opacity: 1; }
+
+/* ============================================================
+   Progress Line
+   ============================================================ */
+.progress-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.progress-label {
+    font-size: 14px;
+}
+
+.progress-bar {
+    display: flex;
+    height: 12px;
+    width: 100%;
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: #e0e0e0; /* visible si total < 100% */
+}
+
+.progress-part {
+    height: 100%;
+    transition: width 0.3s ease;
+}
 
 /* ============================================================
    Theme: old-steam — border style overrides (sharp edges)

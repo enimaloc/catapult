@@ -6,7 +6,7 @@ plugins {
     id("org.sonarqube") version "7.3.0.8198"
 }
 
-group = "fr.esportline"
+group = "fr.enimaloc"
 version = "0.0.1-SNAPSHOT"
 description = "catapult"
 
@@ -24,9 +24,11 @@ configurations {
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-client")
@@ -36,6 +38,14 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("io.github.husnjak:igdb-api-jvm:1.3.2")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("io.getunleash:unleash-client-java:9.2.4")
+    implementation("com.github.growthbook:growthbook-sdk-java:0.10.10")
+    implementation("com.ibm.icu:icu4j:76.1")
+    implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation("org.webjars.npm:chart.js:4.4.9")
+    implementation("org.webjars.npm:htmx.org:2.0.4")
+    implementation("org.webjars:webjars-locator-lite")
     runtimeOnly("org.postgresql:postgresql")
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
