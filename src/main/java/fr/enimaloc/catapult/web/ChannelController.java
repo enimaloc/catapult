@@ -284,7 +284,7 @@ public class ChannelController {
             @AuthenticationPrincipal CatapultOAuth2User principal,
             @PathVariable UUID id) {
         UserAccount channelUser = resolveAndCheck(username, principal);
-        bindingService.deleteBinding(id);
+        bindingService.deleteBinding(channelUser, id);
         return "redirect:/channels/" + channelUser.getTwitchUsername();
     }
 
