@@ -15,6 +15,7 @@ import org.thymeleaf.model.IProcessableElementTag;
 import org.thymeleaf.processor.element.IElementTagStructureHandler;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.Mockito.*;
 
@@ -27,13 +28,15 @@ class ExperimentProcessorsTest {
     @Mock AttributeName attributeName;
     @Mock IElementTagStructureHandler structureHandler;
 
+    private Experiment exp;
     private ExperimentAssignment greenAssignment;
     private ExperimentAssignment controlAssignment;
 
     @BeforeEach
     void setUp() {
-        Experiment exp = new Experiment();
+        exp = new Experiment();
         exp.setKey("my-exp");
+        exp.setStatus(Experiment.Status.ACTIVE);
 
         ExperimentVariant green = new ExperimentVariant();
         green.setKey("green");
@@ -91,6 +94,7 @@ class ExperimentProcessorsTest {
     @Test
     void showFor_keepsElement_whenUserIsInMatchingVariant() {
         when(context.getVariable("activeExperimentAssignments")).thenReturn(List.of(greenAssignment));
+        when(experimentService.getExperiment("my-exp")).thenReturn(Optional.of(exp));
         ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService, false);
         p.doProcess(context, tag, attributeName, "my-exp:green", structureHandler);
         verify(structureHandler, never()).removeElement();
@@ -99,6 +103,7 @@ class ExperimentProcessorsTest {
     @Test
     void showFor_removesElement_whenUserIsInDifferentVariant() {
         when(context.getVariable("activeExperimentAssignments")).thenReturn(List.of(greenAssignment));
+        when(experimentService.getExperiment("my-exp")).thenReturn(Optional.of(exp));
         ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService, false);
         p.doProcess(context, tag, attributeName, "my-exp:blue", structureHandler);
         verify(structureHandler).removeElement();
@@ -107,6 +112,7 @@ class ExperimentProcessorsTest {
     @Test
     void showFor_removesElement_whenAssignmentsAreNull() {
         when(context.getVariable("activeExperimentAssignments")).thenReturn(null);
+        when(experimentService.getExperiment("my-exp")).thenReturn(Optional.of(exp));
         ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService, false);
         p.doProcess(context, tag, attributeName, "my-exp:green", structureHandler);
         verify(structureHandler).removeElement();
@@ -115,6 +121,7 @@ class ExperimentProcessorsTest {
     @Test
     void showFor_callsEnsureExists_withVariantHint() {
         when(context.getVariable("activeExperimentAssignments")).thenReturn(List.of());
+        when(experimentService.getExperiment("my-exp")).thenReturn(Optional.of(exp));
         ShowForVariantProcessor p = new ShowForVariantProcessor("exp", experimentService, false);
         p.doProcess(context, tag, attributeName, "my-exp:green", structureHandler);
         verify(experimentService).ensureExists("my-exp", "green");
