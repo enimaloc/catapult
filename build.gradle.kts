@@ -24,6 +24,7 @@ configurations {
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
@@ -38,7 +39,7 @@ dependencies {
     implementation("io.github.husnjak:igdb-api-jvm:1.3.2")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("io.getunleash:unleash-client-java:9.2.4")
-    implementation("io.github.growthbook:growthbook-sdk-java:1.0.0")
+    implementation("com.github.growthbook:growthbook-sdk-java:0.10.10")
     runtimeOnly("org.postgresql:postgresql")
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
