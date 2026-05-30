@@ -38,6 +38,8 @@ public class SteamAuthController {
     private static final String OPENID_NS = "http://specs.openid.net/auth/2.0";
     private static final String OPENID_IDENTIFIER_SELECT = "http://specs.openid.net/auth/2.0/identifier_select";
     private static final String SESSION_NONCE_KEY = "steam_link_nonce";
+    private static final String REDIRECT_SETTINGS_ERROR_STEAM = "redirect:/settings?error=steam";
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
@@ -75,24 +77,24 @@ public class SteamAuthController {
         if (sessionNonce == null || callbackNonce == null
                 || !MessageDigest.isEqual(sessionNonce.getBytes(), callbackNonce.getBytes())) {
             log.warn("Steam OpenID nonce mismatch for user {}", principal.getUserAccount().getId());
-            return "redirect:/settings?error=steam";
+            return REDIRECT_SETTINGS_ERROR_STEAM;
         }
 
         if (!"id_res".equals(params.get("openid.mode"))) {
             log.warn("Steam OpenID callback rejected for user {}: mode={}",
                 principal.getUserAccount().getId(), params.get("openid.mode"));
-            return "redirect:/settings?error=steam";
+            return REDIRECT_SETTINGS_ERROR_STEAM;
         }
 
         if (!verifyWithSteam(params)) {
             log.warn("Steam OpenID verification failed for user {}", principal.getUserAccount().getId());
-            return "redirect:/settings?error=steam";
+            return REDIRECT_SETTINGS_ERROR_STEAM;
         }
 
         String claimedId = params.get("openid.claimed_id");
         if (claimedId == null || !claimedId.startsWith(STEAM_ID_PREFIX)) {
             log.warn("Invalid Steam claimed_id: {}", claimedId);
-            return "redirect:/settings?error=steam";
+            return REDIRECT_SETTINGS_ERROR_STEAM;
         }
 
         String steamId = claimedId.substring(STEAM_ID_PREFIX.length());
@@ -117,7 +119,7 @@ public class SteamAuthController {
 
     private static String generateNonce() {
         byte[] bytes = new byte[16];
-        new SecureRandom().nextBytes(bytes);
+        SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
