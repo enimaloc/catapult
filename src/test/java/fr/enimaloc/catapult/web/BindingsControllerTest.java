@@ -5,7 +5,9 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.security.CatapultOAuth2UserService;
+import fr.enimaloc.catapult.service.AdminCclService;
 import fr.enimaloc.catapult.service.BindingService;
+import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +41,8 @@ class BindingsControllerTest {
     @MockitoBean GameBindingRepository gameBindingRepository;
     @MockitoBean BindingService bindingService;
     @MockitoBean TwitchService twitchService;
+    @MockitoBean AdminCclService adminCclService;
+    @MockitoBean ExperimentService experimentService;
     @MockitoBean CatapultOAuth2UserService oAuth2UserService;  // needed by SecurityConfig
 
     private UserAccount userAccount;
