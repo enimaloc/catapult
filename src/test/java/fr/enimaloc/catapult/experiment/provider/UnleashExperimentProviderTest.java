@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.experiment.provider;
 import fr.enimaloc.catapult.config.ExperimentProviderProperties;
 import fr.enimaloc.catapult.domain.UserAccount;
 import io.getunleash.FakeUnleash;
+import io.getunleash.variant.Payload;
 import io.getunleash.Variant;
 import org.junit.jupiter.api.Test;
 
@@ -48,7 +49,7 @@ class UnleashExperimentProviderTest {
     void getVariantReturnsMappedVariant() {
         FakeUnleash fake = new FakeUnleash();
         fake.enable("my-toggle");
-        fake.setVariant("my-toggle", new Variant("b", null, true));
+        fake.setVariant("my-toggle", new Variant("b", (Payload) null, true));
         UnleashExperimentProvider provider = new UnleashExperimentProvider(buildProps(), fake);
         UserAccount user = new UserAccount();
         user.setId(UUID.randomUUID());
