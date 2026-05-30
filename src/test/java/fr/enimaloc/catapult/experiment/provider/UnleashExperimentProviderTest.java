@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.experiment.provider;
 import fr.enimaloc.catapult.config.ExperimentProviderProperties;
 import fr.enimaloc.catapult.domain.UserAccount;
 import io.getunleash.FakeUnleash;
-import io.getunleash.variant.Variant;
+import io.getunleash.Variant;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;

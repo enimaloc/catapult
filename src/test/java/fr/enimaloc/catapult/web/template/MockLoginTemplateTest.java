@@ -28,7 +28,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(MockLoginController.class)
 @ActiveProfiles("mock-web")
-@TestPropertySource(properties = "spring.messages.basename=lang/messages")
+@TestPropertySource(properties = {
+    "spring.messages.basename=lang/messages",
+    "spring.messages.use-code-as-default-message=false"
+})
 class MockLoginTemplateTest {
 
     @Autowired MockMvc mockMvc;
@@ -53,37 +56,37 @@ class MockLoginTemplateTest {
 
     @Test
     void mockLogin_htmlHasLangAttribute() throws Exception {
-        Document doc = renderPage("/mock-login");
+        Document doc = renderPage();
         assertThat(doc.select("html[lang]")).isNotEmpty();
     }
 
     @Test
     void mockLogin_titleIsNotBlank() throws Exception {
-        Document doc = renderPage("/mock-login");
+        Document doc = renderPage();
         assertThat(doc.select("title").text()).isNotBlank();
     }
 
     @Test
     void mockLogin_formAndSelectArePresent() throws Exception {
-        Document doc = renderPage("/mock-login");
+        Document doc = renderPage();
         assertThat(doc.select("form")).isNotEmpty();
         assertThat(doc.select("select[name=userId]")).isNotEmpty();
     }
 
     @Test
     void mockLogin_selectHasAriaLabel() throws Exception {
-        Document doc = renderPage("/mock-login");
+        Document doc = renderPage();
         assertThat(doc.select("select[aria-label]")).isNotEmpty();
     }
 
     @Test
     void mockLogin_noUnresolvedI18nKeys() throws Exception {
-        Document doc = renderPage("/mock-login");
+        Document doc = renderPage();
         assertThat(doc.body().text()).doesNotContain("??");
     }
 
-    private Document renderPage(String url) throws Exception {
-        String html = mockMvc.perform(get(url).locale(Locale.FRENCH))
+    private Document renderPage() throws Exception {
+        String html = mockMvc.perform(get("/mock-login").locale(Locale.FRENCH))
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
         return Jsoup.parse(html);

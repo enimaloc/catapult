@@ -1,13 +1,18 @@
 package fr.enimaloc.catapult.web;
 
-import fr.enimaloc.catapult.domain.IgdbAgeRatingCategory;
+import fr.enimaloc.catapult.domain.IgdbRatingDescriptor;
 import fr.enimaloc.catapult.domain.TwitchCclDefinition;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.AdminCclService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 
@@ -18,33 +23,42 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class AdminCclControllerTest {
 
     @Mock
     AdminCclService adminCclService;
 
+    @Mock
+    CatapultOAuth2User principal;
+
     @InjectMocks
     AdminCclController controller;
 
+    @BeforeEach
+    void setUp() {
+        when(principal.getUserAccount()).thenReturn(new UserAccount());
+    }
+
     @Test
-    void index_addsAllCclsAndIgdbCategoriesToModel() {
+    void index_addsAllCclsAndIgdbDescriptorsToModel() {
         TwitchCclDefinition ccl = new TwitchCclDefinition();
         ccl.setId("MatureGame");
         ccl.setName("Mature Game");
 
-        IgdbAgeRatingCategory cat = new IgdbAgeRatingCategory();
-        cat.setId(1L);
-        cat.setDisplayName("PEGI 18");
+        IgdbRatingDescriptor descriptor = new IgdbRatingDescriptor();
+        descriptor.setId(1L);
+        descriptor.setDisplayName("ESRB — Violence");
 
         when(adminCclService.getAllCcls()).thenReturn(List.of(ccl));
-        when(adminCclService.getAllIgdbCategories()).thenReturn(List.of(cat));
+        when(adminCclService.getAllIgdbDescriptors()).thenReturn(List.of(descriptor));
 
         Model model = new ExtendedModelMap();
-        String view = controller.index(model);
+        String view = controller.index(principal, model);
 
         assertThat(view).isEqualTo("admin/ccl");
         assertThat(model.getAttribute("ccls")).isEqualTo(List.of(ccl));
-        assertThat(model.getAttribute("igdbCategories")).isEqualTo(List.of(cat));
+        assertThat(model.getAttribute("igdbDescriptors")).isEqualTo(List.of(descriptor));
     }
 
     @Test

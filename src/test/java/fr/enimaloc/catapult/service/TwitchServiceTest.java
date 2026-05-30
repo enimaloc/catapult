@@ -2,13 +2,14 @@ package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.OAuthToken;
-import fr.enimaloc.catapult.domain.TwitchCcl;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.TwitchCategory;
+import fr.enimaloc.catapult.service.TwitchServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,7 @@ class TwitchServiceTest {
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private TokenEncryptionService tokenEncryptionService;
     @Mock private RestClient restClient;
+    @Mock private TwitchCategoryService twitchCategoryService;
 
     @Mock private RestClient.RequestBodyUriSpec patchSpec;
     @Mock private RestClient.RequestBodySpec bodySpec;
@@ -51,7 +53,7 @@ class TwitchServiceTest {
     @Mock private RestClient.RequestHeadersSpec headersSpec;
     @Mock private RestClient.ResponseSpec getResponseSpec;
 
-    @InjectMocks private TwitchService twitchService;
+    @InjectMocks private TwitchServiceImpl twitchService;
 
     private UserAccount user;
 
@@ -80,12 +82,12 @@ class TwitchServiceTest {
         doReturn(responseSpec).when(bodySpec).retrieve();
 
         doReturn(getSpec).when(restClient).get();
-        doReturn(headersSpec).when(getSpec).uri(anyString());
+        doReturn(headersSpec).when(getSpec).uri(anyString(), any(Object[].class));
         doReturn(headersSpec).when(headersSpec).header(anyString(), anyString());
         doReturn(getResponseSpec).when(headersSpec).retrieve();
     }
 
-    private GameBinding binding(GameBinding.Status status, boolean ignored, boolean cclEnabled, Set<TwitchCcl> ccls) {
+    private GameBinding binding(GameBinding.Status status, boolean ignored, boolean cclEnabled, Set<String> ccls) {
         GameBinding b = new GameBinding();
         b.setStatus(status);
         b.setIgnored(ignored);
@@ -139,7 +141,7 @@ class TwitchServiceTest {
     @Test
     void updateChannel_withSomeCcls_enablesOnlyMatching() {
         twitchService.updateChannel(user,
-            binding(GameBinding.Status.AUTO, false, true, Set.of(TwitchCcl.ViolentGraphic, TwitchCcl.Gambling)));
+            binding(GameBinding.Status.AUTO, false, true, Set.of("ViolentGraphic", "Gambling")));
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());
@@ -159,7 +161,7 @@ class TwitchServiceTest {
     @Test
     void updateChannel_matureGameNotInCclPayload() {
         twitchService.updateChannel(user,
-            binding(GameBinding.Status.AUTO, false, true, Set.of(TwitchCcl.MatureGame)));
+            binding(GameBinding.Status.AUTO, false, true, Set.of("MatureGame")));
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());
@@ -173,7 +175,7 @@ class TwitchServiceTest {
 
     @Test
     void updateChannel_cclDisabledOnBinding_doesNotSendCclPayload() {
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, false, Set.of(TwitchCcl.ViolentGraphic)));
+        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, false, Set.of("ViolentGraphic")));
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());
@@ -302,7 +304,7 @@ class TwitchServiceTest {
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
             .thenReturn(Optional.empty());
         when(twitchCategoryService.searchCategories("Scribble It!"))
-            .thenReturn(List.of(new TwitchService.TwitchCategory("999", "Scribble It!", "https://img/s.jpg")));
+            .thenReturn(List.of(new TwitchCategory("999", "Scribble It!", "https://img/s.jpg")));
 
         Optional<String> result = twitchService.findCategoryIdByName(user, "Scribble It!");
 
@@ -314,7 +316,7 @@ class TwitchServiceTest {
     void findCategoryIdByName_userTokenPresentButNoMatch_fallsBackToSearchCategories() {
         doReturn(Map.of("data", List.of())).when(getResponseSpec).body(Map.class);
         when(twitchCategoryService.searchCategories("Scribble It!"))
-            .thenReturn(List.of(new TwitchService.TwitchCategory("999", "Scribble It!", "https://img/s.jpg")));
+            .thenReturn(List.of(new TwitchCategory("999", "Scribble It!", "https://img/s.jpg")));
 
         Optional<String> result = twitchService.findCategoryIdByName(user, "Scribble It!");
 
@@ -327,7 +329,7 @@ class TwitchServiceTest {
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
             .thenReturn(Optional.empty());
         when(twitchCategoryService.searchCategories("Scribble It"))
-            .thenReturn(List.of(new TwitchService.TwitchCategory("999", "Scribble It!", "https://img/s.jpg")));
+            .thenReturn(List.of(new TwitchCategory("999", "Scribble It!", "https://img/s.jpg")));
 
         Optional<String> result = twitchService.findCategoryIdByName(user, "Scribble It");
 
@@ -366,5 +368,46 @@ class TwitchServiceTest {
         verify(bodySpec).body(bodyCaptor.capture());
 
         assertThat(bodyCaptor.getValue()).doesNotContainKey("content_classification_labels");
+    }
+
+    @Test
+    void getModeratedChannelIds_returns_broadcaster_ids_from_twitch_api() {
+        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+        doReturn(headersSpec).when(getSpec).uri(uriCaptor.capture());
+
+        TwitchServiceImpl.ModeratedChannelsResponse mockResponse =
+            new TwitchServiceImpl.ModeratedChannelsResponse(List.of(
+                new TwitchServiceImpl.ModeratedChannel("ch1"),
+                new TwitchServiceImpl.ModeratedChannel("ch2")
+            ));
+        doReturn(mockResponse).when(getResponseSpec).body(TwitchServiceImpl.ModeratedChannelsResponse.class);
+
+        List<String> result = twitchService.getModeratedChannelIds(user);
+
+        assertThat(result).containsExactlyInAnyOrder("ch1", "ch2");
+        assertThat(uriCaptor.getValue())
+            .contains("/moderation/channels")
+            .contains("user_id=" + user.getTwitchId());
+    }
+
+    @Test
+    void getModeratedChannelIds_returns_empty_list_when_api_throws() {
+        doReturn(headersSpec).when(getSpec).uri(anyString());
+        doThrow(new RuntimeException("network error")).when(getResponseSpec)
+            .body(TwitchServiceImpl.ModeratedChannelsResponse.class);
+
+        List<String> result = twitchService.getModeratedChannelIds(user);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void getModeratedChannelIds_returns_empty_list_when_no_token() {
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+
+        List<String> result = twitchService.getModeratedChannelIds(user);
+
+        assertThat(result).isEmpty();
     }
 }

@@ -21,7 +21,8 @@ CREATE TABLE experiment_variants (
     key           VARCHAR(100) NOT NULL,
     name          VARCHAR(255) NOT NULL,
     weight        INT          NOT NULL DEFAULT 1,
-    is_control    BOOLEAN      NOT NULL DEFAULT false
+    is_control    BOOLEAN      NOT NULL DEFAULT false,
+    CONSTRAINT uq_experiment_variants_key UNIQUE (experiment_id, key)
 );
 
 CREATE TABLE experiment_assignment_rules (
@@ -30,7 +31,7 @@ CREATE TABLE experiment_assignment_rules (
     rule_type         VARCHAR(20) NOT NULL,  -- RANDOM | ATTRIBUTE | MANUAL
     priority          INT         NOT NULL DEFAULT 0,
     percentage        INT,                   -- RANDOM: 0-100
-    attribute_key     VARCHAR(50),           -- ATTRIBUTE: binding_count | account_age_days | has_steam | has_xbox | has_battlenet
+    attribute_key     VARCHAR(50),           -- ATTRIBUTE: account_age_days | has_steam | has_xbox | has_battlenet
     attribute_operator VARCHAR(10),          -- ATTRIBUTE: eq | neq | gt | gte | lt | lte
     attribute_value   VARCHAR(100)           -- ATTRIBUTE: comparison value as string
 );
@@ -61,6 +62,7 @@ CREATE TABLE experiment_feedback (
     nps_score     INT         NOT NULL CHECK (nps_score BETWEEN 0 AND 10),
     comment       TEXT,
     submitted_at  TIMESTAMP   NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMP   NOT NULL DEFAULT now(),
     UNIQUE (experiment_id, user_id)
 );
 

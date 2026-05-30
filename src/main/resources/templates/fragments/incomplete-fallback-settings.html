@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*@thymesvar id="incompleteFallbackSettings" type="fr.enimaloc.catapult.domain.UserSettings"*/-->
+<!--/*@thymesvar id="availableCcls" type="java.util.List"*/-->
+<section th:fragment="incomplete-fallback-settings" class="card">
+    <div class="card-header">
+        <h3 th:text="#{incomplete_fallback.title}">Catégorie par défaut (jeu incomplet)</h3>
+    </div>
+    <p class="text-muted mb-16" th:text="#{incomplete_fallback.subtitle}">Catégorie appliquée quand un jeu ne peut pas être résolu.</p>
+
+    <form th:action="@{/channels/{u}/settings/incomplete-fallback(u=${channelUsername})}" method="post"> <!-- nosemgrep -->
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <div class="inline-edit-fields">
+            <div class="inline-edit-field">
+                <label for="gameSearch-incompleteGame" th:text="#{bindings.edit.twitch_category}">Catégorie Twitch</label>
+                <div class="search-wrapper">
+                    <input type="text"
+                           id="gameSearch-incompleteGame"
+                           th:attr="data-search-url=@{/channels/{u}/api/games/search(u=${channelUsername})}"
+                           data-results-id="gameResults-incompleteGame"
+                           data-gameid-field="twitchGameId-incompleteGame"
+                           data-gamename-field="twitchGameName-incompleteGame"
+                           th:value="${incompleteFallbackSettings.incompleteFallbackTwitchGameName}"
+                           th:placeholder="#{common.search_placeholder}"
+                           autocomplete="off"
+                           oninput="gameSearch(event)">
+                    <ul id="gameResults-incompleteGame" class="game-results"></ul>
+                </div>
+                <input type="hidden" id="twitchGameId-incompleteGame"
+                       name="twitchGameId"
+                       th:value="${incompleteFallbackSettings.incompleteFallbackTwitchGameId}">
+                <input type="hidden" id="twitchGameName-incompleteGame"
+                       name="twitchGameName"
+                       th:value="${incompleteFallbackSettings.incompleteFallbackTwitchGameName}">
+            </div>
+            <div class="inline-edit-field">
+                <label th:text="#{bindings.edit.ccls}">CCLs</label>
+                <div class="ccl-checkboxes">
+                    <div th:each="ccl : ${availableCcls}">
+                        <label>
+                            <input type="checkbox" name="ccls"
+                                   th:value="${ccl.id}"
+                                   th:checked="${incompleteFallbackSettings.incompleteFallbackCcls.contains(ccl.id)}">
+                            <span th:text="${ccl.name}"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="inline-edit-actions" style="margin-top:12px">
+            <button type="submit" class="btn btn-primary" th:text="#{common.save}">Enregistrer</button>
+        </div>
+    </form>
+</section>
+</body>
+</html>
