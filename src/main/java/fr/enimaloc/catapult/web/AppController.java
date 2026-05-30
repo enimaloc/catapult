@@ -34,11 +34,6 @@ public class AppController {
         return "redirect:/channels";
     }
 
-    @GetMapping("/bindings")
-    public String redirectBindings() {
-        return "redirect:/channels";
-    }
-
     // -------------------------------------------------------------------------
     // Help panel (no channel scoping needed)
     // -------------------------------------------------------------------------
