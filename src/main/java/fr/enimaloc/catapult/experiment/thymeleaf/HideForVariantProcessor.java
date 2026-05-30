@@ -44,7 +44,6 @@ class HideForVariantProcessor extends AbstractAttributeTagProcessor {
                 (List<ExperimentAssignment>) context.getVariable("activeExperimentAssignments");
 
         if (assignments == null) {
-            structureHandler.removeElement();
             return;
         }
 
