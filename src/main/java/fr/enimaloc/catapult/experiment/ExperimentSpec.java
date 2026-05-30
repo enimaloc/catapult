@@ -66,6 +66,7 @@ public @interface ExperimentSpec {
     @interface Override {
         ExperimentOverride.OverrideType type();
         ExperimentOverride.OverrideAction action();
+        int priority() default 0;
         String targetVariantId() default "";
         String twitchUsername() default "";
     }

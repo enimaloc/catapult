@@ -211,7 +211,7 @@ public class TwitchService {
 
         log.debug("Twitch user-token lookup empty for '{}', falling back to app-token search", gameName);
         String normalizedQuery = normalizeTitle(gameName);
-        return twitchCategoryService.searchCategories(gameName).stream()
+        return searchCategories(user, gameName).stream()
             .filter(c -> normalizeTitle(c.name()).equals(normalizedQuery))
             .findFirst()
             .map(TwitchCategory::id);
