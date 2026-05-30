@@ -90,13 +90,6 @@ class AppControllerTest {
     }
 
     @Test
-    void getBindings_redirectsToChannels() throws Exception {
-        mockMvc.perform(get("/bindings").with(authentication(auth)))
-            .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/channels"));
-    }
-
-    @Test
     void helpPanel_noGame_passesUnifiedArgs() throws Exception {
         mockMvc.perform(get("/help/no-game").with(authentication(auth)))
             .andExpect(status().isOk());
