@@ -22,7 +22,7 @@ public class UnleashExperimentProvider implements ExperimentProvider {
 
     public UnleashExperimentProvider(ExperimentProviderProperties props) {
         this.config = props.getUnleash();
-        UnleashConfig unleashConfig = UnleashConfig.newBuilder()
+        UnleashConfig unleashConfig = UnleashConfig.builder()
             .appName("catapult")
             .unleashAPI(config.getApiUrl())
             .customHttpHeader("Authorization", config.getClientKey())
@@ -41,7 +41,7 @@ public class UnleashExperimentProvider implements ExperimentProvider {
     @Override
     public Optional<ExperimentVariant> getVariant(UserAccount user, String experimentKey) {
         try {
-            UnleashContext ctx = UnleashContext.newBuilder()
+            UnleashContext ctx = UnleashContext.builder()
                 .userId(user.getId().toString())
                 .build();
             Variant variant = unleash.getVariant(experimentKey, ctx);

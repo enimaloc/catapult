@@ -12,6 +12,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     Optional<UserAccount> findByTwitchId(String twitchId);
 
+    Optional<UserAccount> findByTwitchUsername(String twitchUsername);
+
     List<UserAccount> findByBotEnabledTrueAndStatus(UserAccount.Status status);
 
     List<UserAccount> findBySteamIdNotNull();

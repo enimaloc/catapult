@@ -8,6 +8,7 @@ import com.api.igdb.request.ProtoRequestKt;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import proto.AlternativeName;
 import proto.ExternalGame;
 import proto.ExternalGameSource;
 import proto.Game;
@@ -85,6 +86,29 @@ public class IgdbClient {
             }
         } catch (RequestException e) {
             log.error("[IGDB] /external_games batch failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Cherche un jeu IGDB via le nom de son exécutable Windows (alternative_names).
+     */
+    public List<AlternativeName> findByWindowsExecutable(String exeName, String token) {
+        String name = exeName.replaceAll("(?i)\\.exe$", "").replace("_", " ").replace("-", " ").trim();
+        APICalypse query = new APICalypse()
+            .fields("name,game.id,game.name")
+            .where("name ~ \"" + name.replace("\"", "\\\"") + "\"")
+            .limit(1);
+        log.debug("[IGDB] /alternative_names exe={} — query: {}", exeName, query.buildQuery());
+        try {
+            synchronized (IGDBWrapper.INSTANCE) {
+                setCredentialsIfChanged(token);
+                List<AlternativeName> results = ProtoRequestKt.alternativeNames(IGDBWrapper.INSTANCE, query);
+                log.debug("[IGDB] /alternative_names exe={} — {} result(s)", exeName, results.size());
+                return results;
+            }
+        } catch (RequestException e) {
+            log.error("[IGDB] /alternative_names exe={} failed: {}", exeName, e.getMessage());
             return List.of();
         }
     }
