@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.AdminCclService;
 import fr.enimaloc.catapult.service.BindingService;
+import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -95,7 +96,7 @@ public class BindingsController {
 
     @GetMapping(value = "/api/games/search", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public List<TwitchService.TwitchCategory> searchGames(
+    public List<TwitchCategory> searchGames(
             @AuthenticationPrincipal CatapultOAuth2User principal,
             @RequestParam String q) {
         if (q.isBlank()) return List.of();

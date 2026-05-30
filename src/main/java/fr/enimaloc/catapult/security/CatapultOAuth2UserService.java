@@ -10,8 +10,11 @@ import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
@@ -41,6 +44,12 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     @Value("${app.owner-id:}")
     private String ownerId;
 
+    @Value("${twitch.default-no-game.name:}")
+    private String defaultNoGameName;
+
+    @Value("${twitch.default-no-game.id:}")
+    private String defaultNoGameId;
+
     private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
 
     @Override
@@ -50,6 +59,8 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         try {
             return switch (registrationId) {
                 case "twitch" -> handleTwitchLogin(userRequest, fetchTwitchUser(userRequest));
+                case "xbox" -> handleSecondaryLink(userRequest, OAuthToken.Provider.XBOX);
+                case "battlenet" -> handleSecondaryLink(userRequest, OAuthToken.Provider.BATTLENET);
                 default -> delegate.loadUser(userRequest);
             };
         } catch (OAuth2AuthenticationException e) {
@@ -60,6 +71,23 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             log.error("Unexpected error during OAuth2 login for provider '{}'", registrationId, e);
             throw new OAuth2AuthenticationException(new OAuth2Error("server_error"), e);
         }
+    }
+
+    /**
+     * Discord is a secondary provider (game detection), not a login provider.
+     * When a user links Discord, they are already authenticated via Twitch.
+     * We save the Discord token for their account and return their existing principal.
+     */
+    private OAuth2User handleSecondaryLink(OAuth2UserRequest userRequest, OAuthToken.Provider provider) {
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth == null || !(currentAuth.getPrincipal() instanceof CatapultOAuth2User existingUser)) {
+            log.error("{} link attempted without an authenticated Twitch session", provider);
+            throw new OAuth2AuthenticationException(new OAuth2Error("unauthorized"));
+        }
+
+        saveToken(existingUser.getUserAccount(), provider, userRequest);
+        log.info("{} linked for user {}", provider, existingUser.getUserAccount().getId());
+        return existingUser;
     }
 
     /**
@@ -133,6 +161,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
         UserSettings settings = new UserSettings();
         settings.setUser(account);
+        if (!Strings.isEmpty(defaultNoGameId) && !Strings.isEmpty(defaultNoGameName)) {
+            settings.setNoGameTwitchGameId(defaultNoGameId);
+            settings.setNoGameTwitchGameName(defaultNoGameName);
+        }
         userSettingsRepository.save(settings);
 
         int priority = 1;

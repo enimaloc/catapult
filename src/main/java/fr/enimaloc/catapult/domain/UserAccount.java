@@ -29,7 +29,7 @@ public class UserAccount {
     @Column(name = "twitch_username", nullable = false)
     private String twitchUsername;
 
-    @Column(name = "profile_image_url")
+    @Column(name = "profile_image_url", length = 512)
     private String profileImageUrl;
 
     @Column(name = "steam_id", unique = true)

@@ -1,7 +1,9 @@
 package fr.enimaloc.catapult.web;
 
+import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.AdminCclService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +18,7 @@ public class AdminCclController {
     private final AdminCclService adminCclService;
 
     @GetMapping
-    public String index(Model model) {
+    public String index(@AuthenticationPrincipal CatapultOAuth2User principal, Model model) {
         model.addAttribute("ccls", adminCclService.getAllCcls());
         model.addAttribute("igdbDescriptors", adminCclService.getAllIgdbDescriptors());
         return "admin/ccl";

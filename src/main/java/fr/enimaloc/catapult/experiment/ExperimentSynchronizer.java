@@ -15,13 +15,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.function.Supplier;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ExperimentSynchronizer implements ApplicationRunner {
-    public static final Map<String, List<ExperimentOverride>> WAITING_VARIANT = new HashMap();
+    public static final Map<String, List<ExperimentOverride>> WAITING_VARIANT = new HashMap<>();
 
     private final ExperimentRepository experimentRepository;
     private final ExperimentService experimentService;
@@ -31,6 +30,7 @@ public class ExperimentSynchronizer implements ApplicationRunner {
 
     @Override
     @Transactional
+    @SuppressWarnings("NullableProblems")
     public void run(ApplicationArguments args) {
         applicationContext.getBeansWithAnnotation(ExperimentSpec.class).values().forEach(bean -> {
             ExperimentSpec spec = AnnotationUtils.findAnnotation(bean.getClass(), ExperimentSpec.class);
@@ -47,16 +47,17 @@ public class ExperimentSynchronizer implements ApplicationRunner {
     }
 
     public void updateVariant(UserAccount user) {
-        if (!WAITING_VARIANT.containsKey(user.getTwitchUsername())) return;
+        List<ExperimentOverride> waiting = WAITING_VARIANT.get(user.getTwitchUsername());
+        if (waiting == null) return;
         log.info("Updating registered variant for {}", user.getTwitchUsername());
-        for (ExperimentOverride override : WAITING_VARIANT.get(user.getTwitchUsername())) {
+        for (ExperimentOverride override : waiting) {
             override.setTargetUser(user);
             experimentOverrideRepository.save(override);
             log.debug("Saved variant {}:{} for user {}", override.getExperiment().getName(), override.getTargetVariant(), user.getTwitchUsername());
         }
     }
 
-    private Experiment createExperiment(ExperimentSpec spec) {
+    private void createExperiment(ExperimentSpec spec) {
         Experiment exp = new Experiment();
         exp.setKey(spec.key());
         exp.setName(spec.name());
@@ -64,27 +65,8 @@ public class ExperimentSynchronizer implements ApplicationRunner {
         exp.setStatus(Experiment.Status.DRAFT);
 
         int i = 0;
-        for (ExperimentSpec.Variant vd : spec.variants()) {
-            ExperimentVariant v = new ExperimentVariant();
-            v.setExperiment(exp);
-            v.setKey(vd.key());
-            v.setName(vd.name());
-            v.setWeight(vd.weight());
-            v.setControl(vd.control());
-            v.setInternalId(i++);
-            exp.getVariants().add(v);
-        }
-
-        for (ExperimentSpec.Rule rd : spec.rules()) {
-            ExperimentAssignmentRule rule = new ExperimentAssignmentRule();
-            rule.setExperiment(exp);
-            rule.setRuleType(rd.type());
-            rule.setPriority(rd.priority());
-            if (rd.type() == ExperimentAssignmentRule.RuleType.RANDOM) {
-                rule.setPercentage(rd.percent());
-            }
-            exp.getRules().add(rule);
-        }
+        for (ExperimentSpec.Variant vd : spec.variants()) exp.getVariants().add(createVariant(exp, vd, i++));
+        for (ExperimentSpec.Rule rd : spec.rules()) exp.getRules().add(createRule(exp, rd));
         experimentRepository.save(exp);
 
         for (ExperimentSpec.Override od : spec.overrides()) {
@@ -98,13 +80,12 @@ public class ExperimentSynchronizer implements ApplicationRunner {
                 if (od.targetVariantId().isBlank()) {
                     throw new IllegalStateException("Variant not specified");
                 }
-                Optional<ExperimentVariant> tv = exp.getVariants().stream()
+                ExperimentVariant tv = exp.getVariants().stream()
                         .filter(variant -> variant.getKey().equals(od.targetVariantId()))
-                        .findFirst();
-                if (tv.isEmpty()) {
-                    throw new IllegalStateException("Variant %s does not exist".formatted(od.targetVariantId()));
-                }
-                override.setTargetVariant(tv.get());
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Variant %s does not exist".formatted(od.targetVariantId())));
+                override.setTargetVariant(tv);
             }
             boolean canBeCompleted = true;
             if (od.type() == ExperimentOverride.OverrideType.USER) {
@@ -124,7 +105,25 @@ public class ExperimentSynchronizer implements ApplicationRunner {
             }*/ // TODO Implement
             if (canBeCompleted) experimentOverrideRepository.save(override);
         }
+    }
 
-        return exp;
+    private static ExperimentVariant createVariant(Experiment exp, ExperimentSpec.Variant vd, int internalId) {
+        ExperimentVariant v = new ExperimentVariant();
+        v.setExperiment(exp);
+        v.setKey(vd.key());
+        v.setName(vd.name());
+        v.setWeight(vd.weight());
+        v.setControl(vd.control());
+        v.setInternalId(internalId);
+        return v;
+    }
+
+    private static ExperimentAssignmentRule createRule(Experiment exp, ExperimentSpec.Rule rd) {
+        ExperimentAssignmentRule rule = new ExperimentAssignmentRule();
+        rule.setExperiment(exp);
+        rule.setRuleType(rd.type());
+        rule.setPriority(rd.priority());
+        if (rd.type() == ExperimentAssignmentRule.RuleType.RANDOM) rule.setPercentage(rd.percent());
+        return rule;
     }
 }

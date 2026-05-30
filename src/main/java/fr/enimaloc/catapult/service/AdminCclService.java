@@ -7,7 +7,9 @@ import fr.enimaloc.catapult.repository.TwitchCclDefinitionRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
@@ -37,6 +39,10 @@ public class AdminCclService {
     private final TwitchCclDefinitionRepository twitchCclRepo;
     private final IgdbRatingDescriptorRepository igdbDescriptorRepo;
 
+    @Autowired
+    @Lazy
+    private AdminCclService self;
+
     @Value("${twitch.client-id:}")
     private String twitchClientId;
 
@@ -63,9 +69,9 @@ public class AdminCclService {
         try {
             String appToken = fetchAppToken();
             if (appToken != null) {
-                syncTwitchCcls(appToken);
-                syncIgdbDescriptors(appToken);
-                applyDefaultMappings();
+                self.syncTwitchCcls(appToken);
+                self.syncIgdbDescriptors(appToken);
+                self.applyDefaultMappings();
             }
         } catch (Exception e) {
             log.warn("AdminCclService startup sync failed — admin CCL data may be stale: {}", e.getMessage());
