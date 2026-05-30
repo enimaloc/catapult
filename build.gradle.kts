@@ -27,6 +27,14 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 
+val igdbApiVersion = "1.3.2"
+val unleashVersion = "9.2.4"
+val growthbookVersion = "0.10.10"
+val icuVersion = "76.1"
+val chartjsVersion = "4.4.9"
+val htmxVersion = "2.0.4"
+val jsoupVersion = "1.17.2"
+
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -37,14 +45,14 @@ dependencies {
     implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
-    implementation("io.github.husnjak:igdb-api-jvm:1.3.2")
+    implementation("io.github.husnjak:igdb-api-jvm:$igdbApiVersion")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("io.getunleash:unleash-client-java:9.2.4")
-    implementation("com.github.growthbook:growthbook-sdk-java:0.10.10")
-    implementation("com.ibm.icu:icu4j:76.1")
+    implementation("io.getunleash:unleash-client-java:$unleashVersion")
+    implementation("com.github.growthbook:growthbook-sdk-java:$growthbookVersion")
+    implementation("com.ibm.icu:icu4j:$icuVersion")
     implementation("io.micrometer:micrometer-registry-prometheus")
-    implementation("org.webjars.npm:chart.js:4.4.9")
-    implementation("org.webjars.npm:htmx.org:2.0.4")
+    implementation("org.webjars.npm:chart.js:$chartjsVersion")
+    implementation("org.webjars.npm:htmx.org:$htmxVersion")
     implementation("org.webjars:webjars-locator-lite")
     runtimeOnly("org.postgresql:postgresql")
     compileOnly("org.projectlombok:lombok")
@@ -56,7 +64,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-thymeleaf-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
-    testImplementation("org.jsoup:jsoup:1.17.2")
+    testImplementation("org.jsoup:jsoup:$jsoupVersion")
     runtimeOnly("com.h2database:h2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
