@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*@thymesvar id="noGameSettings" type="fr.enimaloc.catapult.domain.UserSettings"*/-->
+<!--/*@thymesvar id="availableCcls" type="java.util.List"*/-->
+<section th:fragment="no-game-settings" class="card">
+    <div class="card-header">
+        <h3 th:text="#{no_game.title}">Catégorie par défaut (sans jeu)</h3>
+        <button class="btn-help"
+                hx-get="/help/no-game"
+                hx-target="#help-panel-body"
+                hx-swap="innerHTML"
+                hx-on::after-request="openHelpPanel()"
+                th:title="#{help.panel.title}">?</button>
+    </div>
+    <p class="text-muted mb-16" th:text="#{no_game.subtitle}">Catégorie et CCLs appliquées automatiquement quand aucun jeu n'est détecté.</p>
+
+    <form th:action="@{/channels/{u}/settings/no-game(u=${channelUsername})}" method="post"> <!-- nosemgrep -->
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <div class="inline-edit-fields">
+            <div class="inline-edit-field">
+                <label for="gameSearch-noGame" th:text="#{bindings.edit.twitch_category}">Catégorie Twitch</label>
+                <div class="search-wrapper">
+                    <input type="text"
+                           id="gameSearch-noGame"
+                           th:attr="data-search-url=@{/channels/{u}/api/games/search(u=${channelUsername})}"
+                           data-results-id="gameResults-noGame"
+                           data-gameid-field="twitchGameId-noGame"
+                           data-gamename-field="twitchGameName-noGame"
+                           th:value="${noGameSettings.noGameTwitchGameName}"
+                           th:placeholder="#{common.search_placeholder}"
+                           autocomplete="off"
+                           oninput="gameSearch(event)">
+                    <ul id="gameResults-noGame" class="game-results"></ul>
+                </div>
+                <input type="hidden" id="twitchGameId-noGame"
+                       name="twitchGameId"
+                       th:value="${noGameSettings.noGameTwitchGameId}">
+                <input type="hidden" id="twitchGameName-noGame"
+                       name="twitchGameName"
+                       th:value="${noGameSettings.noGameTwitchGameName}">
+            </div>
+            <div class="inline-edit-field">
+                <label th:text="#{bindings.edit.ccls}">CCLs</label>
+                <div class="ccl-checkboxes">
+                    <div th:each="ccl : ${availableCcls}">
+                        <label>
+                            <input type="checkbox" name="ccls"
+                                   th:value="${ccl.id}"
+                                   th:checked="${noGameSettings.noGameCcls.contains(ccl.id)}">
+                            <span th:text="${ccl.name}"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="inline-edit-actions" style="margin-top:12px">
+            <button type="submit" class="btn btn-primary" th:text="#{common.save}">Enregistrer</button>
+        </div>
+    </form>
+
+</section>
+</body>
+</html>

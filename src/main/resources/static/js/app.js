@@ -19,7 +19,15 @@ function gameSearch(event) {
                 if (!data.length) { results.style.display = 'none'; return; }
                 data.forEach(game => {
                     const li = document.createElement('li');
-                    li.textContent = game.name;
+                    if (game.boxArtUrl) {
+                        const img = document.createElement('img');
+                        img.src = game.boxArtUrl.replace('{width}', '30').replace('{height}', '40');
+                        img.alt = '';
+                        li.appendChild(img);
+                    }
+                    const span = document.createElement('span');
+                    span.textContent = game.name;
+                    li.appendChild(span);
                     li.addEventListener('click', () => {
                         document.getElementById(gameIdId).value = game.id;
                         document.getElementById(gameNameId).value = game.name;

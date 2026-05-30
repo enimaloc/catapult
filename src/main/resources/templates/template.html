@@ -1,6 +1,13 @@
+<!--/*@thymesVar id="git" type="fr.enimaloc.catapult.web.GlobalModelAdvice$GitData"*/-->
+<!--/*@thymesVar id="user" type="fr.enimaloc.catapult.domain.UserAccount"*/-->
+<!--/*@thymesVar id="isPendingDeletion" type="java.lang.Boolean"*/-->
+<!--/*@thymesVar id="main_class" type="java.lang.String"*/-->
+<!--/*@thymesVar id="activeExperimentAssignments" type="java.util.List"*/-->
+<!--/*@thymesVar id="appVersion" type="java.lang.String"*/-->
+<!--/*@thymesVar id="app" type="fr.enimaloc.catapult.web.GlobalModelAdvice$App"*/-->
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/springsecurity6"
-      th:fragment="layout(title, active_page, content, additional_head, main_class)">
+<html lang="fr" th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:fragment="layout(title, active_page, content, additional_head, main_class, left_content, right_content)">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,17 +23,18 @@
 </head>
 <body>
 
-<div th:if="${user != null && isPendingDeletion}" class="banner banner-danger">
+<div th:if="${user != null and isPendingDeletion}" class="banner banner-danger">
     <strong th:text="#{app.banner.pending}">⚠ Suppression de compte en cours.</strong>
     <span th:text="#{app.banner.deletion_date}">Ton compte sera supprimé définitivement le</span>
     <strong th:text="${#temporals.format(user.deletionRequestedAt, 'dd/MM/yyyy')}"></strong>.
-    <form th:action="@{/settings/cancel-deletion}" method="post" style="display:inline">
+    <form th:action="@{/channels/{u}/settings/cancel-deletion(u=${user.twitchUsername})}" method="post" style="display:inline"> <!-- nosemgrep -->
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <button type="submit" class="btn btn-sm btn-outline" th:text="#{common.cancel}">Annuler</button>
     </form>
 </div>
 
 <div th:if="${user != null}" sec:authorize="hasAuthority('ROLE_PREVIOUS_ADMINISTRATOR')"
-     style="background:var(--color-warning,#f59e0b);color:#000;padding:0.5rem 1rem;display:flex;align-items:center;gap:1rem;font-size:0.9rem;">
+     class="banner banner-warning">
     <span><span th:text="#{nav.impersonate_as}">Connecté en tant que</span> <strong
             sec:authentication="principal.username"></strong></span>
     <form th:action="@{/admin/impersonate/exit}" method="post" style="display:inline"> <!-- nosemgrep -->
@@ -35,25 +43,31 @@
     </form>
 </div>
 <nav class="navbar">
-    <a th:href="@{/app}" class="nav-brand">🚀 Catapult</a>
+    <a th:href="@{/}" class="nav-brand">🚀 Catapult</a>
     <div class="nav-links" th:if="${user != null}">
+        <a th:href="@{/channels}" th:classappend="${active_page == 'channels'} ? ' active'" th:text="#{nav.my_channels}">Mes chaînes</a>
+        <span th:if="${channelUsername != null}" class="nav-separator">›</span>
+        <span th:if="${channelUsername != null}" class="nav-channel-name" th:text="${channelUsername}"></span>
         <a th:href="@{/app}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'app'} ? ' active'">App</a>
         <a th:href="@{/admin/ccl}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'ccl'} ? ' active'">Admin CCL</a>
-        <a th:href="@{/admin/process-rules}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'process-rules'} ? ' active'" th:text="#{nav.process_rules}">Règles
-            processus</a>
+           th:classappend="${active_page == 'ccl'} ? ' active'" th:text="#{nav.admin_ccl}">Labels de contenu</a>
         <a th:href="@{/admin/members}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'members'} ? ' active'" th:text="#{nav.members}">Membres</a>
+        <a th:href="@{/admin/experiments}" sec:authorize="hasRole('ADMIN')"
+           th:classappend="${active_page == 'experiments'} ? ' active'" th:text="#{nav.admin_experiments}">Tests A/B</a>
         <a th:href="@{/dev/igdb}" sec:authorize="hasRole('ADMIN')" th:classappend="${active_page == 'igdb'} ? ' active'"
            th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
-        <form th:action="@{/logout}" method="post" style="display:inline">
+        <form th:action="@{/logout}" method="post" style="display:inline"> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button type="submit" class="btn-link" th:text="#{nav.logout}">Déconnexion</button>
         </form>
     </div>
-    <div class="theme-switcher">
+    <div class="nav-links" th:unless="${user != null}">
+        <a th:href="@{/oauth2/authorization/twitch}"
+           th:classappend="${active_page == 'login'} ? ' active'">Login</a>
+    </div>
+    <div class="theme-switcher" id="theme-switcher">
         <button class="theme-btn" data-theme="dark" onclick="setTheme('dark')" title="Dark">🌙</button>
         <button class="theme-btn" data-theme="blanc" onclick="setTheme('blanc')" title="Blanc">☀️</button>
         <button class="theme-btn" data-theme="old-steam" onclick="setTheme('old-steam')" title="Old Steam">🎮</button>
@@ -65,10 +79,87 @@
     </div>
 </nav>
 
-<th:block th:if="${main_class != null && !main_class.isEmpty()}">
-    <main th:class="${main_class}" th:include="${content}"></main>
-</th:block>
-<th:block th:unless="${main_class != null && !main_class.isEmpty()}" th:include="${content}"></th:block>
+<div class="page-content">
+    <th:block th:if="${left_content != null or right_content != null}">
+        <div class="page-layout">
+            <aside th:if="${left_content != null}" class="page-sidebar page-sidebar--left" th:replace="${left_content}"></aside>
+            <main th:if="${!#strings.isEmpty(main_class)}" th:class="${main_class}" th:include="${content}"></main>
+            <th:block th:unless="${!#strings.isEmpty(main_class)}" th:include="${content}"></th:block>
+            <aside th:if="${right_content != null}" class="page-sidebar page-sidebar--right" th:replace="${right_content}"></aside>
+        </div>
+    </th:block>
+    <th:block th:unless="${left_content != null or right_content != null}">
+        <main th:if="${!#strings.isEmpty(main_class)}" th:class="${main_class}" th:include="${content}"></main>
+        <th:block th:unless="${!#strings.isEmpty(main_class)}" th:include="${content}"></th:block>
+    </th:block>
+</div>
 
+
+<div id="help-overlay" class="help-overlay" onclick="closeHelpPanel()"></div>
+<div id="help-panel" class="help-panel">
+    <div class="help-panel-header">
+        <span id="help-panel-title" th:text="#{help.panel.title}">Aide</span>
+        <button class="help-panel-close" onclick="closeHelpPanel()" title="Fermer">✕</button>
+    </div>
+    <div id="help-panel-body" class="help-panel-body"></div>
+</div>
+
+<script>
+    function openHelpPanel() {
+        document.getElementById('help-panel').classList.add('open');
+        document.getElementById('help-overlay').classList.add('open');
+    }
+    function closeHelpPanel() {
+        document.getElementById('help-panel').classList.remove('open');
+        document.getElementById('help-overlay').classList.remove('open');
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeHelpPanel();
+    });
+</script>
+
+<div th:if="${user != null and activeExperimentAssignments != null}"
+     th:replace="~{fragments/experiment-feedback-widget :: widget(${activeExperimentAssignments})}"></div>
+
+<footer class="footer" id="footer">
+    <div class="footer-left">
+        <span th:text="#{footer.copyright}">© 2025 enimaloc</span>
+        <a th:href="@{/privacy}" th:text="#{footer.privacy}">Politique de confidentialité</a>
+    </div>
+    <div class="footer-right">
+        <span class="footer-version" th:text="${appVersion}">dev</span>
+        <span>·</span>
+        <span th:text="${git.branch + '@' + git.commit}">unknown@unknown</span>
+        <span>·</span>
+        <a th:unless="${git.repositoryUrl != null}" th:href="${git.repositoryUrl}" target="_blank" rel="noopener" th:text="#{footer.github}">GitHub ↗</a>
+        <span th:if="${git.repositoryUrl != null}" th:text="#{footer.github.local}">Dépôt local</span>
+    </div>
+</footer>
+
+<script>
+    const themeSwitcher = document.getElementById("theme-switcher");
+    const footer = document.getElementById("footer");
+
+    function updatePosition() {
+        const footerRect = footer.getBoundingClientRect();
+
+        const windowHeight = window.innerHeight;
+
+        const overlap = windowHeight - footerRect.top;
+
+        if (overlap > 0) {
+            // Le footer entre dans l'écran → on remonte
+            themeSwitcher.style.bottom = `${16 + overlap}px`;
+        } else {
+            // Position normale
+            themeSwitcher.style.bottom = `16px`;
+        }
+    }
+
+    window.addEventListener("scroll", updatePosition);
+    window.addEventListener("resize", updatePosition);
+
+    updatePosition();
+</script>
 </body>
 </html>

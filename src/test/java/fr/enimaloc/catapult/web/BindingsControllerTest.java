@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.TwitchCcl;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
@@ -79,12 +78,12 @@ class BindingsControllerTest {
                 .with(authentication(auth))
                 .param("twitchGameId", "game-123")
                 .param("twitchGameName", "My Game")
-                .param("ccls", TwitchCcl.ViolentGraphic.name()))
+                .param("ccls", "ViolentGraphic"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/bindings"));
 
         verify(bindingService).updateBinding(eq(userAccount), eq(id),
-            eq("game-123"), eq("My Game"), eq(Set.of(TwitchCcl.ViolentGraphic)), eq(false));
+            eq("game-123"), eq("My Game"), eq(Set.of("ViolentGraphic")), eq(false));
     }
 
     @Test

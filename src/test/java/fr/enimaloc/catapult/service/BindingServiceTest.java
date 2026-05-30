@@ -1,19 +1,17 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.TwitchCcl;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -30,14 +28,21 @@ class BindingServiceTest {
     @Mock private IgdbService igdbService;
     @Mock private TwitchService twitchService;
 
-    @InjectMocks private BindingService bindingService;
+    private BindingService bindingService;
+    private SimpleMeterRegistry meterRegistry;
 
     private UserAccount user;
     private GameBinding binding;
     private UUID bindingId;
 
     @BeforeEach
-    void setup() {
+    void setup() throws Exception {
+        meterRegistry = new SimpleMeterRegistry();
+        bindingService = new BindingService(gameBindingRepository, igdbService, twitchService, meterRegistry);
+        var m = BindingService.class.getDeclaredMethod("registerGauges");
+        m.setAccessible(true);
+        m.invoke(bindingService);
+
         user = new UserAccount();
         bindingId = UUID.randomUUID();
 
@@ -46,20 +51,21 @@ class BindingServiceTest {
         binding.setStatus(GameBinding.Status.AUTO);
         binding.setTwitchGameId("old-game-id");
         binding.setTwitchGameName("Old Game");
-        binding.getCcls().add(TwitchCcl.ViolentGraphic);
-        binding.getCcls().add(TwitchCcl.Gambling);
+        binding.getCcls().add("ViolentGraphic");
+        binding.getCcls().add("Gambling");
 
         when(gameBindingRepository.findById(bindingId)).thenReturn(Optional.of(binding));
         when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(gameBindingRepository.countByIgnoredFalse()).thenReturn(3L);
     }
 
     @Test
     void updateBinding_replacesCclsInPlace() {
-        Set<TwitchCcl> newCcls = Set.of(TwitchCcl.SexualThemes);
+        Set<String> newCcls = Set.of("SexualThemes");
 
         bindingService.updateBinding(user, bindingId, "new-id", "New Game", newCcls, false);
 
-        assertThat(binding.getCcls()).containsExactly(TwitchCcl.SexualThemes);
+        assertThat(binding.getCcls()).containsExactly("SexualThemes");
     }
 
     @Test
@@ -117,5 +123,26 @@ class BindingServiceTest {
         bindingService.deleteBinding(bindingId);
 
         verify(gameBindingRepository).deleteById(bindingId);
+    }
+
+    @Test
+    void deleteBinding_incrementsDeletedCounter() {
+        bindingService.deleteBinding(bindingId);
+
+        assertThat(meterRegistry.counter("catapult.bindings.deleted").count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void updateBinding_doesNotIncrementDeletedCounter() {
+        bindingService.updateBinding(user, bindingId, "new-id", "New Game", Set.of(), false);
+
+        assertThat(meterRegistry.counter("catapult.bindings.deleted").count()).isEqualTo(0.0);
+    }
+
+    @Test
+    void gauge_exposesActiveBindingCount() {
+        double gaugeValue = meterRegistry.get("catapult.bindings.active").gauge().value();
+
+        assertThat(gaugeValue).isEqualTo(3.0);
     }
 }

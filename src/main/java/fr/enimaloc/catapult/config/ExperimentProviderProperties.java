@@ -27,5 +27,6 @@ public class ExperimentProviderProperties {
     public static class GrowthBook {
         private String apiHost;
         private String clientKey;
+        private String apiKey;
     }
 }
