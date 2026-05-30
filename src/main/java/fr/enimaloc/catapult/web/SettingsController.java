@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequiredArgsConstructor
 public class SettingsController {
 
+    private static final String REDIRECT_SETTINGS = "redirect:/settings";
+
     @Value("${steam.api-key:}")
     private String steamApiKey;
 
@@ -48,7 +50,7 @@ public class SettingsController {
         UserAccount user = principal.getUserAccount();
         user.setBotEnabled(enabled);
         // Save via AccountService or UserAccountRepository
-        return "redirect:/settings";
+        return REDIRECT_SETTINGS;
     }
 
     @PostMapping("/settings/delete-account")
@@ -58,13 +60,13 @@ public class SettingsController {
         if (user.getTwitchUsername().equalsIgnoreCase(confirmUsername)) {
             accountService.initiateAccountDeletion(user);
         }
-        return "redirect:/settings";
+        return REDIRECT_SETTINGS;
     }
 
     @PostMapping("/settings/cancel-deletion")
     public String cancelDeletion(@AuthenticationPrincipal CatapultOAuth2User principal) {
         accountService.cancelAccountDeletion(principal.getUserAccount());
-        return "redirect:/settings";
+        return REDIRECT_SETTINGS;
     }
 
     @PostMapping("/settings/disconnect")
@@ -72,6 +74,6 @@ public class SettingsController {
                                      @RequestParam String provider) {
         OAuthToken.Provider p = OAuthToken.Provider.valueOf(provider.toUpperCase());
         accountService.disconnectProvider(principal.getUserAccount(), p);
-        return "redirect:/settings";
+        return REDIRECT_SETTINGS;
     }
 }

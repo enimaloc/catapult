@@ -26,6 +26,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BindingsController {
 
+    private static final String REDIRECT_BINDINGS = "redirect:/bindings";
+
     private final GameBindingRepository gameBindingRepository;
     private final BindingService bindingService;
     private final TwitchService twitchService;
@@ -68,7 +70,7 @@ public class BindingsController {
                                 @RequestParam(required = false) Set<String> ccls) {
         Set<String> cclSet = ccls == null ? Set.of() : new HashSet<>(ccls);
         bindingService.updateBinding(principal.getUserAccount(), id, twitchGameId, twitchGameName, cclSet, ignored);
-        return "redirect:/bindings";
+        return REDIRECT_BINDINGS;
     }
 
     @PostMapping("/bindings/{id}/ccl-toggle")
@@ -76,7 +78,7 @@ public class BindingsController {
                                    @PathVariable UUID id,
                                    @RequestParam(defaultValue = "false") boolean enabled) {
         bindingService.toggleCclEnabled(principal.getUserAccount(), id, enabled);
-        return "redirect:/bindings";
+        return REDIRECT_BINDINGS;
     }
 
     @PostMapping("/bindings/{id}/ignored-toggle")
@@ -84,14 +86,14 @@ public class BindingsController {
                                 @PathVariable UUID id,
                                 @RequestParam(defaultValue = "false") boolean ignored) {
         bindingService.toggleIgnored(principal.getUserAccount(), id, ignored);
-        return "redirect:/bindings";
+        return REDIRECT_BINDINGS;
     }
 
     @PostMapping("/bindings/{id}/delete")
     public String deleteBinding(@AuthenticationPrincipal CatapultOAuth2User principal,
                                 @PathVariable UUID id) {
         bindingService.deleteBinding(principal.getUserAccount(), id);
-        return "redirect:/bindings";
+        return REDIRECT_BINDINGS;
     }
 
     @GetMapping(value = "/api/games/search", produces = MediaType.APPLICATION_JSON_VALUE)
