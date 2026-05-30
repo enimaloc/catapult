@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.monitoring;
 
+import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
 import fr.enimaloc.catapult.service.AdminCclService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
@@ -19,11 +20,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 // Without this isolation, both contexts share the same H2 instance, which causes
 // ExperimentSynchronizer stale-entity failures when the second context reuses JPA entities
 // already managed by the first context's transaction.
-@TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:catapult_prometheus;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=KEY")
+@TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:catapult_prometheus;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=KEY,VALUE")
 class PrometheusEndpointTest {
 
     @MockitoBean
     AdminCclService adminCclService;
+
+    @MockitoBean
+    TwitchLoginSuccessHandler twitchLoginSuccessHandler;
 
     @Autowired
     MeterRegistry meterRegistry;
