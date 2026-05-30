@@ -43,7 +43,11 @@ class HideForVariantProcessor extends AbstractAttributeTagProcessor {
         List<ExperimentAssignment> assignments =
                 (List<ExperimentAssignment>) context.getVariable("activeExperimentAssignments");
 
-        boolean hide = assignments != null && assignments.stream().anyMatch(a ->
+        if (assignments == null) {
+            return;
+        }
+
+        boolean hide = assignments.stream().anyMatch(a ->
                 a.getExperiment().getKey().equals(experimentKey)
                         && a.getVariant().getKey().equals(variantKey));
 

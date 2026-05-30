@@ -11,7 +11,7 @@
     <div class="home-hero">
         <h1>🚀 Catapult</h1>
         <p class="hero-tagline" th:text="#{home.hero.tagline}">Ton stream, toujours dans la bonne catégorie</p>
-        <p class="hero-subtitle" th:text="#{home.hero.subtitle}">
+        <p class="hero-subtitle" th:text="#{home.hero.subtitle(${app.name})}">
             Catapult détecte le jeu que tu lances et met à jour ta catégorie Twitch automatiquement.
         </p>
         <a th:href="@{/oauth2/authorization/twitch}" class="btn btn-twitch">
@@ -26,12 +26,12 @@
 
         <!-- Features -->
         <div class="home-section">
-            <div class="home-section-title" th:text="#{home.features.title}">Ce que fait Catapult</div>
+            <div class="home-section-title" th:text="#{home.features.title(${app.name})}">Ce que fait Catapult</div>
             <div class="home-feature-grid">
                 <div class="home-feature-card">
                     <div class="home-feature-icon">⚡</div>
                     <h3 th:text="#{home.feature.detection.title}">Détection automatique</h3>
-                    <p th:text="#{home.feature.detection.desc}">Steam, Xbox, Battle.net — Catapult sait quel jeu tu lances.</p>
+                    <p th:text="#{home.feature.detection.desc(${app.name})}">Steam, Xbox, Battle.net — Catapult sait quel jeu tu lances.</p>
                 </div>
                 <div class="home-feature-card">
                     <div class="home-feature-icon">🔗</div>
@@ -51,7 +51,7 @@
                 <div class="home-feature-card">
                     <div class="home-feature-icon">🎯</div>
                     <h3 th:text="#{home.feature.nogame.title}">Catégorie par défaut</h3>
-                    <p th:text="#{home.feature.nogame.desc}">En live sans jeu ? Catapult applique ta catégorie de secours.</p>
+                    <p th:text="#{home.feature.nogame.desc(${app.name})}">En live sans jeu ? Catapult applique ta catégorie de secours.</p>
                 </div>
             </div>
         </div>

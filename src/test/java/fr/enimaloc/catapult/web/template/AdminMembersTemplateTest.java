@@ -36,7 +36,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AdminMembersController.class)
-@TestPropertySource(properties = "spring.messages.basename=lang/messages")
+@TestPropertySource(properties = {
+    "spring.messages.basename=lang/messages",
+    "spring.messages.use-code-as-default-message=false"
+})
 class AdminMembersTemplateTest {
 
     @Autowired MockMvc mockMvc;
@@ -76,30 +79,30 @@ class AdminMembersTemplateTest {
 
     @Test
     void adminMembers_htmlHasLangAttribute() throws Exception {
-        Document doc = renderPage("/admin/members");
+        Document doc = renderPage();
         assertThat(doc.select("html[lang]")).isNotEmpty();
     }
 
     @Test
     void adminMembers_titleIsNotBlank() throws Exception {
-        Document doc = renderPage("/admin/members");
+        Document doc = renderPage();
         assertThat(doc.select("title").text()).isNotBlank();
     }
 
     @Test
     void adminMembers_headingIsPresent() throws Exception {
-        Document doc = renderPage("/admin/members");
+        Document doc = renderPage();
         assertThat(doc.select("h2")).isNotEmpty();
     }
 
     @Test
     void adminMembers_noUnresolvedI18nKeys() throws Exception {
-        Document doc = renderPage("/admin/members");
+        Document doc = renderPage();
         assertThat(doc.body().text()).doesNotContain("??");
     }
 
-    private Document renderPage(String url) throws Exception {
-        String html = mockMvc.perform(get(url).locale(Locale.FRENCH).with(authentication(adminAuth)))
+    private Document renderPage() throws Exception {
+        String html = mockMvc.perform(get("/admin/members").locale(Locale.FRENCH).with(authentication(adminAuth)))
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
         return Jsoup.parse(html);
