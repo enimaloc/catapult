@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.web;
 
-import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
@@ -87,8 +86,8 @@ class BindingsControllerTest {
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/bindings"));
 
-        verify(bindingService).updateBinding(eq(userAccount), eq(id),
-            eq("game-123"), eq("My Game"), eq(Set.of("ViolentGraphic")), eq(false));
+        verify(bindingService).updateBinding(userAccount, id,
+            "game-123", "My Game", Set.of("ViolentGraphic"), false);
     }
 
     @Test
@@ -102,8 +101,8 @@ class BindingsControllerTest {
                 .param("twitchGameName", "My Game"))
             .andExpect(status().is3xxRedirection());
 
-        verify(bindingService).updateBinding(eq(userAccount), eq(id),
-            eq("game-123"), eq("My Game"), eq(Set.of()), eq(false));
+        verify(bindingService).updateBinding(userAccount, id,
+            "game-123", "My Game", Set.of(), false);
     }
 
     @Test
@@ -149,7 +148,7 @@ class BindingsControllerTest {
 
     @Test
     void getGameSearch_returnsTwitchCategories() throws Exception {
-        when(twitchService.searchCategories(eq(userAccount), eq("fortnite")))
+        when(twitchService.searchCategories(userAccount, "fortnite"))
             .thenReturn(List.of(new TwitchCategory("1234", "Fortnite", null)));
 
         mockMvc.perform(get("/api/games/search")
