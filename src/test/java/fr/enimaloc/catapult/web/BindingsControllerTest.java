@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.security.CatapultOAuth2UserService;
 import fr.enimaloc.catapult.service.BindingService;
+import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,7 @@ class BindingsControllerTest {
 
         var oAuth2User = mock(OAuth2User.class);
         when(oAuth2User.getAttributes()).thenReturn(Map.of());
-        var catapultUser = new CatapultOAuth2User(oAuth2User, userAccount);
+        var catapultUser = new CatapultOAuth2User(oAuth2User, userAccount, false);
 
         auth = new UsernamePasswordAuthenticationToken(
             catapultUser, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
@@ -139,13 +140,13 @@ class BindingsControllerTest {
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/bindings"));
 
-        verify(bindingService).deleteBinding(id);
+        verify(bindingService).deleteBinding(userAccount, id);
     }
 
     @Test
     void getGameSearch_returnsTwitchCategories() throws Exception {
         when(twitchService.searchCategories(eq(userAccount), eq("fortnite")))
-            .thenReturn(List.of(new TwitchService.TwitchCategory("1234", "Fortnite")));
+            .thenReturn(List.of(new TwitchCategory("1234", "Fortnite", null)));
 
         mockMvc.perform(get("/api/games/search")
                 .with(authentication(auth))
