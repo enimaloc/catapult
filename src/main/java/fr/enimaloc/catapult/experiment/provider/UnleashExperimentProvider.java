@@ -8,7 +8,7 @@ import io.getunleash.DefaultUnleash;
 import io.getunleash.Unleash;
 import io.getunleash.UnleashContext;
 import io.getunleash.util.UnleashConfig;
-import io.getunleash.variant.Variant;
+import io.getunleash.Variant;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;

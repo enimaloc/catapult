@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.experiment;
 
 import fr.enimaloc.catapult.domain.ExperimentAssignmentRule;
+import fr.enimaloc.catapult.domain.ExperimentOverride;
 import org.springframework.stereotype.Component;
 
 import java.lang.annotation.*;
@@ -41,6 +42,8 @@ public @interface ExperimentSpec {
 
     Rule[] rules() default {};
 
+    Override[] overrides() default {};
+
     @Retention(RetentionPolicy.RUNTIME)
     @Target({})
     @interface Variant {
@@ -55,5 +58,15 @@ public @interface ExperimentSpec {
     @interface Rule {
         ExperimentAssignmentRule.RuleType type() default ExperimentAssignmentRule.RuleType.RANDOM;
         int priority() default 0;
+        int percent() default 100;
+    }
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({})
+    @interface Override {
+        ExperimentOverride.OverrideType type();
+        ExperimentOverride.OverrideAction action();
+        String targetVariantId() default "";
+        String twitchUsername() default "";
     }
 }
