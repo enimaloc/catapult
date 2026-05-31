@@ -31,6 +31,7 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
     private static final String TWITCH_API_URL   = "https://api.twitch.tv/helix";
     private static final int    AUTOCOMPLETE_MAX = 8;
     private static final int    BATCH_SIZE       = 100;
+    public static final String BLANK = "BLANK";
 
     public enum PrewarmMode { TOP, SWEEP, BOTH, NONE }
 
@@ -265,7 +266,7 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
         String token = getOrRefreshAppToken();
         if (token.isBlank() || twitchClientId.isBlank()) {
             log.warn("searchCategories '{}' — live search skipped: token={} clientId={}",
-                    query, token.isBlank() ? "BLANK" : "ok", twitchClientId.isBlank() ? "BLANK" : "ok");
+                    query, token.isBlank() ? BLANK : "ok", twitchClientId.isBlank() ? BLANK : "ok");
             return List.of();
         }
 
@@ -313,8 +314,8 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
         }
         if (twitchClientId.isBlank() || twitchClientSecret.isBlank()) {
             log.warn("getOrRefreshAppToken — credentials not configured (clientId={} secret={})",
-                    twitchClientId.isBlank() ? "BLANK" : "ok",
-                    twitchClientSecret.isBlank() ? "BLANK" : "ok");
+                    twitchClientId.isBlank() ? BLANK : "ok",
+                    twitchClientSecret.isBlank() ? BLANK : "ok");
             return "";
         }
         log.debug("getOrRefreshAppToken — fetching new app token");
