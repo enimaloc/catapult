@@ -25,7 +25,8 @@ public class StatisticsService {
 
     public int npsScore(int[] scores) {
         if (scores.length == 0) return 0;
-        long promoters  = 0, detractors = 0;
+        long promoters  = 0;
+        long detractors = 0;
         for (int s : scores) {
             if (s >= 9) promoters++;
             else if (s <= 6) detractors++;
