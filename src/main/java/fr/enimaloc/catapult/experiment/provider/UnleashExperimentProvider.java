@@ -66,7 +66,9 @@ public class UnleashExperimentProvider implements ExperimentProvider {
     }
 
     @Override
-    public void trackEvent(UserAccount user, String experimentKey, String eventKey) {}
+    public void trackEvent(UserAccount user, String experimentKey, String eventKey) {
+        // Silent unsupported on Unleash
+    }
 
     @Override
     public void importExperiments(List<Experiment> experiments) {
