@@ -178,7 +178,8 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
             try {
                 Map<String, Object> response = callTwitch(uri.toString(), token);
                 List<Map<String, Object>> data = response == null ? null : (List<Map<String, Object>>) response.get("data");
-                if (data != null && !data.isEmpty()) {
+                shouldStop = data != null && !data.isEmpty();
+                if (!shouldStop) {
                     List<TwitchCategoryCache> batch = data.stream()
                             .map(g -> toCacheEntry(g, true))
                             .toList();
@@ -187,7 +188,7 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
                             batch.stream().map(c -> "%s (%s)".formatted(c.getName(), c.getId()))
                                     .collect(Collectors.joining(", ", "[", "]")));
                     total += batch.size();
-                } else shouldStop = true;
+                }
             } catch (Exception e) {
                 log.warn("Twitch category sweep batch [{}-{}] failed: {}", offset, offset + BATCH_SIZE - 1, e.getMessage());
                 break;
