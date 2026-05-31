@@ -405,7 +405,7 @@ class IgdbServiceTest {
     // --- loadSourceId branches (L426 sources found, L431 sources empty) ---
 
     @Test
-    void init_sourcesFound_resolvesSourceId() {
+    void init_sourcesFound_resolvesSourceId() throws Exception {
         ReflectionTestUtils.setField(igdbService, "clientSecret", "test-secret");
         setValidToken();
         ExternalGameSource source = ExternalGameSource.newBuilder().setId(5).setName("Steam").build();
@@ -418,7 +418,7 @@ class IgdbServiceTest {
     }
 
     @Test
-    void init_sourcesEmpty_keepsDefaultSourceId() {
+    void init_sourcesEmpty_keepsDefaultSourceId() throws Exception {
         ReflectionTestUtils.setField(igdbService, "clientSecret", "test-secret");
         setValidToken();
         doReturn(List.of()).when(igdbClient).findSourcesByName(anyString(), anyString());
