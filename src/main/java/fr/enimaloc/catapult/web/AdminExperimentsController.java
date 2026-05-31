@@ -19,7 +19,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/experiments")
@@ -79,7 +78,7 @@ public class AdminExperimentsController {
             int[] scores = feedbacks.stream().mapToInt(ExperimentFeedback::getNpsScore).toArray();
             Double avg = feedbackRepository.findAverageNpsByExperimentAndVariant(exp, v);
             return new NpsStat(v.getKey(), statisticsService.npsScore(scores), avg);
-        }).collect(Collectors.toList());
+        }).toList();
 
         boolean hasManualRule = exp.getRules().stream()
             .anyMatch(r -> r.getRuleType() == ExperimentAssignmentRule.RuleType.MANUAL);
