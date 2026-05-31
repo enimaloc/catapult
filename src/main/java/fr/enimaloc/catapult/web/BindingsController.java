@@ -26,8 +26,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BindingsController {
 
-    private static final String REDIRECT_BINDINGS = "redirect:/bindings";
-
     private final GameBindingRepository gameBindingRepository;
     private final BindingService bindingService;
     private final TwitchService twitchService;

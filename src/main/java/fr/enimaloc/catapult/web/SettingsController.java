@@ -20,8 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequiredArgsConstructor
 public class SettingsController {
 
-    private static final String REDIRECT_SETTINGS = "redirect:/settings";
-
     @Value("${steam.api-key:}")
     private String steamApiKey;
 

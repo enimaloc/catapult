@@ -354,7 +354,7 @@ public class IgdbService {
     // -------------------------------------------------------------------------
 
     private Set<String> storeCcls(String igdbGameId, Game game, Set<String> steamCcls) {
-        Set<String> suggested = extractCcls(game);
+        Set<String> suggested = new HashSet<>(extractCcls(game));
         suggested.addAll(steamCcls);
         String ageRatingsLabel = extractAgeRatingsLabel(game);
         log.debug("IGDB+Steam CCL for {}: ratings={}, suggested={}", igdbGameId, ageRatingsLabel, suggested);
