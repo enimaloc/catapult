@@ -35,6 +35,10 @@ public class IrcTwitchChatService implements TwitchChatService {
     private static final String HELIX_USERS_URL = "https://api.twitch.tv/helix/users";
     private static final long MAX_RETRY_SECONDS = 60L;
 
+    public static final String CLIENT_ID = "Client-Id";
+    public static final String AUTHORIZATION = "Authorization";
+    public static final String AUTHORIZATION_BEARER = "Bearer ";
+
     private final OAuthTokenRepository oAuthTokenRepository;
     private final UserAccountRepository userAccountRepository;
     private final TokenEncryptionService tokenEncryptionService;
@@ -215,8 +219,8 @@ public class IrcTwitchChatService implements TwitchChatService {
                         .uri(HELIX_BANS_URL + "?broadcaster_id=" + user.getTwitchId()
                             + "&moderator_id=" + user.getTwitchId()
                             + "&user_id=" + targetId)
-                        .header("Authorization", "Bearer " + accessToken)
-                        .header("Client-Id", twitchClientId)
+                            .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                            .header(CLIENT_ID, twitchClientId)
                         .retrieve()
                         .toBodilessEntity();
                     log.info("[IRC] Unbanned {} for user {}", targetLogin, user.getId());
@@ -243,8 +247,8 @@ public class IrcTwitchChatService implements TwitchChatService {
                     restClient.post()
                         .uri(HELIX_BANS_URL + "?broadcaster_id=" + user.getTwitchId()
                             + "&moderator_id=" + user.getTwitchId())
-                        .header("Authorization", "Bearer " + accessToken)
-                        .header("Client-Id", twitchClientId)
+                            .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                            .header(CLIENT_ID, twitchClientId)
                         .body(Map.of("data", data))
                         .retrieve()
                         .toBodilessEntity();
@@ -261,8 +265,8 @@ public class IrcTwitchChatService implements TwitchChatService {
         try {
             Map<String, Object> response = restClient.get()
                 .uri(HELIX_USERS_URL + "?login=" + java.net.URLEncoder.encode(login, java.nio.charset.StandardCharsets.UTF_8))
-                .header("Authorization", "Bearer " + accessToken)
-                .header("Client-Id", twitchClientId)
+                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                    .header(CLIENT_ID, twitchClientId)
                 .retrieve()
                 .body(Map.class);
             if (response == null) return null;
