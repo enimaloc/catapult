@@ -168,7 +168,8 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
         // Twitch omits missing IDs from the response rather than returning an error.
         // The sweep terminates on the first batch that yields zero results, meaning
         // 100 consecutive IDs were all unknown — a reliable end-of-range signal.
-        while (true) {
+        boolean shouldStop = false;
+        while (!shouldStop) {
             StringBuilder uri = new StringBuilder(TWITCH_API_URL + "/games");
             for (long i = offset; i < offset + BATCH_SIZE; i++) {
                 uri.append(i == offset ? "?id=" : "&id=").append(i);
@@ -186,7 +187,7 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
                             batch.stream().map(c -> "%s (%s)".formatted(c.getName(), c.getId()))
                                     .collect(Collectors.joining(", ", "[", "]")));
                     total += batch.size();
-                }
+                } else shouldStop = true;
             } catch (Exception e) {
                 log.warn("Twitch category sweep batch [{}-{}] failed: {}", offset, offset + BATCH_SIZE - 1, e.getMessage());
                 break;
