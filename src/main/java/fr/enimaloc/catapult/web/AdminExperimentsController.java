@@ -37,6 +37,9 @@ public class AdminExperimentsController {
     private final ExperimentService experimentService;
     private final ApplicationEventPublisher eventPublisher;
 
+    public static final String REDIRECT_EXPERIMENTS_LIST = "redirect:/admin/experiments";
+    public static final String REDIRECT_EXPERIMENT = "redirect:/admin/experiments/";
+
     @GetMapping
     public String list(@AuthenticationPrincipal CatapultOAuth2User principal, Model model) {
         model.addAttribute("experiments", experimentRepository.findAll());
@@ -98,51 +101,51 @@ public class AdminExperimentsController {
     public String activate(@PathVariable UUID id) {
         Experiment exp = findOrThrow(id);
         if (exp.getStatus() != Experiment.Status.DRAFT) {
-            return "redirect:/admin/experiments";
+            return REDIRECT_EXPERIMENTS_LIST;
         }
         exp.setStatus(Experiment.Status.ACTIVE);
         exp.setStartedAt(Instant.now());
         experimentRepository.save(exp);
         eventPublisher.publishEvent(new ExperimentActivatedEvent(this, exp.getId(), exp.getKey()));
-        return "redirect:/admin/experiments/" + id;
+        return REDIRECT_EXPERIMENT + id;
     }
 
     @PostMapping("/{id}/pause")
     public String pause(@PathVariable UUID id) {
         Experiment exp = findOrThrow(id);
         if (exp.getStatus() != Experiment.Status.ACTIVE) {
-            return "redirect:/admin/experiments";
+            return REDIRECT_EXPERIMENTS_LIST;
         }
         exp.setStatus(Experiment.Status.PAUSED);
         experimentRepository.save(exp);
-        return "redirect:/admin/experiments/" + id;
+        return REDIRECT_EXPERIMENT + id;
     }
 
     @PostMapping("/{id}/end")
     public String end(@PathVariable UUID id) {
         Experiment exp = findOrThrow(id);
         if (exp.getStatus() == Experiment.Status.DRAFT || exp.getStatus() == Experiment.Status.ENDED) {
-            return "redirect:/admin/experiments";
+            return REDIRECT_EXPERIMENTS_LIST;
         }
         exp.setStatus(Experiment.Status.ENDED);
         exp.setEndedAt(Instant.now());
         experimentRepository.save(exp);
-        return "redirect:/admin/experiments/" + id;
+        return REDIRECT_EXPERIMENT + id;
     }
 
     @PostMapping("/{id}/assign")
     public String assignUser(@PathVariable UUID id, @RequestParam String twitchUsername) {
         Experiment exp = findOrThrow(id);
         if (exp.getStatus() != Experiment.Status.ACTIVE) {
-            return "redirect:/admin/experiments/" + id + "?assignError=notActive";
+            return REDIRECT_EXPERIMENT + id + "?assignError=notActive";
         }
         var user = userAccountRepository.findByTwitchUsername(twitchUsername);
         if (user.isEmpty()) {
-            return "redirect:/admin/experiments/" + id + "?assignError=userNotFound";
+            return REDIRECT_EXPERIMENT + id + "?assignError=userNotFound";
         }
         boolean alreadyAssigned = assignmentRepository.findByExperimentAndUser(exp, user.get()).isPresent();
         if (alreadyAssigned) {
-            return "redirect:/admin/experiments/" + id + "?assignError=alreadyAssigned";
+            return REDIRECT_EXPERIMENT + id + "?assignError=alreadyAssigned";
         }
         if (!exp.getVariants().isEmpty()) {
             ExperimentVariant controlVariant = exp.getVariants().stream()
@@ -154,7 +157,7 @@ public class AdminExperimentsController {
             assignment.setUser(user.get());
             assignmentRepository.save(assignment);
         }
-        return "redirect:/admin/experiments/" + id;
+        return REDIRECT_EXPERIMENT + id;
     }
 
     // --- Variant weights -----------------------------------------------------
@@ -174,7 +177,7 @@ public class AdminExperimentsController {
                 // Silent ignored
             }
         }
-        return "redirect:/admin/experiments/" + id;
+        return REDIRECT_EXPERIMENT + id;
     }
 
     // --- Rules ---------------------------------------------------------------
@@ -200,7 +203,7 @@ public class AdminExperimentsController {
             rule.setAttributeValue(attributeValue);
         }
         ruleRepository.save(rule);
-        return "redirect:/admin/experiments/" + id;
+        return REDIRECT_EXPERIMENT + id;
     }
 
     @PostMapping("/{id}/rules/{ruleId}/delete")
@@ -212,7 +215,7 @@ public class AdminExperimentsController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         ruleRepository.delete(rule);
-        return "redirect:/admin/experiments/" + id;
+        return REDIRECT_EXPERIMENT + id;
     }
 
     // --- Overrides -----------------------------------------------------------
@@ -235,11 +238,11 @@ public class AdminExperimentsController {
         override.setPriority(priority);
         if (overrideType == ExperimentOverride.OverrideType.USER) {
             if (twitchUsername == null || twitchUsername.isBlank()) {
-                return "redirect:/admin/experiments/" + id + "?overrideError=missingUsername";
+                return REDIRECT_EXPERIMENT + id + "?overrideError=missingUsername";
             }
             UserAccount u = userAccountRepository.findByTwitchUsername(twitchUsername.trim()).orElse(null);
             if (u == null) {
-                return "redirect:/admin/experiments/" + id + "?overrideError=userNotFound";
+                return REDIRECT_EXPERIMENT + id + "?overrideError=userNotFound";
             }
             override.setTargetUser(u);
         } else if (overrideType == ExperimentOverride.OverrideType.ATTRIBUTE) {
@@ -249,16 +252,16 @@ public class AdminExperimentsController {
         }
         if (action == ExperimentOverride.OverrideAction.FORCE_VARIANT) {
             if (targetVariantId == null) {
-                return "redirect:/admin/experiments/" + id + "?overrideError=missingVariant";
+                return REDIRECT_EXPERIMENT + id + "?overrideError=missingVariant";
             }
             Optional<ExperimentVariant> tv = variantRepository.findById(targetVariantId);
             if (tv.isEmpty()) {
-                return "redirect:/admin/experiments/" + id + "?overrideError=variantNotFound";
+                return REDIRECT_EXPERIMENT + id + "?overrideError=variantNotFound";
             }
             override.setTargetVariant(tv.get());
         }
         overrideRepository.save(override);
-        return "redirect:/admin/experiments/" + id;
+        return REDIRECT_EXPERIMENT + id;
     }
 
     @PostMapping("/{id}/overrides/{overrideId}/delete")
@@ -270,7 +273,7 @@ public class AdminExperimentsController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         overrideRepository.delete(override);
-        return "redirect:/admin/experiments/" + id;
+        return REDIRECT_EXPERIMENT + id;
     }
 
     // --- Reassign ------------------------------------------------------------
@@ -279,7 +282,7 @@ public class AdminExperimentsController {
     public String reassign(@PathVariable UUID id) {
         Experiment exp = findOrThrow(id);
         experimentService.reassignAll(exp);
-        return "redirect:/admin/experiments/" + id;
+        return REDIRECT_EXPERIMENT + id;
     }
 
     private Experiment findOrThrow(UUID id) {
