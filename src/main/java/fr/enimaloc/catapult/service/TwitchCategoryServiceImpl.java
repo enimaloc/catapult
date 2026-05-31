@@ -128,20 +128,19 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
 
             try {
                 Map<String, Object> response = callTwitch(uri, token);
-                if (response == null) break;
-                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                if (data == null || data.isEmpty()) break;
+                List<Map<String, Object>> data = response == null ? null : (List<Map<String, Object>>) response.get("data");
+                if (data != null && !data.isEmpty()) {
+                    List<TwitchCategoryCache> batch = data.stream()
+                            .map(g -> toCacheEntry(g, false))
+                            .toList();
+                    cacheRepo.saveAll(batch);
+                    log.trace("Warm with: {}", batch.stream().map(cat -> "%s (%s)".formatted(cat.getName(), cat.getId())).collect(Collectors.joining(", ", "[", "]")));
+                    total += batch.size();
 
-                List<TwitchCategoryCache> batch = data.stream()
-                        .map(g -> toCacheEntry(g, false))
-                        .toList();
-                cacheRepo.saveAll(batch);
-                log.trace("Warm with: {}", batch.stream().map(cat -> "%s (%s)".formatted(cat.getName(), cat.getId())).collect(Collectors.joining(", ", "[", "]")));
-                total += batch.size();
-
-                Map<String, Object> pagination = (Map<String, Object>) response.get("pagination");
-                if (pagination != null) {
-                    cursor = (String) pagination.get("cursor");
+                    Map<String, Object> pagination = (Map<String, Object>) response.get("pagination");
+                    if (pagination != null) {
+                        cursor = (String) pagination.get("cursor");
+                    }
                 }
             } catch (Exception e) {
                 log.warn("Twitch category prewarm batch failed: {}", e.getMessage());
@@ -177,18 +176,17 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
 
             try {
                 Map<String, Object> response = callTwitch(uri.toString(), token);
-                if (response == null) break;
-                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                if (data == null || data.isEmpty()) break;
-
-                List<TwitchCategoryCache> batch = data.stream()
-                        .map(g -> toCacheEntry(g, true))
-                        .toList();
-                cacheRepo.saveAll(batch);
-                log.trace("Sweep batch [{}-{}]: {}", offset, offset + BATCH_SIZE - 1,
-                        batch.stream().map(c -> "%s (%s)".formatted(c.getName(), c.getId()))
-                             .collect(Collectors.joining(", ", "[", "]")));
-                total += batch.size();
+                List<Map<String, Object>> data = response == null ? null : (List<Map<String, Object>>) response.get("data");
+                if (data != null && !data.isEmpty()) {
+                    List<TwitchCategoryCache> batch = data.stream()
+                            .map(g -> toCacheEntry(g, true))
+                            .toList();
+                    cacheRepo.saveAll(batch);
+                    log.trace("Sweep batch [{}-{}]: {}", offset, offset + BATCH_SIZE - 1,
+                            batch.stream().map(c -> "%s (%s)".formatted(c.getName(), c.getId()))
+                                    .collect(Collectors.joining(", ", "[", "]")));
+                    total += batch.size();
+                }
             } catch (Exception e) {
                 log.warn("Twitch category sweep batch [{}-{}] failed: {}", offset, offset + BATCH_SIZE - 1, e.getMessage());
                 break;
