@@ -33,6 +33,10 @@ public class TwitchServiceImpl implements TwitchService {
     private final RestClient restClient;
     private final TwitchCategoryService twitchCategoryService;
 
+    public static final String CLIENT_ID = "Client-Id";
+    public static final String AUTHORIZATION = "Authorization";
+    public static final String AUTHORIZATION_BEARER = "Bearer ";
+
     @Value("${twitch.client-id:}")
     private String twitchClientId;
 
@@ -68,8 +72,8 @@ public class TwitchServiceImpl implements TwitchService {
         try {
             restClient.patch()
                 .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
-                .header("Authorization", "Bearer " + accessToken)
-                .header("Client-ID", twitchClientId)
+                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                    .header(CLIENT_ID, twitchClientId)
                 .header("Content-Type", "application/json")
                 .body(body)
                 .retrieve()
@@ -105,8 +109,8 @@ public class TwitchServiceImpl implements TwitchService {
             try {
                 Map<String, Object> response = restClient.get()
                     .uri(TWITCH_API_URL + "/games?name={name}", gameName)
-                    .header("Authorization", "Bearer " + accessToken)
-                    .header("Client-Id", twitchClientId)
+                        .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                        .header(CLIENT_ID, twitchClientId)
                     .retrieve()
                     .body(Map.class);
 
@@ -186,8 +190,8 @@ public class TwitchServiceImpl implements TwitchService {
         try {
             restClient.patch()
                 .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
-                .header("Authorization", "Bearer " + accessToken)
-                .header("Client-ID", twitchClientId)
+                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                    .header(CLIENT_ID, twitchClientId)
                 .header("Content-Type", "application/json")
                 .body(body)
                 .retrieve()
@@ -218,8 +222,8 @@ public class TwitchServiceImpl implements TwitchService {
                     String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
                     ModeratedChannelsResponse response = restClient.get()
                         .uri(TWITCH_API_URL + "/moderation/channels?user_id=" + viewer.getTwitchId())
-                        .header("Authorization", "Bearer " + accessToken)
-                        .header("Client-ID", twitchClientId)
+                            .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                            .header(CLIENT_ID, twitchClientId)
                         .retrieve()
                         .body(ModeratedChannelsResponse.class);
                     return response != null && response.data() != null
