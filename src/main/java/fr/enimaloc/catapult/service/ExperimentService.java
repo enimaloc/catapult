@@ -24,15 +24,13 @@ public class ExperimentService {
     private final ExperimentAssignmentRepository assignmentRepository;
     private final ExperimentEventRepository eventRepository;
     private final ExperimentOverrideRepository overrideRepository;
-
-    @Lazy
     private final ExperimentService self;
 
     private static final String CONTROL_KEY = "control";
     private final Set<String> knownKeys = ConcurrentHashMap.newKeySet();
 
     @Autowired
-    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, ExperimentService self) {
+    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, @Lazy ExperimentService self) {
         this.experimentRepository = experimentRepository;
         this.assignmentRepository = assignmentRepository;
         this.eventRepository = eventRepository;

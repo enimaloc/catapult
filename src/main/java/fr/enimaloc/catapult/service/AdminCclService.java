@@ -37,8 +37,6 @@ public class AdminCclService {
     private final RestClient restClient;
     private final TwitchCclDefinitionRepository twitchCclRepo;
     private final IgdbRatingDescriptorRepository igdbDescriptorRepo;
-
-    @Lazy
     private final AdminCclService self;
 
     @Value("${twitch.client-id:}")
@@ -63,7 +61,7 @@ public class AdminCclService {
     );
 
     @Autowired
-    public AdminCclService(RestClient restClient, TwitchCclDefinitionRepository twitchCclRepo, IgdbRatingDescriptorRepository igdbDescriptorRepo, AdminCclService self) {
+    public AdminCclService(RestClient restClient, TwitchCclDefinitionRepository twitchCclRepo, IgdbRatingDescriptorRepository igdbDescriptorRepo, @Lazy AdminCclService self) {
         this.restClient = restClient;
         this.twitchCclRepo = twitchCclRepo;
         this.igdbDescriptorRepo = igdbDescriptorRepo;
