@@ -158,7 +158,7 @@ public class TwitchServiceImpl implements TwitchService {
     private List<Map<String, Object>> buildCclPayload(Set<String> cclIds) {
         return EDITABLE_CCL_IDS.stream()
             .map(id -> Map.<String, Object>of("id", id, "is_enabled", cclIds.contains(id)))
-            .collect(Collectors.toList());
+            .toList();
     }
 
     @Override
