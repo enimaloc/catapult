@@ -178,7 +178,7 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
             try {
                 Map<String, Object> response = callTwitch(uri.toString(), token);
                 List<Map<String, Object>> data = response == null ? null : (List<Map<String, Object>>) response.get("data");
-                shouldStop = data != null && !data.isEmpty();
+                shouldStop = data == null || data.isEmpty();
                 if (!shouldStop) {
                     List<TwitchCategoryCache> batch = data.stream()
                             .map(g -> toCacheEntry(g, true))
