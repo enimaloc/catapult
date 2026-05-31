@@ -33,6 +33,8 @@ public class BindingsController {
     private final TwitchService twitchService;
     private final AdminCclService adminCclService;
 
+    public static final String REDIRECT_BINDINGS = "redirect:/bindings";
+
     @GetMapping("/bindings")
     public String bindings(@AuthenticationPrincipal CatapultOAuth2User principal,
                            @RequestParam(defaultValue = "0") int page,

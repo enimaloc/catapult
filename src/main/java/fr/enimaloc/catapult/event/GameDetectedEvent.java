@@ -11,8 +11,8 @@ import org.springframework.context.ApplicationEvent;
 @Getter
 public class GameDetectedEvent extends ApplicationEvent {
 
-    private final UserAccount user;
-    private final DetectedGame detectedGame;
+    private final transient UserAccount user;
+    private final transient DetectedGame detectedGame;
 
     public GameDetectedEvent(Object source, UserAccount user, DetectedGame detectedGame) {
         super(source);

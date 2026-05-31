@@ -31,6 +31,7 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
     private static final String TWITCH_API_URL   = "https://api.twitch.tv/helix";
     private static final int    AUTOCOMPLETE_MAX = 8;
     private static final int    BATCH_SIZE       = 100;
+    public static final String BLANK = "BLANK";
 
     public enum PrewarmMode { TOP, SWEEP, BOTH, NONE }
 
@@ -127,20 +128,19 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
 
             try {
                 Map<String, Object> response = callTwitch(uri, token);
-                if (response == null) break;
-                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                if (data == null || data.isEmpty()) break;
+                List<Map<String, Object>> data = response == null ? null : (List<Map<String, Object>>) response.get("data");
+                if (data != null && !data.isEmpty()) {
+                    List<TwitchCategoryCache> batch = data.stream()
+                            .map(g -> toCacheEntry(g, false))
+                            .toList();
+                    cacheRepo.saveAll(batch);
+                    log.trace("Warm with: {}", batch.stream().map(cat -> "%s (%s)".formatted(cat.getName(), cat.getId())).collect(Collectors.joining(", ", "[", "]")));
+                    total += batch.size();
 
-                List<TwitchCategoryCache> batch = data.stream()
-                        .map(g -> toCacheEntry(g, false))
-                        .toList();
-                cacheRepo.saveAll(batch);
-                log.trace("Warm with: {}", batch.stream().map(cat -> "%s (%s)".formatted(cat.getName(), cat.getId())).collect(Collectors.joining(", ", "[", "]")));
-                total += batch.size();
-
-                Map<String, Object> pagination = (Map<String, Object>) response.get("pagination");
-                if (pagination != null) {
-                    cursor = (String) pagination.get("cursor");
+                    Map<String, Object> pagination = (Map<String, Object>) response.get("pagination");
+                    if (pagination != null) {
+                        cursor = (String) pagination.get("cursor");
+                    }
                 }
             } catch (Exception e) {
                 log.warn("Twitch category prewarm batch failed: {}", e.getMessage());
@@ -168,7 +168,8 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
         // Twitch omits missing IDs from the response rather than returning an error.
         // The sweep terminates on the first batch that yields zero results, meaning
         // 100 consecutive IDs were all unknown — a reliable end-of-range signal.
-        while (true) {
+        boolean shouldStop = false;
+        while (!shouldStop) {
             StringBuilder uri = new StringBuilder(TWITCH_API_URL + "/games");
             for (long i = offset; i < offset + BATCH_SIZE; i++) {
                 uri.append(i == offset ? "?id=" : "&id=").append(i);
@@ -176,18 +177,18 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
 
             try {
                 Map<String, Object> response = callTwitch(uri.toString(), token);
-                if (response == null) break;
-                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                if (data == null || data.isEmpty()) break;
-
-                List<TwitchCategoryCache> batch = data.stream()
-                        .map(g -> toCacheEntry(g, true))
-                        .toList();
-                cacheRepo.saveAll(batch);
-                log.trace("Sweep batch [{}-{}]: {}", offset, offset + BATCH_SIZE - 1,
-                        batch.stream().map(c -> "%s (%s)".formatted(c.getName(), c.getId()))
-                             .collect(Collectors.joining(", ", "[", "]")));
-                total += batch.size();
+                List<Map<String, Object>> data = response == null ? null : (List<Map<String, Object>>) response.get("data");
+                shouldStop = data == null || data.isEmpty();
+                if (!shouldStop) {
+                    List<TwitchCategoryCache> batch = data.stream()
+                            .map(g -> toCacheEntry(g, true))
+                            .toList();
+                    cacheRepo.saveAll(batch);
+                    log.trace("Sweep batch [{}-{}]: {}", offset, offset + BATCH_SIZE - 1,
+                            batch.stream().map(c -> "%s (%s)".formatted(c.getName(), c.getId()))
+                                    .collect(Collectors.joining(", ", "[", "]")));
+                    total += batch.size();
+                }
             } catch (Exception e) {
                 log.warn("Twitch category sweep batch [{}-{}] failed: {}", offset, offset + BATCH_SIZE - 1, e.getMessage());
                 break;
@@ -265,7 +266,7 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
         String token = getOrRefreshAppToken();
         if (token.isBlank() || twitchClientId.isBlank()) {
             log.warn("searchCategories '{}' — live search skipped: token={} clientId={}",
-                    query, token.isBlank() ? "BLANK" : "ok", twitchClientId.isBlank() ? "BLANK" : "ok");
+                    query, token.isBlank() ? BLANK : "ok", twitchClientId.isBlank() ? BLANK : "ok");
             return List.of();
         }
 
@@ -313,8 +314,8 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
         }
         if (twitchClientId.isBlank() || twitchClientSecret.isBlank()) {
             log.warn("getOrRefreshAppToken — credentials not configured (clientId={} secret={})",
-                    twitchClientId.isBlank() ? "BLANK" : "ok",
-                    twitchClientSecret.isBlank() ? "BLANK" : "ok");
+                    twitchClientId.isBlank() ? BLANK : "ok",
+                    twitchClientSecret.isBlank() ? BLANK : "ok");
             return "";
         }
         log.debug("getOrRefreshAppToken — fetching new app token");

@@ -44,6 +44,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ChannelController {
 
+    public static final String ATTR_CHANNEL_USERNAME = "channelUsername";
+    public static final String ATTR_IS_OWNER = "isOwner";
+    public static final String ATTR_AVAILABLE_CCL = "availableCcls";
+
+    public static final String REDIRECT_CHANNEL = "redirect:/channels/";
+
     @Value("${steam.api-key:}")
     private String steamApiKey;
 
@@ -96,8 +102,8 @@ public class ChannelController {
         boolean isOwner = viewer.getId().equals(channelUser.getId());
 
         model.addAttribute("channelUser", channelUser);
-        model.addAttribute("channelUsername", username);
-        model.addAttribute("isOwner", isOwner);
+        model.addAttribute(ATTR_CHANNEL_USERNAME, username);
+        model.addAttribute(ATTR_IS_OWNER, isOwner);
 
         model.addAttribute("currentGame", gameStateService.getLastKnownGame(channelUser).orElse(null));
         model.addAttribute("botEnabled", channelUser.isBotEnabled());
@@ -115,7 +121,7 @@ public class ChannelController {
             bindings = gameBindingRepository.findByUser(channelUser, pageRequest);
         }
         model.addAttribute("bindings", bindings);
-        model.addAttribute("availableCcls", adminCclService.getAllCcls());
+        model.addAttribute(ATTR_AVAILABLE_CCL, adminCclService.getAllCcls());
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterSource", source);
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
@@ -134,7 +140,7 @@ public class ChannelController {
             @AuthenticationPrincipal CatapultOAuth2User principal,
             Model model) {
         UserAccount channelUser = resolveAndCheck(username, principal);
-        model.addAttribute("channelUsername", username);
+        model.addAttribute(ATTR_CHANNEL_USERNAME, username);
         model.addAttribute("currentGame", gameStateService.getLastKnownGame(channelUser).orElse(null));
         model.addAttribute("botEnabled", channelUser.isBotEnabled());
         model.addAttribute("isLive", streamStateService.isLive(channelUser));
@@ -151,8 +157,8 @@ public class ChannelController {
             Model model) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         UserAccount viewer = principal.getUserAccount();
-        model.addAttribute("channelUsername", username);
-        model.addAttribute("isOwner", viewer.getId().equals(channelUser.getId()));
+        model.addAttribute(ATTR_CHANNEL_USERNAME, username);
+        model.addAttribute(ATTR_IS_OWNER, viewer.getId().equals(channelUser.getId()));
 
         PageRequest pageRequest = PageRequest.of(page, 20);
         Page<GameBinding> bindings;
@@ -166,7 +172,7 @@ public class ChannelController {
             bindings = gameBindingRepository.findByUser(channelUser, pageRequest);
         }
         model.addAttribute("bindings", bindings);
-        model.addAttribute("availableCcls", adminCclService.getAllCcls());
+        model.addAttribute(ATTR_AVAILABLE_CCL, adminCclService.getAllCcls());
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterSource", source);
         return "fragments/bindings :: bindings";
@@ -179,8 +185,8 @@ public class ChannelController {
             Model model) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         UserAccount viewer = principal.getUserAccount();
-        model.addAttribute("channelUsername", username);
-        model.addAttribute("isOwner", viewer.getId().equals(channelUser.getId()));
+        model.addAttribute(ATTR_CHANNEL_USERNAME, username);
+        model.addAttribute(ATTR_IS_OWNER, viewer.getId().equals(channelUser.getId()));
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
         model.addAttribute("hasSteam", !steamApiKey.isBlank() && channelUser.getSteamId() != null);
         return "fragments/connections :: connections";
@@ -192,11 +198,11 @@ public class ChannelController {
             @AuthenticationPrincipal CatapultOAuth2User principal,
             Model model) {
         UserAccount channelUser = resolveAndCheck(username, principal);
-        model.addAttribute("channelUsername", username);
+        model.addAttribute(ATTR_CHANNEL_USERNAME, username);
         UserSettings settings = userSettingsRepository.findById(channelUser.getId())
             .orElseGet(UserSettings::new);
         model.addAttribute("noGameSettings", settings);
-        model.addAttribute("availableCcls", adminCclService.getAllCcls());
+        model.addAttribute(ATTR_AVAILABLE_CCL, adminCclService.getAllCcls());
         return "fragments/no-game-settings :: no-game-settings";
     }
 
@@ -253,7 +259,7 @@ public class ChannelController {
         UserAccount channelUser = resolveAndCheck(username, principal);
         Set<String> cclSet = ccls == null ? Set.of() : new HashSet<>(ccls);
         bindingService.updateBinding(channelUser, id, twitchGameId, twitchGameName, cclSet, ignored);
-        return "redirect:/channels/" + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
     }
 
     @PostMapping("/channels/{username}/bindings/{id}/ccl-toggle")
@@ -264,7 +270,7 @@ public class ChannelController {
             @RequestParam(defaultValue = "false") boolean enabled) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         bindingService.toggleCclEnabled(channelUser, id, enabled);
-        return "redirect:/channels/" + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
     }
 
     @PostMapping("/channels/{username}/bindings/{id}/ignored-toggle")
@@ -275,7 +281,7 @@ public class ChannelController {
             @RequestParam(defaultValue = "false") boolean ignored) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         bindingService.toggleIgnored(channelUser, id, ignored);
-        return "redirect:/channels/" + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
     }
 
     @PostMapping("/channels/{username}/bindings/{id}/delete")
@@ -285,7 +291,7 @@ public class ChannelController {
             @PathVariable UUID id) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         bindingService.deleteBinding(channelUser, id);
-        return "redirect:/channels/" + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
     }
 
     // -------------------------------------------------------------------------
@@ -304,7 +310,7 @@ public class ChannelController {
         } else {
             twitchEventSubService.disconnect(channelUser);
         }
-        return "redirect:/channels/" + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
     }
 
     @PostMapping("/channels/{username}/settings/no-game")
@@ -328,7 +334,7 @@ public class ChannelController {
         if (gameStateService.getLastKnownGame(channelUser).isEmpty()) {
             twitchService.resetToDefault(channelUser);
         }
-        return "redirect:/channels/" + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
     }
 
     @GetMapping("/channels/{username}/fragments/incomplete-fallback-settings")
@@ -337,11 +343,11 @@ public class ChannelController {
             @AuthenticationPrincipal CatapultOAuth2User principal,
             Model model) {
         UserAccount channelUser = resolveAndCheck(username, principal);
-        model.addAttribute("channelUsername", username);
+        model.addAttribute(ATTR_CHANNEL_USERNAME, username);
         UserSettings settings = userSettingsRepository.findById(channelUser.getId())
             .orElseGet(UserSettings::new);
         model.addAttribute("incompleteFallbackSettings", settings);
-        model.addAttribute("availableCcls", adminCclService.getAllCcls());
+        model.addAttribute(ATTR_AVAILABLE_CCL, adminCclService.getAllCcls());
         return "fragments/incomplete-fallback-settings :: incomplete-fallback-settings";
     }
 
@@ -363,7 +369,7 @@ public class ChannelController {
         settings.getIncompleteFallbackCcls().clear();
         if (ccls != null) settings.getIncompleteFallbackCcls().addAll(ccls);
         userSettingsRepository.save(settings);
-        return "redirect:/channels/" + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
     }
 
     // -------------------------------------------------------------------------
@@ -380,7 +386,7 @@ public class ChannelController {
         if (channelUser.getTwitchUsername().equalsIgnoreCase(confirmUsername)) {
             accountService.initiateAccountDeletion(channelUser);
         }
-        return "redirect:/channels/" + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
     }
 
     @PostMapping("/channels/{username}/settings/cancel-deletion")
@@ -390,7 +396,7 @@ public class ChannelController {
         UserAccount channelUser = resolveAndCheck(username, principal);
         requireOwner(principal.getUserAccount(), channelUser);
         accountService.cancelAccountDeletion(channelUser);
-        return "redirect:/channels/" + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
     }
 
     @PostMapping("/channels/{username}/settings/disconnect")
@@ -402,7 +408,7 @@ public class ChannelController {
         requireOwner(principal.getUserAccount(), channelUser);
         OAuthToken.Provider p = OAuthToken.Provider.valueOf(provider.toUpperCase());
         accountService.disconnectProvider(channelUser, p);
-        return "redirect:/channels/" + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
     }
 
     // -------------------------------------------------------------------------

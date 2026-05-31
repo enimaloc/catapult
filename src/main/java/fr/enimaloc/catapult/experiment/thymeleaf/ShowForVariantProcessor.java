@@ -22,6 +22,7 @@ class ShowForVariantProcessor extends AbstractAttributeTagProcessor {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ShowForVariantProcessor.class);
     private static final int PRECEDENCE = StandardDialect.PROCESSOR_PRECEDENCE + 10;
     static final String ATTR_NAME = "show-for";
+    public static final String CONTROL = "control";
 
     private final ExperimentService experimentService;
 
@@ -54,23 +55,25 @@ class ShowForVariantProcessor extends AbstractAttributeTagProcessor {
         Experiment.Status status = experiment.map(Experiment::getStatus).orElse(Experiment.Status.DRAFT);
 
         boolean show;
-        if (status == Experiment.Status.DRAFT) {
-            show = variantKey.equals("control");
-        } else if (status == Experiment.Status.ENDED || status == Experiment.Status.PAUSED) {
-            Optional<ExperimentVariant> assigned = experimentService.getAssignedVariant(userAccount, experiment.get());
-            show = assigned.map(v -> v.getKey().equals(variantKey)).orElseGet(() -> variantKey.equals("control"));
-        } else {
-            // ACTIVE: use cached assignments list when available, fall back to getVariant
-            // to ensure assignment is created for first-time users
-            boolean hasAssignment = assignments != null && assignments.stream()
-                    .anyMatch(a -> a.getExperiment().getKey().equals(experimentKey));
-            if (hasAssignment) {
-                show = assignments.stream().anyMatch(a ->
-                        a.getExperiment().getKey().equals(experimentKey)
-                                && a.getVariant().getKey().equals(variantKey));
-            } else {
-                Optional<ExperimentVariant> variant = experimentService.getVariant(userAccount, experimentKey);
-                show = variant.map(v -> v.getKey().equals(variantKey)).orElseGet(() -> variantKey.equals("control"));
+        switch (status) {
+            case Experiment.Status.DRAFT -> show = variantKey.equals(CONTROL);
+            case Experiment.Status.ENDED, Experiment.Status.PAUSED -> {
+                Optional<ExperimentVariant> assigned = experiment.flatMap(exp -> experimentService.getAssignedVariant(userAccount, exp));
+                show = assigned.map(v -> v.getKey().equals(variantKey)).orElseGet(() -> variantKey.equals(CONTROL));
+            }
+            default -> {
+                // ACTIVE: use cached assignments list when available, fall back to getVariant
+                // to ensure assignment is created for first-time users
+                boolean hasAssignment = assignments != null && assignments.stream()
+                        .anyMatch(a -> a.getExperiment().getKey().equals(experimentKey));
+                if (hasAssignment) {
+                    show = assignments.stream().anyMatch(a ->
+                            a.getExperiment().getKey().equals(experimentKey)
+                                    && a.getVariant().getKey().equals(variantKey));
+                } else {
+                    Optional<ExperimentVariant> variant = experimentService.getVariant(userAccount, experimentKey);
+                    show = variant.map(v -> v.getKey().equals(variantKey)).orElseGet(() -> variantKey.equals(CONTROL));
+                }
             }
         }
 

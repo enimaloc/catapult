@@ -24,7 +24,6 @@ import java.util.stream.Stream;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AdminCclService {
 
     private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
@@ -38,10 +37,7 @@ public class AdminCclService {
     private final RestClient restClient;
     private final TwitchCclDefinitionRepository twitchCclRepo;
     private final IgdbRatingDescriptorRepository igdbDescriptorRepo;
-
-    @Autowired
-    @Lazy
-    private AdminCclService self;
+    private final AdminCclService self;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -63,6 +59,14 @@ public class AdminCclService {
         "Gambling",          Set.of("gambling", "simulated gambling", "betting"),
         "ProfanityVulgarity",Set.of("language", "profanity", "crude", "bad language", "strong language", "lyrics", "vulgarity")
     );
+
+    @Autowired
+    public AdminCclService(RestClient restClient, TwitchCclDefinitionRepository twitchCclRepo, IgdbRatingDescriptorRepository igdbDescriptorRepo, @Lazy AdminCclService self) {
+        this.restClient = restClient;
+        this.twitchCclRepo = twitchCclRepo;
+        this.igdbDescriptorRepo = igdbDescriptorRepo;
+        this.self = self;
+    }
 
     @PostConstruct
     public void init() {
