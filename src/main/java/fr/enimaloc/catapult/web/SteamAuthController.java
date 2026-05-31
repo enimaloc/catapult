@@ -26,6 +26,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 @Slf4j
 @Controller
@@ -38,6 +39,16 @@ public class SteamAuthController {
     private static final String OPENID_NS = "http://specs.openid.net/auth/2.0";
     private static final String OPENID_IDENTIFIER_SELECT = "http://specs.openid.net/auth/2.0/identifier_select";
     private static final String SESSION_NONCE_KEY = "steam_link_nonce";
+
+    private static final Random RANDOM = new SecureRandom();
+
+    public static final String REDIRECT_SETTINGS_ERROR = "redirect:/settings?error=steam";
+    public static final String ATTR_OPENID_NS = "openid.ns";
+    public static final String ATTR_OPENID_MODE = "openid.mode";
+    public static final String ATTR_OPENID_RETURN_TO = "openid.return_to";
+    public static final String ATTR_OPENID_REALM = "openid.realm";
+    public static final String ATTR_OPENID_IDENTITY = "openid.identity";
+    public static final String ATTR_OPENID_CLAIMED_ID = "openid.claimed_id";
 
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
@@ -54,12 +65,12 @@ public class SteamAuthController {
         String returnTo = baseUrl + "/connect/steam/callback?nonce=" + nonce;
 
         String redirectUrl = UriComponentsBuilder.fromUriString(STEAM_OPENID_ENDPOINT)
-            .queryParam("openid.ns", OPENID_NS)
-            .queryParam("openid.mode", "checkid_setup")
-            .queryParam("openid.return_to", returnTo)
-            .queryParam("openid.realm", baseUrl)
-            .queryParam("openid.identity", OPENID_IDENTIFIER_SELECT)
-            .queryParam("openid.claimed_id", OPENID_IDENTIFIER_SELECT)
+            .queryParam(ATTR_OPENID_NS, OPENID_NS)
+            .queryParam(ATTR_OPENID_MODE, "checkid_setup")
+            .queryParam(ATTR_OPENID_RETURN_TO, returnTo)
+            .queryParam(ATTR_OPENID_REALM, baseUrl)
+            .queryParam(ATTR_OPENID_IDENTITY, OPENID_IDENTIFIER_SELECT)
+            .queryParam(ATTR_OPENID_CLAIMED_ID, OPENID_IDENTIFIER_SELECT)
             .build().toUriString();
 
         return "redirect:" + redirectUrl;
@@ -75,24 +86,24 @@ public class SteamAuthController {
         if (sessionNonce == null || callbackNonce == null
                 || !MessageDigest.isEqual(sessionNonce.getBytes(), callbackNonce.getBytes())) {
             log.warn("Steam OpenID nonce mismatch for user {}", principal.getUserAccount().getId());
-            return "redirect:/settings?error=steam";
+            return REDIRECT_SETTINGS_ERROR;
         }
 
-        if (!"id_res".equals(params.get("openid.mode"))) {
+        if (!"id_res".equals(params.get(ATTR_OPENID_MODE))) {
             log.warn("Steam OpenID callback rejected for user {}: mode={}",
-                principal.getUserAccount().getId(), params.get("openid.mode"));
-            return "redirect:/settings?error=steam";
+                principal.getUserAccount().getId(), params.get(ATTR_OPENID_MODE));
+            return REDIRECT_SETTINGS_ERROR;
         }
 
         if (!verifyWithSteam(params)) {
             log.warn("Steam OpenID verification failed for user {}", principal.getUserAccount().getId());
-            return "redirect:/settings?error=steam";
+            return REDIRECT_SETTINGS_ERROR;
         }
 
-        String claimedId = params.get("openid.claimed_id");
+        String claimedId = params.get(ATTR_OPENID_CLAIMED_ID);
         if (claimedId == null || !claimedId.startsWith(STEAM_ID_PREFIX)) {
             log.warn("Invalid Steam claimed_id: {}", claimedId);
-            return "redirect:/settings?error=steam";
+            return REDIRECT_SETTINGS_ERROR;
         }
 
         String steamId = claimedId.substring(STEAM_ID_PREFIX.length());
@@ -117,7 +128,7 @@ public class SteamAuthController {
 
     private static String generateNonce() {
         byte[] bytes = new byte[16];
-        new SecureRandom().nextBytes(bytes);
+        RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
@@ -125,7 +136,7 @@ public class SteamAuthController {
         try {
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
             params.forEach((k, v) -> body.put(k, List.of(v)));
-            body.set("openid.mode", "check_authentication");
+            body.set(ATTR_OPENID_MODE, "check_authentication");
 
             String response = restClient.post()
                 .uri(STEAM_OPENID_ENDPOINT)

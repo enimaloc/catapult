@@ -14,25 +14,26 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 @EnableWebSecurity
 @Profile("mock-web")
 public class MockWebSecurityConfig {
+    public static final String MOCK_LOGIN_ROUTE = "/mock-login";
 
     @Bean
     @SuppressWarnings("RedundantThrows")
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         http
             .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"))
             .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/mock-login", "/privacy", "/error", "/css/**", "/js/**",
+                .requestMatchers("/", MOCK_LOGIN_ROUTE, "/privacy", "/error", "/css/**", "/js/**",
                                  "/images/**", "/webjars/**", "/h2-console/**").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .formLogin(FormLoginConfigurer::disable)
             .exceptionHandling(ex -> ex
-                .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/mock-login"))
+                .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint(MOCK_LOGIN_ROUTE))
             )
             .logout(logout -> logout
-                .logoutSuccessUrl("/mock-login")
+                .logoutSuccessUrl(MOCK_LOGIN_ROUTE)
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
             );

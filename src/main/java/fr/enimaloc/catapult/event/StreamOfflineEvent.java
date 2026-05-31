@@ -7,7 +7,7 @@ import org.springframework.context.ApplicationEvent;
 @Getter
 public class StreamOfflineEvent extends ApplicationEvent {
 
-    private final UserAccount user;
+    private final transient UserAccount user;
 
     public StreamOfflineEvent(Object source, UserAccount user) {
         super(source);
