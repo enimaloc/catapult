@@ -38,6 +38,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private static final String HELIX_USERS_URL = "https://api.twitch.tv/helix/users";
     private static final long MAX_RETRY_SECONDS = 60L;
 
+    public static final String PAYLOAD = "payload";
+    public static final String CLIENT_ID = "Client-Id";
+    public static final String AUTHORIZATION = "Authorization";
+    public static final String AUTHORIZATION_BEARER = "Bearer ";
+
     private final OAuthTokenRepository oAuthTokenRepository;
     private final UserAccountRepository userAccountRepository;
     private final TokenEncryptionService tokenEncryptionService;
@@ -113,11 +118,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
             String messageType = root.path("metadata").path("message_type").asText();
             switch (messageType) {
                 case "session_welcome" -> {
-                    String sessionId = root.path("payload").path("session").path("id").asText();
+                    String sessionId = root.path(PAYLOAD).path("session").path("id").asText();
                     subscribe(user, token, sessionId);
                 }
                 case "session_reconnect" -> {
-                    String reconnectUrl = root.path("payload").path("session").path("reconnect_url").asText();
+                    String reconnectUrl = root.path(PAYLOAD).path("session").path("reconnect_url").asText();
                     log.info("[EventSub Chat] session_reconnect for user {}", user.getId());
                     openConnection(user, token, reconnectUrl, 1L);
                 }
@@ -134,7 +139,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     private void handleNotification(UserAccount user, JsonNode root) {
         String subscriptionType = root.path("metadata").path("subscription_type").asText();
-        JsonNode event = root.path("payload").path("event");
+        JsonNode event = root.path(PAYLOAD).path("event");
 
         if ("channel.chat.message".equals(subscriptionType)) {
             String text = event.path("message").path("text").asText();
@@ -182,8 +187,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
         try {
             restClient.post()
                 .uri(EVENTSUB_API)
-                .header("Authorization", "Bearer " + accessToken)
-                .header("Client-ID", twitchClientId)
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
                 .body(Map.of("type", type, "version", "1", "condition", condition,
                     "transport", Map.of("method", "websocket", "session_id", sessionId)))
                 .retrieve()
@@ -203,8 +208,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                 try {
                     restClient.post()
                         .uri(HELIX_CHAT_URL)
-                        .header("Authorization", "Bearer " + accessToken)
-                        .header("Client-Id", twitchClientId)
+                        .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                        .header(CLIENT_ID, twitchClientId)
                         .body(Map.of("broadcaster_id", user.getTwitchId(),
                             "sender_id", user.getTwitchId(), "message", message))
                         .retrieve()
@@ -238,8 +243,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                         .uri(HELIX_BANS_URL + "?broadcaster_id=" + user.getTwitchId()
                             + "&moderator_id=" + user.getTwitchId()
                             + "&user_id=" + targetId)
-                        .header("Authorization", "Bearer " + accessToken)
-                        .header("Client-Id", twitchClientId)
+                            .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                            .header(CLIENT_ID, twitchClientId)
                         .retrieve()
                         .toBodilessEntity();
                     log.info("[EventSub Chat] Unbanned {} for user {}", targetLogin, user.getId());
@@ -266,8 +271,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                     restClient.post()
                         .uri(HELIX_BANS_URL + "?broadcaster_id=" + user.getTwitchId()
                             + "&moderator_id=" + user.getTwitchId())
-                        .header("Authorization", "Bearer " + accessToken)
-                        .header("Client-Id", twitchClientId)
+                            .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                            .header(CLIENT_ID, twitchClientId)
                         .body(Map.of("data", data))
                         .retrieve()
                         .toBodilessEntity();
@@ -285,8 +290,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
         try {
             Map<String, Object> response = restClient.get()
                 .uri(HELIX_USERS_URL + "?login=" + java.net.URLEncoder.encode(login, java.nio.charset.StandardCharsets.UTF_8))
-                .header("Authorization", "Bearer " + accessToken)
-                .header("Client-Id", twitchClientId)
+                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                    .header(CLIENT_ID, twitchClientId)
                 .retrieve()
                 .body(Map.class);
             if (response == null) return null;
