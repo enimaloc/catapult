@@ -62,7 +62,9 @@ public class IrcTwitchChatService implements TwitchChatService {
     }
 
     private void closeQuietly(Socket socket) {
-        try { socket.close(); } catch (IOException ignored) {}
+        try { socket.close(); } catch (IOException ignored) {
+            // Close quietly the socket
+        }
     }
 
     @Override
