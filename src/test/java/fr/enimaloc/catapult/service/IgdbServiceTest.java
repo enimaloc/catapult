@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.IgdbGameCacheEntry;
 import fr.enimaloc.catapult.domain.IgdbGameCcl;
+import fr.enimaloc.catapult.domain.IgdbGameExternalId;
 import fr.enimaloc.catapult.repository.IgdbGameCacheRepository;
 import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.IgdbGameExternalIdRepository;
@@ -16,7 +17,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
+import proto.AlternativeName;
 import proto.ExternalGame;
+import proto.ExternalGameSource;
 import proto.Game;
 
 import java.time.Instant;
@@ -294,5 +297,134 @@ class IgdbServiceTest {
         when(restClient.post()).thenThrow(new RuntimeException("Network error"));
 
         assertThat(igdbService.searchGames("Halo")).isEmpty();
+    }
+
+    // --- findWindowsExecutable paths (new lines L206-236) ---
+
+    @Test
+    void findByWindowsExecutable_returnsGame() {
+        setValidToken();
+        Game game = Game.newBuilder().setId(7).setName("Half-Life").build();
+        AlternativeName alt = AlternativeName.newBuilder().setGame(game).build();
+        when(igdbClient.findByWindowsExecutable(anyString(), anyString()))
+            .thenReturn(List.of(alt));
+
+        Optional<IgdbService.IgdbGame> result = igdbService.findByWindowsExecutable("hl2.exe");
+
+        assertThat(result).contains(new IgdbService.IgdbGame("7", "Half-Life"));
+    }
+
+    @Test
+    void findByWindowsExecutable_withoutExtension_appendsExt() {
+        setValidToken();
+        when(igdbClient.findByWindowsExecutable(anyString(), anyString()))
+            .thenReturn(List.of());
+
+        igdbService.findByWindowsExecutable("game");
+
+        verify(igdbClient).findByWindowsExecutable(eq("game.exe"), anyString());
+    }
+
+    @Test
+    void findByWindowsExecutable_igdbClientEmpty_returnsEmpty() {
+        setValidToken();
+        when(igdbClient.findByWindowsExecutable(anyString(), anyString()))
+            .thenReturn(List.of());
+
+        assertThat(igdbService.findByWindowsExecutable("missing.exe")).isEmpty();
+    }
+
+    // --- findBySteamAppId with steamSourceId >= 0 (new lines L104-106) ---
+
+    @Test
+    void findBySteamAppId_withSteamSourceId_externalIdFound_fallsThrough() {
+        setValidToken();
+        ReflectionTestUtils.setField(igdbService, "steamSourceId", 1L);
+        IgdbGameExternalId extId = new IgdbGameExternalId("42", 1L, "730");
+        when(externalIdRepository.findBySourceIdAndUid(1L, "730")).thenReturn(Optional.of(extId));
+        // igdbGameCache doesn't have "42" → falls through to igdbClient
+        Game game = Game.newBuilder().setId(42).setName("CS:GO").build();
+        ExternalGame ext = ExternalGame.newBuilder().setGame(game).build();
+        when(igdbClient.findExternalGameByUid(anyString(), anyLong(), anyString()))
+            .thenReturn(List.of(ext));
+
+        Optional<IgdbService.IgdbGame> result = igdbService.findBySteamAppId("730");
+
+        assertThat(result).isPresent();
+    }
+
+    // --- getTwitchSourceId getter (new line L500) ---
+
+    @Test
+    void getTwitchSourceId_returnsDefault() {
+        assertThat(igdbService.getTwitchSourceId()).isEqualTo(-1L);
+    }
+
+    // --- prewarmCclCache covers L265 (.toList()) ---
+
+    @Test
+    void prewarmCclCache_withCachedGame_toListCalled() {
+        ((Map<String, String>) ReflectionTestUtils.getField(igdbService, "igdbGameCache"))
+            .put("99", "TestGame");
+        when(cclRepository.findAllIgdbIds()).thenReturn(Set.of("99")); // already cached → toLoad empty
+
+        igdbService.prewarmCclCache(); // reaches .toList() at L265 then returns early
+    }
+
+    // --- suggestCcls paths (new lines L341-346 and L377) ---
+
+    @Test
+    void suggestCcls_withSteamSourceId_steamAppIdPresent_fetchesSteamCcls() {
+        setValidToken();
+        ReflectionTestUtils.setField(igdbService, "steamSourceId", 1L);
+        when(cclRepository.findById("99")).thenReturn(Optional.empty());
+        Game game = Game.newBuilder().setId(99).setName("TestGame").build();
+        when(igdbClient.fetchGameById(eq("99"), anyString(), anyString()))
+            .thenReturn(List.of(game));
+        IgdbGameExternalId extId = new IgdbGameExternalId("99", 1L, "steam-99");
+        when(externalIdRepository.findByIgdbIdAndSourceId("99", 1L))
+            .thenReturn(Optional.of(extId));
+        when(steamStoreService.fetchCcls(List.of("steam-99"))).thenReturn(Map.of());
+
+        igdbService.suggestCcls("99"); // covers L340-350 steam enrichment path
+    }
+
+    @Test
+    void suggestCcls_gameWithNoAgeRatings_returnsEmpty() {
+        setValidToken();
+        when(cclRepository.findById("88")).thenReturn(Optional.empty());
+        Game game = Game.newBuilder().setId(88).setName("EmptyGame").build();
+        when(igdbClient.fetchGameById(eq("88"), anyString(), anyString()))
+            .thenReturn(List.of(game));
+
+        Set<String> result = igdbService.suggestCcls("88"); // covers L377 (descriptorIds empty)
+
+        assertThat(result).isEmpty();
+    }
+
+    // --- loadSourceId branches (L426 sources found, L431 sources empty) ---
+
+    @Test
+    void init_sourcesFound_resolvesSourceId() {
+        ReflectionTestUtils.setField(igdbService, "clientSecret", "test-secret");
+        setValidToken();
+        ExternalGameSource source = ExternalGameSource.newBuilder().setId(5).setName("Steam").build();
+        // doReturn avoids compiler error on checked RequestException
+        doReturn(List.of(source)).when(igdbClient).findSourcesByName(anyString(), anyString());
+
+        igdbService.init(); // covers L426 (sources not empty)
+
+        assertThat(igdbService.getTwitchSourceId()).isNotEqualTo(-1L);
+    }
+
+    @Test
+    void init_sourcesEmpty_keepsDefaultSourceId() {
+        ReflectionTestUtils.setField(igdbService, "clientSecret", "test-secret");
+        setValidToken();
+        doReturn(List.of()).when(igdbClient).findSourcesByName(anyString(), anyString());
+
+        igdbService.init(); // covers L431 (sources empty, logs warning)
+
+        assertThat(igdbService.getTwitchSourceId()).isEqualTo(-1L);
     }
 }
