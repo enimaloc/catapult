@@ -16,6 +16,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
+import proto.ExternalGame;
+import proto.Game;
 
 import java.time.Instant;
 import java.util.List;
@@ -222,5 +224,75 @@ class IgdbServiceTest {
         igdbService.prewarmSteamAppIds(List.of("12345"));
 
         verifyNoInteractions(igdbClient);
+    }
+
+    // --- findBySteamAppId with igdbClient ---
+
+    private void setValidToken() {
+        ReflectionTestUtils.setField(igdbService, "appAccessToken", "test-token");
+        ReflectionTestUtils.setField(igdbService, "tokenExpiresAt", Instant.now().plusSeconds(3600));
+    }
+
+    @Test
+    void findBySteamAppId_igdbClientReturnsGame_returnsGame() {
+        setValidToken();
+        Game game = Game.newBuilder().setId(42).setName("Fortnite").build();
+        ExternalGame ext = ExternalGame.newBuilder().setGame(game).build();
+        when(igdbClient.findExternalGameByUid(anyString(), anyLong(), anyString()))
+            .thenReturn(List.of(ext));
+
+        Optional<IgdbService.IgdbGame> result = igdbService.findBySteamAppId("12345");
+
+        assertThat(result).contains(new IgdbService.IgdbGame("42", "Fortnite"));
+    }
+
+    @Test
+    void findBySteamAppId_igdbClientEmpty_returnsEmpty() {
+        setValidToken();
+        when(igdbClient.findExternalGameByUid(anyString(), anyLong(), anyString()))
+            .thenReturn(List.of());
+
+        assertThat(igdbService.findBySteamAppId("12345")).isEmpty();
+    }
+
+    // --- findByName with igdbClient ---
+
+    @Test
+    void findByName_igdbClientReturnsGame_returnsGame() {
+        setValidToken();
+        Game game = Game.newBuilder().setId(99).setName("Minecraft").build();
+        when(igdbClient.searchByName(anyString(), anyString())).thenReturn(List.of(game));
+
+        Optional<IgdbService.IgdbGame> result = igdbService.findByName("Minecraft");
+
+        assertThat(result).contains(new IgdbService.IgdbGame("99", "Minecraft"));
+    }
+
+    @Test
+    void findByName_igdbClientEmpty_returnsEmpty() {
+        setValidToken();
+        when(igdbClient.searchByName(anyString(), anyString())).thenReturn(List.of());
+
+        assertThat(igdbService.findByName("Minecraft")).isEmpty();
+    }
+
+    // --- searchGames with token ---
+
+    @Test
+    void searchGames_withResults_returnsList() {
+        setValidToken();
+        Game game = Game.newBuilder().setId(7).setName("Halo").build();
+        when(igdbClient.searchByName(anyString(), anyString())).thenReturn(List.of(game));
+
+        List<IgdbService.IgdbGame> results = igdbService.searchGames("Halo");
+
+        assertThat(results).containsExactly(new IgdbService.IgdbGame("7", "Halo"));
+    }
+
+    @Test
+    void searchGames_blankToken_returnsEmpty() {
+        when(restClient.post()).thenThrow(new RuntimeException("Network error"));
+
+        assertThat(igdbService.searchGames("Halo")).isEmpty();
     }
 }
