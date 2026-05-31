@@ -55,7 +55,7 @@ public class ExperimentService {
 
         OverrideResult or = firstMatchingOverride(user, experiment);
         if (or.excluded()) return Optional.empty();
-        if (or.forcedVariant().isPresent()) return applyForcedVariant(user, experiment, or.forcedVariant().get());
+        if (or.forcedVariant().isPresent()) return or.forcedVariant().flatMap(fv -> applyForcedVariant(user, experiment, fv));
 
         Optional<ExperimentAssignment> existing = assignmentRepository.findByExperimentAndUser(experiment, user);
         if (existing.isPresent()) return Optional.of(existing.get().getVariant());
