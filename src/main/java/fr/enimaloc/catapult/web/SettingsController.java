@@ -30,6 +30,8 @@ public class SettingsController {
     private final UserSettingsRepository userSettingsRepository;
     private final AccountService accountService;
 
+    public static final String REDIRECT_SETTINGS = "redirect:/settings";
+
     @GetMapping("/settings")
     public String settings(@AuthenticationPrincipal CatapultOAuth2User principal, Model model) {
         UserAccount user = principal.getUserAccount();

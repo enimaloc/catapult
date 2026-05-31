@@ -11,7 +11,7 @@ import org.springframework.context.ApplicationEvent;
 @Getter
 public class NoGameDetectedEvent extends ApplicationEvent {
 
-    private final UserAccount user;
+    private final transient UserAccount user;
 
     public NoGameDetectedEvent(Object source, UserAccount user) {
         super(source);

@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.Random;
 
 /**
  * Chiffrement AES-256-GCM des tokens OAuth2 stockés en base.
@@ -21,6 +22,7 @@ public class TokenEncryptionService {
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
+    private static final Random RANDOM = new SecureRandom();
 
     private final SecretKey secretKey;
 
@@ -35,7 +37,7 @@ public class TokenEncryptionService {
     public String encrypt(String plaintext) {
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
-            new SecureRandom().nextBytes(iv);
+            RANDOM.nextBytes(iv);
 
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
@@ -48,7 +50,7 @@ public class TokenEncryptionService {
 
             return Base64.getEncoder().encodeToString(buffer.array());
         } catch (Exception e) {
-            throw new RuntimeException("Failed to encrypt token", e);
+            throw new SecurityException("Failed to encrypt token", e);
         }
     }
 
@@ -67,7 +69,7 @@ public class TokenEncryptionService {
 
             return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to decrypt token", e);
+            throw new SecurityException("Failed to decrypt token", e);
         }
     }
 }

@@ -47,11 +47,10 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             for (String appId : appIds) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> entry = (Map<String, Object>) response.get(appId);
-                if (entry == null || !Boolean.TRUE.equals(entry.get("success"))) continue;
+                if (entry == null || !Boolean.TRUE.equals(entry.get("success")) || entry.get("data") == null) continue;
 
                 @SuppressWarnings("unchecked")
                 Map<String, Object> data = (Map<String, Object>) entry.get("data");
-                if (data == null) continue;
 
                 Set<String> ccls = extractCcls(data);
                 if (!ccls.isEmpty()) result.put(appId, ccls);
@@ -74,11 +73,10 @@ public class SteamStoreServiceImpl implements SteamStoreService {
 
         for (Map.Entry<String, Object> entry : ratings.entrySet()) {
             Map<String, Object> rating = (Map<String, Object>) entry.getValue();
-            if (rating == null) continue;
 
-            String descriptors = String.valueOf(rating.getOrDefault("descriptors", ""))
+            String descriptors = String.valueOf(rating == null ? "" : rating.getOrDefault("descriptors", ""))
                 .toLowerCase(Locale.ROOT);
-            if (descriptors.isBlank()) continue;
+            if (rating == null || descriptors.isBlank()) continue;
 
             KEYWORDS.forEach((cclId, keywords) -> {
                 if (keywords.stream().anyMatch(descriptors::contains)) ccls.add(cclId);

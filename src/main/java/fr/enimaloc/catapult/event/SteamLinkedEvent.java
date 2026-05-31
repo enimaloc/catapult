@@ -7,7 +7,7 @@ import org.springframework.context.ApplicationEvent;
 @Getter
 public class SteamLinkedEvent extends ApplicationEvent {
 
-    private final UserAccount user;
+    private final transient UserAccount user;
 
     public SteamLinkedEvent(Object source, UserAccount user) {
         super(source);

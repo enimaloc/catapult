@@ -18,19 +18,25 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ExperimentService {
 
     private final ExperimentRepository experimentRepository;
     private final ExperimentAssignmentRepository assignmentRepository;
     private final ExperimentEventRepository eventRepository;
     private final ExperimentOverrideRepository overrideRepository;
-
-    @Autowired @Lazy
-    private ExperimentService self;
+    private final ExperimentService self;
 
     private static final String CONTROL_KEY = "control";
     private final Set<String> knownKeys = ConcurrentHashMap.newKeySet();
+
+    @Autowired
+    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, @Lazy ExperimentService self) {
+        this.experimentRepository = experimentRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.eventRepository = eventRepository;
+        this.overrideRepository = overrideRepository;
+        this.self = self;
+    }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -47,7 +53,7 @@ public class ExperimentService {
 
         OverrideResult or = firstMatchingOverride(user, experiment);
         if (or.excluded()) return Optional.empty();
-        if (or.forcedVariant().isPresent()) return applyForcedVariant(user, experiment, or.forcedVariant().get());
+        if (or.forcedVariant().isPresent()) return or.forcedVariant().flatMap(fv -> applyForcedVariant(user, experiment, fv));
 
         Optional<ExperimentAssignment> existing = assignmentRepository.findByExperimentAndUser(experiment, user);
         if (existing.isPresent()) return Optional.of(existing.get().getVariant());

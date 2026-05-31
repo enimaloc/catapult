@@ -23,6 +23,8 @@ import org.springframework.security.web.authentication.switchuser.SwitchUserFilt
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    public static final String LOGIN_ROUTE = "/login";
+
     private final CatapultOAuth2UserService oAuth2UserService;
 
     @Bean
@@ -48,7 +50,7 @@ public class SecurityConfig {
             statusChecker.check(details);
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.getPrincipal() instanceof CatapultOAuth2User admin
-                && admin.getUserAccount().getTwitchUsername().equals(details.getUsername())) {
+                    && admin.getUserAccount().getTwitchUsername().equals(details.getUsername())) {
                 throw new LockedException("Cannot impersonate yourself");
             }
         });
@@ -58,29 +60,29 @@ public class SecurityConfig {
     @Bean
     @SuppressWarnings("RedundantThrows")
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                    SwitchUserFilter switchUserFilter) throws Exception {
+                                                   SwitchUserFilter switchUserFilter) {
         http
-            .addFilterAfter(switchUserFilter, AuthorizationFilter.class)
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/login", "/privacy", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
-                .requestMatchers("/admin/impersonate/exit").authenticated()
-                .requestMatchers("/admin/**").hasRole("ADMIN")
-                .anyRequest().authenticated()
-            )
-            .oauth2Login(oauth2 -> oauth2
-                .loginPage("/login")
-                .defaultSuccessUrl("/channels", true)
-                .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService))
-                .failureHandler((request, response, exception) -> {
-                    log.error("OAuth2 login failed: [{}] {}", exception.getClass().getSimpleName(), exception.getMessage(), exception);
-                    new SimpleUrlAuthenticationFailureHandler("/login?error").onAuthenticationFailure(request, response, exception);
-                })
-            )
-            .logout(logout -> logout
-                .logoutSuccessUrl("/login")
-                .invalidateHttpSession(true)
-                .deleteCookies("JSESSIONID")
-            );
+                .addFilterAfter(switchUserFilter, AuthorizationFilter.class)
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/", LOGIN_ROUTE, "/privacy", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                        .requestMatchers("/admin/impersonate/exit").authenticated()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated()
+                )
+                .oauth2Login(oauth2 -> oauth2
+                        .loginPage(LOGIN_ROUTE)
+                        .defaultSuccessUrl("/channels", true)
+                        .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService))
+                        .failureHandler((request, response, exception) -> {
+                            log.error("OAuth2 login failed: [{}] {}", exception.getClass().getSimpleName(), exception.getMessage(), exception);
+                            new SimpleUrlAuthenticationFailureHandler(LOGIN_ROUTE + "?error").onAuthenticationFailure(request, response, exception);
+                        })
+                )
+                .logout(logout -> logout
+                        .logoutSuccessUrl(LOGIN_ROUTE)
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID")
+                );
 
         return http.build();
     }
