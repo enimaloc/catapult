@@ -159,9 +159,10 @@ public class EventSubTwitchChatService implements TwitchChatService {
         ArrayNode badges = event.withArray("badges");
         for (JsonNode badge : badges) {
             String setId = badge.path("set_id").asText("");
-            switch (setId) {
-                case "broadcaster": return ChatCommandEvent.SenderRole.BROADCASTER;
-                case "mod"        : return ChatCommandEvent.SenderRole.MODERATOR;
+            if (setId.equals("broadcaster")) {
+                return ChatCommandEvent.SenderRole.BROADCASTER;
+            } else if (setId.equals("mod")) {
+                return ChatCommandEvent.SenderRole.MODERATOR;
             }
         }
         return ChatCommandEvent.SenderRole.EVERYONE;
