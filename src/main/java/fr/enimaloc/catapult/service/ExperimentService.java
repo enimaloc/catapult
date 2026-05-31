@@ -18,7 +18,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ExperimentService {
 
     private final ExperimentRepository experimentRepository;
@@ -26,11 +25,20 @@ public class ExperimentService {
     private final ExperimentEventRepository eventRepository;
     private final ExperimentOverrideRepository overrideRepository;
 
-    @Autowired @Lazy
-    private ExperimentService self;
+    @Lazy
+    private final ExperimentService self;
 
     private static final String CONTROL_KEY = "control";
     private final Set<String> knownKeys = ConcurrentHashMap.newKeySet();
+
+    @Autowired
+    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, ExperimentService self) {
+        this.experimentRepository = experimentRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.eventRepository = eventRepository;
+        this.overrideRepository = overrideRepository;
+        this.self = self;
+    }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
