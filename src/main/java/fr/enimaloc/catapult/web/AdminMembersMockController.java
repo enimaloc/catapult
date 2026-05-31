@@ -32,12 +32,14 @@ public class AdminMembersMockController {
     private final MockSteamApiClient mockSteamApiClient;
     private final IgdbService igdbService;
 
+    public static final String REDIRECT_ADMIN_MEMBERS = "redirect:/admin/members";
+
     @PostMapping("/{id}/twitch/online")
     public String setTwitchOnline(@PathVariable UUID id) {
         var user = userAccountRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         mockTwitchEventSubService.setOnline(user);
-        return "redirect:/admin/members";
+        return REDIRECT_ADMIN_MEMBERS;
     }
 
     @PostMapping("/{id}/twitch/offline")
@@ -45,7 +47,7 @@ public class AdminMembersMockController {
         var user = userAccountRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         mockTwitchEventSubService.setOffline(user);
-        return "redirect:/admin/members";
+        return REDIRECT_ADMIN_MEMBERS;
     }
 
     @PostMapping("/{id}/steam/set")
@@ -58,7 +60,7 @@ public class AdminMembersMockController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User has no Steam ID");
         }
         mockSteamApiClient.setGameForUser(user.getSteamId(), gameId.strip(), gameName.strip());
-        return "redirect:/admin/members";
+        return REDIRECT_ADMIN_MEMBERS;
     }
 
     @PostMapping("/{id}/steam/clear")
@@ -69,7 +71,7 @@ public class AdminMembersMockController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User has no Steam ID");
         }
         mockSteamApiClient.clearGameForUser(user.getSteamId());
-        return "redirect:/admin/members";
+        return REDIRECT_ADMIN_MEMBERS;
     }
 
     @GetMapping(value = "/igdb/search", produces = MediaType.APPLICATION_JSON_VALUE)
