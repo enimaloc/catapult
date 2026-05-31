@@ -170,7 +170,9 @@ public class AdminExperimentsController {
                 int weight = Math.max(0, Integer.parseInt(raw.trim()));
                 v.setWeight(weight);
                 variantRepository.save(v);
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException ignored) {
+                // Silent ignored
+            }
         }
         return "redirect:/admin/experiments/" + id;
     }
