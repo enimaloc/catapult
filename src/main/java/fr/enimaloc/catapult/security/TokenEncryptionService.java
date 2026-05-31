@@ -48,7 +48,7 @@ public class TokenEncryptionService {
 
             return Base64.getEncoder().encodeToString(buffer.array());
         } catch (Exception e) {
-            throw new RuntimeException("Failed to encrypt token", e);
+            throw new SecurityException("Failed to encrypt token", e);
         }
     }
 
@@ -67,7 +67,7 @@ public class TokenEncryptionService {
 
             return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to decrypt token", e);
+            throw new SecurityException("Failed to decrypt token", e);
         }
     }
 }
