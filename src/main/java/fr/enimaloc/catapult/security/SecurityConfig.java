@@ -48,7 +48,7 @@ public class SecurityConfig {
             statusChecker.check(details);
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.getPrincipal() instanceof CatapultOAuth2User admin
-                && admin.getUserAccount().getTwitchUsername().equals(details.getUsername())) {
+                    && admin.getUserAccount().getTwitchUsername().equals(details.getUsername())) {
                 throw new LockedException("Cannot impersonate yourself");
             }
         });
@@ -58,7 +58,7 @@ public class SecurityConfig {
     @Bean
     @SuppressWarnings("RedundantThrows")
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                    SwitchUserFilter switchUserFilter) throws Exception {
+                                                   SwitchUserFilter switchUserFilter) {
         http
             .addFilterAfter(switchUserFilter, AuthorizationFilter.class)
             .authorizeHttpRequests(auth -> auth
