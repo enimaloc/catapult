@@ -26,6 +26,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 @Slf4j
 @Controller
@@ -38,6 +39,8 @@ public class SteamAuthController {
     private static final String OPENID_NS = "http://specs.openid.net/auth/2.0";
     private static final String OPENID_IDENTIFIER_SELECT = "http://specs.openid.net/auth/2.0/identifier_select";
     private static final String SESSION_NONCE_KEY = "steam_link_nonce";
+
+    private static final Random RANDOM = new SecureRandom();
 
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
@@ -117,7 +120,7 @@ public class SteamAuthController {
 
     private static String generateNonce() {
         byte[] bytes = new byte[16];
-        new SecureRandom().nextBytes(bytes);
+        RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
