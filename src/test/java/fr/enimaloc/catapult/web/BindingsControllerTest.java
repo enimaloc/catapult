@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.web;
 
+import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -144,6 +146,34 @@ class BindingsControllerTest {
             .andExpect(redirectedUrl("/bindings"));
 
         verify(bindingService).deleteBinding(userAccount, id);
+    }
+
+    @Test
+    void getBindings_withStatus_callsStatusRepository() throws Exception {
+        when(gameBindingRepository.findByUserAndStatus(any(), any(), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/bindings")
+                .with(authentication(auth))
+                .param("status", "AUTO"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("bindings"));
+
+        verify(gameBindingRepository).findByUserAndStatus(userAccount, GameBinding.Status.AUTO, PageRequest.of(0, 20));
+    }
+
+    @Test
+    void getBindings_withSource_callsSourceRepository() throws Exception {
+        when(gameBindingRepository.findByUserAndSourceType(any(), any(), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/bindings")
+                .with(authentication(auth))
+                .param("source", "STEAM"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("bindings"));
+
+        verify(gameBindingRepository).findByUserAndSourceType(userAccount, GameBinding.SourceType.STEAM, PageRequest.of(0, 20));
     }
 
     @Test
