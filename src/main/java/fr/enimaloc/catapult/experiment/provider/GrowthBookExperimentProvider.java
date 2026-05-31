@@ -74,7 +74,9 @@ public class GrowthBookExperimentProvider implements ExperimentProvider {
     }
 
     @Override
-    public void trackEvent(UserAccount user, String experimentKey, String eventKey) {}
+    public void trackEvent(UserAccount user, String experimentKey, String eventKey) {
+        // Silent unsupported on GrowthBook
+    }
 
     @Override
     public void importExperiments(List<Experiment> experiments) {

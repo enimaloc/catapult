@@ -20,8 +20,8 @@ import java.util.*;
 @Component
 @RequiredArgsConstructor
 public class ExperimentSynchronizer implements ApplicationRunner {
-    public static final Map<String, List<ExperimentOverride>> WAITING_VARIANT = new HashMap<>();
 
+    private final Map<String, List<ExperimentOverride>> waitingVariant = new HashMap<>();
     private final ExperimentRepository experimentRepository;
     private final ExperimentService experimentService;
     private final ApplicationContext applicationContext;
@@ -47,7 +47,7 @@ public class ExperimentSynchronizer implements ApplicationRunner {
     }
 
     public void updateVariant(UserAccount user) {
-        List<ExperimentOverride> waiting = WAITING_VARIANT.get(user.getTwitchUsername());
+        List<ExperimentOverride> waiting = waitingVariant.get(user.getTwitchUsername());
         if (waiting == null) return;
         log.info("Updating registered variant for {}", user.getTwitchUsername());
         for (ExperimentOverride override : waiting) {
@@ -65,46 +65,62 @@ public class ExperimentSynchronizer implements ApplicationRunner {
         exp.setStatus(Experiment.Status.DRAFT);
 
         int i = 0;
-        for (ExperimentSpec.Variant vd : spec.variants()) exp.getVariants().add(createVariant(exp, vd, i++));
-        for (ExperimentSpec.Rule rd : spec.rules()) exp.getRules().add(createRule(exp, rd));
+        createVariantsForExperiment(spec, exp, i);
+        createRules(spec, exp);
         experimentRepository.save(exp);
 
-        for (ExperimentSpec.Override od : spec.overrides()) {
-            ExperimentOverride override = new ExperimentOverride();
-            override.setExperiment(exp);
-            override.setOverrideType(od.type());
-            override.setAction(od.action());
-            override.setPriority(od.priority());
+        createOverrides(spec, exp);
+    }
 
-            if (od.action() == ExperimentOverride.OverrideAction.FORCE_VARIANT) {
-                if (od.targetVariantId().isBlank()) {
-                    throw new IllegalStateException("Variant not specified");
-                }
-                ExperimentVariant tv = exp.getVariants().stream()
-                        .filter(variant -> variant.getKey().equals(od.targetVariantId()))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException(
-                                "Variant %s does not exist".formatted(od.targetVariantId())));
-                override.setTargetVariant(tv);
-            }
-            boolean canBeCompleted = true;
-            if (od.type() == ExperimentOverride.OverrideType.USER) {
-                if (od.twitchUsername().isBlank()) {
-                    throw new IllegalStateException("Account not specified");
-                }
-                UserAccount u = userAccountRepository.findByTwitchUsername(od.twitchUsername().trim()).orElse(null);
-                if (u == null) {
-                    canBeCompleted = false;
-                    WAITING_VARIANT.computeIfAbsent(od.twitchUsername(), unused -> new ArrayList<>()).add(override);
-                }
-                override.setTargetUser(u);
-            }/* else if (overrideType == ExperimentOverride.OverrideType.ATTRIBUTE) {
-                override.setAttributeKey(attributeKey);
-                override.setAttributeOp(attributeOp);
-                override.setAttributeVal(attributeVal);
-            }*/ // TODO Implement
-            if (canBeCompleted) experimentOverrideRepository.save(override);
+    private void createOverrides(ExperimentSpec spec, Experiment exp) {
+        for (ExperimentSpec.Override od : spec.overrides()) {
+            createOverride(od, exp);
         }
+    }
+
+    private void createOverride(ExperimentSpec.Override od, Experiment exp) {
+        ExperimentOverride override = new ExperimentOverride();
+        override.setExperiment(exp);
+        override.setOverrideType(od.type());
+        override.setAction(od.action());
+        override.setPriority(od.priority());
+
+        if (od.action() == ExperimentOverride.OverrideAction.FORCE_VARIANT) {
+            if (od.targetVariantId().isBlank()) {
+                throw new IllegalStateException("Variant not specified");
+            }
+            ExperimentVariant tv = exp.getVariants().stream()
+                    .filter(variant -> variant.getKey().equals(od.targetVariantId()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Variant %s does not exist".formatted(od.targetVariantId())));
+            override.setTargetVariant(tv);
+        }
+        boolean canBeCompleted = true;
+        if (od.type() == ExperimentOverride.OverrideType.USER) {
+            if (od.twitchUsername().isBlank()) {
+                throw new IllegalStateException("Account not specified");
+            }
+            UserAccount u = userAccountRepository.findByTwitchUsername(od.twitchUsername().trim()).orElse(null);
+            if (u == null) {
+                canBeCompleted = false;
+                waitingVariant.computeIfAbsent(od.twitchUsername(), unused -> new ArrayList<>()).add(override);
+            }
+            override.setTargetUser(u);
+        }/* else if (overrideType == ExperimentOverride.OverrideType.ATTRIBUTE) {
+            override.setAttributeKey(attributeKey);
+            override.setAttributeOp(attributeOp);
+            override.setAttributeVal(attributeVal);
+        }*/ // TODO Implement
+        if (canBeCompleted) experimentOverrideRepository.save(override);
+    }
+
+    private static void createRules(ExperimentSpec spec, Experiment exp) {
+        for (ExperimentSpec.Rule rd : spec.rules()) exp.getRules().add(createRule(exp, rd));
+    }
+
+    private static void createVariantsForExperiment(ExperimentSpec spec, Experiment exp, int i) {
+        for (ExperimentSpec.Variant vd : spec.variants()) exp.getVariants().add(createVariant(exp, vd, i++));
     }
 
     private static ExperimentVariant createVariant(Experiment exp, ExperimentSpec.Variant vd, int internalId) {

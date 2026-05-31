@@ -16,7 +16,7 @@ public class ChatCommandEvent extends ApplicationEvent {
         BROADCASTER, MODERATOR, EVERYONE
     }
 
-    private final UserAccount user;
+    private final transient UserAccount user;
     private final String command;
     private final List<String> args;
     private final SenderRole senderRole;

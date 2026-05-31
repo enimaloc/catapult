@@ -15,12 +15,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import proto.AlternativeName;
-import proto.ExternalGameSource;
-import proto.Game;
+import proto.*;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -262,7 +261,7 @@ public class IgdbService {
         Set<String> alreadyCached = cclRepository.findAllIgdbIds();
         List<String> toLoad = knownIds.stream()
             .filter(id -> !alreadyCached.contains(id) && !cclCache.containsKey(id))
-            .collect(Collectors.toList());
+            .toList();
 
         if (toLoad.isEmpty()) {
             log.info("CCL cache already warm for all {} cached games", knownIds.size());
@@ -367,22 +366,22 @@ public class IgdbService {
 
     private Set<String> extractCcls(Game game) {
         // Collect all descriptor IDs present on this game's age ratings
-        Set<Long> descriptorIds = new HashSet<>();
-        for (proto.AgeRating ar : game.getAgeRatingsList()) {
-            for (proto.AgeRatingContentDescriptionV2 desc : ar.getRatingContentDescriptionsList()) {
-                if (desc.getId() > 0) descriptorIds.add(desc.getId());
-            }
-        }
+        Set<Long> descriptorIds = game.getAgeRatingsList()
+            .stream()
+            .map(AgeRating::getRatingContentDescriptionsList)
+            .flatMap(Collection::stream)
+            .map(AgeRatingContentDescriptionV2::getId)
+            .filter(id -> id > 0)
+            .collect(Collectors.toSet());
 
         if (descriptorIds.isEmpty()) return Set.of();
 
         // DB-driven: find which Twitch CCLs have any of these descriptors mapped
-        Set<String> suggested = new HashSet<>();
-        for (TwitchCclDefinition cclDef : twitchCclRepo.findAll()) {
-            boolean matched = cclDef.getIgdbMappings().stream()
-                .anyMatch(d -> descriptorIds.contains(d.getId()));
-            if (matched) suggested.add(cclDef.getId());
-        }
+        Set<String> suggested = twitchCclRepo.findAll()
+            .stream()
+            .filter(def -> def.getIgdbMappings().stream().anyMatch(m -> descriptorIds.contains(m.getId())))
+            .map(TwitchCclDefinition::getId)
+            .collect(Collectors.toSet());
 
         // Keyword fallback when no admin mappings have been configured yet
         if (suggested.isEmpty()) {

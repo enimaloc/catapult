@@ -32,10 +32,8 @@ public class GameGetterChain {
         List<GetterConfig> configs = getterConfigRepository.findByUserOrderByPriorityAsc(user);
 
         for (GetterConfig config : configs) {
-            if (!config.isEnabled()) continue;
-
             GameGetter getter = getterByProvider.get(config.getProvider());
-            if (getter == null) continue;
+            if (!config.isEnabled() || getter == null) continue;
 
             try {
                 Optional<DetectedGame> result = getter.getCurrentGame(user);

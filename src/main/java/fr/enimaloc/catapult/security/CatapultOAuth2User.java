@@ -23,8 +23,8 @@ public class CatapultOAuth2User implements OAuth2User, UserDetails {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private final OAuth2User delegate; // null pour les sessions impersonifiées
-    private final UserAccount userAccount;
+    private final transient OAuth2User delegate; // null pour les sessions impersonifiées
+    private final transient UserAccount userAccount;
     private final boolean admin;
 
     public CatapultOAuth2User(OAuth2User delegate, UserAccount userAccount, boolean admin) {
