@@ -14,7 +14,6 @@
         <div th:attr="hx-get=@{/channels/{u}/fragments/incomplete-fallback-settings(u=${channelUsername})}" hx-trigger="load" hx-swap="outerHTML">
             <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
         </div>
-        <div exp:show-for="sidebar-layout:control"><div th:replace="~{fragments/bot :: bot}"></div></div>
         <div th:replace="~{fragments/bindings :: bindings}"></div>
         <div th:replace="~{fragments/danger-zone :: danger-zone}"></div>
 
@@ -40,11 +39,9 @@
     <aside id="left-panel">
         <div th:replace="~{fragments/status :: status}"></div>
         <div th:replace="~{fragments/activity-log :: activity-log}"></div>
-        <div exp:show-for="sidebar-layout:bot-left"><div th:replace="~{fragments/bot :: bot}"></div></div>
     </aside>
 
     <aside id="right-panel">
-        <div exp:show-for="sidebar-layout:bot-right"><div th:replace="~{fragments/bot :: bot}"></div></div>
     </aside>
 
     <script th:inline="javascript">
