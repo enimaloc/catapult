@@ -133,8 +133,12 @@
     });
 </script>
 
-<div th:if="${user != null and activeExperimentAssignments != null}"
-     th:replace="~{fragments/experiment-feedback-widget :: widget(${activeExperimentAssignments})}"></div>
+<!--<div th:if="${user != null and activeExperimentAssignments != null}"-->
+<!--     th:replace="~{fragments/experiment-feedback-widget :: widget(${activeExperimentAssignments})}"></div>-->
+
+<th:block th:if="${user != null and !@environment.getProperty('gitlab.token', '').isEmpty()}">
+<div th:replace="~{fragments/feedback-widget :: widget}"></div>
+</th:block>
 
 <footer class="footer" id="footer">
     <div class="footer-left">
