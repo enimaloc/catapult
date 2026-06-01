@@ -121,6 +121,9 @@
 <div th:if="${user != null and activeExperimentAssignments != null}"
      th:replace="~{fragments/experiment-feedback-widget :: widget(${activeExperimentAssignments})}"></div>
 
+<div th:if="${user != null}"
+     th:replace="~{fragments/feedback-widget :: widget}"></div>
+
 <footer class="footer" id="footer">
     <div class="footer-left">
         <span th:text="#{footer.copyright}">© 2025 enimaloc</span>
