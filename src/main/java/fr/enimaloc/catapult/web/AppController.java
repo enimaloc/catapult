@@ -29,7 +29,7 @@ public class AppController {
     // Old URL redirects
     // -------------------------------------------------------------------------
 
-    @GetMapping({"/app", "/dashboard", "/settings"})
+    @GetMapping({"/app", "/dashboard"})
     public String redirectToChannels() {
         return "redirect:/channels";
     }

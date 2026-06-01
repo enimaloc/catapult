@@ -59,8 +59,9 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         try {
             return switch (registrationId) {
                 case "twitch" -> handleTwitchLogin(userRequest, fetchTwitchUser(userRequest));
-                case "xbox" -> handleSecondaryLink(userRequest, OAuthToken.Provider.XBOX);
-                case "battlenet" -> handleSecondaryLink(userRequest, OAuthToken.Provider.BATTLENET);
+                case "steam" -> handleSecondaryLink(userRequest, OAuthToken.Provider.STEAM);
+//                case "xbox" -> handleSecondaryLink(userRequest, OAuthToken.Provider.XBOX);
+//                case "battlenet" -> handleSecondaryLink(userRequest, OAuthToken.Provider.BATTLENET);
                 default -> delegate.loadUser(userRequest);
             };
         } catch (OAuth2AuthenticationException e) {
