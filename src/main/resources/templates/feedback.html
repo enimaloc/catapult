@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template :: layout(
+          ~{::title},
+          'feedback',
+          ~{::section},
+          ~{},
+          'container',
+          null,
+          null)}">
+<head>
+    <title>Mes retours — Catapult</title>
+</head>
+<body>
+<section>
+    <h1>Mes retours</h1>
+    <p style="color:var(--muted); margin-bottom:1.5rem;">
+        Vos signalements et suggestions soumis à l'équipe.
+        Vous recevrez une notification dans le journal d'activité à chaque mise à jour.
+    </p>
+
+    <div th:if="${#lists.isEmpty(submissions)}" style="color:var(--muted);">
+        Aucun retour soumis pour l'instant.
+    </div>
+
+    <table th:unless="${#lists.isEmpty(submissions)}" class="table">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Titre</th>
+                <th>Issue</th>
+                <th>Date</th>
+                <th>Notifications</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="s : ${submissions}">
+                <td>
+                    <span th:text="${s.type.name() == 'BUG' ? '🐛 Bug' : '✨ Suggestion'}"></span>
+                </td>
+                <td th:text="${s.title}"></td>
+                <td>
+                    <a th:href="${s.gitlabIssueUrl}" target="_blank" rel="noopener"
+                       th:text="'#' + ${s.gitlabIssueIid}">Issue</a>
+                </td>
+                <td th:text="${#temporals.format(s.createdAt, 'dd/MM/yyyy HH:mm')}"></td>
+                <td>
+                    <span th:if="${!s.subscribed}" style="color:var(--muted); font-size:0.85rem;">Désabonné</span>
+                    <form th:if="${s.subscribed}" th:action="@{/feedback/{id}/unsubscribe(id=${s.id})}" method="post" style="display:inline"> <!-- nosemgrep -->
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <button type="submit" class="btn btn-sm btn-outline"
+                                onclick="return confirm('Se désabonner des notifications pour cette issue ?')">
+                            🔕 Se désabonner
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+</body>
+</html>
