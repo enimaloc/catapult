@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -87,8 +88,8 @@ class BindingsControllerTest {
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/bindings"));
 
-        verify(bindingService).updateBinding(eq(userAccount), eq(id),
-            eq("game-123"), eq("My Game"), eq(Set.of("ViolentGraphic")), eq(false));
+        verify(bindingService).updateBinding(userAccount, id,
+            "game-123", "My Game", Set.of("ViolentGraphic"), false);
     }
 
     @Test
@@ -102,8 +103,8 @@ class BindingsControllerTest {
                 .param("twitchGameName", "My Game"))
             .andExpect(status().is3xxRedirection());
 
-        verify(bindingService).updateBinding(eq(userAccount), eq(id),
-            eq("game-123"), eq("My Game"), eq(Set.of()), eq(false));
+        verify(bindingService).updateBinding(userAccount, id,
+            "game-123", "My Game", Set.of(), false);
     }
 
     @Test
@@ -148,8 +149,36 @@ class BindingsControllerTest {
     }
 
     @Test
+    void getBindings_withStatus_callsStatusRepository() throws Exception {
+        when(gameBindingRepository.findByUserAndStatus(any(), any(), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/bindings")
+                .with(authentication(auth))
+                .param("status", "AUTO"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("bindings"));
+
+        verify(gameBindingRepository).findByUserAndStatus(userAccount, GameBinding.Status.AUTO, PageRequest.of(0, 20));
+    }
+
+    @Test
+    void getBindings_withSource_callsSourceRepository() throws Exception {
+        when(gameBindingRepository.findByUserAndSourceType(any(), any(), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/bindings")
+                .with(authentication(auth))
+                .param("source", "STEAM"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("bindings"));
+
+        verify(gameBindingRepository).findByUserAndSourceType(userAccount, GameBinding.SourceType.STEAM, PageRequest.of(0, 20));
+    }
+
+    @Test
     void getGameSearch_returnsTwitchCategories() throws Exception {
-        when(twitchService.searchCategories(eq(userAccount), eq("fortnite")))
+        when(twitchService.searchCategories(userAccount, "fortnite"))
             .thenReturn(List.of(new TwitchCategory("1234", "Fortnite", null)));
 
         mockMvc.perform(get("/api/games/search")

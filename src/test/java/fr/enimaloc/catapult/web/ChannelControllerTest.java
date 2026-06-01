@@ -157,6 +157,124 @@ class ChannelControllerTest {
         verify(userSettingsRepository).save(any(UserSettings.class));
     }
 
+    @Test
+    void fragmentStatus_returns200() throws Exception {
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+
+        mockMvc.perform(get("/channels/streamer/fragments/status")
+                .with(authentication(ownerAuth)))
+            .andExpect(status().isOk())
+            .andExpect(view().name("fragments/status :: status"));
+    }
+
+    @Test
+    void fragmentBindings_returns200() throws Exception {
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+
+        mockMvc.perform(get("/channels/streamer/fragments/bindings")
+                .with(authentication(ownerAuth)))
+            .andExpect(status().isOk())
+            .andExpect(view().name("fragments/bindings :: bindings"));
+    }
+
+    @Test
+    void fragmentConnections_returns200() throws Exception {
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+
+        mockMvc.perform(get("/channels/streamer/fragments/connections")
+                .with(authentication(ownerAuth)))
+            .andExpect(status().isOk())
+            .andExpect(view().name("fragments/connections :: connections"));
+    }
+
+    @Test
+    void fragmentNoGameSettings_returns200() throws Exception {
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+
+        mockMvc.perform(get("/channels/streamer/fragments/no-game-settings")
+                .with(authentication(ownerAuth)))
+            .andExpect(status().isOk())
+            .andExpect(view().name("fragments/no-game-settings :: no-game-settings"));
+    }
+
+    @Test
+    void updateBinding_redirectsToChannel() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+
+        mockMvc.perform(post("/channels/streamer/bindings/" + id)
+                .with(authentication(ownerAuth))
+                .with(csrf())
+                .param("twitchGameId", "game-123")
+                .param("twitchGameName", "My Game"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/channels/streamer"));
+    }
+
+    @Test
+    void toggleCclEnabled_redirectsToChannel() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+
+        mockMvc.perform(post("/channels/streamer/bindings/" + id + "/ccl-toggle")
+                .with(authentication(ownerAuth))
+                .with(csrf())
+                .param("enabled", "true"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/channels/streamer"));
+    }
+
+    @Test
+    void toggleIgnored_redirectsToChannel() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+
+        mockMvc.perform(post("/channels/streamer/bindings/" + id + "/ignored-toggle")
+                .with(authentication(ownerAuth))
+                .with(csrf())
+                .param("ignored", "true"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/channels/streamer"));
+    }
+
+    @Test
+    void deleteBinding_redirectsToChannel() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+
+        mockMvc.perform(post("/channels/streamer/bindings/" + id + "/delete")
+                .with(authentication(ownerAuth))
+                .with(csrf()))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/channels/streamer"));
+    }
+
+    @Test
+    void toggleBot_redirectsToChannel() throws Exception {
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+
+        mockMvc.perform(post("/channels/streamer/settings/bot")
+                .with(authentication(ownerAuth))
+                .with(csrf())
+                .param("enabled", "false"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/channels/streamer"));
+    }
+
+    @Test
+    void saveNoGameSettings_redirectsToChannel() throws Exception {
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+        when(userSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(new UserSettings()));
+
+        mockMvc.perform(post("/channels/streamer/settings/no-game")
+                .with(authentication(ownerAuth))
+                .with(csrf())
+                .param("twitchGameId", "509658")
+                .param("twitchGameName", "Just Chatting"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/channels/streamer"));
+    }
+
     private UsernamePasswordAuthenticationToken authFor(UserAccount user) {
         var oAuth2User = mock(OAuth2User.class);
         when(oAuth2User.getAttributes()).thenReturn(Map.of());
