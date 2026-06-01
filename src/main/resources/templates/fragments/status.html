@@ -20,9 +20,15 @@
         </div>
         <div th:if="${botEnabled}" class="status status-active">
             <span class="status-dot"></span> <span th:text="#{status.active}">Actif</span>
+            <form th:action="@{/channels/{u}/settings/bot(u=${channelUsername})}" method="post" > <!-- nosemgrep -->
+                <button type="submit" class="btn btn-primary" th:text="#{common.disable}">Désactiver</button>
+            </form>
         </div>
         <div th:unless="${botEnabled}" class="status status-inactive">
             <span class="status-dot"></span> <span th:text="#{status.inactive}">Inactif</span>
+            <form th:action="@{/channels/{u}/settings/bot(u=${channelUsername})}" method="post" > <!-- nosemgrep -->
+                <button type="submit" class="btn btn-primary" th:text="#{common.enable}">Activer</button>
+            </form>
         </div>
         <div class="divider"></div>
         <h3 th:text="#{status.stream_title}">Stream</h3>
