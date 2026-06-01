@@ -306,6 +306,76 @@ class AdminExperimentsControllerTest {
     }
 
     @Test
+    void addOverride_missingUsername_returnsErrorRedirect() {
+        Experiment exp = experiment();
+        when(experimentRepository.findById(exp.getId())).thenReturn(Optional.of(exp));
+
+        String result = controller.addOverride(exp.getId(),
+            ExperimentOverride.OverrideType.USER,
+            ExperimentOverride.OverrideAction.FORCE_EXCLUDE,
+            0, "", null, null, null, null);
+
+        assertThat(result).isEqualTo("redirect:/admin/experiments/" + exp.getId() + "?overrideError=missingUsername");
+    }
+
+    @Test
+    void addOverride_userNotFound_returnsErrorRedirect() {
+        Experiment exp = experiment();
+        when(experimentRepository.findById(exp.getId())).thenReturn(Optional.of(exp));
+        when(userAccountRepository.findByTwitchUsername("unknown")).thenReturn(Optional.empty());
+
+        String result = controller.addOverride(exp.getId(),
+            ExperimentOverride.OverrideType.USER,
+            ExperimentOverride.OverrideAction.FORCE_EXCLUDE,
+            0, "unknown", null, null, null, null);
+
+        assertThat(result).isEqualTo("redirect:/admin/experiments/" + exp.getId() + "?overrideError=userNotFound");
+    }
+
+    @Test
+    void addOverride_missingVariant_returnsErrorRedirect() {
+        Experiment exp = experiment();
+        when(experimentRepository.findById(exp.getId())).thenReturn(Optional.of(exp));
+
+        String result = controller.addOverride(exp.getId(),
+            ExperimentOverride.OverrideType.ATTRIBUTE,
+            ExperimentOverride.OverrideAction.FORCE_VARIANT,
+            0, null, "has_steam", "eq", "1.0", null);
+
+        assertThat(result).isEqualTo("redirect:/admin/experiments/" + exp.getId() + "?overrideError=missingVariant");
+    }
+
+    @Test
+    void addOverride_variantNotFound_returnsErrorRedirect() {
+        Experiment exp = experiment();
+        UUID variantId = UUID.randomUUID();
+        when(experimentRepository.findById(exp.getId())).thenReturn(Optional.of(exp));
+        when(variantRepository.findById(variantId)).thenReturn(Optional.empty());
+
+        String result = controller.addOverride(exp.getId(),
+            ExperimentOverride.OverrideType.ATTRIBUTE,
+            ExperimentOverride.OverrideAction.FORCE_VARIANT,
+            0, null, "has_steam", "eq", "1.0", variantId);
+
+        assertThat(result).isEqualTo("redirect:/admin/experiments/" + exp.getId() + "?overrideError=variantNotFound");
+    }
+
+    @Test
+    void updateWeights_invalidWeight_isSkipped() {
+        Experiment exp = experiment();
+        ExperimentVariant v = new ExperimentVariant();
+        v.setId(UUID.randomUUID());
+        v.setWeight(50);
+        exp.setVariants(new ArrayList<>(List.of(v)));
+        when(experimentRepository.findById(exp.getId())).thenReturn(Optional.of(exp));
+
+        String result = controller.updateWeights(exp.getId(), Map.of("weight_" + v.getId(), "not-a-number"));
+
+        assertThat(result).isEqualTo("redirect:/admin/experiments/" + exp.getId());
+        verify(variantRepository, never()).save(any());
+    }
+
+    @Test
     void reassign_callsReassignAllAndRedirects() {
         Experiment exp = experiment();
         when(experimentRepository.findById(exp.getId())).thenReturn(Optional.of(exp));
