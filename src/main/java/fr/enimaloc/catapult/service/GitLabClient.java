@@ -23,8 +23,8 @@ public class GitLabClient {
     @Value("${gitlab.token:}")
     private String token;
 
-    @Value("${gitlab.project-path:enimaloc/catapult}")
-    private String projectPath;
+    @Value("${gitlab.project-path:1}")
+    private String projectId;
 
     private final RestClient restClient;
 
@@ -38,11 +38,10 @@ public class GitLabClient {
 
     @SuppressWarnings("unchecked")
     public CreatedIssue createIssue(String title, String description, List<String> labels) {
-        String projectEncoded = URLEncoder.encode(projectPath, StandardCharsets.UTF_8);
         String labelsStr = String.join(",", labels);
 
         Map<String, Object> response = restClient.post()
-            .uri(baseUrl + "/api/v4/projects/" + projectEncoded + "/issues")
+            .uri(baseUrl + "/api/v4/projects/" + projectId + "/issues")
             .header("PRIVATE-TOKEN", token)
             .body(Map.of("title", title, "description", description, "labels", labelsStr))
             .retrieve()
@@ -58,10 +57,8 @@ public class GitLabClient {
 
     @SuppressWarnings("unchecked")
     public IssueState getIssue(int iid) {
-        String projectEncoded = URLEncoder.encode(projectPath, StandardCharsets.UTF_8);
-
         Map<String, Object> response = restClient.get()
-            .uri(baseUrl + "/api/v4/projects/" + projectEncoded + "/issues/" + iid)
+            .uri(baseUrl + "/api/v4/projects/" + projectId + "/issues/" + iid)
             .header("PRIVATE-TOKEN", token)
             .retrieve()
             .body(Map.class);
