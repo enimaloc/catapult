@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.domain.GetterConfig;
+import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,6 +30,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -39,6 +42,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private final UserSettingsRepository userSettingsRepository;
     private final GetterConfigRepository getterConfigRepository;
     private final TokenEncryptionService tokenEncryptionService;
+    private final ApplicationEventPublisher eventPublisher;
     private final RestClient restClient;
 
     @Value("${app.owner-id:}")
@@ -129,8 +133,9 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         String twitchId = oAuth2User.getAttribute("id");
         String twitchUsername = oAuth2User.getAttribute("login");
 
-        UserAccount account = userAccountRepository.findByTwitchId(twitchId)
-            .orElseGet(() -> createNewAccount(twitchId, twitchUsername));
+        Optional<UserAccount> existing = userAccountRepository.findByTwitchId(twitchId);
+        boolean isNew = existing.isEmpty();
+        UserAccount account = existing.orElseGet(() -> createNewAccount(twitchId, twitchUsername));
 
         if (!account.getTwitchUsername().equals(twitchUsername)) {
             account.setTwitchUsername(twitchUsername);
@@ -148,6 +153,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
         userAccountRepository.save(account);
         saveToken(account, OAuthToken.Provider.TWITCH, userRequest);
+
+        if (isNew) {
+            eventPublisher.publishEvent(new AccountCreatedEvent(this, account));
+        }
 
         boolean isAdmin = !ownerId.isBlank() && ownerId.equals(twitchId);
         return new CatapultOAuth2User(oAuth2User, account, isAdmin);
