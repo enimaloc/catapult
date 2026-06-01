@@ -66,10 +66,10 @@ public class AccountService {
     private void deleteAccountPermanently(UserAccount account) {
         revokeTwitchToken(account);
         // Pas d'endpoint de révocation officiel pour ces providers — suppression en base uniquement
-        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
-            oAuthTokenRepository.findByUserAndProvider(account, p)
-                .ifPresent(oAuthTokenRepository::delete);
-        }
+//        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
+//            oAuthTokenRepository.findByUserAndProvider(account, p)
+//                .ifPresent(oAuthTokenRepository::delete);
+//        }
 
         userAccountRepository.delete(account);
         log.info("Account {} permanently deleted", account.getId());
@@ -97,6 +97,10 @@ public class AccountService {
         }
         oAuthTokenRepository.findByUserAndProvider(account, provider)
             .ifPresent(oAuthTokenRepository::delete);
+        if (provider == OAuthToken.Provider.STEAM) {
+            account.setSteamId(null);
+            userAccountRepository.save(account);
+        }
         log.info("Provider {} disconnected for account {}", provider, account.getId());
     }
 }

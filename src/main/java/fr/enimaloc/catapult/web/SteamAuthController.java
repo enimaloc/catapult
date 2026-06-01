@@ -42,6 +42,7 @@ public class SteamAuthController {
     private static final Random RANDOM = new SecureRandom();
 
     public static final String REDIRECT_SETTINGS_ERROR = "redirect:/settings?error=steam";
+    public static final String CLOSING = "closing";
     public static final String ATTR_OPENID_NS = "openid.ns";
     public static final String ATTR_OPENID_MODE = "openid.mode";
     public static final String ATTR_OPENID_RETURN_TO = "openid.return_to";
@@ -85,24 +86,24 @@ public class SteamAuthController {
         if (sessionNonce == null || callbackNonce == null
                 || !MessageDigest.isEqual(sessionNonce.getBytes(), callbackNonce.getBytes())) {
             log.warn("Steam OpenID nonce mismatch for user {}", principal.getUserAccount().getId());
-            return REDIRECT_SETTINGS_ERROR;
+            return CLOSING;
         }
 
         if (!"id_res".equals(params.get(ATTR_OPENID_MODE))) {
             log.warn("Steam OpenID callback rejected for user {}: mode={}",
                 principal.getUserAccount().getId(), params.get(ATTR_OPENID_MODE));
-            return REDIRECT_SETTINGS_ERROR;
+            return CLOSING;
         }
 
         if (!verifyWithSteam(params)) {
             log.warn("Steam OpenID verification failed for user {}", principal.getUserAccount().getId());
-            return REDIRECT_SETTINGS_ERROR;
+            return CLOSING;
         }
 
         String claimedId = params.get(ATTR_OPENID_CLAIMED_ID);
         if (claimedId == null || !claimedId.startsWith(STEAM_ID_PREFIX)) {
             log.warn("Invalid Steam claimed_id: {}", claimedId);
-            return REDIRECT_SETTINGS_ERROR;
+            return CLOSING;
         }
 
         String steamId = claimedId.substring(STEAM_ID_PREFIX.length());
@@ -113,7 +114,7 @@ public class SteamAuthController {
 
         eventPublisher.publishEvent(new SteamLinkedEvent(this, account));
 
-        return "redirect:/settings";
+        return CLOSING;
     }
 
     @PostMapping("/disconnect")
