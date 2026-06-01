@@ -364,11 +364,13 @@ class IgdbServiceTest {
 
     @Test
     void prewarmCclCache_withCachedGame_toListCalled() {
-        ((Map<String, String>) ReflectionTestUtils.getField(igdbService, "igdbGameCache"))
-            .put("99", "TestGame");
+        IgdbGameCacheEntry entry = new IgdbGameCacheEntry("steam:99", "99", "TestGame");
+        when(cacheRepository.findByCachedAtAfter(any(Instant.class))).thenReturn(List.of(entry));
         when(cclRepository.findAllIgdbIds()).thenReturn(Set.of("99")); // already cached → toLoad empty
 
         igdbService.prewarmCclCache(); // reaches .toList() at L265 then returns early
+
+        verify(cclRepository).findAllIgdbIds();
     }
 
     // --- suggestCcls paths (new lines L341-346 and L377) ---
@@ -386,7 +388,9 @@ class IgdbServiceTest {
             .thenReturn(Optional.of(extId));
         when(steamStoreService.fetchCcls(List.of("steam-99"))).thenReturn(Map.of());
 
-        igdbService.suggestCcls("99"); // covers L340-350 steam enrichment path
+        Set<String> result = igdbService.suggestCcls("99");
+
+        assertThat(result).isNotNull();
     }
 
     @Test
