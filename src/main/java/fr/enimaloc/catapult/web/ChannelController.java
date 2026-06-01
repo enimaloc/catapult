@@ -301,16 +301,17 @@ public class ChannelController {
     @PostMapping("/channels/{username}/settings/bot")
     public String toggleBot(
             @PathVariable String username,
-            @AuthenticationPrincipal CatapultOAuth2User principal,
-            @RequestParam boolean enabled) {
-        UserAccount channelUser = resolveAndCheck(username, principal);
-        channelUser.setBotEnabled(enabled);
-        if (enabled) {
-            twitchEventSubService.connect(channelUser);
+            @AuthenticationPrincipal CatapultOAuth2User principal) {
+        UserAccount user = resolveAndCheck(username, principal);
+        boolean newState = !user.isBotEnabled();
+        user.setBotEnabled(newState);
+        userAccountRepository.save(user);
+        if (newState) {
+            twitchEventSubService.connect(user);
         } else {
-            twitchEventSubService.disconnect(channelUser);
+            twitchEventSubService.disconnect(user);
         }
-        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + user.getTwitchUsername();
     }
 
     @PostMapping("/channels/{username}/settings/no-game")
