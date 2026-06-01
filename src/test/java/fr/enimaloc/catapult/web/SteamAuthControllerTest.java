@@ -19,6 +19,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -90,8 +91,8 @@ class SteamAuthControllerTest {
                 .sessionAttr("steam_link_nonce", "correct-nonce")
                 .param("nonce", "wrong-nonce")
                 .param("openid.mode", "id_res"))
-            .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/settings?error=steam"));
+                .andExpect(status().is2xxSuccessful())
+                .andExpect(view().name("closing"));
     }
 
     @Test
@@ -101,8 +102,8 @@ class SteamAuthControllerTest {
                 .sessionAttr("steam_link_nonce", "test-nonce")
                 .param("nonce", "test-nonce")
                 .param("openid.mode", "cancel"))
-            .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/settings?error=steam"));
+                .andExpect(status().is2xxSuccessful())
+                .andExpect(view().name("closing"));
     }
 
     @Test
@@ -114,8 +115,8 @@ class SteamAuthControllerTest {
                 .sessionAttr("steam_link_nonce", "test-nonce")
                 .param("nonce", "test-nonce")
                 .param("openid.mode", "id_res"))
-            .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/settings?error=steam"));
+                .andExpect(status().is2xxSuccessful())
+                .andExpect(view().name("closing"));
     }
 
     @Test
@@ -128,8 +129,8 @@ class SteamAuthControllerTest {
                 .param("nonce", "test-nonce")
                 .param("openid.mode", "id_res")
                 .param("openid.claimed_id", "https://evil.com/id/123"))
-            .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/settings?error=steam"));
+            .andExpect(status().is2xxSuccessful())
+            .andExpect(view().name("closing"));
     }
 
     @Test
