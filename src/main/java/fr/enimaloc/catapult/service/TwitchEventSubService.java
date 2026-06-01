@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -64,6 +66,11 @@ public class TwitchEventSubService implements EventSubService {
     public void shutdown() {
         connections.forEach((userId, ws) -> ws.sendClose(WebSocket.NORMAL_CLOSURE, "application shutdown"));
         connections.clear();
+    }
+
+    @EventListener
+    public void onAccountCreated(AccountCreatedEvent event) {
+        connect(event.getUser());
     }
 
     public void connect(UserAccount user) {
