@@ -95,6 +95,21 @@
 </div>
 
 
+<!-- Changelog panel -->
+<div id="changelog-overlay" class="help-overlay" onclick="closeChangelogPanel()"></div>
+<div id="changelog-panel" class="help-panel">
+    <div class="help-panel-header">
+        <span>Changelog</span>
+        <button class="help-panel-close" onclick="closeChangelogPanel()" title="Fermer">✕</button>
+    </div>
+    <div class="help-panel-body"
+         hx-get="/changelog/fragment"
+         hx-trigger="revealed"
+         hx-swap="innerHTML">
+        <span style="color:var(--muted);">Chargement…</span>
+    </div>
+</div>
+
 <div id="help-overlay" class="help-overlay" onclick="closeHelpPanel()"></div>
 <div id="help-panel" class="help-panel">
     <div class="help-panel-header">
@@ -127,7 +142,8 @@
         <a th:href="@{/privacy}" th:text="#{footer.privacy}">Politique de confidentialité</a>
     </div>
     <div class="footer-right">
-        <span class="footer-version" th:text="${appVersion}">dev</span>
+        <button class="btn-link footer-version" th:text="${appVersion}"
+                onclick="openChangelogPanel()" title="Voir le changelog">dev</button>
         <span>·</span>
         <span th:text="${git.branch + '@' + git.commit}">unknown@unknown</span>
         <span>·</span>
@@ -160,6 +176,29 @@
     window.addEventListener("resize", updatePosition);
 
     updatePosition();
+
+    function openChangelogPanel() {
+        document.getElementById('changelog-panel').classList.add('open');
+        document.getElementById('changelog-overlay').classList.add('open');
+    }
+    function closeChangelogPanel() {
+        document.getElementById('changelog-panel').classList.remove('open');
+        document.getElementById('changelog-overlay').classList.remove('open');
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') { closeHelpPanel(); closeChangelogPanel(); }
+    });
+
+    // Auto-show changelog when app version changes
+    (function() {
+        const currentVersion = document.querySelector('.footer-version')?.textContent?.trim();
+        if (!currentVersion || currentVersion === 'dev') return;
+        const seenVersion = localStorage.getItem('catapult_seen_version');
+        if (seenVersion !== currentVersion) {
+            localStorage.setItem('catapult_seen_version', currentVersion);
+            if (seenVersion !== null) openChangelogPanel();
+        }
+    })();
 </script>
 </body>
 </html>
