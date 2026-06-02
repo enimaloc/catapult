@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,7 +37,6 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
-
     private final UserAccountRepository userAccountRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
     private final UserSettingsRepository userSettingsRepository;
@@ -53,6 +53,9 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
     @Value("${twitch.default-no-game.id:}")
     private String defaultNoGameId;
+
+    @Value("${app.whitelist:}")
+    public List<String> whitelistedId = new ArrayList<>();
 
     private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
 
@@ -125,13 +128,19 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
         return new DefaultOAuth2User(
             List.of(new SimpleGrantedAuthority("ROLE_USER")),
-            data.get(0),
+            data.getFirst(),
             "id"
         );
     }
 
     private OAuth2User handleTwitchLogin(OAuth2UserRequest userRequest, OAuth2User oAuth2User) {
         String twitchId = oAuth2User.getAttribute("id");
+
+        // Whitelist check
+        if (!whitelistedId.isEmpty() && !whitelistedId.contains(twitchId)) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("not_whitelisted"), "User not whitelisted.");
+        }
+
         String twitchUsername = oAuth2User.getAttribute("login");
 
         Optional<UserAccount> existing = userAccountRepository.findByTwitchId(twitchId);
