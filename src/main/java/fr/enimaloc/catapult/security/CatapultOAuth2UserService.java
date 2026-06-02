@@ -54,6 +54,12 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     @Value("${twitch.default-no-game.id:}")
     private String defaultNoGameId;
 
+    @Value("${twitch.default-incomplete-game.name:}")
+    private String defaultIncompleteGameName;
+
+    @Value("${twitch.default-incomplete-game.id:}")
+    private String defaultIncompleteGameId;
+
     @Value("${app.whitelist:}")
     public List<String> whitelistedId = new ArrayList<>();
 
@@ -183,6 +189,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         if (!Strings.isEmpty(defaultNoGameId) && !Strings.isEmpty(defaultNoGameName)) {
             settings.setNoGameTwitchGameId(defaultNoGameId);
             settings.setNoGameTwitchGameName(defaultNoGameName);
+        }
+        if (!Strings.isEmpty(defaultIncompleteGameId) && !Strings.isEmpty(defaultIncompleteGameName)) {
+            settings.setIncompleteFallbackTwitchGameId(defaultIncompleteGameId);
+            settings.setIncompleteFallbackTwitchGameName(defaultIncompleteGameName);
         }
         userSettingsRepository.save(settings);
 
