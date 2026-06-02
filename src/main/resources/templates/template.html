@@ -151,8 +151,8 @@
         <span>·</span>
         <span th:text="${git.branch + '@' + git.commit}">unknown@unknown</span>
         <span>·</span>
-        <a th:unless="${git.repositoryUrl != null}" th:href="${git.repositoryUrl}" target="_blank" rel="noopener" th:text="#{footer.github}">GitHub ↗</a>
-        <span th:if="${git.repositoryUrl != null}" th:text="#{footer.github.local}">Dépôt local</span>
+        <a th:if="${git.repositoryUrl != null}" th:href="${git.repositoryUrl}" target="_blank" rel="noopener" th:text="#{footer.git.gitlab}">Gitlab ↗</a>
+        <span th:unless="${git.repositoryUrl != null}" th:text="#{footer.git.local}">Dépôt local</span>
     </div>
 </footer>
 
