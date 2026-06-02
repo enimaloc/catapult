@@ -21,7 +21,7 @@
             <strong>Signaler / Suggérer</strong>
             <button onclick="document.getElementById('feedback-panel').style.display='none';
                              document.getElementById('feedback-toggle').style.display='block';"
-                    style="background:none; border:none; cursor:pointer; font-size:1.1rem;">✕</button>
+                    style="color: var(--text); background:none; border:none; cursor:pointer; font-size:1.1rem;">✕</button>
         </div>
 
         <form hx-post="/feedback" hx-target="#feedback-widget" hx-swap="outerHTML"> <!-- nosemgrep -->
