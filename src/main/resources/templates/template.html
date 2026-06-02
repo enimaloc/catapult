@@ -158,6 +158,7 @@
 
 <script>
     const themeSwitcher = document.getElementById("theme-switcher");
+    const feedback = document.getElementById("feedback-widget");
     const footer = document.getElementById("footer");
 
     function updatePosition() {
@@ -170,9 +171,11 @@
         if (overlap > 0) {
             // Le footer entre dans l'écran → on remonte
             themeSwitcher.style.bottom = `${16 + overlap}px`;
+            feedback.style.bottom = `${66 + overlap}px`;
         } else {
             // Position normale
             themeSwitcher.style.bottom = `16px`;
+            feedback.style.bottom = `66px`;
         }
     }
 
