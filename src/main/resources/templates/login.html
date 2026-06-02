@@ -15,6 +15,10 @@
                 </svg>
                 <span th:text="#{login.button}">Se connecter avec Twitch</span>
             </a>
+            <p th:if="${loginError == 'not_whitelisted'}" class="error-message"
+               th:text="#{login.error.not_whitelisted}">Not authorized.</p>
+            <p th:if="${loginError == 'generic'}" class="error-message"
+               th:text="#{login.error.generic}">Login failed.</p>
         </div>
     </div>
 </div>
