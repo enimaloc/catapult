@@ -59,6 +59,10 @@ public class GameEventListener {
         }
 
         userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+            if (!settings.isApplyDefaultOnNoGame()) {
+                log.debug("applyDefaultOnNoGame disabled for user {} — skipping", user.getId());
+                return;
+            }
             if (settings.getNoGameTwitchGameId() != null && !settings.getNoGameTwitchGameId().isBlank()) {
                 GameBinding fallbackBinding = new GameBinding();
                 fallbackBinding.setUser(user);

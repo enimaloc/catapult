@@ -146,6 +146,21 @@ class GameEventListenerLiveCheckTest {
     }
 
     @Test
+    void onNoGameDetected_whenLive_withFallbackConfigured_butFlagDisabled_skipsUpdate() {
+        when(streamStateService.isLive(user)).thenReturn(true);
+
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("fallback-id");
+        settings.setNoGameTwitchGameName("Just Chatting");
+        settings.setApplyDefaultOnNoGame(false);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
+
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
     void onGameDetected_whenBindingIncomplete_andFallbackConfigured_andLive_appliesFallback() {
         binding.setStatus(GameBinding.Status.INCOMPLETE);
         when(bindingService.resolveOrCreate(eq(user), any())).thenReturn(binding);
