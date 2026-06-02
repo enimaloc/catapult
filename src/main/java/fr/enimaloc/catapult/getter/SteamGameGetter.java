@@ -18,6 +18,11 @@ public class SteamGameGetter implements GameGetter {
     private final SteamApiClient steamApiClient;
 
     @Override
+    public String name() {
+        return "Steam";
+    }
+
+    @Override
     public Optional<DetectedGame> getCurrentGame(UserAccount user) {
         if (user.getSteamId() == null) return Optional.empty();
         try {
