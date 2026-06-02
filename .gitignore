@@ -49,3 +49,6 @@ src/main/resources/application-dev.properties
 
 ### Local scripts ###
 catapult_obs_local.py
+
+### Generated ###
+src/main/resources/changelog.log

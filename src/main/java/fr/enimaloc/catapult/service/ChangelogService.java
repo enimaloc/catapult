@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -30,10 +31,16 @@ public class ChangelogService {
     @PostConstruct
     public void load() {
         try {
-            List<String> lines = runGitLog();
+            List<String> lines;
+            try {
+                lines = runGitLog();
+            } catch (Exception e) {
+                log.debug("git not available, loading changelog from classpath: {}", e.getMessage());
+                lines = readFromClasspath();
+            }
             sections = parse(lines);
         } catch (Exception e) {
-            log.warn("Could not load changelog from git history: {}", e.getMessage());
+            log.warn("Could not load changelog: {}", e.getMessage());
         }
     }
 
@@ -42,6 +49,14 @@ public class ChangelogService {
             "git", "log", "--format=%h|%s|%D", "--no-merges", "-n", "100"
         ).start();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            return reader.lines().toList();
+        }
+    }
+
+    private List<String> readFromClasspath() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/changelog.log");
+        if (is == null) return List.of();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
             return reader.lines().toList();
         }
     }
