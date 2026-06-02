@@ -53,6 +53,21 @@
                     </div>
                 </div>
             </div>
+            <div class="inline-edit-field">
+                <label th:text="#{no_game.apply_on_stream_start}">Appliquer au début du stream</label>
+                <input type="checkbox" name="applyOnStreamStart"
+                       th:checked="${noGameSettings.applyDefaultOnStreamStart}">
+            </div>
+            <div class="inline-edit-field">
+                <label th:text="#{no_game.apply_on_no_game}">Appliquer quand aucun jeu n'est détecté</label>
+                <input type="checkbox" name="applyOnNoGame"
+                       th:checked="${noGameSettings.applyDefaultOnNoGame}">
+            </div>
+            <div class="inline-edit-field">
+                <label th:text="#{no_game.apply_on_stream_end}">Appliquer à la fin du stream</label>
+                <input type="checkbox" name="applyOnStreamEnd"
+                       th:checked="${noGameSettings.applyDefaultOnStreamEnd}">
+            </div>
         </div>
         <div class="inline-edit-actions" style="margin-top:12px">
             <button type="submit" class="btn btn-primary" th:text="#{common.save}">Enregistrer</button>

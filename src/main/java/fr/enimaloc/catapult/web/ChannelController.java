@@ -320,7 +320,10 @@ public class ChannelController {
             @AuthenticationPrincipal CatapultOAuth2User principal,
             @RequestParam(required = false) String twitchGameId,
             @RequestParam(required = false) String twitchGameName,
-            @RequestParam(required = false) Set<String> ccls) {
+            @RequestParam(required = false) Set<String> ccls,
+            @RequestParam(required = false, defaultValue = "false") boolean applyOnStreamStart,
+            @RequestParam(required = false, defaultValue = "false") boolean applyOnNoGame,
+            @RequestParam(required = false, defaultValue = "false") boolean applyOnStreamEnd) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         UserSettings settings = userSettingsRepository.findById(channelUser.getId()).orElse(null);
         if (settings == null) {
@@ -331,6 +334,9 @@ public class ChannelController {
         settings.setNoGameTwitchGameName(twitchGameName);
         settings.getNoGameCcls().clear();
         if (ccls != null) settings.getNoGameCcls().addAll(ccls);
+        settings.setApplyDefaultOnStreamStart(applyOnStreamStart);
+        settings.setApplyDefaultOnNoGame(applyOnNoGame);
+        settings.setApplyDefaultOnStreamEnd(applyOnStreamEnd);
         userSettingsRepository.save(settings);
         if (gameStateService.getLastKnownGame(channelUser).isEmpty()) {
             twitchService.resetToDefault(channelUser);

@@ -79,19 +79,86 @@ class GameEventListenerLiveCheckTest {
     }
 
     @Test
-    void onStreamOnline_withoutPendingBinding_doesNothing() {
+    void onStreamOnline_withoutPendingBinding_andNoSettings_doesNothing() {
         when(streamStateService.getPending(user)).thenReturn(Optional.empty());
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.empty());
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
         verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).resetToDefault(any());
     }
 
     @Test
-    void onStreamOffline_callsResetToDefaultAndClearsPending() {
+    void onStreamOnline_withoutPending_andFlagEnabled_callsResetToDefault() {
+        when(streamStateService.getPending(user)).thenReturn(Optional.empty());
+
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnStreamStart(true);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(twitchService).resetToDefault(user);
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void onStreamOnline_withoutPending_andFlagDisabled_doesNothing() {
+        when(streamStateService.getPending(user)).thenReturn(Optional.empty());
+
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnStreamStart(false);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(twitchService, never()).resetToDefault(any());
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void onStreamOnline_withPending_andFlagEnabled_appliesPendingNotDefault() {
+        when(streamStateService.getPending(user)).thenReturn(Optional.of(binding));
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService, never()).resetToDefault(any());
+        verify(streamStateService).clearPending(user);
+    }
+
+    @Test
+    void onStreamOffline_whenApplyOnStreamEndEnabled_callsResetToDefaultAndClearsPending() {
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnStreamEnd(true);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
         listener.onStreamOffline(new StreamOfflineEvent(this, user));
 
         verify(twitchService).resetToDefault(user);
+        verify(streamStateService).clearPending(user);
+    }
+
+    @Test
+    void onStreamOffline_whenApplyOnStreamEndDisabled_skipsResetButClearsPending() {
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnStreamEnd(false);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onStreamOffline(new StreamOfflineEvent(this, user));
+
+        verify(twitchService, never()).resetToDefault(any());
+        verify(streamStateService).clearPending(user);
+    }
+
+    @Test
+    void onStreamOffline_whenNoSettings_skipsResetButClearsPending() {
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        listener.onStreamOffline(new StreamOfflineEvent(this, user));
+
+        verify(twitchService, never()).resetToDefault(any());
         verify(streamStateService).clearPending(user);
     }
 
@@ -117,6 +184,21 @@ class GameEventListenerLiveCheckTest {
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
         verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
+    }
+
+    @Test
+    void onNoGameDetected_whenLive_withFallbackConfigured_butFlagDisabled_skipsUpdate() {
+        when(streamStateService.isLive(user)).thenReturn(true);
+
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("fallback-id");
+        settings.setNoGameTwitchGameName("Just Chatting");
+        settings.setApplyDefaultOnNoGame(false);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
+
+        verify(twitchService, never()).updateChannel(any(), any());
     }
 
     @Test
