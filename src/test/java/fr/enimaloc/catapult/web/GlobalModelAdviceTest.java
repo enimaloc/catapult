@@ -19,7 +19,7 @@ class GlobalModelAdviceTest {
         p.setProperty("version", "1.0.0");
         p.setProperty("git.branch", "main");
         p.setProperty("git.commit", "abc1234");
-        p.setProperty("git.github-url", "https://github.com/enimaloc/catapult");
+        p.setProperty("git.repository-url", "https://github.com/enimaloc/catapult");
         BuildProperties buildProperties = new BuildProperties(p);
 
         GlobalModelAdvice advice = new GlobalModelAdvice(Optional.of(buildProperties), List.of());
