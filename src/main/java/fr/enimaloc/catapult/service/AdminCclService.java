@@ -157,6 +157,7 @@ public class AdminCclService {
 
         for (Map<String, Object> item : data) {
             String id = (String) item.get("id");
+            if (id.equals("MatureGame")) continue;
             TwitchCclDefinition def = twitchCclRepo.findById(id)
                 .orElseGet(() -> { var d = new TwitchCclDefinition(); d.setId(id); return d; });
             def.setName((String) item.get("name"));
