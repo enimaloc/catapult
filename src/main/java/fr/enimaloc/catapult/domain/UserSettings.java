@@ -53,4 +53,13 @@ public class UserSettings {
     )
     @Column(name = "ccl_id")
     private Set<String> incompleteFallbackCcls = new HashSet<>();
+
+    @Column(name = "apply_default_on_stream_start", nullable = false)
+    private boolean applyDefaultOnStreamStart = true;
+
+    @Column(name = "apply_default_on_no_game", nullable = false)
+    private boolean applyDefaultOnNoGame = true;
+
+    @Column(name = "apply_default_on_stream_end", nullable = false)
+    private boolean applyDefaultOnStreamEnd = true;
 }

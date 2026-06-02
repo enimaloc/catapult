@@ -35,6 +35,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.mockito.ArgumentCaptor;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -273,6 +275,31 @@ class ChannelControllerTest {
                 .param("twitchGameName", "Just Chatting"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/channels/streamer"));
+    }
+
+    @Test
+    void saveNoGameSettings_persistsTriggerFlags() throws Exception {
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+        UserSettings settings = new UserSettings();
+        when(userSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
+
+        mockMvc.perform(post("/channels/streamer/settings/no-game")
+                .with(authentication(ownerAuth))
+                .with(csrf())
+                .param("twitchGameId", "509658")
+                .param("twitchGameName", "Just Chatting")
+                .param("applyOnStreamStart", "true")
+                // applyOnNoGame intentionally absent (unchecked checkbox → false)
+                .param("applyOnStreamEnd", "true"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/channels/streamer"));
+
+        ArgumentCaptor<UserSettings> captor = ArgumentCaptor.forClass(UserSettings.class);
+        verify(userSettingsRepository).save(captor.capture());
+        UserSettings saved = captor.getValue();
+        assertThat(saved.isApplyDefaultOnStreamStart()).isTrue();
+        assertThat(saved.isApplyDefaultOnNoGame()).isFalse();
+        assertThat(saved.isApplyDefaultOnStreamEnd()).isTrue();
     }
 
     private UsernamePasswordAuthenticationToken authFor(UserAccount user) {

@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.service.TwitchService;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -59,6 +60,10 @@ public class GameEventListener {
         }
 
         userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+            if (!settings.isApplyDefaultOnNoGame()) {
+                log.debug("applyDefaultOnNoGame disabled for user {} — skipping", user.getId());
+                return;
+            }
             if (settings.getNoGameTwitchGameId() != null && !settings.getNoGameTwitchGameId().isBlank()) {
                 GameBinding fallbackBinding = new GameBinding();
                 fallbackBinding.setUser(user);
@@ -77,18 +82,29 @@ public class GameEventListener {
     public void onStreamOnline(StreamOnlineEvent event) {
         UserAccount user = event.getUser();
         log.debug("StreamOnlineEvent for user {}", user.getId());
-        streamStateService.getPending(user).ifPresent(binding -> {
-            twitchService.updateChannel(user, binding);
+        Optional<GameBinding> pending = streamStateService.getPending(user);
+        if (pending.isPresent()) {
+            twitchService.updateChannel(user, pending.get());
             streamStateService.clearPending(user);
-        });
+        } else {
+            userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+                if (settings.isApplyDefaultOnStreamStart()) {
+                    twitchService.resetToDefault(user);
+                }
+            });
+        }
     }
 
     @EventListener
     public void onStreamOffline(StreamOfflineEvent event) {
         UserAccount user = event.getUser();
         log.debug("StreamOfflineEvent for user {}", user.getId());
-        twitchService.resetToDefault(user);
         streamStateService.clearPending(user);
+        userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+            if (settings.isApplyDefaultOnStreamEnd()) {
+                twitchService.resetToDefault(user);
+            }
+        });
     }
 
     private void applyIncompleteFallback(UserAccount user) {
