@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "fr.enimaloc"
-version = "0.0.1-ALPHA"
+version = "0.1.0-ALPHA"
 description = "catapult"
 
 java {
