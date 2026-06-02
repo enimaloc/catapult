@@ -1,3 +1,5 @@
+import java.time.Instant
+
 plugins {
     java
     jacoco
@@ -87,6 +89,22 @@ tasks.jacocoTestReport {
 
 springBoot {
     buildInfo {
+        fun privacyLastUpdateProperties(): Map<String, String> {
+            val privacyDir = file("src/main/resources/lang/privacy")
+
+            if (!privacyDir.exists()) {
+                return emptyMap()
+            }
+
+            return privacyDir
+                .listFiles { file -> file.isFile && file.extension == "html" }
+                .orEmpty()
+                .associate { file ->
+                    val language = file.nameWithoutExtension
+                    "privacy.$language.last-update" to Instant.ofEpochMilli(file.lastModified()).toString()
+                }
+        }
+
         val gitBranch = runCatching {
             ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD")
                 .start().inputStream.bufferedReader().readLine() ?: "unknown"
@@ -113,7 +131,7 @@ springBoot {
                     "git.branch" to gitBranch,
                     "git.commit" to gitCommit,
                     "git.repository-url" to repositoryUrl
-                )
+                ) + privacyLastUpdateProperties()
             )
         }
     }
