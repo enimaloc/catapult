@@ -102,8 +102,8 @@ springBoot {
                 .start().inputStream.bufferedReader().readLine() ?: ""
         }.getOrDefault("")
 
-        val githubUrl = gitRemote
-            .replace(Regex("^git@github\\.com:(.+?)(\\.git)?$"), "https://github.com/$1")
+        val repositoryUrl = gitRemote
+            .replace(Regex("^(?:ssh://)?git@([^:/]+)[:/](.+?)(\\.git)?$"), "https://$1/$2")
             .replace(Regex("\\.git$"), "")
             .ifBlank { "#" }
 
@@ -112,7 +112,7 @@ springBoot {
                 mapOf(
                     "git.branch" to gitBranch,
                     "git.commit" to gitCommit,
-                    "git.github-url" to githubUrl
+                    "git.repository-url" to repositoryUrl
                 )
             )
         }

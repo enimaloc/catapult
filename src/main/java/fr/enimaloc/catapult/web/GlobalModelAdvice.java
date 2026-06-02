@@ -46,7 +46,7 @@ public class GlobalModelAdvice {
         model.addAttribute("git", new GitData(
                 buildProperties.map(p -> p.get("git.branch")).orElse("unknown"),
                 buildProperties.map(p -> p.get("git.commit")).orElse("unknown"),
-                buildProperties.map(p -> p.get("git.github-url"))
+                buildProperties.map(p -> p.get("git.repository-url"))
                         .filter(url -> url.startsWith("https://"))
                         .orElse(null)
         ));
