@@ -88,10 +88,36 @@ class GameEventListenerLiveCheckTest {
     }
 
     @Test
-    void onStreamOffline_callsResetToDefaultAndClearsPending() {
+    void onStreamOffline_whenApplyOnStreamEndEnabled_callsResetToDefaultAndClearsPending() {
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnStreamEnd(true);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
         listener.onStreamOffline(new StreamOfflineEvent(this, user));
 
         verify(twitchService).resetToDefault(user);
+        verify(streamStateService).clearPending(user);
+    }
+
+    @Test
+    void onStreamOffline_whenApplyOnStreamEndDisabled_skipsResetButClearsPending() {
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnStreamEnd(false);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onStreamOffline(new StreamOfflineEvent(this, user));
+
+        verify(twitchService, never()).resetToDefault(any());
+        verify(streamStateService).clearPending(user);
+    }
+
+    @Test
+    void onStreamOffline_whenNoSettings_skipsResetButClearsPending() {
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        listener.onStreamOffline(new StreamOfflineEvent(this, user));
+
+        verify(twitchService, never()).resetToDefault(any());
         verify(streamStateService).clearPending(user);
     }
 

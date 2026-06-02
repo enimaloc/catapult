@@ -87,8 +87,12 @@ public class GameEventListener {
     public void onStreamOffline(StreamOfflineEvent event) {
         UserAccount user = event.getUser();
         log.debug("StreamOfflineEvent for user {}", user.getId());
-        twitchService.resetToDefault(user);
         streamStateService.clearPending(user);
+        userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+            if (settings.isApplyDefaultOnStreamEnd()) {
+                twitchService.resetToDefault(user);
+            }
+        });
     }
 
     private void applyIncompleteFallback(UserAccount user) {
