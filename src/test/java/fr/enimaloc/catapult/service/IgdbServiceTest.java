@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.service;
 import fr.enimaloc.catapult.domain.IgdbGameCacheEntry;
 import fr.enimaloc.catapult.domain.IgdbGameCcl;
 import fr.enimaloc.catapult.domain.IgdbGameExternalId;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import fr.enimaloc.catapult.repository.IgdbGameCacheRepository;
 import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.IgdbGameExternalIdRepository;
@@ -44,6 +46,9 @@ class IgdbServiceTest {
     @Mock TwitchCclDefinitionRepository twitchCclRepo;
     @Mock SteamStoreService steamStoreService;
     @Mock RestClient restClient;
+    @Mock MeterRegistry meterRegistry;
+
+    private SimpleMeterRegistry testRegistry;
 
     @Mock RestClient.RequestBodyUriSpec postSpec;
     @Mock RestClient.RequestBodySpec bodySpec;
@@ -59,6 +64,9 @@ class IgdbServiceTest {
 
         when(cacheRepository.findByCachedAtAfter(any(Instant.class))).thenReturn(List.of());
         when(cclRepository.findAllIgdbIds()).thenReturn(Set.of());
+
+        testRegistry = new SimpleMeterRegistry();
+        ReflectionTestUtils.setField(igdbService, "meterRegistry", testRegistry);
     }
 
     // --- blank clientId early returns ---
@@ -430,5 +438,60 @@ class IgdbServiceTest {
         igdbService.init(); // covers L431 (sources empty, logs warning)
 
         assertThat(igdbService.getTwitchSourceId()).isEqualTo(-1L);
+    }
+
+    // --- cache metrics ---
+
+    @Test
+    void findBySteamAppId_l1Hit_incrementsHitCounter() {
+        ReflectionTestUtils.setField(igdbService, "steamSourceId", 1L);
+        IgdbGameExternalId extId = new IgdbGameExternalId("42", 1L, "12345");
+        when(externalIdRepository.findBySourceIdAndUid(1L, "12345")).thenReturn(Optional.of(extId));
+        @SuppressWarnings("unchecked")
+        Map<String, String> cache = (Map<String, String>) ReflectionTestUtils.getField(igdbService, "igdbGameCache");
+        cache.put("42", "Half-Life");
+
+        igdbService.findBySteamAppId("12345");
+
+        assertThat(testRegistry.counter("catapult.igdb.cache.lookup",
+            "method", "steam", "result", "hit").count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void findBySteamAppId_dbHit_incrementsDbHitCounter() {
+        ReflectionTestUtils.setField(igdbService, "steamSourceId", -1L);
+        IgdbGameCacheEntry entry = new IgdbGameCacheEntry("steam:99999", "99", "Portal");
+        when(cacheRepository.findById("steam:99999")).thenReturn(Optional.of(entry));
+
+        igdbService.findBySteamAppId("99999");
+
+        assertThat(testRegistry.counter("catapult.igdb.cache.lookup",
+            "method", "steam", "result", "db_hit").count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void findByName_l1Hit_incrementsHitCounter() {
+        @SuppressWarnings("unchecked")
+        Map<String, IgdbService.IgdbGame> index =
+            (Map<String, IgdbService.IgdbGame>) ReflectionTestUtils.getField(igdbService, "igdbNameIndex");
+        index.put("portal", new IgdbService.IgdbGame("1", "Portal"));
+
+        igdbService.findByName("Portal");
+
+        assertThat(testRegistry.counter("catapult.igdb.cache.lookup",
+            "method", "name", "result", "hit").count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void findByWindowsExecutable_l1Hit_incrementsHitCounter() {
+        @SuppressWarnings("unchecked")
+        Map<String, IgdbService.IgdbGame> index =
+            (Map<String, IgdbService.IgdbGame>) ReflectionTestUtils.getField(igdbService, "exeNameIndex");
+        index.put("portal2.exe", new IgdbService.IgdbGame("2", "Portal 2"));
+
+        igdbService.findByWindowsExecutable("portal2.exe");
+
+        assertThat(testRegistry.counter("catapult.igdb.cache.lookup",
+            "method", "exe", "result", "hit").count()).isEqualTo(1.0);
     }
 }
