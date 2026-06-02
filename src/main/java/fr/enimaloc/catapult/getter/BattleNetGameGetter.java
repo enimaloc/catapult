@@ -16,6 +16,10 @@ import java.util.Optional;
 @Component
 @ConditionalOnBooleanProperty("battlenet.enabled")
 public class BattleNetGameGetter implements GameGetter {
+    @Override
+    public String name() {
+        return "Battle.net";
+    }
 
     @Override
     public Optional<DetectedGame> getCurrentGame(UserAccount user) {

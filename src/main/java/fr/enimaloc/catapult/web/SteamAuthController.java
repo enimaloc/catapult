@@ -41,7 +41,6 @@ public class SteamAuthController {
     private static final String SESSION_NONCE_KEY = "steam_link_nonce";
     private static final Random RANDOM = new SecureRandom();
 
-    public static final String REDIRECT_SETTINGS_ERROR = "redirect:/settings?error=steam";
     public static final String CLOSING = "closing";
     public static final String ATTR_OPENID_NS = "openid.ns";
     public static final String ATTR_OPENID_MODE = "openid.mode";

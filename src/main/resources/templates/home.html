@@ -31,7 +31,7 @@
                 <div class="home-feature-card">
                     <div class="home-feature-icon">⚡</div>
                     <h3 th:text="#{home.feature.detection.title}">Détection automatique</h3>
-                    <p th:text="#{home.feature.detection.desc(${app.name})}">Steam, Xbox, Battle.net — Catapult sait quel jeu tu lances.</p>
+                    <p th:text="#{home.feature.detection.desc(${app.name}, ${#strings.arrayJoin(app.gettersName, ', ')})}">Steam, Xbox, Battle.net — Catapult sait quel jeu tu lances.</p>
                 </div>
                 <div class="home-feature-card">
                     <div class="home-feature-icon">🔗</div>
@@ -67,7 +67,7 @@
         </div>
 
         <!-- Preview -->
-        <div class="home-section">
+        <div class="home-section" th:if="false">
             <div class="home-section-title" th:text="#{home.preview.title}">Aperçu de l'interface</div>
             <div class="home-preview-mock">
                 <div class="home-preview-status">

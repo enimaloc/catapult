@@ -9,6 +9,7 @@ import java.util.Optional;
  * Chaque implémentation interroge un provider différent (Steam, Discord, ...).
  */
 public interface GameGetter {
+    String name();
 
     Optional<DetectedGame> getCurrentGame(UserAccount user);
 }
