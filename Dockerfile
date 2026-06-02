@@ -2,11 +2,14 @@ FROM eclipse-temurin:21-jdk-alpine AS builder
 
 WORKDIR /app
 
+RUN apk add --no-cache git
+
 COPY gradlew settings.gradle.kts build.gradle.kts ./
 COPY gradle ./gradle
 RUN ./gradlew dependencies --no-daemon -q
 
 COPY src ./src
+COPY .git ./.git
 RUN ./gradlew build -x test --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine
