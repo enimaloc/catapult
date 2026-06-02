@@ -5,6 +5,7 @@ import org.springframework.boot.info.BuildProperties;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.ui.ExtendedModelMap;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -21,7 +22,7 @@ class GlobalModelAdviceTest {
         p.setProperty("git.github-url", "https://github.com/enimaloc/catapult");
         BuildProperties buildProperties = new BuildProperties(p);
 
-        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.of(buildProperties));
+        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.of(buildProperties), List.of());
         ExtendedModelMap model = new ExtendedModelMap();
         advice.addBuildInfo(model);
 
@@ -39,7 +40,7 @@ class GlobalModelAdviceTest {
         p.setProperty("git.github-url", "javascript:alert(1)");
         BuildProperties buildProperties = new BuildProperties(p);
 
-        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.of(buildProperties));
+        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.of(buildProperties), List.of());
         ExtendedModelMap model = new ExtendedModelMap();
         advice.addBuildInfo(model);
 
@@ -54,7 +55,7 @@ class GlobalModelAdviceTest {
         p.setProperty("version", "1.0.0");
         BuildProperties buildProperties = new BuildProperties(p);
 
-        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.of(buildProperties));
+        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.of(buildProperties), List.of());
         ExtendedModelMap model = new ExtendedModelMap();
         advice.addBuildInfo(model);
 
@@ -68,7 +69,7 @@ class GlobalModelAdviceTest {
 
     @Test
     void withoutBuildProperties_usesFallbacks() {
-        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.empty());
+        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.empty(), List.of());
         ExtendedModelMap model = new ExtendedModelMap();
         advice.addBuildInfo(model);
 
@@ -82,7 +83,7 @@ class GlobalModelAdviceTest {
 
     @Test
     void commonAttribute_populatesAppWithNestedStructure() {
-        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.empty());
+        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.empty(), List.of());
         ReflectionTestUtils.setField(advice, "accountDeletionDelayDays", 7);
         ReflectionTestUtils.setField(advice, "appName", "catapult");
         ReflectionTestUtils.setField(advice, "defaultNoGameName", "Just Chatting");
@@ -101,7 +102,7 @@ class GlobalModelAdviceTest {
 
     @Test
     void commonAttribute_appHasDifferentDeletionDelayAndName() {
-        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.empty());
+        GlobalModelAdvice advice = new GlobalModelAdvice(Optional.empty(), List.of());
         ReflectionTestUtils.setField(advice, "accountDeletionDelayDays", 14);
         ReflectionTestUtils.setField(advice, "appName", "myapp");
         ReflectionTestUtils.setField(advice, "defaultNoGameName", "Just Chatting");
