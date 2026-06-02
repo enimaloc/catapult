@@ -64,7 +64,7 @@ public class SecurityConfig {
         http
                 .addFilterAfter(switchUserFilter, AuthorizationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", LOGIN_ROUTE, "/privacy", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                        .requestMatchers("/", LOGIN_ROUTE, "/privacy", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**", "/changelog/**").permitAll()
                         .requestMatchers("/admin/impersonate/exit").authenticated()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
