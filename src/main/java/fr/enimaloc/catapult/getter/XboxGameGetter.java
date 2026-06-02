@@ -17,6 +17,11 @@ import java.util.Optional;
 public class XboxGameGetter implements GameGetter {
 
     @Override
+    public String name() {
+        return "Xbox";
+    }
+
+    @Override
     public Optional<DetectedGame> getCurrentGame(UserAccount user) {
         return Optional.empty();
     }
