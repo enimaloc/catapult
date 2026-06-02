@@ -74,6 +74,22 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+val generateChangelog = tasks.register("generateChangelog") {
+    val outputFile = file("src/main/resources/changelog.log")
+    outputs.file(outputFile)
+    doLast {
+        val lines = runCatching {
+            ProcessBuilder("git", "log", "--format=%h|%s|%D", "--no-merges", "-n", "100")
+                .start().inputStream.bufferedReader().readLines()
+        }.getOrDefault(emptyList())
+        outputFile.writeText(lines.joinToString("\n"))
+    }
+}
+
+tasks.processResources {
+    dependsOn(generateChangelog)
+}
+
 tasks.withType<Test> {
     useJUnitPlatform()
     finalizedBy(tasks.jacocoTestReport)
