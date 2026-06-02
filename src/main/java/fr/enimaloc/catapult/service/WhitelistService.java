@@ -5,12 +5,14 @@ import fr.enimaloc.catapult.domain.WhitelistEntry;
 import fr.enimaloc.catapult.repository.SystemSettingRepository;
 import fr.enimaloc.catapult.repository.WhitelistEntryRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WhitelistService {
 
     private static final String ENABLED_KEY = "whitelist.enabled";
@@ -20,7 +22,7 @@ public class WhitelistService {
 
     public boolean isEnabled() {
         return systemSettingRepository.findById(ENABLED_KEY)
-            .map(s -> "true".equals(s.getValue()))
+            .map(s -> Boolean.parseBoolean(s.getValue()))
             .orElse(false);
     }
 
@@ -33,6 +35,7 @@ public class WhitelistService {
             });
         setting.setValue(String.valueOf(enabled));
         systemSettingRepository.save(setting);
+        log.info("Whitelist {}", enabled ? "enabled" : "disabled");
     }
 
     public boolean contains(String twitchId) {
@@ -42,11 +45,13 @@ public class WhitelistService {
     public void add(String twitchId) {
         if (!whitelistEntryRepository.existsById(twitchId)) {
             whitelistEntryRepository.save(new WhitelistEntry(twitchId));
+            log.debug("Added ID to whitelist: {}", twitchId);
         }
     }
 
     public void remove(String twitchId) {
         whitelistEntryRepository.deleteById(twitchId);
+        log.debug("Removed ID from whitelist: {}", twitchId);
     }
 
     public List<WhitelistEntry> findAll() {
