@@ -61,4 +61,20 @@ class StreamStateServiceTest {
         assertThat(service.isLive(user)).isFalse();
         assertThat(service.getPending(user)).isEmpty();
     }
+
+    @Test
+    void countLive_zeroWhenEmpty() {
+        assertThat(service.countLive()).isEqualTo(0L);
+    }
+
+    @Test
+    void countLive_countsOnlyTrueEntries() {
+        UserAccount u1 = new UserAccount(); u1.setId(UUID.randomUUID());
+        UserAccount u2 = new UserAccount(); u2.setId(UUID.randomUUID());
+        UserAccount u3 = new UserAccount(); u3.setId(UUID.randomUUID());
+        service.setLive(u1, true);
+        service.setLive(u2, false);
+        service.setLive(u3, true);
+        assertThat(service.countLive()).isEqualTo(2L);
+    }
 }

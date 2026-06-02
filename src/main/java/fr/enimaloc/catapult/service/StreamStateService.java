@@ -39,4 +39,8 @@ public class StreamStateService {
         liveStatus.remove(user.getId());
         pendingBinding.remove(user.getId());
     }
+
+    public long countLive() {
+        return liveStatus.values().stream().filter(Boolean::booleanValue).count();
+    }
 }
