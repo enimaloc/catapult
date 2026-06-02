@@ -34,6 +34,12 @@ public class GlobalModelAdvice {
     @Value("${twitch.default-no-game.id}")
     private String defaultNoGameId;
 
+    @Value("${twitch.default-incomplete-game.name:}")
+    private String defaultIncompleteGameName;
+
+    @Value("${twitch.default-incomplete-game.id:}")
+    private String defaultIncompleteGameId;
+
     @ModelAttribute
     public void addBuildInfo(Model model) {
         model.addAttribute("appVersion", buildProperties.map(BuildProperties::getVersion).orElse("dev"));
@@ -56,7 +62,7 @@ public class GlobalModelAdvice {
         model.addAttribute("app", new App(
                 appName,
                 new App.Account(accountDeletionDelayDays),
-                new App.Twitch(defaultNoGameName, defaultNoGameId),
+                new App.Twitch(defaultNoGameName, defaultNoGameId, defaultIncompleteGameName, defaultIncompleteGameId),
                 availableGetters.stream().map(getter -> new App.Getters(getter.name())).toArray(App.Getters[]::new)
         ));
     }
@@ -69,7 +75,7 @@ public class GlobalModelAdvice {
         }
 
         public record Account(int deletionDelayDays) {}
-        public record Twitch(String defaultNoGameName, String defaultNoGameId) {}
+        public record Twitch(String defaultNoGameName, String defaultNoGameId, String defaultIncompleteGameName, String defaultIncompleteGameId) {}
         public record Getters(String name) {}
     }
 
