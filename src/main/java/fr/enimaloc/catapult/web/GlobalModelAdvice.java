@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.getter.GameGetter;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +11,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 @ControllerAdvice
@@ -17,6 +20,7 @@ import java.util.Optional;
 public class GlobalModelAdvice {
 
     private final Optional<BuildProperties> buildProperties;
+    private final List<GameGetter> availableGetters;
 
     @Value("${app.account.deletion-delay-days}")
     private int accountDeletionDelayDays;
@@ -52,15 +56,21 @@ public class GlobalModelAdvice {
         model.addAttribute("app", new App(
                 appName,
                 new App.Account(accountDeletionDelayDays),
-                new App.Twitch(defaultNoGameName, defaultNoGameId)
+                new App.Twitch(defaultNoGameName, defaultNoGameId),
+                availableGetters.stream().map(getter -> new App.Getters(getter.name())).toArray(App.Getters[]::new)
         ));
     }
 
     public record GitData(String branch, String commit, String repositoryUrl) {}
 
-    public record App(String name, Account account, Twitch twitch) {
+    public record App(String name, Account account, Twitch twitch, Getters[] getters, String[] gettersName) {
+        public App(String name, Account account, Twitch twitch, Getters[] getters) {
+            this(name, account, twitch, getters, Arrays.stream(getters).map(Getters::name).toArray(String[]::new));
+        }
+
         public record Account(int deletionDelayDays) {}
         public record Twitch(String defaultNoGameName, String defaultNoGameId) {}
+        public record Getters(String name) {}
     }
 
 }
