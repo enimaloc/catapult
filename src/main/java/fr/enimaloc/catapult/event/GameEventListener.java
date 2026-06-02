@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.service.TwitchService;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -81,10 +82,17 @@ public class GameEventListener {
     public void onStreamOnline(StreamOnlineEvent event) {
         UserAccount user = event.getUser();
         log.debug("StreamOnlineEvent for user {}", user.getId());
-        streamStateService.getPending(user).ifPresent(binding -> {
-            twitchService.updateChannel(user, binding);
+        Optional<GameBinding> pending = streamStateService.getPending(user);
+        if (pending.isPresent()) {
+            twitchService.updateChannel(user, pending.get());
             streamStateService.clearPending(user);
-        });
+        } else {
+            userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+                if (settings.isApplyDefaultOnStreamStart()) {
+                    twitchService.resetToDefault(user);
+                }
+            });
+        }
     }
 
     @EventListener

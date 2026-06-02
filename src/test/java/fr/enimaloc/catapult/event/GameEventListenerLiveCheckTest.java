@@ -79,12 +79,53 @@ class GameEventListenerLiveCheckTest {
     }
 
     @Test
-    void onStreamOnline_withoutPendingBinding_doesNothing() {
+    void onStreamOnline_withoutPendingBinding_andNoSettings_doesNothing() {
         when(streamStateService.getPending(user)).thenReturn(Optional.empty());
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.empty());
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
         verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).resetToDefault(any());
+    }
+
+    @Test
+    void onStreamOnline_withoutPending_andFlagEnabled_callsResetToDefault() {
+        when(streamStateService.getPending(user)).thenReturn(Optional.empty());
+
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnStreamStart(true);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(twitchService).resetToDefault(user);
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void onStreamOnline_withoutPending_andFlagDisabled_doesNothing() {
+        when(streamStateService.getPending(user)).thenReturn(Optional.empty());
+
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnStreamStart(false);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(twitchService, never()).resetToDefault(any());
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void onStreamOnline_withPending_andFlagEnabled_appliesPendingNotDefault() {
+        when(streamStateService.getPending(user)).thenReturn(Optional.of(binding));
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService, never()).resetToDefault(any());
+        verify(streamStateService).clearPending(user);
     }
 
     @Test
