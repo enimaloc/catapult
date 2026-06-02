@@ -33,18 +33,21 @@ public class SchedulerService {
     @Scheduled(fixedRateString = "${app.polling.interval-seconds:60}000")
     public void poll() {
         Timer.Sample sample = Timer.start(meterRegistry);
-        List<UserAccount> activeUsers = userAccountRepository
-            .findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
+        try {
+            List<UserAccount> activeUsers = userAccountRepository
+                .findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
 
-        for (UserAccount user : activeUsers) {
-            try {
-                processUser(user);
-            } catch (Exception e) {
-                log.error("Unexpected error during polling for user {}", user.getId(), e);
+            for (UserAccount user : activeUsers) {
+                try {
+                    processUser(user);
+                } catch (Exception e) {
+                    log.error("Unexpected error during polling for user {}", user.getId(), e);
+                }
+                meterRegistry.counter("catapult.scheduler.users.polled").increment();
             }
-            meterRegistry.counter("catapult.scheduler.users.polled").increment();
+        } finally {
+            sample.stop(Timer.builder("catapult.scheduler.poll.duration").register(meterRegistry));
         }
-        sample.stop(Timer.builder("catapult.scheduler.poll.duration").register(meterRegistry));
     }
 
     private void processUser(UserAccount user) {
