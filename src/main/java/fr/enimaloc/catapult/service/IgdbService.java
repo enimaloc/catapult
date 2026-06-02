@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.repository.IgdbGameCacheRepository;
 import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.IgdbGameExternalIdRepository;
 import fr.enimaloc.catapult.repository.TwitchCclDefinitionRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +42,7 @@ public class IgdbService {
     private final TwitchCclDefinitionRepository twitchCclRepo;
     private final SteamStoreService steamStoreService;
     private final RestClient restClient;
+    private final MeterRegistry meterRegistry;
 
     @Value("${app.igdb.client-id:}")
     private String clientId;
@@ -106,6 +108,7 @@ public class IgdbService {
                 String name = igdbGameCache.get(igdbId);
                 if (name != null) {
                     log.debug("IGDB external ID cache hit for Steam appId={}", appId);
+                    meterRegistry.counter("catapult.igdb.cache.lookup", "method", "steam", "result", "hit").increment();
                     return Optional.of(new IgdbGame(igdbId, name));
                 }
             }
@@ -114,12 +117,16 @@ public class IgdbService {
         // Legacy steam: key lookup in igdb_game_cache
         String key = KEY_STEAM_PREFIX + appId;
         Optional<IgdbGame> fromDb = lookupInDb(key);
-        if (fromDb.isPresent()) return fromDb;
+        if (fromDb.isPresent()) {
+            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "steam", "result", "db_hit").increment();
+            return fromDb;
+        }
 
         String token = getOrRefreshAppToken();
         if (token.isBlank()) return Optional.empty();
 
         List<proto.ExternalGame> results = igdbClient.findExternalGameByUid(appId, steamSourceId, token);
+        meterRegistry.counter("catapult.igdb.cache.lookup", "method", "steam", "result", "miss").increment();
         if (results.isEmpty()) return Optional.empty();
 
         Game game = results.get(0).getGame();
@@ -176,12 +183,14 @@ public class IgdbService {
         IgdbGame cached = igdbNameIndex.get(normalized);
         if (cached != null) {
             log.debug("IGDB in-memory cache hit for '{}'", gameName);
+            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "name", "result", "hit").increment();
             return Optional.of(cached);
         }
 
         String key = KEY_NAME_PREFIX + normalized;
         Optional<IgdbGame> fromDb = lookupInDb(key);
         if (fromDb.isPresent()) {
+            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "name", "result", "db_hit").increment();
             igdbNameIndex.put(normalized, fromDb.get());
             return fromDb;
         }
@@ -190,6 +199,7 @@ public class IgdbService {
         if (token.isBlank()) return Optional.empty();
 
         List<Game> results = igdbClient.searchByName(gameName, token);
+        meterRegistry.counter("catapult.igdb.cache.lookup", "method", "name", "result", "miss").increment();
         if (results.isEmpty()) return Optional.empty();
 
         Game game = results.get(0);
@@ -210,12 +220,14 @@ public class IgdbService {
         IgdbGame cached = exeNameIndex.get(exeName);
         if (cached != null) {
             log.debug("IGDB exe L1 cache hit for '{}'", exeName);
+            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "exe", "result", "hit").increment();
             return Optional.of(cached);
         }
 
         String key = KEY_EXE_PREFIX + exeName;
         Optional<IgdbGame> fromDb = lookupInDb(key);
         if (fromDb.isPresent()) {
+            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "exe", "result", "db_hit").increment();
             exeNameIndex.put(exeName, fromDb.get());
             return fromDb;
         }
@@ -224,6 +236,7 @@ public class IgdbService {
         if (token.isBlank()) return Optional.empty();
 
         List<AlternativeName> results = igdbClient.findByWindowsExecutable(exeName, token);
+        meterRegistry.counter("catapult.igdb.cache.lookup", "method", "exe", "result", "miss").increment();
         if (results.isEmpty()) return Optional.empty();
 
         proto.Game game = results.get(0).getGame();
