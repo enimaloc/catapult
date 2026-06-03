@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.service.WhitelistService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
@@ -28,7 +29,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,6 +44,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private final TokenEncryptionService tokenEncryptionService;
     private final ApplicationEventPublisher eventPublisher;
     private final RestClient restClient;
+    private final WhitelistService whitelistService;
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -60,8 +61,6 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     @Value("${twitch.default-incomplete-game.id:}")
     private String defaultIncompleteGameId;
 
-    @Value("${app.whitelist:}")
-    public List<String> whitelistedId = new ArrayList<>();
 
     private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
 
@@ -142,8 +141,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private OAuth2User handleTwitchLogin(OAuth2UserRequest userRequest, OAuth2User oAuth2User) {
         String twitchId = oAuth2User.getAttribute("id");
 
-        // Whitelist check
-        if (!whitelistedId.isEmpty() && !whitelistedId.contains(twitchId)) {
+        if (whitelistService.isEnabled() && !whitelistService.contains(twitchId)) {
             throw new OAuth2AuthenticationException(new OAuth2Error("not_whitelisted"), "User not whitelisted.");
         }
 
