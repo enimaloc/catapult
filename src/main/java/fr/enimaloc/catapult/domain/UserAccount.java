@@ -35,6 +35,9 @@ public class UserAccount {
     @Column(name = "steam_id", unique = true)
     private String steamId;
 
+    @Column(name = "steam_personal_token")
+    private String steamPersonalToken;
+
     @Column(name = "bot_enabled", nullable = false)
     private boolean botEnabled = true;
 
