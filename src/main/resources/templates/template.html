@@ -56,6 +56,8 @@
            th:classappend="${active_page == 'members'} ? ' active'" th:text="#{nav.members}">Membres</a>
         <a th:href="@{/admin/experiments}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'experiments'} ? ' active'" th:text="#{nav.admin_experiments}">Tests A/B</a>
+        <a th:href="@{/admin/whitelist}" sec:authorize="hasRole('ADMIN')"
+           th:classappend="${active_page == 'whitelist'} ? ' active'" th:text="#{nav.admin_whitelist}">Whitelist</a>
         <a th:href="@{/dev/igdb}" sec:authorize="hasRole('ADMIN')" th:classappend="${active_page == 'igdb'} ? ' active'"
            th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
         <form th:action="@{/logout}" method="post" style="display:inline"> <!-- nosemgrep -->

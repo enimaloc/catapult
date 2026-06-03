@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.security.web.authentication.switchuser.SwitchUserFilter;
 
@@ -75,7 +76,13 @@ public class SecurityConfig {
                         .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService))
                         .failureHandler((request, response, exception) -> {
                             log.error("OAuth2 login failed: [{}] {}", exception.getClass().getSimpleName(), exception.getMessage(), exception);
-                            new SimpleUrlAuthenticationFailureHandler(LOGIN_ROUTE + "?error").onAuthenticationFailure(request, response, exception);
+                            String redirectUrl = LOGIN_ROUTE + "?error";
+                            if (exception instanceof OAuth2AuthenticationException oauthEx
+                                    && "not_whitelisted".equals(oauthEx.getError().getErrorCode())) {
+                                redirectUrl = LOGIN_ROUTE + "?error=not_whitelisted";
+                            }
+                            new SimpleUrlAuthenticationFailureHandler(redirectUrl)
+                                .onAuthenticationFailure(request, response, exception);
                         })
                 )
                 .logout(logout -> logout
