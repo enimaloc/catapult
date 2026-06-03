@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
+import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
+import fr.enimaloc.catapult.event.ChannelCclChangedEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
@@ -29,6 +31,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,6 +49,7 @@ public class TwitchEventSubService implements EventSubService {
 
     private static final String WS_URL = "wss://eventsub.wss.twitch.tv/ws";
     private static final String EVENTSUB_API = "https://api.twitch.tv/helix/eventsub/subscriptions";
+    private static final String HELIX_CHANNELS_API = "https://api.twitch.tv/helix/channels";
     private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
     private static final long MAX_RETRY_SECONDS = 60L;
 
@@ -64,8 +68,11 @@ public class TwitchEventSubService implements EventSubService {
     private String twitchClientSecret;
 
     private final Map<UUID, WebSocket> connections = new ConcurrentHashMap<>();
+    private final Map<UUID, ChannelState> channelStates = new ConcurrentHashMap<>();
     private final Set<UUID> tokenRefreshWarnedUsers = ConcurrentHashMap.newKeySet();
     private final HttpClient httpClient = HttpClient.newHttpClient();
+
+    private record ChannelState(String categoryId, String categoryName, Set<String> cclIds) {}
 
     @PostConstruct
     public void init() {
@@ -98,6 +105,7 @@ public class TwitchEventSubService implements EventSubService {
         if (ws != null) {
             ws.sendClose(WebSocket.NORMAL_CLOSURE, "bot disabled");
         }
+        channelStates.remove(user.getId());
         streamStateService.clear(user);
     }
 
@@ -140,12 +148,16 @@ public class TwitchEventSubService implements EventSubService {
                 }
                 case "notification" -> {
                     String subscriptionType = root.path("metadata").path("subscription_type").asText();
-                    if ("stream.online".equals(subscriptionType)) {
-                        streamStateService.setLive(user, true);
-                        eventPublisher.publishEvent(new StreamOnlineEvent(this, user));
-                    } else if ("stream.offline".equals(subscriptionType)) {
-                        streamStateService.setLive(user, false);
-                        eventPublisher.publishEvent(new StreamOfflineEvent(this, user));
+                    switch (subscriptionType) {
+                        case "stream.online" -> {
+                            streamStateService.setLive(user, true);
+                            eventPublisher.publishEvent(new StreamOnlineEvent(this, user));
+                        }
+                        case "stream.offline" -> {
+                            streamStateService.setLive(user, false);
+                            eventPublisher.publishEvent(new StreamOfflineEvent(this, user));
+                        }
+                        case "channel.update" -> handleChannelUpdate(user, root.path("payload").path("event"));
                     }
                 }
                 case "session_keepalive" -> log.trace("EventSub keepalive for user {}", user.getId());
@@ -159,17 +171,25 @@ public class TwitchEventSubService implements EventSubService {
 
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
         String accessToken = resolveAccessToken(token, user);
-        for (String eventType : List.of("stream.online", "stream.offline")) {
+        var subscriptions = List.of(
+            Map.entry("stream.online", "1"),
+            Map.entry("stream.offline", "1"),
+            Map.entry("channel.update", "2")
+        );
+        for (var sub : subscriptions) {
+            String eventType = sub.getKey();
+            String version = sub.getValue();
             try {
-                postSubscription(accessToken, eventType, user.getTwitchId(), sessionId);
+                postSubscription(accessToken, eventType, version, user.getTwitchId(), sessionId);
                 log.debug("Subscribed to {} for user {}", eventType, user.getId());
             } catch (HttpClientErrorException.Unauthorized e) {
                 log.debug("Token expired for user {}, refreshing", user.getId());
                 String refreshed = refreshAccessToken(token, user);
                 if (refreshed != null) {
                     try {
-                        postSubscription(refreshed, eventType, user.getTwitchId(), sessionId);
+                        postSubscription(refreshed, eventType, version, user.getTwitchId(), sessionId);
                         log.debug("Subscribed to {} for user {} after token refresh", eventType, user.getId());
+                        accessToken = refreshed;
                     } catch (Exception retryEx) {
                         if (tokenRefreshWarnedUsers.add(user.getId())) {
                             log.warn("Failed to subscribe to {} for user {} after refresh: {}", eventType, user.getId(), retryEx.getMessage());
@@ -183,6 +203,50 @@ public class TwitchEventSubService implements EventSubService {
             } catch (Exception e) {
                 log.warn("Failed to subscribe to {} for user {}: {}", eventType, user.getId(), e.getMessage());
             }
+        }
+        initChannelState(user, accessToken);
+    }
+
+    private void handleChannelUpdate(UserAccount user, JsonNode event) {
+        String newCategoryId = event.path("category_id").asText();
+        String newCategoryName = event.path("category_name").asText();
+        Set<String> newCcls = new HashSet<>();
+        event.path("content_classification_labels").forEach(l -> newCcls.add(l.asText()));
+
+        ChannelState previous = channelStates.put(user.getId(), new ChannelState(newCategoryId, newCategoryName, newCcls));
+        if (previous == null) return;
+
+        if (!newCategoryId.equals(previous.categoryId())) {
+            eventPublisher.publishEvent(new ChannelCategoryChangedEvent(this, user, newCategoryId, newCategoryName));
+        }
+        if (!newCcls.equals(previous.cclIds())) {
+            eventPublisher.publishEvent(new ChannelCclChangedEvent(this, user, List.copyOf(newCcls)));
+        }
+    }
+
+    private void initChannelState(UserAccount user, String accessToken) {
+        try {
+            JsonNode response = restClient.get()
+                .uri(HELIX_CHANNELS_API + "?broadcaster_id=" + user.getTwitchId())
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Client-ID", twitchClientId)
+                .retrieve()
+                .body(JsonNode.class);
+            if (response == null || !response.has("data") || response.path("data").isEmpty()) return;
+
+            JsonNode data = response.path("data").get(0);
+            String categoryId = data.path("game_id").asText();
+            String categoryName = data.path("game_name").asText();
+            Set<String> cclIds = new HashSet<>();
+            for (JsonNode label : data.path("content_classification_labels")) {
+                if (label.path("is_enabled").asBoolean()) {
+                    cclIds.add(label.path("id").asText());
+                }
+            }
+            channelStates.put(user.getId(), new ChannelState(categoryId, categoryName, cclIds));
+            log.debug("Initialized channel state for user {}: category={}, ccls={}", user.getId(), categoryId, cclIds);
+        } catch (Exception e) {
+            log.warn("Failed to initialize channel state for user {}: {}", user.getId(), e.getMessage());
         }
     }
 
@@ -237,7 +301,7 @@ public class TwitchEventSubService implements EventSubService {
         }
     }
 
-    private void postSubscription(String accessToken, String eventType, String twitchId, String sessionId) {
+    private void postSubscription(String accessToken, String eventType, String version, String twitchId, String sessionId) {
         restClient.post()
             .uri(EVENTSUB_API)
             .header("Authorization", "Bearer " + accessToken)
@@ -245,7 +309,7 @@ public class TwitchEventSubService implements EventSubService {
             .header("Content-Type", "application/json")
             .body(Map.of(
                 "type", eventType,
-                "version", "1",
+                "version", version,
                 "condition", Map.of("broadcaster_user_id", twitchId),
                 "transport", Map.of("method", "websocket", "session_id", sessionId)
             ))

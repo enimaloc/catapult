@@ -124,8 +124,8 @@ class TwitchEventSubServiceTest {
 
         service.handleMessage(user, token, message);
 
-        // One POST for stream.online, one for stream.offline
-        verify(restClient, times(2)).post();
+        // One POST each for stream.online, stream.offline, channel.update
+        verify(restClient, times(3)).post();
     }
 
     @Test
