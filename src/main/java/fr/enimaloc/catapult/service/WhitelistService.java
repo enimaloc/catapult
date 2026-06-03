@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.repository.WhitelistEntryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -36,6 +37,11 @@ public class WhitelistService {
         setting.setValue(String.valueOf(enabled));
         systemSettingRepository.save(setting);
         log.info("Whitelist {}", enabled ? "enabled" : "disabled");
+    }
+
+    @Transactional
+    public void toggle() {
+        setEnabled(!isEnabled());
     }
 
     public boolean contains(String twitchId) {
