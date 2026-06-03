@@ -31,6 +31,7 @@ import java.net.http.WebSocket;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -63,6 +64,7 @@ public class TwitchEventSubService implements EventSubService {
     private String twitchClientSecret;
 
     private final Map<UUID, WebSocket> connections = new ConcurrentHashMap<>();
+    private final Set<UUID> tokenRefreshWarnedUsers = ConcurrentHashMap.newKeySet();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @PostConstruct
@@ -169,10 +171,14 @@ public class TwitchEventSubService implements EventSubService {
                         postSubscription(refreshed, eventType, user.getTwitchId(), sessionId);
                         log.debug("Subscribed to {} for user {} after token refresh", eventType, user.getId());
                     } catch (Exception retryEx) {
-                        log.warn("Failed to subscribe to {} for user {} after refresh: {}", eventType, user.getId(), retryEx.getMessage());
+                        if (tokenRefreshWarnedUsers.add(user.getId())) {
+                            log.warn("Failed to subscribe to {} for user {} after refresh: {}", eventType, user.getId(), retryEx.getMessage());
+                        }
                     }
                 } else {
-                    log.warn("Failed to subscribe to {} for user {}: token refresh failed", eventType, user.getId());
+                    if (tokenRefreshWarnedUsers.add(user.getId())) {
+                        log.warn("Failed to subscribe to {} for user {}: token refresh failed", eventType, user.getId());
+                    }
                 }
             } catch (Exception e) {
                 log.warn("Failed to subscribe to {} for user {}: {}", eventType, user.getId(), e.getMessage());
@@ -192,7 +198,9 @@ public class TwitchEventSubService implements EventSubService {
     @SuppressWarnings("unchecked")
     private String refreshAccessToken(OAuthToken token, UserAccount user) {
         if (token.getRefreshToken() == null) {
-            log.warn("No refresh token stored for user {} — cannot refresh", user.getId());
+            if (tokenRefreshWarnedUsers.add(user.getId())) {
+                log.warn("No refresh token stored for user {} — cannot refresh", user.getId());
+            }
             return null;
         }
         String refreshToken = tokenEncryptionService.decrypt(token.getRefreshToken());
@@ -218,10 +226,13 @@ public class TwitchEventSubService implements EventSubService {
             if (newRefresh != null) token.setRefreshToken(tokenEncryptionService.encrypt(newRefresh));
             if (expiresIn != null) token.setExpiresAt(Instant.now().plusSeconds(expiresIn.longValue()));
             oAuthTokenRepository.save(token);
+            tokenRefreshWarnedUsers.remove(user.getId());
             log.debug("Refreshed Twitch token for user {}", user.getId());
             return newAccess;
         } catch (Exception e) {
-            log.warn("Failed to refresh Twitch token for user {}: {}", user.getId(), e.getMessage());
+            if (tokenRefreshWarnedUsers.add(user.getId())) {
+                log.warn("Failed to refresh Twitch token for user {}: {}", user.getId(), e.getMessage());
+            }
             return null;
         }
     }
