@@ -49,16 +49,29 @@ public class RealSteamApiClient implements SteamApiClient {
             })
             .orElse(false);
         if (!visibilityPublic) return false;
-        return isGameListVisible(steamId);
+        return isGameListVisible(steamId, null);
+    }
+
+    @Override
+    public boolean isProfilePublic(String steamId, String personalToken) {
+        boolean visibilityPublic = fetchPlayer(steamId)
+            .map(player -> {
+                Object visibility = player.get("communityvisibilitystate");
+                return visibility != null && ((Number) visibility).intValue() == 3;
+            })
+            .orElse(false);
+        if (!visibilityPublic) return false;
+        return isGameListVisible(steamId, personalToken);
     }
 
     @SuppressWarnings("unchecked")
-    private boolean isGameListVisible(String steamId) {
-        if (steamApiKey.isBlank()) return false;
+    private boolean isGameListVisible(String steamId, String personalToken) {
+        String key = (personalToken != null && !personalToken.isBlank()) ? personalToken : steamApiKey;
+        if (key.isBlank()) return false;
 
         String url = UriComponentsBuilder
             .fromUriString(OWNED_GAMES_URL)
-            .queryParam("key", steamApiKey)
+            .queryParam("key", key)
             .queryParam("steamid", steamId)
             .toUriString();
 
