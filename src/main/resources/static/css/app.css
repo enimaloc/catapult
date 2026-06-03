@@ -1406,3 +1406,103 @@ details summary { cursor: pointer; font-weight: 600; }
     background: currentColor;
     border-radius: 2px;
 }
+
+/* ============================================================
+   Mobile breakpoint  (≤768px)
+   ============================================================ */
+@media (max-width: 768px) {
+
+    /* Navbar */
+    .navbar {
+        flex-wrap: wrap;
+        height: auto;
+        min-height: 56px;
+        padding: 0 16px;
+        row-gap: 0;
+    }
+
+    .nav-brand { flex: 1; }
+
+    .nav-hamburger { display: flex; }
+
+    /* Logged-in nav: hidden by default, revealed by .open */
+    .nav-links--main {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+        gap: 0;
+        padding: 8px 0 12px;
+        border-top: 1px solid var(--border);
+        order: 10;
+    }
+    .nav-links--main.open { display: flex; }
+
+    .nav-links--main a,
+    .nav-links--main .btn-link,
+    .nav-links--main form button {
+        padding: 10px 4px;
+        border-bottom: 1px solid var(--border-subtle);
+        font-size: 14px;
+        text-align: left;
+        width: 100%;
+        display: block;
+    }
+    .nav-links--main .nav-separator,
+    .nav-links--main .nav-channel-name {
+        display: block;
+        padding: 10px 4px;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    /* Theme switcher: smaller buttons on mobile */
+    .theme-switcher {
+        bottom: 8px;
+        right: 8px;
+        gap: 1px;
+        padding: 3px;
+    }
+    .theme-btn {
+        font-size: 12px;
+        padding: 3px 4px;
+    }
+
+    /* Page layout */
+    .page-layout {
+        padding: 16px 12px 0;
+        gap: 16px;
+    }
+
+    /* Container */
+    .container { padding: 0 12px; }
+
+    /* Cards */
+    .card { padding: 16px; }
+
+    /* Footer: stacked */
+    .footer {
+        flex-direction: column;
+        gap: 6px;
+        text-align: center;
+        padding: 0.75rem 1rem;
+    }
+    .footer-left,
+    .footer-right {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    /* Home page hero */
+    .home-page   { padding: 0 16px 32px; }
+    .home-hero   { padding: 36px 0 28px; }
+    .home-hero h1 { font-size: 26px; }
+    .home-hero .hero-tagline  { font-size: 17px; }
+    .home-hero .hero-subtitle { font-size: 14px; }
+
+    /* Modal */
+    .modal-content {
+        padding: 20px 16px;
+        margin: 16px;
+        max-width: calc(100vw - 32px);
+    }
+}
