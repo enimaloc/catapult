@@ -1,8 +1,12 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
+import fr.enimaloc.catapult.event.ChannelCclChangedEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
+
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -39,6 +43,16 @@ public class MockTwitchEventSubService implements EventSubService {
         streamStateService.setLive(user, false);
         eventPublisher.publishEvent(new StreamOfflineEvent(this, user));
         log.info("[Mock Twitch] stream.offline → user {}", user.getId());
+    }
+
+    public void setCategory(UserAccount user, String categoryId, String categoryName) {
+        eventPublisher.publishEvent(new ChannelCategoryChangedEvent(this, user, categoryId, categoryName));
+        log.info("[Mock Twitch] channel.update/category → user {} category={}", user.getId(), categoryId);
+    }
+
+    public void setCcl(UserAccount user, List<String> cclIds) {
+        eventPublisher.publishEvent(new ChannelCclChangedEvent(this, user, cclIds));
+        log.info("[Mock Twitch] channel.update/ccl → user {} ccls={}", user.getId(), cclIds);
     }
 
 }

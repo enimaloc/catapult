@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.security;
 
 import fr.enimaloc.catapult.domain.OAuthToken;
+import fr.enimaloc.catapult.event.TwitchLoginEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.ServletException;
@@ -8,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
@@ -35,6 +37,7 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final OAuth2AuthorizedClientRepository authorizedClientRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
     private final TokenEncryptionService tokenEncryptionService;
+    private final ApplicationEventPublisher eventPublisher;
 
     private final SavedRequestAwareAuthenticationSuccessHandler delegate =
         new SavedRequestAwareAuthenticationSuccessHandler();
@@ -52,6 +55,8 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
         if (authentication instanceof OAuth2AuthenticationToken oauth2Token
             && "twitch".equals(oauth2Token.getAuthorizedClientRegistrationId())
             && oauth2Token.getPrincipal() instanceof CatapultOAuth2User catUser) {
+
+            eventPublisher.publishEvent(new TwitchLoginEvent(this, catUser.getUserAccount()));
 
             OAuth2AuthorizedClient client = authorizedClientRepository
                 .loadAuthorizedClient("twitch", authentication, request);
