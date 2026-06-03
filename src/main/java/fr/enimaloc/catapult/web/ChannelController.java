@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.AdminCclService;
@@ -70,6 +71,7 @@ public class ChannelController {
     private final ConnectionEventService connectionEventService;
     private final ExperimentService experimentService;
     private final Optional<SteamApiClient> steamApiClient;
+    private final TokenEncryptionService tokenEncryptionService;
 
     // -------------------------------------------------------------------------
     // Model attributes
@@ -128,14 +130,19 @@ public class ChannelController {
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterSource", source);
         boolean hasSteam = !steamApiKey.isBlank() && channelUser.getSteamId() != null;
+        boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
         boolean steamProfilePrivate = false;
         if (hasSteam && isOwner) {
+            String decryptedPersonalToken = hasSteamPersonalToken
+                ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
+                : null;
             steamProfilePrivate = steamApiClient
-                .map(c -> !c.isProfilePublic(channelUser.getSteamId()))
+                .map(c -> !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken))
                 .orElse(false);
         }
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
         model.addAttribute("hasSteam", hasSteam);
+        model.addAttribute("hasSteamPersonalToken", hasSteamPersonalToken);
         model.addAttribute("steamProfilePrivate", steamProfilePrivate);
 
         return "app";
@@ -198,11 +205,15 @@ public class ChannelController {
         UserAccount viewer = principal.getUserAccount();
         boolean isOwner = viewer.getId().equals(channelUser.getId());
         boolean hasSteam = !steamApiKey.isBlank() && channelUser.getSteamId() != null;
+        boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
 
         boolean steamProfilePrivate = false;
         if (hasSteam && isOwner) {
+            String decryptedPersonalToken = hasSteamPersonalToken
+                ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
+                : null;
             steamProfilePrivate = steamApiClient
-                .map(c -> !c.isProfilePublic(channelUser.getSteamId()))
+                .map(c -> !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken))
                 .orElse(false);
         }
 
@@ -210,6 +221,7 @@ public class ChannelController {
         model.addAttribute(ATTR_IS_OWNER, isOwner);
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
         model.addAttribute("hasSteam", hasSteam);
+        model.addAttribute("hasSteamPersonalToken", hasSteamPersonalToken);
         model.addAttribute("steamProfilePrivate", steamProfilePrivate);
         return "fragments/connections :: connections";
     }
@@ -398,6 +410,32 @@ public class ChannelController {
         settings.getIncompleteFallbackCcls().clear();
         if (ccls != null) settings.getIncompleteFallbackCcls().addAll(ccls);
         userSettingsRepository.save(settings);
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
+    }
+
+    @PostMapping("/channels/{username}/settings/steam-personal-token")
+    public String saveSteamPersonalToken(
+            @PathVariable String username,
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            @RequestParam String token) {
+        UserAccount channelUser = resolveAndCheck(username, principal);
+        requireOwner(principal.getUserAccount(), channelUser);
+        if (token == null || token.isBlank()) {
+            return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
+        }
+        channelUser.setSteamPersonalToken(tokenEncryptionService.encrypt(token.trim()));
+        userAccountRepository.save(channelUser);
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
+    }
+
+    @PostMapping("/channels/{username}/settings/steam-personal-token/delete")
+    public String deleteSteamPersonalToken(
+            @PathVariable String username,
+            @AuthenticationPrincipal CatapultOAuth2User principal) {
+        UserAccount channelUser = resolveAndCheck(username, principal);
+        requireOwner(principal.getUserAccount(), channelUser);
+        channelUser.setSteamPersonalToken(null);
+        userAccountRepository.save(channelUser);
         return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 

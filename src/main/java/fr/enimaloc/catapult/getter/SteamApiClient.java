@@ -11,4 +11,8 @@ public interface SteamApiClient {
     default boolean isProfilePublic(String steamId) {
         return true;
     }
+
+    default boolean isProfilePublic(String steamId, String personalToken) {
+        return isProfilePublic(steamId);
+    }
 }
