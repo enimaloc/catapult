@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class MetricsEventListener {
@@ -54,5 +56,39 @@ public class MetricsEventListener {
                 .tag("experiment", event.getExperimentKey())
                 .register(registry)
                 .increment();
+    }
+
+    @EventListener
+    public void onTwitchLogin(TwitchLoginEvent event) {
+        Counter.builder("catapult.auth.login")
+                .tag("provider", "twitch")
+                .register(registry)
+                .increment();
+    }
+
+    @EventListener
+    public void onChannelCategoryChanged(ChannelCategoryChangedEvent event) {
+        Counter.builder("catapult.channel.category_changed")
+                .tag("category_id", event.getCategoryId())
+                .register(registry)
+                .increment();
+    }
+
+    @EventListener
+    public void onChannelCclChanged(ChannelCclChangedEvent event) {
+        List<String> cclIds = event.getCclIds();
+        if (cclIds.isEmpty()) {
+            Counter.builder("catapult.channel.ccl_changed")
+                    .tag("ccl_id", "none")
+                    .register(registry)
+                    .increment();
+        } else {
+            for (String cclId : cclIds) {
+                Counter.builder("catapult.channel.ccl_changed")
+                        .tag("ccl_id", cclId)
+                        .register(registry)
+                        .increment();
+            }
+        }
     }
 }

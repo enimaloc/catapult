@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
@@ -34,6 +35,7 @@ class TwitchLoginSuccessHandlerTest {
     @Mock OAuth2AuthorizedClientRepository authorizedClientRepository;
     @Mock OAuthTokenRepository oAuthTokenRepository;
     @Mock TokenEncryptionService tokenEncryptionService;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks TwitchLoginSuccessHandler handler;
 

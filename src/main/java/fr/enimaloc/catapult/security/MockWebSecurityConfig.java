@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.FormLoginConfigurer;
@@ -15,6 +16,11 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 @Profile("mock-web")
 public class MockWebSecurityConfig {
     public static final String MOCK_LOGIN_ROUTE = "/mock-login";
+
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
+    }
 
     @Bean
     @SuppressWarnings("RedundantThrows")
