@@ -74,9 +74,8 @@ class AdminWhitelistControllerTest {
 
     @Test
     void toggle_flipsEnabledState_andRedirects() {
-        when(whitelistService.isEnabled()).thenReturn(false);
         String view = controller.toggle();
-        verify(whitelistService).setEnabled(true);
+        verify(whitelistService).toggle();
         assertThat(view).isEqualTo("redirect:/admin/whitelist");
     }
 

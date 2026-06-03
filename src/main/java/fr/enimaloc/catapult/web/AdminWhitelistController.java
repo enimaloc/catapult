@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.web;
 
+import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.WhitelistEntry;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.WhitelistService;
@@ -27,7 +28,7 @@ public class AdminWhitelistController {
             .collect(Collectors.toMap(
                 WhitelistEntry::getTwitchId,
                 e -> userAccountRepository.findByTwitchId(e.getTwitchId())
-                    .map(u -> u.getTwitchUsername())
+                    .map(UserAccount::getTwitchUsername)
                     .orElse("—")
             ));
         model.addAttribute("entries", entries);
@@ -38,7 +39,7 @@ public class AdminWhitelistController {
 
     @PostMapping("/toggle")
     public String toggle() {
-        whitelistService.setEnabled(!whitelistService.isEnabled());
+        whitelistService.toggle();
         return "redirect:/admin/whitelist";
     }
 

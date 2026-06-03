@@ -71,6 +71,17 @@ class WhitelistServiceTest {
     }
 
     @Test
+    void toggle_flipsEnabledStateAtomically() {
+        SystemSetting s = new SystemSetting();
+        s.setKey("whitelist.enabled");
+        s.setValue("false");
+        when(systemSettingRepository.findById("whitelist.enabled")).thenReturn(Optional.of(s));
+        whitelistService.toggle();
+        verify(systemSettingRepository).save(s);
+        assertThat(s.getValue()).isEqualTo("true");
+    }
+
+    @Test
     void contains_delegatesToRepository() {
         when(whitelistEntryRepository.existsById("123")).thenReturn(true);
         assertThat(whitelistService.contains("123")).isTrue();
