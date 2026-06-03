@@ -127,8 +127,16 @@ public class ChannelController {
         model.addAttribute(ATTR_AVAILABLE_CCL, adminCclService.getAllCcls());
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterSource", source);
+        boolean hasSteam = !steamApiKey.isBlank() && channelUser.getSteamId() != null;
+        boolean steamProfilePrivate = false;
+        if (hasSteam && isOwner) {
+            steamProfilePrivate = steamApiClient
+                .map(c -> !c.isProfilePublic(channelUser.getSteamId()))
+                .orElse(false);
+        }
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
-        model.addAttribute("hasSteam", !steamApiKey.isBlank() && channelUser.getSteamId() != null);
+        model.addAttribute("hasSteam", hasSteam);
+        model.addAttribute("steamProfilePrivate", steamProfilePrivate);
 
         return "app";
     }
