@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.getter.MockSteamApiClient;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.StreamStateService;
@@ -19,6 +20,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -30,6 +33,7 @@ public class AdminMembersController {
     private final UserAccountRepository userAccountRepository;
     private final StreamStateService streamStateService;
     private final Environment environment;
+    private final Optional<MockSteamApiClient> mockSteamApiClient;
 
     @PostMapping("/{id}/bot/toggle")
     public String toggleBot(@PathVariable UUID id) {
@@ -46,10 +50,15 @@ public class AdminMembersController {
         Map<UUID, Boolean> liveStatus = members.stream()
             .collect(Collectors.toMap(UserAccount::getId, streamStateService::isLive));
 
+        Set<String> privateSteamProfiles = mockSteamApiClient
+            .map(MockSteamApiClient::getPrivateProfiles)
+            .orElse(Set.of());
+
         model.addAttribute("members", members);
         model.addAttribute("liveStatus", liveStatus);
         model.addAttribute("isMockProfile", Arrays.asList(environment.getActiveProfiles()).contains("mock"));
         model.addAttribute("canMockSteam", Arrays.asList(environment.getActiveProfiles()).contains("mock-steam"));
+        model.addAttribute("privateSteamProfiles", privateSteamProfiles);
         model.addAttribute("currentUserTwitchId", principal.getUserAccount().getTwitchId());
         return "admin/members";
     }

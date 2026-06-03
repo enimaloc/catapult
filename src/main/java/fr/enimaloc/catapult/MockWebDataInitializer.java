@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.event.ExperimentActivatedEvent;
 import fr.enimaloc.catapult.experiment.ExperimentSynchronizer;
+import fr.enimaloc.catapult.getter.MockSteamApiClient;
 import fr.enimaloc.catapult.repository.ExperimentAssignmentRuleRepository;
 import fr.enimaloc.catapult.repository.ExperimentRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -40,6 +42,7 @@ public class MockWebDataInitializer implements ApplicationRunner {
     private final ExperimentAssignmentRuleRepository ruleRepository;
     private final ExperimentSynchronizer experimentSynchronizer;
     private final ApplicationEventPublisher eventPublisher;
+    private final Optional<MockSteamApiClient> mockSteamApiClient;
 
     @Override
     @SuppressWarnings("NullableProblems")
@@ -52,7 +55,13 @@ public class MockWebDataInitializer implements ApplicationRunner {
             createSettings(user);
             experimentSynchronizer.updateVariant(user);
         }
-        log.info("[Mock Web] Initialized users: {} (admin), {} * user",
+
+        UserAccount privateSteamUser = createUserWithSteam("mock-steam-private", "user_steam_private", "steam-mock-private-76561");
+        createSettings(privateSteamUser);
+        experimentSynchronizer.updateVariant(privateSteamUser);
+        mockSteamApiClient.ifPresent(c -> c.setProfilePrivate(privateSteamUser.getSteamId()));
+
+        log.info("[Mock Web] Initialized users: {} (admin), {} * user, 1 private-steam",
                 admin.getTwitchUsername(), mockUsersCount);
 
         // Auto-activate DRAFT experiments so each user immediately sees their correct variant.
@@ -94,6 +103,18 @@ public class MockWebDataInitializer implements ApplicationRunner {
             u.setTwitchUsername(username);
             u.setStatus(UserAccount.Status.ACTIVE);
             u.setBotEnabled(true);
+            return userAccountRepository.save(u);
+        });
+    }
+
+    private UserAccount createUserWithSteam(String twitchId, String username, String steamId) {
+        return userAccountRepository.findByTwitchId(twitchId).orElseGet(() -> {
+            UserAccount u = new UserAccount();
+            u.setTwitchId(twitchId);
+            u.setTwitchUsername(username);
+            u.setStatus(UserAccount.Status.ACTIVE);
+            u.setBotEnabled(true);
+            u.setSteamId(steamId);
             return userAccountRepository.save(u);
         });
     }
