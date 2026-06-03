@@ -19,11 +19,16 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.http.MediaType;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,6 +45,7 @@ public class TwitchEventSubService implements EventSubService {
 
     private static final String WS_URL = "wss://eventsub.wss.twitch.tv/ws";
     private static final String EVENTSUB_API = "https://api.twitch.tv/helix/eventsub/subscriptions";
+    private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
     private static final long MAX_RETRY_SECONDS = 60L;
 
     private final OAuthTokenRepository oAuthTokenRepository;
@@ -52,6 +58,9 @@ public class TwitchEventSubService implements EventSubService {
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
+
+    @Value("${twitch.client-secret:}")
+    private String twitchClientSecret;
 
     private final Map<UUID, WebSocket> connections = new ConcurrentHashMap<>();
     private final HttpClient httpClient = HttpClient.newHttpClient();
@@ -147,27 +156,90 @@ public class TwitchEventSubService implements EventSubService {
     }
 
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
-        String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+        String accessToken = resolveAccessToken(token, user);
         for (String eventType : List.of("stream.online", "stream.offline")) {
             try {
-                restClient.post()
-                    .uri(EVENTSUB_API)
-                    .header("Authorization", "Bearer " + accessToken)
-                    .header("Client-ID", twitchClientId)
-                    .header("Content-Type", "application/json")
-                    .body(Map.of(
-                        "type", eventType,
-                        "version", "1",
-                        "condition", Map.of("broadcaster_user_id", user.getTwitchId()),
-                        "transport", Map.of("method", "websocket", "session_id", sessionId)
-                    ))
-                    .retrieve()
-                    .toBodilessEntity();
+                postSubscription(accessToken, eventType, user.getTwitchId(), sessionId);
                 log.debug("Subscribed to {} for user {}", eventType, user.getId());
+            } catch (HttpClientErrorException.Unauthorized e) {
+                log.debug("Token expired for user {}, refreshing", user.getId());
+                String refreshed = refreshAccessToken(token, user);
+                if (refreshed != null) {
+                    try {
+                        postSubscription(refreshed, eventType, user.getTwitchId(), sessionId);
+                        log.debug("Subscribed to {} for user {} after token refresh", eventType, user.getId());
+                    } catch (Exception retryEx) {
+                        log.warn("Failed to subscribe to {} for user {} after refresh: {}", eventType, user.getId(), retryEx.getMessage());
+                    }
+                } else {
+                    log.warn("Failed to subscribe to {} for user {}: token refresh failed", eventType, user.getId());
+                }
             } catch (Exception e) {
                 log.warn("Failed to subscribe to {} for user {}: {}", eventType, user.getId(), e.getMessage());
             }
         }
+    }
+
+    private String resolveAccessToken(OAuthToken token, UserAccount user) {
+        if (token.getExpiresAt() != null && Instant.now().isAfter(token.getExpiresAt())) {
+            log.debug("Token for user {} is expired, proactively refreshing", user.getId());
+            String refreshed = refreshAccessToken(token, user);
+            if (refreshed != null) return refreshed;
+        }
+        return tokenEncryptionService.decrypt(token.getAccessToken());
+    }
+
+    @SuppressWarnings("unchecked")
+    private String refreshAccessToken(OAuthToken token, UserAccount user) {
+        if (token.getRefreshToken() == null) {
+            log.warn("No refresh token stored for user {} — cannot refresh", user.getId());
+            return null;
+        }
+        String refreshToken = tokenEncryptionService.decrypt(token.getRefreshToken());
+        try {
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.add("grant_type", "refresh_token");
+            form.add("refresh_token", refreshToken);
+            form.add("client_id", twitchClientId);
+            form.add("client_secret", twitchClientSecret);
+            Map<String, Object> response = restClient.post()
+                .uri(TWITCH_TOKEN_URL)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .retrieve()
+                .body(Map.class);
+            if (response == null) return null;
+
+            String newAccess = (String) response.get("access_token");
+            String newRefresh = (String) response.get("refresh_token");
+            Number expiresIn = (Number) response.get("expires_in");
+
+            token.setAccessToken(tokenEncryptionService.encrypt(newAccess));
+            if (newRefresh != null) token.setRefreshToken(tokenEncryptionService.encrypt(newRefresh));
+            if (expiresIn != null) token.setExpiresAt(Instant.now().plusSeconds(expiresIn.longValue()));
+            oAuthTokenRepository.save(token);
+            log.debug("Refreshed Twitch token for user {}", user.getId());
+            return newAccess;
+        } catch (Exception e) {
+            log.warn("Failed to refresh Twitch token for user {}: {}", user.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private void postSubscription(String accessToken, String eventType, String twitchId, String sessionId) {
+        restClient.post()
+            .uri(EVENTSUB_API)
+            .header("Authorization", "Bearer " + accessToken)
+            .header("Client-ID", twitchClientId)
+            .header("Content-Type", "application/json")
+            .body(Map.of(
+                "type", eventType,
+                "version", "1",
+                "condition", Map.of("broadcaster_user_id", twitchId),
+                "transport", Map.of("method", "websocket", "session_id", sessionId)
+            ))
+            .retrieve()
+            .toBodilessEntity();
     }
 
     private class EventSubListener implements WebSocket.Listener {
