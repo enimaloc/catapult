@@ -199,7 +199,7 @@ class ChannelControllerTest {
     void fragmentConnections_privateProfile_setsSteamProfilePrivateTrue() throws Exception {
         owner.setSteamId("76561198000000001");
         when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
-        when(steamApiClient.isProfilePublic("76561198000000001")).thenReturn(false);
+        when(steamApiClient.isProfilePublic("76561198000000001", null)).thenReturn(false);
 
         mockMvc.perform(get("/channels/streamer/fragments/connections")
                 .with(authentication(ownerAuth)))
@@ -211,7 +211,7 @@ class ChannelControllerTest {
     void fragmentConnections_publicProfile_setsSteamProfilePrivateFalse() throws Exception {
         owner.setSteamId("76561198000000001");
         when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
-        when(steamApiClient.isProfilePublic("76561198000000001")).thenReturn(true);
+        when(steamApiClient.isProfilePublic("76561198000000001", null)).thenReturn(true);
 
         mockMvc.perform(get("/channels/streamer/fragments/connections")
                 .with(authentication(ownerAuth)))
