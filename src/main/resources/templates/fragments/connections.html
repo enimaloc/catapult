@@ -3,6 +3,7 @@
 <body>
 <!--/*@thymesvar id="hasSteamProvider" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="hasSteam" type="java.lang.Boolean"*/-->
+<!--/*@thymesvar id="steamProfilePrivate" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="isOwner" type="java.lang.Boolean"*/-->
 <section th:fragment="connections" id="connections-section" class="card"
          th:attr="hx-get=@{/channels/{u}/fragments/connections(u=${channelUsername})}"
@@ -27,6 +28,11 @@
             <strong>Steam</strong>
             <span th:if="${hasSteam}" class="badge badge-connected" th:text="#{connections.connected}">Connecté</span>
             <span th:unless="${hasSteam}" class="badge badge-disconnected" th:text="#{connections.not_connected}">Non connecté</span>
+            <div th:if="${hasSteam and isOwner and steamProfilePrivate}" class="provider-warning">
+                <p th:text="#{connections.steam.private_warning}">Your Steam profile is private — game detection won't work.</p>
+                <a href="https://steamcommunity.com/my/edit/settings" target="_blank" rel="noopener noreferrer"
+                   th:text="#{connections.steam.open_privacy_settings}">Steam Privacy Settings →</a>
+            </div>
             <div th:if="${hasSteam and isOwner}">
                 <form th:action="@{/channels/{u}/settings/disconnect(u=${channelUsername})}" method="post"> <!-- nosemgrep -->
                     <input type="hidden" name="provider" value="STEAM"/>

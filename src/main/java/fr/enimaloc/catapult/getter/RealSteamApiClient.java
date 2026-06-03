@@ -20,18 +20,40 @@ import java.util.Optional;
 @ConditionalOnBooleanProperty("steam.enabled")
 public class RealSteamApiClient implements SteamApiClient {
 
+    private static final String PLAYER_SUMMARIES_URL =
+        "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/";
+
     @Value("${steam.api-key:}")
     private String steamApiKey;
 
     private final RestClient restClient;
 
     @Override
-    @SuppressWarnings("unchecked")
     public Optional<PlayerSummary> getPlayerSummary(String steamId) {
+        return fetchPlayer(steamId).flatMap(player -> {
+            Object gameId   = player.get("gameid");
+            Object gameName = player.get("gameextrainfo");
+            if (gameId == null || gameName == null) return Optional.empty();
+            return Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName)));
+        });
+    }
+
+    @Override
+    public boolean isProfilePublic(String steamId) {
+        return fetchPlayer(steamId)
+            .map(player -> {
+                Object visibility = player.get("communityvisibilitystate");
+                return visibility != null && ((Number) visibility).intValue() == 3;
+            })
+            .orElse(false);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<Map<String, Object>> fetchPlayer(String steamId) {
         if (steamApiKey.isBlank()) return Optional.empty();
 
         String url = UriComponentsBuilder
-            .fromUriString("https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/")
+            .fromUriString(PLAYER_SUMMARIES_URL)
             .queryParam("key", steamApiKey)
             .queryParam("steamids", steamId)
             .toUriString();
@@ -49,16 +71,10 @@ public class RealSteamApiClient implements SteamApiClient {
             List<Map<String, Object>> players = (List<Map<String, Object>>) responseBody.get("players");
             if (players == null || players.isEmpty()) return Optional.empty();
 
-            Map<String, Object> player = players.get(0);
-            Object gameId   = player.get("gameid");
-            Object gameName = player.get("gameextrainfo");
-            if (gameId == null || gameName == null) return Optional.empty();
-
-            return Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName)));
+            return Optional.of(players.get(0));
         } catch (Exception e) {
-            log.warn("Failed to fetch player summary from Steam for {}: {}", steamId, e.getMessage());
+            log.warn("Failed to fetch Steam player data for {}: {}", steamId, e.getMessage());
             return Optional.empty();
         }
     }
-
 }
