@@ -74,6 +74,21 @@ public class AdminMembersMockController {
         return REDIRECT_ADMIN_MEMBERS;
     }
 
+    @PostMapping("/{id}/steam/toggle-private")
+    public String toggleSteamPrivate(@PathVariable UUID id) {
+        var user = userAccountRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (user.getSteamId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User has no Steam ID");
+        }
+        if (mockSteamApiClient.isProfilePublic(user.getSteamId())) {
+            mockSteamApiClient.setProfilePrivate(user.getSteamId());
+        } else {
+            mockSteamApiClient.setProfilePublic(user.getSteamId());
+        }
+        return REDIRECT_ADMIN_MEMBERS;
+    }
+
     @GetMapping(value = "/igdb/search", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public List<Map<String, String>> searchIgdbGames(@RequestParam String q) {
