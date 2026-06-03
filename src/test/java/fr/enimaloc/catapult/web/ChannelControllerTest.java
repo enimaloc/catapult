@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.service.EventSubService;
 import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +71,7 @@ class ChannelControllerTest {
     @MockitoBean CatapultOAuth2UserService oAuth2UserService;
     @MockitoBean ExperimentService experimentService;
     @MockitoBean SteamApiClient steamApiClient;
+    @MockitoBean TokenEncryptionService tokenEncryptionService;
 
     private UserAccount owner;
     private UserAccount moderator;

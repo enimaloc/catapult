@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.security.CatapultOAuth2UserService;
 import fr.enimaloc.catapult.service.*;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.web.ChannelController;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -68,6 +69,7 @@ class AppTemplateTest {
     @MockitoBean ExperimentService experimentService;
     @MockitoBean EventSubService twitchEventSubService;
     @MockitoBean ChannelAccessService channelAccessService;
+    @MockitoBean TokenEncryptionService tokenEncryptionService;
 
     private UsernamePasswordAuthenticationToken auth;
     private UserAccount userAccount;
