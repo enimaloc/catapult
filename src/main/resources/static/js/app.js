@@ -79,3 +79,15 @@ function initThemeUI() {
 }
 
 document.addEventListener('DOMContentLoaded', initThemeUI);
+
+function toggleNavMenu() {
+    const nav = document.querySelector('.nav-links--main');
+    if (nav) nav.classList.toggle('open');
+}
+
+window.addEventListener('resize', function () {
+    if (window.innerWidth > 768) {
+        const nav = document.querySelector('.nav-links--main');
+        if (nav) nav.classList.remove('open');
+    }
+});

@@ -44,7 +44,11 @@
 </div>
 <nav class="navbar">
     <a th:href="@{/}" class="nav-brand">🚀 Catapult</a>
-    <div class="nav-links" th:if="${user != null}">
+    <button th:if="${user != null}" class="nav-hamburger" id="nav-hamburger"
+            aria-label="Menu" onclick="toggleNavMenu()">
+        <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links nav-links--main" th:if="${user != null}">
         <a th:href="@{/channels}" th:classappend="${active_page == 'channels'} ? ' active'" th:text="#{nav.my_channels}">Mes chaînes</a>
         <span th:if="${channelUsername != null}" class="nav-separator">›</span>
         <span th:if="${channelUsername != null}" class="nav-channel-name" th:text="${channelUsername}"></span>
