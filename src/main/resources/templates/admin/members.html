@@ -9,6 +9,7 @@
 <!--/*@thymesvar id="liveStatus" type="java.util.Map"*/-->
 <!--/*@thymesvar id="isMockProfile" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="canMockSteam" type="java.lang.Boolean"*/-->
+<!--/*@thymesvar id="privateSteamProfiles" type="java.util.Set"*/-->
 <!--/*@thymesvar id="currentUserTwitchId" type="java.lang.String"*/-->
     <h2 th:text="#{admin.members.title}">Administration — Membres</h2>
 
@@ -97,6 +98,13 @@
                                 <form th:action="@{/admin/members/{id}/steam/clear(id=${member.id})}" method="post"> <!-- nosemgrep -->
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button type="submit" class="btn btn-sm">Clear</button>
+                                </form>
+                                <form th:action="@{/admin/members/{id}/steam/toggle-private(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button type="submit"
+                                            th:class="${privateSteamProfiles.contains(member.steamId)} ? 'btn btn-sm btn-danger' : 'btn btn-sm'"
+                                            th:text="${privateSteamProfiles.contains(member.steamId)} ? '🔒 Private' : '🌐 Public'">
+                                    </button>
                                 </form>
                             </div>
                             <span th:if="${member.steamId == null}">—</span>
