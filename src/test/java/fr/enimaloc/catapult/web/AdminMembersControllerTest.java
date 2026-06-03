@@ -4,9 +4,9 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.StreamStateService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
@@ -15,6 +15,7 @@ import org.springframework.ui.Model;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +27,12 @@ class AdminMembersControllerTest {
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private StreamStateService streamStateService;
     @Mock private Environment environment;
-    @InjectMocks private AdminMembersController controller;
+    private AdminMembersController controller;
+
+    @BeforeEach
+    void setup() {
+        controller = new AdminMembersController(userAccountRepository, streamStateService, environment, Optional.empty());
+    }
 
     private CatapultOAuth2User adminPrincipal(String twitchId) {
         UserAccount account = new UserAccount();
