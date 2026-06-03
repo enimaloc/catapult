@@ -1377,3 +1377,32 @@ details summary { cursor: pointer; font-weight: 600; }
     padding: 48px;
     color: var(--text-dim);
 }
+
+/* ============================================================
+   Nav separator / channel name (navbar breadcrumb)
+   ============================================================ */
+.nav-separator   { color: var(--text-dim); }
+.nav-channel-name { color: var(--text-subtle); font-weight: 600; }
+
+/* ============================================================
+   Hamburger button (mobile nav trigger)
+   ============================================================ */
+.nav-hamburger {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 6px;
+    border-radius: 4px;
+    color: var(--text);
+}
+.nav-hamburger:hover { background: var(--border); }
+.nav-hamburger span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: currentColor;
+    border-radius: 2px;
+}
