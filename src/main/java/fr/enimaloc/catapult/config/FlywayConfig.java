@@ -19,6 +19,7 @@ public class FlywayConfig {
         Flyway flyway = Flyway.configure()
             .dataSource(dataSource)
             .locations("classpath:db/migration")
+            .outOfOrder(true)
             .load();
         flyway.migrate();
         log.info("Flyway migrations complete.");
