@@ -31,8 +31,8 @@ public class RealSteamApiClient implements SteamApiClient {
     private final RestClient restClient;
 
     @Override
-    public Optional<PlayerSummary> getPlayerSummary(String steamId) {
-        return fetchPlayer(steamId).flatMap(player -> {
+    public Optional<PlayerSummary> getPlayerSummary(String steamId, String personalToken) {
+        return fetchPlayer(steamId, personalToken).flatMap(player -> {
             Object gameId   = player.get("gameid");
             Object gameName = player.get("gameextrainfo");
             if (gameId == null || gameName == null) return Optional.empty();
@@ -42,7 +42,7 @@ public class RealSteamApiClient implements SteamApiClient {
 
     @Override
     public boolean isProfilePublic(String steamId) {
-        boolean visibilityPublic = fetchPlayer(steamId)
+        boolean visibilityPublic = fetchPlayer(steamId, null)
             .map(player -> {
                 Object visibility = player.get("communityvisibilitystate");
                 return visibility != null && ((Number) visibility).intValue() == 3;
@@ -54,7 +54,7 @@ public class RealSteamApiClient implements SteamApiClient {
 
     @Override
     public boolean isProfilePublic(String steamId, String personalToken) {
-        boolean visibilityPublic = fetchPlayer(steamId)
+        boolean visibilityPublic = fetchPlayer(steamId, personalToken)
             .map(player -> {
                 Object visibility = player.get("communityvisibilitystate");
                 return visibility != null && ((Number) visibility).intValue() == 3;
@@ -91,12 +91,12 @@ public class RealSteamApiClient implements SteamApiClient {
     }
 
     @SuppressWarnings("unchecked")
-    private Optional<Map<String, Object>> fetchPlayer(String steamId) {
-        if (steamApiKey.isBlank()) return Optional.empty();
+    private Optional<Map<String, Object>> fetchPlayer(String steamId, String personalToken) {
+        String token = (personalToken != null && !personalToken.isBlank()) ? personalToken : steamApiKey;
 
         String url = UriComponentsBuilder
             .fromUriString(PLAYER_SUMMARIES_URL)
-            .queryParam("key", steamApiKey)
+            .queryParam("key", token)
             .queryParam("steamids", steamId)
             .toUriString();
 

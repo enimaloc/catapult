@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.getter;
 
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -16,6 +17,7 @@ import java.util.Optional;
 public class SteamGameGetter implements GameGetter {
 
     private final SteamApiClient steamApiClient;
+    private final TokenEncryptionService tokenEncryptionService;
 
     @Override
     public String name() {
@@ -26,7 +28,10 @@ public class SteamGameGetter implements GameGetter {
     public Optional<DetectedGame> getCurrentGame(UserAccount user) {
         if (user.getSteamId() == null) return Optional.empty();
         try {
-            return steamApiClient.getPlayerSummary(user.getSteamId())
+            String decryptedPersonalToken = user.getSteamPersonalToken() != null
+                    ? tokenEncryptionService.decrypt(user.getSteamPersonalToken())
+                    : null;
+            return steamApiClient.getPlayerSummary(user.getSteamId(), decryptedPersonalToken)
                 .map(p -> new DetectedGame(p.gameId(), GameBinding.SourceType.STEAM, p.gameName()));
         } catch (Exception e) {
             log.warn("Failed to fetch current game from Steam for user {}: {}", user.getId(), e.getMessage());

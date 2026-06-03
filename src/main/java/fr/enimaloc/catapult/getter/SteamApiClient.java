@@ -6,7 +6,11 @@ public interface SteamApiClient {
 
     record PlayerSummary(String gameId, String gameName) {}
 
-    Optional<PlayerSummary> getPlayerSummary(String steamId);
+    default Optional<PlayerSummary> getPlayerSummary(String steamId) {
+        return getPlayerSummary(steamId, null);
+    }
+
+    Optional<PlayerSummary> getPlayerSummary(String steamId, String personalToken);
 
     default boolean isProfilePublic(String steamId) {
         return true;

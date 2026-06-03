@@ -19,7 +19,7 @@ public class MockSteamApiClient implements SteamApiClient {
     private final Set<String> privateProfiles = ConcurrentHashMap.newKeySet();
 
     @Override
-    public Optional<PlayerSummary> getPlayerSummary(String steamId) {
+    public Optional<PlayerSummary> getPlayerSummary(String steamId, String personalToken) {
         return Optional.ofNullable(gameByUser.get(steamId));
     }
 
