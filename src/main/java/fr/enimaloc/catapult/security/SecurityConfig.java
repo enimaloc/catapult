@@ -27,6 +27,7 @@ public class SecurityConfig {
     public static final String LOGIN_ROUTE = "/login";
 
     private final CatapultOAuth2UserService oAuth2UserService;
+    private final TwitchLoginSuccessHandler loginSuccessHandler;
 
     @Bean
     public SwitchUserFilter switchUserFilter(ImpersonationUserDetailsService impersonationUserDetailsService) {
@@ -72,7 +73,7 @@ public class SecurityConfig {
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .loginPage(LOGIN_ROUTE)
-                        .defaultSuccessUrl("/channels", true)
+                        .successHandler(loginSuccessHandler)
                         .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService))
                         .failureHandler((request, response, exception) -> {
                             log.error("OAuth2 login failed: [{}] {}", exception.getClass().getSimpleName(), exception.getMessage(), exception);
