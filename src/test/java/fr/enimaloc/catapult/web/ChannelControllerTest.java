@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
+import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
@@ -27,6 +28,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -47,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 
 @WebMvcTest(ChannelController.class)
+@TestPropertySource(properties = "steam.api-key=test-key")
 class ChannelControllerTest {
 
     @Autowired MockMvc mockMvc;
@@ -66,6 +69,7 @@ class ChannelControllerTest {
     @MockitoBean UserSettingsRepository userSettingsRepository;
     @MockitoBean CatapultOAuth2UserService oAuth2UserService;
     @MockitoBean ExperimentService experimentService;
+    @MockitoBean SteamApiClient steamApiClient;
 
     private UserAccount owner;
     private UserAccount moderator;
@@ -187,6 +191,30 @@ class ChannelControllerTest {
                 .with(authentication(ownerAuth)))
             .andExpect(status().isOk())
             .andExpect(view().name("fragments/connections :: connections"));
+    }
+
+    @Test
+    void fragmentConnections_privateProfile_setsSteamProfilePrivateTrue() throws Exception {
+        owner.setSteamId("76561198000000001");
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+        when(steamApiClient.isProfilePublic("76561198000000001")).thenReturn(false);
+
+        mockMvc.perform(get("/channels/streamer/fragments/connections")
+                .with(authentication(ownerAuth)))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("steamProfilePrivate", true));
+    }
+
+    @Test
+    void fragmentConnections_publicProfile_setsSteamProfilePrivateFalse() throws Exception {
+        owner.setSteamId("76561198000000001");
+        when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
+        when(steamApiClient.isProfilePublic("76561198000000001")).thenReturn(true);
+
+        mockMvc.perform(get("/channels/streamer/fragments/connections")
+                .with(authentication(ownerAuth)))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("steamProfilePrivate", false));
     }
 
     @Test

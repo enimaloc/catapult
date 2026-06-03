@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
+import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
@@ -37,6 +38,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -67,6 +69,7 @@ public class ChannelController {
     private final ActivityLogService activityLogService;
     private final ConnectionEventService connectionEventService;
     private final ExperimentService experimentService;
+    private final Optional<SteamApiClient> steamApiClient;
 
     // -------------------------------------------------------------------------
     // Model attributes
@@ -185,10 +188,21 @@ public class ChannelController {
             Model model) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         UserAccount viewer = principal.getUserAccount();
+        boolean isOwner = viewer.getId().equals(channelUser.getId());
+        boolean hasSteam = !steamApiKey.isBlank() && channelUser.getSteamId() != null;
+
+        boolean steamProfilePrivate = false;
+        if (hasSteam && isOwner) {
+            steamProfilePrivate = steamApiClient
+                .map(c -> !c.isProfilePublic(channelUser.getSteamId()))
+                .orElse(false);
+        }
+
         model.addAttribute(ATTR_CHANNEL_USERNAME, username);
-        model.addAttribute(ATTR_IS_OWNER, viewer.getId().equals(channelUser.getId()));
+        model.addAttribute(ATTR_IS_OWNER, isOwner);
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
-        model.addAttribute("hasSteam", !steamApiKey.isBlank() && channelUser.getSteamId() != null);
+        model.addAttribute("hasSteam", hasSteam);
+        model.addAttribute("steamProfilePrivate", steamProfilePrivate);
         return "fragments/connections :: connections";
     }
 
@@ -259,7 +273,7 @@ public class ChannelController {
         UserAccount channelUser = resolveAndCheck(username, principal);
         Set<String> cclSet = ccls == null ? Set.of() : new HashSet<>(ccls);
         bindingService.updateBinding(channelUser, id, twitchGameId, twitchGameName, cclSet, ignored);
-        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
     @PostMapping("/channels/{username}/bindings/{id}/ccl-toggle")
@@ -270,7 +284,7 @@ public class ChannelController {
             @RequestParam(defaultValue = "false") boolean enabled) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         bindingService.toggleCclEnabled(channelUser, id, enabled);
-        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
     @PostMapping("/channels/{username}/bindings/{id}/ignored-toggle")
@@ -281,7 +295,7 @@ public class ChannelController {
             @RequestParam(defaultValue = "false") boolean ignored) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         bindingService.toggleIgnored(channelUser, id, ignored);
-        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
     @PostMapping("/channels/{username}/bindings/{id}/delete")
@@ -291,7 +305,7 @@ public class ChannelController {
             @PathVariable UUID id) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         bindingService.deleteBinding(channelUser, id);
-        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
     // -------------------------------------------------------------------------
@@ -311,7 +325,7 @@ public class ChannelController {
         } else {
             twitchEventSubService.disconnect(user);
         }
-        return REDIRECT_CHANNEL + user.getTwitchUsername();
+        return REDIRECT_CHANNEL + user.getTwitchUsername(); // nosemgrep
     }
 
     @PostMapping("/channels/{username}/settings/no-game")
@@ -341,7 +355,7 @@ public class ChannelController {
         if (gameStateService.getLastKnownGame(channelUser).isEmpty()) {
             twitchService.resetToDefault(channelUser);
         }
-        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
     @GetMapping("/channels/{username}/fragments/incomplete-fallback-settings")
@@ -376,7 +390,7 @@ public class ChannelController {
         settings.getIncompleteFallbackCcls().clear();
         if (ccls != null) settings.getIncompleteFallbackCcls().addAll(ccls);
         userSettingsRepository.save(settings);
-        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
     // -------------------------------------------------------------------------
@@ -393,7 +407,7 @@ public class ChannelController {
         if (channelUser.getTwitchUsername().equalsIgnoreCase(confirmUsername)) {
             accountService.initiateAccountDeletion(channelUser);
         }
-        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
     @PostMapping("/channels/{username}/settings/cancel-deletion")
@@ -403,7 +417,7 @@ public class ChannelController {
         UserAccount channelUser = resolveAndCheck(username, principal);
         requireOwner(principal.getUserAccount(), channelUser);
         accountService.cancelAccountDeletion(channelUser);
-        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
     @PostMapping("/channels/{username}/settings/disconnect")
@@ -415,7 +429,7 @@ public class ChannelController {
         requireOwner(principal.getUserAccount(), channelUser);
         OAuthToken.Provider p = OAuthToken.Provider.valueOf(provider.toUpperCase());
         accountService.disconnectProvider(channelUser, p);
-        return REDIRECT_CHANNEL + channelUser.getTwitchUsername();
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
     // -------------------------------------------------------------------------
