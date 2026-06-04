@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -61,7 +62,7 @@ public class TwitchServiceImpl implements TwitchService {
             .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
             .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
             .header(CLIENT_ID, twitchClientId)
-            .header("Content-Type", "application/json")
+            .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
             .body(body)
             .retrieve()
             .toBodilessEntity();
@@ -98,7 +99,7 @@ public class TwitchServiceImpl implements TwitchService {
                     log.info("Twitch channel updated for user {} after token refresh — game_id={}",
                         user.getId(), binding.getTwitchGameId());
                 } catch (Exception retryEx) {
-                    log.warn("Twitch token still invalid for user {} after refresh — pausing bot", user.getId());
+                    log.warn("Twitch channel update failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
                     user.setBotEnabled(false);
                     userAccountRepository.save(user);
                 }
@@ -220,7 +221,7 @@ public class TwitchServiceImpl implements TwitchService {
                     log.info("Twitch channel reset to default for user {} after token refresh — game_id={}",
                         user.getId(), settings.getNoGameTwitchGameId());
                 } catch (Exception retryEx) {
-                    log.warn("Twitch token still invalid for user {} after refresh during reset — pausing bot", user.getId());
+                    log.warn("Twitch channel reset failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
                     user.setBotEnabled(false);
                     userAccountRepository.save(user);
                 }

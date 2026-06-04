@@ -187,7 +187,7 @@ class TwitchServiceTest {
     }
 
     @Test
-    void updateChannel_on401_disablesBotAndSavesUser() {
+    void updateChannel_on401_refreshFails_disablesBot() {
         doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED)).when(responseSpec).toBodilessEntity();
 
         assertThat(user.isBotEnabled()).isTrue(); // pre-condition
