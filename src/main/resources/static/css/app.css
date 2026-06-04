@@ -358,7 +358,9 @@ a:hover { text-decoration: underline; }
 @media (max-width: 1300px) {
     .page-layout {
         grid-template-columns: 1fr;
+        justify-content: start;
     }
+    .page-layout > * { min-width: 0; }
     .page-sidebar--left  { order: 2; }
     .page-sidebar--right { order: 3; }
 }
