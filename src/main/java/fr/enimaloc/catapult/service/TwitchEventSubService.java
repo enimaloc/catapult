@@ -176,10 +176,10 @@ public class TwitchEventSubService implements EventSubService {
                 log.debug("Token expired for user {}, refreshing", user.getId());
                 String refreshed = twitchTokenService.refreshAccessToken(token, user);
                 if (refreshed != null) {
+                    accessToken = refreshed;
                     try {
                         postSubscription(refreshed, eventType, version, user.getTwitchId(), sessionId);
                         log.debug("Subscribed to {} for user {} after token refresh", eventType, user.getId());
-                        accessToken = refreshed;
                     } catch (Exception retryEx) {
                         log.warn("Failed to subscribe to {} for user {} after refresh: {}", eventType, user.getId(), retryEx.getMessage());
                     }
