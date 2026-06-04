@@ -45,6 +45,7 @@ public class TwitchEventSubService implements EventSubService {
     private static final String WS_URL = "wss://eventsub.wss.twitch.tv/ws";
     private static final String EVENTSUB_API = "https://api.twitch.tv/helix/eventsub/subscriptions";
     private static final String HELIX_CHANNELS_API = "https://api.twitch.tv/helix/channels";
+    private static final String HELIX_STREAMS_API = "https://api.twitch.tv/helix/streams";
     private static final long MAX_RETRY_SECONDS = 60L;
 
     private final OAuthTokenRepository oAuthTokenRepository;
@@ -193,6 +194,7 @@ public class TwitchEventSubService implements EventSubService {
             }
         }
         initChannelState(user, accessToken);
+        initStreamState(user, accessToken);
     }
 
     private void handleChannelUpdate(UserAccount user, JsonNode event) {
@@ -214,12 +216,13 @@ public class TwitchEventSubService implements EventSubService {
 
     private void initChannelState(UserAccount user, String accessToken) {
         try {
-            JsonNode response = restClient.get()
+            String raw = restClient.get()
                 .uri(HELIX_CHANNELS_API + "?broadcaster_id=" + user.getTwitchId())
                 .header("Authorization", "Bearer " + accessToken)
                 .header("Client-ID", twitchClientId)
                 .retrieve()
-                .body(JsonNode.class);
+                .body(String.class);
+            JsonNode response = objectMapper.readTree(raw);
             if (response == null || !response.has("data") || response.path("data").isEmpty()) return;
 
             JsonNode data = response.path("data").get(0);
@@ -236,8 +239,26 @@ public class TwitchEventSubService implements EventSubService {
             log.debug("Initialized channel state for user {}: category={}, ccls={}", user.getId(), categoryId, cclIds);
         } catch (Exception e) {
             if (channelStateWarnedUsers.add(user.getId())) {
-                log.warn("Failed to initialize channel state for user {}: {}", user.getId(), e.getMessage());
+                log.warn("Failed to initialize channel state for user {}: {}", user.getId(), e.getMessage(), e);
             }
+        }
+    }
+
+    private void initStreamState(UserAccount user, String accessToken) {
+        try {
+            String raw = restClient.get()
+                .uri(HELIX_STREAMS_API + "?user_id=" + user.getTwitchId())
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Client-ID", twitchClientId)
+                .retrieve()
+                .body(String.class);
+            JsonNode response = objectMapper.readTree(raw);
+            if (response == null || !response.has("data")) return;
+            boolean isLive = !response.path("data").isEmpty();
+            streamStateService.setLive(user, isLive);
+            log.debug("Initialized stream state for user {}: live={}", user.getId(), isLive);
+        } catch (Exception e) {
+            log.warn("Failed to initialize stream state for user {}: {}", user.getId(), e.getMessage(), e);
         }
     }
 
