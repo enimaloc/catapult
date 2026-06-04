@@ -104,3 +104,7 @@ document.addEventListener('click', e => {
         document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
     }
 });
+
+function confirmDelete(btn) {
+    return confirm('Supprimer le compte de ' + btn.dataset.username + ' ?');
+}
