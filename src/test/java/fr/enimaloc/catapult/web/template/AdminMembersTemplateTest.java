@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.security.CatapultOAuth2UserService;
+import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.web.AdminMembersController;
@@ -48,6 +49,7 @@ class AdminMembersTemplateTest {
     @MockitoBean StreamStateService streamStateService;
     @MockitoBean CatapultOAuth2UserService oAuth2UserService;
     @MockitoBean ExperimentService experimentService;
+    @MockitoBean AccountService accountService;
 
     private UsernamePasswordAuthenticationToken adminAuth;
 
