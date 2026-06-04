@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -25,10 +26,13 @@ public class RealSteamApiClient implements SteamApiClient {
     private static final String OWNED_GAMES_URL =
         "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/";
 
+    private static final int DEFAULT_RETRY_AFTER_SECONDS = 60;
+
     @Value("${steam.api-key:}")
     private String steamApiKey;
 
     private final RestClient restClient;
+    private final SteamRateLimiter rateLimiter;
 
     @Override
     public Optional<PlayerSummary> getPlayerSummary(String steamId, String personalToken) {
@@ -69,6 +73,11 @@ public class RealSteamApiClient implements SteamApiClient {
         String key = (personalToken != null && !personalToken.isBlank()) ? personalToken : steamApiKey;
         if (key.isBlank()) return false;
 
+        if (!rateLimiter.acquire()) {
+            log.warn("Steam rate limit reached, skipping game list visibility check for {}", steamId);
+            return false;
+        }
+
         String url = UriComponentsBuilder
             .fromUriString(OWNED_GAMES_URL)
             .queryParam("key", key)
@@ -84,6 +93,11 @@ public class RealSteamApiClient implements SteamApiClient {
 
             Map<String, Object> responseBody = (Map<String, Object>) response.get("response");
             return responseBody != null && responseBody.containsKey("game_count");
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            int retryAfter = parseRetryAfter(e);
+            rateLimiter.onRateLimitResponse(retryAfter);
+            log.warn("Steam API 429 for {}: retry after {}s", steamId, retryAfter);
+            return false;
         } catch (Exception e) {
             log.warn("Failed to check Steam game list visibility for {}: {}", steamId, e.getMessage());
             return false;
@@ -93,6 +107,11 @@ public class RealSteamApiClient implements SteamApiClient {
     @SuppressWarnings("unchecked")
     private Optional<Map<String, Object>> fetchPlayer(String steamId, String personalToken) {
         String token = (personalToken != null && !personalToken.isBlank()) ? personalToken : steamApiKey;
+
+        if (!rateLimiter.acquire()) {
+            log.warn("Steam rate limit reached, skipping player fetch for {}", steamId);
+            return Optional.empty();
+        }
 
         String url = UriComponentsBuilder
             .fromUriString(PLAYER_SUMMARIES_URL)
@@ -114,9 +133,24 @@ public class RealSteamApiClient implements SteamApiClient {
             if (players == null || players.isEmpty()) return Optional.empty();
 
             return Optional.of(players.getFirst());
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            int retryAfter = parseRetryAfter(e);
+            rateLimiter.onRateLimitResponse(retryAfter);
+            log.warn("Steam API 429 for {}: retry after {}s", steamId, retryAfter);
+            return Optional.empty();
         } catch (Exception e) {
             log.warn("Failed to fetch Steam player data for {}: {}", steamId, e.getMessage());
             return Optional.empty();
+        }
+    }
+
+    private int parseRetryAfter(HttpClientErrorException e) {
+        try {
+            var headers = e.getResponseHeaders();
+            String header = headers != null ? headers.getFirst("Retry-After") : null;
+            return header != null ? Integer.parseInt(header) : DEFAULT_RETRY_AFTER_SECONDS;
+        } catch (NumberFormatException ex) {
+            return DEFAULT_RETRY_AFTER_SECONDS;
         }
     }
 }
