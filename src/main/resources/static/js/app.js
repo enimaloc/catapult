@@ -91,3 +91,16 @@ window.addEventListener('resize', function () {
         if (nav) nav.classList.remove('open');
     }
 });
+
+function toggleDropdown(id) {
+    document.querySelectorAll('.dropdown-menu').forEach(m => {
+        if (m.id !== id) m.classList.remove('open');
+    });
+    document.getElementById(id).classList.toggle('open');
+}
+
+document.addEventListener('click', e => {
+    if (!e.target.closest('.dropdown')) {
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    }
+});
