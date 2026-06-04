@@ -11,7 +11,6 @@ import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.security.TokenEncryptionService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -21,16 +20,12 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.http.MediaType;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
-import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,12 +45,11 @@ public class TwitchEventSubService implements EventSubService {
     private static final String WS_URL = "wss://eventsub.wss.twitch.tv/ws";
     private static final String EVENTSUB_API = "https://api.twitch.tv/helix/eventsub/subscriptions";
     private static final String HELIX_CHANNELS_API = "https://api.twitch.tv/helix/channels";
-    private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
     private static final long MAX_RETRY_SECONDS = 60L;
 
     private final OAuthTokenRepository oAuthTokenRepository;
     private final UserAccountRepository userAccountRepository;
-    private final TokenEncryptionService tokenEncryptionService;
+    private final TwitchTokenService twitchTokenService;
     private final StreamStateService streamStateService;
     private final ApplicationEventPublisher eventPublisher;
     private final RestClient restClient;
@@ -64,12 +58,9 @@ public class TwitchEventSubService implements EventSubService {
     @Value("${twitch.client-id:}")
     private String twitchClientId;
 
-    @Value("${twitch.client-secret:}")
-    private String twitchClientSecret;
-
     private final Map<UUID, WebSocket> connections = new ConcurrentHashMap<>();
     private final Map<UUID, ChannelState> channelStates = new ConcurrentHashMap<>();
-    private final Set<UUID> tokenRefreshWarnedUsers = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> channelStateWarnedUsers = ConcurrentHashMap.newKeySet();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     private record ChannelState(String categoryId, String categoryName, Set<String> cclIds) {}
@@ -106,6 +97,7 @@ public class TwitchEventSubService implements EventSubService {
             ws.sendClose(WebSocket.NORMAL_CLOSURE, "bot disabled");
         }
         channelStates.remove(user.getId());
+        channelStateWarnedUsers.remove(user.getId());
         streamStateService.clear(user);
     }
 
@@ -170,7 +162,7 @@ public class TwitchEventSubService implements EventSubService {
     }
 
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
-        String accessToken = resolveAccessToken(token, user);
+        String accessToken = twitchTokenService.resolveAccessToken(token, user);
         var subscriptions = List.of(
             Map.entry("stream.online", "1"),
             Map.entry("stream.offline", "1"),
@@ -184,21 +176,17 @@ public class TwitchEventSubService implements EventSubService {
                 log.debug("Subscribed to {} for user {}", eventType, user.getId());
             } catch (HttpClientErrorException.Unauthorized e) {
                 log.debug("Token expired for user {}, refreshing", user.getId());
-                String refreshed = refreshAccessToken(token, user);
+                String refreshed = twitchTokenService.refreshAccessToken(token, user);
                 if (refreshed != null) {
+                    accessToken = refreshed;
                     try {
                         postSubscription(refreshed, eventType, version, user.getTwitchId(), sessionId);
                         log.debug("Subscribed to {} for user {} after token refresh", eventType, user.getId());
-                        accessToken = refreshed;
                     } catch (Exception retryEx) {
-                        if (tokenRefreshWarnedUsers.add(user.getId())) {
-                            log.warn("Failed to subscribe to {} for user {} after refresh: {}", eventType, user.getId(), retryEx.getMessage());
-                        }
+                        log.warn("Failed to subscribe to {} for user {} after refresh: {}", eventType, user.getId(), retryEx.getMessage());
                     }
                 } else {
-                    if (tokenRefreshWarnedUsers.add(user.getId())) {
-                        log.warn("Failed to subscribe to {} for user {}: token refresh failed", eventType, user.getId());
-                    }
+                    log.warn("Failed to subscribe to {} for user {}: token refresh failed", eventType, user.getId());
                 }
             } catch (Exception e) {
                 log.warn("Failed to subscribe to {} for user {}: {}", eventType, user.getId(), e.getMessage());
@@ -244,60 +232,12 @@ public class TwitchEventSubService implements EventSubService {
                 }
             }
             channelStates.put(user.getId(), new ChannelState(categoryId, categoryName, cclIds));
+            channelStateWarnedUsers.remove(user.getId());
             log.debug("Initialized channel state for user {}: category={}, ccls={}", user.getId(), categoryId, cclIds);
         } catch (Exception e) {
-            log.warn("Failed to initialize channel state for user {}: {}", user.getId(), e.getMessage());
-        }
-    }
-
-    private String resolveAccessToken(OAuthToken token, UserAccount user) {
-        if (token.getExpiresAt() != null && Instant.now().isAfter(token.getExpiresAt())) {
-            log.debug("Token for user {} is expired, proactively refreshing", user.getId());
-            String refreshed = refreshAccessToken(token, user);
-            if (refreshed != null) return refreshed;
-        }
-        return tokenEncryptionService.decrypt(token.getAccessToken());
-    }
-
-    @SuppressWarnings("unchecked")
-    private String refreshAccessToken(OAuthToken token, UserAccount user) {
-        if (token.getRefreshToken() == null) {
-            if (tokenRefreshWarnedUsers.add(user.getId())) {
-                log.warn("No refresh token stored for user {} — cannot refresh", user.getId());
+            if (channelStateWarnedUsers.add(user.getId())) {
+                log.warn("Failed to initialize channel state for user {}: {}", user.getId(), e.getMessage());
             }
-            return null;
-        }
-        String refreshToken = tokenEncryptionService.decrypt(token.getRefreshToken());
-        try {
-            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-            form.add("grant_type", "refresh_token");
-            form.add("refresh_token", refreshToken);
-            form.add("client_id", twitchClientId);
-            form.add("client_secret", twitchClientSecret);
-            Map<String, Object> response = restClient.post()
-                .uri(TWITCH_TOKEN_URL)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(form)
-                .retrieve()
-                .body(Map.class);
-            if (response == null) return null;
-
-            String newAccess = (String) response.get("access_token");
-            String newRefresh = (String) response.get("refresh_token");
-            Number expiresIn = (Number) response.get("expires_in");
-
-            token.setAccessToken(tokenEncryptionService.encrypt(newAccess));
-            if (newRefresh != null) token.setRefreshToken(tokenEncryptionService.encrypt(newRefresh));
-            if (expiresIn != null) token.setExpiresAt(Instant.now().plusSeconds(expiresIn.longValue()));
-            oAuthTokenRepository.save(token);
-            tokenRefreshWarnedUsers.remove(user.getId());
-            log.debug("Refreshed Twitch token for user {}", user.getId());
-            return newAccess;
-        } catch (Exception e) {
-            if (tokenRefreshWarnedUsers.add(user.getId())) {
-                log.warn("Failed to refresh Twitch token for user {}: {}", user.getId(), e.getMessage());
-            }
-            return null;
         }
     }
 

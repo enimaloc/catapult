@@ -5,12 +5,12 @@ import fr.enimaloc.catapult.domain.*;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
-import fr.enimaloc.catapult.security.TokenEncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -29,9 +29,9 @@ public class TwitchServiceImpl implements TwitchService {
     private final OAuthTokenRepository oAuthTokenRepository;
     private final UserAccountRepository userAccountRepository;
     private final UserSettingsRepository userSettingsRepository;
-    private final TokenEncryptionService tokenEncryptionService;
     private final RestClient restClient;
     private final TwitchCategoryService twitchCategoryService;
+    private final TwitchTokenService twitchTokenService;
 
     public static final String CLIENT_ID = "Client-Id";
     public static final String AUTHORIZATION = "Authorization";
@@ -55,8 +55,19 @@ public class TwitchServiceImpl implements TwitchService {
             );
     }
 
+    private void patchChannel(UserAccount user, String accessToken, Map<String, Object> body) {
+        restClient.patch()
+            .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
+            .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+            .header(CLIENT_ID, twitchClientId)
+            .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+            .body(body)
+            .retrieve()
+            .toBodilessEntity();
+    }
+
     private void doUpdateChannel(UserAccount user, GameBinding binding, OAuthToken token) {
-        String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+        String accessToken = twitchTokenService.resolveAccessToken(token, user);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("game_id", binding.getTwitchGameId());
@@ -64,29 +75,32 @@ public class TwitchServiceImpl implements TwitchService {
         boolean globalCclEnabled = userSettingsRepository.findById(user.getId())
             .map(UserSettings::isCclFeatureEnabled)
             .orElse(true);
-
         if (globalCclEnabled && binding.isCclEnabled()) {
             body.put("content_classification_labels", buildCclPayload(binding.getCcls()));
         }
 
         try {
-            restClient.patch()
-                .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
-                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                    .header(CLIENT_ID, twitchClientId)
-                .header("Content-Type", "application/json")
-                .body(body)
-                .retrieve()
-                .toBodilessEntity();
-
+            patchChannel(user, accessToken, body);
             log.info("Twitch channel updated for user {} — game_id={}, ccls={}",
                 user.getId(), binding.getTwitchGameId(), binding.getCcls());
-
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                log.warn("Twitch token invalid for user {} — pausing bot", user.getId());
-                user.setBotEnabled(false);
-                userAccountRepository.save(user);
+                String refreshed = twitchTokenService.refreshAccessToken(token, user);
+                if (refreshed == null) {
+                    log.warn("Twitch token invalid for user {} — pausing bot", user.getId());
+                    user.setBotEnabled(false);
+                    userAccountRepository.save(user);
+                    return;
+                }
+                try {
+                    patchChannel(user, refreshed, body);
+                    log.info("Twitch channel updated for user {} after token refresh — game_id={}",
+                        user.getId(), binding.getTwitchGameId());
+                } catch (Exception retryEx) {
+                    log.warn("Twitch channel update failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
+                    user.setBotEnabled(false);
+                    userAccountRepository.save(user);
+                }
             } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 log.warn("Twitch rate limit hit for user {} — will retry next cycle", user.getId());
             } else {
@@ -101,7 +115,7 @@ public class TwitchServiceImpl implements TwitchService {
     @SuppressWarnings("unchecked")
     public Optional<String> findCategoryIdByName(UserAccount user, String gameName) {
         String accessToken = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .map(t -> tokenEncryptionService.decrypt(t.getAccessToken()))
+            .map(t -> twitchTokenService.resolveAccessToken(t, user))
             .orElse("");
 
         if (!accessToken.isBlank() && !twitchClientId.isBlank()) {
@@ -181,28 +195,34 @@ public class TwitchServiceImpl implements TwitchService {
     }
 
     private void doResetToDefault(UserAccount user, UserSettings settings, OAuthToken token) {
-        String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+        String accessToken = twitchTokenService.resolveAccessToken(token, user);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("game_id", settings.getNoGameTwitchGameId());
         if (settings.isCclFeatureEnabled() && !settings.getNoGameCcls().isEmpty()) {
             body.put("content_classification_labels", buildCclPayload(settings.getNoGameCcls()));
         }
         try {
-            restClient.patch()
-                .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
-                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                    .header(CLIENT_ID, twitchClientId)
-                .header("Content-Type", "application/json")
-                .body(body)
-                .retrieve()
-                .toBodilessEntity();
+            patchChannel(user, accessToken, body);
             log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}",
                 user.getId(), settings.getNoGameTwitchGameId(), settings.getNoGameCcls());
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                log.warn("Twitch token invalid for user {} during reset — pausing bot", user.getId());
-                user.setBotEnabled(false);
-                userAccountRepository.save(user);
+                String refreshed = twitchTokenService.refreshAccessToken(token, user);
+                if (refreshed == null) {
+                    log.warn("Twitch token invalid for user {} during reset — pausing bot", user.getId());
+                    user.setBotEnabled(false);
+                    userAccountRepository.save(user);
+                    return;
+                }
+                try {
+                    patchChannel(user, refreshed, body);
+                    log.info("Twitch channel reset to default for user {} after token refresh — game_id={}",
+                        user.getId(), settings.getNoGameTwitchGameId());
+                } catch (Exception retryEx) {
+                    log.warn("Twitch channel reset failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
+                    user.setBotEnabled(false);
+                    userAccountRepository.save(user);
+                }
             } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 log.warn("Twitch rate limit hit for user {} during reset — skipping", user.getId());
             } else {
@@ -219,7 +239,7 @@ public class TwitchServiceImpl implements TwitchService {
         return oAuthTokenRepository.findByUserAndProvider(viewer, OAuthToken.Provider.TWITCH)
             .map(token -> {
                 try {
-                    String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+                    String accessToken = twitchTokenService.resolveAccessToken(token, viewer);
                     ModeratedChannelsResponse response = restClient.get()
                         .uri(TWITCH_API_URL + "/moderation/channels?user_id=" + viewer.getTwitchId())
                             .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
