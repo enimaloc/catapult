@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.domain.*;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
-import fr.enimaloc.catapult.security.TokenEncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,7 +29,6 @@ public class TwitchServiceImpl implements TwitchService {
     private final OAuthTokenRepository oAuthTokenRepository;
     private final UserAccountRepository userAccountRepository;
     private final UserSettingsRepository userSettingsRepository;
-    private final TokenEncryptionService tokenEncryptionService;
     private final RestClient restClient;
     private final TwitchCategoryService twitchCategoryService;
     private final TwitchTokenService twitchTokenService;
@@ -117,7 +115,7 @@ public class TwitchServiceImpl implements TwitchService {
     @SuppressWarnings("unchecked")
     public Optional<String> findCategoryIdByName(UserAccount user, String gameName) {
         String accessToken = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .map(t -> tokenEncryptionService.decrypt(t.getAccessToken()))
+            .map(t -> twitchTokenService.resolveAccessToken(t, user))
             .orElse("");
 
         if (!accessToken.isBlank() && !twitchClientId.isBlank()) {
@@ -241,7 +239,7 @@ public class TwitchServiceImpl implements TwitchService {
         return oAuthTokenRepository.findByUserAndProvider(viewer, OAuthToken.Provider.TWITCH)
             .map(token -> {
                 try {
-                    String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+                    String accessToken = twitchTokenService.resolveAccessToken(token, viewer);
                     ModeratedChannelsResponse response = restClient.get()
                         .uri(TWITCH_API_URL + "/moderation/channels?user_id=" + viewer.getTwitchId())
                             .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
