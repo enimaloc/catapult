@@ -148,5 +148,6 @@ class AdminMembersControllerTest {
             .isInstanceOf(ResponseStatusException.class)
             .extracting(e -> ((ResponseStatusException) e).getStatusCode())
             .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(accountService, never()).deleteAccountImmediately(any());
     }
 }
