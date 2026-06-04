@@ -7,7 +7,6 @@ import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.security.TokenEncryptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,7 +37,7 @@ class TwitchEventSubServiceTest {
 
     @Mock private OAuthTokenRepository oAuthTokenRepository;
     @Mock private UserAccountRepository userAccountRepository;
-    @Mock private TokenEncryptionService tokenEncryptionService;
+    @Mock private TwitchTokenService twitchTokenService;
     @Mock private StreamStateService streamStateService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RestClient restClient;
@@ -61,7 +60,7 @@ class TwitchEventSubServiceTest {
         token = new OAuthToken();
         token.setAccessToken("encrypted");
 
-        when(tokenEncryptionService.decrypt("encrypted")).thenReturn("decrypted-token");
+        when(twitchTokenService.resolveAccessToken(eq(token), eq(user))).thenReturn("decrypted-token");
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
             .thenReturn(Optional.of(token));
 
