@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
@@ -46,8 +47,13 @@ class TwitchEventSubServiceTest {
     @Mock private RestClient.RequestBodySpec postBodySpec;
     @Mock private RestClient.ResponseSpec postResponseSpec;
 
+    @Mock private RestClient.RequestHeadersUriSpec getUriSpec;
+    @Mock private RestClient.RequestHeadersSpec getHeaderSpec;
+    @Mock private RestClient.ResponseSpec getResponseSpec;
+
     @InjectMocks private TwitchEventSubService service;
 
+    private final ObjectMapper mapper = new ObjectMapper();
     private UserAccount user;
     private OAuthToken token;
 
@@ -125,6 +131,72 @@ class TwitchEventSubServiceTest {
 
         // One POST each for stream.online, stream.offline, channel.update
         verify(restClient, times(3)).post();
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_whenStreamIsLive_setsLiveTrue() {
+        when(restClient.get()).thenReturn(getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.header(anyString(), anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        // first call is initChannelState (empty object, returns early), second is initStreamState
+        when(getResponseSpec.body(String.class))
+            .thenReturn("{}")
+            .thenReturn("{\"data\":[{\"id\":\"42\",\"user_id\":\"broadcaster-123\"}]}");
+
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message);
+
+        verify(streamStateService).setLive(user, true);
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_whenStreamIsOffline_setsLiveFalse() {
+        when(restClient.get()).thenReturn(getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.header(anyString(), anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.body(String.class))
+            .thenReturn("{}")
+            .thenReturn("{\"data\":[]}");
+
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message);
+
+        verify(streamStateService).setLive(user, false);
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_whenStreamsApiFails_doesNotThrow() {
+        when(restClient.get()).thenReturn(getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.header(anyString(), anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.body(String.class))
+            .thenReturn("{}")
+            .thenThrow(new RuntimeException("network error"));
+
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        assertThatNoException().isThrownBy(() -> service.handleMessage(user, token, message));
+        verify(streamStateService, never()).setLive(any(), anyBoolean());
     }
 
     @Test
