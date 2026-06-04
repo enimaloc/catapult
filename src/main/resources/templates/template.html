@@ -126,13 +126,19 @@
 </div>
 
 <script>
+    let _openPanels = 0;
+    function _lockScroll()   { if (++_openPanels === 1) document.body.style.overflow = 'hidden'; }
+    function _unlockScroll() { if (--_openPanels <= 0)  { _openPanels = 0; document.body.style.overflow = ''; } }
+
     function openHelpPanel() {
         document.getElementById('help-panel').classList.add('open');
         document.getElementById('help-overlay').classList.add('open');
+        _lockScroll();
     }
     function closeHelpPanel() {
         document.getElementById('help-panel').classList.remove('open');
         document.getElementById('help-overlay').classList.remove('open');
+        _unlockScroll();
     }
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeHelpPanel();
@@ -193,10 +199,12 @@
     function openChangelogPanel() {
         document.getElementById('changelog-panel').classList.add('open');
         document.getElementById('changelog-overlay').classList.add('open');
+        _lockScroll();
     }
     function closeChangelogPanel() {
         document.getElementById('changelog-panel').classList.remove('open');
         document.getElementById('changelog-overlay').classList.remove('open');
+        _unlockScroll();
     }
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') { closeHelpPanel(); closeChangelogPanel(); }
