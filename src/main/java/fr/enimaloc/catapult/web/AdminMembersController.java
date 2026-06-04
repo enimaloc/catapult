@@ -21,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -51,7 +52,7 @@ public class AdminMembersController {
                                 @AuthenticationPrincipal CatapultOAuth2User principal) {
         UserAccount user = userAccountRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (user.getTwitchId().equals(principal.getUserAccount().getTwitchId())) {
+        if (Objects.equals(user.getTwitchId(), principal.getUserAccount().getTwitchId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         accountService.deleteAccountImmediately(user);
