@@ -60,6 +60,7 @@ public class TwitchEventSubService implements EventSubService {
 
     private final Map<UUID, WebSocket> connections = new ConcurrentHashMap<>();
     private final Map<UUID, ChannelState> channelStates = new ConcurrentHashMap<>();
+    private final Set<UUID> channelStateWarnedUsers = ConcurrentHashMap.newKeySet();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     private record ChannelState(String categoryId, String categoryName, Set<String> cclIds) {}
@@ -96,6 +97,7 @@ public class TwitchEventSubService implements EventSubService {
             ws.sendClose(WebSocket.NORMAL_CLOSURE, "bot disabled");
         }
         channelStates.remove(user.getId());
+        channelStateWarnedUsers.remove(user.getId());
         streamStateService.clear(user);
     }
 
@@ -230,9 +232,12 @@ public class TwitchEventSubService implements EventSubService {
                 }
             }
             channelStates.put(user.getId(), new ChannelState(categoryId, categoryName, cclIds));
+            channelStateWarnedUsers.remove(user.getId());
             log.debug("Initialized channel state for user {}: category={}, ccls={}", user.getId(), categoryId, cclIds);
         } catch (Exception e) {
-            log.warn("Failed to initialize channel state for user {}: {}", user.getId(), e.getMessage());
+            if (channelStateWarnedUsers.add(user.getId())) {
+                log.warn("Failed to initialize channel state for user {}: {}", user.getId(), e.getMessage());
+            }
         }
     }
 
