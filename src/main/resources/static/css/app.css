@@ -1021,6 +1021,11 @@ details summary { cursor: pointer; font-weight: 600; }
 /* ============================================================
    Theme switcher (floating, fixed bottom-right)
    ============================================================ */
+.theme-switcher,
+#feedback-widget {
+    z-index: 200;
+}
+
 .theme-switcher {
     position: fixed;
     bottom: 16px;
@@ -1031,7 +1036,6 @@ details summary { cursor: pointer; font-weight: 600; }
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 4px;
-    z-index: 200;
 }
 
 .theme-btn {
