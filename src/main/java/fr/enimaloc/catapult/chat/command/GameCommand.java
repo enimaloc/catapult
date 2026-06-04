@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.GameStateService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.List;
  */
 @Component
 @RequiredArgsConstructor
+@ConditionalOnExpression("false")
 public class GameCommand implements ChatCommand {
 
     private final GameStateService gameStateService;
