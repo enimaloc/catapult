@@ -44,6 +44,7 @@ class TwitchServiceTest {
     @Mock private TokenEncryptionService tokenEncryptionService;
     @Mock private RestClient restClient;
     @Mock private TwitchCategoryService twitchCategoryService;
+    @Mock private TwitchTokenService twitchTokenService;
 
     @Mock private RestClient.RequestBodyUriSpec patchSpec;
     @Mock private RestClient.RequestBodySpec bodySpec;
@@ -68,6 +69,8 @@ class TwitchServiceTest {
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
             .thenReturn(Optional.of(token));
         when(tokenEncryptionService.decrypt("encrypted-token")).thenReturn("plain-token");
+        when(twitchTokenService.resolveAccessToken(any(OAuthToken.class), eq(user))).thenReturn("plain-token");
+        when(twitchTokenService.refreshAccessToken(any(OAuthToken.class), eq(user))).thenReturn(null);
 
         UserSettings settings = new UserSettings();
         settings.setCclFeatureEnabled(true);
@@ -409,5 +412,61 @@ class TwitchServiceTest {
         List<String> result = twitchService.getModeratedChannelIds(user);
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void updateChannel_on401_refreshSucceeds_retriesAndUpdatesChannel() {
+        when(twitchTokenService.refreshAccessToken(any(OAuthToken.class), eq(user))).thenReturn("refreshed-token");
+        // First call (plain-token) → 401, second call (refreshed-token) → success
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED))
+            .doReturn(null)
+            .when(responseSpec).toBodilessEntity();
+
+        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+
+        assertThat(user.isBotEnabled()).isTrue();
+        verify(userAccountRepository, never()).save(user);
+    }
+
+    @Test
+    void updateChannel_on401_refreshSucceeds_retryAlso401_disablesBot() {
+        when(twitchTokenService.refreshAccessToken(any(OAuthToken.class), eq(user))).thenReturn("refreshed-token");
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED))
+            .when(responseSpec).toBodilessEntity();
+
+        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+
+        assertThat(user.isBotEnabled()).isFalse();
+        verify(userAccountRepository).save(user);
+    }
+
+    @Test
+    void resetToDefault_on401_refreshFails_disablesBot() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(twitchTokenService.refreshAccessToken(any(OAuthToken.class), eq(user))).thenReturn(null);
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED)).when(responseSpec).toBodilessEntity();
+
+        twitchService.resetToDefault(user);
+
+        assertThat(user.isBotEnabled()).isFalse();
+        verify(userAccountRepository).save(user);
+    }
+
+    @Test
+    void resetToDefault_on401_refreshSucceeds_retriesAndResets() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(twitchTokenService.refreshAccessToken(any(OAuthToken.class), eq(user))).thenReturn("refreshed-token");
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED))
+            .doReturn(null)
+            .when(responseSpec).toBodilessEntity();
+
+        twitchService.resetToDefault(user);
+
+        assertThat(user.isBotEnabled()).isTrue();
+        verify(userAccountRepository, never()).save(user);
     }
 }
