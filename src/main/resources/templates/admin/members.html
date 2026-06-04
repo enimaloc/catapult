@@ -110,11 +110,26 @@
                             <span th:if="${member.steamId == null}">—</span>
                         </td>
                         <td>
-                            <form th:action="@{/admin/impersonate}" method="post"> <!-- nosemgrep -->
-                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                <input type="hidden" name="username" th:value="${member.twitchUsername}"/>
-                                <button type="submit" class="btn btn-sm" th:disabled="${member.twitchId == currentUserTwitchId}">Impersonate</button>
-                            </form>
+                            <div class="dropdown">
+                                <button class="btn btn-sm" type="button"
+                                        th:onclick="|toggleDropdown('menu-' + ${member.id})|">⋮</button>
+                                <div class="dropdown-menu" th:id="'menu-' + ${member.id}">
+                                    <form th:action="@{/admin/impersonate}" method="post"> <!-- nosemgrep -->
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <input type="hidden" name="username" th:value="${member.twitchUsername}"/>
+                                        <button type="submit" class="dropdown-item"
+                                                th:disabled="${member.twitchId == currentUserTwitchId}"
+                                                th:text="#{admin.members.actions.impersonate}">Impersonner</button>
+                                    </form>
+                                    <hr class="dropdown-divider"/>
+                                    <form th:action="@{/admin/members/{id}/delete(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="dropdown-item dropdown-item--danger"
+                                                th:disabled="${member.twitchId == currentUserTwitchId}"
+                                                th:text="#{admin.members.actions.delete}">Supprimer</button>
+                                    </form>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 </tbody>

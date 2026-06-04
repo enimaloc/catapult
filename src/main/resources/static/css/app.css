@@ -1512,3 +1512,51 @@ details summary { cursor: pointer; font-weight: 600; }
         max-width: calc(100vw - 32px);
     }
 }
+
+/* ============================================================
+   Dropdown menu (actions ⋮)
+   ============================================================ */
+.dropdown { position: relative; display: inline-block; }
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    min-width: 140px;
+    z-index: 50;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .4);
+    overflow: hidden;
+    margin-top: 2px;
+}
+
+.dropdown-menu.open { display: block; }
+
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 8px 14px;
+    background: none;
+    border: none;
+    text-align: left;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text);
+    cursor: pointer;
+    transition: background .1s;
+}
+
+.dropdown-item:hover:not(:disabled) { background: var(--border); }
+.dropdown-item:disabled { opacity: .45; cursor: not-allowed; }
+.dropdown-item--danger { color: var(--danger-text); }
+
+.dropdown-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 4px 0;
+}
+
+[data-theme="old-steam"] .dropdown-menu { border-radius: 0; }
