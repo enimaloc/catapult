@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.web;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
+import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,8 +11,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -19,6 +22,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,11 +34,12 @@ class AdminMembersControllerTest {
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private StreamStateService streamStateService;
     @Mock private Environment environment;
+    @Mock private AccountService accountService;
     private AdminMembersController controller;
 
     @BeforeEach
     void setup() {
-        controller = new AdminMembersController(userAccountRepository, streamStateService, environment, Optional.empty());
+        controller = new AdminMembersController(userAccountRepository, streamStateService, environment, Optional.empty(), accountService);
     }
 
     private CatapultOAuth2User adminPrincipal(String twitchId) {
@@ -96,5 +104,49 @@ class AdminMembersControllerTest {
         controller.page(model, adminPrincipal("myTwitchId"));
 
         assertThat(model.getAttribute("currentUserTwitchId")).isEqualTo("myTwitchId");
+    }
+
+    @Test
+    void deleteAccount_callsServiceAndRedirects() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setTwitchId("target123");
+        target.setTwitchUsername("target");
+        target.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        String view = controller.deleteAccount(target.getId(), adminPrincipal("adminId"));
+
+        verify(accountService).deleteAccountImmediately(target);
+        assertThat(view).isEqualTo("redirect:/admin/members");
+    }
+
+    @Test
+    void deleteAccount_selfDeletion_throws403() {
+        UserAccount self = new UserAccount();
+        self.setId(UUID.randomUUID());
+        self.setTwitchId("adminId");
+        self.setTwitchUsername("admin");
+        self.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(self.getId())).thenReturn(Optional.of(self));
+
+        assertThatThrownBy(() -> controller.deleteAccount(self.getId(), adminPrincipal("adminId")))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.FORBIDDEN);
+        verify(accountService, never()).deleteAccountImmediately(any());
+    }
+
+    @Test
+    void deleteAccount_unknownId_throws404() {
+        UUID unknownId = UUID.randomUUID();
+        when(userAccountRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.deleteAccount(unknownId, adminPrincipal("adminId")))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
     }
 }

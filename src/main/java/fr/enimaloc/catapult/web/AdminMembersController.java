@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.getter.MockSteamApiClient;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
+import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.env.Environment;
@@ -34,6 +35,7 @@ public class AdminMembersController {
     private final StreamStateService streamStateService;
     private final Environment environment;
     private final Optional<MockSteamApiClient> mockSteamApiClient;
+    private final AccountService accountService;
 
     @PostMapping("/{id}/bot/toggle")
     public String toggleBot(@PathVariable UUID id) {
@@ -41,6 +43,18 @@ public class AdminMembersController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         user.setBotEnabled(!user.isBotEnabled());
         userAccountRepository.save(user);
+        return "redirect:/admin/members";
+    }
+
+    @PostMapping("/{id}/delete")
+    public String deleteAccount(@PathVariable UUID id,
+                                @AuthenticationPrincipal CatapultOAuth2User principal) {
+        UserAccount user = userAccountRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (user.getTwitchId().equals(principal.getUserAccount().getTwitchId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        accountService.deleteAccountImmediately(user);
         return "redirect:/admin/members";
     }
 
