@@ -71,6 +71,7 @@ public class TwitchTokenService {
             if (response == null) return null;
 
             String newAccess = (String) response.get("access_token");
+            if (newAccess == null) return null;
             String newRefresh = (String) response.get("refresh_token");
             Number expiresIn = (Number) response.get("expires_in");
 
