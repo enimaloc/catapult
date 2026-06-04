@@ -47,6 +47,11 @@ public class AccountService {
         log.info("Account {} deletion cancelled", account.getId());
     }
 
+    @Transactional
+    public void deleteAccountImmediately(UserAccount account) {
+        deleteAccountPermanently(account);
+    }
+
     @Scheduled(cron = "0 0 2 * * *")
     @Transactional
     public void purgeExpiredAccounts() {
