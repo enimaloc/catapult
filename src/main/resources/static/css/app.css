@@ -358,7 +358,9 @@ a:hover { text-decoration: underline; }
 @media (max-width: 1300px) {
     .page-layout {
         grid-template-columns: 1fr;
+        justify-content: start;
     }
+    .page-layout > * { min-width: 0; }
     .page-sidebar--left  { order: 2; }
     .page-sidebar--right { order: 3; }
 }
@@ -430,7 +432,7 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, .45);
-    z-index: 150;
+    z-index: 300;
     display: none;
 }
 .help-overlay.open { display: block; }
@@ -444,7 +446,7 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
     height: 100%;
     background: var(--bg-surface);
     border-left: 1px solid var(--border);
-    z-index: 200;
+    z-index: 400;
     display: flex;
     flex-direction: column;
     transform: translateX(100%);
@@ -1019,6 +1021,11 @@ details summary { cursor: pointer; font-weight: 600; }
 /* ============================================================
    Theme switcher (floating, fixed bottom-right)
    ============================================================ */
+.theme-switcher,
+#feedback-widget {
+    z-index: 200;
+}
+
 .theme-switcher {
     position: fixed;
     bottom: 16px;
@@ -1029,7 +1036,6 @@ details summary { cursor: pointer; font-weight: 600; }
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 4px;
-    z-index: 200;
 }
 
 .theme-btn {
