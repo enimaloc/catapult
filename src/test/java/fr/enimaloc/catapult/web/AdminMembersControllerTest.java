@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.AccountService;
+import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,11 +37,12 @@ class AdminMembersControllerTest {
     @Mock private StreamStateService streamStateService;
     @Mock private Environment environment;
     @Mock private AccountService accountService;
+    @Mock private AdminMigrationService adminMigrationService;
     private AdminMembersController controller;
 
     @BeforeEach
     void setup() {
-        controller = new AdminMembersController(userAccountRepository, streamStateService, environment, Optional.empty(), accountService);
+        controller = new AdminMembersController(userAccountRepository, streamStateService, environment, Optional.empty(), accountService, adminMigrationService);
     }
 
     private CatapultOAuth2User adminPrincipal(String twitchId) {
@@ -195,5 +197,91 @@ class AdminMembersControllerTest {
             .extracting(e -> ((ResponseStatusException) e).getStatusCode())
             .isEqualTo(HttpStatus.NOT_FOUND);
         verify(accountService, never()).disconnectProvider(any(), any());
+    }
+
+    @Test
+    void migrateData_callsServiceAndRedirects() {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UserAccount source = new UserAccount();
+        source.setId(sourceId);
+        source.setStatus(UserAccount.Status.ACTIVE);
+        UserAccount target = new UserAccount();
+        target.setId(targetId);
+        target.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(sourceId)).thenReturn(Optional.of(source));
+        when(userAccountRepository.findById(targetId)).thenReturn(Optional.of(target));
+
+        String view = controller.migrateData(sourceId, targetId, true, false, false);
+
+        verify(adminMigrationService).migrate(source, target,
+            new AdminMigrationService.MigrateOptions(true, false, false));
+        assertThat(view).isEqualTo("redirect:/admin/members");
+    }
+
+    @Test
+    void migrateData_sourceNotFound_throws404() {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        when(userAccountRepository.findById(sourceId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.migrateData(sourceId, targetId, true, false, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(adminMigrationService, never()).migrate(any(), any(), any());
+    }
+
+    @Test
+    void migrateData_targetNotFound_throws404() {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UserAccount source = new UserAccount();
+        source.setId(sourceId);
+        source.setStatus(UserAccount.Status.ACTIVE);
+        when(userAccountRepository.findById(sourceId)).thenReturn(Optional.of(source));
+        when(userAccountRepository.findById(targetId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.migrateData(sourceId, targetId, true, false, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(adminMigrationService, never()).migrate(any(), any(), any());
+    }
+
+    @Test
+    void migrateData_sameSourceAndTarget_throws400() {
+        UUID id = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(id);
+        user.setStatus(UserAccount.Status.ACTIVE);
+        when(userAccountRepository.findById(id)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> controller.migrateData(id, id, true, false, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(adminMigrationService, never()).migrate(any(), any(), any());
+    }
+
+    @Test
+    void migrateData_noOptionsSelected_throws400() {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UserAccount source = new UserAccount();
+        source.setId(sourceId);
+        source.setStatus(UserAccount.Status.ACTIVE);
+        UserAccount target = new UserAccount();
+        target.setId(targetId);
+        target.setStatus(UserAccount.Status.ACTIVE);
+        when(userAccountRepository.findById(sourceId)).thenReturn(Optional.of(source));
+        when(userAccountRepository.findById(targetId)).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> controller.migrateData(sourceId, targetId, false, false, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(adminMigrationService, never()).migrate(any(), any(), any());
     }
 }

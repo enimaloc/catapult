@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.getter.MockSteamApiClient;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.AccountService;
+import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
@@ -40,6 +42,7 @@ public class AdminMembersController {
     private final Environment environment;
     private final Optional<MockSteamApiClient> mockSteamApiClient;
     private final AccountService accountService;
+    private final AdminMigrationService adminMigrationService;
 
     @PostMapping("/{id}/bot/toggle")
     public String toggleBot(@PathVariable UUID id) {
@@ -73,6 +76,29 @@ public class AdminMembersController {
         }
         log.info("Admin unlinked Steam for account {} (twitchId={})", user.getId(), user.getTwitchId());
         accountService.disconnectProvider(user, OAuthToken.Provider.STEAM);
+        return "redirect:/admin/members";
+    }
+
+    @PostMapping("/{id}/migrate")
+    public String migrateData(@PathVariable UUID id,
+                              @RequestParam UUID targetId,
+                              @RequestParam(defaultValue = "false") boolean migrateSettings,
+                              @RequestParam(defaultValue = "false") boolean migrateGetters,
+                              @RequestParam(defaultValue = "false") boolean migrateBindings) {
+        UserAccount source = userAccountRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        UserAccount target = userAccountRepository.findById(targetId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (source.getId().equals(target.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        if (!migrateSettings && !migrateGetters && !migrateBindings) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        log.info("Admin migrated data from {} to {} (settings={} getters={} bindings={})",
+            source.getId(), target.getId(), migrateSettings, migrateGetters, migrateBindings);
+        adminMigrationService.migrate(source, target,
+            new AdminMigrationService.MigrateOptions(migrateSettings, migrateGetters, migrateBindings));
         return "redirect:/admin/members";
     }
 
