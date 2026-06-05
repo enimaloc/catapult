@@ -57,7 +57,7 @@ public class CatapultOAuth2User implements OAuth2User, UserDetails {
     @Override
     @SuppressWarnings("NullableProblems")
     public String getName() {
-        return userAccount.getTwitchId();
+        return userAccount.getTwitchId() != null ? userAccount.getTwitchId() : userAccount.getId().toString();
     }
 
     // --- UserDetails ---
@@ -70,7 +70,7 @@ public class CatapultOAuth2User implements OAuth2User, UserDetails {
     @Override
     @SuppressWarnings("NullableProblems")
     public String getUsername() {
-        return userAccount.getTwitchUsername();
+        return userAccount.getTwitchUsername() != null ? userAccount.getTwitchUsername() : (userAccount.getTwitchId() != null ? userAccount.getTwitchId() : userAccount.getId().toString());
     }
 
     @Override

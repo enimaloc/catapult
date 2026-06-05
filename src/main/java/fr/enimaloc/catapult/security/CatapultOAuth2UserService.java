@@ -31,6 +31,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -151,7 +152,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         boolean isNew = existing.isEmpty();
         UserAccount account = existing.orElseGet(() -> createNewAccount(twitchId, twitchUsername));
 
-        if (!account.getTwitchUsername().equals(twitchUsername)) {
+        if (!Objects.equals(account.getTwitchUsername(), twitchUsername)) {
             account.setTwitchUsername(twitchUsername);
         }
 
