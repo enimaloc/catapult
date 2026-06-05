@@ -107,4 +107,23 @@ class CatapultOAuth2UserServiceTest {
         assertThat(inactive.getStatus()).isEqualTo(UserAccount.Status.ACTIVE);
         assertThat(inactive.getTwitchUsername()).isEqualTo("new_name");
     }
+
+    @Test
+    void login_reactivatesPendingDeletionAccount() {
+        UserAccount pendingDeletion = new UserAccount();
+        pendingDeletion.setId(UUID.randomUUID());
+        pendingDeletion.setTwitchId("twitch-456");
+        pendingDeletion.setTwitchUsername("old_name");
+        pendingDeletion.setStatus(UserAccount.Status.PENDING_DELETION);
+        pendingDeletion.setDeletionRequestedAt(java.time.Instant.now());
+        when(userAccountRepository.findByTwitchId("twitch-456")).thenReturn(Optional.of(pendingDeletion));
+        when(userAccountRepository.save(any())).thenReturn(pendingDeletion);
+        when(oAuthTokenRepository.findByUserAndProvider(any(), any())).thenReturn(Optional.empty());
+        mockTwitchUserInfo("twitch-456", "new_name");
+
+        service.loadUser(buildRequest());
+
+        assertThat(pendingDeletion.getStatus()).isEqualTo(UserAccount.Status.ACTIVE);
+        assertThat(pendingDeletion.getDeletionRequestedAt()).isNull();
+    }
 }
