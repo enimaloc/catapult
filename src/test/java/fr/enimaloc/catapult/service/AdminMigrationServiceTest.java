@@ -74,7 +74,10 @@ class AdminMigrationServiceTest {
         UserSettings saved = captor.getValue();
         assertThat(saved.isCclFeatureEnabled()).isFalse();
         assertThat(saved.getNoGameTwitchGameId()).isEqualTo("game1");
+        assertThat(saved.getNoGameTwitchGameName()).isEqualTo("Game One");
         assertThat(saved.getNoGameCcls()).containsExactlyInAnyOrder("gore");
+        assertThat(saved.getIncompleteFallbackTwitchGameId()).isEqualTo("game2");
+        assertThat(saved.getIncompleteFallbackTwitchGameName()).isEqualTo("Game Two");
         assertThat(saved.getIncompleteFallbackCcls()).containsExactlyInAnyOrder("language");
         assertThat(saved.isApplyDefaultOnStreamStart()).isFalse();
         assertThat(saved.isApplyDefaultOnNoGame()).isFalse();
@@ -213,6 +216,7 @@ class AdminMigrationServiceTest {
         tgtGb.setUser(target);
         tgtGb.setSourceId("12345");
         tgtGb.setSourceType(GameBinding.SourceType.STEAM);
+        tgtGb.setSourceName("Old Source Name");
         tgtGb.setTwitchGameId("t1");
         tgtGb.setTwitchGameName("Old Name");
         tgtGb.setStatus(GameBinding.Status.AUTO);
@@ -233,5 +237,6 @@ class AdminMigrationServiceTest {
         assertThat(tgtGb.isIgnored()).isTrue();
         assertThat(tgtGb.isCclEnabled()).isFalse();
         assertThat(tgtGb.getCcls()).isEmpty();
+        assertThat(tgtGb.getSourceName()).isEqualTo("Half-Life 2");
     }
 }
