@@ -161,10 +161,13 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             account.setProfileImageUrl(profileImageUrl);
         }
 
-        if (account.getStatus() == UserAccount.Status.PENDING_DELETION
-                || account.getStatus() == UserAccount.Status.INACTIVE) {
+        if (account.getStatus() == UserAccount.Status.PENDING_DELETION) {
             account.setStatus(UserAccount.Status.ACTIVE);
             account.setDeletionRequestedAt(null);
+        } else if (account.getStatus() == UserAccount.Status.INACTIVE) {
+            // Scheduler-deactivated accounts still have twitchId set, so findByTwitchId found them.
+            // Admin-unlinked accounts have twitchId=null and cannot reach this branch.
+            account.setStatus(UserAccount.Status.ACTIVE);
         }
 
         userAccountRepository.save(account);
