@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
 import java.util.ArrayList;
@@ -31,6 +32,7 @@ public class TwitchAccountValidationService {
     private String twitchClientId;
 
     @Scheduled(cron = "0 0 3 * * *")
+    @Transactional
     public void validateAccounts() {
         List<UserAccount> accounts = userAccountRepository
             .findByStatusAndTwitchIdNotNull(UserAccount.Status.ACTIVE);
