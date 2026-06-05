@@ -72,11 +72,12 @@ public class TwitchServiceImpl implements TwitchService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("game_id", binding.getTwitchGameId());
 
-        boolean globalCclEnabled = userSettingsRepository.findById(user.getId())
-            .map(UserSettings::isCclFeatureEnabled)
-            .orElse(true);
+        UserSettings userSettings = userSettingsRepository.findById(user.getId()).orElse(null);
+        boolean globalCclEnabled = userSettings != null ? userSettings.isCclFeatureEnabled() : true;
         if (globalCclEnabled && binding.isCclEnabled()) {
-            body.put("content_classification_labels", buildCclPayload(binding.getCcls()));
+            // Only apply the blocklist to persisted bindings; synthetic fallback bindings (id == null) bypass it
+            Set<String> blocked = (userSettings != null && binding.getId() != null) ? userSettings.getBlockedCcls() : Set.of();
+            body.put("content_classification_labels", buildCclPayload(binding.getCcls(), blocked));
         }
 
         try {
@@ -173,9 +174,9 @@ public class TwitchServiceImpl implements TwitchService {
         "ViolentGraphic", "SexualThemes", "DrugsIntoxication", "Gambling", "ProfanityVulgarity"
     );
 
-    private List<Map<String, Object>> buildCclPayload(Set<String> cclIds) {
+    private List<Map<String, Object>> buildCclPayload(Set<String> cclIds, Set<String> blockedCcls) {
         return EDITABLE_CCL_IDS.stream()
-            .map(id -> Map.<String, Object>of("id", id, "is_enabled", cclIds.contains(id)))
+            .map(id -> Map.<String, Object>of("id", id, "is_enabled", cclIds.contains(id) && !blockedCcls.contains(id)))
             .toList();
     }
 
@@ -199,7 +200,7 @@ public class TwitchServiceImpl implements TwitchService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("game_id", settings.getNoGameTwitchGameId());
         if (settings.isCclFeatureEnabled() && !settings.getNoGameCcls().isEmpty()) {
-            body.put("content_classification_labels", buildCclPayload(settings.getNoGameCcls()));
+            body.put("content_classification_labels", buildCclPayload(settings.getNoGameCcls(), Set.of()));
         }
         try {
             patchChannel(user, accessToken, body);
