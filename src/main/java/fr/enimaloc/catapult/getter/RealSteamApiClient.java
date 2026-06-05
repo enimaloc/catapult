@@ -10,9 +10,12 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
@@ -31,8 +34,12 @@ public class RealSteamApiClient implements SteamApiClient {
     @Value("${steam.api-key:}")
     private String steamApiKey;
 
+    @Value("${steam.profile-cache.ttl:PT15M}")
+    private Duration profileCacheTtl;
+
     private final RestClient restClient;
     private final SteamRateLimiter rateLimiter;
+    private final Map<CacheKey, CachedProfileStatus> profileCache = new ConcurrentHashMap<>();
 
     @Override
     public Optional<PlayerSummary> getPlayerSummary(String steamId, String personalToken) {
@@ -46,18 +53,25 @@ public class RealSteamApiClient implements SteamApiClient {
 
     @Override
     public boolean isProfilePublic(String steamId) {
-        boolean visibilityPublic = fetchPlayer(steamId, null)
-            .map(player -> {
-                Object visibility = player.get("communityvisibilitystate");
-                return visibility != null && ((Number) visibility).intValue() == 3;
-            })
-            .orElse(false);
-        if (!visibilityPublic) return false;
-        return isGameListVisible(steamId, null);
+        return isProfilePublic(steamId, null);
     }
 
     @Override
     public boolean isProfilePublic(String steamId, String personalToken) {
+        String tokenKey = (personalToken != null && !personalToken.isBlank()) ? personalToken : "";
+        CacheKey key = new CacheKey(steamId, tokenKey);
+        CachedProfileStatus cached = profileCache.get(key);
+        if (cached != null && !cached.isExpired()) return cached.isPublic();
+
+        CachedProfileStatus fresh = profileCache.compute(key, (k, existing) -> {
+            if (existing != null && !existing.isExpired()) return existing;
+            boolean result = fetchIsProfilePublic(steamId, personalToken);
+            return new CachedProfileStatus(result, Instant.now().plus(profileCacheTtl));
+        });
+        return fresh.isPublic();
+    }
+
+    private boolean fetchIsProfilePublic(String steamId, String personalToken) {
         boolean visibilityPublic = fetchPlayer(steamId, personalToken)
             .map(player -> {
                 Object visibility = player.get("communityvisibilitystate");
@@ -152,5 +166,11 @@ public class RealSteamApiClient implements SteamApiClient {
         } catch (NumberFormatException ex) {
             return DEFAULT_RETRY_AFTER_SECONDS;
         }
+    }
+
+    private record CacheKey(String steamId, String tokenKey) {}
+
+    private record CachedProfileStatus(boolean isPublic, Instant expiresAt) {
+        boolean isExpired() { return Instant.now().isAfter(expiresAt); }
     }
 }
