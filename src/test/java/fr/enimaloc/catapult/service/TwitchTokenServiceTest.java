@@ -167,4 +167,13 @@ class TwitchTokenServiceTest {
         assertThat(result).isNull();
         verify(oAuthTokenRepository, never()).save(any());
     }
+
+    @Test
+    void getAppAccessToken_returnsToken() {
+        when(postResponseSpec.body(Map.class)).thenReturn(Map.of("access_token", "app-token-abc"));
+
+        String token = service.getAppAccessToken();
+
+        assertThat(token).isEqualTo("app-token-abc");
+    }
 }

@@ -89,4 +89,26 @@ public class TwitchTokenService {
             return null;
         }
     }
+
+    @SuppressWarnings("unchecked")
+    public String getAppAccessToken() {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "client_credentials");
+        form.add("client_id", twitchClientId);
+        form.add("client_secret", twitchClientSecret);
+        Map<String, Object> response = restClient.post()
+            .uri(TWITCH_TOKEN_URL)
+            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+            .body(form)
+            .retrieve()
+            .body(Map.class);
+        if (response == null) {
+            throw new IllegalStateException("Empty response from Twitch token endpoint");
+        }
+        String token = (String) response.get("access_token");
+        if (token == null) {
+            throw new IllegalStateException("No access_token in Twitch token response");
+        }
+        return token;
+    }
 }
