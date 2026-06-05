@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Controller
 @RequestMapping("/admin/members")
 @RequiredArgsConstructor
@@ -55,6 +57,8 @@ public class AdminMembersController {
         if (Objects.equals(user.getTwitchId(), principal.getUserAccount().getTwitchId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        log.info("Admin {} deleted account {} (twitchId={})",
+            principal.getUserAccount().getTwitchId(), user.getId(), user.getTwitchId());
         accountService.deleteAccountImmediately(user);
         return "redirect:/admin/members";
     }

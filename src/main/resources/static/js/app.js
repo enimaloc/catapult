@@ -106,5 +106,5 @@ document.addEventListener('click', e => {
 });
 
 function confirmDelete(btn) {
-    return confirm('Supprimer le compte de ' + btn.dataset.username + ' ?');
+    return confirm(btn.dataset.confirm);
 }

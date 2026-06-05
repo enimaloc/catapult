@@ -127,7 +127,7 @@
                                         <button type="submit" class="dropdown-item dropdown-item--danger"
                                                 th:disabled="${member.twitchId == currentUserTwitchId}"
                                                 th:text="#{admin.members.actions.delete}"
-                                                th:data-username="${member.twitchUsername}"
+                                                th:data-confirm="#{admin.members.actions.delete.confirm(${member.twitchUsername})}"
                                                 onclick="return confirmDelete(this)">Supprimer</button>
                                     </form>
                                 </div>
