@@ -90,6 +90,25 @@ class TwitchAccountValidationServiceTest {
     }
 
     @Test
+    void validate_nullApiResponse_skipsAndDoesNotMarkInactive() {
+        UserAccount u = userWith("555");
+        when(userAccountRepository.findByStatusAndTwitchIdNotNull(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of(u));
+        when(twitchTokenService.getAppAccessToken()).thenReturn("app-token");
+
+        when(restClient.get()).thenReturn(getSpec);
+        when(getSpec.uri(anyString())).thenReturn(headersSpec);
+        when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
+        when(headersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(Map.class)).thenReturn(null);
+
+        service.validateAccounts();
+
+        assertThat(u.getStatus()).isEqualTo(UserAccount.Status.ACTIVE);
+        verify(userAccountRepository, never()).saveAll(anyList());
+    }
+
+    @Test
     void validate_updatesUsernameAndAvatarWhenChanged() {
         UserAccount u = userWith("444");
         u.setTwitchUsername("old_name");

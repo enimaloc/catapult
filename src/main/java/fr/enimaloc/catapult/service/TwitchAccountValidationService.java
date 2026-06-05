@@ -69,6 +69,11 @@ public class TwitchAccountValidationService {
             return;
         }
 
+        if (response == null) {
+            log.warn("Empty response from Twitch users API for batch of {} accounts, skipping", batch.size());
+            return;
+        }
+
         List<Map<String, Object>> data = (List<Map<String, Object>>) response.getOrDefault("data", List.of());
         Set<String> validIds = data.stream()
             .map(u -> (String) u.get("id"))
