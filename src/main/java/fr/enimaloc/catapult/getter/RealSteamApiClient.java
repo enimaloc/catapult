@@ -12,10 +12,14 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -69,6 +73,64 @@ public class RealSteamApiClient implements SteamApiClient {
             return new CachedProfileStatus(result, Instant.now().plus(profileCacheTtl));
         });
         return fresh.isPublic();
+    }
+
+    @Override
+    public Map<String, Optional<PlayerSummary>> getPlayerSummaries(Collection<String> steamIds) {
+        Map<String, Optional<PlayerSummary>> result = new HashMap<>();
+        List<String> idList = new ArrayList<>(steamIds);
+        for (int i = 0; i < idList.size(); i += 100) {
+            result.putAll(fetchPlayerBatch(idList.subList(i, Math.min(i + 100, idList.size()))));
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Optional<PlayerSummary>> fetchPlayerBatch(List<String> steamIds) {
+        Map<String, Optional<PlayerSummary>> result = steamIds.stream()
+            .collect(Collectors.toMap(id -> id, id -> Optional.empty()));
+
+        if (steamApiKey.isBlank()) return result;
+
+        if (!rateLimiter.acquire()) {
+            log.warn("Steam rate limit reached, skipping batch of {} users", steamIds.size());
+            return result;
+        }
+
+        String url = UriComponentsBuilder
+            .fromUriString(PLAYER_SUMMARIES_URL)
+            .queryParam("key", steamApiKey)
+            .queryParam("steamids", String.join(",", steamIds))
+            .toUriString();
+
+        try {
+            Map<String, Object> response = restClient.get().uri(url).retrieve().body(Map.class);
+            if (response == null) return result;
+
+            Map<String, Object> body = (Map<String, Object>) response.get("response");
+            if (body == null) return result;
+
+            List<Map<String, Object>> players = (List<Map<String, Object>>) body.get("players");
+            if (players == null) return result;
+
+            for (Map<String, Object> player : players) {
+                String id = String.valueOf(player.get("steamid"));
+                Object gameId   = player.get("gameid");
+                Object gameName = player.get("gameextrainfo");
+                result.put(id,
+                    (gameId != null && gameName != null)
+                        ? Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName)))
+                        : Optional.empty());
+            }
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            int retryAfter = parseRetryAfter(e);
+            rateLimiter.onRateLimitResponse(retryAfter);
+            log.warn("Steam API 429 during batch fetch: retry after {}s", retryAfter);
+        } catch (Exception e) {
+            log.warn("Failed to batch-fetch Steam player summaries: {}", e.getMessage());
+        }
+
+        return result;
     }
 
     private boolean fetchIsProfilePublic(String steamId, String personalToken) {
