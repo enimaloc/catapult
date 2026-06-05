@@ -5,6 +5,7 @@
 <!--/*@thymesvar id="filterStatus" type="java.lang.String"*/-->
 <!--/*@thymesvar id="filterSource" type="java.lang.String"*/-->
 <!--/*@thymesvar id="availableCcls" type="java.util.List"*/-->
+<!--/*@thymesvar id="blockedCcls" type="java.util.Set"*/-->
 <div th:fragment="bindings" class="card"
      th:attr="hx-get=@{/channels/{u}/fragments/bindings(u=${channelUsername},page=${bindings.number},status=${filterStatus},source=${filterSource})}"
      hx-trigger="every 10s [!isEditing()]"
@@ -53,7 +54,11 @@
                         <span th:unless="${binding.twitchGameName}" class="text-muted">—</span>
                     </td>
                     <td>
-                        <span th:each="ccl : ${binding.ccls}" class="badge badge-ccl" th:text="${ccl}"></span>
+                        <span th:each="ccl : ${binding.ccls}"
+                              class="badge"
+                              th:classappend="${blockedCcls != null and blockedCcls.contains(ccl)} ? 'badge-warning' : 'badge-ccl'"
+                              th:title="${blockedCcls != null and blockedCcls.contains(ccl)} ? #{ccl_settings.blocked_tooltip} : ''"
+                              th:text="${ccl}"></span>
                     </td>
                     <td>
                         <span class="badge"
@@ -117,11 +122,16 @@
                                     <label th:text="#{bindings.edit.ccls}">CCLs</label>
                                     <div class="ccl-checkboxes">
                                         <div th:each="ccl : ${availableCcls}">
-                                            <label>
+                                            <label th:title="${blockedCcls != null and blockedCcls.contains(ccl.id)} ? #{ccl_settings.blocked_tooltip} : ''">
+                                                <!-- hidden input preserves blocked CCL value so it survives the form submit -->
+                                                <input th:if="${blockedCcls != null and blockedCcls.contains(ccl.id) and binding.ccls.contains(ccl.id)}"
+                                                       type="hidden" name="ccls" th:value="${ccl.id}">
                                                 <input type="checkbox" name="ccls"
                                                        th:value="${ccl.id}"
-                                                       th:checked="${binding.ccls.contains(ccl.id)}">
-                                                <span th:text="${ccl.name}"></span>
+                                                       th:checked="${binding.ccls.contains(ccl.id)}"
+                                                       th:disabled="${blockedCcls != null and blockedCcls.contains(ccl.id)}">
+                                                <span th:text="${ccl.name}"
+                                                      th:classappend="${blockedCcls != null and blockedCcls.contains(ccl.id)} ? 'text-muted' : ''"></span>
                                             </label>
                                         </div>
                                     </div>

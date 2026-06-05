@@ -50,6 +50,7 @@ public class ChannelController {
     public static final String ATTR_CHANNEL_USERNAME = "channelUsername";
     public static final String ATTR_IS_OWNER = "isOwner";
     public static final String ATTR_AVAILABLE_CCL = "availableCcls";
+    public static final String ATTR_BLOCKED_CCLS = "blockedCcls";
 
     public static final String REDIRECT_CHANNEL = "redirect:/channels/";
 
@@ -127,6 +128,8 @@ public class ChannelController {
         }
         model.addAttribute("bindings", bindings);
         model.addAttribute(ATTR_AVAILABLE_CCL, adminCclService.getAllCcls());
+        model.addAttribute(ATTR_BLOCKED_CCLS, userSettingsRepository.findById(channelUser.getId())
+            .map(UserSettings::getBlockedCcls).orElse(Set.of()));
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterSource", source);
         boolean hasSteam = !steamApiKey.isBlank() && channelUser.getSteamId() != null;
@@ -191,6 +194,8 @@ public class ChannelController {
         }
         model.addAttribute("bindings", bindings);
         model.addAttribute(ATTR_AVAILABLE_CCL, adminCclService.getAllCcls());
+        model.addAttribute(ATTR_BLOCKED_CCLS, userSettingsRepository.findById(channelUser.getId())
+            .map(UserSettings::getBlockedCcls).orElse(Set.of()));
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterSource", source);
         return "fragments/bindings :: bindings";
@@ -409,6 +414,39 @@ public class ChannelController {
         settings.setIncompleteFallbackTwitchGameName(twitchGameName);
         settings.getIncompleteFallbackCcls().clear();
         if (ccls != null) settings.getIncompleteFallbackCcls().addAll(ccls);
+        userSettingsRepository.save(settings);
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
+    }
+
+    @GetMapping("/channels/{username}/fragments/ccl-settings")
+    public String fragmentCclSettings(
+            @PathVariable String username,
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            Model model) {
+        UserAccount channelUser = resolveAndCheck(username, principal);
+        model.addAttribute(ATTR_CHANNEL_USERNAME, username);
+        UserSettings settings = userSettingsRepository.findById(channelUser.getId())
+            .orElseGet(UserSettings::new);
+        model.addAttribute("cclSettings", settings);
+        model.addAttribute(ATTR_AVAILABLE_CCL, adminCclService.getAllCcls());
+        return "fragments/ccl-settings :: ccl-settings";
+    }
+
+    @PostMapping("/channels/{username}/settings/ccl")
+    public String saveCclSettings(
+            @PathVariable String username,
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            @RequestParam(required = false, defaultValue = "false") boolean cclEnabled,
+            @RequestParam(required = false) Set<String> blockedCcls) {
+        UserAccount channelUser = resolveAndCheck(username, principal);
+        UserSettings settings = userSettingsRepository.findById(channelUser.getId()).orElse(null);
+        if (settings == null) {
+            settings = new UserSettings();
+            settings.setUser(channelUser);
+        }
+        settings.setCclFeatureEnabled(cclEnabled);
+        settings.getBlockedCcls().clear();
+        if (blockedCcls != null) settings.getBlockedCcls().addAll(blockedCcls);
         userSettingsRepository.save(settings);
         return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
