@@ -119,6 +119,10 @@ class AdminMembersTemplateTest {
         Document doc = renderPage();
         assertThat(doc.select("html")).isNotEmpty();
         assertThat(doc.body().text()).doesNotContain("??");
+        // INACTIVE badge should appear
+        assertThat(doc.body().text()).containsIgnoringCase("inactif");
+        // Unlink Twitch form should NOT appear for INACTIVE accounts
+        assertThat(doc.select("form[action*='twitch/unlink']")).isEmpty();
     }
 
     private Document renderPage() throws Exception {

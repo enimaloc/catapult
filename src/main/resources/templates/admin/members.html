@@ -36,9 +36,9 @@
                     <tr th:each="member : ${members}">
                         <td>
                             <strong th:text="${member.twitchUsername ?: '—'}"></strong>
-                            <span th:if="${member.twitchUsername == null}"
+                            <span th:if="${member.status.name() == 'INACTIVE'}"
                                   class="badge" th:text="#{admin.members.username.inactive}"></span><br>
-                            <span class="badge" th:text="${member.twitchId ?: '—'}"></span>
+                            <span th:if="${member.twitchId != null}" class="badge" th:text="${member.twitchId}"></span>
                         </td>
                         <td th:text="${member.steamId ?: '—'}"></td>
                         <td>
@@ -168,7 +168,7 @@
                         <!--/*@thymesvar id="member" type="fr.enimaloc.catapult.domain.UserAccount"*/-->
                         <th:block th:each="member : ${members}">
                             <option th:value="${member.id}"
-                                    th:text="${member.twitchUsername}"
+                                    th:text="${member.twitchUsername ?: '—'}"
                                     th:data-member-id="${member.id}"></option>
                         </th:block>
                     </select>
