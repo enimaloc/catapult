@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.GameGetterChain;
+import fr.enimaloc.catapult.getter.SteamGameGetter;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -29,6 +30,7 @@ public class SchedulerService {
     private final GameStateService gameStateService;
     private final ApplicationEventPublisher eventPublisher;
     private final MeterRegistry meterRegistry;
+    private final Optional<SteamGameGetter> steamGameGetter;
 
     @Scheduled(fixedRateString = "${app.polling.interval-seconds:60}000")
     public void poll() {
@@ -36,6 +38,10 @@ public class SchedulerService {
         try {
             List<UserAccount> activeUsers = userAccountRepository
                 .findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
+
+            steamGameGetter.ifPresent(getter -> getter.prefetchBatch(
+                activeUsers.stream().filter(u -> u.getSteamId() != null).toList()
+            ));
 
             for (UserAccount user : activeUsers) {
                 try {
@@ -46,6 +52,7 @@ public class SchedulerService {
                 meterRegistry.counter("catapult.scheduler.users.polled").increment();
             }
         } finally {
+            steamGameGetter.ifPresent(SteamGameGetter::clearCycleCache);
             sample.stop(Timer.builder("catapult.scheduler.poll.duration").register(meterRegistry));
         }
     }
