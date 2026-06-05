@@ -54,6 +54,14 @@ public class UserSettings {
     @Column(name = "ccl_id")
     private Set<String> incompleteFallbackCcls = new HashSet<>();
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "user_settings_blocked_ccls",
+        joinColumns = @JoinColumn(name = "user_id")
+    )
+    @Column(name = "ccl_id")
+    private Set<String> blockedCcls = new HashSet<>();
+
     @Column(name = "apply_default_on_stream_start", nullable = false)
     private boolean applyDefaultOnStreamStart = true;
 
