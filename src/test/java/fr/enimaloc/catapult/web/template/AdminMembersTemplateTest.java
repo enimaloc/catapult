@@ -105,6 +105,22 @@ class AdminMembersTemplateTest {
         assertThat(doc.body().text()).doesNotContain("??");
     }
 
+    @Test
+    void adminMembers_inactiveMember_rendersWithoutErrors() throws Exception {
+        UserAccount inactive = new UserAccount();
+        inactive.setId(java.util.UUID.randomUUID());
+        inactive.setTwitchId(null);
+        inactive.setTwitchUsername(null);
+        inactive.setStatus(UserAccount.Status.INACTIVE);
+
+        when(userAccountRepository.findAll()).thenReturn(List.of(inactive));
+        when(streamStateService.isLive(inactive)).thenReturn(false);
+
+        Document doc = renderPage();
+        assertThat(doc.select("html")).isNotEmpty();
+        assertThat(doc.body().text()).doesNotContain("??");
+    }
+
     private Document renderPage() throws Exception {
         String html = mockMvc.perform(get("/admin/members").locale(Locale.FRENCH).with(authentication(adminAuth)))
             .andExpect(status().isOk())

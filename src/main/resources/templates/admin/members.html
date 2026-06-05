@@ -35,8 +35,10 @@
                     <!--/*@thymesvar id="member" type="fr.enimaloc.catapult.domain.UserAccount"*/-->
                     <tr th:each="member : ${members}">
                         <td>
-                            <strong th:text="${member.twitchUsername}"></strong><br>
-                            <span class="badge" th:text="${member.twitchId}"></span>
+                            <strong th:text="${member.twitchUsername ?: '—'}"></strong>
+                            <span th:if="${member.twitchUsername == null}"
+                                  class="badge" th:text="#{admin.members.username.inactive}"></span><br>
+                            <span class="badge" th:text="${member.twitchId ?: '—'}"></span>
                         </td>
                         <td th:text="${member.steamId ?: '—'}"></td>
                         <td>
@@ -117,9 +119,9 @@
                                 <div class="dropdown-menu" th:id="'menu-' + ${member.id}">
                                     <form th:action="@{/admin/impersonate}" method="post"> <!-- nosemgrep -->
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <input type="hidden" name="username" th:value="${member.twitchUsername}"/>
+                                        <input type="hidden" name="username" th:value="${member.twitchUsername ?: ''}"/>
                                         <button type="submit" class="dropdown-item"
-                                                th:disabled="${member.twitchId == currentUserTwitchId}"
+                                                th:disabled="${member.status.name() != 'ACTIVE' or member.twitchId == currentUserTwitchId}"
                                                 th:text="#{admin.members.actions.impersonate}">Impersonner</button>
                                     </form>
                                     <form th:if="${member.steamId != null}" th:action="@{/admin/members/{id}/steam/unlink(id=${member.id})}" method="post"> <!-- nosemgrep -->
@@ -127,9 +129,14 @@
                                         <button type="submit" class="dropdown-item"
                                                 th:text="#{admin.members.actions.steam_unlink}">Délier Steam</button>
                                     </form>
+                                    <form th:if="${member.status.name() == 'ACTIVE'}" th:action="@{/admin/members/{id}/twitch/unlink(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="dropdown-item"
+                                                th:text="#{admin.members.actions.twitch_unlink}">Délier Twitch</button>
+                                    </form>
                                     <button type="button" class="dropdown-item"
                                             th:data-source-id="${member.id}"
-                                            th:data-source-name="${member.twitchUsername}"
+                                            th:data-source-name="${member.twitchUsername ?: '—'}"
                                             onclick="openMigrateModal(this)"
                                             th:text="#{admin.members.actions.migrate}">Migrer…</button>
                                     <hr class="dropdown-divider"/>
@@ -138,7 +145,7 @@
                                         <button type="submit" class="dropdown-item dropdown-item--danger"
                                                 th:disabled="${member.twitchId == currentUserTwitchId}"
                                                 th:text="#{admin.members.actions.delete}"
-                                                th:data-confirm="#{admin.members.actions.delete.confirm(${member.twitchUsername})}"
+                                                th:data-confirm="#{admin.members.actions.delete.confirm(${member.twitchUsername ?: '—'})}"
                                                 onclick="return confirmDelete(this)">Supprimer</button>
                                     </form>
                                 </div>
