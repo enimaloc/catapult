@@ -161,7 +161,8 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             account.setProfileImageUrl(profileImageUrl);
         }
 
-        if (account.getStatus() == UserAccount.Status.PENDING_DELETION) {
+        if (account.getStatus() == UserAccount.Status.PENDING_DELETION
+                || account.getStatus() == UserAccount.Status.INACTIVE) {
             account.setStatus(UserAccount.Status.ACTIVE);
             account.setDeletionRequestedAt(null);
         }
