@@ -51,6 +51,7 @@ class AccountServiceTest {
         account.setTwitchId("twitch123");
         account.setTwitchUsername("streamer");
         account.setStatus(UserAccount.Status.ACTIVE);
+        account.setProfileImageUrl("https://static-cdn.jtvnw.net/jtv_user_pictures/avatar.jpg");
         account.setBotEnabled(true);
     }
 
