@@ -19,4 +19,6 @@ public interface ExperimentFeedbackRepository extends JpaRepository<ExperimentFe
 
     @Query("SELECT AVG(f.npsScore) FROM ExperimentFeedback f WHERE f.experiment = :experiment AND f.variant = :variant")
     Double findAverageNpsByExperimentAndVariant(Experiment experiment, ExperimentVariant variant);
+
+    void deleteByUser(UserAccount user);
 }

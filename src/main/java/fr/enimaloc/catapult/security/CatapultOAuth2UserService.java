@@ -31,6 +31,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -151,7 +152,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         boolean isNew = existing.isEmpty();
         UserAccount account = existing.orElseGet(() -> createNewAccount(twitchId, twitchUsername));
 
-        if (!account.getTwitchUsername().equals(twitchUsername)) {
+        if (!Objects.equals(account.getTwitchUsername(), twitchUsername)) {
             account.setTwitchUsername(twitchUsername);
         }
 
@@ -163,6 +164,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         if (account.getStatus() == UserAccount.Status.PENDING_DELETION) {
             account.setStatus(UserAccount.Status.ACTIVE);
             account.setDeletionRequestedAt(null);
+        } else if (account.getStatus() == UserAccount.Status.INACTIVE) {
+            // Scheduler-deactivated accounts still have twitchId set, so findByTwitchId found them.
+            // Admin-unlinked accounts have twitchId=null and cannot reach this branch.
+            account.setStatus(UserAccount.Status.ACTIVE);
         }
 
         userAccountRepository.save(account);

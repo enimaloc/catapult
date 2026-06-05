@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -166,5 +167,32 @@ class TwitchTokenServiceTest {
 
         assertThat(result).isNull();
         verify(oAuthTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void getAppAccessToken_returnsToken() {
+        when(postResponseSpec.body(Map.class)).thenReturn(Map.of("access_token", "app-token-abc"));
+
+        String token = service.getAppAccessToken();
+
+        assertThat(token).isEqualTo("app-token-abc");
+    }
+
+    @Test
+    void getAppAccessToken_nullResponse_throwsIllegalState() {
+        when(postResponseSpec.body(Map.class)).thenReturn(null);
+
+        assertThatThrownBy(() -> service.getAppAccessToken())
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Empty response");
+    }
+
+    @Test
+    void getAppAccessToken_missingAccessToken_throwsIllegalState() {
+        when(postResponseSpec.body(Map.class)).thenReturn(Map.of());
+
+        assertThatThrownBy(() -> service.getAppAccessToken())
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("No access_token");
     }
 }

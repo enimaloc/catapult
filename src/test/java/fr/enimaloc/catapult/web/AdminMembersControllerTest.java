@@ -1,8 +1,11 @@
 package fr.enimaloc.catapult.web;
 
+import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
+import fr.enimaloc.catapult.service.AccountService;
+import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,8 +13,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -19,6 +24,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,11 +36,13 @@ class AdminMembersControllerTest {
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private StreamStateService streamStateService;
     @Mock private Environment environment;
+    @Mock private AccountService accountService;
+    @Mock private AdminMigrationService adminMigrationService;
     private AdminMembersController controller;
 
     @BeforeEach
     void setup() {
-        controller = new AdminMembersController(userAccountRepository, streamStateService, environment, Optional.empty());
+        controller = new AdminMembersController(userAccountRepository, streamStateService, environment, Optional.empty(), accountService, adminMigrationService);
     }
 
     private CatapultOAuth2User adminPrincipal(String twitchId) {
@@ -96,5 +107,226 @@ class AdminMembersControllerTest {
         controller.page(model, adminPrincipal("myTwitchId"));
 
         assertThat(model.getAttribute("currentUserTwitchId")).isEqualTo("myTwitchId");
+    }
+
+    @Test
+    void deleteAccount_callsServiceAndRedirects() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setTwitchId("target123");
+        target.setTwitchUsername("target");
+        target.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        String view = controller.deleteAccount(target.getId(), adminPrincipal("adminId"));
+
+        verify(accountService).deleteAccountImmediately(target);
+        assertThat(view).isEqualTo("redirect:/admin/members");
+    }
+
+    @Test
+    void deleteAccount_selfDeletion_throws403() {
+        UserAccount self = new UserAccount();
+        self.setId(UUID.randomUUID());
+        self.setTwitchId("adminId");
+        self.setTwitchUsername("admin");
+        self.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(self.getId())).thenReturn(Optional.of(self));
+
+        assertThatThrownBy(() -> controller.deleteAccount(self.getId(), adminPrincipal("adminId")))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.FORBIDDEN);
+        verify(accountService, never()).deleteAccountImmediately(any());
+    }
+
+    @Test
+    void deleteAccount_unknownId_throws404() {
+        UUID unknownId = UUID.randomUUID();
+        when(userAccountRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.deleteAccount(unknownId, adminPrincipal("adminId")))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(accountService, never()).deleteAccountImmediately(any());
+    }
+
+    @Test
+    void unlinkSteam_callsDisconnectAndRedirects() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setTwitchId("target123");
+        target.setTwitchUsername("target");
+        target.setSteamId("76561198000000000");
+        target.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        String view = controller.unlinkSteam(target.getId());
+
+        verify(accountService).disconnectProvider(target, OAuthToken.Provider.STEAM);
+        assertThat(view).isEqualTo("redirect:/admin/members");
+    }
+
+    @Test
+    void unlinkSteam_noSteamId_throws400() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setSteamId(null);
+        target.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> controller.unlinkSteam(target.getId()))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(accountService, never()).disconnectProvider(any(), any());
+    }
+
+    @Test
+    void unlinkSteam_unknownId_throws404() {
+        UUID unknownId = UUID.randomUUID();
+        when(userAccountRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.unlinkSteam(unknownId))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(accountService, never()).disconnectProvider(any(), any());
+    }
+
+    @Test
+    void unlinkTwitch_callsServiceAndRedirects() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setTwitchId("target123");
+        target.setTwitchUsername("target");
+        target.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        String view = controller.unlinkTwitch(target.getId());
+
+        verify(accountService).unlinkTwitch(target);
+        assertThat(view).isEqualTo("redirect:/admin/members");
+    }
+
+    @Test
+    void unlinkTwitch_unknownId_throws404() {
+        UUID unknownId = UUID.randomUUID();
+        when(userAccountRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.unlinkTwitch(unknownId))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(accountService, never()).unlinkTwitch(any());
+    }
+
+    @Test
+    void unlinkTwitch_notActive_throws400() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setTwitchId(null);
+        target.setTwitchUsername(null);
+        target.setStatus(UserAccount.Status.INACTIVE);
+
+        when(userAccountRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> controller.unlinkTwitch(target.getId()))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(accountService, never()).unlinkTwitch(any());
+    }
+
+    @Test
+    void migrateData_callsServiceAndRedirects() {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UserAccount source = new UserAccount();
+        source.setId(sourceId);
+        source.setStatus(UserAccount.Status.ACTIVE);
+        UserAccount target = new UserAccount();
+        target.setId(targetId);
+        target.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(sourceId)).thenReturn(Optional.of(source));
+        when(userAccountRepository.findById(targetId)).thenReturn(Optional.of(target));
+
+        String view = controller.migrateData(sourceId, targetId, true, false, false);
+
+        verify(adminMigrationService).migrate(source, target,
+            new AdminMigrationService.MigrateOptions(true, false, false));
+        assertThat(view).isEqualTo("redirect:/admin/members");
+    }
+
+    @Test
+    void migrateData_sourceNotFound_throws404() {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        when(userAccountRepository.findById(sourceId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.migrateData(sourceId, targetId, true, false, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(adminMigrationService, never()).migrate(any(), any(), any());
+    }
+
+    @Test
+    void migrateData_targetNotFound_throws404() {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UserAccount source = new UserAccount();
+        source.setId(sourceId);
+        source.setStatus(UserAccount.Status.ACTIVE);
+        when(userAccountRepository.findById(sourceId)).thenReturn(Optional.of(source));
+        when(userAccountRepository.findById(targetId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.migrateData(sourceId, targetId, true, false, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(adminMigrationService, never()).migrate(any(), any(), any());
+    }
+
+    @Test
+    void migrateData_sameSourceAndTarget_throws400() {
+        UUID id = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(id);
+        user.setStatus(UserAccount.Status.ACTIVE);
+        when(userAccountRepository.findById(id)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> controller.migrateData(id, id, true, false, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(adminMigrationService, never()).migrate(any(), any(), any());
+    }
+
+    @Test
+    void migrateData_noOptionsSelected_throws400() {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UserAccount source = new UserAccount();
+        source.setId(sourceId);
+        source.setStatus(UserAccount.Status.ACTIVE);
+        UserAccount target = new UserAccount();
+        target.setId(targetId);
+        target.setStatus(UserAccount.Status.ACTIVE);
+        when(userAccountRepository.findById(sourceId)).thenReturn(Optional.of(source));
+        when(userAccountRepository.findById(targetId)).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> controller.migrateData(sourceId, targetId, false, false, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(adminMigrationService, never()).migrate(any(), any(), any());
     }
 }
