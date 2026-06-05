@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.web;
 
+import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
@@ -149,5 +150,50 @@ class AdminMembersControllerTest {
             .extracting(e -> ((ResponseStatusException) e).getStatusCode())
             .isEqualTo(HttpStatus.NOT_FOUND);
         verify(accountService, never()).deleteAccountImmediately(any());
+    }
+
+    @Test
+    void unlinkSteam_callsDisconnectAndRedirects() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setTwitchId("target123");
+        target.setTwitchUsername("target");
+        target.setSteamId("76561198000000000");
+        target.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        String view = controller.unlinkSteam(target.getId());
+
+        verify(accountService).disconnectProvider(target, OAuthToken.Provider.STEAM);
+        assertThat(view).isEqualTo("redirect:/admin/members");
+    }
+
+    @Test
+    void unlinkSteam_noSteamId_throws400() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setSteamId(null);
+        target.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> controller.unlinkSteam(target.getId()))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(accountService, never()).disconnectProvider(any(), any());
+    }
+
+    @Test
+    void unlinkSteam_unknownId_throws404() {
+        UUID unknownId = UUID.randomUUID();
+        when(userAccountRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.unlinkSteam(unknownId))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(accountService, never()).disconnectProvider(any(), any());
     }
 }

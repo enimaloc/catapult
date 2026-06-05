@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.web;
 
+import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.getter.MockSteamApiClient;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
@@ -60,6 +61,18 @@ public class AdminMembersController {
         log.info("Admin {} deleted account {} (twitchId={})",
             principal.getUserAccount().getTwitchId(), user.getId(), user.getTwitchId());
         accountService.deleteAccountImmediately(user);
+        return "redirect:/admin/members";
+    }
+
+    @PostMapping("/{id}/steam/unlink")
+    public String unlinkSteam(@PathVariable UUID id) {
+        UserAccount user = userAccountRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (user.getSteamId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        log.info("Admin unlinked Steam for account {} (twitchId={})", user.getId(), user.getTwitchId());
+        accountService.disconnectProvider(user, OAuthToken.Provider.STEAM);
         return "redirect:/admin/members";
     }
 
