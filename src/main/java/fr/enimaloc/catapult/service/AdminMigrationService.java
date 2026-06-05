@@ -81,6 +81,7 @@ public class AdminMigrationService {
                     tgt -> {
                         tgt.setTwitchGameId(src.getTwitchGameId());
                         tgt.setTwitchGameName(src.getTwitchGameName());
+                        tgt.setSourceName(src.getSourceName());
                         tgt.setStatus(src.getStatus());
                         tgt.setIgnored(src.isIgnored());
                         tgt.setCclEnabled(src.isCclEnabled());
