@@ -51,6 +51,7 @@ class AccountServiceTest {
         account.setTwitchId("twitch123");
         account.setTwitchUsername("streamer");
         account.setStatus(UserAccount.Status.ACTIVE);
+        account.setBotEnabled(true);
     }
 
     @Test
@@ -92,6 +93,24 @@ class AccountServiceTest {
         assertThat(account.getStatus()).isEqualTo(UserAccount.Status.INACTIVE);
         assertThat(account.getTwitchId()).isNull();
         assertThat(account.getTwitchUsername()).isNull();
+        assertThat(account.getProfileImageUrl()).isNull();
+        assertThat(account.isBotEnabled()).isFalse();
+        verify(userAccountRepository).save(account);
+    }
+
+    @Test
+    void unlinkTwitch_noToken_stillSetsInactiveAndNullsFields() {
+        when(oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+
+        accountService.unlinkTwitch(account);
+
+        verify(oAuthTokenRepository, never()).delete(any(OAuthToken.class));
+        assertThat(account.getStatus()).isEqualTo(UserAccount.Status.INACTIVE);
+        assertThat(account.getTwitchId()).isNull();
+        assertThat(account.getTwitchUsername()).isNull();
+        assertThat(account.getProfileImageUrl()).isNull();
+        assertThat(account.isBotEnabled()).isFalse();
         verify(userAccountRepository).save(account);
     }
 
