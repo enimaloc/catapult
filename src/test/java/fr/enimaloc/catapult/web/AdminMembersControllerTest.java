@@ -228,6 +228,23 @@ class AdminMembersControllerTest {
     }
 
     @Test
+    void unlinkTwitch_notActive_throws400() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setTwitchId(null);
+        target.setTwitchUsername(null);
+        target.setStatus(UserAccount.Status.INACTIVE);
+
+        when(userAccountRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> controller.unlinkTwitch(target.getId()))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(accountService, never()).unlinkTwitch(any());
+    }
+
+    @Test
     void migrateData_callsServiceAndRedirects() {
         UUID sourceId = UUID.randomUUID();
         UUID targetId = UUID.randomUUID();
