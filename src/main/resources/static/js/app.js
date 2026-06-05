@@ -91,3 +91,48 @@ window.addEventListener('resize', function () {
         if (nav) nav.classList.remove('open');
     }
 });
+
+function toggleDropdown(id) {
+    document.querySelectorAll('.dropdown-menu').forEach(m => {
+        if (m.id !== id) m.classList.remove('open');
+    });
+    document.getElementById(id).classList.toggle('open');
+}
+
+document.addEventListener('click', e => {
+    if (!e.target.closest('.dropdown')) {
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    }
+});
+
+function confirmDelete(btn) {
+    return confirm(btn.dataset.confirm);
+}
+
+function openMigrateModal(btn) {
+    const sourceId = btn.dataset.sourceId;
+    const sourceName = btn.dataset.sourceName;
+    const modal = document.getElementById('migrate-modal');
+    const title = document.getElementById('migrate-modal-title');
+    const form = document.getElementById('migrate-form');
+    const select = document.getElementById('migrate-target');
+
+    form.action = '/admin/members/' + sourceId + '/migrate';
+    title.textContent = (title.dataset.prefix || '') + ' ' + sourceName;
+
+    Array.from(select.options).forEach(opt => { opt.hidden = opt.value === sourceId; });
+    const first = Array.from(select.options).find(o => !o.hidden);
+    if (first) select.value = first.value;
+
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    modal.style.display = 'flex';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const migrateModal = document.getElementById('migrate-modal');
+    if (migrateModal) {
+        migrateModal.addEventListener('click', e => {
+            if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+        });
+    }
+});

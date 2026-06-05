@@ -16,17 +16,17 @@ import java.util.UUID;
 public class UserAccount {
 
     public enum Status {
-        ACTIVE, PENDING_DELETION
+        ACTIVE, INACTIVE, PENDING_DELETION
     }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "twitch_id", nullable = false, unique = true)
+    @Column(name = "twitch_id", unique = true)
     private String twitchId;
 
-    @Column(name = "twitch_username", nullable = false)
+    @Column(name = "twitch_username")
     private String twitchUsername;
 
     @Column(name = "profile_image_url", length = 512)

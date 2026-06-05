@@ -4,6 +4,8 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.security.CatapultOAuth2UserService;
+import fr.enimaloc.catapult.service.AccountService;
+import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.web.AdminMembersController;
@@ -48,6 +50,8 @@ class AdminMembersTemplateTest {
     @MockitoBean StreamStateService streamStateService;
     @MockitoBean CatapultOAuth2UserService oAuth2UserService;
     @MockitoBean ExperimentService experimentService;
+    @MockitoBean AccountService accountService;
+    @MockitoBean AdminMigrationService adminMigrationService;
 
     private UsernamePasswordAuthenticationToken adminAuth;
 
@@ -99,6 +103,26 @@ class AdminMembersTemplateTest {
     void adminMembers_noUnresolvedI18nKeys() throws Exception {
         Document doc = renderPage();
         assertThat(doc.body().text()).doesNotContain("??");
+    }
+
+    @Test
+    void adminMembers_inactiveMember_rendersWithoutErrors() throws Exception {
+        UserAccount inactive = new UserAccount();
+        inactive.setId(java.util.UUID.randomUUID());
+        inactive.setTwitchId(null);
+        inactive.setTwitchUsername(null);
+        inactive.setStatus(UserAccount.Status.INACTIVE);
+
+        when(userAccountRepository.findAll()).thenReturn(List.of(inactive));
+        when(streamStateService.isLive(inactive)).thenReturn(false);
+
+        Document doc = renderPage();
+        assertThat(doc.select("html")).isNotEmpty();
+        assertThat(doc.body().text()).doesNotContain("??");
+        // INACTIVE badge should appear
+        assertThat(doc.body().text()).containsIgnoringCase("inactif");
+        // Unlink Twitch form should NOT appear for INACTIVE accounts
+        assertThat(doc.select("form[action*='twitch/unlink']")).isEmpty();
     }
 
     private Document renderPage() throws Exception {
