@@ -15,9 +15,11 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -131,5 +133,20 @@ public class AccountService {
             userAccountRepository.save(account);
         }
         log.info("Provider {} disconnected for account {}", provider, account.getId());
+    }
+
+    @Transactional
+    public void unlinkTwitch(UserAccount account) {
+        if (account.getStatus() != UserAccount.Status.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Cannot unlink Twitch from an account that is not ACTIVE");
+        }
+        oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.TWITCH)
+            .ifPresent(oAuthTokenRepository::delete);
+        account.setTwitchId(null);
+        account.setTwitchUsername(null);
+        account.setStatus(UserAccount.Status.INACTIVE);
+        userAccountRepository.save(account);
+        log.info("Admin unlinked Twitch for account {}", account.getId());
     }
 }

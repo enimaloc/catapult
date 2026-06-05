@@ -18,10 +18,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,5 +77,43 @@ class AccountServiceTest {
         verify(oAuthTokenRepository, never()).delete(any(OAuthToken.class));
         verify(experimentOverrideRepository).deleteByTargetUser(account);
         verify(userAccountRepository).delete(account);
+    }
+
+    @Test
+    void unlinkTwitch_setsInactiveAndNullsFields() {
+        OAuthToken token = new OAuthToken();
+        token.setId(UUID.randomUUID());
+        when(oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.of(token));
+
+        accountService.unlinkTwitch(account);
+
+        verify(oAuthTokenRepository).delete(token);
+        assertThat(account.getStatus()).isEqualTo(UserAccount.Status.INACTIVE);
+        assertThat(account.getTwitchId()).isNull();
+        assertThat(account.getTwitchUsername()).isNull();
+        verify(userAccountRepository).save(account);
+    }
+
+    @Test
+    void unlinkTwitch_alreadyInactive_throws400() {
+        account.setStatus(UserAccount.Status.INACTIVE);
+
+        assertThatThrownBy(() -> accountService.unlinkTwitch(account))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(userAccountRepository, never()).save(any());
+    }
+
+    @Test
+    void unlinkTwitch_pendingDeletion_throws400() {
+        account.setStatus(UserAccount.Status.PENDING_DELETION);
+
+        assertThatThrownBy(() -> accountService.unlinkTwitch(account))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(userAccountRepository, never()).save(any());
     }
 }
