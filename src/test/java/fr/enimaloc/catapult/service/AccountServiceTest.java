@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.ExperimentOverrideRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,7 @@ class AccountServiceTest {
 
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private OAuthTokenRepository oAuthTokenRepository;
+    @Mock private ExperimentOverrideRepository experimentOverrideRepository;
     @InjectMocks private AccountService accountService;
 
     private UserAccount account;
@@ -44,6 +46,7 @@ class AccountServiceTest {
         accountService.deleteAccountImmediately(account);
 
         verify(oAuthTokenRepository).delete(token);
+        verify(experimentOverrideRepository).deleteByTargetUser(account);
         verify(userAccountRepository).delete(account);
     }
 
@@ -55,6 +58,7 @@ class AccountServiceTest {
         accountService.deleteAccountImmediately(account);
 
         verify(oAuthTokenRepository, never()).delete(any(OAuthToken.class));
+        verify(experimentOverrideRepository).deleteByTargetUser(account);
         verify(userAccountRepository).delete(account);
     }
 }

@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.ExperimentOverrideRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class AccountService {
 
     private final UserAccountRepository userAccountRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
+    private final ExperimentOverrideRepository experimentOverrideRepository;
 
     @Value("${app.account.deletion-delay-days:7}")
     private int deletionDelayDays;
@@ -70,6 +72,7 @@ public class AccountService {
 
     private void deleteAccountPermanently(UserAccount account) {
         revokeTwitchToken(account);
+        experimentOverrideRepository.deleteByTargetUser(account);
         // Pas d'endpoint de révocation officiel pour ces providers — suppression en base uniquement
 //        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
 //            oAuthTokenRepository.findByUserAndProvider(account, p)
