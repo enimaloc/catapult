@@ -145,6 +145,8 @@ public class AccountService {
             .ifPresent(oAuthTokenRepository::delete);
         account.setTwitchId(null);
         account.setTwitchUsername(null);
+        account.setProfileImageUrl(null);
+        account.setBotEnabled(false);
         account.setStatus(UserAccount.Status.INACTIVE);
         userAccountRepository.save(account);
         log.info("Admin unlinked Twitch for account {}", account.getId());
