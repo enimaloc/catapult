@@ -108,3 +108,38 @@ document.addEventListener('click', e => {
 function confirmDelete(btn) {
     return confirm(btn.dataset.confirm);
 }
+
+function openMigrateModal(btn) {
+    const sourceId = btn.dataset.sourceId;
+    const sourceName = btn.dataset.sourceName;
+    const modal = document.getElementById('migrate-modal');
+    const form = document.getElementById('migrate-form');
+    const title = document.getElementById('migrate-modal-title');
+    if (!modal || !form) return;
+    form.action = '/admin/members/' + sourceId + '/migrate';
+    if (title) title.textContent = (title.dataset.prefix || title.textContent.trim()) + ' ' + sourceName;
+    const select = document.getElementById('migrate-target');
+    if (select) {
+        Array.from(select.options).forEach(opt => {
+            opt.disabled = opt.value === sourceId;
+        });
+        const firstEnabled = Array.from(select.options).find(opt => !opt.disabled);
+        if (firstEnabled) firstEnabled.selected = true;
+    }
+    modal.style.display = 'flex';
+}
+
+function closeMigrateModal() {
+    const modal = document.getElementById('migrate-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('migrate-modal');
+    if (!modal) return;
+    const titleEl = document.getElementById('migrate-modal-title');
+    if (titleEl) titleEl.dataset.prefix = titleEl.textContent.trim();
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal.style.display !== 'none') closeMigrateModal();
+    });
+});
