@@ -200,6 +200,34 @@ class AdminMembersControllerTest {
     }
 
     @Test
+    void unlinkTwitch_callsServiceAndRedirects() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setTwitchId("target123");
+        target.setTwitchUsername("target");
+        target.setStatus(UserAccount.Status.ACTIVE);
+
+        when(userAccountRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        String view = controller.unlinkTwitch(target.getId());
+
+        verify(accountService).unlinkTwitch(target);
+        assertThat(view).isEqualTo("redirect:/admin/members");
+    }
+
+    @Test
+    void unlinkTwitch_unknownId_throws404() {
+        UUID unknownId = UUID.randomUUID();
+        when(userAccountRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.unlinkTwitch(unknownId))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(accountService, never()).unlinkTwitch(any());
+    }
+
+    @Test
     void migrateData_callsServiceAndRedirects() {
         UUID sourceId = UUID.randomUUID();
         UUID targetId = UUID.randomUUID();
