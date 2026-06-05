@@ -83,6 +83,9 @@ public class AdminMembersController {
     public String unlinkTwitch(@PathVariable UUID id) {
         UserAccount user = userAccountRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (user.getStatus() != UserAccount.Status.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
         log.info("Admin unlinked Twitch for account {} (twitchId={})", user.getId(), user.getTwitchId());
         accountService.unlinkTwitch(user);
         return "redirect:/admin/members";
