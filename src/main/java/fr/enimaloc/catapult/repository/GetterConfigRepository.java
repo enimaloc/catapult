@@ -13,4 +13,6 @@ public interface GetterConfigRepository extends JpaRepository<GetterConfig, UUID
     List<GetterConfig> findByUserOrderByPriorityAsc(UserAccount user);
 
     Optional<GetterConfig> findByUserAndProvider(UserAccount user, GetterConfig.Provider provider);
+
+    void deleteByUser(UserAccount user);
 }

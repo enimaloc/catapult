@@ -2,9 +2,16 @@ package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.ExperimentAssignmentRepository;
+import fr.enimaloc.catapult.repository.ExperimentEventRepository;
+import fr.enimaloc.catapult.repository.ExperimentFeedbackRepository;
 import fr.enimaloc.catapult.repository.ExperimentOverrideRepository;
+import fr.enimaloc.catapult.repository.FeedbackSubmissionRepository;
+import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +30,13 @@ class AccountServiceTest {
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private OAuthTokenRepository oAuthTokenRepository;
     @Mock private ExperimentOverrideRepository experimentOverrideRepository;
+    @Mock private ExperimentAssignmentRepository experimentAssignmentRepository;
+    @Mock private ExperimentEventRepository experimentEventRepository;
+    @Mock private ExperimentFeedbackRepository experimentFeedbackRepository;
+    @Mock private FeedbackSubmissionRepository feedbackSubmissionRepository;
+    @Mock private GameBindingRepository gameBindingRepository;
+    @Mock private GetterConfigRepository getterConfigRepository;
+    @Mock private UserSettingsRepository userSettingsRepository;
     @InjectMocks private AccountService accountService;
 
     private UserAccount account;
