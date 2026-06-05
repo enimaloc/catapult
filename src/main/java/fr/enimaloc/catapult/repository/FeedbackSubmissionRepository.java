@@ -12,4 +12,6 @@ public interface FeedbackSubmissionRepository extends JpaRepository<FeedbackSubm
     List<FeedbackSubmission> findByUserOrderByCreatedAtDesc(UserAccount user);
 
     List<FeedbackSubmission> findBySubscribedTrue();
+
+    void deleteByUser(UserAccount user);
 }

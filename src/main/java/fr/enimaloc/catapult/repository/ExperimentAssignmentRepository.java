@@ -42,4 +42,6 @@ public interface ExperimentAssignmentRepository extends JpaRepository<Experiment
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM ExperimentAssignment a WHERE a.experiment = :experiment")
     void deleteAllByExperiment(@Param("experiment") Experiment experiment);
+
+    void deleteByUser(UserAccount user);
 }

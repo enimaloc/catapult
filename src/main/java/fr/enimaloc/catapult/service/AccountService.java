@@ -2,9 +2,16 @@ package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.ExperimentAssignmentRepository;
+import fr.enimaloc.catapult.repository.ExperimentEventRepository;
+import fr.enimaloc.catapult.repository.ExperimentFeedbackRepository;
 import fr.enimaloc.catapult.repository.ExperimentOverrideRepository;
+import fr.enimaloc.catapult.repository.FeedbackSubmissionRepository;
+import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +30,13 @@ public class AccountService {
     private final UserAccountRepository userAccountRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
     private final ExperimentOverrideRepository experimentOverrideRepository;
+    private final ExperimentAssignmentRepository experimentAssignmentRepository;
+    private final ExperimentEventRepository experimentEventRepository;
+    private final ExperimentFeedbackRepository experimentFeedbackRepository;
+    private final FeedbackSubmissionRepository feedbackSubmissionRepository;
+    private final GameBindingRepository gameBindingRepository;
+    private final GetterConfigRepository getterConfigRepository;
+    private final UserSettingsRepository userSettingsRepository;
 
     @Value("${app.account.deletion-delay-days:7}")
     private int deletionDelayDays;
@@ -73,6 +87,13 @@ public class AccountService {
     private void deleteAccountPermanently(UserAccount account) {
         revokeTwitchToken(account);
         experimentOverrideRepository.deleteByTargetUser(account);
+        experimentAssignmentRepository.deleteByUser(account);
+        experimentEventRepository.deleteByUser(account);
+        experimentFeedbackRepository.deleteByUser(account);
+        feedbackSubmissionRepository.deleteByUser(account);
+        gameBindingRepository.deleteByUser(account);
+        getterConfigRepository.deleteByUser(account);
+        userSettingsRepository.deleteByUser(account);
         // Pas d'endpoint de révocation officiel pour ces providers — suppression en base uniquement
 //        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
 //            oAuthTokenRepository.findByUserAndProvider(account, p)
