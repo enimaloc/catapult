@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.getter;
 
+import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
 import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
