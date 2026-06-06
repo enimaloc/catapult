@@ -30,7 +30,8 @@ public class GameEventListener {
         GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
 
         if (binding.isIgnored()) {
-            log.debug("Binding is ignored — skipping update for user {}", user.getId());
+            log.debug("Binding is ignored — applying no-game fallback for user {}", user.getId());
+            applyNoGameFallback(user);
             return;
         }
 
@@ -53,29 +54,7 @@ public class GameEventListener {
     public void onNoGameDetected(NoGameDetectedEvent event) {
         UserAccount user = event.getUser();
         log.debug("NoGameDetectedEvent for user {}", user.getId());
-
-        if (!streamStateService.isLive(user)) {
-            log.debug("User {} not live — skipping no-game fallback", user.getId());
-            return;
-        }
-
-        userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
-            if (!settings.isApplyDefaultOnNoGame()) {
-                log.debug("applyDefaultOnNoGame disabled for user {} — skipping", user.getId());
-                return;
-            }
-            if (settings.getNoGameTwitchGameId() != null && !settings.getNoGameTwitchGameId().isBlank()) {
-                GameBinding fallbackBinding = new GameBinding();
-                fallbackBinding.setUser(user);
-                fallbackBinding.setSourceType(GameBinding.SourceType.MANUAL);
-                fallbackBinding.setSourceName("no-game-fallback");
-                fallbackBinding.setTwitchGameId(settings.getNoGameTwitchGameId());
-                fallbackBinding.setTwitchGameName(settings.getNoGameTwitchGameName());
-                fallbackBinding.setStatus(GameBinding.Status.MANUAL);
-
-                twitchService.updateChannel(user, fallbackBinding);
-            }
-        });
+        applyNoGameFallback(user);
     }
 
     @EventListener
@@ -103,6 +82,29 @@ public class GameEventListener {
         userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
             if (settings.isApplyDefaultOnStreamEnd()) {
                 twitchService.resetToDefault(user);
+            }
+        });
+    }
+
+    private void applyNoGameFallback(UserAccount user) {
+        if (!streamStateService.isLive(user)) {
+            log.debug("User {} not live — skipping no-game fallback", user.getId());
+            return;
+        }
+        userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+            if (!settings.isApplyDefaultOnNoGame()) {
+                log.debug("applyDefaultOnNoGame disabled for user {} — skipping", user.getId());
+                return;
+            }
+            if (settings.getNoGameTwitchGameId() != null && !settings.getNoGameTwitchGameId().isBlank()) {
+                GameBinding fallbackBinding = new GameBinding();
+                fallbackBinding.setUser(user);
+                fallbackBinding.setSourceType(GameBinding.SourceType.MANUAL);
+                fallbackBinding.setSourceName("no-game-fallback");
+                fallbackBinding.setTwitchGameId(settings.getNoGameTwitchGameId());
+                fallbackBinding.setTwitchGameName(settings.getNoGameTwitchGameName());
+                fallbackBinding.setStatus(GameBinding.Status.MANUAL);
+                twitchService.updateChannel(user, fallbackBinding);
             }
         });
     }
