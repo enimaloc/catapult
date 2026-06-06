@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.getter;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -29,7 +28,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @Profile("!mock")
-@RequiredArgsConstructor
 @ConditionalOnBooleanProperty("steam.enabled")
 public class RealSteamApiClient implements SteamApiClient {
 
@@ -40,6 +38,9 @@ public class RealSteamApiClient implements SteamApiClient {
 
     private static final int DEFAULT_RETRY_AFTER_SECONDS = 60;
 
+    private static final String RESPONSE_KEY = "response";
+    private static final String STEAMID_KEY  = "steamid";
+
     @Value("${steam.api-key:}")
     private String steamApiKey;
 
@@ -48,11 +49,16 @@ public class RealSteamApiClient implements SteamApiClient {
 
     private final RestClient restClient;
     private final SteamRateLimiter rateLimiter;
+    private final Executor steamExecutor;
     private final Map<CacheKey, CachedProfileStatus> profileCache = new ConcurrentHashMap<>();
 
     @Autowired
-    @Qualifier("steamExecutor")
-    private Executor steamExecutor;
+    public RealSteamApiClient(RestClient restClient, SteamRateLimiter rateLimiter,
+                               @Qualifier("steamExecutor") Executor steamExecutor) {
+        this.restClient = restClient;
+        this.rateLimiter = rateLimiter;
+        this.steamExecutor = steamExecutor;
+    }
 
     // -------------------------------------------------------------------------
     // SteamApiClient implementation
@@ -81,12 +87,12 @@ public class RealSteamApiClient implements SteamApiClient {
         String tokenKey = (personalToken != null && !personalToken.isBlank()) ? personalToken : "";
         CacheKey key = new CacheKey(steamId, tokenKey);
         CachedProfileStatus cached = profileCache.get(key);
-        if (cached != null && !cached.isExpired()) {
+        if (cached != null && cached.isValid()) {
             return CompletableFuture.completedFuture(cached.isPublic());
         }
         return CompletableFuture.supplyAsync(() -> {
             CachedProfileStatus fresh = profileCache.compute(key, (k, existing) -> {
-                if (existing != null && !existing.isExpired()) return existing;
+                if (existing != null && existing.isValid()) return existing;
                 boolean result = fetchIsProfilePublic(steamId, personalToken);
                 return new CachedProfileStatus(result, Instant.now().plus(profileCacheTtl));
             });
@@ -137,14 +143,14 @@ public class RealSteamApiClient implements SteamApiClient {
             Map<String, Object> response = restClient.get().uri(url).retrieve().body(Map.class);
             if (response == null) return result;
 
-            Map<String, Object> body = (Map<String, Object>) response.get("response");
+            Map<String, Object> body = (Map<String, Object>) response.get(RESPONSE_KEY);
             if (body == null) return result;
 
             List<Map<String, Object>> players = (List<Map<String, Object>>) body.get("players");
             if (players == null) return result;
 
             for (Map<String, Object> player : players) {
-                String id = String.valueOf(player.get("steamid"));
+                String id = String.valueOf(player.get(STEAMID_KEY));
                 Object gameId   = player.get("gameid");
                 Object gameName = player.get("gameextrainfo");
                 result.put(id,
@@ -197,7 +203,7 @@ public class RealSteamApiClient implements SteamApiClient {
                 .body(Map.class);
             if (response == null) return false;
 
-            Map<String, Object> responseBody = (Map<String, Object>) response.get("response");
+            Map<String, Object> responseBody = (Map<String, Object>) response.get(RESPONSE_KEY);
             return responseBody != null && responseBody.containsKey("game_count");
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
@@ -232,7 +238,7 @@ public class RealSteamApiClient implements SteamApiClient {
                 .body(Map.class);
             if (response == null) return Optional.empty();
 
-            Map<String, Object> responseBody = (Map<String, Object>) response.get("response");
+            Map<String, Object> responseBody = (Map<String, Object>) response.get(RESPONSE_KEY);
             if (responseBody == null) return Optional.empty();
 
             List<Map<String, Object>> players = (List<Map<String, Object>>) responseBody.get("players");
@@ -267,7 +273,7 @@ public class RealSteamApiClient implements SteamApiClient {
         try {
             Map<String, Object> response = restClient.get().uri(url).retrieve().body(Map.class);
             if (response == null) return List.of();
-            Map<String, Object> body = (Map<String, Object>) response.get("response");
+            Map<String, Object> body = (Map<String, Object>) response.get(RESPONSE_KEY);
             if (body == null) return List.of();
             List<Map<String, Object>> games = (List<Map<String, Object>>) body.get("games");
             if (games == null) return List.of();
@@ -300,6 +306,6 @@ public class RealSteamApiClient implements SteamApiClient {
     private record CacheKey(String steamId, String tokenKey) {}
 
     private record CachedProfileStatus(boolean isPublic, Instant expiresAt) {
-        boolean isExpired() { return Instant.now().isAfter(expiresAt); }
+        boolean isValid() { return Instant.now().isBefore(expiresAt); }
     }
 }
