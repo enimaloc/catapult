@@ -46,9 +46,9 @@ public class AdminSteamKeysController {
         return "redirect:/admin/steam-keys";
     }
 
-    @PostMapping("/{key}/delete")
-    public String delete(@PathVariable String key) {
-        repository.deleteById(key);
+    @PostMapping("/delete")
+    public String delete(@RequestParam String apiKey) {
+        repository.deleteById(apiKey);
         if (rotator != null) rotator.refreshKeys();
         return "redirect:/admin/steam-keys";
     }
