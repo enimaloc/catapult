@@ -630,9 +630,10 @@ public class ChannelController {
 
     private void syncTokenToPool(UserAccount user, String plainToken, boolean shared) {
         steamApiKeyRepository.deleteByOwner(user);
-        if (shared && !steamApiKeyRepository.existsById(plainToken)) {
+        if (!steamApiKeyRepository.existsById(plainToken)) {
             SteamApiKeyEntry entry = new SteamApiKeyEntry(plainToken);
             entry.setOwner(user);
+            entry.setExclusive(!shared);
             steamApiKeyRepository.save(entry);
         }
         if (rotator != null) rotator.refreshKeys();
