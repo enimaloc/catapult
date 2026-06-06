@@ -40,7 +40,7 @@ public class SteamApiKeyRotator {
     public void refreshKeys() {
         this.keys = repository.findByExclusiveFalse()
             .stream()
-            .map(e -> e.getApiKey())
+            .map(SteamApiKeyEntry::getApiKey)
             .toList();
         log.info("Steam API key pool refreshed: {} key(s)", keys.size());
     }
@@ -55,7 +55,7 @@ public class SteamApiKeyRotator {
             .toList();
 
         if (!available.isEmpty()) {
-            int idx = Math.abs(counter.getAndIncrement() % available.size());
+            int idx = Math.floorMod(counter.getAndIncrement(), available.size());
             return Optional.of(available.get(idx));
         }
 
