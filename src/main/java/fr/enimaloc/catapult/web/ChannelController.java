@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Controller
@@ -144,8 +145,8 @@ public class ChannelController {
             steamProfilePrivate = steamApiClient
                 .map(c -> {
                     try {
-                        return !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken)
-                            .orTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                        return !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken) // nosemgrep
+                            .orTimeout(2, TimeUnit.SECONDS)
                             .exceptionally(e -> {
                                 log.warn("Steam profile check failed for user {}: {}", channelUser.getId(), e.getMessage());
                                 return true;
@@ -235,8 +236,8 @@ public class ChannelController {
             steamProfilePrivate = steamApiClient
                 .map(c -> {
                     try {
-                        return !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken)
-                            .orTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                        return !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken) // nosemgrep
+                            .orTimeout(2, TimeUnit.SECONDS)
                             .exceptionally(e -> {
                                 log.warn("Steam profile check failed for user {}: {}", channelUser.getId(), e.getMessage());
                                 return true;

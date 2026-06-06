@@ -23,7 +23,7 @@ public class SteamGameGetter implements GameGetter {
     private final SteamApiClient steamApiClient;
     private final TokenEncryptionService tokenEncryptionService;
 
-    private Map<String, Optional<SteamApiClient.PlayerSummary>> cycleCache = Map.of();
+    private volatile Map<String, Optional<SteamApiClient.PlayerSummary>> cycleCache = Map.of();
 
     @Override
     public String name() {
