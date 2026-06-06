@@ -64,6 +64,10 @@ public class SteamApiKeyRotator {
             .min(Comparator.comparingLong(k -> keyBlockedUntil.getOrDefault(k, 0L)));
     }
 
+    public Map<String, Long> getKeyBlockedUntil() {
+        return Map.copyOf(keyBlockedUntil);
+    }
+
     public boolean isAllKeysBlocked() {
         List<String> snapshot = keys;
         if (snapshot.isEmpty()) return false;
