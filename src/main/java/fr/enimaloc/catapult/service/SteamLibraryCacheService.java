@@ -3,10 +3,12 @@ package fr.enimaloc.catapult.service;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.getter.SteamApiClient;
+import fr.enimaloc.catapult.getter.SteamRateLimiter;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.event.EventListener;
@@ -25,6 +27,9 @@ public class SteamLibraryCacheService {
     private final SteamApiClient steamApiClient;
     private final IgdbService igdbService;
     private final UserAccountRepository userAccountRepository;
+
+    @Autowired(required = false)
+    private SteamRateLimiter rateLimiter;
 
     @Async
     @PostConstruct
@@ -48,6 +53,19 @@ public class SteamLibraryCacheService {
 
     private void cacheLibrary(UserAccount user) {
         if (user.getSteamId() == null) return;
+
+        if (rateLimiter != null) {
+            long wait = rateLimiter.millisUntilAvailable();
+            if (wait > 0) {
+                log.info("Steam rate limited — waiting {}ms before pre-caching steamId={}", wait, user.getSteamId());
+                try {
+                    Thread.sleep(wait);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
 
         log.info("Pre-caching Steam library for user {} (steamId={})", user.getId(), user.getSteamId());
         List<String> appIds = steamApiClient.getOwnedGameIds(user.getSteamId());
