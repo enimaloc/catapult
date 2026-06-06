@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.SteamApiClient;
+import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
@@ -25,6 +26,7 @@ import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -59,6 +61,9 @@ public class ChannelController {
 
     @Value("${steam.api-key:}")
     private String steamApiKey;
+
+    @Autowired(required = false)
+    private SteamApiKeyRotator rotator;
 
     private final UserAccountRepository userAccountRepository;
     private final ChannelAccessService channelAccessService;
@@ -135,7 +140,7 @@ public class ChannelController {
             .map(UserSettings::getBlockedCcls).orElse(Set.of()));
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterSource", source);
-        boolean hasSteam = !steamApiKey.isBlank() && channelUser.getSteamId() != null;
+        boolean hasSteam = steamKeyAvailable() && channelUser.getSteamId() != null;
         boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
         boolean steamProfilePrivate = false;
         if (hasSteam && isOwner) {
@@ -159,7 +164,7 @@ public class ChannelController {
                 })
                 .orElse(false);
         }
-        model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
+        model.addAttribute("hasSteamProvider", steamKeyAvailable());
         model.addAttribute("hasSteam", hasSteam);
         model.addAttribute("hasSteamPersonalToken", hasSteamPersonalToken);
         model.addAttribute("steamProfilePrivate", steamProfilePrivate);
@@ -225,7 +230,7 @@ public class ChannelController {
         UserAccount channelUser = resolveAndCheck(username, principal);
         UserAccount viewer = principal.getUserAccount();
         boolean isOwner = viewer.getId().equals(channelUser.getId());
-        boolean hasSteam = !steamApiKey.isBlank() && channelUser.getSteamId() != null;
+        boolean hasSteam = steamKeyAvailable() && channelUser.getSteamId() != null;
         boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
 
         boolean steamProfilePrivate = false;
@@ -253,7 +258,7 @@ public class ChannelController {
 
         model.addAttribute(ATTR_CHANNEL_USERNAME, username);
         model.addAttribute(ATTR_IS_OWNER, isOwner);
-        model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
+        model.addAttribute("hasSteamProvider", steamKeyAvailable());
         model.addAttribute("hasSteam", hasSteam);
         model.addAttribute("hasSteamPersonalToken", hasSteamPersonalToken);
         model.addAttribute("steamProfilePrivate", steamProfilePrivate);
@@ -563,5 +568,10 @@ public class ChannelController {
         if (!viewer.getId().equals(channelUser.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+    }
+
+    private boolean steamKeyAvailable() {
+        if (rotator != null) return rotator.nextKey().isPresent();
+        return !steamApiKey.isBlank();
     }
 }
