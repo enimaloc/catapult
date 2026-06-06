@@ -265,4 +265,75 @@ class GameEventListenerLiveCheckTest {
         verify(twitchService, never()).updateChannel(any(), any());
         verify(streamStateService, never()).storePending(any(), any());
     }
+
+    @Test
+    void onGameDetected_whenIgnored_andLive_andFlagEnabled_andFallbackConfigured_callsUpdateChannel() {
+        binding.setIgnored(true);
+        when(bindingService.resolveOrCreate(eq(user), any())).thenReturn(binding);
+        when(streamStateService.isLive(user)).thenReturn(true);
+
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("no-game-id");
+        settings.setNoGameTwitchGameName("Just Chatting");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
+
+        verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
+    }
+
+    @Test
+    void onGameDetected_whenIgnored_andLive_andFlagDisabled_skipsUpdate() {
+        binding.setIgnored(true);
+        when(bindingService.resolveOrCreate(eq(user), any())).thenReturn(binding);
+        when(streamStateService.isLive(user)).thenReturn(true);
+
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("no-game-id");
+        settings.setApplyDefaultOnNoGame(false);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
+
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void onGameDetected_whenIgnored_andLive_andNoFallbackConfigured_skipsUpdate() {
+        binding.setIgnored(true);
+        when(bindingService.resolveOrCreate(eq(user), any())).thenReturn(binding);
+        when(streamStateService.isLive(user)).thenReturn(true);
+
+        UserSettings settings = new UserSettings();
+        // noGameTwitchGameId is null — no fallback
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
+
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void onGameDetected_whenIgnored_andNotLive_skipsRepositoryAndUpdate() {
+        binding.setIgnored(true);
+        when(bindingService.resolveOrCreate(eq(user), any())).thenReturn(binding);
+        when(streamStateService.isLive(user)).thenReturn(false);
+
+        listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
+
+        verify(userSettingsRepository, never()).findById(any());
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void onGameDetected_whenIgnored_andNoSettings_skipsUpdate() {
+        binding.setIgnored(true);
+        when(bindingService.resolveOrCreate(eq(user), any())).thenReturn(binding);
+        when(streamStateService.isLive(user)).thenReturn(true);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
+
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
 }
