@@ -24,6 +24,7 @@ import fr.enimaloc.catapult.service.EventSubService;
 import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -43,6 +44,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+@Slf4j
 @Controller
 @RequiredArgsConstructor
 public class ChannelController {
@@ -140,7 +142,20 @@ public class ChannelController {
                 ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
                 : null;
             steamProfilePrivate = steamApiClient
-                .map(c -> !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken))
+                .map(c -> {
+                    try {
+                        return !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken)
+                            .orTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                            .exceptionally(e -> {
+                                log.warn("Steam profile check failed for user {}: {}", channelUser.getId(), e.getMessage());
+                                return true;
+                            })
+                            .join();
+                    } catch (Exception e) {
+                        log.warn("Steam profile check failed for user {}: {}", channelUser.getId(), e.getMessage());
+                        return false;
+                    }
+                })
                 .orElse(false);
         }
         model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
@@ -218,7 +233,20 @@ public class ChannelController {
                 ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
                 : null;
             steamProfilePrivate = steamApiClient
-                .map(c -> !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken))
+                .map(c -> {
+                    try {
+                        return !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken)
+                            .orTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                            .exceptionally(e -> {
+                                log.warn("Steam profile check failed for user {}: {}", channelUser.getId(), e.getMessage());
+                                return true;
+                            })
+                            .join();
+                    } catch (Exception e) {
+                        log.warn("Steam profile check failed for user {}: {}", channelUser.getId(), e.getMessage());
+                        return false;
+                    }
+                })
                 .orElse(false);
         }
 

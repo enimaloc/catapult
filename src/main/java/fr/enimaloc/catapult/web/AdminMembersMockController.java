@@ -81,7 +81,7 @@ public class AdminMembersMockController {
         if (user.getSteamId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User has no Steam ID");
         }
-        if (mockSteamApiClient.isProfilePublic(user.getSteamId())) {
+        if (mockSteamApiClient.isProfilePublic(user.getSteamId()).join()) {
             mockSteamApiClient.setProfilePrivate(user.getSteamId());
         } else {
             mockSteamApiClient.setProfilePublic(user.getSteamId());
