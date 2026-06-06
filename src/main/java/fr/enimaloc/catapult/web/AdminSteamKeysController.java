@@ -36,6 +36,9 @@ public class AdminSteamKeysController {
     @PostMapping("/add")
     public String add(@RequestParam String apiKey) {
         String trimmed = apiKey.trim();
+        if (!trimmed.matches("[0-9A-Fa-f]{32}")) {
+            return "redirect:/admin/steam-keys?error=invalid";
+        }
         if (!repository.existsById(trimmed)) {
             repository.save(new SteamApiKeyEntry(trimmed));
             if (rotator != null) rotator.refreshKeys();

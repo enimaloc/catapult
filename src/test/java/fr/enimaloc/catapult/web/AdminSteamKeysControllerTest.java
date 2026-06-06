@@ -49,20 +49,28 @@ class AdminSteamKeysControllerTest {
 
     @Test
     void add_savesNewKey_andRefreshesRotator() {
-        when(repository.existsById("NEW_KEY")).thenReturn(false);
+        when(repository.existsById("ABCD1234ABCD1234ABCD1234ABCD1234")).thenReturn(false);
 
-        String view = controller.add("  NEW_KEY  ");
+        String view = controller.add("  ABCD1234ABCD1234ABCD1234ABCD1234  ");
 
-        verify(repository).save(argThat(e -> e.getApiKey().equals("NEW_KEY")));
+        verify(repository).save(argThat(e -> e.getApiKey().equals("ABCD1234ABCD1234ABCD1234ABCD1234")));
         verify(rotator).refreshKeys();
         assertThat(view).isEqualTo("redirect:/admin/steam-keys");
     }
 
     @Test
-    void add_skipsAlreadyPresentKey() {
-        when(repository.existsById("EXISTS")).thenReturn(true);
+    void add_rejectsInvalidKeyFormat() {
+        String view = controller.add("NOT_A_VALID_KEY");
+        verify(repository, never()).save(any());
+        verify(rotator, never()).refreshKeys();
+        assertThat(view).isEqualTo("redirect:/admin/steam-keys?error=invalid");
+    }
 
-        controller.add("EXISTS");
+    @Test
+    void add_skipsAlreadyPresentKey() {
+        when(repository.existsById("ABCD1234ABCD1234ABCD1234ABCD1234")).thenReturn(true);
+
+        controller.add("ABCD1234ABCD1234ABCD1234ABCD1234");
 
         verify(repository, never()).save(any());
         verify(rotator, never()).refreshKeys();
