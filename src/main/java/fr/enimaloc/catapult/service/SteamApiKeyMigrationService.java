@@ -29,7 +29,6 @@ public class SteamApiKeyMigrationService implements ApplicationRunner {
     @Setter
     private SteamApiKeyRotator rotator;
 
-    @Autowired
     public SteamApiKeyMigrationService(SteamApiKeyRepository repository,
                                        @Autowired(required = false) SteamApiKeyRotator rotator) {
         this.repository = repository;
@@ -46,7 +45,7 @@ public class SteamApiKeyMigrationService implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        List<String> allKeys = new ArrayList<>(apiKeys);
+        List<String> allKeys = new ArrayList<>(apiKeys.stream().distinct().toList());
         if (!legacyApiKey.isBlank() && !allKeys.contains(legacyApiKey)) {
             allKeys.add(legacyApiKey);
         }
