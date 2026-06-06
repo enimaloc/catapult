@@ -45,4 +45,8 @@ public interface SteamApiClient {
     default CompletableFuture<List<String>> getOwnedGameIds(String steamId) {
         return CompletableFuture.completedFuture(List.of());
     }
+
+    default boolean isRateLimited() {
+        return false;
+    }
 }
