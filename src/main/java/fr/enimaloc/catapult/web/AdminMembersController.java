@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
+import jakarta.servlet.http.HttpSession;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +59,9 @@ public class AdminMembersController {
                                 @AuthenticationPrincipal CatapultOAuth2User principal) {
         UserAccount user = userAccountRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (user.isSystemAccount()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
         if (Objects.equals(user.getTwitchId(), principal.getUserAccount().getTwitchId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
@@ -99,6 +103,9 @@ public class AdminMembersController {
                               @RequestParam(defaultValue = "false") boolean migrateBindings) {
         UserAccount source = userAccountRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (source.isSystemAccount()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
         UserAccount target = userAccountRepository.findById(targetId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (source.getId().equals(target.getId())) {
@@ -112,6 +119,17 @@ public class AdminMembersController {
         adminMigrationService.migrate(source, target,
             new AdminMigrationService.MigrateOptions(migrateSettings, migrateGetters, migrateBindings));
         return "redirect:/admin/members";
+    }
+
+    @GetMapping("/{id}/bot/link-twitch")
+    public String linkBotTwitch(@PathVariable UUID id, HttpSession session) {
+        UserAccount account = userAccountRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!account.isSystemAccount()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        session.setAttribute("bot-link-pending", id.toString());
+        return "redirect:/oauth2/authorization/twitch";
     }
 
     @GetMapping
