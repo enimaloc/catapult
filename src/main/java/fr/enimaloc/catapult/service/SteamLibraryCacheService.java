@@ -64,6 +64,10 @@ public class SteamLibraryCacheService {
                     return;
                 }
                 igdbService.prewarmSteamAppIds(appIds);
+            })
+            .exceptionally(e -> {
+                log.warn("Failed to cache Steam library for steamId={}: {}", user.getSteamId(), e.getMessage());
+                return null;
             });
     }
 }

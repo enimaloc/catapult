@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -40,11 +41,13 @@ public class SchedulerService {
                 .findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
 
             steamGameGetter.ifPresent(getter -> {
+                CompletableFuture<Void> prefetch = getter.prefetchBatch(
+                    activeUsers.stream().filter(u -> u.getSteamId() != null).toList()
+                );
                 try {
-                    getter.prefetchBatch(
-                        activeUsers.stream().filter(u -> u.getSteamId() != null).toList()
-                    ).get(5, java.util.concurrent.TimeUnit.SECONDS);
+                    prefetch.get(5, java.util.concurrent.TimeUnit.SECONDS);
                 } catch (java.util.concurrent.TimeoutException e) {
+                    prefetch.cancel(false);
                     log.warn("Steam prefetch timed out after 5s — proceeding with partial results");
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
