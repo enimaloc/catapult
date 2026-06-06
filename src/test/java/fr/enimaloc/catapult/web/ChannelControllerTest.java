@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import org.mockito.ArgumentCaptor;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -199,7 +200,8 @@ class ChannelControllerTest {
     void fragmentConnections_privateProfile_setsSteamProfilePrivateTrue() throws Exception {
         owner.setSteamId("76561198000000001");
         when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
-        when(steamApiClient.isProfilePublic("76561198000000001", null)).thenReturn(false);
+        when(steamApiClient.isProfilePublic("76561198000000001", null))
+            .thenReturn(CompletableFuture.completedFuture(false));
 
         mockMvc.perform(get("/channels/streamer/fragments/connections")
                 .with(authentication(ownerAuth)))
@@ -211,7 +213,8 @@ class ChannelControllerTest {
     void fragmentConnections_publicProfile_setsSteamProfilePrivateFalse() throws Exception {
         owner.setSteamId("76561198000000001");
         when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
-        when(steamApiClient.isProfilePublic("76561198000000001", null)).thenReturn(true);
+        when(steamApiClient.isProfilePublic("76561198000000001", null))
+            .thenReturn(CompletableFuture.completedFuture(true));
 
         mockMvc.perform(get("/channels/streamer/fragments/connections")
                 .with(authentication(ownerAuth)))
