@@ -2,6 +2,8 @@ package fr.enimaloc.catapult.getter;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Profile;
@@ -19,7 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -46,45 +50,70 @@ public class RealSteamApiClient implements SteamApiClient {
     private final SteamRateLimiter rateLimiter;
     private final Map<CacheKey, CachedProfileStatus> profileCache = new ConcurrentHashMap<>();
 
+    @Autowired
+    @Qualifier("steamExecutor")
+    private Executor steamExecutor;
+
+    // -------------------------------------------------------------------------
+    // SteamApiClient implementation
+    // -------------------------------------------------------------------------
+
     @Override
-    public Optional<PlayerSummary> getPlayerSummary(String steamId, String personalToken) {
-        return fetchPlayer(steamId, personalToken).flatMap(player -> {
-            Object gameId   = player.get("gameid");
-            Object gameName = player.get("gameextrainfo");
-            if (gameId == null || gameName == null) return Optional.empty();
-            return Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName)));
-        });
+    public CompletableFuture<Optional<PlayerSummary>> getPlayerSummary(String steamId, String personalToken) {
+        return CompletableFuture.supplyAsync(
+            () -> fetchPlayer(steamId, personalToken).flatMap(player -> {
+                Object gameId   = player.get("gameid");
+                Object gameName = player.get("gameextrainfo");
+                if (gameId == null || gameName == null) return Optional.empty();
+                return Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName)));
+            }),
+            steamExecutor
+        );
     }
 
     @Override
-    public boolean isProfilePublic(String steamId) {
+    public CompletableFuture<Boolean> isProfilePublic(String steamId) {
         return isProfilePublic(steamId, null);
     }
 
     @Override
-    public boolean isProfilePublic(String steamId, String personalToken) {
+    public CompletableFuture<Boolean> isProfilePublic(String steamId, String personalToken) {
         String tokenKey = (personalToken != null && !personalToken.isBlank()) ? personalToken : "";
         CacheKey key = new CacheKey(steamId, tokenKey);
         CachedProfileStatus cached = profileCache.get(key);
-        if (cached != null && !cached.isExpired()) return cached.isPublic();
-
-        CachedProfileStatus fresh = profileCache.compute(key, (k, existing) -> {
-            if (existing != null && !existing.isExpired()) return existing;
-            boolean result = fetchIsProfilePublic(steamId, personalToken);
-            return new CachedProfileStatus(result, Instant.now().plus(profileCacheTtl));
-        });
-        return fresh.isPublic();
+        if (cached != null && !cached.isExpired()) {
+            return CompletableFuture.completedFuture(cached.isPublic());
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            CachedProfileStatus fresh = profileCache.compute(key, (k, existing) -> {
+                if (existing != null && !existing.isExpired()) return existing;
+                boolean result = fetchIsProfilePublic(steamId, personalToken);
+                return new CachedProfileStatus(result, Instant.now().plus(profileCacheTtl));
+            });
+            return fresh.isPublic();
+        }, steamExecutor);
     }
 
     @Override
-    public Map<String, Optional<PlayerSummary>> getPlayerSummaries(Collection<String> steamIds) {
-        Map<String, Optional<PlayerSummary>> result = new HashMap<>();
-        List<String> idList = new ArrayList<>(steamIds);
-        for (int i = 0; i < idList.size(); i += 100) {
-            result.putAll(fetchPlayerBatch(idList.subList(i, Math.min(i + 100, idList.size()))));
-        }
-        return result;
+    public CompletableFuture<Map<String, Optional<PlayerSummary>>> getPlayerSummaries(Collection<String> steamIds) {
+        return CompletableFuture.supplyAsync(() -> {
+            Map<String, Optional<PlayerSummary>> result = new HashMap<>();
+            List<String> idList = new ArrayList<>(steamIds);
+            for (int i = 0; i < idList.size(); i += 100) {
+                result.putAll(fetchPlayerBatch(idList.subList(i, Math.min(i + 100, idList.size()))));
+            }
+            return result;
+        }, steamExecutor);
     }
+
+    @Override
+    public CompletableFuture<List<String>> getOwnedGameIds(String steamId) {
+        return CompletableFuture.supplyAsync(() -> fetchOwnedGameIds(steamId), steamExecutor);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private HTTP helpers (synchronous, called from virtual threads)
+    // -------------------------------------------------------------------------
 
     @SuppressWarnings("unchecked")
     private Map<String, Optional<PlayerSummary>> fetchPlayerBatch(List<String> steamIds) {
@@ -221,15 +250,12 @@ public class RealSteamApiClient implements SteamApiClient {
         }
     }
 
-    @Override
     @SuppressWarnings("unchecked")
-    public List<String> getOwnedGameIds(String steamId) {
+    private List<String> fetchOwnedGameIds(String steamId) {
         if (steamApiKey.isBlank()) return List.of();
 
-        if (!rateLimiter.acquire()) {
-            log.warn("Steam rate limit reached, skipping owned games fetch for {}", steamId);
-            return List.of();
-        }
+        // acquireBlocking() — background task, can wait indefinitely on the semaphore
+        if (!rateLimiter.acquireBlocking()) return List.of();
 
         String url = UriComponentsBuilder
             .fromUriString(OWNED_GAMES_URL)
