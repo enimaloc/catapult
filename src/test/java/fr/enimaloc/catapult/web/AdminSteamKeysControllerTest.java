@@ -12,6 +12,7 @@ import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -24,27 +25,46 @@ class AdminSteamKeysControllerTest {
     @InjectMocks AdminSteamKeysController controller;
 
     @Test
-    void page_populatesEntries_andSteamEnabled() {
+    void page_populatesKeyStatuses_andSteamEnabled() {
         SteamApiKeyEntry entry = new SteamApiKeyEntry("ABCD1234ABCD1234ABCD1234ABCD1234");
-        when(repository.findByExclusiveFalse()).thenReturn(List.of(entry));
+        when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of(entry));
+        when(rotator.getKeyBlockedUntil()).thenReturn(Map.of());
 
         Model model = new ExtendedModelMap();
         String view = controller.page(model);
 
         assertThat(view).isEqualTo("admin/steam-keys");
-        assertThat(model.getAttribute("entries")).isEqualTo(List.of(entry));
+        assertThat(model.getAttribute("keyStatuses")).isNotNull();
         assertThat(model.getAttribute("steamEnabled")).isEqualTo(true);
     }
 
     @Test
     void page_steamEnabled_falseWhenRotatorNull() {
         controller = new AdminSteamKeysController(repository);
-        when(repository.findByExclusiveFalse()).thenReturn(List.of());
+        when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of());
 
         Model model = new ExtendedModelMap();
         controller.page(model);
 
         assertThat(model.getAttribute("steamEnabled")).isEqualTo(false);
+    }
+
+    @Test
+    void page_blockedKey_showsRemainingSeconds() {
+        SteamApiKeyEntry entry = new SteamApiKeyEntry("ABCD1234ABCD1234ABCD1234ABCD1234");
+        long blockedUntil = System.currentTimeMillis() + 60_000L;
+        when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of(entry));
+        when(rotator.getKeyBlockedUntil()).thenReturn(Map.of("ABCD1234ABCD1234ABCD1234ABCD1234", blockedUntil));
+
+        Model model = new ExtendedModelMap();
+        controller.page(model);
+
+        @SuppressWarnings("unchecked")
+        var statuses = (java.util.Map<String, AdminSteamKeysController.KeyStatus>) model.getAttribute("keyStatuses");
+        assertThat(statuses).isNotNull();
+        AdminSteamKeysController.KeyStatus status = statuses.get("ABCD1234ABCD1234ABCD1234ABCD1234");
+        assertThat(status.blocked()).isTrue();
+        assertThat(status.blockedForSeconds()).isGreaterThan(0);
     }
 
     @Test
@@ -81,6 +101,14 @@ class AdminSteamKeysControllerTest {
         String view = controller.delete("OLD_KEY");
 
         verify(repository).deleteById("OLD_KEY");
+        verify(rotator).refreshKeys();
+        assertThat(view).isEqualTo("redirect:/admin/steam-keys");
+    }
+
+    @Test
+    void refresh_callsRotatorRefresh() {
+        String view = controller.refresh();
+
         verify(rotator).refreshKeys();
         assertThat(view).isEqualTo("redirect:/admin/steam-keys");
     }

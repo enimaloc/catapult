@@ -8,9 +8,16 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
 @Controller
 @RequestMapping("/admin/steam-keys")
 public class AdminSteamKeysController {
+
+    public record KeyStatus(String masked, String owner, boolean blocked, long blockedForSeconds) {}
 
     private final SteamApiKeyRepository repository;
     private final SteamApiKeyRotator rotator;
@@ -28,7 +35,24 @@ public class AdminSteamKeysController {
 
     @GetMapping
     public String page(Model model) {
-        model.addAttribute("entries", repository.findByExclusiveFalse());
+        List<SteamApiKeyEntry> entries = repository.findByExclusiveFalseWithOwner();
+        Map<String, Long> blockedUntil = rotator != null ? rotator.getKeyBlockedUntil() : Map.of();
+        long now = System.currentTimeMillis();
+
+        Map<String, KeyStatus> keyStatuses = new LinkedHashMap<>();
+        for (SteamApiKeyEntry entry : entries) {
+            String key = entry.getApiKey();
+            String masked = key.length() > 8
+                ? key.substring(0, 4) + "…" + key.substring(key.length() - 4)
+                : "…";
+            String owner = entry.getOwner() != null ? entry.getOwner().getTwitchUsername() : null;
+            long until = blockedUntil.getOrDefault(key, 0L);
+            boolean blocked = until > now;
+            long remainingSec = blocked ? TimeUnit.MILLISECONDS.toSeconds(until - now) : 0L;
+            keyStatuses.put(key, new KeyStatus(masked, owner, blocked, remainingSec));
+        }
+
+        model.addAttribute("keyStatuses", keyStatuses);
         model.addAttribute("steamEnabled", rotator != null);
         return "admin/steam-keys";
     }
@@ -49,6 +73,12 @@ public class AdminSteamKeysController {
     @PostMapping("/delete")
     public String delete(@RequestParam String apiKey) {
         repository.deleteById(apiKey);
+        if (rotator != null) rotator.refreshKeys();
+        return "redirect:/admin/steam-keys";
+    }
+
+    @PostMapping("/refresh")
+    public String refresh() {
         if (rotator != null) rotator.refreshKeys();
         return "redirect:/admin/steam-keys";
     }
