@@ -41,23 +41,23 @@ public class RealSteamApiClient implements SteamApiClient {
     private static final String RESPONSE_KEY = "response";
     private static final String STEAMID_KEY  = "steamid";
 
-    @Value("${steam.api-key:}")
-    private String steamApiKey;
-
     @Value("${steam.profile-cache.ttl:PT15M}")
     private Duration profileCacheTtl;
 
     private final RestClient restClient;
     private final SteamRateLimiter rateLimiter;
     private final Executor steamExecutor;
+    private final SteamApiKeyRotator rotator;
     private final Map<CacheKey, CachedProfileStatus> profileCache = new ConcurrentHashMap<>();
 
     @Autowired
     public RealSteamApiClient(RestClient restClient, SteamRateLimiter rateLimiter,
-                               @Qualifier("steamExecutor") Executor steamExecutor) {
+                               @Qualifier("steamExecutor") Executor steamExecutor,
+                               SteamApiKeyRotator rotator) {
         this.restClient = restClient;
         this.rateLimiter = rateLimiter;
         this.steamExecutor = steamExecutor;
+        this.rotator = rotator;
     }
 
     // -------------------------------------------------------------------------
@@ -126,7 +126,12 @@ public class RealSteamApiClient implements SteamApiClient {
         Map<String, Optional<PlayerSummary>> result = steamIds.stream()
             .collect(Collectors.toMap(id -> id, id -> Optional.empty()));
 
-        if (steamApiKey.isBlank()) return result;
+        Optional<String> keyOpt = rotator.nextKey();
+        if (keyOpt.isEmpty()) {
+            log.warn("No Steam API key available, skipping batch of {} users", steamIds.size());
+            return result;
+        }
+        String apiKey = keyOpt.get();
 
         if (!rateLimiter.acquire()) {
             log.warn("Steam rate limit reached, skipping batch of {} users", steamIds.size());
@@ -135,7 +140,7 @@ public class RealSteamApiClient implements SteamApiClient {
 
         String url = UriComponentsBuilder
             .fromUriString(PLAYER_SUMMARIES_URL)
-            .queryParam("key", steamApiKey)
+            .queryParam("key", apiKey)
             .queryParam("steamids", String.join(",", steamIds))
             .toUriString();
 
@@ -160,7 +165,7 @@ public class RealSteamApiClient implements SteamApiClient {
             }
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
-            rateLimiter.onRateLimitResponse(retryAfter);
+            rotator.onKeyRateLimited(apiKey, retryAfter);
             log.warn("Steam API 429 during batch fetch: retry after {}s", retryAfter);
         } catch (Exception e) {
             log.warn("Failed to batch-fetch Steam player summaries: {}", e.getMessage());
@@ -182,8 +187,20 @@ public class RealSteamApiClient implements SteamApiClient {
 
     @SuppressWarnings("unchecked")
     private boolean isGameListVisible(String steamId, String personalToken) {
-        String key = (personalToken != null && !personalToken.isBlank()) ? personalToken : steamApiKey;
-        if (key.isBlank()) return false;
+        String key;
+        boolean usedRotator;
+        if (personalToken != null && !personalToken.isBlank()) {
+            key = personalToken;
+            usedRotator = false;
+        } else {
+            Optional<String> keyOpt = rotator.nextKey();
+            if (keyOpt.isEmpty()) {
+                log.warn("No Steam API key available for game list visibility check {}", steamId);
+                return false;
+            }
+            key = keyOpt.get();
+            usedRotator = true;
+        }
 
         if (!rateLimiter.acquire()) {
             log.warn("Steam rate limit reached, skipping game list visibility check for {}", steamId);
@@ -207,7 +224,8 @@ public class RealSteamApiClient implements SteamApiClient {
             return responseBody != null && responseBody.containsKey("game_count");
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
-            rateLimiter.onRateLimitResponse(retryAfter);
+            if (usedRotator) rotator.onKeyRateLimited(key, retryAfter);
+            else rateLimiter.onRateLimitResponse(retryAfter);
             log.warn("Steam API 429 for {}: retry after {}s", steamId, retryAfter);
             return false;
         } catch (Exception e) {
@@ -218,7 +236,20 @@ public class RealSteamApiClient implements SteamApiClient {
 
     @SuppressWarnings("unchecked")
     private Optional<Map<String, Object>> fetchPlayer(String steamId, String personalToken) {
-        String token = (personalToken != null && !personalToken.isBlank()) ? personalToken : steamApiKey;
+        String token;
+        boolean usedRotator;
+        if (personalToken != null && !personalToken.isBlank()) {
+            token = personalToken;
+            usedRotator = false;
+        } else {
+            Optional<String> keyOpt = rotator.nextKey();
+            if (keyOpt.isEmpty()) {
+                log.warn("No Steam API key available for player fetch {}", steamId);
+                return Optional.empty();
+            }
+            token = keyOpt.get();
+            usedRotator = true;
+        }
 
         if (!rateLimiter.acquire()) {
             log.warn("Steam rate limit reached, skipping player fetch for {}", steamId);
@@ -247,7 +278,8 @@ public class RealSteamApiClient implements SteamApiClient {
             return Optional.of(players.getFirst());
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
-            rateLimiter.onRateLimitResponse(retryAfter);
+            if (usedRotator) rotator.onKeyRateLimited(token, retryAfter);
+            else rateLimiter.onRateLimitResponse(retryAfter);
             log.warn("Steam API 429 for {}: retry after {}s", steamId, retryAfter);
             return Optional.empty();
         } catch (Exception e) {
@@ -258,14 +290,18 @@ public class RealSteamApiClient implements SteamApiClient {
 
     @SuppressWarnings("unchecked")
     private List<String> fetchOwnedGameIds(String steamId) {
-        if (steamApiKey.isBlank()) return List.of();
+        Optional<String> keyOpt = rotator.nextKey();
+        if (keyOpt.isEmpty()) {
+            log.warn("No Steam API key available for owned game fetch {}", steamId);
+            return List.of();
+        }
+        String apiKey = keyOpt.get();
 
-        // acquireBlocking() — background task, can wait indefinitely on the semaphore
         if (!rateLimiter.acquireBlocking()) return List.of();
 
         String url = UriComponentsBuilder
             .fromUriString(OWNED_GAMES_URL)
-            .queryParam("key", steamApiKey)
+            .queryParam("key", apiKey)
             .queryParam("steamid", steamId)
             .queryParam("include_appinfo", 1)
             .toUriString();
@@ -284,7 +320,7 @@ public class RealSteamApiClient implements SteamApiClient {
                 .toList();
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
-            rateLimiter.onRateLimitResponse(retryAfter);
+            rotator.onKeyRateLimited(apiKey, retryAfter);
             log.warn("Steam API 429 fetching owned games for {}: retry after {}s", steamId, retryAfter);
             return List.of();
         } catch (Exception e) {
