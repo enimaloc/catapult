@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -19,13 +20,13 @@ public class MockSteamApiClient implements SteamApiClient {
     private final Set<String> privateProfiles = ConcurrentHashMap.newKeySet();
 
     @Override
-    public Optional<PlayerSummary> getPlayerSummary(String steamId, String personalToken) {
-        return Optional.ofNullable(gameByUser.get(steamId));
+    public CompletableFuture<Optional<PlayerSummary>> getPlayerSummary(String steamId, String personalToken) {
+        return CompletableFuture.completedFuture(Optional.ofNullable(gameByUser.get(steamId)));
     }
 
     @Override
-    public boolean isProfilePublic(String steamId) {
-        return !privateProfiles.contains(steamId);
+    public CompletableFuture<Boolean> isProfilePublic(String steamId) {
+        return CompletableFuture.completedFuture(!privateProfiles.contains(steamId));
     }
 
     public void setGameForUser(String steamId, String gameId, String gameName) {
