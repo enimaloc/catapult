@@ -39,9 +39,19 @@ public class SchedulerService {
             List<UserAccount> activeUsers = userAccountRepository
                 .findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
 
-            steamGameGetter.ifPresent(getter -> getter.prefetchBatch(
-                activeUsers.stream().filter(u -> u.getSteamId() != null).toList()
-            ));
+            steamGameGetter.ifPresent(getter -> {
+                try {
+                    getter.prefetchBatch(
+                        activeUsers.stream().filter(u -> u.getSteamId() != null).toList()
+                    ).get(5, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (java.util.concurrent.TimeoutException e) {
+                    log.warn("Steam prefetch timed out after 5s — proceeding with partial results");
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (java.util.concurrent.ExecutionException e) {
+                    log.warn("Steam prefetch failed: {}", e.getCause().getMessage());
+                }
+            });
 
             for (UserAccount user : activeUsers) {
                 try {
