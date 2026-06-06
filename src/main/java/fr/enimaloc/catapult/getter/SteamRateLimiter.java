@@ -22,30 +22,46 @@ public class SteamRateLimiter {
     // 200 req/5min ≈ 0.67 req/s; 3 permits per 5s window stays safely under that.
     private final int permitsPerWindow;
     private final long maxWaitMs;
+    private final long windowMs;
     private final Semaphore semaphore;
     private volatile long blockedUntil = 0;
 
     public SteamRateLimiter(
         @Value("${steam.rate-limit.permits-per-window:3}") int permitsPerWindow,
-        @Value("${steam.rate-limit.max-wait-ms:2000}") long maxWaitMs
+        @Value("${steam.rate-limit.max-wait-ms:2000}") long maxWaitMs,
+        @Value("${steam.rate-limit.window-ms:5000}") long windowMs
     ) {
         this.permitsPerWindow = permitsPerWindow;
         this.maxWaitMs = maxWaitMs;
+        this.windowMs = windowMs;
         this.semaphore = new Semaphore(permitsPerWindow, true);
     }
 
     /**
      * Acquire a permit before making a Steam API call.
-     * Waits up to maxWaitMs for a token to become available.
-     * Returns false if rate-limited and the timeout expires.
+     * Fast-fails immediately if within the 429 penalty window.
+     * Otherwise waits up to maxWaitMs for a token to become available.
      */
     public boolean acquire() {
+        if (System.currentTimeMillis() < blockedUntil) return false;
         try {
             return semaphore.tryAcquire(maxWaitMs, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
         }
+    }
+
+    /**
+     * Returns how long (ms) a background task should sleep before calling acquire(),
+     * accounting for the current penalty window and one replenishment cycle.
+     * Returns 0 when tokens are likely available immediately.
+     */
+    public long millisUntilAvailable() {
+        long remaining = blockedUntil - System.currentTimeMillis();
+        if (remaining <= 0) return 0;
+        // Wait through the penalty window + one replenishment cycle to ensure tokens are added
+        return remaining + windowMs;
     }
 
     /**
