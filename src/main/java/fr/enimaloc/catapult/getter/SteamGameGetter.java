@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -21,14 +23,14 @@ public class SteamGameGetter implements GameGetter {
     private final SteamApiClient steamApiClient;
     private final TokenEncryptionService tokenEncryptionService;
 
-    private Map<String, Optional<SteamApiClient.PlayerSummary>> cycleCache = Map.of();
+    private volatile Map<String, Optional<SteamApiClient.PlayerSummary>> cycleCache = Map.of();
 
     @Override
     public String name() {
         return "Steam";
     }
 
-    public void prefetchBatch(List<UserAccount> users) {
+    public CompletableFuture<Void> prefetchBatch(List<UserAccount> users) {
         List<String> batchIds = users.stream()
             .filter(u -> u.getSteamId() != null && u.getSteamPersonalToken() == null)
             .map(UserAccount::getSteamId)
@@ -36,11 +38,11 @@ public class SteamGameGetter implements GameGetter {
 
         if (batchIds.isEmpty()) {
             cycleCache = Map.of();
-            return;
+            return CompletableFuture.completedFuture(null);
         }
 
-        cycleCache = steamApiClient.getPlayerSummaries(batchIds);
-        log.debug("Prefetched Steam summaries for {} users (batch)", batchIds.size());
+        return steamApiClient.getPlayerSummaries(batchIds)
+            .thenAccept(result -> cycleCache = result);
     }
 
     public void clearCycleCache() {
@@ -56,10 +58,16 @@ public class SteamGameGetter implements GameGetter {
                     .map(p -> new DetectedGame(p.gameId(), GameBinding.SourceType.STEAM, p.gameName()));
             }
             String decryptedPersonalToken = user.getSteamPersonalToken() != null
-                    ? tokenEncryptionService.decrypt(user.getSteamPersonalToken())
-                    : null;
+                ? tokenEncryptionService.decrypt(user.getSteamPersonalToken())
+                : null;
             return steamApiClient.getPlayerSummary(user.getSteamId(), decryptedPersonalToken)
-                .map(p -> new DetectedGame(p.gameId(), GameBinding.SourceType.STEAM, p.gameName()));
+                .orTimeout(2, TimeUnit.SECONDS)
+                .exceptionally(e -> {
+                    log.warn("Steam getPlayerSummary timed out or failed for {}: {}", user.getSteamId(), e.getMessage());
+                    return Optional.empty();
+                })
+                .thenApply(opt -> opt.map(p -> new DetectedGame(p.gameId(), GameBinding.SourceType.STEAM, p.gameName())))
+                .join();
         } catch (Exception e) {
             log.warn("Failed to fetch current game from Steam for user {}: {}", user.getId(), e.getMessage());
             return Optional.empty();
