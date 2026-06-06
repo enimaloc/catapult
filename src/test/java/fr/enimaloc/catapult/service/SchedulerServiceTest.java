@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.getter.GameGetterChain;
+import fr.enimaloc.catapult.getter.SteamGameGetter;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +38,8 @@ class SchedulerServiceTest {
     void setUp() {
         registry = new SimpleMeterRegistry();
         schedulerService = new SchedulerService(
-            userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry);
+            userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
+            Optional.empty());
     }
 
     @Test
