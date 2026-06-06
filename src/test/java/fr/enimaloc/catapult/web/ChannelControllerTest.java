@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import org.mockito.ArgumentCaptor;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -72,6 +74,7 @@ class ChannelControllerTest {
     @MockitoBean ExperimentService experimentService;
     @MockitoBean SteamApiClient steamApiClient;
     @MockitoBean TokenEncryptionService tokenEncryptionService;
+    @MockitoBean SteamApiKeyRepository steamApiKeyRepository;
 
     private UserAccount owner;
     private UserAccount moderator;
@@ -199,7 +202,8 @@ class ChannelControllerTest {
     void fragmentConnections_privateProfile_setsSteamProfilePrivateTrue() throws Exception {
         owner.setSteamId("76561198000000001");
         when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
-        when(steamApiClient.isProfilePublic("76561198000000001", null)).thenReturn(false);
+        when(steamApiClient.isProfilePublic("76561198000000001", null))
+            .thenReturn(CompletableFuture.completedFuture(false));
 
         mockMvc.perform(get("/channels/streamer/fragments/connections")
                 .with(authentication(ownerAuth)))
@@ -211,7 +215,8 @@ class ChannelControllerTest {
     void fragmentConnections_publicProfile_setsSteamProfilePrivateFalse() throws Exception {
         owner.setSteamId("76561198000000001");
         when(channelAccessService.canAccess(owner, owner)).thenReturn(true);
-        when(steamApiClient.isProfilePublic("76561198000000001", null)).thenReturn(true);
+        when(steamApiClient.isProfilePublic("76561198000000001", null))
+            .thenReturn(CompletableFuture.completedFuture(true));
 
         mockMvc.perform(get("/channels/streamer/fragments/connections")
                 .with(authentication(ownerAuth)))

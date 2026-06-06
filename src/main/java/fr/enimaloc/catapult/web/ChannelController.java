@@ -6,7 +6,11 @@ import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.SteamApiClient;
+import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
+import fr.enimaloc.catapult.getter.SteamRateLimiter;
+import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
@@ -24,6 +28,8 @@ import fr.enimaloc.catapult.service.EventSubService;
 import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -42,7 +48,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Controller
 @RequiredArgsConstructor
 public class ChannelController {
@@ -56,6 +64,12 @@ public class ChannelController {
 
     @Value("${steam.api-key:}")
     private String steamApiKey;
+
+    @Autowired(required = false)
+    private SteamApiKeyRotator rotator;
+
+    @Autowired(required = false)
+    private SteamRateLimiter steamRateLimiter;
 
     private final UserAccountRepository userAccountRepository;
     private final ChannelAccessService channelAccessService;
@@ -73,6 +87,7 @@ public class ChannelController {
     private final ExperimentService experimentService;
     private final Optional<SteamApiClient> steamApiClient;
     private final TokenEncryptionService tokenEncryptionService;
+    private final SteamApiKeyRepository steamApiKeyRepository;
 
     // -------------------------------------------------------------------------
     // Model attributes
@@ -132,21 +147,42 @@ public class ChannelController {
             .map(UserSettings::getBlockedCcls).orElse(Set.of()));
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterSource", source);
-        boolean hasSteam = !steamApiKey.isBlank() && channelUser.getSteamId() != null;
+        boolean hasSteam = steamKeyAvailable() && channelUser.getSteamId() != null;
         boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
+        boolean steamTokenShared = channelUser.isSteamTokenShared();
         boolean steamProfilePrivate = false;
+        boolean steamRateLimited = false;
         if (hasSteam && isOwner) {
             String decryptedPersonalToken = hasSteamPersonalToken
                 ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
                 : null;
             steamProfilePrivate = steamApiClient
-                .map(c -> !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken))
+                .map(c -> {
+                    try {
+                        return !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken) // nosemgrep
+                            .orTimeout(2, TimeUnit.SECONDS)
+                            .exceptionally(e -> {
+                                log.warn("Steam profile check failed for user {}: {}", channelUser.getId(), e.getMessage());
+                                return true;
+                            })
+                            .join();
+                    } catch (Exception e) {
+                        log.warn("Steam profile check failed for user {}: {}", channelUser.getId(), e.getMessage());
+                        return false;
+                    }
+                })
                 .orElse(false);
+            if (steamProfilePrivate && isSteamRateLimited()) {
+                steamRateLimited = true;
+                steamProfilePrivate = false;
+            }
         }
-        model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
+        model.addAttribute("hasSteamProvider", steamKeyAvailable());
         model.addAttribute("hasSteam", hasSteam);
         model.addAttribute("hasSteamPersonalToken", hasSteamPersonalToken);
+        model.addAttribute("steamTokenShared", steamTokenShared);
         model.addAttribute("steamProfilePrivate", steamProfilePrivate);
+        model.addAttribute("steamRateLimited", steamRateLimited);
 
         return "app";
     }
@@ -209,25 +245,46 @@ public class ChannelController {
         UserAccount channelUser = resolveAndCheck(username, principal);
         UserAccount viewer = principal.getUserAccount();
         boolean isOwner = viewer.getId().equals(channelUser.getId());
-        boolean hasSteam = !steamApiKey.isBlank() && channelUser.getSteamId() != null;
+        boolean hasSteam = steamKeyAvailable() && channelUser.getSteamId() != null;
         boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
+        boolean steamTokenShared = channelUser.isSteamTokenShared();
 
         boolean steamProfilePrivate = false;
+        boolean steamRateLimited = false;
         if (hasSteam && isOwner) {
             String decryptedPersonalToken = hasSteamPersonalToken
                 ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
                 : null;
             steamProfilePrivate = steamApiClient
-                .map(c -> !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken))
+                .map(c -> {
+                    try {
+                        return !c.isProfilePublic(channelUser.getSteamId(), decryptedPersonalToken) // nosemgrep
+                            .orTimeout(2, TimeUnit.SECONDS)
+                            .exceptionally(e -> {
+                                log.warn("Steam profile check failed for user {}: {}", channelUser.getId(), e.getMessage());
+                                return true;
+                            })
+                            .join();
+                    } catch (Exception e) {
+                        log.warn("Steam profile check failed for user {}: {}", channelUser.getId(), e.getMessage());
+                        return false;
+                    }
+                })
                 .orElse(false);
+            if (steamProfilePrivate && isSteamRateLimited()) {
+                steamRateLimited = true;
+                steamProfilePrivate = false;
+            }
         }
 
         model.addAttribute(ATTR_CHANNEL_USERNAME, username);
         model.addAttribute(ATTR_IS_OWNER, isOwner);
-        model.addAttribute("hasSteamProvider", !steamApiKey.isBlank());
+        model.addAttribute("hasSteamProvider", steamKeyAvailable());
         model.addAttribute("hasSteam", hasSteam);
         model.addAttribute("hasSteamPersonalToken", hasSteamPersonalToken);
+        model.addAttribute("steamTokenShared", steamTokenShared);
         model.addAttribute("steamProfilePrivate", steamProfilePrivate);
+        model.addAttribute("steamRateLimited", steamRateLimited);
         return "fragments/connections :: connections";
     }
 
@@ -455,14 +512,35 @@ public class ChannelController {
     public String saveSteamPersonalToken(
             @PathVariable String username,
             @AuthenticationPrincipal CatapultOAuth2User principal,
-            @RequestParam String token) {
+            @RequestParam String token,
+            @RequestParam(defaultValue = "false") boolean shared) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         requireOwner(principal.getUserAccount(), channelUser);
         if (token == null || token.isBlank()) {
             return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
         }
-        channelUser.setSteamPersonalToken(tokenEncryptionService.encrypt(token.trim()));
+        String trimmed = token.trim();
+        channelUser.setSteamPersonalToken(tokenEncryptionService.encrypt(trimmed));
+        channelUser.setSteamTokenShared(shared);
         userAccountRepository.save(channelUser);
+        syncTokenToPool(channelUser, trimmed, shared);
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
+    }
+
+    @PostMapping("/channels/{username}/settings/steam-personal-token/sharing")
+    public String updateSteamTokenSharing(
+            @PathVariable String username,
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            @RequestParam boolean shared) {
+        UserAccount channelUser = resolveAndCheck(username, principal);
+        requireOwner(principal.getUserAccount(), channelUser);
+        if (channelUser.getSteamPersonalToken() == null) {
+            return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
+        }
+        channelUser.setSteamTokenShared(shared);
+        userAccountRepository.save(channelUser);
+        String decryptedToken = tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken());
+        syncTokenToPool(channelUser, decryptedToken, shared);
         return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
@@ -473,7 +551,10 @@ public class ChannelController {
         UserAccount channelUser = resolveAndCheck(username, principal);
         requireOwner(principal.getUserAccount(), channelUser);
         channelUser.setSteamPersonalToken(null);
+        channelUser.setSteamTokenShared(false);
         userAccountRepository.save(channelUser);
+        steamApiKeyRepository.deleteByOwner(channelUser);
+        if (rotator != null) rotator.refreshKeys();
         return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
@@ -534,5 +615,27 @@ public class ChannelController {
         if (!viewer.getId().equals(channelUser.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+    }
+
+    private boolean steamKeyAvailable() {
+        if (rotator != null) return rotator.nextKey().isPresent();
+        return !steamApiKey.isBlank();
+    }
+
+    private boolean isSteamRateLimited() {
+        return (steamRateLimiter != null && steamRateLimiter.isBlocked())
+            || (rotator != null && rotator.isAllKeysBlocked())
+            || steamApiClient.map(SteamApiClient::isRateLimited).orElse(false);
+    }
+
+    private void syncTokenToPool(UserAccount user, String plainToken, boolean shared) {
+        steamApiKeyRepository.deleteByOwner(user);
+        if (!steamApiKeyRepository.existsById(plainToken)) {
+            SteamApiKeyEntry entry = new SteamApiKeyEntry(plainToken);
+            entry.setOwner(user);
+            entry.setExclusive(!shared);
+            steamApiKeyRepository.save(entry);
+        }
+        if (rotator != null) rotator.refreshKeys();
     }
 }

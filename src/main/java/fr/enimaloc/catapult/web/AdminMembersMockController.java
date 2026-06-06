@@ -81,11 +81,17 @@ public class AdminMembersMockController {
         if (user.getSteamId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User has no Steam ID");
         }
-        if (mockSteamApiClient.isProfilePublic(user.getSteamId())) {
+        if (mockSteamApiClient.isProfilePublic(user.getSteamId()).join()) {
             mockSteamApiClient.setProfilePrivate(user.getSteamId());
         } else {
             mockSteamApiClient.setProfilePublic(user.getSteamId());
         }
+        return REDIRECT_ADMIN_MEMBERS;
+    }
+
+    @PostMapping("/steam/toggle-rate-limit")
+    public String toggleSteamRateLimit() {
+        mockSteamApiClient.setRateLimited(!mockSteamApiClient.isRateLimited());
         return REDIRECT_ADMIN_MEMBERS;
     }
 
