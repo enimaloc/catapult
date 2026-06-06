@@ -57,6 +57,12 @@
                                    style="flex:1;" required/>
                             <button type="submit" class="btn btn-primary" th:text="#{connections.steam.modal.save}">Enregistrer</button>
                         </div>
+                        <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; margin-top:0.5rem; cursor:pointer;">
+                            <input type="hidden" name="shared" value="false"/>
+                            <input type="checkbox" name="shared" value="true"
+                                   onchange="this.previousElementSibling.disabled=this.checked"/>
+                            <span th:text="#{connections.steam.share_token}">Partager avec les autres profils</span>
+                        </label>
                     </form>
                 </div>
             </div>
@@ -85,6 +91,12 @@
                                style="flex:1;" required/>
                         <button type="submit" class="btn btn-primary" th:text="#{connections.steam.modal.save}">Enregistrer</button>
                     </div>
+                    <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; margin-top:0.5rem; cursor:pointer;">
+                        <input type="hidden" name="shared" value="false"/>
+                        <input type="checkbox" name="shared" value="true"
+                               onchange="this.previousElementSibling.disabled=this.checked"/>
+                        <span th:text="#{connections.steam.share_token}">Partager avec les autres profils</span>
+                    </label>
                 </form>
             </div>
         </div>

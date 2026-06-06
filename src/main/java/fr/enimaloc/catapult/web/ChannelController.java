@@ -8,7 +8,9 @@ import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
 import fr.enimaloc.catapult.getter.SteamRateLimiter;
+import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
@@ -85,6 +87,7 @@ public class ChannelController {
     private final ExperimentService experimentService;
     private final Optional<SteamApiClient> steamApiClient;
     private final TokenEncryptionService tokenEncryptionService;
+    private final SteamApiKeyRepository steamApiKeyRepository;
 
     // -------------------------------------------------------------------------
     // Model attributes
@@ -146,6 +149,7 @@ public class ChannelController {
         model.addAttribute("filterSource", source);
         boolean hasSteam = steamKeyAvailable() && channelUser.getSteamId() != null;
         boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
+        boolean steamTokenShared = channelUser.isSteamTokenShared();
         boolean steamProfilePrivate = false;
         boolean steamRateLimited = false;
         if (hasSteam && isOwner) {
@@ -176,6 +180,7 @@ public class ChannelController {
         model.addAttribute("hasSteamProvider", steamKeyAvailable());
         model.addAttribute("hasSteam", hasSteam);
         model.addAttribute("hasSteamPersonalToken", hasSteamPersonalToken);
+        model.addAttribute("steamTokenShared", steamTokenShared);
         model.addAttribute("steamProfilePrivate", steamProfilePrivate);
         model.addAttribute("steamRateLimited", steamRateLimited);
 
@@ -242,6 +247,7 @@ public class ChannelController {
         boolean isOwner = viewer.getId().equals(channelUser.getId());
         boolean hasSteam = steamKeyAvailable() && channelUser.getSteamId() != null;
         boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
+        boolean steamTokenShared = channelUser.isSteamTokenShared();
 
         boolean steamProfilePrivate = false;
         boolean steamRateLimited = false;
@@ -276,6 +282,7 @@ public class ChannelController {
         model.addAttribute("hasSteamProvider", steamKeyAvailable());
         model.addAttribute("hasSteam", hasSteam);
         model.addAttribute("hasSteamPersonalToken", hasSteamPersonalToken);
+        model.addAttribute("steamTokenShared", steamTokenShared);
         model.addAttribute("steamProfilePrivate", steamProfilePrivate);
         model.addAttribute("steamRateLimited", steamRateLimited);
         return "fragments/connections :: connections";
@@ -505,14 +512,35 @@ public class ChannelController {
     public String saveSteamPersonalToken(
             @PathVariable String username,
             @AuthenticationPrincipal CatapultOAuth2User principal,
-            @RequestParam String token) {
+            @RequestParam String token,
+            @RequestParam(defaultValue = "false") boolean shared) {
         UserAccount channelUser = resolveAndCheck(username, principal);
         requireOwner(principal.getUserAccount(), channelUser);
         if (token == null || token.isBlank()) {
             return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
         }
-        channelUser.setSteamPersonalToken(tokenEncryptionService.encrypt(token.trim()));
+        String trimmed = token.trim();
+        channelUser.setSteamPersonalToken(tokenEncryptionService.encrypt(trimmed));
+        channelUser.setSteamTokenShared(shared);
         userAccountRepository.save(channelUser);
+        syncTokenToPool(channelUser, trimmed, shared);
+        return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
+    }
+
+    @PostMapping("/channels/{username}/settings/steam-personal-token/sharing")
+    public String updateSteamTokenSharing(
+            @PathVariable String username,
+            @AuthenticationPrincipal CatapultOAuth2User principal,
+            @RequestParam boolean shared) {
+        UserAccount channelUser = resolveAndCheck(username, principal);
+        requireOwner(principal.getUserAccount(), channelUser);
+        if (channelUser.getSteamPersonalToken() == null) {
+            return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
+        }
+        channelUser.setSteamTokenShared(shared);
+        userAccountRepository.save(channelUser);
+        String decryptedToken = tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken());
+        syncTokenToPool(channelUser, decryptedToken, shared);
         return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
@@ -523,7 +551,10 @@ public class ChannelController {
         UserAccount channelUser = resolveAndCheck(username, principal);
         requireOwner(principal.getUserAccount(), channelUser);
         channelUser.setSteamPersonalToken(null);
+        channelUser.setSteamTokenShared(false);
         userAccountRepository.save(channelUser);
+        steamApiKeyRepository.deleteByOwner(channelUser);
+        if (rotator != null) rotator.refreshKeys();
         return REDIRECT_CHANNEL + channelUser.getTwitchUsername(); // nosemgrep
     }
 
@@ -595,5 +626,15 @@ public class ChannelController {
         return (steamRateLimiter != null && steamRateLimiter.isBlocked())
             || (rotator != null && rotator.isAllKeysBlocked())
             || steamApiClient.map(SteamApiClient::isRateLimited).orElse(false);
+    }
+
+    private void syncTokenToPool(UserAccount user, String plainToken, boolean shared) {
+        steamApiKeyRepository.deleteByOwner(user);
+        if (shared && !steamApiKeyRepository.existsById(plainToken)) {
+            SteamApiKeyEntry entry = new SteamApiKeyEntry(plainToken);
+            entry.setOwner(user);
+            steamApiKeyRepository.save(entry);
+        }
+        if (rotator != null) rotator.refreshKeys();
     }
 }
