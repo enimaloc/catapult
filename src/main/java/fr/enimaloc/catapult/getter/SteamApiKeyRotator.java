@@ -64,6 +64,13 @@ public class SteamApiKeyRotator {
             .min(Comparator.comparingLong(k -> keyBlockedUntil.getOrDefault(k, 0L)));
     }
 
+    public boolean isAllKeysBlocked() {
+        List<String> snapshot = keys;
+        if (snapshot.isEmpty()) return false;
+        long now = System.currentTimeMillis();
+        return snapshot.stream().allMatch(k -> keyBlockedUntil.getOrDefault(k, 0L) > now);
+    }
+
     public void onKeyRateLimited(String key, int retryAfterSeconds) {
         keyBlockedUntil.put(key, System.currentTimeMillis() + retryAfterSeconds * 1000L);
         String masked = key.length() > 8
