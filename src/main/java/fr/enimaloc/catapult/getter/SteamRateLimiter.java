@@ -53,6 +53,20 @@ public class SteamRateLimiter {
     }
 
     /**
+     * Acquire a permit by blocking indefinitely (for background tasks on virtual threads).
+     * Used for background operations like library preload that can afford to block.
+     */
+    public boolean acquireBlocking() {
+        try {
+            semaphore.acquire();
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    /**
      * Returns how long (ms) a background task should sleep before calling acquire(),
      * accounting for the current penalty window and one replenishment cycle.
      * Returns 0 when tokens are likely available immediately.
