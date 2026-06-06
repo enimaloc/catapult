@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
@@ -73,6 +74,7 @@ class ChannelControllerTest {
     @MockitoBean ExperimentService experimentService;
     @MockitoBean SteamApiClient steamApiClient;
     @MockitoBean TokenEncryptionService tokenEncryptionService;
+    @MockitoBean SteamApiKeyRepository steamApiKeyRepository;
 
     private UserAccount owner;
     private UserAccount moderator;

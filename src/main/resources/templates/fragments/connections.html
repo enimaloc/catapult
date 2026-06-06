@@ -7,6 +7,7 @@
 <!--/*@thymesvar id="steamRateLimited" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="isOwner" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="hasSteamPersonalToken" type="java.lang.Boolean"*/-->
+<!--/*@thymesvar id="steamTokenShared" type="java.lang.Boolean"*/-->
 <section th:fragment="connections" id="connections-section" class="card"
          th:attr="hx-get=@{/channels/{u}/fragments/connections(u=${channelUsername})}"
          hx-trigger="every 30s"
@@ -46,13 +47,30 @@
                         th:text="#{connections.steam.resolve}">Résoudre →</button>
             </div>
 
-            <!-- Personal token saved indicator -->
+            <!-- Personal token saved: sharing checkbox + delete -->
             <div th:if="${hasSteam and isOwner and hasSteamPersonalToken}" class="provider-info">
                 <span class="badge badge-connected" th:text="#{connections.steam.personal_token_set}">Token personnel ✓</span>
+                <form th:action="@{/channels/{u}/settings/steam-personal-token/sharing(u=${channelUsername})}" method="post" style="display:inline"> <!-- nosemgrep -->
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; cursor:pointer; margin-top:0.4rem;">
+                        <input type="hidden" name="shared" value="false"/>
+                        <input type="checkbox" name="shared" value="true"
+                               th:checked="${steamTokenShared}"
+                               onchange="this.previousElementSibling.disabled=this.checked; this.form.submit()"/>
+                        <span th:text="#{connections.steam.share_token}">Partager avec les autres profils</span>
+                    </label>
+                </form>
                 <form th:action="@{/channels/{u}/settings/steam-personal-token/delete(u=${channelUsername})}" method="post" style="display:inline"> <!-- nosemgrep -->
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit" class="btn btn-sm btn-danger" th:text="#{connections.steam.delete_personal_token}">Supprimer le token</button>
                 </form>
+            </div>
+
+            <!-- Invite to add a token even when profile is public -->
+            <div th:if="${hasSteam and isOwner and !hasSteamPersonalToken and !steamProfilePrivate}" style="margin-top:0.4rem;">
+                <button type="button" class="btn btn-sm"
+                        onclick="document.getElementById('steamPrivacyModal').style.display='flex'"
+                        th:text="#{connections.steam.add_personal_token}">Ajouter un token →</button>
             </div>
 
             <div th:if="${hasSteam and isOwner}">
