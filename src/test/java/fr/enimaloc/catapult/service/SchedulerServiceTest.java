@@ -18,8 +18,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,5 +81,23 @@ class SchedulerServiceTest {
 
         assertThat(registry.get("catapult.scheduler.users.polled").counter().count())
             .isEqualTo(1.0);
+    }
+
+    @Test
+    void poll_withSteamGetter_callsPrefetchBatch() {
+        SteamGameGetter steamGetter = mock(SteamGameGetter.class);
+        when(steamGetter.prefetchBatch(any()))
+            .thenReturn(CompletableFuture.completedFuture(null));
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of());
+
+        SchedulerService service = new SchedulerService(
+            userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
+            Optional.of(steamGetter));
+
+        service.poll();
+
+        verify(steamGetter).prefetchBatch(any());
+        verify(steamGetter).clearCycleCache();
     }
 }

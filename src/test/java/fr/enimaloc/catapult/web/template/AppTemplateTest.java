@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.web.template;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
@@ -70,6 +71,7 @@ class AppTemplateTest {
     @MockitoBean EventSubService twitchEventSubService;
     @MockitoBean ChannelAccessService channelAccessService;
     @MockitoBean TokenEncryptionService tokenEncryptionService;
+    @MockitoBean SteamApiKeyRepository steamApiKeyRepository;
 
     private UsernamePasswordAuthenticationToken auth;
     private UserAccount userAccount;

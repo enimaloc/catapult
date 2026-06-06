@@ -3,12 +3,10 @@ package fr.enimaloc.catapult.service;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.getter.SteamApiClient;
-import fr.enimaloc.catapult.getter.SteamRateLimiter;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.event.EventListener;
@@ -16,6 +14,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -28,52 +27,47 @@ public class SteamLibraryCacheService {
     private final IgdbService igdbService;
     private final UserAccountRepository userAccountRepository;
 
-    @Autowired(required = false)
-    private SteamRateLimiter rateLimiter;
-
     @Async
     @PostConstruct
     public void preloadAllUserLibraries() {
         List<UserAccount> users = userAccountRepository.findBySteamIdNotNull();
         if (users.isEmpty()) {
             log.info("No users with Steam linked — skipping library preload");
-        } else {
-            log.info("Pre-caching Steam libraries for {} user(s) at startup", users.size());
-            users.forEach(this::cacheLibrary);
+            igdbService.prewarmCclCache();
+            return;
         }
+
+        log.info("Pre-caching Steam libraries for {} user(s) at startup", users.size());
+        List<CompletableFuture<Void>> futures = users.stream()
+            .map(this::cacheLibraryAsync)
+            .toList();
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
         igdbService.prewarmCclCache();
     }
 
     @Async
     @EventListener
     public void onSteamLinked(SteamLinkedEvent event) {
-        cacheLibrary(event.getUser());
+        cacheLibraryAsync(event.getUser()).join();
         igdbService.prewarmCclCache();
     }
 
-    private void cacheLibrary(UserAccount user) {
-        if (user.getSteamId() == null) return;
-
-        if (rateLimiter != null) {
-            long wait = rateLimiter.millisUntilAvailable();
-            if (wait > 0) {
-                log.info("Steam rate limited — waiting {}ms before pre-caching steamId={}", wait, user.getSteamId());
-                try {
-                    Thread.sleep(wait);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-            }
-        }
+    private CompletableFuture<Void> cacheLibraryAsync(UserAccount user) {
+        if (user.getSteamId() == null) return CompletableFuture.completedFuture(null);
 
         log.info("Pre-caching Steam library for user {} (steamId={})", user.getId(), user.getSteamId());
-        List<String> appIds = steamApiClient.getOwnedGameIds(user.getSteamId());
-        if (appIds.isEmpty()) {
-            log.warn("No owned games returned for steamId={} (private profile?)", user.getSteamId());
-            return;
-        }
-
-        igdbService.prewarmSteamAppIds(appIds);
+        return steamApiClient.getOwnedGameIds(user.getSteamId())
+            .thenAccept(appIds -> {
+                if (appIds.isEmpty()) {
+                    log.warn("No owned games returned for steamId={} (private profile?)", user.getSteamId());
+                    return;
+                }
+                igdbService.prewarmSteamAppIds(appIds);
+            })
+            .exceptionally(e -> {
+                log.warn("Failed to cache Steam library for steamId={}: {}", user.getSteamId(), e.getMessage());
+                return null;
+            });
     }
 }
