@@ -9,7 +9,9 @@ import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.WhitelistService;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
@@ -28,11 +30,14 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -46,6 +51,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private final ApplicationEventPublisher eventPublisher;
     private final RestClient restClient;
     private final WhitelistService whitelistService;
+    private final AdminMigrationService adminMigrationService;
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -148,9 +154,21 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
         String twitchUsername = oAuth2User.getAttribute("login");
 
+        // Check for pending bot-link flow before the normal login path
+        Optional<String> pendingBotLinkId = getPendingBotLinkId();
+        if (pendingBotLinkId.isPresent()) {
+            return handleBotLink(twitchId, userRequest, pendingBotLinkId.get());
+        }
+
         Optional<UserAccount> existing = userAccountRepository.findByTwitchId(twitchId);
         boolean isNew = existing.isEmpty();
         UserAccount account = existing.orElseGet(() -> createNewAccount(twitchId, twitchUsername));
+
+        if (account.isSystemAccount()) {
+            throw new OAuth2AuthenticationException(
+                new OAuth2Error("system_account_login_forbidden"),
+                "The system account cannot be used to login.");
+        }
 
         if (!Objects.equals(account.getTwitchUsername(), twitchUsername)) {
             account.setTwitchUsername(twitchUsername);
@@ -165,8 +183,6 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             account.setStatus(UserAccount.Status.ACTIVE);
             account.setDeletionRequestedAt(null);
         } else if (account.getStatus() == UserAccount.Status.INACTIVE) {
-            // Scheduler-deactivated accounts still have twitchId set, so findByTwitchId found them.
-            // Admin-unlinked accounts have twitchId=null and cannot reach this branch.
             account.setStatus(UserAccount.Status.ACTIVE);
         }
 
@@ -187,6 +203,17 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         account.setTwitchUsername(twitchUsername);
         account = userAccountRepository.save(account);
 
+        final UserAccount saved = account;
+        userAccountRepository.findBySystemAccountTrue().ifPresentOrElse(
+            system -> adminMigrationService.migrate(
+                system, saved, new AdminMigrationService.MigrateOptions(true, true, false)),
+            () -> initDefaultSettings(saved)
+        );
+
+        return account;
+    }
+
+    private void initDefaultSettings(UserAccount account) {
         UserSettings settings = new UserSettings();
         settings.setUser(account);
         if (!Strings.isEmpty(defaultNoGameId) && !Strings.isEmpty(defaultNoGameName)) {
@@ -208,8 +235,6 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             config.setEnabled(provider == GetterConfig.Provider.STEAM);
             getterConfigRepository.save(config);
         }
-
-        return account;
     }
 
     private void saveToken(UserAccount account, OAuthToken.Provider provider, OAuth2UserRequest userRequest) {
@@ -228,5 +253,51 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         }
 
         oAuthTokenRepository.save(token);
+    }
+
+    private Optional<String> getPendingBotLinkId() {
+        try {
+            ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+            HttpSession session = attrs.getRequest().getSession(false);
+            if (session != null) {
+                return Optional.ofNullable((String) session.getAttribute("bot-link-pending"));
+            }
+        } catch (IllegalStateException ignored) {
+            // No HTTP request context (e.g., in unit tests)
+        }
+        return Optional.empty();
+    }
+
+    private OAuth2User handleBotLink(String botTwitchId, OAuth2UserRequest userRequest, String systemAccountId) {
+        UserAccount systemAccount = userAccountRepository.findById(UUID.fromString(systemAccountId))
+            .filter(UserAccount::isSystemAccount)
+            .orElseThrow(() -> new OAuth2AuthenticationException(new OAuth2Error("system_not_found")));
+
+        userAccountRepository.findByTwitchId(botTwitchId).ifPresent(existing -> {
+            if (!existing.isSystemAccount()) {
+                throw new OAuth2AuthenticationException(new OAuth2Error("bot_twitch_id_already_taken"),
+                    "Twitch account already registered as a regular user.");
+            }
+        });
+
+        systemAccount.setTwitchId(botTwitchId);
+        userAccountRepository.save(systemAccount);
+        saveToken(systemAccount, OAuthToken.Provider.TWITCH, userRequest);
+
+        try {
+            ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+            attrs.getRequest().getSession(false).removeAttribute("bot-link-pending");
+        } catch (IllegalStateException ignored) {}
+
+        log.info("Bot Twitch account {} linked to system account", botTwitchId);
+
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth != null && currentAuth.getPrincipal() instanceof CatapultOAuth2User adminUser) {
+            return adminUser;
+        }
+        throw new OAuth2AuthenticationException(new OAuth2Error("admin_not_authenticated"),
+            "No authenticated admin found during bot link.");
     }
 }
