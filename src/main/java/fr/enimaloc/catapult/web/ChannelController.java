@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
+import fr.enimaloc.catapult.getter.SteamRateLimiter;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
@@ -64,6 +65,9 @@ public class ChannelController {
 
     @Autowired(required = false)
     private SteamApiKeyRotator rotator;
+
+    @Autowired(required = false)
+    private SteamRateLimiter steamRateLimiter;
 
     private final UserAccountRepository userAccountRepository;
     private final ChannelAccessService channelAccessService;
@@ -143,6 +147,7 @@ public class ChannelController {
         boolean hasSteam = steamKeyAvailable() && channelUser.getSteamId() != null;
         boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
         boolean steamProfilePrivate = false;
+        boolean steamRateLimited = false;
         if (hasSteam && isOwner) {
             String decryptedPersonalToken = hasSteamPersonalToken
                 ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
@@ -163,11 +168,16 @@ public class ChannelController {
                     }
                 })
                 .orElse(false);
+            if (steamProfilePrivate && isSteamRateLimited()) {
+                steamRateLimited = true;
+                steamProfilePrivate = false;
+            }
         }
         model.addAttribute("hasSteamProvider", steamKeyAvailable());
         model.addAttribute("hasSteam", hasSteam);
         model.addAttribute("hasSteamPersonalToken", hasSteamPersonalToken);
         model.addAttribute("steamProfilePrivate", steamProfilePrivate);
+        model.addAttribute("steamRateLimited", steamRateLimited);
 
         return "app";
     }
@@ -234,6 +244,7 @@ public class ChannelController {
         boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
 
         boolean steamProfilePrivate = false;
+        boolean steamRateLimited = false;
         if (hasSteam && isOwner) {
             String decryptedPersonalToken = hasSteamPersonalToken
                 ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
@@ -254,6 +265,10 @@ public class ChannelController {
                     }
                 })
                 .orElse(false);
+            if (steamProfilePrivate && isSteamRateLimited()) {
+                steamRateLimited = true;
+                steamProfilePrivate = false;
+            }
         }
 
         model.addAttribute(ATTR_CHANNEL_USERNAME, username);
@@ -262,6 +277,7 @@ public class ChannelController {
         model.addAttribute("hasSteam", hasSteam);
         model.addAttribute("hasSteamPersonalToken", hasSteamPersonalToken);
         model.addAttribute("steamProfilePrivate", steamProfilePrivate);
+        model.addAttribute("steamRateLimited", steamRateLimited);
         return "fragments/connections :: connections";
     }
 
@@ -573,5 +589,10 @@ public class ChannelController {
     private boolean steamKeyAvailable() {
         if (rotator != null) return rotator.nextKey().isPresent();
         return !steamApiKey.isBlank();
+    }
+
+    private boolean isSteamRateLimited() {
+        return (steamRateLimiter != null && steamRateLimiter.isBlocked())
+            || (rotator != null && rotator.isAllKeysBlocked());
     }
 }
