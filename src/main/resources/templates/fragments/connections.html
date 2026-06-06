@@ -4,6 +4,7 @@
 <!--/*@thymesvar id="hasSteamProvider" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="hasSteam" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="steamProfilePrivate" type="java.lang.Boolean"*/-->
+<!--/*@thymesvar id="steamRateLimited" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="isOwner" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="hasSteamPersonalToken" type="java.lang.Boolean"*/-->
 <section th:fragment="connections" id="connections-section" class="card"
@@ -26,9 +27,16 @@
             <p class="text-muted text-sm" th:text="#{connections.twitch_note}">Provider principal — déconnexion via logout</p>
         </div>
         <div th:if="${hasSteamProvider}" class="provider-card">
-            <strong>Steam</strong>
-            <span th:if="${hasSteam}" class="badge badge-connected" th:text="#{connections.connected}">Connecté</span>
-            <span th:unless="${hasSteam}" class="badge badge-disconnected" th:text="#{connections.not_connected}">Non connecté</span>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+                <strong>Steam</strong>
+                <span th:if="${hasSteam}" class="badge badge-connected" th:text="#{connections.connected}">Connecté</span>
+                <span th:unless="${hasSteam}" class="badge badge-disconnected" th:text="#{connections.not_connected}">Non connecté</span>
+                <!-- Rate-limited indicator -->
+                <button th:if="${hasSteam and isOwner and steamRateLimited}"
+                        type="button" class="btn-help"
+                        onclick="document.getElementById('steamRateLimitModal').style.display='flex'"
+                        th:title="#{connections.steam.rate_limited.help_title}">!</button>
+            </div>
 
             <!-- Private warning with resolve button -->
             <div th:if="${hasSteam and isOwner and steamProfilePrivate and !hasSteamPersonalToken}" class="provider-warning">

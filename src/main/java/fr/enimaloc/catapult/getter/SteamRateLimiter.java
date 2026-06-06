@@ -78,6 +78,10 @@ public class SteamRateLimiter {
         return remaining + windowMs;
     }
 
+    public boolean isBlocked() {
+        return System.currentTimeMillis() < blockedUntil;
+    }
+
     /**
      * Called when Steam returns a 429. Drains all tokens and blocks
      * replenishment until the Retry-After deadline.
