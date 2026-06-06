@@ -1,7 +1,8 @@
 package fr.enimaloc.catapult.getter;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Profile;
@@ -19,13 +20,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @Profile("!mock")
-@RequiredArgsConstructor
 @ConditionalOnBooleanProperty("steam.enabled")
 public class RealSteamApiClient implements SteamApiClient {
 
@@ -36,62 +38,100 @@ public class RealSteamApiClient implements SteamApiClient {
 
     private static final int DEFAULT_RETRY_AFTER_SECONDS = 60;
 
-    @Value("${steam.api-key:}")
-    private String steamApiKey;
+    private static final String RESPONSE_KEY = "response";
+    private static final String STEAMID_KEY  = "steamid";
 
     @Value("${steam.profile-cache.ttl:PT15M}")
     private Duration profileCacheTtl;
 
     private final RestClient restClient;
     private final SteamRateLimiter rateLimiter;
+    private final Executor steamExecutor;
+    private final SteamApiKeyRotator rotator;
     private final Map<CacheKey, CachedProfileStatus> profileCache = new ConcurrentHashMap<>();
 
+    @Autowired
+    public RealSteamApiClient(RestClient restClient, SteamRateLimiter rateLimiter,
+                               @Qualifier("steamExecutor") Executor steamExecutor,
+                               SteamApiKeyRotator rotator) {
+        this.restClient = restClient;
+        this.rateLimiter = rateLimiter;
+        this.steamExecutor = steamExecutor;
+        this.rotator = rotator;
+    }
+
+    // -------------------------------------------------------------------------
+    // SteamApiClient implementation
+    // -------------------------------------------------------------------------
+
     @Override
-    public Optional<PlayerSummary> getPlayerSummary(String steamId, String personalToken) {
-        return fetchPlayer(steamId, personalToken).flatMap(player -> {
-            Object gameId   = player.get("gameid");
-            Object gameName = player.get("gameextrainfo");
-            if (gameId == null || gameName == null) return Optional.empty();
-            return Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName)));
-        });
+    public CompletableFuture<Optional<PlayerSummary>> getPlayerSummary(String steamId, String personalToken) {
+        return CompletableFuture.supplyAsync(
+            () -> fetchPlayer(steamId, personalToken).flatMap(player -> {
+                Object gameId   = player.get("gameid");
+                Object gameName = player.get("gameextrainfo");
+                if (gameId == null || gameName == null) return Optional.empty();
+                return Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName)));
+            }),
+            steamExecutor
+        );
     }
 
     @Override
-    public boolean isProfilePublic(String steamId) {
+    public CompletableFuture<Boolean> isProfilePublic(String steamId) {
         return isProfilePublic(steamId, null);
     }
 
     @Override
-    public boolean isProfilePublic(String steamId, String personalToken) {
+    public CompletableFuture<Boolean> isProfilePublic(String steamId, String personalToken) {
         String tokenKey = (personalToken != null && !personalToken.isBlank()) ? personalToken : "";
         CacheKey key = new CacheKey(steamId, tokenKey);
         CachedProfileStatus cached = profileCache.get(key);
-        if (cached != null && !cached.isExpired()) return cached.isPublic();
-
-        CachedProfileStatus fresh = profileCache.compute(key, (k, existing) -> {
-            if (existing != null && !existing.isExpired()) return existing;
-            boolean result = fetchIsProfilePublic(steamId, personalToken);
-            return new CachedProfileStatus(result, Instant.now().plus(profileCacheTtl));
-        });
-        return fresh.isPublic();
+        if (cached != null && cached.isValid()) {
+            return CompletableFuture.completedFuture(cached.isPublic());
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            CachedProfileStatus fresh = profileCache.compute(key, (k, existing) -> {
+                if (existing != null && existing.isValid()) return existing;
+                boolean result = fetchIsProfilePublic(steamId, personalToken);
+                return new CachedProfileStatus(result, Instant.now().plus(profileCacheTtl));
+            });
+            return fresh.isPublic();
+        }, steamExecutor);
     }
 
     @Override
-    public Map<String, Optional<PlayerSummary>> getPlayerSummaries(Collection<String> steamIds) {
-        Map<String, Optional<PlayerSummary>> result = new HashMap<>();
-        List<String> idList = new ArrayList<>(steamIds);
-        for (int i = 0; i < idList.size(); i += 100) {
-            result.putAll(fetchPlayerBatch(idList.subList(i, Math.min(i + 100, idList.size()))));
-        }
-        return result;
+    public CompletableFuture<Map<String, Optional<PlayerSummary>>> getPlayerSummaries(Collection<String> steamIds) {
+        return CompletableFuture.supplyAsync(() -> {
+            Map<String, Optional<PlayerSummary>> result = new HashMap<>();
+            List<String> idList = new ArrayList<>(steamIds);
+            for (int i = 0; i < idList.size(); i += 100) {
+                result.putAll(fetchPlayerBatch(idList.subList(i, Math.min(i + 100, idList.size()))));
+            }
+            return result;
+        }, steamExecutor);
     }
+
+    @Override
+    public CompletableFuture<List<String>> getOwnedGameIds(String steamId) {
+        return CompletableFuture.supplyAsync(() -> fetchOwnedGameIds(steamId), steamExecutor);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private HTTP helpers (synchronous, called from virtual threads)
+    // -------------------------------------------------------------------------
 
     @SuppressWarnings("unchecked")
     private Map<String, Optional<PlayerSummary>> fetchPlayerBatch(List<String> steamIds) {
         Map<String, Optional<PlayerSummary>> result = steamIds.stream()
             .collect(Collectors.toMap(id -> id, id -> Optional.empty()));
 
-        if (steamApiKey.isBlank()) return result;
+        Optional<String> keyOpt = rotator.nextKey();
+        if (keyOpt.isEmpty()) {
+            log.warn("No Steam API key available, skipping batch of {} users", steamIds.size());
+            return result;
+        }
+        String apiKey = keyOpt.get();
 
         if (!rateLimiter.acquire()) {
             log.warn("Steam rate limit reached, skipping batch of {} users", steamIds.size());
@@ -100,7 +140,7 @@ public class RealSteamApiClient implements SteamApiClient {
 
         String url = UriComponentsBuilder
             .fromUriString(PLAYER_SUMMARIES_URL)
-            .queryParam("key", steamApiKey)
+            .queryParam("key", apiKey)
             .queryParam("steamids", String.join(",", steamIds))
             .toUriString();
 
@@ -108,14 +148,14 @@ public class RealSteamApiClient implements SteamApiClient {
             Map<String, Object> response = restClient.get().uri(url).retrieve().body(Map.class);
             if (response == null) return result;
 
-            Map<String, Object> body = (Map<String, Object>) response.get("response");
+            Map<String, Object> body = (Map<String, Object>) response.get(RESPONSE_KEY);
             if (body == null) return result;
 
             List<Map<String, Object>> players = (List<Map<String, Object>>) body.get("players");
             if (players == null) return result;
 
             for (Map<String, Object> player : players) {
-                String id = String.valueOf(player.get("steamid"));
+                String id = String.valueOf(player.get(STEAMID_KEY));
                 Object gameId   = player.get("gameid");
                 Object gameName = player.get("gameextrainfo");
                 result.put(id,
@@ -125,7 +165,7 @@ public class RealSteamApiClient implements SteamApiClient {
             }
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
-            rateLimiter.onRateLimitResponse(retryAfter);
+            rotator.onKeyRateLimited(apiKey, retryAfter);
             log.warn("Steam API 429 during batch fetch: retry after {}s", retryAfter);
         } catch (Exception e) {
             log.warn("Failed to batch-fetch Steam player summaries: {}", e.getMessage());
@@ -147,8 +187,20 @@ public class RealSteamApiClient implements SteamApiClient {
 
     @SuppressWarnings("unchecked")
     private boolean isGameListVisible(String steamId, String personalToken) {
-        String key = (personalToken != null && !personalToken.isBlank()) ? personalToken : steamApiKey;
-        if (key.isBlank()) return false;
+        String key;
+        boolean usedRotator;
+        if (personalToken != null && !personalToken.isBlank()) {
+            key = personalToken;
+            usedRotator = false;
+        } else {
+            Optional<String> keyOpt = rotator.nextKey();
+            if (keyOpt.isEmpty()) {
+                log.warn("No Steam API key available for game list visibility check {}", steamId);
+                return false;
+            }
+            key = keyOpt.get();
+            usedRotator = true;
+        }
 
         if (!rateLimiter.acquire()) {
             log.warn("Steam rate limit reached, skipping game list visibility check for {}", steamId);
@@ -168,11 +220,12 @@ public class RealSteamApiClient implements SteamApiClient {
                 .body(Map.class);
             if (response == null) return false;
 
-            Map<String, Object> responseBody = (Map<String, Object>) response.get("response");
+            Map<String, Object> responseBody = (Map<String, Object>) response.get(RESPONSE_KEY);
             return responseBody != null && responseBody.containsKey("game_count");
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
-            rateLimiter.onRateLimitResponse(retryAfter);
+            if (usedRotator) rotator.onKeyRateLimited(key, retryAfter);
+            else rateLimiter.onRateLimitResponse(retryAfter);
             log.warn("Steam API 429 for {}: retry after {}s", steamId, retryAfter);
             return false;
         } catch (Exception e) {
@@ -183,7 +236,20 @@ public class RealSteamApiClient implements SteamApiClient {
 
     @SuppressWarnings("unchecked")
     private Optional<Map<String, Object>> fetchPlayer(String steamId, String personalToken) {
-        String token = (personalToken != null && !personalToken.isBlank()) ? personalToken : steamApiKey;
+        String token;
+        boolean usedRotator;
+        if (personalToken != null && !personalToken.isBlank()) {
+            token = personalToken;
+            usedRotator = false;
+        } else {
+            Optional<String> keyOpt = rotator.nextKey();
+            if (keyOpt.isEmpty()) {
+                log.warn("No Steam API key available for player fetch {}", steamId);
+                return Optional.empty();
+            }
+            token = keyOpt.get();
+            usedRotator = true;
+        }
 
         if (!rateLimiter.acquire()) {
             log.warn("Steam rate limit reached, skipping player fetch for {}", steamId);
@@ -203,7 +269,7 @@ public class RealSteamApiClient implements SteamApiClient {
                 .body(Map.class);
             if (response == null) return Optional.empty();
 
-            Map<String, Object> responseBody = (Map<String, Object>) response.get("response");
+            Map<String, Object> responseBody = (Map<String, Object>) response.get(RESPONSE_KEY);
             if (responseBody == null) return Optional.empty();
 
             List<Map<String, Object>> players = (List<Map<String, Object>>) responseBody.get("players");
@@ -212,7 +278,8 @@ public class RealSteamApiClient implements SteamApiClient {
             return Optional.of(players.getFirst());
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
-            rateLimiter.onRateLimitResponse(retryAfter);
+            if (usedRotator) rotator.onKeyRateLimited(token, retryAfter);
+            else rateLimiter.onRateLimitResponse(retryAfter);
             log.warn("Steam API 429 for {}: retry after {}s", steamId, retryAfter);
             return Optional.empty();
         } catch (Exception e) {
@@ -221,19 +288,20 @@ public class RealSteamApiClient implements SteamApiClient {
         }
     }
 
-    @Override
     @SuppressWarnings("unchecked")
-    public List<String> getOwnedGameIds(String steamId) {
-        if (steamApiKey.isBlank()) return List.of();
-
-        if (!rateLimiter.acquire()) {
-            log.warn("Steam rate limit reached, skipping owned games fetch for {}", steamId);
+    private List<String> fetchOwnedGameIds(String steamId) {
+        Optional<String> keyOpt = rotator.nextKey();
+        if (keyOpt.isEmpty()) {
+            log.warn("No Steam API key available for owned game fetch {}", steamId);
             return List.of();
         }
+        String apiKey = keyOpt.get();
+
+        if (!rateLimiter.acquireBlocking()) return List.of();
 
         String url = UriComponentsBuilder
             .fromUriString(OWNED_GAMES_URL)
-            .queryParam("key", steamApiKey)
+            .queryParam("key", apiKey)
             .queryParam("steamid", steamId)
             .queryParam("include_appinfo", 1)
             .toUriString();
@@ -241,7 +309,7 @@ public class RealSteamApiClient implements SteamApiClient {
         try {
             Map<String, Object> response = restClient.get().uri(url).retrieve().body(Map.class);
             if (response == null) return List.of();
-            Map<String, Object> body = (Map<String, Object>) response.get("response");
+            Map<String, Object> body = (Map<String, Object>) response.get(RESPONSE_KEY);
             if (body == null) return List.of();
             List<Map<String, Object>> games = (List<Map<String, Object>>) body.get("games");
             if (games == null) return List.of();
@@ -252,7 +320,7 @@ public class RealSteamApiClient implements SteamApiClient {
                 .toList();
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
-            rateLimiter.onRateLimitResponse(retryAfter);
+            rotator.onKeyRateLimited(apiKey, retryAfter);
             log.warn("Steam API 429 fetching owned games for {}: retry after {}s", steamId, retryAfter);
             return List.of();
         } catch (Exception e) {
@@ -274,6 +342,6 @@ public class RealSteamApiClient implements SteamApiClient {
     private record CacheKey(String steamId, String tokenKey) {}
 
     private record CachedProfileStatus(boolean isPublic, Instant expiresAt) {
-        boolean isExpired() { return Instant.now().isAfter(expiresAt); }
+        boolean isValid() { return Instant.now().isBefore(expiresAt); }
     }
 }
