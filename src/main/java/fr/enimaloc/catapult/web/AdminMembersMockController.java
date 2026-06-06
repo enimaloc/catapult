@@ -89,6 +89,12 @@ public class AdminMembersMockController {
         return REDIRECT_ADMIN_MEMBERS;
     }
 
+    @PostMapping("/steam/toggle-rate-limit")
+    public String toggleSteamRateLimit() {
+        mockSteamApiClient.setRateLimited(!mockSteamApiClient.isRateLimited());
+        return REDIRECT_ADMIN_MEMBERS;
+    }
+
     @GetMapping(value = "/igdb/search", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public List<Map<String, String>> searchIgdbGames(@RequestParam String q) {

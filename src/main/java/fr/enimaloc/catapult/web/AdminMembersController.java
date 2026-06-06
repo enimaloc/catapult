@@ -123,12 +123,16 @@ public class AdminMembersController {
         Set<String> privateSteamProfiles = mockSteamApiClient
             .map(MockSteamApiClient::getPrivateProfiles)
             .orElse(Set.of());
+        boolean steamRateLimited = mockSteamApiClient
+            .map(MockSteamApiClient::isRateLimited)
+            .orElse(false);
 
         model.addAttribute("members", members);
         model.addAttribute("liveStatus", liveStatus);
         model.addAttribute("isMockProfile", Arrays.asList(environment.getActiveProfiles()).contains("mock"));
         model.addAttribute("canMockSteam", Arrays.asList(environment.getActiveProfiles()).contains("mock-steam"));
         model.addAttribute("privateSteamProfiles", privateSteamProfiles);
+        model.addAttribute("steamRateLimited", steamRateLimited);
         model.addAttribute("currentUserTwitchId", principal.getUserAccount().getTwitchId());
         return "admin/members";
     }

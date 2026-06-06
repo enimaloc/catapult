@@ -593,6 +593,7 @@ public class ChannelController {
 
     private boolean isSteamRateLimited() {
         return (steamRateLimiter != null && steamRateLimiter.isBlocked())
-            || (rotator != null && rotator.isAllKeysBlocked());
+            || (rotator != null && rotator.isAllKeysBlocked())
+            || steamApiClient.map(SteamApiClient::isRateLimited).orElse(false);
     }
 }

@@ -18,6 +18,7 @@ public class MockSteamApiClient implements SteamApiClient {
 
     private final Map<String, PlayerSummary> gameByUser = new ConcurrentHashMap<>();
     private final Set<String> privateProfiles = ConcurrentHashMap.newKeySet();
+    private volatile boolean rateLimited = false;
 
     @Override
     public CompletableFuture<Optional<PlayerSummary>> getPlayerSummary(String steamId, String personalToken) {
@@ -26,7 +27,13 @@ public class MockSteamApiClient implements SteamApiClient {
 
     @Override
     public CompletableFuture<Boolean> isProfilePublic(String steamId) {
+        if (rateLimited) return CompletableFuture.completedFuture(false);
         return CompletableFuture.completedFuture(!privateProfiles.contains(steamId));
+    }
+
+    @Override
+    public boolean isRateLimited() {
+        return rateLimited;
     }
 
     public void setGameForUser(String steamId, String gameId, String gameName) {
@@ -47,6 +54,11 @@ public class MockSteamApiClient implements SteamApiClient {
     public void setProfilePublic(String steamId) {
         privateProfiles.remove(steamId);
         log.info("[Mock Steam] Profile {} set to public", steamId);
+    }
+
+    public void setRateLimited(boolean rateLimited) {
+        this.rateLimited = rateLimited;
+        log.info("[Mock Steam] Rate limit {}", rateLimited ? "enabled" : "disabled");
     }
 
     public Set<String> getPrivateProfiles() {
