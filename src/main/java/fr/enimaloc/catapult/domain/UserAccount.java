@@ -41,6 +41,9 @@ public class UserAccount {
     @Column(name = "steam_token_shared", nullable = false)
     private boolean steamTokenShared = false;
 
+    @Column(name = "is_system", nullable = false)
+    private boolean systemAccount = false;
+
     @Column(name = "bot_enabled", nullable = false)
     private boolean botEnabled = true;
 
