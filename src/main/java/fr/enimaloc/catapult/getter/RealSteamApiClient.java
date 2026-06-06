@@ -17,6 +17,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -217,6 +218,46 @@ public class RealSteamApiClient implements SteamApiClient {
         } catch (Exception e) {
             log.warn("Failed to fetch Steam player data for {}: {}", steamId, e.getMessage());
             return Optional.empty();
+        }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<String> getOwnedGameIds(String steamId) {
+        if (steamApiKey.isBlank()) return List.of();
+
+        if (!rateLimiter.acquire()) {
+            log.warn("Steam rate limit reached, skipping owned games fetch for {}", steamId);
+            return List.of();
+        }
+
+        String url = UriComponentsBuilder
+            .fromUriString(OWNED_GAMES_URL)
+            .queryParam("key", steamApiKey)
+            .queryParam("steamid", steamId)
+            .queryParam("include_appinfo", 1)
+            .toUriString();
+
+        try {
+            Map<String, Object> response = restClient.get().uri(url).retrieve().body(Map.class);
+            if (response == null) return List.of();
+            Map<String, Object> body = (Map<String, Object>) response.get("response");
+            if (body == null) return List.of();
+            List<Map<String, Object>> games = (List<Map<String, Object>>) body.get("games");
+            if (games == null) return List.of();
+            return games.stream()
+                .map(g -> g.get("appid"))
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .toList();
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            int retryAfter = parseRetryAfter(e);
+            rateLimiter.onRateLimitResponse(retryAfter);
+            log.warn("Steam API 429 fetching owned games for {}: retry after {}s", steamId, retryAfter);
+            return List.of();
+        } catch (Exception e) {
+            log.warn("Failed to fetch owned Steam games for {}: {}", steamId, e.getMessage());
+            return List.of();
         }
     }
 

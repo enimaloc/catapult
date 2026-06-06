@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.getter;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -29,5 +30,9 @@ public interface SteamApiClient {
 
     default boolean isProfilePublic(String steamId, String personalToken) {
         return isProfilePublic(steamId);
+    }
+
+    default List<String> getOwnedGameIds(String steamId) {
+        return List.of();
     }
 }
