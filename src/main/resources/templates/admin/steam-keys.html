@@ -52,9 +52,9 @@
                                 </span>
                             </td>
                             <td>
-                                <form th:action="@{/admin/steam-keys/{key}/delete(key=${entry.apiKey})}" <!-- nosemgrep -->
-                                      method="post">
+                                <form th:action="@{/admin/steam-keys/delete}" method="post"> <!-- nosemgrep -->
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="apiKey" th:value="${entry.apiKey}"/>
                                     <button type="submit" class="btn btn-sm" th:text="#{admin.steam_keys.action.delete}">Delete</button>
                                 </form>
                             </td>
