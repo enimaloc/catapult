@@ -604,6 +604,9 @@ public class ChannelController {
     private UserAccount resolveAndCheck(String username, CatapultOAuth2User principal) {
         UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (channelUser.isSystemAccount()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         UserAccount viewer = principal.getUserAccount();
         if (!channelAccessService.canAccess(viewer, channelUser)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);

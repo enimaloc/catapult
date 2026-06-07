@@ -108,6 +108,9 @@ public class AdminMembersController {
         }
         UserAccount target = userAccountRepository.findById(targetId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (target.isSystemAccount()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
         if (source.getId().equals(target.getId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
