@@ -1,10 +1,13 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.domain.GetterConfig;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.WhitelistService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +45,7 @@ class CatapultOAuth2UserServiceTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RestClient restClient;
     @Mock private WhitelistService whitelistService;
+    @Mock private AdminMigrationService adminMigrationService;
 
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
@@ -53,7 +57,8 @@ class CatapultOAuth2UserServiceTest {
     void setUp() {
         service = new CatapultOAuth2UserService(
             userAccountRepository, oAuthTokenRepository, userSettingsRepository,
-            getterConfigRepository, tokenEncryptionService, eventPublisher, restClient, whitelistService
+            getterConfigRepository, tokenEncryptionService, eventPublisher, restClient, whitelistService,
+            adminMigrationService
         );
         ReflectionTestUtils.setField(service, "ownerId", "");
         ReflectionTestUtils.setField(service, "defaultNoGameName", "");
@@ -88,6 +93,51 @@ class CatapultOAuth2UserServiceTest {
         ));
         when(whitelistService.isEnabled()).thenReturn(false);
         when(tokenEncryptionService.encrypt(anyString())).thenReturn("encrypted");
+    }
+
+    private UserAccount systemAccount() {
+        UserAccount s = new UserAccount();
+        s.setId(UUID.randomUUID());
+        s.setSystemAccount(true);
+        s.setTwitchUsername("Catapult");
+        s.setStatus(UserAccount.Status.ACTIVE);
+        return s;
+    }
+
+    @Test
+    void createNewAccount_systemAccountExists_copiesSettingsAndGetters() {
+        UserAccount system = systemAccount();
+        when(userAccountRepository.findBySystemAccountTrue()).thenReturn(Optional.of(system));
+
+        UserAccount newAccount = new UserAccount();
+        newAccount.setId(UUID.randomUUID());
+        when(userAccountRepository.save(any(UserAccount.class))).thenReturn(newAccount);
+
+        ReflectionTestUtils.invokeMethod(service, "createNewAccount", "twitchId123", "streamer");
+
+        verify(adminMigrationService).migrate(
+            eq(system),
+            eq(newAccount),
+            eq(new AdminMigrationService.MigrateOptions(true, true, false))
+        );
+        verify(userSettingsRepository, never()).save(any(UserSettings.class));
+        verify(getterConfigRepository, never()).save(any(GetterConfig.class));
+    }
+
+    @Test
+    void createNewAccount_noSystemAccount_initializesDefaults() {
+        when(userAccountRepository.findBySystemAccountTrue()).thenReturn(Optional.empty());
+
+        UserAccount newAccount = new UserAccount();
+        newAccount.setId(UUID.randomUUID());
+        when(userAccountRepository.save(any(UserAccount.class))).thenReturn(newAccount);
+
+        ReflectionTestUtils.invokeMethod(service, "createNewAccount", "twitchId123", "streamer");
+
+        verify(adminMigrationService, never()).migrate(any(), any(), any());
+        verify(userSettingsRepository).save(any(UserSettings.class));
+        verify(getterConfigRepository, times(GetterConfig.Provider.values().length))
+            .save(any(GetterConfig.class));
     }
 
     @Test
