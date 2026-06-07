@@ -20,20 +20,22 @@ BOLD='\033[1m'
 RESET='\033[0m'
 
 # ── State ──────────────────────────────────────────────────────────────────
-CHANNEL=""
+CHANNELS=()
 VERBOSE=false
 WS_PID=""
-PREV_GAME=""
-PREV_TITLE=""
-PREV_CCLS=""
+declare -A BROADCASTER_IDS
+declare -A BROADCASTER_NAMES
+declare -A PREV_GAME
+declare -A PREV_TITLE
+declare -A PREV_CCLS
 
 # ── Help ───────────────────────────────────────────────────────────────────
 usage() {
   cat <<EOF
-Usage: $(basename "$0") <channel> [-v] [--help]
+Usage: $(basename "$0") <channel> [channel2 ...] [-v] [--help]
 
 Arguments:
-  <channel>    Twitch channel login name (e.g. ninja)
+  <channel>    Twitch channel login name(s) (e.g. ninja pokimane xqc)
 
 Options:
   -v           Verbose mode — also prints raw JSON for each event
@@ -67,12 +69,12 @@ parse_args() {
       --help) usage; exit 0 ;;
       -v)     VERBOSE=true ;;
       -*)     echo "Unknown option: $1" >&2; usage; exit 1 ;;
-      *)      CHANNEL="$1" ;;
+      *)      CHANNELS+=("$1") ;;
     esac
     shift
   done
-  if [[ -z "$CHANNEL" ]]; then
-    echo "Error: channel name required" >&2; usage; exit 1
+  if [[ ${#CHANNELS[@]} -eq 0 ]]; then
+    echo "Error: at least one channel name required" >&2; usage; exit 1
   fi
 }
 
@@ -85,12 +87,12 @@ cleanup() {
 
 # ── Resolve broadcaster ID ─────────────────────────────────────────────────
 get_broadcaster_id() {
-  local response
-  response=$(twitch api get /users -q "login=$CHANNEL" 2>/dev/null)
-  local id
+  local login="$1"
+  local response id
+  response=$(twitch api get /users -q "login=$login" 2>/dev/null)
   id=$(echo "$response" | jq -r '.data[0].id // empty')
   if [[ -z "$id" ]]; then
-    echo "Error: channel '$CHANNEL' not found on Twitch" >&2
+    echo "Error: channel '$login' not found on Twitch" >&2
     exit 1
   fi
   echo "$id"
@@ -101,19 +103,21 @@ fetch_initial_state() {
   local broadcaster_id="$1"
   local response
   response=$(twitch api get /channels -q "broadcaster_id=$broadcaster_id" 2>/dev/null)
-  PREV_GAME=$(echo "$response" | jq -r '.data[0].game_name // ""')
-  PREV_TITLE=$(echo "$response" | jq -r '.data[0].title // ""')
-  PREV_CCLS=$(echo "$response" | jq -r '.data[0].content_classification_labels // [] | sort | join(",")')
+  PREV_GAME["$broadcaster_id"]=$(echo "$response" | jq -r '.data[0].game_name // ""')
+  PREV_TITLE["$broadcaster_id"]=$(echo "$response" | jq -r '.data[0].title // ""')
+  PREV_CCLS["$broadcaster_id"]=$(echo "$response" | jq -r '.data[0].content_classification_labels // [] | sort | join(",")')
 }
 
 # ── Format and display notification events ─────────────────────────────────
 format_event() {
   local payload="$1"
-  local sub_type ts event
+  local sub_type ts event bid login
 
   sub_type=$(echo "$payload" | jq -r '.metadata.subscription_type')
   ts=$(date '+%H:%M:%S')
   event=$(echo "$payload" | jq -r '.payload.event')
+  bid=$(echo "$payload" | jq -r '.payload.event.broadcaster_user_id')
+  login="${BROADCASTER_NAMES[$bid]:-unknown}"
 
   if [[ "$VERBOSE" == true ]]; then
     echo "$payload" | jq '.'
@@ -121,15 +125,11 @@ format_event() {
 
   case "$sub_type" in
     "stream.online")
-      local user
-      user=$(echo "$event" | jq -r '.broadcaster_user_name')
-      echo -e "[${ts}] ${GREEN}${BOLD}🟢 STREAM ONLINE${RESET}   ${BOLD}${user}${RESET}"
+      echo -e "[${ts}] [${login}] ${GREEN}${BOLD}🟢 STREAM ONLINE${RESET}"
       ;;
 
     "stream.offline")
-      local user
-      user=$(echo "$event" | jq -r '.broadcaster_user_name')
-      echo -e "[${ts}] ${RED}${BOLD}🔴 STREAM OFFLINE${RESET}  ${BOLD}${user}${RESET}"
+      echo -e "[${ts}] [${login}] ${RED}${BOLD}🔴 STREAM OFFLINE${RESET}"
       ;;
 
     "channel.update")
@@ -138,17 +138,17 @@ format_event() {
       title=$(echo "$event" | jq -r '.title // ""')
       ccls=$(echo  "$event" | jq -r '.content_classification_labels // [] | sort | join(",")')
 
-      if [[ "$game" != "$PREV_GAME" ]]; then
-        echo -e "[${ts}] ${YELLOW}${BOLD}🎮 GAME CHANGE${RESET}     ${PREV_GAME:-<none>} ${BOLD}→${RESET} ${BOLD}${game}${RESET}"
-        PREV_GAME="$game"
+      if [[ "$game" != "${PREV_GAME[$bid]:-}" ]]; then
+        echo -e "[${ts}] [${login}] ${YELLOW}${BOLD}🎮 GAME CHANGE${RESET}     ${PREV_GAME[$bid]:-<none>} ${BOLD}→${RESET} ${BOLD}${game}${RESET}"
+        PREV_GAME["$bid"]="$game"
       fi
-      if [[ "$title" != "$PREV_TITLE" ]]; then
-        echo -e "[${ts}]    TITLE CHANGE    \"${PREV_TITLE}\" ${BOLD}→${RESET} \"${BOLD}${title}${RESET}\""
-        PREV_TITLE="$title"
+      if [[ "$title" != "${PREV_TITLE[$bid]:-}" ]]; then
+        echo -e "[${ts}] [${login}]    TITLE CHANGE    \"${PREV_TITLE[$bid]:-}\" ${BOLD}→${RESET} \"${BOLD}${title}${RESET}\""
+        PREV_TITLE["$bid"]="$title"
       fi
-      if [[ "$ccls" != "$PREV_CCLS" ]]; then
-        echo -e "[${ts}] ${CYAN}${BOLD}🏷  CCL CHANGE${RESET}      ${PREV_CCLS:-<none>} ${BOLD}→${RESET} ${BOLD}${ccls:-<none>}${RESET}"
-        PREV_CCLS="$ccls"
+      if [[ "$ccls" != "${PREV_CCLS[$bid]:-}" ]]; then
+        echo -e "[${ts}] [${login}] ${CYAN}${BOLD}🏷  CCL CHANGE${RESET}      ${PREV_CCLS[$bid]:-<none>} ${BOLD}→${RESET} ${BOLD}${ccls:-<none>}${RESET}"
+        PREV_CCLS["$bid"]="$ccls"
       fi
       ;;
   esac
@@ -185,11 +185,15 @@ main() {
   check_deps
   parse_args "$@"
 
-  echo -e "${BOLD}Resolving channel:${RESET} ${CYAN}${CHANNEL}${RESET}"
-  local broadcaster_id
-  broadcaster_id=$(get_broadcaster_id)
-  fetch_initial_state "$broadcaster_id"
-  echo -e "${BOLD}ID:${RESET} ${broadcaster_id} | ${BOLD}Game:${RESET} ${PREV_GAME:-<none>} | ${BOLD}Title:${RESET} ${PREV_TITLE:-<none>} | ${BOLD}CCLs:${RESET} ${PREV_CCLS:-<none>}"
+  for channel in "${CHANNELS[@]}"; do
+    echo -e "${BOLD}Resolving channel:${RESET} ${CYAN}${channel}${RESET}"
+    local bid
+    bid=$(get_broadcaster_id "$channel")
+    BROADCASTER_IDS["$channel"]="$bid"
+    BROADCASTER_NAMES["$bid"]="$channel"
+    fetch_initial_state "$bid"
+    echo -e "${BOLD}ID:${RESET} ${bid} | ${BOLD}Game:${RESET} ${PREV_GAME[$bid]:-<none>} | ${BOLD}Title:${RESET} ${PREV_TITLE[$bid]:-<none>} | ${BOLD}CCLs:${RESET} ${PREV_CCLS[$bid]:-<none>}"
+  done
 
   mkfifo "$FIFO"
   trap cleanup SIGINT SIGTERM EXIT
@@ -209,8 +213,12 @@ main() {
       "session_welcome")
         session_id=$(echo "$line" | jq -r '.payload.session.id')
         echo -e "${GREEN}Session:${RESET} ${session_id}"
-        subscribe_events "$session_id" "$broadcaster_id"
-        echo -e "${GREEN}${BOLD}Listening for events on ${CYAN}${CHANNEL}${GREEN}...${RESET} (Ctrl+C to stop)"
+        for bid in "${BROADCASTER_IDS[@]}"; do
+          subscribe_events "$session_id" "$bid"
+        done
+        local channels_str
+        channels_str=$(printf '%s,' "${CHANNELS[@]}" | sed 's/,$//')
+        echo -e "${GREEN}${BOLD}Listening for events on ${CYAN}${channels_str}${GREEN}...${RESET} (Ctrl+C to stop)"
         ;;
       "session_keepalive")
         ;;
