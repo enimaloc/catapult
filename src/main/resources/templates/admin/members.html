@@ -139,6 +139,9 @@
                                                 th:text="#{admin.members.actions.impersonate}">Impersonner</button>
                                     </form>
                                     <th:block th:if="${member.systemAccount}">
+                                        <a th:href="@{/admin/members/{id}/settings(id=${member.id})}"
+                                           class="dropdown-item"
+                                           th:text="#{admin.members.actions.edit_settings}">Modifier les settings…</a>
                                         <a th:href="@{/admin/members/{id}/bot/link-twitch(id=${member.id})}"
                                            class="dropdown-item"
                                            th:text="#{admin.members.actions.link_bot}">Lier le Bot Twitch…</a>
