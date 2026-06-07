@@ -5,6 +5,7 @@ set -euo pipefail
 WS_URL="wss://eventsub.wss.twitch.tv/ws"
 FIFO_BASE="/tmp/twitch_ws_fifo_$$"
 WS_LIMIT=10
+WS_CONN_LIMIT=3
 
 declare -A SUBSCRIPTIONS=(
   ["channel.update"]="2"
@@ -77,6 +78,19 @@ parse_args() {
   done
   if [[ ${#CHANNELS[@]} -eq 0 ]]; then
     echo "Error: at least one channel name required" >&2; usage; exit 1
+  fi
+}
+
+# ── Delete stale WebSocket EventSub subscriptions ─────────────────────────
+cleanup_stale_ws_subs() {
+  local ids
+  ids=$(twitch api get /eventsub/subscriptions 2>/dev/null \
+    | jq -r '.data[] | select(.transport.method == "websocket") | .id' 2>/dev/null) || true
+  if [[ -n "$ids" ]]; then
+    echo -e "${YELLOW}Cleaning up stale WebSocket subscriptions...${RESET}"
+    while IFS= read -r id; do
+      twitch api delete /eventsub/subscriptions -q "id=$id" &>/dev/null || true
+    done <<< "$ids"
   fi
 }
 
@@ -234,6 +248,16 @@ main() {
   check_deps
   parse_args "$@"
 
+  cleanup_stale_ws_subs
+
+  local max_per_conn=$(( WS_LIMIT / ${#SUBSCRIPTIONS[@]} ))
+  local max_channels=$(( WS_CONN_LIMIT * max_per_conn ))
+
+  if [[ ${#CHANNELS[@]} -gt $max_channels ]]; then
+    echo -e "${YELLOW}Warning: ${#CHANNELS[@]} channels requested but max is ${max_channels} (${WS_CONN_LIMIT} connections × ${max_per_conn} channels each). Extra channels will be ignored.${RESET}" >&2
+    CHANNELS=("${CHANNELS[@]:0:$max_channels}")
+  fi
+
   for channel in "${CHANNELS[@]}"; do
     echo -e "${BOLD}Resolving channel:${RESET} ${CYAN}${channel}${RESET}"
     local bid
@@ -246,7 +270,6 @@ main() {
 
   trap cleanup SIGINT SIGTERM EXIT
 
-  local max_per_conn=$(( WS_LIMIT / ${#SUBSCRIPTIONS[@]} ))
   local total=${#CHANNELS[@]}
   local i=0
 
