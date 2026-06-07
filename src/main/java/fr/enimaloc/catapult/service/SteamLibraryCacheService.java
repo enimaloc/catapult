@@ -4,10 +4,10 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -28,7 +28,7 @@ public class SteamLibraryCacheService {
     private final UserAccountRepository userAccountRepository;
 
     @Async
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void preloadAllUserLibraries() {
         List<UserAccount> users = userAccountRepository.findBySteamIdNotNull();
         if (users.isEmpty()) {
