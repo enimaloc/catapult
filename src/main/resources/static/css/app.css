@@ -595,6 +595,7 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
 .badge-default      { background: #1e293b; color: var(--text-muted); }
 .badge-ccl          { background: #312e81; color: #c4b5fd; margin-right: 4px; }
 .badge-live         { background: #e91916; color: #fff; }
+.badge-system       { background: var(--accent); color: var(--bg); font-weight: 700; }
 
 /* ============================================================
    Provider grid (settings)
@@ -679,6 +680,8 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
 
 .table tr:last-child td { border-bottom: none; }
 .table tbody tr:hover { background: var(--bg-surface); }
+.table tbody tr.system-account { background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated)); }
+.table tbody tr.system-account:hover { background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated)); }
 
 /* ============================================================
    Filters
