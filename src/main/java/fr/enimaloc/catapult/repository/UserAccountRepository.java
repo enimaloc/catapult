@@ -26,4 +26,6 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
     List<UserAccount> findByStatusAndDeletionRequestedAtBefore(UserAccount.Status status, Instant cutoff);
 
     List<UserAccount> findByStatusAndTwitchIdNotNull(UserAccount.Status status);
+
+    Optional<UserAccount> findBySystemAccountTrue();
 }
