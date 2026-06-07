@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.StreamStateService;
+import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +39,7 @@ class AdminMembersControllerTest {
     @Mock private Environment environment;
     @Mock private AccountService accountService;
     @Mock private AdminMigrationService adminMigrationService;
+    @Mock private HttpSession session;
     private AdminMembersController controller;
 
     @BeforeEach
@@ -328,5 +330,69 @@ class AdminMembersControllerTest {
             .extracting(e -> ((ResponseStatusException) e).getStatusCode())
             .isEqualTo(HttpStatus.BAD_REQUEST);
         verify(adminMigrationService, never()).migrate(any(), any(), any());
+    }
+
+    @Test
+    void deleteAccount_systemAccount_throwsForbidden() {
+        UserAccount system = new UserAccount();
+        system.setId(UUID.randomUUID());
+        system.setTwitchId("botTwitchId");
+        system.setSystemAccount(true);
+
+        when(userAccountRepository.findById(system.getId())).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> controller.deleteAccount(system.getId(), adminPrincipal("adminId")))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.FORBIDDEN);
+        verify(accountService, never()).deleteAccountImmediately(any());
+    }
+
+    @Test
+    void migrateData_systemAsSource_throws400() {
+        UUID systemId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UserAccount system = new UserAccount();
+        system.setId(systemId);
+        system.setSystemAccount(true);
+
+        when(userAccountRepository.findById(systemId)).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> controller.migrateData(systemId, targetId, true, false, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(adminMigrationService, never()).migrate(any(), any(), any());
+    }
+
+    @Test
+    void linkBotTwitch_systemAccount_storesSessionAndRedirects() {
+        UserAccount system = new UserAccount();
+        UUID systemId = UUID.randomUUID();
+        system.setId(systemId);
+        system.setSystemAccount(true);
+
+        when(userAccountRepository.findById(systemId)).thenReturn(Optional.of(system));
+
+        String view = controller.linkBotTwitch(systemId, session);
+
+        verify(session).setAttribute("bot-link-pending", systemId.toString());
+        assertThat(view).isEqualTo("redirect:/oauth2/authorization/twitch");
+    }
+
+    @Test
+    void linkBotTwitch_regularAccount_throws400() {
+        UserAccount regular = new UserAccount();
+        UUID regularId = UUID.randomUUID();
+        regular.setId(regularId);
+        regular.setSystemAccount(false);
+
+        when(userAccountRepository.findById(regularId)).thenReturn(Optional.of(regular));
+
+        assertThatThrownBy(() -> controller.linkBotTwitch(regularId, session))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(session, never()).setAttribute(any(), any());
     }
 }
