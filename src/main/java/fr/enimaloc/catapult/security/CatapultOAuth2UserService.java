@@ -84,8 +84,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
                 default -> delegate.loadUser(userRequest);
             };
         } catch (OAuth2AuthenticationException e) {
-            log.error("OAuth2 authentication failed for provider '{}': {} — {}",
-                registrationId, e.getError().getErrorCode(), e.getMessage());
+            if (!"not_whitelisted".equals(e.getError().getErrorCode())) {
+                log.error("OAuth2 authentication failed for provider '{}': {} — {}",
+                    registrationId, e.getError().getErrorCode(), e.getMessage());
+            }
             throw e;
         } catch (Exception e) {
             log.error("Unexpected error during OAuth2 login for provider '{}'", registrationId, e);
@@ -148,11 +150,12 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private OAuth2User handleTwitchLogin(OAuth2UserRequest userRequest, OAuth2User oAuth2User) {
         String twitchId = oAuth2User.getAttribute("id");
 
+        String twitchUsername = oAuth2User.getAttribute("login");
+
         if (whitelistService.isEnabled() && !whitelistService.contains(twitchId)) {
+            log.warn("Access denied - user not whitelisted: id={}, login={}", twitchId, twitchUsername);
             throw new OAuth2AuthenticationException(new OAuth2Error("not_whitelisted"), "User not whitelisted.");
         }
-
-        String twitchUsername = oAuth2User.getAttribute("login");
 
         // Check for pending bot-link flow before the normal login path
         Optional<String> pendingBotLinkId = getPendingBotLinkId();
