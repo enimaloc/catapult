@@ -124,6 +124,19 @@ public class AdminMembersController {
         return "redirect:/admin/members";
     }
 
+    @GetMapping("/{id}/settings")
+    public String systemSettings(@PathVariable UUID id) {
+        UserAccount account = userAccountRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!account.isSystemAccount()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        if (account.getTwitchUsername() == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "System account has no username");
+        }
+        return "redirect:/channels/" + account.getTwitchUsername();
+    }
+
     @GetMapping("/{id}/bot/link-twitch")
     public String linkBotTwitch(@PathVariable UUID id, HttpSession session) {
         UserAccount account = userAccountRepository.findById(id)
