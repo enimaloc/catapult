@@ -81,6 +81,7 @@ parse_args() {
 # ── Cleanup ────────────────────────────────────────────────────────────────
 cleanup() {
   [[ -n "$WS_PID" ]] && kill "$WS_PID" 2>/dev/null || true
+  exec 3>&- 2>/dev/null || true
   [[ -p "$FIFO" ]] && rm -f "$FIFO"
   echo -e "\n${BOLD}Disconnected.${RESET}"
 }
@@ -118,6 +119,7 @@ format_event() {
   event=$(echo "$payload" | jq -r '.payload.event')
   bid=$(echo "$payload" | jq -r '.payload.event.broadcaster_user_id')
   login="${BROADCASTER_NAMES[$bid]:-unknown}"
+  [[ -z "${BROADCASTER_NAMES[$bid]+set}" ]] && return
 
   if [[ "$VERBOSE" == true ]]; then
     echo "$payload" | jq '.'
@@ -196,6 +198,7 @@ main() {
   done
 
   mkfifo "$FIFO"
+  exec 3>"$FIFO"
   trap cleanup SIGINT SIGTERM EXIT
 
   websocat --no-close "$WS_URL" < /dev/null > "$FIFO" &
