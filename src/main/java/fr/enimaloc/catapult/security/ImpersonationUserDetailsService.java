@@ -22,6 +22,9 @@ public class ImpersonationUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String twitchUsername) throws UsernameNotFoundException {
         var account = userAccountRepository.findByTwitchUsername(twitchUsername)
             .orElseThrow(() -> new UsernameNotFoundException("User not found: " + twitchUsername));
+        if (account.isSystemAccount()) {
+            throw new org.springframework.security.authentication.LockedException("Cannot impersonate system account");
+        }
         boolean isAdmin = !ownerId.isBlank() && ownerId.equals(account.getTwitchId());
         return CatapultOAuth2User.forImpersonation(account, isAdmin);
     }

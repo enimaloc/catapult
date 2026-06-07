@@ -605,7 +605,12 @@ public class ChannelController {
         UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (channelUser.isSystemAccount()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            boolean isAdmin = principal.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+            if (!isAdmin) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            }
+            return channelUser;
         }
         UserAccount viewer = principal.getUserAccount();
         if (!channelAccessService.canAccess(viewer, channelUser)) {
