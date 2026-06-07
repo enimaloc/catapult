@@ -294,7 +294,8 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         log.info("Bot Twitch account {} linked to system account", botTwitchId);
 
         Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
-        if (currentAuth != null && currentAuth.getPrincipal() instanceof CatapultOAuth2User adminUser) {
+        if (currentAuth != null && currentAuth.getPrincipal() instanceof CatapultOAuth2User adminUser
+                && adminUser.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()))) {
             return adminUser;
         }
         throw new OAuth2AuthenticationException(new OAuth2Error("admin_not_authenticated"),
