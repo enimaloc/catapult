@@ -198,7 +198,7 @@ main() {
   done
 
   mkfifo "$FIFO"
-  exec 3>"$FIFO"
+  exec 3<>"$FIFO"
   trap cleanup SIGINT SIGTERM EXIT
 
   websocat --no-close "$WS_URL" < /dev/null > "$FIFO" &
