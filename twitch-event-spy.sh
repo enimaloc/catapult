@@ -3,7 +3,8 @@ set -euo pipefail
 
 # ── Constants ──────────────────────────────────────────────────────────────
 WS_URL="wss://eventsub.wss.twitch.tv/ws"
-FIFO="/tmp/twitch_ws_fifo_$$"
+FIFO_BASE="/tmp/twitch_ws_fifo_$$"
+WS_LIMIT=10
 
 declare -A SUBSCRIPTIONS=(
   ["channel.update"]="2"
@@ -22,7 +23,8 @@ RESET='\033[0m'
 # ── State ──────────────────────────────────────────────────────────────────
 CHANNELS=()
 VERBOSE=false
-WS_PID=""
+CONN_PIDS=()
+FIFOS=()
 declare -A BROADCASTER_IDS
 declare -A BROADCASTER_NAMES
 declare -A PREV_GAME
@@ -80,9 +82,12 @@ parse_args() {
 
 # ── Cleanup ────────────────────────────────────────────────────────────────
 cleanup() {
-  [[ -n "$WS_PID" ]] && kill "$WS_PID" 2>/dev/null || true
-  exec 3>&- 2>/dev/null || true
-  [[ -p "$FIFO" ]] && rm -f "$FIFO"
+  for pid in "${CONN_PIDS[@]:-}"; do
+    kill "$pid" 2>/dev/null || true
+  done
+  for fifo in "${FIFOS[@]:-}"; do
+    [[ -p "$fifo" ]] && rm -f "$fifo"
+  done
   echo -e "\n${BOLD}Disconnected.${RESET}"
 }
 
@@ -182,6 +187,48 @@ subscribe_events() {
   done
 }
 
+# ── One WebSocket connection handling a batch of channels ──────────────────
+run_connection() {
+  local fifo="$1"
+  shift
+  local -a channels=("$@")
+  local ws_pid="" session_id="" msg_type new_url
+
+  exec 3<>"$fifo"
+
+  websocat --no-close "$WS_URL" < /dev/null > "$fifo" &
+  ws_pid=$!
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    msg_type=$(echo "$line" | jq -r '.metadata.message_type // empty' 2>/dev/null) || continue
+
+    case "$msg_type" in
+      "session_welcome")
+        session_id=$(echo "$line" | jq -r '.payload.session.id')
+        echo -e "${GREEN}Session:${RESET} ${session_id}"
+        for channel in "${channels[@]}"; do
+          subscribe_events "$session_id" "${BROADCASTER_IDS[$channel]}"
+        done
+        ;;
+      "session_keepalive")
+        ;;
+      "session_reconnect")
+        new_url=$(echo "$line" | jq -r '.payload.session.reconnect_url')
+        echo -e "${YELLOW}⚠ Reconnect requested — switching URL...${RESET}"
+        kill "$ws_pid" 2>/dev/null || true
+        websocat --no-close "$new_url" < /dev/null > "$fifo" &
+        ws_pid=$!
+        ;;
+      "notification")
+        format_event "$line"
+        ;;
+    esac
+  done < "$fifo"
+
+  echo "WebSocket closed." >&2
+}
+
 main() {
   [[ "${1:-}" == "--help" ]] && { usage; exit 0; }
   check_deps
@@ -197,52 +244,30 @@ main() {
     echo -e "${BOLD}ID:${RESET} ${bid} | ${BOLD}Game:${RESET} ${PREV_GAME[$bid]:-<none>} | ${BOLD}Title:${RESET} ${PREV_TITLE[$bid]:-<none>} | ${BOLD}CCLs:${RESET} ${PREV_CCLS[$bid]:-<none>}"
   done
 
-  mkfifo "$FIFO"
-  exec 3<>"$FIFO"
   trap cleanup SIGINT SIGTERM EXIT
 
-  websocat --no-close "$WS_URL" < /dev/null > "$FIFO" &
-  WS_PID=$!
+  local max_per_conn=$(( WS_LIMIT / ${#SUBSCRIPTIONS[@]} ))
+  local total=${#CHANNELS[@]}
+  local i=0
 
-  echo -e "${CYAN}Connecting to EventSub WebSocket...${RESET}"
+  while [[ $i -lt $total ]]; do
+    local batch=("${CHANNELS[@]:$i:$max_per_conn}")
+    local fifo="${FIFO_BASE}_${i}"
+    FIFOS+=("$fifo")
+    mkfifo "$fifo"
+    local batch_str
+    batch_str=$(printf '%s,' "${batch[@]}" | sed 's/,$//')
+    echo -e "${CYAN}Connecting for:${RESET} ${batch_str}"
+    run_connection "$fifo" "${batch[@]}" &
+    CONN_PIDS+=($!)
+    (( i += max_per_conn ))
+  done
 
-  local session_id=""
-  local msg_type
-  while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    msg_type=$(echo "$line" | jq -r '.metadata.message_type // empty' 2>/dev/null) || continue
+  local channels_str
+  channels_str=$(printf '%s,' "${CHANNELS[@]}" | sed 's/,$//')
+  echo -e "${GREEN}${BOLD}Listening for events on ${CYAN}${channels_str}${GREEN}...${RESET} (Ctrl+C to stop)"
 
-    case "$msg_type" in
-      "session_welcome")
-        session_id=$(echo "$line" | jq -r '.payload.session.id')
-        echo -e "${GREEN}Session:${RESET} ${session_id}"
-        for bid in "${BROADCASTER_IDS[@]}"; do
-          subscribe_events "$session_id" "$bid"
-        done
-        local channels_str
-        channels_str=$(printf '%s,' "${CHANNELS[@]}" | sed 's/,$//')
-        echo -e "${GREEN}${BOLD}Listening for events on ${CYAN}${channels_str}${GREEN}...${RESET} (Ctrl+C to stop)"
-        ;;
-      "session_keepalive")
-        ;;
-      "session_reconnect")
-        local new_url
-        new_url=$(echo "$line" | jq -r '.payload.session.reconnect_url')
-        echo -e "${YELLOW}⚠ Reconnect requested — switching URL...${RESET}"
-        kill "$WS_PID" 2>/dev/null || true
-        websocat --no-close "$new_url" < /dev/null > "$FIFO" &
-        WS_PID=$!
-        ;;
-      "notification")
-        format_event "$line"
-        ;;
-      *)
-        ;;
-    esac
-  done < "$FIFO"
-
-  echo "WebSocket closed." >&2
-  exit 1
+  wait "${CONN_PIDS[@]}"
 }
 
 main "$@"
