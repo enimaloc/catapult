@@ -73,6 +73,15 @@ public class AdminController {
         return "admin/members";
     }
 
+    @GetMapping("/members/{id}/settings")
+    public String memberSettings(@PathVariable UUID id) {
+        MemberSummaryDto member = apiClient.get("/api/admin/members/{id}", MemberSummaryDto.class, id);
+        if (member == null || member.twitchUsername() == null) {
+            return "redirect:/admin/members";
+        }
+        return "redirect:/channels/" + member.twitchUsername();
+    }
+
     @PostMapping("/members/{id}/bot/toggle")
     public String toggleMemberBot(@PathVariable UUID id) {
         apiClient.post("/api/admin/members/{id}/bot/toggle", null, id);
@@ -307,4 +316,6 @@ public class AdminController {
     record KeyStatusDto(String masked, String owner, boolean blocked, long blockedForSeconds) {}
 
     record SteamKeysPageDto(Map<String, KeyStatusDto> keyStatuses, boolean steamEnabled) {}
+
+    record MemberSummaryDto(UUID id, String twitchUsername) {}
 }
