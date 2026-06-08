@@ -2,14 +2,14 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.security.AuthCodeStore;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,6 +24,18 @@ import java.util.UUID;
 public class ApiAuthController {
 
     private final UserAccountRepository userAccountRepository;
+    private final AuthCodeStore codeStore;
+
+    /**
+     * Single-use token exchange: catapult-web calls this server-to-server after receiving
+     * the opaque code in /auth/callback. Returns 410 Gone if the code is expired or already used.
+     */
+    @PostMapping("/exchange")
+    public ResponseEntity<Map<String, String>> exchange(@RequestParam String code) {
+        return codeStore.consume(code)
+                .map(jwt -> ResponseEntity.ok(Map.of("token", jwt)))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.GONE).build());
+    }
 
     @GetMapping("/validate")
     public UserInfoResponse validate(@AuthenticationPrincipal Jwt jwt) {
