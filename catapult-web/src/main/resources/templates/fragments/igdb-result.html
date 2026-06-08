@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="igdb-result">
+    <pre th:if="${igdbResult != null and igdbResult.hasError()}"
+         class="igdb-result igdb-result--error"
+         th:text="${igdbResult.error}"></pre>
+    <pre th:if="${igdbResult != null and !igdbResult.hasError()}"
+         class="igdb-result igdb-result--ok"
+         th:text="${igdbResult.result}"></pre>
+    <span th:if="${igdbResult == null}" class="igdb-result igdb-result--error">Request failed</span>
+</th:block>
+</body>
+</html>
