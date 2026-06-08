@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'experiments', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title>Catapult — Experiments</title>
+</head>
+<body>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 th:text="#{admin.experiments.title}">A/B Experiments</h2>
+    </div>
+
+    <div th:if="${#lists.isEmpty(experiments)}" class="text-muted">
+        <p th:text="#{admin.experiments.empty}">Aucun experiment configuré.</p>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(experiments)}" class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th th:text="#{admin.experiments.column.name}">Nom</th>
+                    <th th:text="#{admin.experiments.column.key}">Clé</th>
+                    <th th:text="#{admin.experiments.column.status}">Statut</th>
+                    <th th:text="#{admin.experiments.column.actions}">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="exp : ${experiments}">
+                    <td><strong th:text="${exp.name}"></strong></td>
+                    <td><span class="badge" th:text="${exp.key}"></span></td>
+                    <td><span class="badge" th:text="${exp.status}"></span></td>
+                    <td>
+                        <a th:href="@{/admin/experiments/{id}(id=${exp.id})}" class="btn btn-sm btn-outline" th:text="#{admin.experiments.action.view}">Voir</a>
+                        <form th:if="${exp.status.name() == 'DRAFT'}" th:action="@{/admin/experiments/{id}/activate(id=${exp.id})}" method="post" style="display:inline"> <!-- nosemgrep -->
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit" class="btn btn-sm btn-primary" th:text="#{admin.experiments.action.activate}">Activer</button>
+                        </form>
+                        <form th:if="${exp.status.name() == 'ACTIVE'}" th:action="@{/admin/experiments/{id}/pause(id=${exp.id})}" method="post" style="display:inline"> <!-- nosemgrep -->
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit" class="btn btn-sm btn-outline" th:text="#{admin.experiments.action.pause}">Pause</button>
+                        </form>
+                        <form th:if="${exp.status.name() == 'ACTIVE' || exp.status.name() == 'PAUSED'}" th:action="@{/admin/experiments/{id}/end(id=${exp.id})}" method="post" style="display:inline"> <!-- nosemgrep -->
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit" class="btn btn-sm" th:text="#{admin.experiments.action.end}">Arrêter</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

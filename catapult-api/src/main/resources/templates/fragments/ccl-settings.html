@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*@thymesvar id="cclSettings" type="fr.enimaloc.catapult.domain.UserSettings"*/-->
+<!--/*@thymesvar id="availableCcls" type="java.util.List"*/-->
+<section th:fragment="ccl-settings" class="card">
+    <div class="card-header">
+        <h3 th:text="#{ccl_settings.title}">Filtres de labels de contenu</h3>
+        <button class="btn-help"
+                hx-get="/help/ccl-settings"
+                hx-target="#help-panel-body"
+                hx-swap="innerHTML"
+                hx-on::after-request="openHelpPanel()"
+                th:title="#{help.panel.title}">?</button>
+    </div>
+    <p class="text-muted mb-16" th:text="#{ccl_settings.subtitle}">Contrôle global des labels de contenu appliqués à ton stream.</p>
+
+    <form th:action="@{/channels/{u}/settings/ccl(u=${channelUsername})}" method="post"> <!-- nosemgrep -->
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <div class="inline-edit-fields">
+            <div class="inline-edit-field">
+                <label th:text="#{ccl_settings.enabled}">Activer les labels de contenu</label>
+                <input type="checkbox" name="cclEnabled"
+                       th:checked="${cclSettings.cclFeatureEnabled}">
+            </div>
+            <div class="inline-edit-field">
+                <label th:text="#{ccl_settings.blocked}">Labels à ne jamais appliquer</label>
+                <div class="ccl-checkboxes">
+                    <div th:each="ccl : ${availableCcls}">
+                        <label>
+                            <input type="checkbox" name="blockedCcls"
+                                   th:value="${ccl.id}"
+                                   th:checked="${cclSettings.blockedCcls.contains(ccl.id)}">
+                            <span th:text="${ccl.name}"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="inline-edit-actions" style="margin-top:12px">
+            <button type="submit" class="btn btn-primary" th:text="#{common.save}">Enregistrer</button>
+        </div>
+    </form>
+
+</section>
+</body>
+</html>

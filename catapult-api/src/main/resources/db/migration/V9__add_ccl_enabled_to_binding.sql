@@ -1,0 +1,2 @@
+ALTER TABLE game_binding
+    ADD COLUMN ccl_enabled BOOLEAN NOT NULL DEFAULT TRUE;
