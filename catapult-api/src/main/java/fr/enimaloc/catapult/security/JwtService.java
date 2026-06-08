@@ -3,9 +3,6 @@ package fr.enimaloc.catapult.security;
 import fr.enimaloc.catapult.domain.UserAccount;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -14,7 +11,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Service
 public class JwtService {
 
@@ -22,9 +18,9 @@ public class JwtService {
     private final long expiryMillis;
 
     public JwtService(
-            @Value("${app.jwt.secret:}") String secret,
+            SecretKey jwtSecretKey,
             @Value("${app.jwt.expiry-hours:24}") long expiryHours) {
-        this.key = buildKey(secret);
+        this.key = jwtSecretKey;
         this.expiryMillis = TimeUnit.HOURS.toMillis(expiryHours);
     }
 
@@ -33,6 +29,10 @@ public class JwtService {
         List<String> roles = user.getAuthorities().stream()
                 .map(a -> a.getAuthority())
                 .toList();
+        return generateForUser(account, roles);
+    }
+
+    public String generateForUser(UserAccount account, List<String> roles) {
         return Jwts.builder()
                 .subject(account.getId().toString())
                 .claim("twitchId", account.getTwitchId())
@@ -52,16 +52,4 @@ public class JwtService {
                 .getPayload();
     }
 
-    private static SecretKey buildKey(String secret) {
-        if (secret == null || secret.isBlank()) {
-            log.warn("app.jwt.secret is not configured — generating a random ephemeral key (tokens will not survive restarts)");
-            return Jwts.SIG.HS256.key().build();
-        }
-        try {
-            return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
-        } catch (Exception e) {
-            log.warn("app.jwt.secret is not valid Base64 — using raw UTF-8 bytes");
-            return Keys.hmacShaKeyFor(secret.getBytes());
-        }
-    }
 }
