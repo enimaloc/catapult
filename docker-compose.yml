@@ -4,9 +4,9 @@ services:
       context: .
       dockerfile: catapult-api/Dockerfile
     image: registry.gitlab.com/enimaloc/catapult/api:latest
-    ports:
-      - "8080:8080"
-      - "8090:8090"
+    expose:
+      - "8080"
+      - "8090"
     environment:
       DB_URL: jdbc:postgresql://db:5432/catapult
       DB_USERNAME: ${DB_USERNAME}
@@ -30,9 +30,9 @@ services:
       context: .
       dockerfile: catapult-web/Dockerfile
     image: registry.gitlab.com/enimaloc/catapult/web:latest
-    ports:
-      - "8081:8081"
-      - "8091:8091"
+    expose:
+      - "8081"
+      - "8091"
     environment:
       CATAPULT_API_URL: ${CATAPULT_API_URL:-http://catapult-api:8080}
       JWT_SECRET: ${JWT_SECRET}
