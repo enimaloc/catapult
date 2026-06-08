@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, null, ~{::body}, ~{::style}, 'container', null, null)}">
+<head>
+    <meta charset="UTF-8">
+    <title>Catapult</title>
+</head>
+<body>
+    <div th:if="${steamError}" class="card" style="text-align:center;padding:32px">
+        <p style="font-size:1.5em">⚠️</p>
+        <p th:text="#{closing.steam_error}">La connexion Steam a échoué. Veuillez réessayer.</p>
+        <button onclick="window.close()" class="btn btn-outline" th:text="#{closing.close}">Fermer</button>
+    </div>
+    <div th:unless="${steamError}" class="card" style="text-align:center;padding:32px">
+        <p th:text="#{closing.success}">Connexion réussie. Vous pouvez fermer cette page.</p>
+        <script>
+            const bc = new BroadcastChannel('catapult-connections');
+            bc.postMessage('steam-linked');
+            bc.close();
+            window.close();
+        </script>
+    </div>
+</body>
+</html>
