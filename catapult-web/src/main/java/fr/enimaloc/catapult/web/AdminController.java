@@ -1,18 +1,18 @@
 package fr.enimaloc.catapult.web;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import fr.enimaloc.catapult.client.ApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,12 +57,18 @@ public class AdminController {
 
     @GetMapping("/members")
     public String membersPage(Model model) {
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = apiClient.get("/api/admin/members", Map.class);
+        AdminMembersPageDto data = apiClient.get("/api/admin/members", AdminMembersPageDto.class);
         if (data != null) {
-            model.addAttribute("members", data.get("members"));
-            model.addAttribute("liveStatus", data.get("liveStatus"));
-            model.addAttribute("isMockProfile", Boolean.TRUE.equals(data.get("isMockProfile")));
+            // Convert string UUID keys to UUID so the template lookup works
+            Map<UUID, Boolean> liveStatus = new LinkedHashMap<>();
+            if (data.liveStatus() != null) {
+                data.liveStatus().forEach((k, v) -> {
+                    try { liveStatus.put(UUID.fromString(k), v); } catch (IllegalArgumentException ignored) {}
+                });
+            }
+            model.addAttribute("members", data.members());
+            model.addAttribute("liveStatus", liveStatus);
+            model.addAttribute("isMockProfile", data.isMockProfile());
         }
         return "admin/members";
     }
@@ -138,11 +144,10 @@ public class AdminController {
 
     @GetMapping("/steam-keys")
     public String steamKeysPage(Model model) {
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = apiClient.get("/api/admin/steam-keys", Map.class);
+        SteamKeysPageDto data = apiClient.get("/api/admin/steam-keys", SteamKeysPageDto.class);
         if (data != null) {
-            model.addAttribute("keyStatuses", data.get("keyStatuses"));
-            model.addAttribute("steamEnabled", Boolean.TRUE.equals(data.get("steamEnabled")));
+            model.addAttribute("keyStatuses", data.keyStatuses());
+            model.addAttribute("steamEnabled", data.steamEnabled());
         }
         return "admin/steam-keys";
     }
@@ -289,4 +294,17 @@ public class AdminController {
     record AddOverrideRequest(String overrideType, String action, int priority,
                               String twitchUsername, String attributeKey,
                               String attributeOp, String attributeVal, UUID targetVariantId) {}
+
+    // ── Typed response DTOs ───────────────────────────────────────────────────
+
+    enum MemberStatus { ACTIVE, INACTIVE, PENDING_DELETION }
+
+    record MemberDto(UUID id, String twitchId, String twitchUsername, String steamId,
+                     MemberStatus status, boolean systemAccount, boolean botEnabled, Instant createdAt) {}
+
+    record AdminMembersPageDto(List<MemberDto> members, Map<String, Boolean> liveStatus, boolean isMockProfile) {}
+
+    record KeyStatusDto(String masked, String owner, boolean blocked, long blockedForSeconds) {}
+
+    record SteamKeysPageDto(Map<String, KeyStatusDto> keyStatuses, boolean steamEnabled) {}
 }
