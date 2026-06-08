@@ -35,7 +35,7 @@ public class ApiSecurityConfig {
         http
                 .securityMatcher("/api/**")
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/config/**", "/api/changelog").permitAll()
+                        .requestMatchers("/api/health", "/api/config/**", "/api/changelog").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
