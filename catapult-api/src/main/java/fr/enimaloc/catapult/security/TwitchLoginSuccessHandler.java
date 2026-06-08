@@ -41,6 +41,7 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final TokenEncryptionService tokenEncryptionService;
     private final ApplicationEventPublisher eventPublisher;
     private final JwtService jwtService;
+    private final AuthCodeStore codeStore;
 
     @Value("${app.web-url:}")
     private String webUrl;
@@ -83,12 +84,14 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                     catUser.getUserAccount().getId());
             }
 
-            // If catapult-web is configured, redirect there with a JWT instead of serving UI directly.
+            // If catapult-web is configured, redirect there with a one-time code instead of the JWT.
+            // catapult-web exchanges the code server-to-server via POST /api/auth/exchange (30s TTL, single-use).
             if (webUrl != null && !webUrl.isBlank()) {
                 String jwt = jwtService.generate(catUser);
+                String code = codeStore.issue(jwt);
                 String callbackUrl = UriComponentsBuilder.fromUriString(webUrl)
                         .path("/auth/callback")
-                        .queryParam("token", jwt)
+                        .queryParam("code", code)
                         .build().toUriString();
                 response.sendRedirect(callbackUrl);
                 return;

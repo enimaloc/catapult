@@ -103,6 +103,25 @@ public class ApiClient {
         }
     }
 
+    /**
+     * Exchanges a one-time code (received from catapult-api's OAuth2 redirect) for a JWT.
+     * This call is server-to-server: the JWT itself never travels through the browser.
+     * Returns null if the code is expired, already used, or the exchange request fails.
+     */
+    public String exchangeCode(String code) {
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, String> body = restClient.post()
+                    .uri("/api/auth/exchange?code={code}", code)
+                    .retrieve()
+                    .body(java.util.Map.class);
+            return body != null ? body.get("token") : null;
+        } catch (Exception e) {
+            log.warn("Code exchange failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
     public void streamSse(String path, SseEmitter emitter, Object... uriVars) {
         String jwt = currentJwt(); // capture on the request thread before handing off
         Thread.ofVirtual().start(() -> {
