@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.client.ApiClient;
+import fr.enimaloc.catapult.client.ApiHealthService;
 import fr.enimaloc.catapult.security.CatapultWebUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,12 +16,22 @@ import java.util.Map;
 public class HomeController {
 
     private final ApiClient apiClient;
+    private final ApiHealthService apiHealthService;
 
     @GetMapping("/")
     public String home(@AuthenticationPrincipal CatapultWebUser principal, Model model) {
+        if (!apiHealthService.isAvailable()) {
+            model.addAttribute("showSteam",     false);
+            model.addAttribute("showXbox",      false);
+            model.addAttribute("showBattlenet", false);
+            model.addAttribute("hasAnySources", false);
+            return "home";
+        }
+
         if (principal != null) {
             return "redirect:/app";
         }
+
         Map<?, ?> providers = apiClient.get("/api/config/providers", Map.class);
         boolean showSteam     = providers != null && Boolean.TRUE.equals(providers.get("steam"));
         boolean showXbox      = providers != null && Boolean.TRUE.equals(providers.get("xbox"));

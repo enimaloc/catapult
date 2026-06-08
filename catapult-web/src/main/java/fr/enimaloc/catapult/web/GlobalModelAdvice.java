@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.client.ApiClient;
+import fr.enimaloc.catapult.client.ApiHealthService;
 import fr.enimaloc.catapult.security.CatapultWebUser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,12 @@ public class GlobalModelAdvice {
 
     private final Optional<BuildProperties> buildProperties;
     private final ApiClient apiClient;
+    private final ApiHealthService apiHealthService;
+
+    @ModelAttribute
+    public void addGlobalFlags(Model model) {
+        model.addAttribute("apiAvailable", apiHealthService.isAvailable());
+    }
 
     @ModelAttribute
     public void addBuildInfo(Model model) {
