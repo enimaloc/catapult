@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'login', ~{::body}, null, null, null, null)}">
+<head>
+    <title>Catapult - Mock Login</title>
+</head>
+<body>
+<div class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <h1>🚀 Catapult</h1>
+            <p class="subtitle">Mode développement — sélectionner un utilisateur</p>
+            <form method="post" th:action="@{/mock-login}"> <!-- nosemgrep -->
+                <div class="form-group">
+                    <select name="userId" class="form-control" aria-label="Utilisateur">
+                        <option th:each="user : ${users}"
+                                th:value="${user.id}"
+                                th:text="${user.twitchUsername + (user.twitchId == ownerId ? ' (admin)' : '')}">
+                        </option>
+                    </select>
+                </div>
+                <button type="submit" class="btn" style="width:100%;justify-content:center;margin-top:12px">
+                    Se connecter
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>
