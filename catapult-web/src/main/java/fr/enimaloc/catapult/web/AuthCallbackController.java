@@ -2,7 +2,6 @@ package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.client.ApiClient;
 import jakarta.servlet.http.HttpSession;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -10,12 +9,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 /**
  * Receives the JWT from catapult-api after a successful OAuth2 login and stores it in the session.
  * catapult-api redirects here as: GET /auth/callback?token=<JWT>
+ *
+ * The login redirect uses a path-relative URL (/oauth2/authorization/twitch) that nginx-router
+ * proxies internally to catapult-api, so the browser never touches catapult-api:8080 directly.
  */
 @Controller
 public class AuthCallbackController {
-
-    @Value("${catapult.api.url}")
-    private String apiUrl;
 
     @GetMapping("/auth/callback")
     public String callback(@RequestParam String token, HttpSession session) {
@@ -25,7 +24,7 @@ public class AuthCallbackController {
 
     @GetMapping("/login")
     public String login() {
-        return "redirect:" + apiUrl + "/oauth2/authorization/twitch";
+        return "redirect:/oauth2/authorization/twitch";
     }
 
     @GetMapping("/logout-redirect")
