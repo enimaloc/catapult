@@ -113,12 +113,20 @@ public class ApiAdminMembersController {
                 new AdminMigrationService.MigrateOptions(body.migrateSettings(), body.migrateGetters(), body.migrateBindings()));
     }
 
+    @GetMapping("/{id}")
+    public MemberSummary getMember(@PathVariable UUID id) {
+        UserAccount user = findOrThrow(id);
+        return new MemberSummary(user.getId(), user.getTwitchUsername());
+    }
+
     private UserAccount findOrThrow(UUID id) {
         return userAccountRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     public record MembersPageData(List<UserAccount> members, Map<UUID, Boolean> liveStatus, boolean isMockProfile) {}
+
+    public record MemberSummary(UUID id, String twitchUsername) {}
 
     public record MigrateRequest(UUID targetId, boolean migrateSettings, boolean migrateGetters, boolean migrateBindings) {}
 }
