@@ -2,23 +2,32 @@ package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.client.ApiClient;
 import jakarta.servlet.http.HttpSession;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Receives the JWT from catapult-api after a successful OAuth2 login and stores it in the session.
- * catapult-api redirects here as: GET /auth/callback?token=<JWT>
- *
- * The login redirect uses a path-relative URL (/oauth2/authorization/twitch) that nginx-router
- * proxies internally to catapult-api, so the browser never touches catapult-api:8080 directly.
+ * Handles the post-OAuth2 callback from catapult-api.
+ * catapult-api redirects here with a short-lived one-time code (not the JWT itself).
+ * This controller exchanges the code for a JWT server-to-server, keeping the JWT out of URLs.
  */
+@Slf4j
 @Controller
+@RequiredArgsConstructor
 public class AuthCallbackController {
 
+    private final ApiClient apiClient;
+
     @GetMapping("/auth/callback")
-    public String callback(@RequestParam String token, HttpSession session) {
-        session.setAttribute(ApiClient.SESSION_JWT_KEY, token);
+    public String callback(@RequestParam String code, HttpSession session) {
+        String jwt = apiClient.exchangeCode(code);
+        if (jwt == null) {
+            log.warn("Auth code exchange failed or expired");
+            return "redirect:/login?error";
+        }
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, jwt);
         return "redirect:/channels";
     }
 
