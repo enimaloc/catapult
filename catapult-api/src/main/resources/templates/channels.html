@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'channels', ~{::div#main-content}, null, 'container', null, null)}">
+<head>
+    <title th:text="#{channels.title}">My Channels</title>
+</head>
+<body>
+    <div id="main-content">
+        <h1 th:text="#{channels.title}">My Channels</h1>
+
+        <div class="channel-grid" th:unless="${#lists.isEmpty(channels)}">
+            <a class="channel-card"
+               th:classappend="${liveStatus[channel.id]} ? ' channel-card--live'"
+               th:href="@{/channels/{u}(u=${channel.twitchUsername})}"
+               th:each="channel : ${channels}">
+
+                <div class="channel-card__avatar">
+                    <img th:if="${channel.profileImageUrl != null}"
+                         th:src="${channel.profileImageUrl}"
+                         th:alt="${channel.twitchUsername}" />
+                    <span th:unless="${channel.profileImageUrl != null}"
+                          class="channel-card__initials"
+                          th:text="${#strings.toUpperCase(#strings.substring(channel.twitchUsername, 0, 1))}"></span>
+                </div>
+
+                <span class="channel-card__live-badge"
+                      th:if="${liveStatus[channel.id]}"
+                      th:text="#{channels.live_badge}">LIVE</span>
+
+                <div class="channel-card__body">
+                    <span class="channel-card__name" th:text="${channel.twitchUsername}"></span>
+                    <span class="badge badge-owner"
+                          th:if="${channel.twitchId == viewerTwitchId}"
+                          th:text="#{channels.owner_badge}">Propriétaire</span>
+                    <span class="badge badge-moderator"
+                          th:unless="${channel.twitchId == viewerTwitchId}"
+                          th:text="#{channels.moderator_badge}">Modérateur</span>
+                </div>
+            </a>
+        </div>
+
+        <div class="channel-empty-state" th:if="${#lists.isEmpty(channels)}">
+            <p th:text="#{channels.empty}">Aucune chaîne accessible.</p>
+        </div>
+    </div>
+</body>
+</html>
