@@ -1563,3 +1563,22 @@ details summary { cursor: pointer; font-weight: 600; }
 }
 
 [data-theme="old-steam"] .dropdown-menu { border-radius: 0; }
+
+/* ── Maintenance banner ──────────────────────────────────────────────────── */
+.maintenance-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    background: #422006;
+    color: #fcd34d;
+    border: 1px solid #92400e;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.maintenance-banner__icon { font-size: 1.5rem; flex-shrink: 0; }
+.maintenance-banner p { margin: 0.25rem 0 0; font-size: 0.875rem; opacity: .85; }
