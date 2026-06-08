@@ -36,12 +36,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-client")
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
-    // Thymeleaf kept during transition — removed once catapult-web controllers are validated
+    // Thymeleaf kept for the experiment dialect (custom th:* processors and tests)
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
-    implementation("org.webjars.npm:chart.js:4.4.9")
-    implementation("org.webjars.npm:htmx.org:2.0.4")
-    implementation("org.webjars:webjars-locator-lite")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")

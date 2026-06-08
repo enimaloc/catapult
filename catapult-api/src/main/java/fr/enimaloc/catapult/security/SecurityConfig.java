@@ -2,22 +2,21 @@ package fr.enimaloc.catapult.security;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import org.springframework.security.web.session.HttpSessionEventPublisher;
-import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
-import org.springframework.security.authentication.LockedException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
-import org.springframework.security.web.authentication.switchuser.SwitchUserFilter;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 
+/**
+ * Handles the Twitch OAuth2 login flow for catapult-api.
+ * Only /oauth2/** and /login/oauth2/** reach this filter chain (nginx routes them here).
+ * Everything else is handled by ApiSecurityConfig (/api/**) or catapult-web.
+ */
 @Slf4j
 @Configuration
 @EnableWebSecurity
@@ -25,10 +24,11 @@ import org.springframework.security.web.authentication.switchuser.SwitchUserFilt
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    public static final String LOGIN_ROUTE = "/login";
-
     private final CatapultOAuth2UserService oAuth2UserService;
     private final TwitchLoginSuccessHandler loginSuccessHandler;
+
+    @Value("${app.web-url:http://localhost:8081}")
+    private String webUrl;
 
     @Bean
     public HttpSessionEventPublisher httpSessionEventPublisher() {
@@ -36,67 +36,27 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SwitchUserFilter switchUserFilter(ImpersonationUserDetailsService impersonationUserDetailsService) {
-        SwitchUserFilter filter = new SwitchUserFilter();
-        filter.setUserDetailsService(impersonationUserDetailsService);
-        filter.setSwitchUserUrl("/admin/impersonate");
-        filter.setExitUserUrl("/admin/impersonate/exit");
-        filter.setSuccessHandler((req, res, auth) -> {
-            // If the resulting authentication has ROLE_PREVIOUS_ADMINISTRATOR it is a
-            // switch-in; if not (i.e. we just exited back to the original admin) redirect
-            // to the members page instead.
-            boolean isSwitched = auth.getAuthorities().stream()
-                    .anyMatch(a -> SwitchUserFilter.ROLE_PREVIOUS_ADMINISTRATOR.equals(a.getAuthority()));
-            res.sendRedirect(isSwitched ? "/channels" : "/admin/members");
-        });
-        filter.setFailureHandler((req, res, ex) -> {
-            log.warn("Impersonation failed: {}", ex.getMessage());
-            res.sendRedirect("/admin/members?error=impersonateFailed");
-        });
-        AccountStatusUserDetailsChecker statusChecker = new AccountStatusUserDetailsChecker();
-        filter.setUserDetailsChecker(details -> {
-            statusChecker.check(details);
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof CatapultOAuth2User admin
-                    && admin.getUserAccount().getTwitchUsername().equals(details.getUsername())) {
-                throw new LockedException("Cannot impersonate yourself");
-            }
-        });
-        return filter;
-    }
-
-    @Bean
     @SuppressWarnings("RedundantThrows")
-    public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   SwitchUserFilter switchUserFilter) {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .addFilterAfter(switchUserFilter, AuthorizationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", LOGIN_ROUTE, "/privacy", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**", "/changelog/**", "/actuator/**").permitAll()
-                        .requestMatchers("/admin/impersonate/exit").authenticated()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
                 .oauth2Login(oauth2 -> oauth2
-                        .loginPage(LOGIN_ROUTE)
                         .successHandler(loginSuccessHandler)
                         .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService))
                         .failureHandler((request, response, exception) -> {
                             log.error("OAuth2 login failed: [{}] {}", exception.getClass().getSimpleName(), exception.getMessage(), exception);
-                            String redirectUrl = LOGIN_ROUTE + "?error";
+                            String redirectUrl = webUrl + "/login?error";
                             if (exception instanceof OAuth2AuthenticationException oauthEx
                                     && "not_whitelisted".equals(oauthEx.getError().getErrorCode())) {
-                                redirectUrl = LOGIN_ROUTE + "?error=not_whitelisted";
+                                redirectUrl = webUrl + "/login?error=not_whitelisted";
                             }
-                            new SimpleUrlAuthenticationFailureHandler(redirectUrl)
-                                .onAuthenticationFailure(request, response, exception);
+                            response.sendRedirect(redirectUrl);
                         })
                 )
-                .logout(logout -> logout
-                        .logoutSuccessUrl(LOGIN_ROUTE)
-                        .invalidateHttpSession(true)
-                        .deleteCookies("JSESSIONID")
-                );
+                .csrf(csrf -> csrf.disable())
+                .logout(logout -> logout.disable());
 
         return http.build();
     }
