@@ -12,7 +12,6 @@ usage() {
 
 NEW="$1"
 
-# Refuse obvious non-versions
 if [[ ! "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9._-]+)?$ ]]; then
     echo "error: '$NEW' does not look like a version (expected MAJOR.MINOR.PATCH[-QUALIFIER])" >&2
     exit 1
@@ -28,6 +27,14 @@ if [ "$OLD" = "$NEW" ]; then
 fi
 
 sed -i "s/version = \"$OLD\"/version = \"$NEW\"/" "$ROOT_BUILD"
-
 echo "Version updated: $OLD → $NEW"
-echo "File: $ROOT_BUILD (allprojects block — catapult-api and catapult-web inherit)"
+
+git add "$ROOT_BUILD"
+git commit -m "chore(release): bump version to $NEW"
+
+TAG="v$NEW"
+git tag "$TAG"
+echo "Tag created: $TAG"
+
+git push origin HEAD "$TAG"
+echo "Pushed commit and tag $TAG to origin"
