@@ -1,30 +1,49 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REGISTRY="registry.gitlab.com/enimaloc/catapult"
-REMOTE="ssh.enimaloc.fr"
+REGISTRY="${REGISTRY:-registry.gitlab.com/enimaloc/catapult}"
+REMOTE="${REMOTE:-ssh.enimaloc.fr}"
 
 VERSION=${1:-$(grep -m1 'version = "' build.gradle.kts | sed -E 's/.*version = "(.*)".*/\1/')}
 
-IMAGES=(
-    "api:$REGISTRY/api"
-    "web:$REGISTRY/web"
-    "maintenance:$REGISTRY/maintenance"
-    "nginx-router:$REGISTRY/nginx-router"
+# Build image name: "registry/name" when registry is set, just "name" otherwise
+img() {
+    local name="$1"
+    if [ -n "$REGISTRY" ]; then
+        echo "$REGISTRY/$name"
+    else
+        echo "$name"
+    fi
+}
+
+SERVICES=(
+    "api:catapult-api/Dockerfile:."
+    "web:catapult-web/Dockerfile:."
+    "maintenance::catapult-maintenance"
+    "nginx-router::nginx-router"
 )
 
 echo "==> Building images (version: $VERSION)"
-docker build -t "$REGISTRY/api:$VERSION"          -t "$REGISTRY/api:latest"          -f catapult-api/Dockerfile .
-docker build -t "$REGISTRY/web:$VERSION"          -t "$REGISTRY/web:latest"          -f catapult-web/Dockerfile .
-docker build -t "$REGISTRY/maintenance:$VERSION"  -t "$REGISTRY/maintenance:latest"  catapult-maintenance/
-docker build -t "$REGISTRY/nginx-router:$VERSION" -t "$REGISTRY/nginx-router:latest" nginx-router/
+for entry in "${SERVICES[@]}"; do
+    name="${entry%%:*}"
+    rest="${entry#*:}"
+    dockerfile="${rest%%:*}"
+    context="${rest#*:}"
+    image="$(img "$name")"
+
+    if [ -n "$dockerfile" ]; then
+        docker build -t "$image:$VERSION" -t "$image:latest" -f "$dockerfile" "$context"
+    else
+        docker build -t "$image:$VERSION" -t "$image:latest" "$context"
+    fi
+done
 
 echo "==> Deploying to $REMOTE"
-for entry in "${IMAGES[@]}"; do
+for entry in "${SERVICES[@]}"; do
     name="${entry%%:*}"
-    image="${entry#*:}"
+    image="$(img "$name")"
     echo "  -> $name"
-    docker save "$image:latest" | ssh -C "$REMOTE" docker load
+    docker save "$image:latest"   | ssh -C "$REMOTE" docker load
     docker save "$image:$VERSION" | ssh -C "$REMOTE" docker load
 done
 
