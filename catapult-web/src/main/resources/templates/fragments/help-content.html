@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*@thymesvar id="helpTitle" type="java.lang.String"*/-->
+<!--/*@thymesvar id="helpBody" type="java.lang.String"*/-->
+<div th:fragment="help-content">
+    <h4 th:text="${helpTitle}"></h4>
+    <div th:utext="${helpBody}"></div>
+</div>
+</body>
+</html>
