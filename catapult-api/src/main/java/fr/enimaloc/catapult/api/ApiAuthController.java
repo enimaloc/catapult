@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,7 +40,9 @@ public class ApiAuthController {
                 account.getTwitchUsername(),
                 account.getProfileImageUrl(),
                 account.getStatus().name(),
-                roles != null ? roles : List.of()
+                roles != null ? roles : List.of(),
+                account.getDeletionRequestedAt() != null
+                        ? account.getDeletionRequestedAt().toString() : null
         );
     }
 
@@ -54,7 +57,8 @@ public class ApiAuthController {
             String username,
             String profileImageUrl,
             String status,
-            List<String> roles
+            List<String> roles,
+            String deletionRequestedAt
     ) {}
 
     public static Map<String, Object> toClaimsMap(UserInfoResponse r) {

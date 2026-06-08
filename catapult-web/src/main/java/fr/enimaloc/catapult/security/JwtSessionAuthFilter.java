@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -60,13 +61,17 @@ public class JwtSessionAuthFilter extends OncePerRequestFilter {
         Map<?, ?> body = apiClient.get("/api/auth/validate", Map.class);
         if (body == null) return null;
 
+        String deletionStr = (String) body.get("deletionRequestedAt");
+        Instant deletionRequestedAt = deletionStr != null ? Instant.parse(deletionStr) : null;
+
         return new CatapultWebUser(
                 UUID.fromString((String) body.get("id")),
                 (String) body.get("twitchId"),
                 (String) body.get("username"),
                 (String) body.get("profileImageUrl"),
                 (String) body.get("status"),
-                (List<String>) body.get("roles")
+                (List<String>) body.get("roles"),
+                deletionRequestedAt
         );
     }
 }
