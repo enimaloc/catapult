@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REGISTRY="${REGISTRY:-registry.gitlab.com/enimaloc/catapult}"
+REGISTRY="${REGISTRY:-enimaloc/catapult}"
 REMOTE="${REMOTE:-ssh.enimaloc.fr}"
 
 VERSION=${1:-$(grep -m1 'version = "' build.gradle.kts | sed -E 's/.*version = "(.*)".*/\1/')}
