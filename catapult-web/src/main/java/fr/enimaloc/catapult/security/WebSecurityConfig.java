@@ -22,7 +22,7 @@ public class WebSecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/login", "/auth/callback", "/privacy", "/error",
                                 "/css/**", "/js/**", "/images/**", "/webjars/**",
-                                "/changelog", "/changelog/**", "/actuator/**").permitAll()
+                                "/changelog", "/changelog/**", "/actuator/**", "/status").permitAll()
                         .requestMatchers("/admin/impersonate/exit").hasAuthority("ROLE_PREVIOUS_ADMINISTRATOR")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

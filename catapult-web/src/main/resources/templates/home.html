@@ -106,5 +106,18 @@
 
     </div>
 </div>
+
+<th:block th:if="${!apiAvailable}">
+<script th:inline="javascript">
+    (function () {
+        var interval = setInterval(function () {
+            fetch('/status')
+                .then(function (r) { return r.json(); })
+                .then(function (data) { if (data.available) { clearInterval(interval); location.reload(); } })
+                .catch(function () {});
+        }, 5000);
+    })();
+</script>
+</th:block>
 </body>
 </html>
