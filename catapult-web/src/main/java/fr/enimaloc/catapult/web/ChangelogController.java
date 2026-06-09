@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.client.ApiClient;
+import fr.enimaloc.catapult.web.dto.ChangelogDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Controller;
@@ -9,14 +10,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
-import java.util.Map;
 
 @Controller
 @RequestMapping("/changelog")
 @RequiredArgsConstructor
 public class ChangelogController {
 
-    private static final ParameterizedTypeReference<List<Map<String, Object>>> SECTIONS_TYPE =
+    private static final ParameterizedTypeReference<List<ChangelogDto.ChangelogSection>> SECTIONS_TYPE =
             new ParameterizedTypeReference<>() {};
 
     private final ApiClient apiClient;
