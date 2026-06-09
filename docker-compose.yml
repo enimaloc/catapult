@@ -18,12 +18,26 @@ services:
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET}
       STEAM_API_KEY: ${STEAM_API_KEY}
       IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
+      GITLAB_TOKEN: ${GITLAB_TOKEN:-}
+      WHITELIST: ${WHITELIST:-}
       JWT_SECRET: ${JWT_SECRET}
       CATAPULT_WEB_URL: ${CATAPULT_WEB_URL:-http://catapult-web:8081}
+#      SPRING_PROFILES_ACTIVE: mock
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 1m
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
+    entrypoint: ["java", "-Dlogger.level.fr.enimaloc.catapult.service=trace", "-jar", "app.jar"]
+    networks:
+      - monitor
+      - proxy
+      - default
 
   catapult-web:
     build:
@@ -36,9 +50,20 @@ services:
     environment:
       CATAPULT_API_URL: ${CATAPULT_API_URL:-http://catapult-api:8080}
       JWT_SECRET: ${JWT_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 1m
     depends_on:
-      - catapult-api
+      catapult-api:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - monitor
+      - proxy
+      - default
 
   catapult-maintenance:
     build:
@@ -76,3 +101,9 @@ services:
 
 volumes:
   postgres_data:
+
+networks:
+  monitor:
+    external: true
+  proxy:
+    external: true
