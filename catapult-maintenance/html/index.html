@@ -68,6 +68,12 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
         }
+
+        .retry-hint {
+            margin-top: 1.25rem;
+            font-size: 0.75rem;
+            color: #475569;
+        }
     </style>
 </head>
 <body>
@@ -81,6 +87,23 @@
         <div class="badge">
             <span class="pulse"></span>Nous revenons bientôt
         </div>
+        <p class="retry-hint" id="retry-hint">Vérification automatique en cours…</p>
     </div>
+    <script>
+        (function () {
+            var attempts = 0;
+            var interval = setInterval(function () {
+                fetch('/up')
+                    .then(function (r) {
+                        if (r.ok) { clearInterval(interval); location.reload(); }
+                    })
+                    .catch(function () {
+                        attempts++;
+                        var hint = document.getElementById('retry-hint');
+                        if (hint) hint.textContent = 'Nouvelle tentative dans 5s… (' + attempts + ')';
+                    });
+            }, 5000);
+        })();
+    </script>
 </body>
 </html>
