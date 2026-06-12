@@ -1,0 +1,158 @@
+# Politique de divulgation de failles - Catapult
+
+Date : Juin 2026
+Contact : security@enimaloc.fr
+
+
+## Table des matières
+
+1. Introduction
+2. Signaler une faille
+3. Temps de traitement
+4. Portée
+5. Exclusions
+6. Cadre de la preuve
+
+
+## 1. Introduction
+
+Cette politique définit le cadre de divulgation responsable des failles de sécurité
+affectant les services Catapult. Elle permet aux chercheurs en sécurité de signaler
+tout problème potentiel dans un cadre défini et transparent.
+
+
+## 2. Signaler une faille
+
+Envoyez votre rapport à : security@enimaloc.fr
+
+Lors de votre recherche, veillez à :
+- Ne pas porter atteinte à la vie privée des utilisateurs
+- Ne pas détruire, altérer ou exfiltrer des données
+- Ne pas dégrader la disponibilité du service
+- Fournir un proof of concept reproductible
+- Interrompre vos tests dès que vous avez obtenu la preuve de la vulnérabilité
+
+
+## 3. Temps de traitement
+
+- Accusé de réception : 24 heures
+- Réponse de qualification : 72 heures
+
+
+## 4. Portée
+
+Sont dans le périmètre tous les sous-domaines proposant un fichier
+/.well-known/security.txt référençant cette politique.
+
+Vous pouvez vérifier que le fichier security.txt pointe bien vers cette page avant
+de commencer vos tests.
+
+
+## 5. Exclusions
+
+Hors périmètre :
+- Accès physique aux infrastructures
+- Ingénierie sociale
+- Résultats bruts d'outils automatisés sans analyse
+- Preuves de concept uniquement en vidéo
+- Rapports de dommages théoriques sans exploitation démontrée
+- Problèmes liés à des services tiers (Twitch, Steam, IGDB)
+
+Types de problèmes exclus :
+- DoS/DDoS réseau
+- Bugs d'interface utilisateur sans impact sécurité
+- Problèmes d'en-tête Host sans preuve d'exploitation
+- Banner grabbing / fingerprinting
+
+
+## 6. Cadre de la preuve
+
+- XSS : alert(document.domain) est suffisant
+- RCE : exécution de code sans impact (ex : id, whoami)
+- SQLi : erreur SQL ou divulgation de version suffisante
+- Redirection invalide : utiliser http://example.com
+- Divulgation d'information sensible : chiffrer avec PGP avant envoi
+- CSRF : joindre le fichier ou inclure le code dans le rapport
+- SSRF : limiter la requête à /.well-known/security.txt
+- LFI : récupérer uniquement /.well-known/security.txt
+
+
+---
+
+# Vulnerability Disclosure Policy - Catapult
+
+Date: June 2026
+Contact: security@enimaloc.fr
+
+
+## Table of contents
+
+1. Introduction
+2. Reporting a vulnerability
+3. Response times
+4. Scope
+5. Exclusions
+6. Proof of concept guidelines
+
+
+## 1. Introduction
+
+This policy defines the responsible disclosure framework for security vulnerabilities
+affecting Catapult services. It allows security researchers to report potential issues
+within a defined and transparent framework.
+
+
+## 2. Reporting a vulnerability
+
+Send your report to: security@enimaloc.fr
+
+When conducting research, please:
+- Do not violate user privacy
+- Do not destroy, alter or exfiltrate data
+- Do not degrade service availability
+- Provide a reproducible proof of concept
+- Stop testing as soon as you have demonstrated the vulnerability
+
+
+## 3. Response times
+
+- Acknowledgement: 24 hours
+- Qualification response: 72 hours
+
+
+## 4. Scope
+
+In scope: all subdomains that serve a /.well-known/security.txt file referencing
+this policy.
+
+Please verify that the security.txt file points to this page before starting
+your tests.
+
+
+## 5. Exclusions
+
+Out of scope:
+- Physical access to infrastructure
+- Social engineering
+- Raw automated tool output without analysis
+- Video-only proofs of concept
+- Theoretical damage reports without demonstrated exploitation
+- Issues related to third-party services (Twitch, Steam, IGDB)
+
+Excluded issue types:
+- Network DoS/DDoS
+- UI/UX bugs without security impact
+- Host header issues without proof of exploitation
+- Banner grabbing / fingerprinting
+
+
+## 6. Proof of concept guidelines
+
+- XSS: alert(document.domain) is sufficient
+- RCE: harmless code execution only (e.g. id, whoami)
+- SQLi: SQL error or version disclosure is sufficient
+- Invalid redirect: use http://example.com
+- Sensitive information disclosure: encrypt with PGP before sending
+- CSRF: attach the file or include the code in the report
+- SSRF: limit the request to /.well-known/security.txt
+- LFI: retrieve /.well-known/security.txt only
