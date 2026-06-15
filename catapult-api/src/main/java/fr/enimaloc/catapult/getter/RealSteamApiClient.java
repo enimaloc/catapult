@@ -114,7 +114,12 @@ public class RealSteamApiClient implements SteamApiClient {
 
     @Override
     public CompletableFuture<List<String>> getOwnedGameIds(String steamId) {
-        return CompletableFuture.supplyAsync(() -> fetchOwnedGameIds(steamId), steamExecutor);
+        return getOwnedGameIds(steamId, null);
+    }
+
+    @Override
+    public CompletableFuture<List<String>> getOwnedGameIds(String steamId, String personalToken) {
+        return CompletableFuture.supplyAsync(() -> fetchOwnedGameIds(steamId, personalToken), steamExecutor);
     }
 
     // -------------------------------------------------------------------------
@@ -289,43 +294,58 @@ public class RealSteamApiClient implements SteamApiClient {
     }
 
     @SuppressWarnings("unchecked")
-    private List<String> fetchOwnedGameIds(String steamId) {
-        Optional<String> keyOpt = rotator.nextKey();
-        if (keyOpt.isEmpty()) {
-            log.warn("No Steam API key available for owned game fetch {}", steamId);
-            return List.of();
-        }
-        String apiKey = keyOpt.get();
+    private List<String> fetchOwnedGameIds(String steamId, String personalToken) {
+        boolean usePersonalToken = personalToken != null && !personalToken.isBlank();
 
-        if (!rateLimiter.acquireBlocking()) return List.of();
+        while (true) {
+            String key;
+            boolean usedRotator;
+            if (usePersonalToken) {
+                key = personalToken;
+                usedRotator = false;
+            } else {
+                Optional<String> keyOpt = rotator.nextKey();
+                if (keyOpt.isEmpty()) {
+                    log.warn("No Steam API key available for owned game fetch {}", steamId);
+                    return List.of();
+                }
+                key = keyOpt.get();
+                usedRotator = true;
+            }
 
-        String url = UriComponentsBuilder
-            .fromUriString(OWNED_GAMES_URL)
-            .queryParam("key", apiKey)
-            .queryParam("steamid", steamId)
-            .queryParam("include_appinfo", 1)
-            .toUriString();
+            if (!rateLimiter.acquireBlocking()) return List.of();
 
-        try {
-            Map<String, Object> response = restClient.get().uri(url).retrieve().body(Map.class);
-            if (response == null) return List.of();
-            Map<String, Object> body = (Map<String, Object>) response.get(RESPONSE_KEY);
-            if (body == null) return List.of();
-            List<Map<String, Object>> games = (List<Map<String, Object>>) body.get("games");
-            if (games == null) return List.of();
-            return games.stream()
-                .map(g -> g.get("appid"))
-                .filter(Objects::nonNull)
-                .map(String::valueOf)
-                .toList();
-        } catch (HttpClientErrorException.TooManyRequests e) {
-            int retryAfter = parseRetryAfter(e);
-            rotator.onKeyRateLimited(apiKey, retryAfter);
-            log.warn("Steam API 429 fetching owned games for {}: retry after {}s", steamId, retryAfter);
-            return List.of();
-        } catch (Exception e) {
-            log.warn("Failed to fetch owned Steam games for {}: {}", steamId, e.getMessage());
-            return List.of();
+            String url = UriComponentsBuilder
+                .fromUriString(OWNED_GAMES_URL)
+                .queryParam("key", key)
+                .queryParam("steamid", steamId)
+                .queryParam("include_appinfo", 1)
+                .toUriString();
+
+            try {
+                Map<String, Object> response = restClient.get().uri(url).retrieve().body(Map.class);
+                if (response == null) return List.of();
+                Map<String, Object> body = (Map<String, Object>) response.get(RESPONSE_KEY);
+                if (body == null) return List.of();
+                List<Map<String, Object>> games = (List<Map<String, Object>>) body.get("games");
+                if (games == null) return List.of();
+                return games.stream()
+                    .map(g -> g.get("appid"))
+                    .filter(Objects::nonNull)
+                    .map(String::valueOf)
+                    .toList();
+            } catch (HttpClientErrorException.TooManyRequests e) {
+                int retryAfter = parseRetryAfter(e);
+                if (usedRotator) rotator.onKeyRateLimited(key, retryAfter);
+                else rateLimiter.onRateLimitResponse(retryAfter);
+                log.warn("Steam API 429 fetching owned games for {}: retry after {}s", steamId, retryAfter);
+                if (usePersonalToken || rotator.isAllKeysBlocked()) {
+                    return List.of();
+                }
+            } catch (Exception e) {
+                log.warn("Failed to fetch owned Steam games for {}: {}", steamId, e.getMessage());
+                return List.of();
+            }
         }
     }
 

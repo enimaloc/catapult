@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -26,6 +27,7 @@ public class SteamLibraryCacheService {
     private final SteamApiClient steamApiClient;
     private final IgdbService igdbService;
     private final UserAccountRepository userAccountRepository;
+    private final TokenEncryptionService tokenEncryptionService;
 
     @Async
     @EventListener(ApplicationReadyEvent.class)
@@ -57,7 +59,10 @@ public class SteamLibraryCacheService {
         if (user.getSteamId() == null) return CompletableFuture.completedFuture(null);
 
         log.info("Pre-caching Steam library for user {} (steamId={})", user.getId(), user.getSteamId());
-        return steamApiClient.getOwnedGameIds(user.getSteamId())
+        String personalToken = user.getSteamPersonalToken() != null
+            ? tokenEncryptionService.decrypt(user.getSteamPersonalToken())
+            : null;
+        return steamApiClient.getOwnedGameIds(user.getSteamId(), personalToken)
             .thenAccept(appIds -> {
                 if (appIds.isEmpty()) {
                     log.warn("No owned games returned for steamId={} (private profile?)", user.getSteamId());
