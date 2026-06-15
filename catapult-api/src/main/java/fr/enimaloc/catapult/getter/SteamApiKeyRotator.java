@@ -82,7 +82,7 @@ public class SteamApiKeyRotator {
             : "…";
         log.warn("Steam key {} rate limited for {}s", masked, retryAfterSeconds);
         if (conservativePause) {
-            rateLimiter.onRateLimitResponse(retryAfterSeconds);
+            rateLimiter.blockAll(retryAfterSeconds);
         }
     }
 }
