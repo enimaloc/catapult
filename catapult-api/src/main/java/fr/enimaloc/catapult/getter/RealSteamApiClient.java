@@ -138,7 +138,7 @@ public class RealSteamApiClient implements SteamApiClient {
         }
         String apiKey = keyOpt.get();
 
-        if (!rateLimiter.acquire()) {
+        if (!rateLimiter.acquire(apiKey)) {
             log.warn("Steam rate limit reached, skipping batch of {} users", steamIds.size());
             return result;
         }
@@ -207,7 +207,7 @@ public class RealSteamApiClient implements SteamApiClient {
             usedRotator = true;
         }
 
-        if (!rateLimiter.acquire()) {
+        if (!rateLimiter.acquire(key)) {
             log.warn("Steam rate limit reached, skipping game list visibility check for {}", steamId);
             return false;
         }
@@ -230,7 +230,7 @@ public class RealSteamApiClient implements SteamApiClient {
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
             if (usedRotator) rotator.onKeyRateLimited(key, retryAfter);
-            else rateLimiter.onRateLimitResponse(retryAfter);
+            else rateLimiter.onRateLimitResponse(key, retryAfter);
             log.warn("Steam API 429 for {}: retry after {}s", steamId, retryAfter);
             return false;
         } catch (Exception e) {
@@ -256,7 +256,7 @@ public class RealSteamApiClient implements SteamApiClient {
             usedRotator = true;
         }
 
-        if (!rateLimiter.acquire()) {
+        if (!rateLimiter.acquire(token)) {
             log.warn("Steam rate limit reached, skipping player fetch for {}", steamId);
             return Optional.empty();
         }
@@ -284,7 +284,7 @@ public class RealSteamApiClient implements SteamApiClient {
         } catch (HttpClientErrorException.TooManyRequests e) {
             int retryAfter = parseRetryAfter(e);
             if (usedRotator) rotator.onKeyRateLimited(token, retryAfter);
-            else rateLimiter.onRateLimitResponse(retryAfter);
+            else rateLimiter.onRateLimitResponse(token, retryAfter);
             log.warn("Steam API 429 for {}: retry after {}s", steamId, retryAfter);
             return Optional.empty();
         } catch (Exception e) {
@@ -313,7 +313,7 @@ public class RealSteamApiClient implements SteamApiClient {
                 usedRotator = true;
             }
 
-            if (!rateLimiter.acquireBlocking()) return List.of();
+            if (!rateLimiter.acquireBlocking(key)) return List.of();
 
             String url = UriComponentsBuilder
                 .fromUriString(OWNED_GAMES_URL)
@@ -337,7 +337,7 @@ public class RealSteamApiClient implements SteamApiClient {
             } catch (HttpClientErrorException.TooManyRequests e) {
                 int retryAfter = parseRetryAfter(e);
                 if (usedRotator) rotator.onKeyRateLimited(key, retryAfter);
-                else rateLimiter.onRateLimitResponse(retryAfter);
+                else rateLimiter.onRateLimitResponse(key, retryAfter);
                 log.warn("Steam API 429 fetching owned games for {}: retry after {}s", steamId, retryAfter);
                 if (usePersonalToken || rotator.isAllKeysBlocked()) {
                     return List.of();
