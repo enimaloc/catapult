@@ -92,6 +92,7 @@ public class ChannelPageController {
             model.addAttribute("steamTokenShared", data.steamTokenShared());
             model.addAttribute("steamProfilePrivate", data.steamProfilePrivate());
             model.addAttribute("steamRateLimited", data.steamRateLimited());
+            model.addAttribute("steamOfflineMode", data.steamOfflineMode());
         }
         return "fragments/connections :: connections";
     }
@@ -179,6 +180,7 @@ public class ChannelPageController {
         model.addAttribute("steamTokenShared", data.steamTokenShared());
         model.addAttribute("steamProfilePrivate", data.steamProfilePrivate());
         model.addAttribute("steamRateLimited", data.steamRateLimited());
+        model.addAttribute("steamOfflineMode", data.steamOfflineMode());
     }
 
     // ── DTOs ──────────────────────────────────────────────────────────────────
@@ -204,7 +206,8 @@ public class ChannelPageController {
             boolean hasSteamPersonalToken,
             boolean steamTokenShared,
             boolean steamProfilePrivate,
-            boolean steamRateLimited
+            boolean steamRateLimited,
+            boolean steamOfflineMode
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
