@@ -8,6 +8,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -84,17 +85,32 @@ public class ChannelPageController {
     public String connectionsFragment(@PathVariable String username, Model model) {
         ChannelPageData data = apiClient.get("/api/channels/{username}", ChannelPageData.class, username);
         if (data != null) {
-            model.addAttribute("channelUsername", data.channelUsername());
-            model.addAttribute("isOwner", data.isOwner());
-            model.addAttribute("hasSteamProvider", data.hasSteamProvider());
-            model.addAttribute("hasSteam", data.hasSteam());
-            model.addAttribute("hasSteamPersonalToken", data.hasSteamPersonalToken());
-            model.addAttribute("steamTokenShared", data.steamTokenShared());
-            model.addAttribute("steamProfilePrivate", data.steamProfilePrivate());
-            model.addAttribute("steamRateLimited", data.steamRateLimited());
-            model.addAttribute("steamOfflineMode", data.steamOfflineMode());
+            populateConnectionsModel(model, data);
         }
         return "fragments/connections :: connections";
+    }
+
+    @PostMapping("/settings/steam/refresh-profile-cache")
+    public String refreshSteamProfileCache(@PathVariable String username, Model model) {
+        apiClient.post("/api/channels/{username}/steam/refresh-profile-cache", null, username);
+        ChannelPageData data = apiClient.get("/api/channels/{username}", ChannelPageData.class, username);
+        if (data != null) {
+            populateConnectionsModel(model, data);
+        }
+        return "fragments/connections :: connections";
+    }
+
+    private void populateConnectionsModel(Model model, ChannelPageData data) {
+        model.addAttribute("channelUsername", data.channelUsername());
+        model.addAttribute("isOwner", data.isOwner());
+        model.addAttribute("hasSteamProvider", data.hasSteamProvider());
+        model.addAttribute("hasSteam", data.hasSteam());
+        model.addAttribute("hasSteamPersonalToken", data.hasSteamPersonalToken());
+        model.addAttribute("steamTokenShared", data.steamTokenShared());
+        model.addAttribute("steamProfilePrivate", data.steamProfilePrivate());
+        model.addAttribute("steamRateLimited", data.steamRateLimited());
+        model.addAttribute("steamOfflineMode", data.steamOfflineMode());
+        model.addAttribute("steamProfileCacheTtlMinutes", data.steamProfileCacheTtlMinutes());
     }
 
     @GetMapping("/fragments/bindings")
@@ -181,6 +197,7 @@ public class ChannelPageController {
         model.addAttribute("steamProfilePrivate", data.steamProfilePrivate());
         model.addAttribute("steamRateLimited", data.steamRateLimited());
         model.addAttribute("steamOfflineMode", data.steamOfflineMode());
+        model.addAttribute("steamProfileCacheTtlMinutes", data.steamProfileCacheTtlMinutes());
     }
 
     // ── DTOs ──────────────────────────────────────────────────────────────────
@@ -207,7 +224,8 @@ public class ChannelPageController {
             boolean steamTokenShared,
             boolean steamProfilePrivate,
             boolean steamRateLimited,
-            boolean steamOfflineMode
+            boolean steamOfflineMode,
+            long steamProfileCacheTtlMinutes
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
