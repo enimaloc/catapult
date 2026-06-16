@@ -18,6 +18,7 @@ public class MockSteamApiClient implements SteamApiClient {
 
     private final Map<String, PlayerSummary> gameByUser = new ConcurrentHashMap<>();
     private final Set<String> privateProfiles = ConcurrentHashMap.newKeySet();
+    private final Set<String> offlineProfiles = ConcurrentHashMap.newKeySet();
     private volatile boolean rateLimited = false;
 
     @Override
@@ -26,9 +27,11 @@ public class MockSteamApiClient implements SteamApiClient {
     }
 
     @Override
-    public CompletableFuture<Boolean> isProfilePublic(String steamId) {
-        if (rateLimited) return CompletableFuture.completedFuture(false);
-        return CompletableFuture.completedFuture(!privateProfiles.contains(steamId));
+    public CompletableFuture<SteamProfileStatus> getProfileStatus(String steamId, String personalToken) {
+        if (rateLimited) return CompletableFuture.completedFuture(new SteamProfileStatus(false, false));
+        boolean profilePublic = !privateProfiles.contains(steamId);
+        boolean offlineMode = offlineProfiles.contains(steamId);
+        return CompletableFuture.completedFuture(new SteamProfileStatus(profilePublic, offlineMode));
     }
 
     @Override
@@ -54,6 +57,16 @@ public class MockSteamApiClient implements SteamApiClient {
     public void setProfilePublic(String steamId) {
         privateProfiles.remove(steamId);
         log.info("[Mock Steam] Profile {} set to public", steamId);
+    }
+
+    public void setOffline(String steamId) {
+        offlineProfiles.add(steamId);
+        log.info("[Mock Steam] Profile {} set to offline", steamId);
+    }
+
+    public void setOnline(String steamId) {
+        offlineProfiles.remove(steamId);
+        log.info("[Mock Steam] Profile {} set to online", steamId);
     }
 
     public void setRateLimited(boolean rateLimited) {
