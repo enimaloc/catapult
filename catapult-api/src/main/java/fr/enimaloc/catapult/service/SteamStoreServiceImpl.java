@@ -82,7 +82,7 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             Map<String, Object> fullgame = (Map<String, Object>) data.get("fullgame");
             if (fullgame == null) return Optional.empty();
 
-            Object id = fullgame.get("id");
+            Object id = fullgame.get("appid");
             if (id == null) return Optional.empty();
 
             String resolved = String.valueOf(id);
