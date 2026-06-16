@@ -84,7 +84,11 @@ public class SchedulerService {
 
     @Scheduled(fixedRateString = "${app.retry.incomplete-interval-ms:21600000}")
     public void retryIncompleteBindings() {
-        bindingService.refreshIncompleteBindings();
+        try {
+            bindingService.refreshIncompleteBindings();
+        } catch (Exception e) {
+            log.error("Failed to refresh incomplete bindings", e);
+        }
     }
 
     private void processUser(UserAccount user) {
