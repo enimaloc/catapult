@@ -151,21 +151,24 @@ public class ApiChannelDataController {
         boolean steamTokenShared = channelUser.isSteamTokenShared();
         boolean steamProfilePrivate = false;
         boolean steamRateLimited = false;
+        boolean steamOfflineMode = false;
 
         if (hasSteam && isOwner) {
             String decryptedToken = hasSteamPersonalToken
                     ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
                     : null;
-            steamProfilePrivate = steamApiClient.map(c -> {
+            SteamApiClient.SteamProfileStatus profileStatus = steamApiClient.map(c -> {
                 try {
-                    return !c.isProfilePublic(channelUser.getSteamId(), decryptedToken)
+                    return c.getProfileStatus(channelUser.getSteamId(), decryptedToken)
                             .orTimeout(2, TimeUnit.SECONDS)
-                            .exceptionally(e -> true)
+                            .exceptionally(e -> new SteamApiClient.SteamProfileStatus(false, false))
                             .join();
                 } catch (Exception e) {
-                    return false;
+                    return new SteamApiClient.SteamProfileStatus(false, false);
                 }
-            }).orElse(false);
+            }).orElse(new SteamApiClient.SteamProfileStatus(true, false));
+            steamProfilePrivate = !profileStatus.profilePublic();
+            steamOfflineMode = profileStatus.offlineMode();
             boolean isRateLimited = steamApiClient.map(SteamApiClient::isRateLimited).orElse(false)
                     || steamApiKeyRotator.isAllKeysBlocked();
             if (steamProfilePrivate && isRateLimited) {
@@ -200,7 +203,8 @@ public class ApiChannelDataController {
                 hasSteamPersonalToken,
                 steamTokenShared,
                 steamProfilePrivate,
-                steamRateLimited
+                steamRateLimited,
+                steamOfflineMode
         );
     }
 
@@ -309,7 +313,8 @@ public class ApiChannelDataController {
             boolean hasSteamPersonalToken,
             boolean steamTokenShared,
             boolean steamProfilePrivate,
-            boolean steamRateLimited
+            boolean steamRateLimited,
+            boolean steamOfflineMode
     ) {}
 
     public record ChannelUserDto(String id, String twitchId, String twitchUsername, String profileImageUrl) {}
