@@ -75,7 +75,11 @@ public class SchedulerService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
-        bindingService.refreshIncompleteBindings();
+        try {
+            bindingService.refreshIncompleteBindings();
+        } catch (Exception e) {
+            log.error("Failed to refresh incomplete bindings at startup", e);
+        }
     }
 
     @Scheduled(fixedRateString = "${app.retry.incomplete-interval-ms:21600000}")
