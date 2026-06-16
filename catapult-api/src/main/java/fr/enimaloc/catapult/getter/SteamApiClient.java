@@ -11,6 +11,9 @@ public interface SteamApiClient {
 
     record PlayerSummary(String gameId, String gameName) {}
 
+    record SteamProfileStatus(boolean profilePublic, boolean offlineMode) {}
+
+
     CompletableFuture<Optional<PlayerSummary>> getPlayerSummary(String steamId, String personalToken);
 
     default CompletableFuture<Optional<PlayerSummary>> getPlayerSummary(String steamId) {
@@ -34,12 +37,16 @@ public interface SteamApiClient {
                 )));
     }
 
+    default CompletableFuture<SteamProfileStatus> getProfileStatus(String steamId, String personalToken) {
+        return CompletableFuture.completedFuture(new SteamProfileStatus(true, false));
+    }
+
     default CompletableFuture<Boolean> isProfilePublic(String steamId) {
-        return CompletableFuture.completedFuture(true);
+        return isProfilePublic(steamId, null);
     }
 
     default CompletableFuture<Boolean> isProfilePublic(String steamId, String personalToken) {
-        return isProfilePublic(steamId);
+        return getProfileStatus(steamId, personalToken).thenApply(SteamProfileStatus::profilePublic);
     }
 
     default CompletableFuture<List<String>> getOwnedGameIds(String steamId) {
