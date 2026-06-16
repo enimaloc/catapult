@@ -5,6 +5,7 @@
 <!--/*@thymesvar id="hasSteam" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="steamProfilePrivate" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="steamRateLimited" type="java.lang.Boolean"*/-->
+<!--/*@thymesvar id="steamOfflineMode" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="isOwner" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="hasSteamPersonalToken" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="steamTokenShared" type="java.lang.Boolean"*/-->
@@ -37,6 +38,11 @@
                         type="button" class="btn-help"
                         onclick="document.getElementById('steamRateLimitModal').style.display='flex'"
                         th:title="#{connections.steam.rate_limited.help_title}">!</button>
+            </div>
+
+            <!-- Offline mode warning -->
+            <div th:if="${hasSteam and isOwner and steamOfflineMode}" class="provider-warning">
+                <p th:text="#{connections.steam.offline_warning}">Ton compte Steam est en mode hors-ligne — la détection de jeu ne fonctionne pas.</p>
             </div>
 
             <!-- Private warning with resolve button -->
