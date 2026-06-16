@@ -78,25 +78,20 @@ public class RealSteamApiClient implements SteamApiClient {
     }
 
     @Override
-    public CompletableFuture<Boolean> isProfilePublic(String steamId) {
-        return isProfilePublic(steamId, null);
-    }
-
-    @Override
-    public CompletableFuture<Boolean> isProfilePublic(String steamId, String personalToken) {
+    public CompletableFuture<SteamApiClient.SteamProfileStatus> getProfileStatus(String steamId, String personalToken) {
         String tokenKey = (personalToken != null && !personalToken.isBlank()) ? personalToken : "";
         CacheKey key = new CacheKey(steamId, tokenKey);
         CachedProfileStatus cached = profileCache.get(key);
         if (cached != null && cached.isValid()) {
-            return CompletableFuture.completedFuture(cached.isPublic());
+            return CompletableFuture.completedFuture(cached.toStatus());
         }
         return CompletableFuture.supplyAsync(() -> {
             CachedProfileStatus fresh = profileCache.compute(key, (k, existing) -> {
                 if (existing != null && existing.isValid()) return existing;
-                boolean result = fetchIsProfilePublic(steamId, personalToken);
-                return new CachedProfileStatus(result, Instant.now().plus(profileCacheTtl));
+                SteamApiClient.SteamProfileStatus result = fetchProfileStatus(steamId, personalToken);
+                return new CachedProfileStatus(result.profilePublic(), result.offlineMode(), Instant.now().plus(profileCacheTtl));
             });
-            return fresh.isPublic();
+            return fresh.toStatus();
         }, steamExecutor);
     }
 
@@ -179,15 +174,24 @@ public class RealSteamApiClient implements SteamApiClient {
         return result;
     }
 
-    private boolean fetchIsProfilePublic(String steamId, String personalToken) {
-        boolean visibilityPublic = fetchPlayer(steamId, personalToken)
-            .map(player -> {
-                Object visibility = player.get("communityvisibilitystate");
-                return visibility != null && ((Number) visibility).intValue() == 3;
-            })
-            .orElse(false);
-        if (!visibilityPublic) return false;
-        return isGameListVisible(steamId, personalToken);
+    private SteamApiClient.SteamProfileStatus fetchProfileStatus(String steamId, String personalToken) {
+        Optional<Map<String, Object>> playerOpt = fetchPlayer(steamId, personalToken);
+        if (playerOpt.isEmpty()) {
+            return new SteamApiClient.SteamProfileStatus(false, false);
+        }
+        Map<String, Object> player = playerOpt.get();
+
+        Object visibilityObj = player.get("communityvisibilitystate");
+        boolean profileVisible = visibilityObj != null && ((Number) visibilityObj).intValue() == 3;
+
+        Object personaStateObj = player.get("personastate");
+        boolean offlineMode = personaStateObj == null || ((Number) personaStateObj).intValue() == 0;
+
+        if (!profileVisible) {
+            return new SteamApiClient.SteamProfileStatus(false, offlineMode);
+        }
+        boolean gameListVisible = isGameListVisible(steamId, personalToken);
+        return new SteamApiClient.SteamProfileStatus(gameListVisible, offlineMode);
     }
 
     @SuppressWarnings("unchecked")
@@ -361,7 +365,8 @@ public class RealSteamApiClient implements SteamApiClient {
 
     private record CacheKey(String steamId, String tokenKey) {}
 
-    private record CachedProfileStatus(boolean isPublic, Instant expiresAt) {
+    private record CachedProfileStatus(boolean isPublic, boolean offlineMode, Instant expiresAt) {
         boolean isValid() { return Instant.now().isBefore(expiresAt); }
+        SteamApiClient.SteamProfileStatus toStatus() { return new SteamApiClient.SteamProfileStatus(isPublic, offlineMode); }
     }
 }
