@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.getter;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -60,4 +61,10 @@ public interface SteamApiClient {
     default boolean isRateLimited() {
         return false;
     }
+
+    default Duration getProfileCacheTtl() {
+        return Duration.ofMinutes(15);
+    }
+
+    default void invalidateProfileCache(String steamId, String personalToken) {}
 }

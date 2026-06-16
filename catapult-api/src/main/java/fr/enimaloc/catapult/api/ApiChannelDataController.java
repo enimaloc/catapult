@@ -26,8 +26,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -147,6 +149,7 @@ public class ApiChannelDataController {
 
         boolean hasSteamProvider = steamApiClient.isPresent();
         boolean hasSteam = hasSteamProvider && channelUser.getSteamId() != null;
+        long steamProfileCacheTtlMinutes = steamApiClient.map(c -> c.getProfileCacheTtl().toMinutes()).orElse(15L);
         boolean hasSteamPersonalToken = channelUser.getSteamPersonalToken() != null;
         boolean steamTokenShared = channelUser.isSteamTokenShared();
         boolean steamProfilePrivate = false;
@@ -204,8 +207,30 @@ public class ApiChannelDataController {
                 steamTokenShared,
                 steamProfilePrivate,
                 steamRateLimited,
-                steamOfflineMode
+                steamOfflineMode,
+                steamProfileCacheTtlMinutes
         );
+    }
+
+    @PostMapping("/steam/refresh-profile-cache")
+    public ResponseEntity<Void> refreshProfileCache(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt) {
+        UUID viewerId = UUID.fromString(jwt.getSubject());
+        UserAccount viewer = userAccountRepository.findById(viewerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!viewer.getId().equals(channelUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        if (channelUser.getSteamId() != null) {
+            String personalToken = channelUser.getSteamPersonalToken() != null
+                    ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
+                    : null;
+            steamApiClient.ifPresent(c -> c.invalidateProfileCache(channelUser.getSteamId(), personalToken));
+        }
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/status")
@@ -314,7 +339,8 @@ public class ApiChannelDataController {
             boolean steamTokenShared,
             boolean steamProfilePrivate,
             boolean steamRateLimited,
-            boolean steamOfflineMode
+            boolean steamOfflineMode,
+            long steamProfileCacheTtlMinutes
     ) {}
 
     public record ChannelUserDto(String id, String twitchId, String twitchUsername, String profileImageUrl) {}
