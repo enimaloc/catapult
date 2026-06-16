@@ -27,4 +27,6 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
     Optional<GameBinding> findByIdAndUser(UUID id, UserAccount user);
 
     void deleteByUser(UserAccount user);
+
+    List<GameBinding> findAllByStatus(GameBinding.Status status);
 }
