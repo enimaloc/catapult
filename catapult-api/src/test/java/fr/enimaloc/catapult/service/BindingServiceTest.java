@@ -205,7 +205,7 @@ class BindingServiceTest {
 
     @Test
     void refreshIncompleteBindings_noIncomplete_doesNothing() {
-        when(gameBindingRepository.findAllByStatus(GameBinding.Status.INCOMPLETE))
+        when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
             .thenReturn(List.of());
 
         bindingService.refreshIncompleteBindings();
@@ -223,7 +223,7 @@ class BindingServiceTest {
         incomplete.setSourceName("Half-Life 3");
         incomplete.setStatus(GameBinding.Status.INCOMPLETE);
 
-        when(gameBindingRepository.findAllByStatus(GameBinding.Status.INCOMPLETE))
+        when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
             .thenReturn(List.of(incomplete));
         IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("42", "Half-Life 3");
         when(igdbService.findBySteamAppId("steam-999")).thenReturn(Optional.of(igdbGame));
@@ -239,6 +239,25 @@ class BindingServiceTest {
     }
 
     @Test
+    void refreshIncompleteBindings_ignoredBinding_isSkipped() {
+        GameBinding ignored = new GameBinding();
+        ignored.setUser(user);
+        ignored.setSourceId("steam-111");
+        ignored.setSourceType(GameBinding.SourceType.STEAM);
+        ignored.setSourceName("Ignored Game");
+        ignored.setStatus(GameBinding.Status.INCOMPLETE);
+        ignored.setIgnored(true);
+
+        // findAllByStatusAndIgnoredFalse should NOT return ignored bindings
+        when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
+            .thenReturn(List.of());
+
+        bindingService.refreshIncompleteBindings();
+
+        verifyNoInteractions(igdbService);
+    }
+
+    @Test
     void refreshIncompleteBindings_stillUnresolvable_remainsIncomplete() {
         GameBinding incomplete = new GameBinding();
         incomplete.setUser(user);
@@ -247,7 +266,7 @@ class BindingServiceTest {
         incomplete.setSourceName("Unknown Indie Game");
         incomplete.setStatus(GameBinding.Status.INCOMPLETE);
 
-        when(gameBindingRepository.findAllByStatus(GameBinding.Status.INCOMPLETE))
+        when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
             .thenReturn(List.of(incomplete));
         when(igdbService.findByName("Unknown Indie Game")).thenReturn(Optional.empty());
         when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));

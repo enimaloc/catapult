@@ -38,7 +38,7 @@ public class BindingService {
 
     @Transactional
     public void refreshIncompleteBindings() {
-        List<GameBinding> incomplete = gameBindingRepository.findAllByStatus(GameBinding.Status.INCOMPLETE);
+        List<GameBinding> incomplete = gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE);
         if (incomplete.isEmpty()) {
             log.info("No INCOMPLETE bindings to refresh");
             return;
@@ -80,6 +80,7 @@ public class BindingService {
             binding.setStatus(GameBinding.Status.AUTO);
 
             Set<String> ccls = igdbService.suggestCcls(igdbId);
+            binding.getCcls().clear();
             binding.getCcls().addAll(ccls);
 
             if (twitchId == null) {
