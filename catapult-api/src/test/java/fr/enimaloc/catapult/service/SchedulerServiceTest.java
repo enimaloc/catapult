@@ -33,6 +33,7 @@ class SchedulerServiceTest {
     @Mock GameGetterChain gameGetterChain;
     @Mock GameStateService gameStateService;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock BindingService bindingService;
 
     private SimpleMeterRegistry registry;
     private SchedulerService schedulerService;
@@ -42,7 +43,7 @@ class SchedulerServiceTest {
         registry = new SimpleMeterRegistry();
         schedulerService = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.empty());
+            Optional.empty(), bindingService);
     }
 
     @Test
@@ -93,11 +94,25 @@ class SchedulerServiceTest {
 
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.of(steamGetter));
+            Optional.of(steamGetter), bindingService);
 
         service.poll();
 
         verify(steamGetter).prefetchBatch(any());
         verify(steamGetter).clearCycleCache();
+    }
+
+    @Test
+    void onStartup_callsRefreshIncompleteBindings() {
+        schedulerService.onStartup();
+
+        verify(bindingService).refreshIncompleteBindings();
+    }
+
+    @Test
+    void retryIncompleteBindings_callsRefreshIncompleteBindings() {
+        schedulerService.retryIncompleteBindings();
+
+        verify(bindingService).refreshIncompleteBindings();
     }
 }

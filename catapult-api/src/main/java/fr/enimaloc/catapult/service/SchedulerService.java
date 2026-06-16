@@ -11,8 +11,10 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +34,7 @@ public class SchedulerService {
     private final ApplicationEventPublisher eventPublisher;
     private final MeterRegistry meterRegistry;
     private final Optional<SteamGameGetter> steamGameGetter;
+    private final BindingService bindingService;
 
     @Scheduled(fixedRateString = "${app.polling.interval-seconds:60}000")
     public void poll() {
@@ -67,6 +70,24 @@ public class SchedulerService {
         } finally {
             steamGameGetter.ifPresent(SteamGameGetter::clearCycleCache);
             sample.stop(Timer.builder("catapult.scheduler.poll.duration").register(meterRegistry));
+        }
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void onStartup() {
+        try {
+            bindingService.refreshIncompleteBindings();
+        } catch (Exception e) {
+            log.error("Failed to refresh incomplete bindings at startup", e);
+        }
+    }
+
+    @Scheduled(fixedRateString = "${app.retry.incomplete-interval-ms:21600000}")
+    public void retryIncompleteBindings() {
+        try {
+            bindingService.refreshIncompleteBindings();
+        } catch (Exception e) {
+            log.error("Failed to refresh incomplete bindings", e);
         }
     }
 
