@@ -78,11 +78,15 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             Map<String, Object> data = (Map<String, Object>) entry.get("data");
             if (data == null) return Optional.empty();
 
-            Object parentId = data.get("parentid");
-            if (parentId == null) return Optional.empty();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fullgame = (Map<String, Object>) data.get("fullgame");
+            if (fullgame == null) return Optional.empty();
 
-            String resolved = String.valueOf(parentId);
-            log.debug("Steam appId={} is a beta — resolved to parentid={}", appId, resolved);
+            Object id = fullgame.get("id");
+            if (id == null) return Optional.empty();
+
+            String resolved = String.valueOf(id);
+            log.debug("Steam appId={} is a beta — resolved to fullgame.id={}", appId, resolved);
             return Optional.of(resolved);
         } catch (Exception e) {
             log.warn("Steam appdetails failed resolving parentid for appId={}: {}", appId, e.getMessage());
