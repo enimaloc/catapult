@@ -64,6 +64,36 @@ public class SteamStoreServiceImpl implements SteamStoreService {
         }
     }
 
+    @Override
+    @SuppressWarnings("unchecked")
+    public Optional<String> resolveFullGameAppId(String appId) {
+        String uri = APP_DETAILS_URL + "?appids=" + appId;
+        try {
+            Map<String, Object> response = restClient.get().uri(uri).retrieve().body(Map.class);
+            if (response == null) return Optional.empty();
+
+            Map<String, Object> entry = (Map<String, Object>) response.get(appId);
+            if (entry == null || !Boolean.TRUE.equals(entry.get("success"))) return Optional.empty();
+
+            Map<String, Object> data = (Map<String, Object>) entry.get("data");
+            if (data == null) return Optional.empty();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fullgame = (Map<String, Object>) data.get("fullgame");
+            if (fullgame == null) return Optional.empty();
+
+            Object id = fullgame.get("appid");
+            if (id == null) return Optional.empty();
+
+            String resolved = String.valueOf(id);
+            log.debug("Steam appId={} is a beta — resolved to fullgame.id={}", appId, resolved);
+            return Optional.of(resolved);
+        } catch (Exception e) {
+            log.warn("Steam appdetails failed resolving parentid for appId={}: {}", appId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private Set<String> extractCcls(Map<String, Object> data) {
         Set<String> ccls = new HashSet<>();
