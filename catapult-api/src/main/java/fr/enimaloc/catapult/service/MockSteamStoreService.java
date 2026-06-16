@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -14,5 +15,10 @@ public class MockSteamStoreService implements SteamStoreService {
     @Override
     public Map<String, Set<String>> fetchCcls(Collection<String> appIds) {
         return Map.of();
+    }
+
+    @Override
+    public Optional<String> resolveFullGameAppId(String appId) {
+        return Optional.empty();
     }
 }
