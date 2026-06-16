@@ -363,6 +363,17 @@ public class RealSteamApiClient implements SteamApiClient {
         }
     }
 
+    @Override
+    public Duration getProfileCacheTtl() {
+        return profileCacheTtl;
+    }
+
+    @Override
+    public void invalidateProfileCache(String steamId, String personalToken) {
+        String tokenKey = (personalToken != null && !personalToken.isBlank()) ? personalToken : "";
+        profileCache.remove(new CacheKey(steamId, tokenKey));
+    }
+
     private record CacheKey(String steamId, String tokenKey) {}
 
     private record CachedProfileStatus(boolean isPublic, boolean offlineMode, Instant expiresAt) {
