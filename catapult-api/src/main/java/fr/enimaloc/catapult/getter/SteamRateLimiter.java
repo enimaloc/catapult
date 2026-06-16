@@ -7,24 +7,26 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-// Token bucket: permitsPerWindow tokens replenished every window-ms milliseconds.
-// On a 429 response, all tokens are drained and replenishment is blocked until
-// the Retry-After deadline, preventing further requests during the penalty window.
+// Per-key token bucket: each API key (shared or personal) gets its own permit pool.
+// On a 429 response for a key, that key's permits are drained and blocked until
+// the Retry-After deadline. conservativePause drains all keys simultaneously.
 @Slf4j
 @Component
 @Profile("!mock")
 @ConditionalOnBooleanProperty("steam.enabled")
 public class SteamRateLimiter {
 
-    // 200 req/5min ≈ 0.67 req/s; 3 permits per 5s window stays safely under that.
     private final int permitsPerWindow;
     private final long maxWaitMs;
     private final long windowMs;
-    private final Semaphore semaphore;
-    private volatile long blockedUntil = 0;
+
+    private final ConcurrentHashMap<String, Semaphore> keyPermits = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> keyBlockedUntil = new ConcurrentHashMap<>();
+    private volatile long globalBlockedUntil = 0;
 
     public SteamRateLimiter(
         @Value("${steam.rate-limit.permits-per-window:3}") int permitsPerWindow,
@@ -34,18 +36,18 @@ public class SteamRateLimiter {
         this.permitsPerWindow = permitsPerWindow;
         this.maxWaitMs = maxWaitMs;
         this.windowMs = windowMs;
-        this.semaphore = new Semaphore(permitsPerWindow, true);
     }
 
     /**
-     * Acquire a permit before making a Steam API call.
-     * Fast-fails immediately if within the 429 penalty window.
+     * Acquire a permit for the given key before making a Steam API call.
+     * Fast-fails if the key or the global penalty window is active.
      * Otherwise waits up to maxWaitMs for a token to become available.
      */
-    public boolean acquire() {
-        if (System.currentTimeMillis() < blockedUntil) return false;
+    public boolean acquire(String key) {
+        long now = System.currentTimeMillis();
+        if (now < globalBlockedUntil || now < keyBlockedUntil.getOrDefault(key, 0L)) return false;
         try {
-            return semaphore.tryAcquire(maxWaitMs, TimeUnit.MILLISECONDS);
+            return semaphoreFor(key).tryAcquire(maxWaitMs, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
@@ -54,11 +56,10 @@ public class SteamRateLimiter {
 
     /**
      * Acquire a permit by blocking indefinitely (for background tasks on virtual threads).
-     * Used for background operations like library preload that can afford to block.
      */
-    public boolean acquireBlocking() {
+    public boolean acquireBlocking(String key) {
         try {
-            semaphore.acquire();
+            semaphoreFor(key).acquire();
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -67,37 +68,47 @@ public class SteamRateLimiter {
     }
 
     /**
-     * Returns how long (ms) a background task should sleep before calling acquire(),
-     * accounting for the current penalty window and one replenishment cycle.
-     * Returns 0 when tokens are likely available immediately.
+     * Called when a specific key receives a 429. Drains that key's permits
+     * and blocks it until the Retry-After deadline.
      */
-    public long millisUntilAvailable() {
-        long remaining = blockedUntil - System.currentTimeMillis();
-        if (remaining <= 0) return 0;
-        // Wait through the penalty window + one replenishment cycle to ensure tokens are added
-        return remaining + windowMs;
-    }
-
-    public boolean isBlocked() {
-        return System.currentTimeMillis() < blockedUntil;
+    public void onRateLimitResponse(String key, int retryAfterSeconds) {
+        semaphoreFor(key).drainPermits();
+        keyBlockedUntil.put(key, System.currentTimeMillis() + retryAfterSeconds * 1000L);
+        log.warn("Steam key rate limited — pausing for {}s", retryAfterSeconds);
     }
 
     /**
-     * Called when Steam returns a 429. Drains all tokens and blocks
-     * replenishment until the Retry-After deadline.
+     * Called when conservativePause is enabled: drains all key permits globally.
      */
-    public void onRateLimitResponse(int retryAfterSeconds) {
-        semaphore.drainPermits();
-        blockedUntil = System.currentTimeMillis() + (retryAfterSeconds * 1000L);
-        log.warn("Steam API rate limited — pausing for {}s", retryAfterSeconds);
+    public void blockAll(int retryAfterSeconds) {
+        globalBlockedUntil = System.currentTimeMillis() + retryAfterSeconds * 1000L;
+        keyPermits.values().forEach(Semaphore::drainPermits);
+        log.warn("Steam API global rate limit — pausing all keys for {}s", retryAfterSeconds);
+    }
+
+    public boolean isBlocked() {
+        return System.currentTimeMillis() < globalBlockedUntil;
+    }
+
+    public long millisUntilAvailable() {
+        long remaining = globalBlockedUntil - System.currentTimeMillis();
+        if (remaining <= 0) return 0;
+        return remaining + windowMs;
     }
 
     @Scheduled(fixedRateString = "${steam.rate-limit.window-ms:5000}")
     void replenish() {
-        if (System.currentTimeMillis() < blockedUntil) return;
-        int deficit = permitsPerWindow - semaphore.availablePermits();
-        if (deficit > 0) {
-            semaphore.release(deficit);
-        }
+        long now = System.currentTimeMillis();
+        if (now < globalBlockedUntil) return;
+        keyPermits.forEach((key, semaphore) -> {
+            if (now >= keyBlockedUntil.getOrDefault(key, 0L)) {
+                int deficit = permitsPerWindow - semaphore.availablePermits();
+                if (deficit > 0) semaphore.release(deficit);
+            }
+        });
+    }
+
+    private Semaphore semaphoreFor(String key) {
+        return keyPermits.computeIfAbsent(key, k -> new Semaphore(permitsPerWindow, true));
     }
 }

@@ -79,12 +79,12 @@ class SteamApiKeyRotatorTest {
     void onKeyRateLimited_pausesRateLimiter_whenConservative() {
         rotator = new SteamApiKeyRotator(repository, rateLimiter, true);
         rotator.onKeyRateLimited("KEY_A", 30);
-        verify(rateLimiter).onRateLimitResponse(30);
+        verify(rateLimiter).blockAll(30);
     }
 
     @Test
     void onKeyRateLimited_doesNotPauseRateLimiter_whenNotConservative() {
         rotator.onKeyRateLimited("KEY_A", 30);
-        verify(rateLimiter, never()).onRateLimitResponse(anyInt());
+        verify(rateLimiter, never()).blockAll(anyInt());
     }
 }
