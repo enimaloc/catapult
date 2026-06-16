@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -200,5 +201,78 @@ class BindingServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(GameBinding.Status.AUTO);
         assertThat(result.getTwitchGameId()).isEqualTo("twitch-456");
+    }
+
+    @Test
+    void refreshIncompleteBindings_noIncomplete_doesNothing() {
+        when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
+            .thenReturn(List.of());
+
+        bindingService.refreshIncompleteBindings();
+
+        verify(gameBindingRepository, never()).save(any());
+        verifyNoInteractions(igdbService);
+    }
+
+    @Test
+    void refreshIncompleteBindings_incompleteResolved_savesAsAuto() {
+        GameBinding incomplete = new GameBinding();
+        incomplete.setUser(user);
+        incomplete.setSourceId("steam-999");
+        incomplete.setSourceType(GameBinding.SourceType.STEAM);
+        incomplete.setSourceName("Half-Life 3");
+        incomplete.setStatus(GameBinding.Status.INCOMPLETE);
+
+        when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
+            .thenReturn(List.of(incomplete));
+        IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("42", "Half-Life 3");
+        when(igdbService.findBySteamAppId("steam-999")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.findTwitchGameId("42")).thenReturn(Optional.of("twitch-42"));
+        when(igdbService.suggestCcls("42")).thenReturn(Set.of());
+        when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        bindingService.refreshIncompleteBindings();
+
+        assertThat(incomplete.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        assertThat(incomplete.getTwitchGameId()).isEqualTo("twitch-42");
+        verify(gameBindingRepository).save(incomplete);
+    }
+
+    @Test
+    void refreshIncompleteBindings_ignoredBinding_isSkipped() {
+        GameBinding ignored = new GameBinding();
+        ignored.setUser(user);
+        ignored.setSourceId("steam-111");
+        ignored.setSourceType(GameBinding.SourceType.STEAM);
+        ignored.setSourceName("Ignored Game");
+        ignored.setStatus(GameBinding.Status.INCOMPLETE);
+        ignored.setIgnored(true);
+
+        // findAllByStatusAndIgnoredFalse should NOT return ignored bindings
+        when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
+            .thenReturn(List.of());
+
+        bindingService.refreshIncompleteBindings();
+
+        verifyNoInteractions(igdbService);
+    }
+
+    @Test
+    void refreshIncompleteBindings_stillUnresolvable_remainsIncomplete() {
+        GameBinding incomplete = new GameBinding();
+        incomplete.setUser(user);
+        incomplete.setSourceId(null);
+        incomplete.setSourceType(GameBinding.SourceType.MANUAL);
+        incomplete.setSourceName("Unknown Indie Game");
+        incomplete.setStatus(GameBinding.Status.INCOMPLETE);
+
+        when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
+            .thenReturn(List.of(incomplete));
+        when(igdbService.findByName("Unknown Indie Game")).thenReturn(Optional.empty());
+        when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        bindingService.refreshIncompleteBindings();
+
+        assertThat(incomplete.getStatus()).isEqualTo(GameBinding.Status.INCOMPLETE);
     }
 }

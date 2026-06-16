@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -33,6 +34,25 @@ public class BindingService {
         }
 
         return existing.orElseGet(() -> createWithIgdbResolution(user, detectedGame));
+    }
+
+    @Transactional
+    public void refreshIncompleteBindings() {
+        List<GameBinding> incomplete = gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE);
+        if (incomplete.isEmpty()) {
+            log.info("No INCOMPLETE bindings to refresh");
+            return;
+        }
+        log.info("Refreshing {} INCOMPLETE binding(s)", incomplete.size());
+        int resolved = 0;
+        for (GameBinding binding : incomplete) {
+            DetectedGame detected = new DetectedGame(
+                binding.getSourceId(), binding.getSourceType(), binding.getSourceName()
+            );
+            GameBinding updated = updateWithIgdbResolution(binding.getUser(), detected, binding);
+            if (updated.getStatus() != GameBinding.Status.INCOMPLETE) resolved++;
+        }
+        log.info("INCOMPLETE binding refresh complete: {}/{} resolved", resolved, incomplete.size());
     }
 
     private GameBinding createWithIgdbResolution(UserAccount user, DetectedGame detectedGame) {
@@ -60,6 +80,7 @@ public class BindingService {
             binding.setStatus(GameBinding.Status.AUTO);
 
             Set<String> ccls = igdbService.suggestCcls(igdbId);
+            binding.getCcls().clear();
             binding.getCcls().addAll(ccls);
 
             if (twitchId == null) {
