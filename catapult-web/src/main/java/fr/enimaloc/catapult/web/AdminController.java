@@ -301,12 +301,19 @@ public class AdminController {
         Map<String, Object> data = apiClient.get("/api/admin/invite", Map.class);
         if (data != null) {
             model.addAttribute("invites", data.get("invites"));
+            model.addAttribute("membersWithoutInvite", data.get("membersWithoutInvite"));
             model.addAttribute("globalMaxMembers", data.get("globalMaxMembers"));
             model.addAttribute("defaultMaxUses", data.get("defaultMaxUses"));
             model.addAttribute("defaultCanReinvite", Boolean.TRUE.equals(data.get("defaultCanReinvite")));
             model.addAttribute("globalCapReached", Boolean.TRUE.equals(data.get("globalCapReached")));
         }
         return "admin/invite";
+    }
+
+    @PostMapping("/invite/grant/{userId}")
+    public String grantInvite(@PathVariable UUID userId) {
+        apiClient.post("/api/admin/invite/grant/{userId}", null, userId);
+        return "redirect:/admin/invite";
     }
 
     @PostMapping("/invite/settings")
