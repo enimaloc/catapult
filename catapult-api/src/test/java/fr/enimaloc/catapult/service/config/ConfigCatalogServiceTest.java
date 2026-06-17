@@ -61,4 +61,26 @@ class ConfigCatalogServiceTest {
                 .findFirst().orElseThrow();
         assertThat(secretEntry.value()).isNull();
     }
+
+    @Test
+    void catalog_kebabCasedApiKeysAreFlaggedAsSecrets() {
+        env.getPropertySources().addLast(new MapPropertySource("kebab", Map.of(
+                "steam.api-key", "raw",
+                "steam.api-keys", "raw",
+                "app.gitlab-token", "raw"
+        )));
+        props.setExposedPrefixes(List.of("app.", "twitch.", "steam."));
+        props.setSecretPatterns(List.of(
+                ".*\\.secret$", ".*\\.password$", ".*\\.api\\.key$", ".*\\.api\\.keys$", ".*token.*"
+        ));
+
+        List<ConfigEntry> entries = service.catalog();
+
+        assertThat(entries).extracting(ConfigEntry::key, ConfigEntry::secret)
+                .contains(
+                        tuple("steam.api-key", true),
+                        tuple("steam.api-keys", true),
+                        tuple("app.gitlab-token", true)
+                );
+    }
 }
