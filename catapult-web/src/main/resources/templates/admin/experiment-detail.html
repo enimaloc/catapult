@@ -207,10 +207,10 @@
         <tr th:each="r : ${experiment.rules}">
             <td><span class="badge" th:text="${r.ruleType}"></span></td>
             <td>
-                <span th:if="${r.ruleType.name() == 'RANDOM'}" th:text="${r.percentage} + '%'"></span>
-                <span th:if="${r.ruleType.name() == 'ATTRIBUTE'}"
+                <span th:if="${r.ruleType == 'RANDOM'}" th:text="${r.percentage} + '%'"></span>
+                <span th:if="${r.ruleType == 'ATTRIBUTE'}"
                       th:text="${r.attributeKey} + ' ' + ${r.attributeOperator} + ' ' + ${r.attributeValue}"></span>
-                <span th:if="${r.ruleType.name() == 'MANUAL'}" class="text-muted"
+                <span th:if="${r.ruleType == 'MANUAL'}" class="text-muted"
                       th:text="#{admin.experiment.rule.manual}">—</span>
             </td>
             <td th:text="${r.priority}"></td>
@@ -308,9 +308,9 @@
             <td><span class="badge" th:text="${o.overrideType}"></span></td>
             <td><span class="badge" th:text="${o.action}"></span></td>
             <td>
-                        <span th:if="${o.overrideType.name() == 'USER' and o.targetUser != null}"
+                        <span th:if="${o.overrideType == 'USER' and o.targetUser != null}"
                               th:text="${o.targetUser.twitchUsername}"></span>
-                <span th:if="${o.overrideType.name() == 'ATTRIBUTE'}"
+                <span th:if="${o.overrideType == 'ATTRIBUTE'}"
                       th:text="${o.attributeKey} + ' ' + ${o.attributeOp} + ' ' + ${o.attributeVal}"></span>
             </td>
             <td>
@@ -450,7 +450,7 @@
         </button>
     </form>
 
-    <form th:if="${experiment.status.name() == 'ACTIVE' or experiment.status.name() == 'PAUSED'}" th:action="@{/admin/experiments/{id}/reassign(id=${experiment.id})}" method="post" style="margin-top:0.75rem;"> <!-- nosemgrep -->
+    <form th:if="${experiment.status == 'ACTIVE' or experiment.status == 'PAUSED'}" th:action="@{/admin/experiments/{id}/reassign(id=${experiment.id})}" method="post" style="margin-top:0.75rem;"> <!-- nosemgrep -->
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <button type="submit" class="btn btn-sm"
                 style="color:var(--error,red); border-color:var(--error,red);"
