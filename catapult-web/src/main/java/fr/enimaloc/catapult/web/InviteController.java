@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Map;
 
 @Controller
@@ -31,7 +33,12 @@ public class InviteController {
             model.addAttribute("code", data.get("code"));
             model.addAttribute("inviteUrl", data.get("inviteUrl"));
             model.addAttribute("regeneratedAt", data.get("regeneratedAt"));
-            model.addAttribute("redemptions", data.get("redemptions"));
+            record Redemption(String inviteeTwitchId, Instant redeemedAt) {}
+            model.addAttribute("redemptions", ((ArrayList<Map<String, String>>) data.get("redemptions"))
+                    .stream()
+                    .map(m -> new Redemption(m.get("inviteeTwitchId"), Instant.parse(m.get("redeemedAt"))))
+                    .toList()
+            );
         }
         return "invite";
     }
