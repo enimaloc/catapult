@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.AdminMigrationService;
+import fr.enimaloc.catapult.service.InviteService;
 import fr.enimaloc.catapult.service.WhitelistService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,7 @@ class CatapultOAuth2UserServiceTest {
     @Mock private RestClient restClient;
     @Mock private WhitelistService whitelistService;
     @Mock private AdminMigrationService adminMigrationService;
+    @Mock private InviteService inviteService;
 
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
@@ -58,7 +60,7 @@ class CatapultOAuth2UserServiceTest {
         service = new CatapultOAuth2UserService(
             userAccountRepository, oAuthTokenRepository, userSettingsRepository,
             getterConfigRepository, tokenEncryptionService, eventPublisher, restClient, whitelistService,
-            adminMigrationService
+            adminMigrationService, inviteService
         );
         ReflectionTestUtils.setField(service, "ownerId", "");
         ReflectionTestUtils.setField(service, "defaultNoGameName", "");
