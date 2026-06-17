@@ -91,8 +91,6 @@ class GameEventListenerLiveCheckTest {
 
     @Test
     void onStreamOnline_withoutPending_andFlagEnabled_callsResetToDefault() {
-        when(streamStateService.getPending(user)).thenReturn(Optional.empty());
-
         UserSettings settings = new UserSettings();
         settings.setApplyDefaultOnStreamStart(true);
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
@@ -101,6 +99,7 @@ class GameEventListenerLiveCheckTest {
 
         verify(twitchService).resetToDefault(user);
         verify(twitchService, never()).updateChannel(any(), any());
+        verify(streamStateService).clearPending(user);
     }
 
     @Test
@@ -118,7 +117,23 @@ class GameEventListenerLiveCheckTest {
     }
 
     @Test
-    void onStreamOnline_withPending_andFlagEnabled_appliesPendingNotDefault() {
+    void onStreamOnline_withPending_andFlagEnabled_appliesDefaultAndClearsPending() {
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnStreamStart(true);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(twitchService).resetToDefault(user);
+        verify(twitchService, never()).updateChannel(any(), any());
+        verify(streamStateService).clearPending(user);
+    }
+
+    @Test
+    void onStreamOnline_withPending_andFlagDisabled_appliesPendingAndClears() {
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnStreamStart(false);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
         when(streamStateService.getPending(user)).thenReturn(Optional.of(binding));
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
