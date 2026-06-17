@@ -48,9 +48,13 @@ public class SecurityConfig {
                         .failureHandler((request, response, exception) -> {
                             log.error("OAuth2 login failed: [{}] {}", exception.getClass().getSimpleName(), exception.getMessage(), exception);
                             String redirectUrl = webUrl + "/login?error";
-                            if (exception instanceof OAuth2AuthenticationException oauthEx
-                                    && "not_whitelisted".equals(oauthEx.getError().getErrorCode())) {
-                                redirectUrl = webUrl + "/login?error=not_whitelisted";
+                            if (exception instanceof OAuth2AuthenticationException oauthEx) {
+                                redirectUrl = switch (oauthEx.getError().getErrorCode()) {
+                                    case "not_whitelisted" -> webUrl + "/login?error=not_whitelisted";
+                                    case "invalid_invite"  -> webUrl + "/join?error=invalid_invite";
+                                    case "alpha_full"      -> webUrl + "/join?error=alpha_full";
+                                    default -> redirectUrl;
+                                };
                             }
                             response.sendRedirect(redirectUrl);
                         })

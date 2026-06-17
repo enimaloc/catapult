@@ -8,6 +8,12 @@
 <!--/*@thymesvar id="entries" type="java.util.List"*/-->
 <!--/*@thymesvar id="resolvedUsernames" type="java.util.Map"*/-->
 <!--/*@thymesvar id="whitelistEnabled" type="java.lang.Boolean"*/-->
+<!--/*@thymesvar id="inviteEnabled" type="java.lang.Boolean"*/-->
+<!--/*@thymesvar id="globalMaxMembers" type="java.lang.Integer"*/-->
+<!--/*@thymesvar id="defaultMaxUses" type="java.lang.Integer"*/-->
+<!--/*@thymesvar id="defaultCanReinvite" type="java.lang.Boolean"*/-->
+<!--/*@thymesvar id="globalCapReached" type="java.lang.Boolean"*/-->
+<!--/*@thymesvar id="invites" type="java.util.List"*/-->
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
         <h2 th:text="#{admin.whitelist.title}">Administration — Whitelist</h2>
         <form th:action="@{/admin/whitelist/toggle}" method="post"> <!-- nosemgrep -->
@@ -33,6 +39,98 @@
                    style="flex:1; max-width:200px;"/>
             <button type="submit" class="btn btn-primary" th:text="#{admin.whitelist.add.button}">Add</button>
         </form>
+    </div>
+
+    <!-- Invite system section (only visible when whitelist is enabled) -->
+    <div th:if="${whitelistEnabled}" class="card" style="margin-bottom:1rem; padding:1rem;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+            <h3 th:text="#{admin.whitelist.invite.title}" style="margin:0;">Invitations</h3>
+            <form th:action="@{/admin/whitelist/invite/toggle}" method="post"> <!-- nosemgrep -->
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="pill-toggle"
+                     th:classappend="${inviteEnabled ? 'pill-toggle--active' : 'pill-toggle--inactive'}">
+                    <button type="submit" class="pill-toggle__btn"
+                            th:text="${inviteEnabled} ? #{common.disable} : #{common.enable}">Toggle</button>
+                </div>
+            </form>
+        </div>
+        <div th:if="${inviteEnabled}">
+            <form th:action="@{/admin/whitelist/invite/settings}" method="post" style="display:grid; grid-template-columns:1fr 1fr auto; gap:1rem; align-items:end; margin-bottom:0.75rem;"> <!-- nosemgrep -->
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div>
+                    <label class="label" th:text="#{admin.invite.settings.global_max}">Cap global</label>
+                    <input type="number" name="globalMaxMembers" min="1" th:value="${globalMaxMembers}" style="width:100%;"/>
+                </div>
+                <div>
+                    <label class="label" th:text="#{admin.invite.settings.default_max_uses}">Max utilisations</label>
+                    <input type="number" name="defaultMaxUses" min="0" th:value="${defaultMaxUses}" style="width:100%;"/>
+                </div>
+                <div>
+                    <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.85rem;">
+                        <input type="checkbox" name="defaultCanReinvite" value="true" th:checked="${defaultCanReinvite}"/>
+                        <span th:text="#{admin.invite.settings.default_can_reinvite}">Invités peuvent inviter</span>
+                    </label>
+                    <button type="submit" class="btn btn-sm btn-primary" style="margin-top:0.5rem;"
+                            th:text="#{admin.invite.settings.save}">Enregistrer</button>
+                </div>
+            </form>
+            <div th:if="${globalCapReached}" class="text-muted" style="font-size:0.85rem; color:var(--color-warning);"
+                 th:text="#{admin.invite.cap.reached}">Cap atteint</div>
+            <!-- Invite list -->
+            <div th:unless="${#lists.isEmpty(invites)}" class="table-container" style="margin-top:0.75rem;">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.invite.column.owner}">Owner</th>
+                            <th th:text="#{admin.invite.column.code}">Code</th>
+                            <th th:text="#{admin.invite.column.uses}">Uses</th>
+                            <th th:text="#{admin.invite.column.max_uses}">Max</th>
+                            <th th:text="#{admin.invite.column.can_reinvite}">Reinvite</th>
+                            <th th:text="#{admin.invite.column.actions}">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="inv : ${invites}">
+                            <td th:text="${inv.ownerUsername}"></td>
+                            <td><span class="badge" style="letter-spacing:0.1em;" th:text="${inv.code}"></span></td>
+                            <td th:text="${inv.useCount}"></td>
+                            <td>
+                                <span th:if="${inv.maxUses == null}" class="text-muted"
+                                      th:text="|(#{admin.invite.default})|"></span>
+                                <span th:unless="${inv.maxUses == null}"
+                                      th:class="${inv.maxUses == 0} ? 'badge badge-danger' : ''"
+                                      th:text="${inv.maxUses}"></span>
+                            </td>
+                            <td>
+                                <span th:if="${inv.canReinvite == null}" class="text-muted">—</span>
+                                <span th:unless="${inv.canReinvite == null}"
+                                      th:text="${inv.canReinvite} ? '✓' : '✗'"></span>
+                            </td>
+                            <td>
+                                <details>
+                                    <summary class="btn btn-sm">Quota</summary>
+                                    <div style="padding:0.5rem; background:var(--card-bg); border-radius:4px; margin-top:0.3rem; min-width:200px;">
+                                        <form th:action="@{/admin/whitelist/invite/{id}/quota(id=${inv.id})}" method="post"> <!-- nosemgrep -->
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <div style="display:flex; flex-direction:column; gap:0.4rem;">
+                                                <label class="label" style="font-size:0.8rem;" th:text="#{admin.invite.column.max_uses}">Max</label>
+                                                <input type="number" name="maxUses" min="0" th:value="${inv.maxUses}" style="width:100%;"/>
+                                                <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.82rem; cursor:pointer;">
+                                                    <input type="checkbox" name="canReinvite" value="true" th:checked="${inv.canReinvite}"/>
+                                                    <span th:text="#{admin.invite.column.can_reinvite}">Reinvite</span>
+                                                </label>
+                                                <button type="submit" class="btn btn-sm btn-primary"
+                                                        th:text="#{admin.invite.quota.save}">Save</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </details>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <div th:if="${#lists.isEmpty(entries)}" class="text-muted">
