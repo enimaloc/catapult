@@ -42,6 +42,9 @@ public class InviteController {
         return "redirect:/invite";
     }
 
+    private static final java.util.regex.Pattern INVITE_CODE_PATTERN =
+        java.util.regex.Pattern.compile("^[A-Z2-9]{1,12}$");
+
     @GetMapping("/join")
     public String joinPage(@RequestParam(required = false) String invite,
                            @RequestParam(required = false) String error,
@@ -50,8 +53,10 @@ public class InviteController {
         if (user != null) {
             return "redirect:/channels";
         }
+        String validatedCode = (invite != null && INVITE_CODE_PATTERN.matcher(invite).matches())
+            ? invite : null;
         String oauthBase = (apiPublicUrl != null && !apiPublicUrl.isBlank()) ? apiPublicUrl : "";
-        model.addAttribute("inviteCode", invite);
+        model.addAttribute("inviteCode", validatedCode);
         model.addAttribute("error", error);
         model.addAttribute("oauthBase", oauthBase);
         return "join";
