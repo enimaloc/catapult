@@ -188,6 +188,15 @@ class GameEventListenerLiveCheckTest {
     }
 
     @Test
+    void onNoGameDetected_clearsPendingBinding_evenWhenNotLive() {
+        when(streamStateService.isLive(user)).thenReturn(false);
+
+        listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
+
+        verify(streamStateService).clearPending(user);
+    }
+
+    @Test
     void onNoGameDetected_whenLive_withFallbackConfigured_callsUpdateChannel() {
         when(streamStateService.isLive(user)).thenReturn(true);
 
