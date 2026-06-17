@@ -26,6 +26,7 @@ import java.util.UUID;
 @Slf4j
 public class InviteService {
 
+    static final String KEY_INVITE_ENABLED       = "invite.enabled";
     static final String KEY_GLOBAL_MAX_MEMBERS   = "invite.global_max_members";
     static final String KEY_DEFAULT_MAX_USES     = "invite.default_max_uses";
     static final String KEY_DEFAULT_CAN_REINVITE = "invite.default_can_reinvite";
@@ -42,9 +43,29 @@ public class InviteService {
 
     // ── User-facing ──────────────────────────────────────────────────────────
 
-    /** Returns the user's invite only if one has been explicitly granted. No auto-creation. */
+    /**
+     * Returns the user's invite, auto-creating one if the invite system is globally enabled.
+     * Admin can effectively block a user from inviting by setting maxUses=0 on their invite.
+     */
+    @Transactional
     public Optional<AlphaInvite> getInvite(UserAccount owner) {
-        return inviteRepository.findByOwner(owner);
+        Optional<AlphaInvite> existing = inviteRepository.findByOwner(owner);
+        if (existing.isPresent()) return existing;
+        if (isInviteEnabled() && whitelistService.isEnabled()) {
+            return Optional.of(createAndSaveInvite(owner));
+        }
+        return Optional.empty();
+    }
+
+    public boolean isInviteEnabled() {
+        return systemSettingRepository.findById(KEY_INVITE_ENABLED)
+            .map(s -> Boolean.parseBoolean(s.getValue()))
+            .orElse(false);
+    }
+
+    @Transactional
+    public void setInviteEnabled(boolean enabled) {
+        saveSetting(KEY_INVITE_ENABLED, String.valueOf(enabled));
     }
 
     @Transactional

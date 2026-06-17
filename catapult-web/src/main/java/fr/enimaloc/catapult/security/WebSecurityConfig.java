@@ -20,7 +20,7 @@ public class WebSecurityConfig {
         http
                 .addFilterBefore(jwtFilter, AnonymousAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/login", "/auth/callback", "/privacy", "/error",
+                        .requestMatchers("/", "/login", "/auth/callback", "/join", "/privacy", "/error",
                                 "/css/**", "/js/**", "/images/**", "/webjars/**",
                                 "/changelog", "/changelog/**", "/actuator/**", "/status").permitAll()
                         .requestMatchers("/admin/impersonate/exit").hasAuthority("ROLE_PREVIOUS_ADMINISTRATOR")
