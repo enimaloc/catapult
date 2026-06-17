@@ -61,16 +61,18 @@ public class GameEventListener {
     public void onStreamOnline(StreamOnlineEvent event) {
         UserAccount user = event.getUser();
         log.debug("StreamOnlineEvent for user {}", user.getId());
+        boolean applyDefault = userSettingsRepository.findById(user.getId())
+            .map(settings -> settings.isApplyDefaultOnStreamStart())
+            .orElse(false);
+        if (applyDefault) {
+            twitchService.resetToDefault(user);
+            streamStateService.clearPending(user);
+            return;
+        }
         Optional<GameBinding> pending = streamStateService.getPending(user);
         if (pending.isPresent()) {
             twitchService.updateChannel(user, pending.get());
             streamStateService.clearPending(user);
-        } else {
-            userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
-                if (settings.isApplyDefaultOnStreamStart()) {
-                    twitchService.resetToDefault(user);
-                }
-            });
         }
     }
 
