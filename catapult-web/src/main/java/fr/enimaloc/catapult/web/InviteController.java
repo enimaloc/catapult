@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @Controller
@@ -24,6 +24,8 @@ public class InviteController {
     @Value("${catapult.api.public-url:}")
     private String apiPublicUrl;
 
+    public record Redemption(String inviteeTwitchId, Instant redeemedAt) {}
+
     @GetMapping("/invite")
     public String invitePage(@AuthenticationPrincipal CatapultWebUser user, Model model) {
         @SuppressWarnings("unchecked")
@@ -33,12 +35,13 @@ public class InviteController {
             model.addAttribute("code", data.get("code"));
             model.addAttribute("inviteUrl", data.get("inviteUrl"));
             model.addAttribute("regeneratedAt", data.get("regeneratedAt"));
-            record Redemption(String inviteeTwitchId, Instant redeemedAt) {}
-            model.addAttribute("redemptions", ((ArrayList<Map<String, String>>) data.get("redemptions"))
-                    .stream()
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> rawRedemptions = (List<Map<String, String>>) data.get("redemptions");
+            List<Redemption> redemptions = rawRedemptions == null ? List.of()
+                : rawRedemptions.stream()
                     .map(m -> new Redemption(m.get("inviteeTwitchId"), Instant.parse(m.get("redeemedAt"))))
-                    .toList()
-            );
+                    .toList();
+            model.addAttribute("redemptions", redemptions);
         }
         return "invite";
     }
