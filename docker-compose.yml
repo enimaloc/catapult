@@ -61,6 +61,11 @@ services:
       - UPSTREAM_MAINTENANCE=${UPSTREAM_MAINTENANCE:-catapult-maintenance:80}
       # In local/dev (no TLS termination), force http to avoid Spring building https redirect URIs
       - FORWARDED_PROTO=${FORWARDED_PROTO:-$$scheme}
+    # nginx resolves upstreams at startup — wait for services to exist in Docker DNS
+    depends_on:
+      - catapult-api
+      - catapult-web
+      - catapult-maintenance
     restart: unless-stopped
 
   catapult-db:
