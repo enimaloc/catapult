@@ -54,6 +54,7 @@ public class GameEventListener {
     public void onNoGameDetected(NoGameDetectedEvent event) {
         UserAccount user = event.getUser();
         log.debug("NoGameDetectedEvent for user {}", user.getId());
+        streamStateService.clearPending(user);
         applyNoGameFallback(user);
     }
 
