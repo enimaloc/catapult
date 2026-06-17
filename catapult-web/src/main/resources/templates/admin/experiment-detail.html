@@ -180,10 +180,10 @@
 </div>
 
 <!-- Bloc ④ Commentaires -->
-<div class="card" th:if="${feedbackPage != null and feedbackPage.totalElements > 0}" style="margin-bottom:1rem;">
+<div class="card" th:if="${feedbackPage != null and !#lists.isEmpty(feedbackPage)}" style="margin-bottom:1rem;">
     <h3 th:text="#{admin.experiment.section.feedback}">Commentaires utilisateurs</h3>
     <!--/*@thymesvar id="f" type="fr.enimaloc.catapult.domain.ExperimentFeedback"*/-->
-    <div th:each="f : ${feedbackPage.content}" style="padding:0.5rem 0; border-bottom:1px solid var(--border);">
+    <div th:each="f : ${feedbackPage}" style="padding:0.5rem 0; border-bottom:1px solid var(--border);">
         <span class="badge" th:text="${f.variant.key}"></span>
         <strong th:text="${f.npsScore} + '/10'"></strong>
         <span th:if="${f.comment != null}" th:text="' — ' + ${f.comment}"></span>
@@ -413,7 +413,7 @@
 <!-- Bloc ⑦ Participants -->
 <div class="card" style="margin-top:1rem;" th:if="${participantPage != null}">
     <h3 th:text="#{admin.experiment.section.participants}">Participants</h3>
-    <table class="table" th:if="${participantPage.totalElements > 0}">
+    <table class="table" th:if="${!#lists.isEmpty(participantPage)}">
         <thead>
         <tr>
             <th th:text="#{admin.experiment.column.user}">Utilisateur</th>
@@ -423,14 +423,14 @@
         </thead>
         <tbody>
         <!--/*@thymesvar id="a" type="fr.enimaloc.catapult.domain.ExperimentAssignment"*/-->
-        <tr th:each="a : ${participantPage.content}">
+        <tr th:each="a : ${participantPage}">
             <td th:text="${a.user.twitchUsername}"></td>
             <td><span class="badge" th:text="${a.variant.key}"></span></td>
-            <td th:text="${#temporals.format(a.assignedAt, 'dd/MM/yyyy HH:mm')}"></td>
+            <td th:text="${#temporals.format(a.assignedAt, 'dd/MM/yyyy HH:mm', 'UTC')}"></td>
         </tr>
         </tbody>
     </table>
-    <p th:if="${participantPage.totalElements == 0}" class="text-muted"
+    <p th:if="${#lists.isEmpty(participantPage)}" class="text-muted"
        th:text="#{admin.experiment.participants.empty}">Aucun participant assigné.</p>
 
     <div th:if="${param.assignError != null}" style="color:var(--error,red); margin-top:0.5rem;">
