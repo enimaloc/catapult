@@ -34,10 +34,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
     entrypoint: ["java", "-Dlogger.level.fr.enimaloc.catapult.service=trace", "-jar", "app.jar"]
-    networks:
-      - monitor
-      - proxy
-      - default
 
   catapult-web:
     build:
@@ -50,20 +46,15 @@ services:
     environment:
       CATAPULT_API_URL: ${CATAPULT_API_URL:-http://catapult-api:8080}
       JWT_SECRET: ${JWT_SECRET}
+      # Empty = use relative URL for OAuth so nginx routes /oauth2/** to catapult-api correctly
+      CATAPULT_API_PUBLIC_URL: ""
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8081/actuator/health || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 5
       start_period: 1m
-    depends_on:
-      catapult-api:
-        condition: service_healthy
     restart: unless-stopped
-    networks:
-      - monitor
-      - proxy
-      - default
 
   catapult-maintenance:
     build:
@@ -77,9 +68,6 @@ services:
     image: registry.gitlab.com/enimaloc/catapult/nginx-router:latest
     ports:
       - "80:80"
-    depends_on:
-      - catapult-web
-      - catapult-maintenance
     restart: unless-stopped
 
   db:
@@ -101,9 +89,3 @@ services:
 
 volumes:
   postgres_data:
-
-networks:
-  monitor:
-    external: true
-  proxy:
-    external: true
