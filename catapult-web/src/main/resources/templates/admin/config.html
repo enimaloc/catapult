@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'config', ~{::body}, ~{::head/script}, 'container', null, null)}">
+<head>
+    <title>Catapult — Configuration</title>
+    <script th:src="@{/js/admin-config.js}" defer></script>
+</head>
+<body>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 style="margin:0">Administration — Configuration</h2>
+    </div>
+
+    <p class="text-muted" style="margin-bottom:1rem;">
+        Modifications appliquées en live. Les clés marquées
+        <span class="badge warn" title="Redémarrage requis">⚠</span>
+        requièrent un redémarrage du module.
+    </p>
+
+    <div class="toolbar" style="margin-bottom:0.5rem;">
+        <input id="config-search" type="search" placeholder="Filtrer par clé…" style="width:100%; max-width:24rem;">
+    </div>
+
+    <table id="config-table" class="table">
+        <thead>
+            <tr>
+                <th>Clé</th>
+                <th>Valeur</th>
+                <th>Source</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</body>
+</html>
