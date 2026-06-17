@@ -60,7 +60,7 @@
                     <tbody>
                         <tr th:each="r : ${redemptions}">
                             <td><span class="badge" th:text="${r.inviteeTwitchId}"></span></td>
-                            <td th:text="${#temporals.format(r.redeemedAt, 'dd/MM/yyyy HH:mm')}"></td>
+                            <td th:text="${#temporals.format(r.redeemedAt, 'dd/MM/yyyy HH:mm', 'UTC')}"></td>
                         </tr>
                     </tbody>
                 </table>
