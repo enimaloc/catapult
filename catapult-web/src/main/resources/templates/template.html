@@ -91,21 +91,13 @@
     </div>
 </nav>
 
-<th:block th:with="showInviteCard=${user != null and invitePlacementVariant == 'card'}">
 <div class="page-content">
     <th:block th:if="${left_content != null or right_content != null or showInviteCard}">
         <div class="page-layout">
             <aside th:if="${left_content != null}" class="page-sidebar page-sidebar--left"><th:block th:replace="${left_content}"></th:block></aside>
             <main th:if="${!#strings.isEmpty(main_class)}" th:class="${main_class}"><th:block th:replace="${content}"></th:block></main>
             <th:block th:unless="${!#strings.isEmpty(main_class)}"><th:block th:replace="${content}"></th:block></th:block>
-            <aside th:if="${right_content != null or showInviteCard}" class="page-sidebar page-sidebar--right">
-                <div th:if="${showInviteCard}" class="card invite-card"
-                     th:classappend="${active_page == 'invite'} ? ' invite-card--active'">
-                    <div class="invite-card__icon" aria-hidden="true">✉️</div>
-                    <h3 class="invite-card__title" th:text="#{invite.card.title}">Invite des amis</h3>
-                    <p class="invite-card__text" th:text="#{invite.card.text}">Partage Catapult avec ton réseau et profite de la communauté.</p>
-                    <a th:href="@{/invite}" class="btn btn-primary invite-card__cta" th:text="#{invite.card.cta}">Mes invitations</a>
-                </div>
+            <aside th:if="${right_content != null}" class="page-sidebar page-sidebar--right">
                 <th:block th:if="${right_content != null}" th:replace="${right_content}"></th:block>
             </aside>
         </div>
@@ -115,7 +107,6 @@
         <th:block th:unless="${!#strings.isEmpty(main_class)}"><th:block th:replace="${content}"></th:block></th:block>
     </th:block>
 </div>
-</th:block>
 
 
 <!-- Changelog panel -->
