@@ -92,7 +92,7 @@
 </nav>
 
 <div class="page-content">
-    <th:block th:if="${left_content != null or right_content != null or showInviteCard}">
+    <th:block th:if="${left_content != null or right_content != null}">
         <div class="page-layout">
             <aside th:if="${left_content != null}" class="page-sidebar page-sidebar--left"><th:block th:replace="${left_content}"></th:block></aside>
             <main th:if="${!#strings.isEmpty(main_class)}" th:class="${main_class}"><th:block th:replace="${content}"></th:block></main>
@@ -102,7 +102,7 @@
             </aside>
         </div>
     </th:block>
-    <th:block th:unless="${left_content != null or right_content != null or showInviteCard}">
+    <th:block th:unless="${left_content != null or right_content != null}">
         <main th:if="${!#strings.isEmpty(main_class)}" th:class="${main_class}"><th:block th:replace="${content}"></th:block></main>
         <th:block th:unless="${!#strings.isEmpty(main_class)}"><th:block th:replace="${content}"></th:block></th:block>
     </th:block>
