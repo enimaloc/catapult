@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.AdminMigrationService;
+import fr.enimaloc.catapult.service.InviteService;
 import fr.enimaloc.catapult.service.WhitelistService;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private final RestClient restClient;
     private final WhitelistService whitelistService;
     private final AdminMigrationService adminMigrationService;
+    private final InviteService inviteService;
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -153,8 +155,14 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         String twitchUsername = oAuth2User.getAttribute("login");
 
         if (whitelistService.isEnabled() && !whitelistService.contains(twitchId)) {
-            log.warn("Access denied - user not whitelisted: id={}, login={}", twitchId, twitchUsername);
-            throw new OAuth2AuthenticationException(new OAuth2Error("not_whitelisted"), "User not whitelisted.");
+            Optional<String> pendingInvite = getPendingInviteCode();
+            if (pendingInvite.isEmpty()) {
+                log.warn("Access denied - user not whitelisted: id={}, login={}", twitchId, twitchUsername);
+                throw new OAuth2AuthenticationException(new OAuth2Error("not_whitelisted"), "User not whitelisted.");
+            }
+            // Invite code valid — adds user to whitelist, then fall through to normal account creation
+            inviteService.redeem(pendingInvite.get(), twitchId);
+            clearPendingInviteCode();
         }
 
         // Check for pending bot-link flow before the normal login path
@@ -303,5 +311,28 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         }
         throw new OAuth2AuthenticationException(new OAuth2Error("admin_not_authenticated"),
             "No authenticated admin found during bot link.");
+    }
+
+    private Optional<String> getPendingInviteCode() {
+        try {
+            ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+            HttpSession session = attrs.getRequest().getSession(false);
+            if (session != null) {
+                return Optional.ofNullable((String) session.getAttribute(InviteCodeRelayFilter.SESSION_KEY));
+            }
+        } catch (IllegalStateException ignored) {}
+        return Optional.empty();
+    }
+
+    private void clearPendingInviteCode() {
+        try {
+            ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+            HttpSession session = attrs.getRequest().getSession(false);
+            if (session != null) {
+                session.removeAttribute(InviteCodeRelayFilter.SESSION_KEY);
+            }
+        } catch (IllegalStateException ignored) {}
     }
 }
