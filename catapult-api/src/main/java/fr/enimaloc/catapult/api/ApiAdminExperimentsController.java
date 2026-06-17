@@ -56,9 +56,16 @@ public class ApiAdminExperimentsController {
     private final ExperimentService experimentService;
     private final ApplicationEventPublisher eventPublisher;
 
+    @Transactional(readOnly = true)
     @GetMapping
     public List<Experiment> list() {
-        return experimentRepository.findAll();
+        List<Experiment> all = experimentRepository.findAll();
+        // Force-load lazy collections inside the transaction so Jackson can serialize after it closes
+        all.forEach(e -> {
+            e.getRules().size();
+            e.getVariants().size();
+        });
+        return all;
     }
 
     @Transactional(readOnly = true)
