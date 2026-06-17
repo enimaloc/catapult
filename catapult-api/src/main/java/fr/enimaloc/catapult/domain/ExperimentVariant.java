@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,6 +19,7 @@ public class ExperimentVariant {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "experiment_id", nullable = false)
+    @JsonIgnore
     private Experiment experiment;
 
     @Column(nullable = false)
