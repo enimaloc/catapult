@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'admin-invite', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title>Catapult — Invitations (Admin)</title>
+</head>
+<body>
+<!--/*@thymesvar id="invites" type="java.util.List"*/-->
+<!--/*@thymesvar id="globalMaxMembers" type="java.lang.Integer"*/-->
+<!--/*@thymesvar id="defaultMaxUses" type="java.lang.Integer"*/-->
+<!--/*@thymesvar id="defaultCanReinvite" type="java.lang.Boolean"*/-->
+<!--/*@thymesvar id="globalCapReached" type="java.lang.Boolean"*/-->
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 th:text="#{admin.invite.title}" style="margin:0;">Administration — Invitations</h2>
+        <span th:if="${globalCapReached}" class="badge badge-danger"
+              th:text="#{admin.invite.cap.reached}">Alpha full</span>
+    </div>
+
+    <!-- Global settings -->
+    <div class="card" style="margin-bottom:1.5rem; padding:1rem;">
+        <h3 th:text="#{admin.invite.settings.title}" style="margin-top:0;">Paramètres globaux</h3>
+        <form th:action="@{/admin/invite/settings}" method="post"> <!-- nosemgrep -->
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:1rem; align-items:end;">
+                <div>
+                    <label class="label" th:text="#{admin.invite.settings.global_max}">Max membres alpha</label>
+                    <input type="number" name="globalMaxMembers" min="1"
+                           th:value="${globalMaxMembers}"
+                           style="width:100%;"/>
+                </div>
+                <div>
+                    <label class="label" th:text="#{admin.invite.settings.default_max_uses}">Max utilisations par invite</label>
+                    <input type="number" name="defaultMaxUses" min="0"
+                           th:value="${defaultMaxUses}"
+                           style="width:100%;"/>
+                </div>
+                <div>
+                    <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                        <input type="checkbox" name="defaultCanReinvite" value="true"
+                               th:checked="${defaultCanReinvite}"/>
+                        <span th:text="#{admin.invite.settings.default_can_reinvite}">Invités peuvent inviter</span>
+                    </label>
+                </div>
+            </div>
+            <div style="margin-top:1rem;">
+                <button type="submit" class="btn btn-primary"
+                        th:text="#{admin.invite.settings.save}">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Invite list -->
+    <h3 th:text="#{admin.invite.list.title}">Invitations actives</h3>
+
+    <div th:if="${#lists.isEmpty(invites)}" class="text-muted"
+         th:text="#{admin.invite.list.empty}">Aucune invitation pour l'instant.</div>
+
+    <div th:unless="${#lists.isEmpty(invites)}" class="card">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.invite.column.owner}">Propriétaire</th>
+                        <th th:text="#{admin.invite.column.code}">Code</th>
+                        <th th:text="#{admin.invite.column.uses}">Utilisations</th>
+                        <th th:text="#{admin.invite.column.max_uses}">Max</th>
+                        <th th:text="#{admin.invite.column.can_reinvite}">Peut inviter</th>
+                        <th th:text="#{admin.invite.column.actions}">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="inv : ${invites}">
+                        <td th:text="${inv.ownerUsername}"></td>
+                        <td><span class="badge" style="letter-spacing:0.1em;" th:text="${inv.code}"></span></td>
+                        <td th:text="${inv.useCount}"></td>
+                        <td>
+                            <span th:if="${inv.maxUses == null}" class="text-muted"
+                                  th:text="|(#{admin.invite.default})|"></span>
+                            <span th:unless="${inv.maxUses == null}" th:text="${inv.maxUses}"></span>
+                        </td>
+                        <td>
+                            <span th:if="${inv.canReinvite == null}" class="text-muted"
+                                  th:text="|(#{admin.invite.default})|"></span>
+                            <span th:unless="${inv.canReinvite == null}"
+                                  th:text="${inv.canReinvite} ? '✓' : '✗'"></span>
+                        </td>
+                        <td>
+                            <details>
+                                <summary class="btn btn-sm" th:text="#{admin.invite.quota.save}">Quota</summary>
+                                <div style="padding:0.5rem; background:var(--surface-2,var(--card-bg)); border-radius:4px; margin-top:0.5rem; min-width:240px;">
+                                    <form th:action="@{/admin/invite/{id}/quota(id=${inv.id})}" method="post"> <!-- nosemgrep -->
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                            <label class="label" style="font-size:0.8rem;"
+                                                   th:text="#{admin.invite.column.max_uses}">Max uses</label>
+                                            <input type="number" name="maxUses" min="0"
+                                                   th:value="${inv.maxUses}"
+                                                   style="width:100%;"/>
+                                            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.85rem;">
+                                                <input type="checkbox" name="canReinvite" value="true"
+                                                       th:checked="${inv.canReinvite}"/>
+                                                <span th:text="#{admin.invite.column.can_reinvite}">Peut inviter</span>
+                                            </label>
+                                            <button type="submit" class="btn btn-sm btn-primary"
+                                                    th:text="#{admin.invite.quota.save}">Enregistrer</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </details>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
