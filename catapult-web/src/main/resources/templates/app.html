@@ -126,6 +126,13 @@
     </aside>
 
     <aside id="right-panel">
+        <div th:if="${invitePlacementVariant == 'card'}" class="card invite-card"
+             th:classappend="${active_page == 'invite'} ? ' invite-card--active'">
+            <div class="invite-card__icon" aria-hidden="true">✉️</div>
+            <h3 class="invite-card__title" th:text="#{invite.card.title}">Invite des amis</h3>
+            <p class="invite-card__text" th:text="#{invite.card.text}">Partage Catapult avec ton réseau et profite de la communauté.</p>
+            <a th:href="@{/invite}" class="btn btn-primary invite-card__cta" th:text="#{invite.card.cta}">Mes invitations</a>
+        </div>
     </aside>
 
     <script th:inline="javascript">
