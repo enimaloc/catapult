@@ -40,6 +40,7 @@ public class InviteService {
     private final SystemSettingRepository         systemSettingRepository;
     private final WhitelistEntryRepository        whitelistEntryRepository;
     private final WhitelistService                whitelistService;
+    private final ExperimentService               experimentService;
 
     // ── User-facing ──────────────────────────────────────────────────────────
 
@@ -125,6 +126,9 @@ public class InviteService {
         redemption.setInvite(invite);
         redemption.setInviteeTwitchId(inviteeTwitchId);
         redemptionRepository.save(redemption);
+
+        // Bottom-of-funnel: success attributed to the inviter's variant (not the invitee)
+        experimentService.track(invite.getOwner(), "invite-button-placement", "invite_redeemed");
 
         boolean canReinvite = effectiveCanReinvite(invite);
         log.info("Invite '{}' redeemed by {} ({}/{}), canReinvite={}", code, inviteeTwitchId,
