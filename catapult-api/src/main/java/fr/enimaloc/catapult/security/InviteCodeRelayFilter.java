@@ -29,9 +29,11 @@ public class InviteCodeRelayFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
         if ("/oauth2/authorization/twitch".equals(request.getRequestURI())) {
             String invite = request.getParameter("invite");
+            log.info("OAuth2 initiation — URI={}, invite param={}", request.getRequestURI(), invite);
             if (invite != null && !invite.isBlank()) {
+                String sessionId = request.getSession(true).getId();
                 request.getSession(true).setAttribute(SESSION_KEY, invite.trim().toUpperCase());
-                log.debug("Stored invite code in session for OAuth flow");
+                log.info("Stored invite code '{}' in session {} for OAuth flow", invite.trim().toUpperCase(), sessionId);
             }
         }
         chain.doFilter(request, response);
