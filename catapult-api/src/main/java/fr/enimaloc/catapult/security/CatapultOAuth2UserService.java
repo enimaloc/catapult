@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.InviteService;
 import fr.enimaloc.catapult.service.WhitelistService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -325,14 +326,15 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         try {
             ServletRequestAttributes attrs =
                 (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
-            HttpSession session = attrs.getRequest().getSession(false);
-            log.info("getPendingInviteCode — session={}, key={}, value={}",
-                session != null ? session.getId() : "null",
-                InviteCodeRelayFilter.SESSION_KEY,
-                session != null ? session.getAttribute(InviteCodeRelayFilter.SESSION_KEY) : "no-session");
-            if (session != null) {
-                return Optional.ofNullable((String) session.getAttribute(InviteCodeRelayFilter.SESSION_KEY));
-            }
+            HttpServletRequest request = attrs.getRequest();
+            HttpSession session = request.getSession(false);
+            String fromSession = session != null
+                ? (String) session.getAttribute(InviteCodeRelayFilter.SESSION_KEY)
+                : null;
+            String fromCookie = readCookie(request, InviteCodeRelayFilter.COOKIE_NAME);
+            log.info("getPendingInviteCode — sessionId={}, fromSession={}, fromCookie={}",
+                session != null ? session.getId() : "null", fromSession, fromCookie);
+            return Optional.ofNullable(fromSession != null ? fromSession : fromCookie);
         } catch (IllegalStateException e) {
             log.warn("getPendingInviteCode — no request context: {}", e.getMessage());
         }
@@ -343,10 +345,29 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         try {
             ServletRequestAttributes attrs =
                 (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
-            HttpSession session = attrs.getRequest().getSession(false);
+            HttpServletRequest request = attrs.getRequest();
+            HttpSession session = request.getSession(false);
             if (session != null) {
                 session.removeAttribute(InviteCodeRelayFilter.SESSION_KEY);
             }
+            org.springframework.http.ResponseCookie expired = org.springframework.http.ResponseCookie
+                .from(InviteCodeRelayFilter.COOKIE_NAME, "")
+                .httpOnly(true)
+                .secure(request.isSecure())
+                .path("/")
+                .maxAge(0)
+                .sameSite("Lax")
+                .build();
+            attrs.getResponse().addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, expired.toString());
         } catch (IllegalStateException ignored) {}
+    }
+
+    private static String readCookie(HttpServletRequest request, String name) {
+        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (jakarta.servlet.http.Cookie c : cookies) {
+            if (name.equals(c.getName())) return c.getValue();
+        }
+        return null;
     }
 }
