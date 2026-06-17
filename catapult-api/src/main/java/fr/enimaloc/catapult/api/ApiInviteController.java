@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.AlphaInvite;
 import fr.enimaloc.catapult.domain.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.InviteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,8 +28,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ApiInviteController {
 
+    static final String EXPERIMENT_KEY        = "invite-button-placement";
+    static final String EVENT_PAGE_VIEW       = "invite_page_view";
+    static final String EVENT_LINK_REGENERATED = "invite_link_regenerated";
+
     private final InviteService inviteService;
     private final UserAccountRepository userAccountRepository;
+    private final ExperimentService experimentService;
 
     @Value("${app.web-url:}")
     private String webUrl;
@@ -36,6 +42,7 @@ public class ApiInviteController {
     @GetMapping
     public InvitePageData page(@AuthenticationPrincipal Jwt jwt) {
         UserAccount user = resolveUser(jwt);
+        experimentService.track(user, EXPERIMENT_KEY, EVENT_PAGE_VIEW);
         Optional<AlphaInvite> inviteOpt = inviteService.getInvite(user);
         if (inviteOpt.isEmpty()) {
             return new InvitePageData(false, null, null, null, null, List.of());
@@ -54,6 +61,7 @@ public class ApiInviteController {
     public void regenerate(@AuthenticationPrincipal Jwt jwt) {
         UserAccount user = resolveUser(jwt);
         inviteService.regenerateCode(user);
+        experimentService.track(user, EXPERIMENT_KEY, EVENT_LINK_REGENERATED);
     }
 
     private UserAccount resolveUser(Jwt jwt) {
