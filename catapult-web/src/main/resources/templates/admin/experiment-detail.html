@@ -426,7 +426,7 @@
         <tr th:each="a : ${participantPage}">
             <td th:text="${a.user.twitchUsername}"></td>
             <td><span class="badge" th:text="${a.variant.key}"></span></td>
-            <td th:text="${#temporals.format(a.assignedAt, 'dd/MM/yyyy HH:mm', 'UTC')}"></td>
+            <td th:text="${#strings.replace(#strings.substring(a.assignedAt, 0, 16), 'T', ' ')}"></td>
         </tr>
         </tbody>
     </table>
