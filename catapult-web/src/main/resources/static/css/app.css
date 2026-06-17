@@ -1582,3 +1582,19 @@ details summary { cursor: pointer; font-weight: 600; }
 
 .maintenance-banner__icon { font-size: 1.5rem; flex-shrink: 0; }
 .maintenance-banner p { margin: 0.25rem 0 0; font-size: 0.875rem; opacity: .85; }
+
+/* ── Invite sidebar card (experiment: invite-button-placement, variant: card) ── */
+.invite-card {
+    padding: 1.25rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.invite-card__icon { font-size: 2rem; line-height: 1; }
+.invite-card__title { margin: 0.25rem 0 0; font-size: 1rem; font-weight: 700; }
+.invite-card__text { margin: 0; font-size: 0.85rem; color: var(--muted, #aaa); }
+.invite-card__cta { margin-top: 0.5rem; width: 100%; }
+.invite-card--active { outline: 2px solid var(--color-primary, #9147ff); }
