@@ -6,6 +6,7 @@
 </head>
 <body>
 <!--/*@thymesvar id="invites" type="java.util.List"*/-->
+<!--/*@thymesvar id="membersWithoutInvite" type="java.util.List"*/-->
 <!--/*@thymesvar id="globalMaxMembers" type="java.lang.Integer"*/-->
 <!--/*@thymesvar id="defaultMaxUses" type="java.lang.Integer"*/-->
 <!--/*@thymesvar id="defaultCanReinvite" type="java.lang.Boolean"*/-->
@@ -48,6 +49,34 @@
                         th:text="#{admin.invite.settings.save}">Enregistrer</button>
             </div>
         </form>
+    </div>
+
+    <!-- Members without invite -->
+    <div th:if="${membersWithoutInvite != null and !#lists.isEmpty(membersWithoutInvite)}"
+         class="card" style="margin-bottom:1.5rem; padding:1rem;">
+        <h3 th:text="#{admin.invite.grant.title}" style="margin-top:0;">Accorder une invitation</h3>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.invite.column.owner}">Membre</th>
+                        <th th:text="#{admin.invite.column.actions}">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="member : ${membersWithoutInvite}">
+                        <td th:text="${member.twitchUsername}"></td>
+                        <td>
+                            <form th:action="@{/admin/invite/grant/{id}(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="btn btn-sm btn-primary"
+                                        th:text="#{admin.invite.grant.button}">Accorder</button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Invite list -->

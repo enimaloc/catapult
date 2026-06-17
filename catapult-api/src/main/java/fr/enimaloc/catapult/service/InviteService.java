@@ -42,39 +42,26 @@ public class InviteService {
 
     // ── User-facing ──────────────────────────────────────────────────────────
 
-    /**
-     * Returns the user's invite if they're allowed to have one, empty otherwise.
-     * Admin-added users (no redemption record) always get an invite.
-     * Invite-added users get an invite only if their inviter had canReinvite=true.
-     */
-    @Transactional
-    public Optional<AlphaInvite> getOrCreateInvite(UserAccount owner) {
-        Optional<AlphaInvite> existing = inviteRepository.findByOwner(owner);
-        if (existing.isPresent()) return existing;
-
-        List<AlphaInviteRedemption> redemptions = redemptionRepository.findByInviteeTwitchId(owner.getTwitchId());
-        if (redemptions.isEmpty()) {
-            // Admin-added user — always eligible
-            return Optional.of(createAndSaveInvite(owner));
-        }
-
-        // Invite-added user — check if their inviter allowed re-inviting
-        AlphaInvite sourceInvite = redemptions.getFirst().getInvite();
-        if (effectiveCanReinvite(sourceInvite)) {
-            return Optional.of(createAndSaveInvite(owner));
-        }
-        return Optional.empty();
+    /** Returns the user's invite only if one has been explicitly granted. No auto-creation. */
+    public Optional<AlphaInvite> getInvite(UserAccount owner) {
+        return inviteRepository.findByOwner(owner);
     }
 
     @Transactional
     public Optional<AlphaInvite> regenerateCode(UserAccount owner) {
-        Optional<AlphaInvite> inviteOpt = getOrCreateInvite(owner);
+        Optional<AlphaInvite> inviteOpt = inviteRepository.findByOwner(owner);
         inviteOpt.ifPresent(invite -> {
             invite.setCode(generateUniqueCode());
             invite.setRegeneratedAt(Instant.now());
             inviteRepository.save(invite);
         });
         return inviteOpt;
+    }
+
+    /** Creates an invite for a user (admin operation or canReinvite grant). */
+    @Transactional
+    public AlphaInvite grantInvite(UserAccount owner) {
+        return inviteRepository.findByOwner(owner).orElseGet(() -> createAndSaveInvite(owner));
     }
 
     public List<AlphaInviteRedemption> getRedemptions(AlphaInvite invite) {
@@ -86,10 +73,11 @@ public class InviteService {
     /**
      * Validates and redeems an invite code for a not-yet-whitelisted user.
      * Adds the user to the whitelist on success.
+     * Returns true if the invitee should also receive an invite (canReinvite=true).
      * Throws OAuth2AuthenticationException on any failure.
      */
     @Transactional
-    public void redeem(String code, String inviteeTwitchId) {
+    public boolean redeem(String code, String inviteeTwitchId) {
         if (isGlobalCapReached()) {
             log.warn("Alpha cap reached, rejecting invite redemption for {}", inviteeTwitchId);
             throw new OAuth2AuthenticationException(new OAuth2Error("alpha_full"), "Alpha is full.");
@@ -117,8 +105,10 @@ public class InviteService {
         redemption.setInviteeTwitchId(inviteeTwitchId);
         redemptionRepository.save(redemption);
 
-        log.info("Invite '{}' redeemed by {} ({}/{})", code, inviteeTwitchId,
-            invite.getUseCount(), effectiveMax < 0 ? "∞" : effectiveMax);
+        boolean canReinvite = effectiveCanReinvite(invite);
+        log.info("Invite '{}' redeemed by {} ({}/{}), canReinvite={}", code, inviteeTwitchId,
+            invite.getUseCount(), effectiveMax < 0 ? "∞" : effectiveMax, canReinvite);
+        return canReinvite;
     }
 
     // ── Admin ────────────────────────────────────────────────────────────────
