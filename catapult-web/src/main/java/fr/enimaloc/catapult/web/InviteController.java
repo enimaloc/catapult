@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.web;
 import fr.enimaloc.catapult.client.ApiClient;
 import fr.enimaloc.catapult.security.CatapultWebUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -17,6 +18,9 @@ import java.util.Map;
 public class InviteController {
 
     private final ApiClient apiClient;
+
+    @Value("${catapult.api.public-url:}")
+    private String apiPublicUrl;
 
     @GetMapping("/invite")
     public String invitePage(@AuthenticationPrincipal CatapultWebUser user, Model model) {
@@ -46,8 +50,10 @@ public class InviteController {
         if (user != null) {
             return "redirect:/channels";
         }
+        String oauthBase = (apiPublicUrl != null && !apiPublicUrl.isBlank()) ? apiPublicUrl : "";
         model.addAttribute("inviteCode", invite);
         model.addAttribute("error", error);
+        model.addAttribute("oauthBase", oauthBase);
         return "join";
     }
 }
