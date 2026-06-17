@@ -1583,32 +1583,18 @@ details summary { cursor: pointer; font-weight: 600; }
 .maintenance-banner__icon { font-size: 1.5rem; flex-shrink: 0; }
 .maintenance-banner p { margin: 0.25rem 0 0; font-size: 0.875rem; opacity: .85; }
 
-/* ── Invite Floating Action Button (experiment: invite-button-placement) ── */
-.invite-fab {
-    position: fixed;
-    bottom: 1.5rem;
-    right: 1.5rem;
-    z-index: 900;
+/* ── Invite sidebar card (experiment: invite-button-placement, variant: card) ── */
+.invite-card {
+    padding: 1.25rem;
+    text-align: center;
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem 1.25rem;
-    background: var(--color-primary, #9147ff);
-    color: #fff;
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    text-decoration: none;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-    transition: transform .15s ease, box-shadow .15s ease;
 }
 
-.invite-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3); }
-.invite-fab:active { transform: translateY(0); }
-.invite-fab--active { outline: 3px solid rgba(255, 255, 255, 0.6); }
-.invite-fab__icon { font-size: 1.15rem; line-height: 1; }
-
-@media (max-width: 600px) {
-    .invite-fab { padding: 0.65rem 0.85rem; bottom: 1rem; right: 1rem; }
-    .invite-fab__label { display: none; }
-}
+.invite-card__icon { font-size: 2rem; line-height: 1; }
+.invite-card__title { margin: 0.25rem 0 0; font-size: 1rem; font-weight: 700; }
+.invite-card__text { margin: 0; font-size: 0.85rem; color: var(--muted, #aaa); }
+.invite-card__cta { margin-top: 0.5rem; width: 100%; }
+.invite-card--active { outline: 2px solid var(--color-primary, #9147ff); }
