@@ -158,6 +158,9 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         boolean grantInviteAfterCreate = false;
         if (whitelistService.isEnabled() && !isOwner && !whitelistService.contains(twitchId)) {
             Optional<String> pendingInvite = getPendingInviteCode();
+            log.info("Whitelist check — id={}, whitelistEnabled={}, inWhitelist={}, inviteCode={}",
+                twitchId, whitelistService.isEnabled(), whitelistService.contains(twitchId),
+                pendingInvite.orElse("(none)"));
             if (pendingInvite.isEmpty()) {
                 log.warn("Access denied - user not whitelisted: id={}, login={}", twitchId, twitchUsername);
                 throw new OAuth2AuthenticationException(new OAuth2Error("not_whitelisted"), "User not whitelisted.");
@@ -323,10 +326,16 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             ServletRequestAttributes attrs =
                 (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
             HttpSession session = attrs.getRequest().getSession(false);
+            log.info("getPendingInviteCode — session={}, key={}, value={}",
+                session != null ? session.getId() : "null",
+                InviteCodeRelayFilter.SESSION_KEY,
+                session != null ? session.getAttribute(InviteCodeRelayFilter.SESSION_KEY) : "no-session");
             if (session != null) {
                 return Optional.ofNullable((String) session.getAttribute(InviteCodeRelayFilter.SESSION_KEY));
             }
-        } catch (IllegalStateException ignored) {}
+        } catch (IllegalStateException e) {
+            log.warn("getPendingInviteCode — no request context: {}", e.getMessage());
+        }
         return Optional.empty();
     }
 
