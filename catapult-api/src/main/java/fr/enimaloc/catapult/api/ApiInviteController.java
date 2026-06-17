@@ -36,7 +36,7 @@ public class ApiInviteController {
     @GetMapping
     public InvitePageData page(@AuthenticationPrincipal Jwt jwt) {
         UserAccount user = resolveUser(jwt);
-        Optional<AlphaInvite> inviteOpt = inviteService.getOrCreateInvite(user);
+        Optional<AlphaInvite> inviteOpt = inviteService.getInvite(user);
         if (inviteOpt.isEmpty()) {
             return new InvitePageData(false, null, null, null, null, List.of());
         }
