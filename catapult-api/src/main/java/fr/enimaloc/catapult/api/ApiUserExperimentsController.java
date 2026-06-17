@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,6 +29,7 @@ public class ApiUserExperimentsController {
      * Triggers assignment if the user is eligible but not yet assigned.
      * Returns {"variant": null} when no assignment applies (experiment paused/ended/excluded).
      */
+    @Transactional
     @GetMapping("/variant/{key}")
     public VariantResponse getVariant(@PathVariable String key, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
