@@ -21,6 +21,7 @@ public class FlywayConfig {
             .locations("classpath:db/migration")
             .outOfOrder(true)
             .load();
+        flyway.repair();
         flyway.migrate();
         log.info("Flyway migrations complete.");
         return flyway;

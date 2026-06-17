@@ -127,6 +127,12 @@ public class AdminController {
             model.addAttribute("entries", data.get("entries"));
             model.addAttribute("resolvedUsernames", data.get("resolvedUsernames"));
             model.addAttribute("whitelistEnabled", Boolean.TRUE.equals(data.get("whitelistEnabled")));
+            model.addAttribute("inviteEnabled", Boolean.TRUE.equals(data.get("inviteEnabled")));
+            model.addAttribute("globalMaxMembers", data.get("globalMaxMembers"));
+            model.addAttribute("defaultMaxUses", data.get("defaultMaxUses"));
+            model.addAttribute("defaultCanReinvite", Boolean.TRUE.equals(data.get("defaultCanReinvite")));
+            model.addAttribute("globalCapReached", Boolean.TRUE.equals(data.get("globalCapReached")));
+            model.addAttribute("invites", data.get("invites"));
         }
         return "admin/whitelist";
     }
@@ -146,6 +152,36 @@ public class AdminController {
     @PostMapping("/whitelist/{id}/delete")
     public String deleteWhitelist(@PathVariable String id) {
         apiClient.post("/api/admin/whitelist/{id}/delete", null, id);
+        return "redirect:/admin/whitelist";
+    }
+
+    @PostMapping("/whitelist/invite/toggle")
+    public String toggleInvites() {
+        apiClient.post("/api/admin/whitelist/invite/toggle", null);
+        return "redirect:/admin/whitelist";
+    }
+
+    @PostMapping("/whitelist/invite/settings")
+    public String updateInviteSettings(
+            @RequestParam(required = false) Integer globalMaxMembers,
+            @RequestParam(required = false) Integer defaultMaxUses,
+            @RequestParam(defaultValue = "false") boolean defaultCanReinvite) {
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("globalMaxMembers", globalMaxMembers);
+        body.put("defaultMaxUses", defaultMaxUses);
+        body.put("defaultCanReinvite", defaultCanReinvite);
+        apiClient.post("/api/admin/whitelist/invite/settings", body);
+        return "redirect:/admin/whitelist";
+    }
+
+    @PostMapping("/whitelist/invite/{inviteId}/quota")
+    public String updateWhitelistInviteQuota(@PathVariable UUID inviteId,
+                                             @RequestParam(required = false) Integer maxUses,
+                                             @RequestParam(required = false) Boolean canReinvite) {
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("maxUses", maxUses);
+        body.put("canReinvite", canReinvite);
+        apiClient.post("/api/admin/whitelist/invite/{inviteId}/quota", body, inviteId);
         return "redirect:/admin/whitelist";
     }
 

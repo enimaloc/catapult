@@ -10,7 +10,9 @@ import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.AdminMigrationService;
+import fr.enimaloc.catapult.service.InviteService;
 import fr.enimaloc.catapult.service.WhitelistService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +54,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private final RestClient restClient;
     private final WhitelistService whitelistService;
     private final AdminMigrationService adminMigrationService;
+    private final InviteService inviteService;
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -152,9 +155,20 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
         String twitchUsername = oAuth2User.getAttribute("login");
 
-        if (whitelistService.isEnabled() && !whitelistService.contains(twitchId)) {
-            log.warn("Access denied - user not whitelisted: id={}, login={}", twitchId, twitchUsername);
-            throw new OAuth2AuthenticationException(new OAuth2Error("not_whitelisted"), "User not whitelisted.");
+        boolean isOwner = !ownerId.isBlank() && ownerId.equals(twitchId);
+        boolean grantInviteAfterCreate = false;
+        if (whitelistService.isEnabled() && !isOwner && !whitelistService.contains(twitchId)) {
+            Optional<String> pendingInvite = getPendingInviteCode();
+            log.info("Whitelist check — id={}, whitelistEnabled={}, inWhitelist={}, inviteCode={}",
+                twitchId, whitelistService.isEnabled(), whitelistService.contains(twitchId),
+                pendingInvite.orElse("(none)"));
+            if (pendingInvite.isEmpty()) {
+                log.warn("Access denied - user not whitelisted: id={}, login={}", twitchId, twitchUsername);
+                throw new OAuth2AuthenticationException(new OAuth2Error("not_whitelisted"), "User not whitelisted.");
+            }
+            // Invite code valid — adds user to whitelist, then fall through to normal account creation
+            grantInviteAfterCreate = inviteService.redeem(pendingInvite.get(), twitchId);
+            clearPendingInviteCode();
         }
 
         // Check for pending bot-link flow before the normal login path
@@ -196,8 +210,11 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             eventPublisher.publishEvent(new AccountCreatedEvent(this, account));
         }
 
-        boolean isAdmin = !ownerId.isBlank() && ownerId.equals(twitchId);
-        return new CatapultOAuth2User(oAuth2User, account, isAdmin);
+        if (grantInviteAfterCreate) {
+            inviteService.grantInvite(account);
+        }
+
+        return new CatapultOAuth2User(oAuth2User, account, isOwner);
     }
 
     private UserAccount createNewAccount(String twitchId, String twitchUsername) {
@@ -303,5 +320,54 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         }
         throw new OAuth2AuthenticationException(new OAuth2Error("admin_not_authenticated"),
             "No authenticated admin found during bot link.");
+    }
+
+    private Optional<String> getPendingInviteCode() {
+        try {
+            ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+            HttpServletRequest request = attrs.getRequest();
+            HttpSession session = request.getSession(false);
+            String fromSession = session != null
+                ? (String) session.getAttribute(InviteCodeRelayFilter.SESSION_KEY)
+                : null;
+            String fromCookie = readCookie(request, InviteCodeRelayFilter.COOKIE_NAME);
+            log.info("getPendingInviteCode — sessionId={}, fromSession={}, fromCookie={}",
+                session != null ? session.getId() : "null", fromSession, fromCookie);
+            return Optional.ofNullable(fromSession != null ? fromSession : fromCookie);
+        } catch (IllegalStateException e) {
+            log.warn("getPendingInviteCode — no request context: {}", e.getMessage());
+        }
+        return Optional.empty();
+    }
+
+    private void clearPendingInviteCode() {
+        try {
+            ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+            HttpServletRequest request = attrs.getRequest();
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                session.removeAttribute(InviteCodeRelayFilter.SESSION_KEY);
+            }
+            org.springframework.http.ResponseCookie expired = org.springframework.http.ResponseCookie
+                .from(InviteCodeRelayFilter.COOKIE_NAME, "")
+                .httpOnly(true)
+                .secure(request.isSecure())
+                .path("/")
+                .maxAge(0)
+                .sameSite("Lax")
+                .build();
+            attrs.getResponse().addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, expired.toString());
+        } catch (IllegalStateException ignored) {}
+    }
+
+    private static String readCookie(HttpServletRequest request, String name) {
+        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (jakarta.servlet.http.Cookie c : cookies) {
+            if (name.equals(c.getName())) return c.getValue();
+        }
+        return null;
     }
 }

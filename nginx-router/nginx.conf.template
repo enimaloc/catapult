@@ -1,22 +1,22 @@
 upstream frontend {
-    server catapult-web:8081;
+    server ${UPSTREAM_FRONTEND};
 }
 
 upstream backend {
-    server catapult-api:8080;
+    server ${UPSTREAM_BACKEND};
 }
 
 upstream maintenance {
-    server catapult-maintenance:80;
+    server ${UPSTREAM_MAINTENANCE};
 }
 
 server {
-    listen 80;
+    listen 8080;
 
     proxy_set_header Host              $host;
     proxy_set_header X-Real-IP         $remote_addr;
     proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Proto ${FORWARDED_PROTO};
     proxy_set_header X-Forwarded-Host  $host;
     proxy_set_header X-Forwarded-Port  $server_port;
 

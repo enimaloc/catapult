@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, null, ~{::div#join-content}, null, null, null, null)}">
+<head>
+    <title th:text="#{join.title}">Rejoindre l'alpha</title>
+</head>
+<body>
+<!--/*@thymesvar id="inviteCode" type="java.lang.String"*/-->
+<!--/*@thymesvar id="error" type="java.lang.String"*/-->
+<div id="join-content">
+    <div class="home-hero">
+        <h1>🚀 Catapult</h1>
+        <p class="hero-tagline" th:text="#{join.subtitle}">Vous avez été invité à rejoindre l'alpha.</p>
+
+        <div th:if="${error != null}" style="margin:1rem auto; max-width:480px;">
+            <div class="banner banner-danger"
+                 th:text="${error == 'invalid_invite'} ? #{join.error.invalid_invite} :
+                           (${error == 'alpha_full'} ? #{join.error.alpha_full} : #{login.error.generic})">
+                Erreur.
+            </div>
+        </div>
+
+        <div th:if="${inviteCode == null and error == null}" class="banner banner-warning"
+             style="max-width:480px; margin:1rem auto;"
+             th:text="#{join.no_code}">
+            Aucun code d'invitation valide.
+        </div>
+
+        <a th:if="${inviteCode != null}"
+           th:href="${oauthBase + '/oauth2/authorization/twitch?invite=' + #uris.escapeQueryParam(inviteCode)}"
+           class="btn btn-twitch">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+            </svg>
+            <span th:text="#{join.cta}">Se connecter avec Twitch</span>
+        </a>
+    </div>
+</div>
+</body>
+</html>
