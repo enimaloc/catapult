@@ -154,8 +154,9 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
         String twitchUsername = oAuth2User.getAttribute("login");
 
+        boolean isOwner = !ownerId.isBlank() && ownerId.equals(twitchId);
         boolean grantInviteAfterCreate = false;
-        if (whitelistService.isEnabled() && !whitelistService.contains(twitchId)) {
+        if (whitelistService.isEnabled() && !isOwner && !whitelistService.contains(twitchId)) {
             Optional<String> pendingInvite = getPendingInviteCode();
             if (pendingInvite.isEmpty()) {
                 log.warn("Access denied - user not whitelisted: id={}, login={}", twitchId, twitchUsername);
@@ -209,8 +210,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             inviteService.grantInvite(account);
         }
 
-        boolean isAdmin = !ownerId.isBlank() && ownerId.equals(twitchId);
-        return new CatapultOAuth2User(oAuth2User, account, isAdmin);
+        return new CatapultOAuth2User(oAuth2User, account, isOwner);
     }
 
     private UserAccount createNewAccount(String twitchId, String twitchUsername) {
