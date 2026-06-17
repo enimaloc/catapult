@@ -7,6 +7,7 @@
 <!--/*@thymesVar id="app" type="fr.enimaloc.catapult.web.GlobalModelAdvice$App"*/-->
 <!DOCTYPE html>
 <html lang="fr" th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:exp="http://www.w3.org/1999/xhtml"
       th:fragment="layout(title, active_page, content, additional_head, main_class, left_content, right_content)">
 <head>
     <meta charset="UTF-8">
@@ -50,7 +51,8 @@
     </button>
     <div class="nav-links nav-links--main" th:if="${user != null}">
         <a th:href="@{/channels}" th:classappend="${active_page == 'channels'} ? ' active'" th:text="#{nav.my_channels}">Mes chaînes</a>
-        <a th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
+        <a exp:show-for="invite-button-placement:nav-default"
+           th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
         <span th:if="${channelUsername != null}" class="nav-separator">›</span>
         <span th:if="${channelUsername != null}" class="nav-channel-name" th:text="${channelUsername}"></span>
         <a th:href="@{/app}" sec:authorize="hasRole('ADMIN')"
@@ -67,6 +69,8 @@
            th:classappend="${active_page == 'steam-keys'} ? ' active'" th:text="#{nav.admin_steam_keys}">Steam Keys</a>
         <a th:href="@{/dev/igdb}" sec:authorize="hasRole('ADMIN')" th:classappend="${active_page == 'igdb'} ? ' active'"
            th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
+        <a exp:show-for="invite-button-placement:nav-end"
+           th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
         <form th:action="@{/logout}" method="post" style="display:inline"> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button type="submit" class="btn-link" th:text="#{nav.logout}">Déconnexion</button>
@@ -87,6 +91,13 @@
         </button>
     </div>
 </nav>
+
+<a th:if="${user != null}" exp:show-for="invite-button-placement:floating"
+   th:href="@{/invite}" class="invite-fab" th:title="#{nav.invite}"
+   th:classappend="${active_page == 'invite'} ? ' invite-fab--active'">
+    <span class="invite-fab__icon" aria-hidden="true">✉️</span>
+    <span class="invite-fab__label" th:text="#{nav.invite}">Invitations</span>
+</a>
 
 <div class="page-content">
     <th:block th:if="${left_content != null or right_content != null}">
