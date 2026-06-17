@@ -50,6 +50,7 @@
     </button>
     <div class="nav-links nav-links--main" th:if="${user != null}">
         <a th:href="@{/channels}" th:classappend="${active_page == 'channels'} ? ' active'" th:text="#{nav.my_channels}">Mes chaînes</a>
+        <a th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
         <span th:if="${channelUsername != null}" class="nav-separator">›</span>
         <span th:if="${channelUsername != null}" class="nav-channel-name" th:text="${channelUsername}"></span>
         <a th:href="@{/app}" sec:authorize="hasRole('ADMIN')"
