@@ -293,6 +293,46 @@ public class AdminController {
         return "redirect:/admin/experiments/" + id;
     }
 
+    // ── Invite ───────────────────────────────────────────────────────────────
+
+    @GetMapping("/invite")
+    public String invitePage(Model model) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = apiClient.get("/api/admin/invite", Map.class);
+        if (data != null) {
+            model.addAttribute("invites", data.get("invites"));
+            model.addAttribute("globalMaxMembers", data.get("globalMaxMembers"));
+            model.addAttribute("defaultMaxUses", data.get("defaultMaxUses"));
+            model.addAttribute("defaultCanReinvite", Boolean.TRUE.equals(data.get("defaultCanReinvite")));
+            model.addAttribute("globalCapReached", Boolean.TRUE.equals(data.get("globalCapReached")));
+        }
+        return "admin/invite";
+    }
+
+    @PostMapping("/invite/settings")
+    public String updateInviteSettings(
+            @RequestParam(required = false) Integer globalMaxMembers,
+            @RequestParam(required = false) Integer defaultMaxUses,
+            @RequestParam(defaultValue = "false") boolean defaultCanReinvite) {
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("globalMaxMembers", globalMaxMembers);
+        body.put("defaultMaxUses", defaultMaxUses);
+        body.put("defaultCanReinvite", defaultCanReinvite);
+        apiClient.post("/api/admin/invite/settings", body);
+        return "redirect:/admin/invite";
+    }
+
+    @PostMapping("/invite/{inviteId}/quota")
+    public String updateInviteQuota(@PathVariable UUID inviteId,
+                                    @RequestParam(required = false) Integer maxUses,
+                                    @RequestParam(required = false) Boolean canReinvite) {
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("maxUses", maxUses);
+        body.put("canReinvite", canReinvite);
+        apiClient.post("/api/admin/invite/{inviteId}/quota", body, inviteId);
+        return "redirect:/admin/invite";
+    }
+
     // ── Request bodies ────────────────────────────────────────────────────────
 
     record MigrateRequest(UUID targetId, boolean migrateSettings, boolean migrateGetters, boolean migrateBindings) {}
