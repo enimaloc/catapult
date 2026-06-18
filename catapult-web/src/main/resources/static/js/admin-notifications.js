@@ -4,6 +4,14 @@
   const form = dialog.querySelector('form');
   const audienceSel = form.elements.audience;
   const targetedRow = form.querySelector('.targeted');
+  const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+
+  function authHeaders(extra) {
+    const h = Object.assign({}, extra || {});
+    if (csrfToken) h[csrfHeader] = csrfToken;
+    return h;
+  }
 
   document.getElementById('open-new').addEventListener('click', () => dialog.showModal());
   audienceSel.addEventListener('change', () => {
@@ -21,9 +29,9 @@
       expiresAt: form.elements.expiresAt.value ? new Date(form.elements.expiresAt.value).toISOString() : null,
       targetUserId: form.elements.audience.value === 'TARGETED' ? form.elements.targetUserId.value : null,
     };
-    const res = await fetch('/api/admin/notifications', {
+    const res = await fetch('/admin/notifications/api/create', {
       method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
     });
     if (!res.ok) { alert(`Échec: ${res.status}`); return; }
@@ -33,7 +41,7 @@
   });
 
   async function load() {
-    const res = await fetch('/api/admin/notifications?page=0&size=20', { credentials: 'same-origin' });
+    const res = await fetch('/admin/notifications/api/list?page=0&size=20', { credentials: 'same-origin' });
     if (!res.ok) return;
     const data = await res.json();
     while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
@@ -59,7 +67,9 @@
     const btn = ev.target.closest('button[data-action="delete"]');
     if (!btn) return;
     if (!confirm('Supprimer ?')) return;
-    await fetch(`/api/admin/notifications/${encodeURIComponent(btn.dataset.id)}`, { method: 'DELETE', credentials: 'same-origin' });
+    await fetch(`/admin/notifications/api/${encodeURIComponent(btn.dataset.id)}`, {
+      method: 'DELETE', credentials: 'same-origin', headers: authHeaders()
+    });
     load();
   });
 
