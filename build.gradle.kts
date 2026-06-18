@@ -11,5 +11,11 @@ subprojects {
     repositories {
         mavenCentral()
         maven { url = uri("https://jitpack.io") }
+        maven {
+            url = uri("https://repo.spring.io/snapshot")
+            content {
+                includeGroupByRegex("org\\.springframework\\.cloud(\\..*)?")
+            }
+        }
     }
 }
