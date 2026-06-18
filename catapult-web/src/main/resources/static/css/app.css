@@ -1745,3 +1745,10 @@ details summary { cursor: pointer; font-weight: 600; }
 .notif-actions a:hover {
     text-decoration: underline;
 }
+
+
+/* Admin config tabs */
+.config-tab { background: transparent; border: 0; padding: 0.5rem 1rem; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; }
+.config-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.config-tab:hover { color: var(--text); }
+
