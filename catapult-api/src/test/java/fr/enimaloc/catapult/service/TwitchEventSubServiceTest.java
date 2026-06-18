@@ -22,7 +22,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
+import java.net.http.WebSocket;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -215,5 +217,70 @@ class TwitchEventSubServiceTest {
         assertThatNoException().isThrownBy(
             () -> service.handleMessage(user, token, message)
         );
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_storesKeepaliveTimeoutFromPayload() {
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc", "keepalive_timeout_seconds": 30 } }
+            }
+            """;
+
+        service.handleMessage(user, token, message);
+
+        Map<UUID, Long> timeouts = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "keepaliveTimeoutSeconds");
+        assertThat(timeouts).containsEntry(user.getId(), 30L);
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_fallsBackToDefaultWhenTimeoutAbsent() {
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message);
+
+        Map<UUID, Long> timeouts = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "keepaliveTimeoutSeconds");
+        assertThat(timeouts).containsEntry(user.getId(), 10L);
+    }
+
+    @Test
+    void onWatchdogTrigger_whenListenerWebSocketIsCurrent_abortsAndRemovesFromConnections() {
+        WebSocket ws = mock(WebSocket.class);
+        TwitchEventSubService.EventSubListener listener =
+            service.new EventSubListener(user, token, "wss://eventsub.wss.twitch.tv/ws", 1L);
+        ReflectionTestUtils.setField(listener, "webSocket", ws);
+
+        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
+        connections.put(user.getId(), ws);
+
+        service.onWatchdogTrigger(user, listener);
+
+        verify(ws).abort();
+        assertThat(connections).doesNotContainKey(user.getId());
+    }
+
+    @Test
+    void onWatchdogTrigger_whenListenerWebSocketHasBeenReplaced_isIdempotentNoOp() {
+        WebSocket staleWs = mock(WebSocket.class);
+        WebSocket freshWs = mock(WebSocket.class);
+        TwitchEventSubService.EventSubListener staleListener =
+            service.new EventSubListener(user, token, "wss://eventsub.wss.twitch.tv/ws", 1L);
+        ReflectionTestUtils.setField(staleListener, "webSocket", staleWs);
+
+        // Simulate session_reconnect: connections now points to freshWs, staleListener is orphaned.
+        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
+        connections.put(user.getId(), freshWs);
+
+        service.onWatchdogTrigger(user, staleListener);
+
+        verify(staleWs, never()).abort();
+        verify(freshWs, never()).abort();
+        assertThat(connections).containsEntry(user.getId(), freshWs);
     }
 }
