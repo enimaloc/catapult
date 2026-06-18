@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'notifications', ~{::body}, ~{::head/script}, 'container', null, null)}">
+<head>
+    <title>Catapult — Notifications</title>
+    <script th:src="@{/js/admin-notifications.js}" defer></script>
+</head>
+<body>
+    <section>
+      <header>
+        <h1>Notifications</h1>
+        <button id="open-new">+ Nouvelle notification</button>
+      </header>
+
+      <table id="notif-table">
+        <thead><tr><th>Titre</th><th>Sévérité</th><th>Audience</th><th>Créée</th><th>Expire</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <dialog id="new-notif">
+        <form method="dialog">
+          <label>Titre <input name="title" required maxlength="255"></label>
+          <label>Corps (markdown)<textarea name="body" rows="6" required></textarea></label>
+          <label>Sévérité
+            <select name="severity">
+              <option value="INFO">INFO</option><option value="WARNING">WARNING</option><option value="ERROR">ERROR</option>
+            </select>
+          </label>
+          <label>CTA URL (optionnel) <input name="ctaUrl" type="url"></label>
+          <label>CTA label (optionnel) <input name="ctaLabel" maxlength="64"></label>
+          <label>Expire à (optionnel) <input name="expiresAt" type="datetime-local"></label>
+          <label>Audience
+            <select name="audience"><option value="BROADCAST">Tous</option><option value="TARGETED">Un utilisateur</option></select>
+          </label>
+          <label class="targeted" hidden>User ID <input name="targetUserId"></label>
+          <menu>
+            <button value="cancel">Annuler</button>
+            <button id="send" value="ok">Envoyer</button>
+          </menu>
+        </form>
+      </dialog>
+    </section>
+</body>
+</html>
