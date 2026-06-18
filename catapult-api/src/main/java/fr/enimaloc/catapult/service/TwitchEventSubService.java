@@ -34,6 +34,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -47,6 +50,8 @@ public class TwitchEventSubService implements EventSubService {
     private static final String HELIX_CHANNELS_API = "https://api.twitch.tv/helix/channels";
     private static final String HELIX_STREAMS_API = "https://api.twitch.tv/helix/streams";
     private static final long MAX_RETRY_SECONDS = 60L;
+    private static final long DEFAULT_KEEPALIVE_SECONDS = 10L;
+    private static final double KEEPALIVE_GRACE = 1.5;
 
     private final OAuthTokenRepository oAuthTokenRepository;
     private final UserAccountRepository userAccountRepository;
@@ -62,7 +67,14 @@ public class TwitchEventSubService implements EventSubService {
     private final Map<UUID, WebSocket> connections = new ConcurrentHashMap<>();
     private final Map<UUID, ChannelState> channelStates = new ConcurrentHashMap<>();
     private final Set<UUID> channelStateWarnedUsers = ConcurrentHashMap.newKeySet();
+    private final Map<UUID, Long> keepaliveTimeoutSeconds = new ConcurrentHashMap<>();
+    private final Map<UUID, ScheduledFuture<?>> watchdogs = new ConcurrentHashMap<>();
     private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final ScheduledExecutorService watchdogExecutor = Executors.newScheduledThreadPool(2, r -> {
+        Thread t = new Thread(r, "twitch-eventsub-watchdog");
+        t.setDaemon(true);
+        return t;
+    });
 
     private record ChannelState(String categoryId, String categoryName, Set<String> cclIds) {}
 
@@ -74,6 +86,9 @@ public class TwitchEventSubService implements EventSubService {
 
     @PreDestroy
     public void shutdown() {
+        watchdogs.values().forEach(f -> f.cancel(false));
+        watchdogs.clear();
+        watchdogExecutor.shutdownNow();
         connections.forEach((userId, ws) -> ws.sendClose(WebSocket.NORMAL_CLOSURE, "application shutdown"));
         connections.clear();
     }
@@ -93,6 +108,8 @@ public class TwitchEventSubService implements EventSubService {
     }
 
     public void disconnect(UserAccount user) {
+        cancelWatchdog(user.getId());
+        keepaliveTimeoutSeconds.remove(user.getId());
         WebSocket ws = connections.remove(user.getId());
         if (ws != null) {
             ws.sendClose(WebSocket.NORMAL_CLOSURE, "bot disabled");
@@ -124,6 +141,48 @@ public class TwitchEventSubService implements EventSubService {
         });
     }
 
+    private void armWatchdog(UserAccount user, EventSubListener listener) {
+        long timeout = keepaliveTimeoutSeconds.getOrDefault(user.getId(), DEFAULT_KEEPALIVE_SECONDS);
+        long deadlineSeconds = Math.max(1L, Math.round(timeout * KEEPALIVE_GRACE));
+        ScheduledFuture<?> next = watchdogExecutor.schedule(
+            () -> onWatchdogTrigger(user, listener),
+            deadlineSeconds,
+            TimeUnit.SECONDS
+        );
+        ScheduledFuture<?> previous = watchdogs.put(user.getId(), next);
+        if (previous != null) previous.cancel(false);
+    }
+
+    private void cancelWatchdog(UUID userId) {
+        ScheduledFuture<?> f = watchdogs.remove(userId);
+        if (f != null) f.cancel(false);
+    }
+
+    /**
+     * Invoked when no message (event or keepalive) has been received within the configured
+     * keepalive timeout. Twitch's protocol requires the client to consider the WebSocket
+     * dead and reconnect.
+     *
+     * <p>Design constraints for the implementation:
+     * <ul>
+     *   <li>Idempotent: a session_reconnect may have already replaced {@code listener.webSocket}
+     *       in {@link #connections}. If so, leave the new connection alone.</li>
+     *   <li>{@link WebSocket#abort()} closes the TCP socket without triggering {@code onClose},
+     *       so explicit cleanup of {@link #connections} is required here.</li>
+     *   <li>Use {@link #WS_URL} (the canonical welcome URL) for reconnect, not
+     *       {@code listener.wsUrl} — a stale reconnect URL is single-use.</li>
+     * </ul>
+     *
+     * <p>TODO(user contribution): implement the trigger logic. Expected ~5-10 lines.
+     */
+    // Package-private for testing
+    void onWatchdogTrigger(UserAccount user, EventSubListener listener) {
+        if (!connections.remove(user.getId(), listener.webSocket)) return;
+        log.warn("EventSub keepalive timeout for user {}, aborting and reconnecting", user.getId());
+        listener.webSocket.abort();
+        scheduleReconnect(user, listener.token, WS_URL, listener.retryDelaySeconds);
+    }
+
     // Package-private for testing
     void handleMessage(UserAccount user, OAuthToken token, String message) {
         try {
@@ -131,7 +190,10 @@ public class TwitchEventSubService implements EventSubService {
             String messageType = root.path("metadata").path("message_type").asText();
             switch (messageType) {
                 case "session_welcome" -> {
-                    String sessionId = root.path("payload").path("session").path("id").asText();
+                    JsonNode session = root.path("payload").path("session");
+                    String sessionId = session.path("id").asText();
+                    long timeout = session.path("keepalive_timeout_seconds").asLong(DEFAULT_KEEPALIVE_SECONDS);
+                    keepaliveTimeoutSeconds.put(user.getId(), timeout);
                     subscribe(user, token, sessionId);
                 }
                 case "session_reconnect" -> {
@@ -278,12 +340,17 @@ public class TwitchEventSubService implements EventSubService {
             .toBodilessEntity();
     }
 
-    private class EventSubListener implements WebSocket.Listener {
+    // Package-private for testing
+    class EventSubListener implements WebSocket.Listener {
         private final UserAccount user;
         private final OAuthToken token;
         private final String wsUrl;
         private final long retryDelaySeconds;
         private final StringBuilder buffer = new StringBuilder();
+        // Written once by the WS callback thread in onOpen, then only read by the watchdog scheduler.
+        // No compound updates → volatile is sufficient; AtomicReference would be ceremony.
+        @SuppressWarnings("java:S3077")
+        private volatile WebSocket webSocket;
 
         EventSubListener(UserAccount user, OAuthToken token, String wsUrl, long retryDelaySeconds) {
             this.user = user;
@@ -295,6 +362,7 @@ public class TwitchEventSubService implements EventSubService {
         @Override
         public void onOpen(WebSocket webSocket) {
             log.debug("EventSub WebSocket opened for user {}", user.getId());
+            this.webSocket = webSocket;
             webSocket.request(1);
         }
 
@@ -305,6 +373,7 @@ public class TwitchEventSubService implements EventSubService {
                 String message = buffer.toString();
                 buffer.setLength(0);
                 handleMessage(user, token, message);
+                armWatchdog(user, this);
             }
             webSocket.request(1);
             return null;
@@ -313,6 +382,7 @@ public class TwitchEventSubService implements EventSubService {
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             log.debug("EventSub WebSocket closed for user {} ({}): {}", user.getId(), statusCode, reason);
+            cancelWatchdog(user.getId());
             connections.remove(user.getId());
             if (statusCode != WebSocket.NORMAL_CLOSURE) {
                 scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
@@ -323,6 +393,7 @@ public class TwitchEventSubService implements EventSubService {
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
             log.warn("EventSub WebSocket error for user {}: {}", user.getId(), error.getMessage());
+            cancelWatchdog(user.getId());
             connections.remove(user.getId());
             scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
         }
