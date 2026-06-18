@@ -1,9 +1,17 @@
 (async function () {
   const tbody = document.querySelector('#config-table tbody');
   const search = document.querySelector('#config-search');
+  const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+
+  function authHeaders(extra) {
+    const h = Object.assign({}, extra || {});
+    if (csrfToken) h[csrfHeader] = csrfToken;
+    return h;
+  }
 
   async function load() {
-    const res = await fetch('/api/admin/config', { credentials: 'same-origin' });
+    const res = await fetch('/admin/config/api/catalog', { credentials: 'same-origin' });
     if (!res.ok) {
       tbody.innerHTML = '';
       const tr = document.createElement('tr');
@@ -85,18 +93,19 @@
     const key = btn.dataset.key;
     if (btn.dataset.action === 'reset') {
       if (!confirm(`Réinitialiser ${key} ?`)) return;
-      await fetch(`/api/admin/config/${encodeURIComponent(key)}`, {
+      await fetch(`/admin/config/api/${encodeURIComponent(key)}`, {
         method: 'DELETE',
-        credentials: 'same-origin'
+        credentials: 'same-origin',
+        headers: authHeaders()
       });
       load();
     } else if (btn.dataset.action === 'edit') {
       const value = prompt(`Nouvelle valeur pour ${key} :`);
       if (value === null) return;
-      const res = await fetch(`/api/admin/config/${encodeURIComponent(key)}`, {
+      const res = await fetch(`/admin/config/api/${encodeURIComponent(key)}`, {
         method: 'PUT',
         credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ value })
       });
       if (!res.ok) {

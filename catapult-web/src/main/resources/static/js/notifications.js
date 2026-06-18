@@ -48,11 +48,19 @@
     list.prepend(li);
   }
 
+  const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+  function authHeaders(extra) {
+    const h = Object.assign({}, extra || {});
+    if (csrfToken) h[csrfHeader] = csrfToken;
+    return h;
+  }
+
   async function loadInitial() {
     try {
       const [listRes, countRes] = await Promise.all([
-        fetch('/api/notifications?page=0&size=10', { credentials: 'same-origin' }),
-        fetch('/api/notifications/unread-count', { credentials: 'same-origin' })
+        fetch('/notifications/api/list?page=0&size=10', { credentials: 'same-origin' }),
+        fetch('/notifications/api/unread-count', { credentials: 'same-origin' })
       ]);
       if (countRes.ok) setUnread(parseInt(await countRes.text(), 10) || 0);
       if (listRes.ok) {
@@ -64,7 +72,7 @@
   }
 
   function connect() {
-    const src = new EventSource('/api/notifications/stream');
+    const src = new EventSource('/notifications/api/stream');
     src.addEventListener('notification', (ev) => {
       try {
         const n = JSON.parse(ev.data);
@@ -82,14 +90,14 @@
 
   btn.addEventListener('click', () => { dropdown.hidden = !dropdown.hidden; });
   markAll.addEventListener('click', async () => {
-    await fetch('/api/notifications/read-all', { method: 'POST', credentials: 'same-origin' });
+    await fetch('/notifications/api/read-all', { method: 'POST', credentials: 'same-origin', headers: authHeaders() });
     setUnread(0);
   });
   list.addEventListener('click', async (ev) => {
     const b = ev.target.closest('button[data-action="read"]');
     if (!b) return;
     const id = b.parentElement.dataset.id;
-    await fetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'POST', credentials: 'same-origin' });
+    await fetch(`/notifications/api/${encodeURIComponent(id)}/read`, { method: 'POST', credentials: 'same-origin', headers: authHeaders() });
     setUnread(unread - 1);
     b.parentElement.classList.add('read');
   });

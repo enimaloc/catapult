@@ -103,6 +103,33 @@ public class ApiClient {
         }
     }
 
+    public boolean put(String path, Object body, Object... uriVars) {
+        try {
+            restClient.put()
+                    .uri(path, uriVars)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+            return true;
+        } catch (Exception e) {
+            log.warn("PUT {} failed: {}", path, e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean delete(String path, Object... uriVars) {
+        try {
+            restClient.delete()
+                    .uri(path, uriVars)
+                    .retrieve()
+                    .toBodilessEntity();
+            return true;
+        } catch (Exception e) {
+            log.warn("DELETE {} failed: {}", path, e.getMessage());
+            return false;
+        }
+    }
+
     /**
      * Exchanges a one-time code (received from catapult-api's OAuth2 redirect) for a JWT.
      * This call is server-to-server: the JWT itself never travels through the browser.
