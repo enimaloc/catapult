@@ -39,6 +39,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private static final String HELIX_BANS_URL = "https://api.twitch.tv/helix/moderation/bans";
     private static final String HELIX_USERS_URL = "https://api.twitch.tv/helix/users";
     private static final long MAX_RETRY_SECONDS = 60L;
+    private static final long DEFAULT_KEEPALIVE_SECONDS = 10L;
+    private static final double KEEPALIVE_GRACE = 1.5;
 
     public static final String PAYLOAD = "payload";
     public static final String CLIENT_ID = "Client-Id";
@@ -57,7 +59,14 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     private final Map<UUID, WebSocket> connections = new ConcurrentHashMap<>();
     private final Set<UUID> intentionallyDisconnected = ConcurrentHashMap.newKeySet();
+    private final Map<UUID, Long> keepaliveTimeoutSeconds = new ConcurrentHashMap<>();
+    private final Map<UUID, ScheduledFuture<?>> watchdogs = new ConcurrentHashMap<>();
     private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final ScheduledExecutorService watchdogExecutor = Executors.newScheduledThreadPool(2, r -> {
+        Thread t = new Thread(r, "twitch-chat-watchdog");
+        t.setDaemon(true);
+        return t;
+    });
 
     @PostConstruct
     public void init() {
@@ -67,6 +76,9 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @PreDestroy
     public void shutdown() {
+        watchdogs.values().forEach(f -> f.cancel(false));
+        watchdogs.clear();
+        watchdogExecutor.shutdownNow();
         connections.forEach((id, ws) -> ws.sendClose(WebSocket.NORMAL_CLOSURE, "shutdown"));
         connections.clear();
     }
@@ -90,6 +102,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
     @Override
     public void disconnect(UserAccount user) {
         intentionallyDisconnected.add(user.getId());
+        cancelWatchdog(user.getId());
+        keepaliveTimeoutSeconds.remove(user.getId());
         WebSocket ws = connections.remove(user.getId());
         if (ws != null) ws.sendClose(WebSocket.NORMAL_CLOSURE, "bot disabled");
     }
@@ -119,13 +133,41 @@ public class EventSubTwitchChatService implements TwitchChatService {
         });
     }
 
+    private void armWatchdog(UserAccount user, ChatListener listener) {
+        long timeout = keepaliveTimeoutSeconds.getOrDefault(user.getId(), DEFAULT_KEEPALIVE_SECONDS);
+        long deadlineSeconds = Math.max(1L, Math.round(timeout * KEEPALIVE_GRACE));
+        ScheduledFuture<?> next = watchdogExecutor.schedule(
+            () -> onWatchdogTrigger(user, listener),
+            deadlineSeconds,
+            TimeUnit.SECONDS
+        );
+        ScheduledFuture<?> previous = watchdogs.put(user.getId(), next);
+        if (previous != null) previous.cancel(false);
+    }
+
+    private void cancelWatchdog(UUID userId) {
+        ScheduledFuture<?> f = watchdogs.remove(userId);
+        if (f != null) f.cancel(false);
+    }
+
+    private void onWatchdogTrigger(UserAccount user, ChatListener listener) {
+        if (!connections.remove(user.getId(), listener.webSocket)) return;
+        log.warn("[EventSub Chat] keepalive timeout for user {}, aborting and reconnecting", user.getId());
+        listener.webSocket.abort();
+        if (intentionallyDisconnected.contains(user.getId())) return;
+        scheduleReconnect(user, listener.token, WS_URL, listener.retryDelaySeconds);
+    }
+
     void handleMessage(UserAccount user, OAuthToken token, String message) {
         try {
             JsonNode root = objectMapper.readTree(message);
             String messageType = root.path("metadata").path("message_type").asText();
             switch (messageType) {
                 case "session_welcome" -> {
-                    String sessionId = root.path(PAYLOAD).path("session").path("id").asText();
+                    JsonNode session = root.path(PAYLOAD).path("session");
+                    String sessionId = session.path("id").asText();
+                    long timeout = session.path("keepalive_timeout_seconds").asLong(DEFAULT_KEEPALIVE_SECONDS);
+                    keepaliveTimeoutSeconds.put(user.getId(), timeout);
                     subscribe(user, token, sessionId);
                 }
                 case "session_reconnect" -> {
@@ -317,6 +359,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
         private final String wsUrl;
         private final long retryDelaySeconds;
         private final StringBuilder buffer = new StringBuilder();
+        @SuppressWarnings("java:S3077")
+        private volatile WebSocket webSocket;
 
         ChatListener(UserAccount user, OAuthToken token, String wsUrl, long retryDelaySeconds) {
             this.user = user;
@@ -328,6 +372,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         @Override
         public void onOpen(WebSocket webSocket) {
             log.debug("[EventSub Chat] WebSocket opened for user {}", user.getId());
+            this.webSocket = webSocket;
             webSocket.request(1);
         }
 
@@ -338,6 +383,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
                 String message = buffer.toString();
                 buffer.setLength(0);
                 handleMessage(user, token, message);
+                armWatchdog(user, this);
             }
             webSocket.request(1);
             return null;
@@ -347,6 +393,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             log.debug("[EventSub Chat] WebSocket closed for user {} ({}): {}",
                 user.getId(), statusCode, reason);
+            cancelWatchdog(user.getId());
             connections.remove(user.getId());
             if (statusCode != WebSocket.NORMAL_CLOSURE) {
                 scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
@@ -357,6 +404,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
             log.warn("[EventSub Chat] WebSocket error for user {}: {}", user.getId(), error.getMessage());
+            cancelWatchdog(user.getId());
             connections.remove(user.getId());
             if (!intentionallyDisconnected.contains(user.getId())) {
                 scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
