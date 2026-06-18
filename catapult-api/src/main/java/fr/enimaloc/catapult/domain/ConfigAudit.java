@@ -15,6 +15,9 @@ public class ConfigAudit {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "module", nullable = false, length = 16)
+    private String module = "api";
+
     @Column(name = "key", nullable = false)
     private String key;
 

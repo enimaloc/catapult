@@ -53,19 +53,21 @@ class ConfigOverrideServiceTest {
 
     @Test
     void apply_storesOverrideAndAuditAndRefreshes() {
-        when(overrideRepo.findById("app.foo")).thenReturn(Optional.empty());
+        when(overrideRepo.findByIdModuleAndIdKey("api", "app.foo")).thenReturn(Optional.empty());
 
         service.apply("app.foo", "42", actor);
 
         ArgumentCaptor<ConfigOverride> ovCap = ArgumentCaptor.forClass(ConfigOverride.class);
         verify(overrideRepo).save(ovCap.capture());
         assertThat(ovCap.getValue().getKey()).isEqualTo("app.foo");
+        assertThat(ovCap.getValue().getModule()).isEqualTo("api");
         assertThat(ovCap.getValue().getValue()).isEqualTo("42");
         assertThat(source.getProperty("app.foo")).isEqualTo("42");
 
         ArgumentCaptor<ConfigAudit> auCap = ArgumentCaptor.forClass(ConfigAudit.class);
         verify(auditRepo).save(auCap.capture());
         assertThat(auCap.getValue().getNewValue()).isEqualTo("42");
+        assertThat(auCap.getValue().getModule()).isEqualTo("api");
 
         verify(refresher).refresh();
         verify(eventPublisher).publishEvent(any(ConfigOverrideAppliedEvent.class));
@@ -73,7 +75,7 @@ class ConfigOverrideServiceTest {
 
     @Test
     void apply_secretKey_redactsAuditValues() {
-        when(overrideRepo.findById("twitch.client-secret")).thenReturn(Optional.empty());
+        when(overrideRepo.findByIdModuleAndIdKey("api", "twitch.client-secret")).thenReturn(Optional.empty());
 
         service.apply("twitch.client-secret", "supersecret", actor);
 
@@ -104,7 +106,7 @@ class ConfigOverrideServiceTest {
         existing.setKey("app.foo");
         existing.setValue("old");
         existing.setSecret(false);
-        when(overrideRepo.findById("app.foo")).thenReturn(Optional.of(existing));
+        when(overrideRepo.findByIdModuleAndIdKey("api", "app.foo")).thenReturn(Optional.of(existing));
         source.put("app.foo", "old");
 
         service.clear("app.foo", actor);
@@ -116,7 +118,64 @@ class ConfigOverrideServiceTest {
         verify(auditRepo).save(auCap.capture());
         assertThat(auCap.getValue().getPreviousValue()).isEqualTo("old");
         assertThat(auCap.getValue().getNewValue()).isNull();
+        assertThat(auCap.getValue().getModule()).isEqualTo("api");
 
         verify(refresher).refresh();
+    }
+
+    @Test
+    void apply_webModule_storesOverrideWithoutRefreshOrPropertySource() {
+        when(overrideRepo.findByIdModuleAndIdKey("web", "web.feature.foo")).thenReturn(Optional.empty());
+
+        service.apply("web", "web.feature.foo", "true", actor);
+
+        ArgumentCaptor<ConfigOverride> ovCap = ArgumentCaptor.forClass(ConfigOverride.class);
+        verify(overrideRepo).save(ovCap.capture());
+        assertThat(ovCap.getValue().getKey()).isEqualTo("web.feature.foo");
+        assertThat(ovCap.getValue().getModule()).isEqualTo("web");
+        assertThat(ovCap.getValue().getValue()).isEqualTo("true");
+
+        ArgumentCaptor<ConfigAudit> auCap = ArgumentCaptor.forClass(ConfigAudit.class);
+        verify(auditRepo).save(auCap.capture());
+        assertThat(auCap.getValue().getModule()).isEqualTo("web");
+        assertThat(auCap.getValue().getNewValue()).isEqualTo("true");
+
+        // No api property-source mutation
+        assertThat(source.getProperty("web.feature.foo")).isNull();
+        // No context refresh for web
+        verify(refresher, never()).refresh();
+        // Event still published for observability
+        verify(eventPublisher).publishEvent(any(ConfigOverrideAppliedEvent.class));
+    }
+
+    @Test
+    void apply_webModule_skipsTabooAndExposedValidation() {
+        // 'spring.datasource.url' is NOT exposed for api, but web is unrestricted here.
+        when(overrideRepo.findByIdModuleAndIdKey("web", "spring.datasource.url")).thenReturn(Optional.empty());
+
+        service.apply("web", "spring.datasource.url", "x", actor);
+
+        verify(overrideRepo).save(any(ConfigOverride.class));
+        verify(auditRepo).save(any(ConfigAudit.class));
+    }
+
+    @Test
+    void clear_webModule_removesOverrideWithoutRefresh() {
+        ConfigOverride existing = new ConfigOverride();
+        existing.setModule("web");
+        existing.setKey("web.feature.foo");
+        existing.setValue("true");
+        existing.setSecret(false);
+        when(overrideRepo.findByIdModuleAndIdKey("web", "web.feature.foo")).thenReturn(Optional.of(existing));
+
+        service.clear("web", "web.feature.foo", actor);
+
+        verify(overrideRepo).delete(existing);
+        verify(refresher, never()).refresh();
+        verify(eventPublisher).publishEvent(any(ConfigOverrideAppliedEvent.class));
+
+        ArgumentCaptor<ConfigAudit> auCap = ArgumentCaptor.forClass(ConfigAudit.class);
+        verify(auditRepo).save(auCap.capture());
+        assertThat(auCap.getValue().getModule()).isEqualTo("web");
     }
 }
