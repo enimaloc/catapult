@@ -67,6 +67,10 @@
            th:classappend="${active_page == 'whitelist'} ? ' active'" th:text="#{nav.admin_whitelist}">Whitelist</a>
         <a th:href="@{/admin/steam-keys}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'steam-keys'} ? ' active'" th:text="#{nav.admin_steam_keys}">Steam Keys</a>
+        <a th:href="@{/admin/config}" sec:authorize="hasRole('ADMIN')"
+           th:classappend="${active_page == 'config'} ? ' active'" th:text="#{nav.admin_config}">Configuration</a>
+        <a th:href="@{/admin/notifications}" sec:authorize="hasRole('ADMIN')"
+           th:classappend="${active_page == 'notifications'} ? ' active'" th:text="#{nav.admin_notifications}">Notifications</a>
         <a th:href="@{/dev/igdb}" sec:authorize="hasRole('ADMIN')" th:classappend="${active_page == 'igdb'} ? ' active'"
            th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
         <a th:if="${invitePlacementVariant == 'nav-end'}"
