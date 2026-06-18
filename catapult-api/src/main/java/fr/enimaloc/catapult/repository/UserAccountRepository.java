@@ -27,5 +27,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     List<UserAccount> findByStatusAndTwitchIdNotNull(UserAccount.Status status);
 
+    List<UserAccount> findByStatus(UserAccount.Status status);
+
     Optional<UserAccount> findBySystemAccountTrue();
 }
