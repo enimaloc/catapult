@@ -1752,3 +1752,14 @@ details summary { cursor: pointer; font-weight: 600; }
 .config-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .config-tab:hover { color: var(--text); }
 
+
+
+/* Admin notifications dialog */
+.admin-notif-dialog { border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); color: var(--text); padding: 1.25rem; max-width: 32rem; }
+.admin-notif-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+.admin-notif-dialog input,
+.admin-notif-dialog textarea,
+.admin-notif-dialog select { width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); margin-top: 0.25rem; box-sizing: border-box; }
+.admin-notif-dialog textarea { font-family: inherit; resize: vertical; }
+.admin-notif-dialog .label { display: block; font-size: 0.85em; color: var(--text-muted); font-weight: 600; }
+
