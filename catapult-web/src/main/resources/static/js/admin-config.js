@@ -1,8 +1,10 @@
 (async function () {
   const tbody = document.querySelector('#config-table tbody');
   const search = document.querySelector('#config-search');
+  const tabs = Array.from(document.querySelectorAll('.config-tab'));
   const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
   const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+  let currentModule = 'api';
 
   function authHeaders(extra) {
     const h = Object.assign({}, extra || {});
@@ -10,8 +12,19 @@
     return h;
   }
 
+  tabs.forEach(t => t.addEventListener('click', () => {
+    if (t.dataset.module === currentModule) return;
+    currentModule = t.dataset.module;
+    tabs.forEach(other => {
+      const active = other.dataset.module === currentModule;
+      other.classList.toggle('active', active);
+      other.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    load();
+  }));
+
   async function load() {
-    const res = await fetch('/admin/config/api/catalog', { credentials: 'same-origin' });
+    const res = await fetch(`/admin/config/api/catalog?module=${encodeURIComponent(currentModule)}`, { credentials: 'same-origin' });
     if (!res.ok) {
       tbody.innerHTML = '';
       const tr = document.createElement('tr');
@@ -93,7 +106,7 @@
     const key = btn.dataset.key;
     if (btn.dataset.action === 'reset') {
       if (!confirm(`Réinitialiser ${key} ?`)) return;
-      await fetch(`/admin/config/api/${encodeURIComponent(key)}`, {
+      await fetch(`/admin/config/api/${encodeURIComponent(key)}?module=${encodeURIComponent(currentModule)}`, {
         method: 'DELETE',
         credentials: 'same-origin',
         headers: authHeaders()
@@ -102,7 +115,7 @@
     } else if (btn.dataset.action === 'edit') {
       const value = prompt(`Nouvelle valeur pour ${key} :`);
       if (value === null) return;
-      const res = await fetch(`/admin/config/api/${encodeURIComponent(key)}`, {
+      const res = await fetch(`/admin/config/api/${encodeURIComponent(key)}?module=${encodeURIComponent(currentModule)}`, {
         method: 'PUT',
         credentials: 'same-origin',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
