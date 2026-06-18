@@ -28,6 +28,9 @@ val growthbookVersion = "0.10.10"
 val icuVersion = "76.1"
 val jsoupVersion = "1.17.2"
 val jjwtVersion = "0.12.6"
+val commonmarkVersion = "0.22.0"
+// NOTE: Spring Boot 4.0.4 + Spring Cloud GA mismatch — using snapshot until 5.0 GA.
+val springCloudContextVersion = "5.0.3-SNAPSHOT"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -48,6 +51,9 @@ dependencies {
     implementation("com.github.growthbook:growthbook-sdk-java:$growthbookVersion")
     implementation("com.ibm.icu:icu4j:$icuVersion")
     implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation("org.jsoup:jsoup:$jsoupVersion")
+    implementation("org.commonmark:commonmark:$commonmarkVersion")
+    implementation("org.springframework.cloud:spring-cloud-context:$springCloudContextVersion")
 
     // JWT generation/validation
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
@@ -66,7 +72,6 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-thymeleaf-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
-    testImplementation("org.jsoup:jsoup:$jsoupVersion")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
