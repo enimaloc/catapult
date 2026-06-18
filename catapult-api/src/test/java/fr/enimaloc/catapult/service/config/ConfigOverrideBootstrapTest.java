@@ -23,7 +23,7 @@ class ConfigOverrideBootstrapTest {
         DatabaseOverridePropertySource src = new DatabaseOverridePropertySource();
         ConfigOverride a = override("app.x", "1");
         ConfigOverride b = override("twitch.y", "2");
-        when(repo.findAll()).thenReturn(List.of(a, b));
+        when(repo.findByIdModule("api")).thenReturn(List.of(a, b));
 
         new ConfigOverrideBootstrap(repo, src, null).loadAll();
 

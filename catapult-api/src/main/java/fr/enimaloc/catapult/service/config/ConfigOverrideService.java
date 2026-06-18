@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.config;
 import fr.enimaloc.catapult.config.DatabaseOverridePropertySource;
 import fr.enimaloc.catapult.domain.ConfigAudit;
 import fr.enimaloc.catapult.domain.ConfigOverride;
+import fr.enimaloc.catapult.domain.ConfigOverrideId;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.ConfigOverrideAppliedEvent;
 import fr.enimaloc.catapult.repository.ConfigAuditRepository;
@@ -23,6 +24,9 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class ConfigOverrideService {
 
+    public static final String MODULE_API = "api";
+    public static final String MODULE_WEB = "web";
+
     private final ConfigOverrideRepository overrideRepo;
     private final ConfigAuditRepository auditRepo;
     private final DatabaseOverridePropertySource source;
@@ -32,14 +36,22 @@ public class ConfigOverrideService {
 
     @Transactional
     public void apply(String key, String newValue, UserAccount actor) {
-        validate(key);
+        apply(MODULE_API, key, newValue, actor);
+    }
+
+    @Transactional
+    public void apply(String module, String key, String newValue, UserAccount actor) {
+        String mod = normalizeModule(module);
+        if (MODULE_API.equals(mod)) {
+            validate(key);
+        }
         boolean secret = isSecret(key);
 
-        Optional<ConfigOverride> existing = overrideRepo.findById(key);
+        Optional<ConfigOverride> existing = overrideRepo.findByIdModuleAndIdKey(mod, key);
         String previousValue = existing.map(ConfigOverride::getValue).orElse(null);
 
         ConfigOverride ov = existing.orElseGet(ConfigOverride::new);
-        ov.setKey(key);
+        ov.setId(new ConfigOverrideId(mod, key));
         ov.setValue(newValue);
         ov.setSecret(secret);
         ov.setUpdatedAt(Instant.now());
@@ -47,6 +59,7 @@ public class ConfigOverrideService {
         overrideRepo.save(ov);
 
         ConfigAudit audit = new ConfigAudit();
+        audit.setModule(mod);
         audit.setKey(key);
         audit.setPreviousValue(secret ? "***" : previousValue);
         audit.setNewValue(secret ? "***" : newValue);
@@ -54,15 +67,25 @@ public class ConfigOverrideService {
         audit.setChangedBy(actor.getId());
         auditRepo.save(audit);
 
-        source.put(key, newValue);
-        refresher.refresh();
+        if (MODULE_API.equals(mod)) {
+            source.put(key, newValue);
+            refresher.refresh();
+        }
         eventPublisher.publishEvent(new ConfigOverrideAppliedEvent(this, key, newValue));
     }
 
     @Transactional
     public void clear(String key, UserAccount actor) {
-        validate(key);
-        Optional<ConfigOverride> existing = overrideRepo.findById(key);
+        clear(MODULE_API, key, actor);
+    }
+
+    @Transactional
+    public void clear(String module, String key, UserAccount actor) {
+        String mod = normalizeModule(module);
+        if (MODULE_API.equals(mod)) {
+            validate(key);
+        }
+        Optional<ConfigOverride> existing = overrideRepo.findByIdModuleAndIdKey(mod, key);
         if (existing.isEmpty()) {
             return;
         }
@@ -71,6 +94,7 @@ public class ConfigOverrideService {
         overrideRepo.delete(ov);
 
         ConfigAudit audit = new ConfigAudit();
+        audit.setModule(mod);
         audit.setKey(key);
         audit.setPreviousValue(secret ? "***" : ov.getValue());
         audit.setNewValue(null);
@@ -78,9 +102,15 @@ public class ConfigOverrideService {
         audit.setChangedBy(actor.getId());
         auditRepo.save(audit);
 
-        source.remove(key);
-        refresher.refresh();
+        if (MODULE_API.equals(mod)) {
+            source.remove(key);
+            refresher.refresh();
+        }
         eventPublisher.publishEvent(new ConfigOverrideAppliedEvent(this, key, null));
+    }
+
+    private String normalizeModule(String module) {
+        return module == null || module.isBlank() ? MODULE_API : module;
     }
 
     private void validate(String key) {

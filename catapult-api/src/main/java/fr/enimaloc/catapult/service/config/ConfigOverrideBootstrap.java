@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.config;
 
 import fr.enimaloc.catapult.config.DatabaseOverridePropertySource;
+import fr.enimaloc.catapult.domain.ConfigOverride;
 import fr.enimaloc.catapult.repository.ConfigOverrideRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +27,8 @@ public class ConfigOverrideBootstrap {
     }
 
     public void loadAll() {
-        repo.findAll().forEach(o -> source.put(o.getKey(), o.getValue()));
+        repo.findByIdModule(ConfigOverride.DEFAULT_MODULE)
+                .forEach(o -> source.put(o.getKey(), o.getValue()));
         log.info("Loaded {} config overrides from DB", source.keys().size());
     }
 }

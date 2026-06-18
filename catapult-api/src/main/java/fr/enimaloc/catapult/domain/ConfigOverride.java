@@ -11,9 +11,11 @@ import java.util.UUID;
 @Getter
 @Setter
 public class ConfigOverride {
-    @Id
-    @Column(name = "key", nullable = false, unique = true)
-    private String key;
+
+    public static final String DEFAULT_MODULE = "api";
+
+    @EmbeddedId
+    private ConfigOverrideId id = new ConfigOverrideId(DEFAULT_MODULE, null);
 
     @Column(name = "value")
     private String value;
@@ -26,4 +28,28 @@ public class ConfigOverride {
 
     @Column(name = "updated_by", nullable = false)
     private UUID updatedBy;
+
+    public String getKey() {
+        return id == null ? null : id.getKey();
+    }
+
+    public void setKey(String key) {
+        if (id == null) {
+            id = new ConfigOverrideId(DEFAULT_MODULE, key);
+        } else {
+            id.setKey(key);
+        }
+    }
+
+    public String getModule() {
+        return id == null ? null : id.getModule();
+    }
+
+    public void setModule(String module) {
+        if (id == null) {
+            id = new ConfigOverrideId(module, null);
+        } else {
+            id.setModule(module);
+        }
+    }
 }
