@@ -6,39 +6,82 @@
     <script th:src="@{/js/admin-notifications.js}" defer></script>
 </head>
 <body>
-    <section>
-      <header>
-        <h1>Notifications</h1>
-        <button id="open-new">+ Nouvelle notification</button>
-      </header>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 style="margin:0">Administration — Notifications</h2>
+        <button id="open-new" type="button" class="btn btn-primary">+ Nouvelle notification</button>
+    </div>
 
-      <table id="notif-table">
-        <thead><tr><th>Titre</th><th>Sévérité</th><th>Audience</th><th>Créée</th><th>Expire</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>
+    <p class="text-muted" style="margin-bottom:1rem;">
+        Envoyer une notification à un utilisateur précis ou à toute la userbase active.
+        Le corps accepte du markdown basique (gras, italique, lien, code).
+    </p>
 
-      <dialog id="new-notif">
-        <form method="dialog">
-          <label>Titre <input name="title" required maxlength="255"></label>
-          <label>Corps (markdown)<textarea name="body" rows="6" required></textarea></label>
-          <label>Sévérité
-            <select name="severity">
-              <option value="INFO">INFO</option><option value="WARNING">WARNING</option><option value="ERROR">ERROR</option>
-            </select>
-          </label>
-          <label>CTA URL (optionnel) <input name="ctaUrl" type="url"></label>
-          <label>CTA label (optionnel) <input name="ctaLabel" maxlength="64"></label>
-          <label>Expire à (optionnel) <input name="expiresAt" type="datetime-local"></label>
-          <label>Audience
-            <select name="audience"><option value="BROADCAST">Tous</option><option value="TARGETED">Un utilisateur</option></select>
-          </label>
-          <label class="targeted" hidden>User ID <input name="targetUserId"></label>
-          <menu>
-            <button value="cancel">Annuler</button>
-            <button id="send" value="ok">Envoyer</button>
-          </menu>
+    <div class="card" style="padding:0;">
+        <div class="table-container">
+            <table id="notif-table" class="table">
+                <thead>
+                    <tr>
+                        <th>Titre</th>
+                        <th>Sévérité</th>
+                        <th>Audience</th>
+                        <th>Créée</th>
+                        <th>Expire</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <dialog id="new-notif" class="admin-notif-dialog">
+        <form method="dialog" style="display:flex; flex-direction:column; gap:0.75rem; min-width:24rem;">
+            <h3 style="margin:0">Nouvelle notification</h3>
+
+            <label class="label">Titre
+                <input name="title" required maxlength="255" autocomplete="off">
+            </label>
+
+            <label class="label">Corps (markdown)
+                <textarea name="body" rows="6" required></textarea>
+            </label>
+
+            <label class="label">Sévérité
+                <select name="severity">
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                </select>
+            </label>
+
+            <label class="label">CTA URL (optionnel)
+                <input name="ctaUrl" type="url" placeholder="https://…">
+            </label>
+
+            <label class="label">CTA label (optionnel)
+                <input name="ctaLabel" maxlength="64">
+            </label>
+
+            <label class="label">Expire à (optionnel)
+                <input name="expiresAt" type="datetime-local">
+            </label>
+
+            <label class="label">Audience
+                <select name="audience">
+                    <option value="BROADCAST">Tous les utilisateurs actifs</option>
+                    <option value="TARGETED">Un utilisateur précis</option>
+                </select>
+            </label>
+
+            <label class="label targeted" hidden>Identifiant utilisateur (UUID)
+                <input name="targetUserId" autocomplete="off">
+            </label>
+
+            <menu style="display:flex; gap:0.5rem; justify-content:flex-end; margin:0; padding:0;">
+                <button type="button" id="cancel" value="cancel" class="btn btn-sm">Annuler</button>
+                <button type="button" id="send" value="ok" class="btn btn-sm btn-primary">Envoyer</button>
+            </menu>
         </form>
-      </dialog>
-    </section>
+    </dialog>
 </body>
 </html>

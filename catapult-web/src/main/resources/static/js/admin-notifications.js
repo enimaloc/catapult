@@ -14,6 +14,7 @@
   }
 
   document.getElementById('open-new').addEventListener('click', () => dialog.showModal());
+  document.getElementById('cancel').addEventListener('click', () => { dialog.close(); form.reset(); });
   audienceSel.addEventListener('change', () => {
     targetedRow.hidden = audienceSel.value !== 'TARGETED';
   });
@@ -34,7 +35,11 @@
       headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
     });
-    if (!res.ok) { alert(`Échec: ${res.status}`); return; }
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      alert(`Échec (${res.status}): ${txt || res.statusText}`);
+      return;
+    }
     dialog.close();
     form.reset();
     load();
