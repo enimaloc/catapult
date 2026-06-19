@@ -8,11 +8,15 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -108,17 +112,19 @@ public class SystemTwitchAccountService {
 
     @SuppressWarnings("unchecked")
     private void callRefreshAndUpdate(OAuthToken token, String refreshToken) {
+        String body = "grant_type=refresh_token"
+            + "&refresh_token=" + URLEncoder.encode(refreshToken, StandardCharsets.UTF_8)
+            + "&client_id=" + URLEncoder.encode(twitchClientId, StandardCharsets.UTF_8)
+            + "&client_secret=" + URLEncoder.encode(twitchClientSecret, StandardCharsets.UTF_8);
         try {
             Map<String, Object> response = restClient.post()
-                .uri(TWITCH_TOKEN_URL
-                    + "?grant_type=refresh_token"
-                    + "&refresh_token=" + refreshToken
-                    + "&client_id=" + twitchClientId
-                    + "&client_secret=" + twitchClientSecret)
+                .uri(TWITCH_TOKEN_URL)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(body)
                 .retrieve()
                 .body(Map.class);
             if (response == null) {
-                log.error("System Twitch refresh returned null");
+                log.error("System Twitch refresh returned null response");
                 return;
             }
             String access = (String) response.get("access_token");
@@ -133,8 +139,12 @@ public class SystemTwitchAccountService {
             accessTokenCache = access;
             expiresAt = token.getExpiresAt();
             log.info("System Twitch token refreshed");
+        } catch (RestClientResponseException e) {
+            // Only log the status/reason; never the URI or body to avoid leaking the secret in logs.
+            log.error("System Twitch refresh HTTP error: {} {}",
+                e.getStatusCode().value(), e.getStatusText());
         } catch (Exception e) {
-            log.error("System Twitch refresh failed: {}", e.getMessage());
+            log.error("System Twitch refresh failed: {}", e.getClass().getSimpleName());
         }
     }
 
