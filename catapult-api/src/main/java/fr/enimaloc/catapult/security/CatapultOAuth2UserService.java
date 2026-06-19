@@ -280,9 +280,19 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             ServletRequestAttributes attrs =
                 (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
             HttpSession session = attrs.getRequest().getSession(false);
-            if (session != null) {
-                return Optional.ofNullable((String) session.getAttribute("bot-link-pending"));
+            if (session == null) return Optional.empty();
+            String pending = (String) session.getAttribute(BotLinkController.SESSION_ATTR);
+            if (pending == null) return Optional.empty();
+            Long expiresAt = (Long) session.getAttribute(BotLinkController.SESSION_EXPIRES_ATTR);
+            if (expiresAt == null || expiresAt < System.currentTimeMillis()) {
+                // TTL expired: drop the pending value so it can't piggy-back on
+                // an unrelated future Twitch login.
+                session.removeAttribute(BotLinkController.SESSION_ATTR);
+                session.removeAttribute(BotLinkController.SESSION_EXPIRES_ATTR);
+                log.info("Discarded expired bot-link-pending");
+                return Optional.empty();
             }
+            return Optional.of(pending);
         } catch (IllegalStateException ignored) {
             // No HTTP request context (e.g., in unit tests)
         }
@@ -336,7 +346,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             ServletRequestAttributes attrs =
                 (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
             HttpSession session = attrs.getRequest().getSession(false);
-            if (session != null) session.removeAttribute("bot-link-pending");
+            if (session != null) {
+                session.removeAttribute(BotLinkController.SESSION_ATTR);
+                session.removeAttribute(BotLinkController.SESSION_EXPIRES_ATTR);
+            }
         } catch (IllegalStateException ignored) {
             // pas de request context
         }

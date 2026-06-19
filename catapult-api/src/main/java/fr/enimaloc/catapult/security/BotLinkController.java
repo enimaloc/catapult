@@ -8,6 +8,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.Instant;
+
 /**
  * Démarre le flow OAuth Twitch pour rattacher un compte Twitch (le bot) au
  * {@code UserAccount} marqué {@code systemAccount=true}. L'admin clique
@@ -15,11 +17,20 @@ import org.springframework.web.bind.annotation.RequestParam;
  * endpoint (via nginx) qui pose l'ID du compte système dans la session
  * catapult-api avant le redirect OAuth.
  * <p>
- * Pas de check d'auth ici car l'admin est authentifié côté catapult-web via JWT
- * mais pas nécessairement côté catapult-api (sessions séparées). La vérification
- * {@code ROLE_ADMIN} se fait à la fin du flow dans
- * {@link CatapultOAuth2UserService#handleBotLink} (avant toute modification de
- * state). Worst case : un attaquant déclenche un flow qui sera rejeté au retour.
+ * <strong>Sécurité</strong> : Pas de check d'auth en entrée car l'admin est
+ * authentifié via JWT côté catapult-web mais pas nécessairement par session
+ * côté catapult-api (sessions séparées entre apps). L'enforcement est en deux
+ * couches :
+ * <ol>
+ *   <li>{@link CatapultOAuth2UserService#handleBotLink} vérifie {@code ROLE_ADMIN}
+ *       <em>avant</em> toute modification de state.</li>
+ *   <li>L'attribut session {@code bot-link-pending} a un TTL court
+ *       ({@value #PENDING_TTL_SECONDS}s) pour qu'un attaquant trompant un admin
+ *       en visitant ce lien ne puisse pas lier l'admin à un mauvais OAuth flow
+ *       déclenché plusieurs minutes plus tard.</li>
+ * </ol>
+ * Toute valeur précédente est écrasée pour ne pas piggy-back sur un flow
+ * antérieur.
  */
 @Slf4j
 @Controller
@@ -27,10 +38,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequiredArgsConstructor
 public class BotLinkController {
 
+    public static final String SESSION_ATTR = "bot-link-pending";
+    public static final String SESSION_EXPIRES_ATTR = "bot-link-pending-expires-at";
+    public static final long PENDING_TTL_SECONDS = 300L; // 5 min
+
     @GetMapping("/oauth2/start-bot-link")
     public String startBotLink(@RequestParam("systemAccountId") String systemAccountId,
                                 HttpSession session) {
-        session.setAttribute("bot-link-pending", systemAccountId);
+        session.setAttribute(SESSION_ATTR, systemAccountId);
+        session.setAttribute(SESSION_EXPIRES_ATTR,
+            Instant.now().plusSeconds(PENDING_TTL_SECONDS).toEpochMilli());
         log.info("Bot link flow started for system account {}", systemAccountId);
         return "redirect:/oauth2/authorization/twitch";
     }
