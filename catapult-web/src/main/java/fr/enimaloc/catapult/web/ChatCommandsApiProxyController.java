@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.client.ApiClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,7 @@ import java.util.UUID;
  * {@link ApiClient}. Mirrors the pattern used by
  * {@code NotificationsApiProxyController}.
  */
+@Slf4j
 @Controller
 @RequestMapping("/chat-commands/api")
 @RequiredArgsConstructor
@@ -34,10 +36,17 @@ public class ChatCommandsApiProxyController {
 
     @GetMapping
     @ResponseBody
-    public Map<String, Object> list() {
+    public ResponseEntity<Map<String, Object>> list() {
         Map<String, Object> data = apiClient.get(
             "/api/chat-commands", new ParameterizedTypeReference<>() {});
-        return data != null ? data : Map.of();
+        if (data == null) {
+            // ApiClient swallows errors and returns null. Re-surface as 502 so
+            // the browser sees something instead of "{}", and log a clear hint.
+            log.warn("[chat-commands proxy] GET /api/chat-commands returned null — likely 403 (experiment gate) or 5xx");
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("error", "Upstream call failed (check catapult-api logs; likely experiment gate)"));
+        }
+        return ResponseEntity.ok(data);
     }
 
     @PostMapping("/presets/{key}")
