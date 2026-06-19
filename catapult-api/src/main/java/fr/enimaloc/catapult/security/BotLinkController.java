@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,12 +44,20 @@ public class BotLinkController {
     public static final long PENDING_TTL_SECONDS = 300L; // 5 min
 
     @GetMapping("/oauth2/start-bot-link")
-    public String startBotLink(@RequestParam("systemAccountId") String systemAccountId,
-                                HttpSession session) {
+    public void startBotLink(@RequestParam("systemAccountId") String systemAccountId,
+                              HttpSession session,
+                              HttpServletResponse response) {
         session.setAttribute(SESSION_ATTR, systemAccountId);
         session.setAttribute(SESSION_EXPIRES_ATTR,
             Instant.now().plusSeconds(PENDING_TTL_SECONDS).toEpochMilli());
         log.info("Bot link flow started for system account {}", systemAccountId);
-        return "redirect:/oauth2/authorization/twitch";
+
+        // On émet un Location relatif au lieu de "redirect:..." qui passerait par
+        // HttpServletResponse.sendRedirect → toAbsolute() et utiliserait le port
+        // interne du connector Tomcat (8080) au lieu du port public (80) — bug
+        // visible derrière nginx avec server.forward-headers-strategy=native +
+        // X-Forwarded-Port=8080 fixe.
+        response.setStatus(HttpServletResponse.SC_FOUND);
+        response.setHeader("Location", "/oauth2/authorization/twitch");
     }
 }
