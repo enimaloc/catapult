@@ -9,7 +9,7 @@ Outil d'automatisation pour streamers Twitch : détecte le jeu en cours et met �
 
 - **Détection automatique du jeu** via Steam, Xbox et Battle.net (chaîne de priorité configurable)
 - **Mise à jour Twitch** — catégorie et labels CCL synchronisés à chaque changement de jeu
-- **Commandes chat** — `!game` et `!setgame` disponibles dans le chat Twitch
+- **Commandes chat data-driven** — presets `!game`, `!description`, `!store`, `!release`, `!igdb` (templates customisables avec placeholders `{game.name|fallback}`), `!setgame` côté modération. Réponses postées par un compte bot dédié quand il est `/mod` du canal, sinon fallback transparent sur le compte du streamer. Gateé par l'experiment `chat.commands` (rolling release).
 - **Interface d'administration** — gestion des bindings jeu, des règles CCL et des paramètres utilisateur
 - **A/B testing** — moteur d'expérimentation interne, avec support optionnel Unleash, GrowthBook et GitLab Feature Flags
 - **Métriques Prometheus** exposées sur `/actuator/prometheus`
@@ -47,6 +47,8 @@ L'application est accessible sur `http://localhost:8080`.
 | `BATTLENET_CLIENT_ID` | Non | Client ID Battle.net |
 | `BATTLENET_CLIENT_SECRET` | Non | Client Secret Battle.net |
 | `IGDB_CLIENT_ID` | Non | Client ID IGDB (utilise `TWITCH_CLIENT_ID` si absent) |
+| `TWITCH_SYSTEM_USER_ID` | Non | ID Twitch du bot système pour répondre aux commandes chat. Sans cette variable, le bot est désactivé et les réponses passent toujours par le compte du streamer. |
+| `TWITCH_SYSTEM_REFRESH_TOKEN` | Non | Refresh token OAuth du bot Twitch système (scopes `user:write:chat`, `user:bot`, `channel:bot`). |
 
 ## Développement
 
