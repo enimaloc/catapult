@@ -55,7 +55,7 @@
 
     <script>
     (async function () {
-        const res = await fetch('/api/chat-commands');
+        const res = await fetch('/chat-commands/api');
         if (!res.ok) return;
         const data = await res.json();
 
@@ -81,7 +81,7 @@
             btn.type = 'button';
             btn.className = 'btn btn-sm';
             btn.textContent = 'Add';
-            btn.onclick = () => fetch('/api/chat-commands/presets/' + k, { method: 'POST' })
+            btn.onclick = () => fetch('/chat-commands/api/presets/' + k, { method: 'POST' })
                 .then(() => window.location.reload());
             li.appendChild(btn);
             presetsList.appendChild(li);
