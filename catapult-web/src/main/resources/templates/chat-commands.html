@@ -56,7 +56,18 @@
     <script>
     (async function () {
         const res = await fetch('/chat-commands/api');
-        if (!res.ok) return;
+        if (!res.ok) {
+            const body = await res.text().catch(() => '');
+            const list = document.getElementById('commands-list');
+            if (list) {
+                while (list.firstChild) list.removeChild(list.firstChild);
+                const li = document.createElement('li');
+                li.className = 'card error';
+                li.textContent = 'Erreur API ' + res.status + ' — ' + body;
+                list.appendChild(li);
+            }
+            return;
+        }
         const data = await res.json();
 
         if (data.botModStatus && data.botModStatus.modded === false) {
