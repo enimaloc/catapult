@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @RequiredArgsConstructor
 public class ChatCommandsPageController {
 
-    @GetMapping("/admin/chat-commands")
+    @GetMapping("/chat-commands")
     public String page() {
         return "chat-commands";
     }

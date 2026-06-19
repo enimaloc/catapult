@@ -46,7 +46,7 @@ import java.util.UUID;
  * <p>All endpoints are gated by the {@code chat.commands} experiment.</p>
  */
 @RestController
-@RequestMapping("/api/admin/chat-commands")
+@RequestMapping("/api/chat-commands")
 @RequiredArgsConstructor
 public class ApiAdminChatCommandsController {
 
