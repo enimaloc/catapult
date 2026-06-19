@@ -7,7 +7,6 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -20,7 +19,6 @@ import java.util.Set;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnExpression("false")
 public class SetGameCommand implements ChatCommand {
 
     private final TwitchService twitchService;
