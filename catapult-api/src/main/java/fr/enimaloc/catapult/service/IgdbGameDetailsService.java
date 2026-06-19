@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.service;
 import fr.enimaloc.catapult.domain.IgdbGameDetails;
 import fr.enimaloc.catapult.repository.IgdbGameDetailsRepository;
 import io.micrometer.core.instrument.MeterRegistry;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,19 +26,28 @@ import java.util.concurrent.Executor;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class IgdbGameDetailsService {
 
     private final IgdbGameDetailsRepository repository;
     private final IgdbClient igdbClient;
     private final IgdbService igdbService;
     private final MeterRegistry meterRegistry;
-
-    @Qualifier("igdbRefreshExecutor")
     private final Executor refreshExecutor;
 
     @Value("${app.igdb.details-cache-ttl-hours:168}")
     private int cacheTtlHours;
+
+    public IgdbGameDetailsService(IgdbGameDetailsRepository repository,
+                                  IgdbClient igdbClient,
+                                  IgdbService igdbService,
+                                  MeterRegistry meterRegistry,
+                                  @Qualifier("igdbRefreshExecutor") Executor refreshExecutor) {
+        this.repository = repository;
+        this.igdbClient = igdbClient;
+        this.igdbService = igdbService;
+        this.meterRegistry = meterRegistry;
+        this.refreshExecutor = refreshExecutor;
+    }
 
     /**
      * Returns the enriched details for the given IGDB game id, hitting the cache
