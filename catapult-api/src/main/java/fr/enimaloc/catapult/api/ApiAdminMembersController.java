@@ -115,9 +115,8 @@ public class ApiAdminMembersController {
 
     /**
      * Marque un UserAccount régulier comme compte système (le bot pour les
-     * commandes chat). Tout précédent système account est démarqué ; s'il est
-     * vide (pas de Twitch ID, créé par SystemAccountInitializer comme template
-     * de settings), il est supprimé pour éviter l'orphelin.
+     * commandes chat). Tout précédent système account est démarqué ; s'il n'a
+     * pas de Twitch identity, il est supprimé pour éviter l'orphelin.
      */
     @PostMapping("/{id}/promote-to-system")
     @ResponseStatus(HttpStatus.NO_CONTENT)
