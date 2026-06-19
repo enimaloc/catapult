@@ -78,7 +78,7 @@ class ApiAdminChatCommandsControllerTest {
         mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(false);
 
-        mvc.perform(withAdmin(get("/api/admin/chat-commands")))
+        mvc.perform(withAdmin(get("/api/chat-commands")))
                 .andExpect(status().isForbidden());
     }
 
@@ -91,7 +91,7 @@ class ApiAdminChatCommandsControllerTest {
         when(systemAccount.check(any(), any()))
                 .thenReturn(new SystemTwitchAccountService.BotModStatus(false, Instant.now()));
 
-        mvc.perform(withAdmin(get("/api/admin/chat-commands")))
+        mvc.perform(withAdmin(get("/api/chat-commands")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.presets").isArray())
                 .andExpect(jsonPath("$.commands").isArray())
@@ -110,7 +110,7 @@ class ApiAdminChatCommandsControllerTest {
                 "permission", "EVERYONE",
                 "enabled", true));
 
-        mvc.perform(withAdmin(post("/api/admin/chat-commands"))
+        mvc.perform(withAdmin(post("/api/chat-commands"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
@@ -131,7 +131,7 @@ class ApiAdminChatCommandsControllerTest {
                 "permission", "EVERYONE",
                 "enabled", true));
 
-        mvc.perform(withAdmin(post("/api/admin/chat-commands"))
+        mvc.perform(withAdmin(post("/api/chat-commands"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
@@ -157,7 +157,7 @@ class ApiAdminChatCommandsControllerTest {
                 "permission", "EVERYONE",
                 "enabled", true));
 
-        mvc.perform(withAdmin(post("/api/admin/chat-commands"))
+        mvc.perform(withAdmin(post("/api/chat-commands"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
@@ -185,7 +185,7 @@ class ApiAdminChatCommandsControllerTest {
         def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
         when(repository.findById(otherId)).thenReturn(Optional.of(def));
 
-        mvc.perform(withAdmin(delete("/api/admin/chat-commands/{id}", otherId)))
+        mvc.perform(withAdmin(delete("/api/chat-commands/{id}", otherId)))
                 .andExpect(status().isNotFound());
 
         verify(repository, never()).delete(any(ChatCommandDefinition.class));
