@@ -14,6 +14,7 @@ import proto.ExternalGameSource;
 import proto.Game;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -169,6 +170,27 @@ public class IgdbClient {
         } catch (RequestException e) {
             log.error("[IGDB] /games by id failed for {}: {}", igdbId, e.getMessage());
             return List.of();
+        }
+    }
+
+    /**
+     * Récupère les détails enrichis d'un jeu (slug, summary, first_release_date,
+     * websites, external_games) pour la cache stale-while-revalidate.
+     */
+    public Optional<Game> fetchGameDetails(String igdbId, String token) {
+        String fields = "id,name,slug,summary,first_release_date,websites.url,websites.category,external_games.uid,external_games.external_game_source";
+        APICalypse query = new APICalypse().fields(fields).where("id = " + Long.parseLong(igdbId)).limit(1);
+        log.debug("[IGDB] /games details id={} — query: {}", igdbId, query.buildQuery());
+        try {
+            synchronized (IGDBWrapper.INSTANCE) {
+                setCredentialsIfChanged(token);
+                List<Game> results = ProtoRequestKt.games(IGDBWrapper.INSTANCE, query);
+                log.debug("[IGDB] /games details id={} — {} result(s)", igdbId, results.size());
+                return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+            }
+        } catch (RequestException e) {
+            log.error("[IGDB] /games details failed for {}: {}", igdbId, e.getMessage());
+            return Optional.empty();
         }
     }
 
