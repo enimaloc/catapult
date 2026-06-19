@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'chat-commands', ~{::body}, ~{::head/script}, 'container', null, null)}">
+<head>
+    <title th:text="#{chat_commands.page.title}">Catapult — Chat commands</title>
+    <script>/* placeholder for additional_head fragment */</script>
+</head>
+<body>
+    <section>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+            <h2 style="margin:0" th:text="#{chat_commands.page.title}">Chat commands</h2>
+        </div>
+
+        <div id="botModStatusBanner" class="banner banner-warning" hidden>
+            <span th:text="#{chat_commands.bot_not_modded}">
+                The Catapult bot is not a moderator of your channel. Replies are sent under your own name. Type /mod CatapultBot to enable the dedicated bot.
+            </span>
+        </div>
+
+        <section style="margin-top:1.5rem;">
+            <h3 th:text="#{chat_commands.presets.title}">Available presets</h3>
+            <ul id="presets-list" class="card-list"></ul>
+        </section>
+
+        <section style="margin-top:1.5rem;">
+            <h3 th:text="#{chat_commands.commands.title}">Your commands</h3>
+            <ul id="commands-list" class="card-list"></ul>
+        </section>
+
+        <aside class="placeholder-catalog" style="margin-top:1.5rem;">
+            <h3 th:text="#{chat_commands.placeholders.title}">Available placeholders</h3>
+            <ul>
+                <li><code>{game.name}</code></li>
+                <li><code>{game.summary}</code></li>
+                <li><code>{game.release_date}</code></li>
+                <li><code>{game.store.url}</code></li>
+                <li><code>{game.store.steam}</code></li>
+                <li><code>{game.store.xbox}</code></li>
+                <li><code>{game.store.battlenet}</code></li>
+                <li><code>{game.store.official}</code></li>
+                <li><code>{game.igdb.url}</code></li>
+            </ul>
+        </aside>
+    </section>
+
+    <template id="command-card-tpl">
+        <li class="card">
+            <header>
+                <code class="cmd-name"></code>
+                <label><input type="checkbox" class="enabled-toggle"></label>
+            </header>
+            <p class="cmd-template"></p>
+        </li>
+    </template>
+
+    <script>
+    (async function () {
+        const res = await fetch('/api/admin/chat-commands');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.botModStatus && data.botModStatus.modded === false) {
+            document.getElementById('botModStatusBanner').hidden = false;
+        }
+
+        const list = document.getElementById('commands-list');
+        const tpl = document.getElementById('command-card-tpl').content;
+        for (const cmd of (data.commands || [])) {
+            const card = tpl.cloneNode(true);
+            card.querySelector('.cmd-name').textContent = cmd.name;
+            card.querySelector('.cmd-template').textContent = cmd.template;
+            card.querySelector('.enabled-toggle').checked = cmd.enabled;
+            list.appendChild(card);
+        }
+
+        const presetsList = document.getElementById('presets-list');
+        for (const k of (data.presets || [])) {
+            const li = document.createElement('li');
+            li.textContent = '!' + k + ' ';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm';
+            btn.textContent = 'Add';
+            btn.onclick = () => fetch('/api/admin/chat-commands/presets/' + k, { method: 'POST' })
+                .then(() => window.location.reload());
+            li.appendChild(btn);
+            presetsList.appendChild(li);
+        }
+    })();
+    </script>
+</body>
+</html>
