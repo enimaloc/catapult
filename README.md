@@ -47,8 +47,8 @@ L'application est accessible sur `http://localhost:8080`.
 | `BATTLENET_CLIENT_ID` | Non | Client ID Battle.net |
 | `BATTLENET_CLIENT_SECRET` | Non | Client Secret Battle.net |
 | `IGDB_CLIENT_ID` | Non | Client ID IGDB (utilise `TWITCH_CLIENT_ID` si absent) |
-| `TWITCH_SYSTEM_USER_ID` | Non | ID Twitch du bot système pour répondre aux commandes chat. Sans cette variable, le bot est désactivé et les réponses passent toujours par le compte du streamer. |
-| `TWITCH_SYSTEM_REFRESH_TOKEN` | Non | Refresh token OAuth du bot Twitch système (scopes `user:write:chat`, `user:bot`, `channel:bot`). |
+
+> Le compte bot Twitch (utilisé pour répondre aux commandes chat) se configure depuis l'admin : page Membres → "Lier le Bot Twitch" sur le compte système (qui démarre un flow OAuth Twitch dédié, le token est stocké chiffré en base). Tant que cette liaison n'est pas faite, les réponses passent par le compte du streamer.
 
 ## Développement
 
