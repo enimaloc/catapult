@@ -73,7 +73,7 @@
            th:classappend="${active_page == 'config'} ? ' active'" th:text="#{nav.admin_config}">Configuration</a>
         <a th:href="@{/admin/notifications}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'notifications'} ? ' active'" th:text="#{nav.admin_notifications}">Notifications</a>
-        <a th:href="@{/chat-commands}" sec:authorize="isAuthenticated()"
+        <a th:href="@{/chat-commands}" th:if="${chatCommandsRolledOut}"
            th:classappend="${active_page == 'chat-commands'} ? ' active'" th:text="#{nav.chat_commands}">Chat commands</a>
         <a th:href="@{/dev/igdb}" sec:authorize="hasRole('ADMIN')" th:classappend="${active_page == 'igdb'} ? ' active'"
            th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
