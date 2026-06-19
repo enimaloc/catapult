@@ -88,6 +88,17 @@ public class AdminController {
         return "redirect:/admin/members";
     }
 
+    /**
+     * Démarre le flow OAuth Twitch pour rattacher un compte Twitch (le bot)
+     * à un UserAccount marqué `systemAccount=true`. La requête est redirigée
+     * vers un endpoint catapult-api (via nginx) qui pose `bot-link-pending`
+     * dans la session catapult-api avant le redirect OAuth.
+     */
+    @GetMapping("/members/{id}/bot/link-twitch")
+    public String linkBotTwitch(@PathVariable UUID id) {
+        return "redirect:/oauth2/start-bot-link?systemAccountId=" + id;
+    }
+
     @PostMapping("/members/{id}/delete")
     public String deleteMember(@PathVariable UUID id) {
         apiClient.post("/api/admin/members/{id}/delete", null, id);
