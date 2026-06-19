@@ -199,7 +199,11 @@ public class ApiAdminChatCommandsController {
     }
 
     private void gate(UserAccount user) {
-        if (!experimentService.isRolledOut(user, EXPERIMENT_KEY)) {
+        // evaluateGate (not isRolledOut) so that an admin override on the user
+        // materialises the assignment on first call. isRolledOut only reads
+        // existing assignments, so overrides without a prior assignment would
+        // never let the user reach this page.
+        if (!experimentService.evaluateGate(user, EXPERIMENT_KEY)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature not enabled");
         }
     }

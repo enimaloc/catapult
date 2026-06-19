@@ -76,7 +76,7 @@ class ApiAdminChatCommandsControllerTest {
     @Test
     void get_returns_403_when_not_rolled_out() throws Exception {
         mockUser();
-        when(experimentService.isRolledOut(any(), eq("chat.commands"))).thenReturn(false);
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(false);
 
         mvc.perform(withAdmin(get("/api/admin/chat-commands")))
                 .andExpect(status().isForbidden());
@@ -85,7 +85,7 @@ class ApiAdminChatCommandsControllerTest {
     @Test
     void get_returns_list_when_rolled_out() throws Exception {
         mockUser();
-        when(experimentService.isRolledOut(any(), eq("chat.commands"))).thenReturn(true);
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
         when(repository.findByUser(any())).thenReturn(List.of());
         when(catalog.allKeys()).thenReturn(Set.of("game", "store"));
         when(systemAccount.check(any(), any()))
@@ -102,7 +102,7 @@ class ApiAdminChatCommandsControllerTest {
     @Test
     void post_invalid_name_returns_400() throws Exception {
         mockUser();
-        when(experimentService.isRolledOut(any(), eq("chat.commands"))).thenReturn(true);
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
         String body = om.writeValueAsString(Map.of(
                 "name", "noBang",
@@ -121,7 +121,7 @@ class ApiAdminChatCommandsControllerTest {
     @Test
     void post_with_unknown_placeholder_returns_400() throws Exception {
         mockUser();
-        when(experimentService.isRolledOut(any(), eq("chat.commands"))).thenReturn(true);
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
         when(placeholderResolver.findUnknownPaths("Hi {game.unknown}"))
                 .thenReturn(Set.of("game.unknown"));
 
@@ -142,7 +142,7 @@ class ApiAdminChatCommandsControllerTest {
     @Test
     void post_creates_successfully() throws Exception {
         UserAccount user = mockUser();
-        when(experimentService.isRolledOut(any(), eq("chat.commands"))).thenReturn(true);
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
         when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
         when(repository.existsByUserAndName(any(), eq("!foo"))).thenReturn(false);
         when(repository.save(any())).thenAnswer(inv -> {
@@ -171,7 +171,7 @@ class ApiAdminChatCommandsControllerTest {
     @Test
     void delete_returns_404_if_user_does_not_own_command() throws Exception {
         mockUser();
-        when(experimentService.isRolledOut(any(), eq("chat.commands"))).thenReturn(true);
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
         UUID otherId = UUID.randomUUID();
         UserAccount otherOwner = new UserAccount();
