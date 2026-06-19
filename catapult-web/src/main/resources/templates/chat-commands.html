@@ -13,7 +13,7 @@
 
         <div id="botModStatusBanner" class="banner banner-warning" hidden>
             <span th:text="#{chat_commands.bot_not_modded}">
-                The Catapult bot is not a moderator of your channel. Replies are sent under your own name. Type /mod CatapultBot to enable the dedicated bot.
+                The Catapult bot is not a moderator of your channel.
             </span>
         </div>
 
@@ -25,6 +25,37 @@
         <section style="margin-top:1.5rem;">
             <h3 th:text="#{chat_commands.commands.title}">Your commands</h3>
             <ul id="commands-list" class="card-list"></ul>
+        </section>
+
+        <section style="margin-top:1.5rem;">
+            <h3 th:text="#{chat_commands.add_custom}">Add custom command</h3>
+            <form id="custom-form" style="display:flex; flex-direction:column; gap:.5rem; max-width:600px;">
+                <label>
+                    <span>Name</span>
+                    <input type="text" name="name" placeholder="!nomcommande"
+                           pattern="^![a-z][a-z0-9_]{0,30}$" required
+                           style="font-family:monospace; width:100%">
+                </label>
+                <label>
+                    <span>Template</span>
+                    <textarea name="template" rows="2" required maxlength="500"
+                              placeholder="Texte renvoyé, ex: Je joue à {game.name|}" style="width:100%"></textarea>
+                </label>
+                <label>
+                    <span>Permission</span>
+                    <select name="permission">
+                        <option value="EVERYONE">EVERYONE</option>
+                        <option value="MODERATOR">MODERATOR</option>
+                        <option value="BROADCASTER">BROADCASTER</option>
+                    </select>
+                </label>
+                <div><button type="submit" class="btn">Create</button></div>
+            </form>
+        </section>
+
+        <section style="margin-top:1.5rem;">
+            <h3>Built-in commands (read-only)</h3>
+            <ul id="builtin-list" class="card-list"></ul>
         </section>
 
         <aside class="placeholder-catalog" style="margin-top:1.5rem;">
@@ -40,16 +71,30 @@
                 <li><code>{game.store.official}</code></li>
                 <li><code>{game.igdb.url}</code></li>
             </ul>
+            <p style="font-size:.9em; opacity:.8">
+                Use <code>{path|fallback}</code> to provide a fallback text.
+                If a placeholder has no value and no fallback, the command stays silent.
+            </p>
         </aside>
     </section>
 
     <template id="command-card-tpl">
-        <li class="card">
-            <header>
-                <code class="cmd-name"></code>
-                <label><input type="checkbox" class="enabled-toggle"></label>
-            </header>
-            <p class="cmd-template"></p>
+        <li class="card" style="display:flex; flex-direction:column; gap:.5rem; padding:1rem;">
+            <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+                <input type="text" class="cmd-name" pattern="^![a-z][a-z0-9_]{0,30}$"
+                       required style="font-family:monospace; width:12em">
+                <select class="permission-select">
+                    <option value="EVERYONE">EVERYONE</option>
+                    <option value="MODERATOR">MODERATOR</option>
+                    <option value="BROADCASTER">BROADCASTER</option>
+                </select>
+                <label><input type="checkbox" class="enabled-toggle"> enabled</label>
+            </div>
+            <textarea class="cmd-template" rows="2" maxlength="500" style="width:100%"></textarea>
+            <div style="display:flex; gap:.5rem;">
+                <button type="button" class="btn save-btn">Save</button>
+                <button type="button" class="btn delete-btn" style="margin-left:auto">Delete</button>
+            </div>
         </li>
     </template>
 
@@ -61,37 +106,64 @@
         h[CSRF_HEADER] = CSRF_TOKEN;
         return h;
     }
+    function jsonHeaders() {
+        return csrfHeaders({ 'Content-Type': 'application/json' });
+    }
+    async function reportError(r) {
+        const body = await r.text().catch(() => '');
+        alert('Erreur ' + r.status + ' : ' + body);
+    }
 
     (async function () {
         const res = await fetch('/chat-commands/api');
-        if (!res.ok) {
-            const body = await res.text().catch(() => '');
-            const list = document.getElementById('commands-list');
-            if (list) {
-                while (list.firstChild) list.removeChild(list.firstChild);
-                const li = document.createElement('li');
-                li.className = 'card error';
-                li.textContent = 'Erreur API ' + res.status + ' — ' + body;
-                list.appendChild(li);
-            }
-            return;
-        }
+        if (!res.ok) { await reportError(res); return; }
         const data = await res.json();
 
         if (data.botModStatus && data.botModStatus.modded === false) {
             document.getElementById('botModStatusBanner').hidden = false;
         }
 
-        const list = document.getElementById('commands-list');
+        // ── Existing commands (editable) ──────────────────────────────────────
+        const commandsList = document.getElementById('commands-list');
         const tpl = document.getElementById('command-card-tpl').content;
         for (const cmd of (data.commands || [])) {
-            const card = tpl.cloneNode(true);
-            card.querySelector('.cmd-name').textContent = cmd.name;
-            card.querySelector('.cmd-template').textContent = cmd.template;
+            const node = tpl.cloneNode(true);
+            const card = node.querySelector('li');
+            card.dataset.id = cmd.id;
+            card.querySelector('.cmd-name').value = cmd.name;
+            card.querySelector('.cmd-template').value = cmd.template;
+            card.querySelector('.permission-select').value = cmd.permission;
             card.querySelector('.enabled-toggle').checked = cmd.enabled;
-            list.appendChild(card);
+
+            card.querySelector('.save-btn').onclick = async () => {
+                const body = {
+                    name: card.querySelector('.cmd-name').value,
+                    template: card.querySelector('.cmd-template').value,
+                    permission: card.querySelector('.permission-select').value,
+                    enabled: card.querySelector('.enabled-toggle').checked,
+                    fallbacks: {}
+                };
+                const r = await fetch('/chat-commands/api/' + cmd.id, {
+                    method: 'PUT',
+                    headers: jsonHeaders(),
+                    body: JSON.stringify(body)
+                });
+                if (r.ok) window.location.reload(); else await reportError(r);
+            };
+
+            card.querySelector('.delete-btn').onclick = async () => {
+                if (!confirm('Supprimer ' + cmd.name + ' ?')) return;
+                const r = await fetch('/chat-commands/api/' + cmd.id, {
+                    method: 'DELETE',
+                    headers: csrfHeaders()
+                });
+                if (r.ok) window.location.reload(); else await reportError(r);
+            };
+
+            commandsList.appendChild(node);
         }
 
+        // ── Presets (Add button) ──────────────────────────────────────────────
         const presetsList = document.getElementById('presets-list');
         for (const k of (data.presets || [])) {
             const li = document.createElement('li');
@@ -105,17 +177,47 @@
                     method: 'POST',
                     headers: csrfHeaders()
                 });
-                if (r.ok) {
-                    window.location.reload();
-                } else {
-                    const body = await r.text().catch(() => '');
-                    alert('Erreur ' + r.status + ' : ' + body);
-                }
+                if (r.ok) window.location.reload(); else await reportError(r);
             };
             li.appendChild(btn);
             presetsList.appendChild(li);
         }
+
+        // ── Built-in commands (read-only) ─────────────────────────────────────
+        const builtinList = document.getElementById('builtin-list');
+        for (const b of (data.builtins || [])) {
+            const li = document.createElement('li');
+            li.className = 'card';
+            const code = document.createElement('code');
+            code.textContent = b.name;
+            const meta = document.createElement('span');
+            meta.style.marginLeft = '.5rem';
+            meta.style.opacity = '.7';
+            meta.textContent = '— ' + b.permission;
+            li.appendChild(code);
+            li.appendChild(meta);
+            builtinList.appendChild(li);
+        }
     })();
+
+    // ── Custom command creation ──────────────────────────────────────────────
+    document.getElementById('custom-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const body = {
+            name: fd.get('name'),
+            template: fd.get('template'),
+            permission: fd.get('permission'),
+            enabled: true,
+            fallbacks: {}
+        };
+        const r = await fetch('/chat-commands/api', {
+            method: 'POST',
+            headers: jsonHeaders(),
+            body: JSON.stringify(body)
+        });
+        if (r.ok) window.location.reload(); else await reportError(r);
+    };
     </script>
 </body>
 </html>
