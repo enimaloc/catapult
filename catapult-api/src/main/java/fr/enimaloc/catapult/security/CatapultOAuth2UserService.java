@@ -171,12 +171,6 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             clearPendingInviteCode();
         }
 
-        // Check for pending bot-link flow before the normal login path
-        Optional<String> pendingBotLinkId = getPendingBotLinkId();
-        if (pendingBotLinkId.isPresent()) {
-            return handleBotLink(twitchId, userRequest, pendingBotLinkId.get());
-        }
-
         Optional<UserAccount> existing = userAccountRepository.findByTwitchId(twitchId);
         boolean isNew = existing.isEmpty();
         UserAccount account = existing.orElseGet(() -> createNewAccount(twitchId, twitchUsername));
@@ -273,86 +267,6 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         }
 
         oAuthTokenRepository.save(token);
-    }
-
-    private Optional<String> getPendingBotLinkId() {
-        try {
-            ServletRequestAttributes attrs =
-                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
-            HttpSession session = attrs.getRequest().getSession(false);
-            if (session == null) return Optional.empty();
-            String pending = (String) session.getAttribute(BotLinkController.SESSION_ATTR);
-            if (pending == null) return Optional.empty();
-            Long expiresAt = (Long) session.getAttribute(BotLinkController.SESSION_EXPIRES_ATTR);
-            if (expiresAt == null || expiresAt < System.currentTimeMillis()) {
-                // TTL expired: drop the pending value so it can't piggy-back on
-                // an unrelated future Twitch login.
-                session.removeAttribute(BotLinkController.SESSION_ATTR);
-                session.removeAttribute(BotLinkController.SESSION_EXPIRES_ATTR);
-                log.info("Discarded expired bot-link-pending");
-                return Optional.empty();
-            }
-            return Optional.of(pending);
-        } catch (IllegalStateException ignored) {
-            // No HTTP request context (e.g., in unit tests)
-        }
-        return Optional.empty();
-    }
-
-    private OAuth2User handleBotLink(String botTwitchId, OAuth2UserRequest userRequest, String systemAccountId) {
-        // 1. Vérifier l'admin AVANT toute mutation pour éviter qu'un appel non
-        //    authentifié au flow (le bouton est gateé côté UI mais le endpoint
-        //    /oauth2/start-bot-link n'a pas de contrôle d'auth) puisse setter
-        //    arbitrairement le twitchId du compte système.
-        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
-        CatapultOAuth2User adminUser = (currentAuth != null
-                && currentAuth.getPrincipal() instanceof CatapultOAuth2User user
-                && user.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())))
-            ? user : null;
-        if (adminUser == null) {
-            clearBotLinkPending();
-            throw new OAuth2AuthenticationException(new OAuth2Error("admin_not_authenticated"),
-                "No authenticated admin found during bot link.");
-        }
-
-        // 2. Vérifier la cible : système account existant + Twitch ID non déjà
-        //    pris par un user régulier.
-        UserAccount systemAccount = userAccountRepository.findById(UUID.fromString(systemAccountId))
-            .filter(UserAccount::isSystemAccount)
-            .orElseThrow(() -> {
-                clearBotLinkPending();
-                return new OAuth2AuthenticationException(new OAuth2Error("system_not_found"));
-            });
-
-        userAccountRepository.findByTwitchId(botTwitchId).ifPresent(existing -> {
-            if (!existing.isSystemAccount()) {
-                clearBotLinkPending();
-                throw new OAuth2AuthenticationException(new OAuth2Error("bot_twitch_id_already_taken"),
-                    "Twitch account already registered as a regular user.");
-            }
-        });
-
-        // 3. Lier.
-        systemAccount.setTwitchId(botTwitchId);
-        userAccountRepository.save(systemAccount);
-        saveToken(systemAccount, OAuthToken.Provider.TWITCH, userRequest);
-        clearBotLinkPending();
-        log.info("Bot Twitch account {} linked to system account {}", botTwitchId, systemAccountId);
-        return adminUser;
-    }
-
-    private void clearBotLinkPending() {
-        try {
-            ServletRequestAttributes attrs =
-                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
-            HttpSession session = attrs.getRequest().getSession(false);
-            if (session != null) {
-                session.removeAttribute(BotLinkController.SESSION_ATTR);
-                session.removeAttribute(BotLinkController.SESSION_EXPIRES_ATTR);
-            }
-        } catch (IllegalStateException ignored) {
-            // pas de request context
-        }
     }
 
     private Optional<String> getPendingInviteCode() {
