@@ -55,6 +55,11 @@ public class ChatCommandsApiProxyController {
     public ResponseEntity<Map<String, Object>> instantiatePreset(@PathVariable String key) {
         Map<String, Object> response = apiClient.post(
             "/api/chat-commands/presets/{key}", null, Map.class, key);
+        if (response == null) {
+            log.warn("[chat-commands proxy] POST /api/chat-commands/presets/{} returned null", key);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("error", "Failed to instantiate preset (check catapult-api logs)"));
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

@@ -92,8 +92,15 @@
             btn.type = 'button';
             btn.className = 'btn btn-sm';
             btn.textContent = 'Add';
-            btn.onclick = () => fetch('/chat-commands/api/presets/' + k, { method: 'POST' })
-                .then(() => window.location.reload());
+            btn.onclick = async () => {
+                const r = await fetch('/chat-commands/api/presets/' + k, { method: 'POST' });
+                if (r.ok) {
+                    window.location.reload();
+                } else {
+                    const body = await r.text().catch(() => '');
+                    alert('Erreur ' + r.status + ' : ' + body);
+                }
+            };
             li.appendChild(btn);
             presetsList.appendChild(li);
         }
