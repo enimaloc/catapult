@@ -113,6 +113,38 @@ public class ApiAdminMembersController {
                 new AdminMigrationService.MigrateOptions(body.migrateSettings(), body.migrateGetters(), body.migrateBindings()));
     }
 
+    /**
+     * Marque un UserAccount régulier comme compte système (le bot pour les
+     * commandes chat). Tout précédent système account est démarqué ; s'il est
+     * vide (pas de Twitch ID, créé par SystemAccountInitializer comme template
+     * de settings), il est supprimé pour éviter l'orphelin.
+     */
+    @PostMapping("/{id}/promote-to-system")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @org.springframework.transaction.annotation.Transactional
+    public void promoteToSystem(@PathVariable UUID id) {
+        UserAccount target = findOrThrow(id);
+        if (target.isSystemAccount()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Already system account");
+        }
+        if (target.getTwitchId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Target has no Twitch identity");
+        }
+        userAccountRepository.findBySystemAccountTrue().ifPresent(previous -> {
+            previous.setSystemAccount(false);
+            if (previous.getTwitchId() == null) {
+                userAccountRepository.delete(previous);
+                log.info("Deleted empty system-account placeholder {}", previous.getId());
+            } else {
+                userAccountRepository.save(previous);
+                log.info("Demoted previous system account {} (still has Twitch id, kept as regular)", previous.getId());
+            }
+        });
+        target.setSystemAccount(true);
+        userAccountRepository.save(target);
+        log.info("Promoted account {} (twitchId={}) as system account", target.getId(), target.getTwitchId());
+    }
+
     @GetMapping("/{id}")
     public MemberSummary getMember(@PathVariable UUID id) {
         UserAccount user = findOrThrow(id);
