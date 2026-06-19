@@ -61,6 +61,7 @@ public class ApiAdminChatCommandsController {
     private final SystemTwitchAccountService systemAccount;
     private final UserAccountRepository userRepo;
     private final ApplicationEventPublisher eventPublisher;
+    private final List<fr.enimaloc.catapult.chat.ChatCommand> staticCommands;
 
     public record FallbackDto(String placeholder, String fallbackText) {}
 
@@ -84,9 +85,13 @@ public class ApiAdminChatCommandsController {
 
     public record BotModStatusDto(boolean modded, Instant checkedAt) {}
 
+    /** Read-only view on a Java-coded ChatCommand (not editable by the streamer). */
+    public record BuiltinDto(String name, ChatCommandEvent.SenderRole permission) {}
+
     public record ListResponse(
         List<String> presets,
         List<CommandDto> commands,
+        List<BuiltinDto> builtins,
         BotModStatusDto botModStatus
     ) {}
 
@@ -108,9 +113,14 @@ public class ApiAdminChatCommandsController {
         List<CommandDto> commands = repository.findByUser(user).stream()
             .map(CommandDto::fromEntity).toList();
         SystemTwitchAccountService.BotModStatus s = checkBotMod(user);
+        List<BuiltinDto> builtins = staticCommands.stream()
+            .map(c -> new BuiltinDto(c.getName(), c.getRequiredPermission()))
+            .sorted((a, b) -> a.name().compareTo(b.name()))
+            .toList();
         return new ListResponse(
             new ArrayList<>(catalog.allKeys()),
             commands,
+            builtins,
             new BotModStatusDto(s.modded(), s.checkedAt())
         );
     }
