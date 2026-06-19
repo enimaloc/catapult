@@ -3,13 +3,12 @@ package fr.enimaloc.catapult.service;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
@@ -24,6 +23,19 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Manages the OAuth token of the system bot UserAccount (marked
+ * {@code systemAccount=true}) that posts chat-command responses on behalf of
+ * streamers when it is mod of their channel.
+ * <p>
+ * The bot is linked to a Twitch identity via the admin OAuth flow
+ * ({@code /admin/members/{id}/bot/link-twitch} → {@code /oauth2/start-bot-link}
+ * → {@code /oauth2/authorization/twitch}); the resulting token is stored in
+ * {@code oauth_token(user=systemAccount, provider=TWITCH)} by
+ * {@link fr.enimaloc.catapult.security.CatapultOAuth2UserService#handleBotLink}.
+ * <p>
+ * The service is a no-op until that link is performed.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -38,12 +50,10 @@ public class SystemTwitchAccountService {
     private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
     private static final String HELIX_MODERATORS_URL = "https://api.twitch.tv/helix/moderation/moderators";
 
+    private final UserAccountRepository userAccountRepository;
     private final OAuthTokenRepository tokenRepo;
     private final TokenEncryptionService encryption;
     private final RestClient restClient;
-
-    @Value("${twitch.system.user-id:}")
-    private String systemUserId;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -51,67 +61,54 @@ public class SystemTwitchAccountService {
     @Value("${twitch.client-secret:}")
     private String twitchClientSecret;
 
-    @Value("${twitch.system.refresh-token:}")
-    private String seedRefreshToken;
-
     @Value("${twitch.system.mod-cache-ttl-seconds:600}")
     private long modCacheTtlSeconds;
 
-    private volatile String accessTokenCache;
-    private volatile Instant expiresAt = Instant.EPOCH;
-
     private final Map<UUID, BotModStatus> modCache = new ConcurrentHashMap<>();
 
-    @PostConstruct
-    @Transactional
-    public void init() {
-        Optional<OAuthToken> existing = tokenRepo.findByProviderAndUserIsNull(OAuthToken.Provider.SYSTEM);
-        if (existing.isPresent()) {
-            accessTokenCache = encryption.decrypt(existing.get().getAccessToken());
-            expiresAt = existing.get().getExpiresAt() != null
-                ? existing.get().getExpiresAt() : Instant.EPOCH;
-            return;
-        }
-        if (seedRefreshToken == null || seedRefreshToken.isBlank()) {
-            log.warn("No system Twitch refresh token configured; system bot disabled");
-            return;
-        }
-        refreshFromSeed();
-    }
-
+    /**
+     * Returns a valid bot access token, refreshing it via the stored refresh
+     * token if it's within 60s of expiry. Returns {@code null} if the bot is
+     * not yet linked (no system account with a Twitch ID + token).
+     */
     public String getAccessToken() {
-        if (accessTokenCache != null && Instant.now().isAfter(expiresAt.minusSeconds(60))) {
-            refresh();
+        Optional<TokenView> view = loadCurrentToken();
+        if (view.isEmpty()) return null;
+        TokenView v = view.get();
+        if (v.expiresAt.isBefore(Instant.now().plusSeconds(60))) {
+            return refresh().orElse(null);
         }
-        return accessTokenCache;
+        return v.accessToken;
     }
 
+    /**
+     * Returns the Twitch user ID of the bot, or {@code null} if not linked.
+     */
     public String getSystemTwitchId() {
-        return systemUserId;
-    }
-
-    @Scheduled(fixedDelay = 30 * 60 * 1000L) // every 30 min
-    public void refreshIfNeeded() {
-        if (accessTokenCache != null && Instant.now().isAfter(expiresAt.minusSeconds(15 * 60))) {
-            refresh();
-        }
+        return userAccountRepository.findBySystemAccountTrue()
+            .map(UserAccount::getTwitchId)
+            .orElse(null);
     }
 
     @Transactional
-    public synchronized void refresh() {
-        OAuthToken token = tokenRepo.findByProviderAndUserIsNull(OAuthToken.Provider.SYSTEM)
-            .orElseGet(this::createSystemTokenRecord);
+    public synchronized Optional<String> refresh() {
+        Optional<UserAccount> systemAccount = userAccountRepository.findBySystemAccountTrue();
+        if (systemAccount.isEmpty() || systemAccount.get().getTwitchId() == null) {
+            return Optional.empty();
+        }
+        Optional<OAuthToken> tokenOpt = tokenRepo.findByUserAndProvider(systemAccount.get(),
+            OAuthToken.Provider.TWITCH);
+        if (tokenOpt.isEmpty() || tokenOpt.get().getRefreshToken() == null) {
+            log.warn("System bot Twitch refresh impossible: no refresh token stored");
+            return Optional.empty();
+        }
+        OAuthToken token = tokenOpt.get();
         String currentRefresh = encryption.decrypt(token.getRefreshToken());
-        callRefreshAndUpdate(token, currentRefresh);
-    }
-
-    private void refreshFromSeed() {
-        OAuthToken token = createSystemTokenRecord();
-        callRefreshAndUpdate(token, seedRefreshToken);
+        return callRefreshAndUpdate(token, currentRefresh);
     }
 
     @SuppressWarnings("unchecked")
-    private void callRefreshAndUpdate(OAuthToken token, String refreshToken) {
+    private Optional<String> callRefreshAndUpdate(OAuthToken token, String refreshToken) {
         String body = "grant_type=refresh_token"
             + "&refresh_token=" + URLEncoder.encode(refreshToken, StandardCharsets.UTF_8)
             + "&client_id=" + URLEncoder.encode(twitchClientId, StandardCharsets.UTF_8)
@@ -125,34 +122,28 @@ public class SystemTwitchAccountService {
                 .body(Map.class);
             if (response == null) {
                 log.error("System Twitch refresh returned null response");
-                return;
+                return Optional.empty();
             }
             String access = (String) response.get("access_token");
             String newRefresh = (String) response.get("refresh_token");
             Number expiresIn = (Number) response.get("expires_in");
 
             token.setAccessToken(encryption.encrypt(access));
-            token.setRefreshToken(encryption.encrypt(newRefresh));
+            if (newRefresh != null) {
+                token.setRefreshToken(encryption.encrypt(newRefresh));
+            }
             token.setExpiresAt(Instant.now().plusSeconds(expiresIn.longValue()));
             tokenRepo.save(token);
-
-            accessTokenCache = access;
-            expiresAt = token.getExpiresAt();
-            log.info("System Twitch token refreshed");
+            log.info("System bot Twitch token refreshed");
+            return Optional.of(access);
         } catch (RestClientResponseException e) {
-            // Only log the status/reason; never the URI or body to avoid leaking the secret in logs.
-            log.error("System Twitch refresh HTTP error: {} {}",
+            log.error("System bot Twitch refresh HTTP error: {} {}",
                 e.getStatusCode().value(), e.getStatusText());
+            return Optional.empty();
         } catch (Exception e) {
-            log.error("System Twitch refresh failed: {}", e.getClass().getSimpleName());
+            log.error("System bot Twitch refresh failed: {}", e.getClass().getSimpleName());
+            return Optional.empty();
         }
-    }
-
-    private OAuthToken createSystemTokenRecord() {
-        OAuthToken t = new OAuthToken();
-        t.setProvider(OAuthToken.Provider.SYSTEM);
-        t.setUser(null);
-        return t;
     }
 
     public BotModStatus check(UserAccount user, String streamerToken) {
@@ -172,10 +163,12 @@ public class SystemTwitchAccountService {
 
     @SuppressWarnings("unchecked")
     private BotModStatus fetchModStatus(UserAccount user, String streamerToken) {
+        String botTwitchId = getSystemTwitchId();
+        if (botTwitchId == null) return BotModStatus.ofModded(false);
         try {
             Map<String, Object> response = restClient.get()
                 .uri(HELIX_MODERATORS_URL + "?broadcaster_id=" + user.getTwitchId()
-                    + "&user_id=" + systemUserId)
+                    + "&user_id=" + botTwitchId)
                 .header("Authorization", "Bearer " + streamerToken)
                 .header("Client-Id", twitchClientId)
                 .retrieve()
@@ -187,4 +180,15 @@ public class SystemTwitchAccountService {
             return BotModStatus.ofModded(false);
         }
     }
+
+    private Optional<TokenView> loadCurrentToken() {
+        return userAccountRepository.findBySystemAccountTrue()
+            .filter(a -> a.getTwitchId() != null)
+            .flatMap(a -> tokenRepo.findByUserAndProvider(a, OAuthToken.Provider.TWITCH))
+            .map(t -> new TokenView(
+                encryption.decrypt(t.getAccessToken()),
+                t.getExpiresAt() != null ? t.getExpiresAt() : Instant.EPOCH));
+    }
+
+    private record TokenView(String accessToken, Instant expiresAt) {}
 }
