@@ -73,10 +73,9 @@ public class ApiClient {
 
     public <T> T post(String path, Object body, Class<T> responseType, Object... uriVars) {
         try {
-            return restClient.post()
-                    .uri(path, uriVars)
-                    .body(body)
-                    .retrieve()
+            var spec = restClient.post().uri(path, uriVars);
+            // RestClient.RequestBodySpec#body(null) NPEs on body.getClass(); skip when no payload.
+            return (body == null ? spec.retrieve() : spec.body(body).retrieve())
                     .body(responseType);
         } catch (Exception e) {
             log.warn("POST {} failed: {}", path, e.getMessage());
