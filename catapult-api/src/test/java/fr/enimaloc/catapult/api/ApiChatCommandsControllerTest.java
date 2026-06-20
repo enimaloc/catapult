@@ -42,10 +42,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(
-        controllers = ApiAdminChatCommandsController.class,
+        controllers = ApiChatCommandsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-class ApiAdminChatCommandsControllerTest {
+class ApiChatCommandsControllerTest {
 
     @Autowired MockMvc mvc;
     final ObjectMapper om = new ObjectMapper();
