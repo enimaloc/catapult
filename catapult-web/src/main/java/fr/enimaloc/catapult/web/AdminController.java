@@ -203,7 +203,7 @@ public class AdminController {
     public String steamKeysPage(Model model) {
         SteamKeysPageDto data = apiClient.get("/api/admin/steam-keys", SteamKeysPageDto.class);
         if (data != null) {
-            model.addAttribute("keyStatuses", data.keyStatuses());
+            model.addAttribute("keys", data.keys());
             model.addAttribute("steamEnabled", data.steamEnabled());
         }
         return "admin/steam-keys";
@@ -216,8 +216,8 @@ public class AdminController {
     }
 
     @PostMapping("/steam-keys/delete")
-    public String deleteSteamKey(@RequestParam String apiKey) {
-        apiClient.post("/api/admin/steam-keys/delete", Map.of("apiKey", apiKey));
+    public String deleteSteamKey(@RequestParam String keyId) {
+        apiClient.post("/api/admin/steam-keys/delete", Map.of("keyId", keyId));
         return "redirect:/admin/steam-keys";
     }
 
@@ -225,6 +225,63 @@ public class AdminController {
     public String refreshSteamKeys() {
         apiClient.post("/api/admin/steam-keys/refresh", null);
         return "redirect:/admin/steam-keys";
+    }
+
+    // ── DTDD Keys ────────────────────────────────────────────────────────────
+
+    @GetMapping("/dtdd-keys")
+    public String dtddKeysPage(Model model) {
+        DtddKeysPageDto data = apiClient.get("/api/admin/dtdd-keys", DtddKeysPageDto.class);
+        if (data != null) {
+            model.addAttribute("keys", data.keys());
+            model.addAttribute("dtddEnabled", data.dtddEnabled());
+        }
+        return "admin/dtdd-keys";
+    }
+
+    @PostMapping("/dtdd-keys/add")
+    public String addDtddKey(@RequestParam String apiKey) {
+        apiClient.post("/api/admin/dtdd-keys/add", Map.of("apiKey", apiKey));
+        return "redirect:/admin/dtdd-keys";
+    }
+
+    @PostMapping("/dtdd-keys/delete")
+    public String deleteDtddKey(@RequestParam String keyId) {
+        apiClient.post("/api/admin/dtdd-keys/delete", Map.of("keyId", keyId));
+        return "redirect:/admin/dtdd-keys";
+    }
+
+    @PostMapping("/dtdd-keys/refresh")
+    public String refreshDtddKeys() {
+        apiClient.post("/api/admin/dtdd-keys/refresh", null);
+        return "redirect:/admin/dtdd-keys";
+    }
+
+    // ── DTDD Mapping ─────────────────────────────────────────────────────────
+
+    @GetMapping("/dtdd-mapping")
+    public String dtddMappingPage(@RequestParam(defaultValue = "PENDING") String status, Model model) {
+        @SuppressWarnings("unchecked")
+        java.util.List<java.util.Map<String, Object>> proposals = apiClient.get(
+            "/api/admin/dtdd-mapping/proposals?status={s}",
+            new org.springframework.core.ParameterizedTypeReference<java.util.List<java.util.Map<String, Object>>>() {},
+            status);
+        model.addAttribute("proposals", proposals != null ? proposals : java.util.List.of());
+        model.addAttribute("currentStatus", status);
+        return "admin/dtdd-mapping";
+    }
+
+    @PostMapping("/dtdd-mapping/proposals/{id}/approve")
+    public String approveDtddProposal(@PathVariable UUID id) {
+        apiClient.post("/api/admin/dtdd-mapping/proposals/" + id + "/approve", null);
+        return "redirect:/admin/dtdd-mapping";
+    }
+
+    @PostMapping("/dtdd-mapping/proposals/{id}/reject")
+    public String rejectDtddProposal(@PathVariable UUID id, @RequestParam(required = false) String reason) {
+        apiClient.post("/api/admin/dtdd-mapping/proposals/" + id + "/reject",
+            reason != null ? Map.of("reason", reason) : Map.of());
+        return "redirect:/admin/dtdd-mapping";
     }
 
     // ── Experiments ──────────────────────────────────────────────────────────
@@ -361,9 +418,11 @@ public class AdminController {
 
     record AdminMembersPageDto(List<MemberDto> members, Map<String, Boolean> liveStatus, boolean isMockProfile) {}
 
-    record KeyStatusDto(String masked, String owner, boolean blocked, long blockedForSeconds) {}
+    record KeyStatusDto(String id, String masked, String owner, boolean blocked, long blockedForSeconds) {}
 
-    record SteamKeysPageDto(Map<String, KeyStatusDto> keyStatuses, boolean steamEnabled) {}
+    record SteamKeysPageDto(java.util.List<KeyStatusDto> keys, boolean steamEnabled) {}
+
+    record DtddKeysPageDto(java.util.List<KeyStatusDto> keys, boolean dtddEnabled) {}
 
     record MemberSummaryDto(UUID id, String twitchUsername) {}
 }

@@ -19,6 +19,9 @@
         </div>
         <div th:replace="~{fragments/bindings :: bindings}"></div>
         <th:block th:if="${chatCommandsRolledOut}"><div th:replace="~{fragments/chat-commands-card :: chat-commands-card}"></div></th:block>
+        <div th:attr="hx-get=@{/channels/{u}/fragments/dtdd-mapping(u=${channelUsername})}" hx-trigger="load" hx-swap="outerHTML">
+            <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
+        </div>
         <div th:replace="~{fragments/danger-zone :: danger-zone}"></div>
 
         <!-- Modal Steam privacy -->
@@ -175,5 +178,6 @@
             es.onerror = function () { es.close(); };
         })();
     </script>
+    <div th:replace="~{fragments/dtdd-mapping :: dtdd-mapping-script}"></div>
 </body>
 </html>
