@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,13 +36,16 @@ class GameContextServiceTest {
     @Mock
     private IgdbGameDetailsService igdbGameDetailsService;
 
-    @InjectMocks
+    @Mock
+    private IgdbGameCclRepository igdbGameCclRepository;
+
     private GameContextService service;
 
     private UserAccount user;
 
     @BeforeEach
     void setUp() {
+        service = new GameContextService(igdbService, igdbGameDetailsService, igdbGameCclRepository, null);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
