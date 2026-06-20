@@ -41,14 +41,14 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Admin REST endpoints for managing chat command definitions owned by the current user.
+ * REST endpoints for managing chat command definitions owned by the current user.
  *
  * <p>All endpoints are gated by the {@code chat.commands} experiment.</p>
  */
 @RestController
 @RequestMapping("/api/chat-commands")
 @RequiredArgsConstructor
-public class ApiAdminChatCommandsController {
+public class ApiChatCommandsController {
 
     public static final String EXPERIMENT_KEY = "chat.commands";
 
