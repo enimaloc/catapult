@@ -223,8 +223,15 @@ public class ApiAdminChatCommandsController {
      * available in the controller — the full mod-status check is exercised lazily at
      * sendMessage time. We pass an empty token here; {@link SystemTwitchAccountService#check}
      * is expected to gracefully fall back to "not modded" on auth failure and cache it.
+     * <p>
+     * When no system bot is configured, the mod check makes no sense — the streamer's
+     * own account is used for sending — so we short-circuit to "modded=true" to keep
+     * the banner hidden.
      */
     private SystemTwitchAccountService.BotModStatus checkBotMod(UserAccount user) {
+        if (systemAccount.getSystemTwitchId() == null) {
+            return new SystemTwitchAccountService.BotModStatus(true, Instant.now());
+        }
         try {
             return systemAccount.check(user, "");
         } catch (Exception e) {
