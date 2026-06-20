@@ -256,11 +256,10 @@ public class ApiAdminChatCommandsController {
     }
 
     private void applyRequest(ChatCommandDefinition def, UpsertRequest req) {
-        // Built-ins ont leur nom verrouillé (la dispatch Java cherche un nom
-        // fixe — renommer briserait le lien).
-        if (!ChatCommandPresetCatalog.isBuiltin(def)) {
-            def.setName(req.name());
-        }
+        // Renommage autorisé même pour les built-ins : le DynamicCommandResolver
+        // route les rows builtin vers le bean Java statique via leur presetKey,
+        // donc le nom peut diverger de cmd.getName() sans casser la dispatch.
+        def.setName(req.name());
         def.setTemplate(req.template());
         def.setPermission(req.permission());
         def.setEnabled(req.enabled());

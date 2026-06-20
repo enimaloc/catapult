@@ -47,7 +47,10 @@ public class SetGameCommand implements ChatCommand {
 
     @Override
     public Object execute(UserAccount user, List<String> args) {
-        Optional<ChatCommandDefinition> defOpt = definitionRepository.findByUserAndName(user, getName());
+        // Lookup par presetKey (pas par nom) car l'utilisateur peut renommer
+        // la commande tout en gardant l'action Java associée.
+        Optional<ChatCommandDefinition> defOpt = definitionRepository.findByUserAndPresetKey(
+            user, "builtin:" + getName().replaceFirst("^!", ""));
         if (defOpt.isPresent() && !defOpt.get().isEnabled()) {
             return null; // explicitement désactivé par le streamer
         }
