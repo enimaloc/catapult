@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.getter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Profile;
@@ -27,6 +28,7 @@ public class RealDtddApiClient implements DtddApiClient {
     private final RestClient client;
     private final DtddApiKeyRotator rotator;
 
+    @Autowired
     public RealDtddApiClient(@Value("${dtdd.api-base-url}") String baseUrl,
                              DtddApiKeyRotator rotator) {
         this(RestClient.builder().baseUrl(baseUrl).build(), rotator);
