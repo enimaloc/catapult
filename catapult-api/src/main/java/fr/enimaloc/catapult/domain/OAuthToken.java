@@ -17,15 +17,15 @@ import java.util.UUID;
 public class OAuthToken {
 
     public enum Provider {
-        TWITCH, STEAM
+        TWITCH, STEAM, SYSTEM
     }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
     private UserAccount user;
 
     @Enumerated(EnumType.STRING)

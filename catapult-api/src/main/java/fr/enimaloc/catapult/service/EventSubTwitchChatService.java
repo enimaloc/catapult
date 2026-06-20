@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private final ApplicationEventPublisher eventPublisher;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final SystemTwitchAccountService systemTwitchAccountService;
+    private final MeterRegistry meterRegistry;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -251,22 +254,52 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void sendMessage(UserAccount user, String message) {
-        oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .ifPresent(token -> {
-                String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
-                try {
-                    restClient.post()
-                        .uri(HELIX_CHAT_URL)
-                        .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                        .header(CLIENT_ID, twitchClientId)
-                        .body(Map.of("broadcaster_id", user.getTwitchId(),
-                            "sender_id", user.getTwitchId(), "message", message))
-                        .retrieve()
-                        .toBodilessEntity();
-                } catch (Exception e) {
-                    log.warn("[EventSub Chat] sendMessage failed for user {}: {}", user.getId(), e.getMessage());
-                }
-            });
+        // 1. Si un compte système est configuré (i.e. promu via /admin/members
+        //    et donc présent dans oauth_token), on envoie via lui. Le bot peut
+        //    poster même sans être mod du canal — Twitch ne bloque pas
+        //    l'envoi, il applique simplement un rate-limit plus strict pour
+        //    les non-mods.
+        String botAccess = systemTwitchAccountService.getAccessToken();
+        String botTwitchId = systemTwitchAccountService.getSystemTwitchId();
+        if (botAccess != null && botTwitchId != null
+            && trySend(user, message, botAccess, botTwitchId, "bot")) {
+            return;
+        }
+
+        // 2. Fallback : pas de compte système OU l'envoi via bot a échoué.
+        //    On utilise le token Twitch du streamer.
+        Optional<OAuthToken> streamerToken = oAuthTokenRepository
+            .findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
+        if (streamerToken.isEmpty()) {
+            log.warn("[EventSub Chat] sendMessage: no system bot AND no streamer token for user {}",
+                user.getId());
+            return;
+        }
+        String streamerAccess = tokenEncryptionService.decrypt(streamerToken.get().getAccessToken());
+        trySend(user, message, streamerAccess, user.getTwitchId(), "streamer");
+    }
+
+    private boolean trySend(UserAccount user, String message, String accessToken,
+                            String senderId, String senderLabel) {
+        try {
+            restClient.post()
+                .uri(HELIX_CHAT_URL)
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
+                .body(Map.of("broadcaster_id", user.getTwitchId(),
+                    "sender_id", senderId, "message", message))
+                .retrieve()
+                .toBodilessEntity();
+            meterRegistry.counter("catapult.chat.commands.send",
+                "sender", senderLabel, "outcome", "success").increment();
+            return true;
+        } catch (Exception e) {
+            meterRegistry.counter("catapult.chat.commands.send",
+                "sender", senderLabel, "outcome", "failed").increment();
+            log.warn("[EventSub Chat] sendMessage failed ({}) for user {}: {}",
+                senderLabel, user.getId(), e.getMessage());
+            return false;
+        }
     }
 
     @Override

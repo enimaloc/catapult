@@ -142,11 +142,15 @@
                                         <a th:href="@{/admin/members/{id}/settings(id=${member.id})}"
                                            class="dropdown-item"
                                            th:text="#{admin.members.actions.edit_settings}">Modifier les settings…</a>
-                                        <a th:href="@{/admin/members/{id}/bot/link-twitch(id=${member.id})}"
-                                           class="dropdown-item"
-                                           th:text="#{admin.members.actions.link_bot}">Lier le Bot Twitch…</a>
                                     </th:block>
                                     <th:block th:unless="${member.systemAccount}">
+                                        <form th:if="${member.twitchId != null}" th:action="@{/admin/members/{id}/promote-to-system(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <button type="submit" class="dropdown-item"
+                                                    th:text="#{admin.members.actions.promote_to_system}"
+                                                    th:data-confirm="#{admin.members.actions.promote_to_system.confirm(${member.twitchUsername ?: '—'})}"
+                                                    onclick="return confirm(this.dataset.confirm)">Marquer comme compte système…</button>
+                                        </form>
                                         <form th:if="${member.steamId != null}" th:action="@{/admin/members/{id}/steam/unlink(id=${member.id})}" method="post"> <!-- nosemgrep -->
                                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="dropdown-item"

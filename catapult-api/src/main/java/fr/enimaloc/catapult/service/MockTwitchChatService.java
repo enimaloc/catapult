@@ -6,10 +6,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "app.chat.provider", havingValue = "mock", matchIfMissing = true)
 public class MockTwitchChatService implements TwitchChatService {
+
+    private final Map<UUID, String> lastMessageByUser = new ConcurrentHashMap<>();
 
     @Override
     public void connect(UserAccount user) {
@@ -24,6 +30,17 @@ public class MockTwitchChatService implements TwitchChatService {
     @Override
     public void sendMessage(UserAccount user, String message) {
         log.info("[Mock Chat] sendMessage() for {}: {}", user.getTwitchUsername(), message);
+        lastMessageByUser.put(user.getId(), message);
+    }
+
+    /** Returns the last chat message captured for the given user, or {@code null} if none. */
+    public String lastMessageFor(UUID userId) {
+        return lastMessageByUser.get(userId);
+    }
+
+    /** Clears all captured chat messages (useful for test isolation). */
+    public void clearMessages() {
+        lastMessageByUser.clear();
     }
 
     @Override

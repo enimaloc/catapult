@@ -88,6 +88,18 @@ public class AdminController {
         return "redirect:/admin/members";
     }
 
+    /**
+     * Marque un compte régulier comme compte système (le bot pour les commandes
+     * chat). Le compte cible doit déjà être logué via Twitch ; l'admin déclenche
+     * juste le flip du flag. Un éventuel compte système placeholder vide est
+     * démarqué côté API.
+     */
+    @PostMapping("/members/{id}/promote-to-system")
+    public String promoteToSystem(@PathVariable UUID id) {
+        apiClient.post("/api/admin/members/{id}/promote-to-system", null, id);
+        return "redirect:/admin/members";
+    }
+
     @PostMapping("/members/{id}/delete")
     public String deleteMember(@PathVariable UUID id) {
         apiClient.post("/api/admin/members/{id}/delete", null, id);
