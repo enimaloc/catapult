@@ -26,6 +26,7 @@ public class ChatCommandPresetCatalog {
         PRESETS.put("store",       new Preset("store",       ChatCommandEvent.SenderRole.EVERYONE));
         PRESETS.put("release",     new Preset("release",     ChatCommandEvent.SenderRole.EVERYONE));
         PRESETS.put("igdb",        new Preset("igdb",        ChatCommandEvent.SenderRole.EVERYONE));
+        PRESETS.put("triggers",    new Preset("triggers",    ChatCommandEvent.SenderRole.EVERYONE));
     }
 
     public static final String BUILTIN_PRESET_KEY_PREFIX = "builtin:";
