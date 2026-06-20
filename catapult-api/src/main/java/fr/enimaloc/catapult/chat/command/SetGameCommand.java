@@ -20,7 +20,7 @@ import java.util.Set;
  * Permission par défaut : MODERATOR.
  * <p>
  * La réponse texte est customisable via une {@link ChatCommandDefinition}
- * (préchargée par {@code ChatCommandPresetCatalog.bootstrapDisabled}). Le
+ * (préchargée par {@code ChatCommandPresetCatalog.ensureBuiltins}). Le
  * template support le placeholder {@code {args}} qui est remplacé par la liste
  * des arguments tapés ; pas d'autre placeholder résolu ici (le contexte de
  * jeu courant n'est pas encore mis à jour à l'instant du dispatch).

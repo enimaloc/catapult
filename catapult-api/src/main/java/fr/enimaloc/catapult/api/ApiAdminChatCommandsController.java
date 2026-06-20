@@ -105,11 +105,15 @@ public class ApiAdminChatCommandsController {
     public ListResponse list(@AuthenticationPrincipal Jwt jwt) {
         UserAccount user = currentUser(jwt);
         gate(user);
-        // First visit: bootstrap all presets (disabled). Subsequent calls find
-        // the existing rows and skip the bootstrap path.
+        // Built-ins (e.g. !setgame) are always ensured — they evolve as new
+        // Java ChatCommand beans get registered, and their deletion is not
+        // meaningful (the action stays in code).
+        catalog.ensureBuiltins(user, Locale.FRANCE);
         List<ChatCommandDefinition> existing = repository.findByUser(user);
-        if (existing.isEmpty()) {
-            catalog.bootstrapDisabled(user, Locale.FRANCE);
+        // First-ever visit: also seed all data-driven presets disabled.
+        // After that, a user can delete them freely without them coming back.
+        if (existing.stream().allMatch(ChatCommandPresetCatalog::isBuiltin)) {
+            catalog.bootstrapPresetsDisabled(user, Locale.FRANCE);
             existing = repository.findByUser(user);
         }
         List<CommandDto> commands = existing.stream()
