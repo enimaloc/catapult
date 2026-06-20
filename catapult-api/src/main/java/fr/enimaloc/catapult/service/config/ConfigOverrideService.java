@@ -44,6 +44,7 @@ public class ConfigOverrideService {
         String mod = normalizeModule(module);
         if (MODULE_API.equals(mod)) {
             validate(key);
+            validateValue(key, newValue);
         }
         boolean secret = isSecret(key);
 
@@ -119,6 +120,40 @@ public class ConfigOverrideService {
         }
         if (props.getExposedPrefixes().stream().noneMatch(key::startsWith)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Key not exposable");
+        }
+    }
+
+    void validateValue(String key, String value) {
+        if (value == null) return;
+        if (key.equals("dtdd.match.min-confidence") || key.equals("dtdd.match.min-candidate-score")) {
+            double d = parseDouble(key, value);
+            if (d < 0.0 || d > 1.0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, key + " must be in [0.0, 1.0]");
+            }
+        } else if (key.startsWith("dtdd.match.weight-")) {
+            double d = parseDouble(key, value);
+            if (d < 0.0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, key + " must be >= 0");
+            }
+        } else if (key.startsWith("dtdd.cache.") && (key.contains("ttl-hours") || key.contains("ttl-days"))) {
+            long n = parseLong(key, value);
+            if (n <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, key + " must be > 0");
+            }
+        }
+    }
+
+    private static double parseDouble(String key, String value) {
+        try { return Double.parseDouble(value); }
+        catch (NumberFormatException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, key + " must be a number");
+        }
+    }
+
+    private static long parseLong(String key, String value) {
+        try { return Long.parseLong(value); }
+        catch (NumberFormatException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, key + " must be an integer");
         }
     }
 

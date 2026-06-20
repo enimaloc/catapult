@@ -89,10 +89,42 @@ class PlaceholderResolverTest {
             new DetectedGame("1", GameBinding.SourceType.STEAM, "Halo"),
             "100", "Halo", null,
             LocalDate.of(2024, 3, 14),
-            Map.of(), null, null);
+            Map.of(), null, null, null, null);
         Optional<String> result = resolver.resolve(
             "{game.release_date}", ctx, Map.of(), Locale.FRANCE);
         assertThat(result).contains("14/03/2024");
+    }
+
+    @Test
+    void resolves_dtddYes() {
+        var topics = new fr.enimaloc.catapult.getter.DtddApiClient.DtddTopics(
+            java.util.List.of("A dog dies", "Flashing lights"),
+            java.util.List.of(), java.util.List.of());
+        GameContext ctx = new GameContext(
+            new DetectedGame("1", GameBinding.SourceType.STEAM, "Stardew"),
+            "100", "Stardew", null, null, Map.of(), null, null, topics, null);
+        assertThat(resolver.resolve("Triggers: {dtdd.yes}", ctx, Map.of(), Locale.ENGLISH))
+            .contains("Triggers: A dog dies, Flashing lights");
+    }
+
+    @Test
+    void resolves_gameAgerating() {
+        GameContext ctx = new GameContext(
+            new DetectedGame("1", GameBinding.SourceType.STEAM, "Stardew"),
+            "100", "Stardew", null, null, Map.of(), null, null, null, "PEGI 12 — Violence");
+        assertThat(resolver.resolve("Rated: {game.agerating}", ctx, Map.of(), Locale.ENGLISH))
+            .contains("Rated: PEGI 12 — Violence");
+    }
+
+    @Test
+    void resolves_dtddYesEmpty_skipsWhenNoFallback() {
+        var topics = new fr.enimaloc.catapult.getter.DtddApiClient.DtddTopics(
+            java.util.List.of(), java.util.List.of(), java.util.List.of());
+        GameContext ctx = new GameContext(
+            new DetectedGame("1", GameBinding.SourceType.STEAM, "Stardew"),
+            "100", "Stardew", null, null, Map.of(), null, null, topics, null);
+        assertThat(resolver.resolve("Just {dtdd.yes}", ctx, Map.of(), Locale.ENGLISH))
+            .isEmpty();
     }
 
     @Test
@@ -112,6 +144,6 @@ class PlaceholderResolverTest {
     private GameContext contextWithName(String name) {
         return new GameContext(
             new DetectedGame("1", GameBinding.SourceType.STEAM, name),
-            "100", name, null, null, Map.of(), null, null);
+            "100", name, null, null, Map.of(), null, null, null, null);
     }
 }
