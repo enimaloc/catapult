@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 @RequestMapping("/api/admin/dtdd-keys")
 public class ApiAdminDtddKeysController {
 
-    private static final Pattern KEY_PATTERN = Pattern.compile("[A-Za-z0-9]{16,128}");
+    private static final Pattern KEY_PATTERN = Pattern.compile("ddd_[A-Za-z0-9]{16,128}");
 
     private final DtddApiKeyRepository repository;
     private final DtddApiKeyRotator rotator;
