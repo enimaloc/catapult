@@ -157,6 +157,7 @@
                     const badge = row.querySelector('.builtin-badge');
                     badge.hidden = false;
                     badge.title = I18N.builtinTooltip;
+                    row.querySelector('.cmd-name').disabled = true;
                     deleteBtn.remove();
                 }
                 tbody.appendChild(node);
