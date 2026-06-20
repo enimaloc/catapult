@@ -9,7 +9,8 @@ Outil d'automatisation pour streamers Twitch : détecte le jeu en cours et met �
 
 - **Détection automatique du jeu** via Steam, Xbox et Battle.net (chaîne de priorité configurable)
 - **Mise à jour Twitch** — catégorie et labels CCL synchronisés à chaque changement de jeu
-- **Commandes chat data-driven** — presets `!game`, `!description`, `!store`, `!release`, `!igdb` (templates customisables avec placeholders `{game.name|fallback}`), `!setgame` côté modération. Réponses postées par un compte bot dédié quand il est `/mod` du canal, sinon fallback transparent sur le compte du streamer. Gateé par l'experiment `chat.commands` (rolling release).
+- **Commandes chat data-driven** — presets `!game`, `!description`, `!store`, `!release`, `!igdb`, `!triggers` (templates customisables avec placeholders `{game.name|fallback}`, `{dtdd.yes|no|mostly}`, `{game.agerating}`), `!setgame` côté modération. Réponses postées par un compte bot dédié quand il est `/mod` du canal, sinon fallback transparent sur le compte du streamer. Gateé par l'experiment `chat.commands` (rolling release).
+- **Trigger warnings DoesTheDogDie** — intégration optionnelle de [doesthedogdie.com](https://www.doesthedogdie.com) avec pool de clés API rotatif, cache à 3 niveaux, mapping IGDB→DTDD revue par streamer/admin, et placeholders `{dtdd.*}` pour les chat commands.
 - **Interface d'administration** — gestion des bindings jeu, des règles CCL et des paramètres utilisateur
 - **A/B testing** — moteur d'expérimentation interne, avec support optionnel Unleash, GrowthBook et GitLab Feature Flags
 - **Métriques Prometheus** exposées sur `/actuator/prometheus`
@@ -47,6 +48,7 @@ L'application est accessible sur `http://localhost:8080`.
 | `BATTLENET_CLIENT_ID` | Non | Client ID Battle.net |
 | `BATTLENET_CLIENT_SECRET` | Non | Client Secret Battle.net |
 | `IGDB_CLIENT_ID` | Non | Client ID IGDB (utilise `TWITCH_CLIENT_ID` si absent) |
+| `DTDD_ENABLED` | Non | Active l'intégration DoesTheDogDie (clés gérées dans l'admin `/admin/dtdd-keys`) |
 
 > Le compte bot Twitch (utilisé pour répondre aux commandes chat) se configure depuis l'admin : page Membres → "Lier le Bot Twitch" sur le compte système (qui démarre un flow OAuth Twitch dédié, le token est stocké chiffré en base). Tant que cette liaison n'est pas faite, les réponses passent par le compte du streamer.
 
