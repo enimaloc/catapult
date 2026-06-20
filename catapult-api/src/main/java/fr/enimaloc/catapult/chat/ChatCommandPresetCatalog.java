@@ -80,8 +80,13 @@ public class ChatCommandPresetCatalog {
      * voie d'emblée toutes les commandes pré-configurées et n'ait qu'à les
      * activer.
      */
-    public void bootstrapDisabled(UserAccount user, Locale locale) {
-        // 1. Presets data-driven (désactivés par défaut).
+    /**
+     * Pré-enregistre les presets data-driven (game, description, store...) pour
+     * {@code user}, désactivés par défaut. À n'appeler que lors du tout premier
+     * affichage de la page (liste vide) pour respecter une éventuelle
+     * suppression manuelle ultérieure.
+     */
+    public void bootstrapPresetsDisabled(UserAccount user, Locale locale) {
         for (Map.Entry<String, Preset> entry : PRESETS.entrySet()) {
             String presetKey = entry.getKey();
             Preset preset = entry.getValue();
@@ -98,8 +103,16 @@ public class ChatCommandPresetCatalog {
             def.setPresetKey(presetKey);
             repository.save(def);
         }
-        // 2. Commandes Java (built-in) : nom verrouillé, template editable,
-        //    activé par défaut puisque la logique d'action existait déjà.
+    }
+
+    /**
+     * Garantit qu'une ligne ChatCommandDefinition existe pour chaque commande
+     * Java (built-in) pour {@code user}. À appeler à chaque visite : les
+     * built-ins évoluent quand de nouveaux beans {@link ChatCommand} sont
+     * ajoutés au code, et la suppression d'une built-in n'a pas de sens
+     * (l'action Java reste).
+     */
+    public void ensureBuiltins(UserAccount user, Locale locale) {
         for (ChatCommand cmd : staticCommands) {
             String name = cmd.getName();
             if (repository.existsByUserAndName(user, name)) continue;
