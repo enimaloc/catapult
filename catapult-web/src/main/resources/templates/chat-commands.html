@@ -19,18 +19,17 @@
 
         <section style="margin-top:1.5rem;">
             <h3 th:text="#{chat_commands.commands.title}">Your commands</h3>
-            <p style="opacity:.8; font-size:.9em;">
-                Tous les presets sont pré-enregistrés désactivés. Coche
-                « enabled » et clique « Save » pour activer.
+            <p style="opacity:.8; font-size:.9em;" th:text="#{chat_commands.intro}">
+                Tous les presets sont pré-enregistrés désactivés.
             </p>
             <table class="commands-table" style="width:100%; border-collapse:collapse;">
                 <thead>
-                    <tr style="text-align:left; border-bottom:1px solid currentColor; opacity:.7;">
-                        <th style="padding:.5rem .5rem;">Nom</th>
-                        <th style="padding:.5rem .5rem;">Réponse</th>
-                        <th style="padding:.5rem .5rem;">Permission</th>
-                        <th style="padding:.5rem .5rem; text-align:center;">Activé</th>
-                        <th style="padding:.5rem .5rem;">Actions</th>
+                    <tr style="text-align:left; border-bottom:1px solid var(--border); color:var(--text-muted);">
+                        <th style="padding:.5rem .5rem;" th:text="#{chat_commands.column.name}">Name</th>
+                        <th style="padding:.5rem .5rem;" th:text="#{chat_commands.column.response}">Response</th>
+                        <th style="padding:.5rem .5rem;" th:text="#{chat_commands.column.permission}">Permission</th>
+                        <th style="padding:.5rem .5rem; text-align:center;" th:text="#{chat_commands.column.enabled}">Enabled</th>
+                        <th style="padding:.5rem .5rem;" th:text="#{chat_commands.column.actions}">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="commands-tbody"></tbody>
@@ -41,27 +40,27 @@
             <h3 th:text="#{chat_commands.add_custom}">Add custom command</h3>
             <form id="custom-form" style="display:flex; flex-direction:column; gap:.75rem; max-width:600px;">
                 <div class="form-field">
-                    <label for="custom-name">Name</label>
+                    <label for="custom-name" th:text="#{chat_commands.column.name}">Name</label>
                     <input id="custom-name" class="form-input" type="text" name="name"
-                           placeholder="!nomcommande"
+                           th:placeholder="#{chat_commands.field.name.placeholder}"
                            pattern="^![a-z][a-z0-9_]{0,30}$" required
                            style="font-family:monospace;">
                 </div>
                 <div class="form-field">
-                    <label for="custom-template">Template</label>
+                    <label for="custom-template" th:text="#{chat_commands.column.response}">Response</label>
                     <textarea id="custom-template" class="form-input" name="template" rows="2"
                               required maxlength="500"
-                              placeholder="Texte renvoyé, ex: Je joue à {game.name|}"></textarea>
+                              th:placeholder="#{chat_commands.field.template.placeholder}"></textarea>
                 </div>
                 <div class="form-field">
-                    <label for="custom-permission">Permission</label>
+                    <label for="custom-permission" th:text="#{chat_commands.column.permission}">Permission</label>
                     <select id="custom-permission" class="form-input" name="permission" style="width:auto;">
-                        <option value="EVERYONE">EVERYONE</option>
-                        <option value="MODERATOR">MODERATOR</option>
-                        <option value="BROADCASTER">BROADCASTER</option>
+                        <option value="EVERYONE" th:text="#{chat_commands.permission.everyone}">Everyone</option>
+                        <option value="MODERATOR" th:text="#{chat_commands.permission.moderator}">Moderator</option>
+                        <option value="BROADCASTER" th:text="#{chat_commands.permission.broadcaster}">Broadcaster</option>
                     </select>
                 </div>
-                <div><button type="submit" class="btn btn-primary">Create</button></div>
+                <div><button type="submit" class="btn btn-primary" th:text="#{chat_commands.action.create}">Create</button></div>
             </form>
         </section>
 
@@ -77,11 +76,10 @@
                 <li><code>{game.store.battlenet}</code></li>
                 <li><code>{game.store.official}</code></li>
                 <li><code>{game.igdb.url}</code></li>
-                <li><code>{args}</code> <em>(uniquement !setgame)</em></li>
+                <li><code>{args}</code> <em th:text="'(' + #{chat_commands.placeholders.args_hint} + ')'">(only !setgame)</em></li>
             </ul>
-            <p style="font-size:.9em; opacity:.8">
+            <p style="font-size:.9em; opacity:.8" th:utext="#{chat_commands.placeholders.fallback_hint}">
                 Use <code>{path|fallback}</code> to provide a fallback text.
-                If a placeholder has no value and no fallback, the command stays silent.
             </p>
         </aside>
     </section>
@@ -92,6 +90,7 @@
                 <input type="text" class="cmd-name form-input" pattern="^![a-z][a-z0-9_]{0,30}$"
                        required style="font-family:monospace; width:9em;">
                 <span class="builtin-badge" hidden
+                      th:text="#{chat_commands.badge.builtin}"
                       style="display:inline-block; font-size:.7em; margin-left:.25em; padding:.1em .35em; border:1px solid var(--border); border-radius:.25em; color:var(--text-muted);">built-in</span>
             </td>
             <td style="padding:.5rem .5rem;">
@@ -100,9 +99,9 @@
             </td>
             <td style="padding:.5rem .5rem;">
                 <select class="permission-select form-input" style="width:auto;">
-                    <option value="EVERYONE">EVERYONE</option>
-                    <option value="MODERATOR">MODERATOR</option>
-                    <option value="BROADCASTER">BROADCASTER</option>
+                    <option value="EVERYONE" th:text="#{chat_commands.permission.everyone}">Everyone</option>
+                    <option value="MODERATOR" th:text="#{chat_commands.permission.moderator}">Moderator</option>
+                    <option value="BROADCASTER" th:text="#{chat_commands.permission.broadcaster}">Broadcaster</option>
                 </select>
             </td>
             <td style="padding:.5rem .5rem; text-align:center;">
@@ -112,8 +111,8 @@
                 </label>
             </td>
             <td style="padding:.5rem .5rem; white-space:nowrap;">
-                <button type="button" class="btn save-btn">Save</button>
-                <button type="button" class="btn delete-btn">Delete</button>
+                <button type="button" class="btn save-btn" th:text="#{chat_commands.action.save}">Save</button>
+                <button type="button" class="btn delete-btn" th:text="#{chat_commands.action.delete}">Delete</button>
             </td>
         </tr>
     </template>
@@ -121,6 +120,10 @@
     <script th:inline="javascript">
     const CSRF_HEADER = /*[[${_csrf.headerName}]]*/ 'X-CSRF-TOKEN';
     const CSRF_TOKEN  = /*[[${_csrf.token}]]*/ '';
+    const I18N = {
+        deleteConfirm: /*[[#{chat_commands.action.delete_confirm(' ')}]]*/ 'Supprimer  ?',
+        builtinTooltip: /*[[#{chat_commands.badge.builtin.tooltip}]]*/ 'Java command — name not editable'
+    };
     function csrfHeaders(extra) {
         const h = Object.assign({}, extra || {});
         h[CSRF_HEADER] = CSRF_TOKEN;
@@ -173,7 +176,7 @@
 
             const deleteBtn = row.querySelector('.delete-btn');
             deleteBtn.onclick = async () => {
-                if (!confirm('Supprimer ' + cmd.name + ' ?')) return;
+                if (!confirm(I18N.deleteConfirm.replace('  ', ' ' + cmd.name + ' '))) return;
                 const r = await fetch('/chat-commands/api/' + cmd.id, {
                     method: 'DELETE',
                     headers: csrfHeaders()
@@ -183,10 +186,10 @@
 
             const isBuiltin = cmd.presetKey && cmd.presetKey.indexOf('builtin:') === 0;
             if (isBuiltin) {
-                const nameInput = row.querySelector('.cmd-name');
-                nameInput.readOnly = true;
-                nameInput.title = 'Commande Java — nom non modifiable';
+                // Le nom est libre d'édition : DynamicCommandResolver route
+                // les rows builtin vers leur bean Java statique via presetKey.
                 row.querySelector('.builtin-badge').hidden = false;
+                row.querySelector('.builtin-badge').title = I18N.builtinTooltip;
                 deleteBtn.remove();
             }
 
