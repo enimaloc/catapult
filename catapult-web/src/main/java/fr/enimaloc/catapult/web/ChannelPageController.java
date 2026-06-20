@@ -16,6 +16,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Controller
 @RequestMapping("/channels/{username}")
@@ -42,6 +43,25 @@ public class ChannelPageController {
         }
         populateModel(model, data);
         return "app";
+    }
+
+    @GetMapping("/fragments/dtdd-mapping")
+    public String dtddMappingFragment(@PathVariable String username, Model model) {
+        model.addAttribute("channelUsername", username);
+        DtddMappingStatusDto status = apiClient.get(
+                "/api/channels/{username}/dtdd-mapping", DtddMappingStatusDto.class, username);
+        if (status != null) {
+            model.addAttribute("dtddCurrent", status.current());
+            model.addAttribute("dtddPending", status.myPendingProposal());
+            model.addAttribute("dtddCanValidate", status.canValidateDirectly());
+            model.addAttribute("dtddIgdbId", status.igdbId());
+        } else {
+            model.addAttribute("dtddCurrent", null);
+            model.addAttribute("dtddPending", null);
+            model.addAttribute("dtddCanValidate", false);
+            model.addAttribute("dtddIgdbId", null);
+        }
+        return "fragments/dtdd-mapping :: dtdd-mapping";
     }
 
     @GetMapping("/fragments/status")
@@ -280,4 +300,13 @@ public class ChannelPageController {
             boolean isLive,
             GameDto currentGame
     ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record DtddMappingStatusDto(DtddMappingCurrentDto current, DtddMappingProposalDto myPendingProposal, boolean canValidateDirectly, String igdbId) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record DtddMappingCurrentDto(Long dtddId, String name, double confidence, boolean verified) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record DtddMappingProposalDto(UUID id, Long proposedDtddId, String reason) {}
 }

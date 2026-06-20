@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="dtdd-mapping" class="card" id="dtddMappingCard">
+    <div class="card-header">
+        <h3 th:text="#{dashboard.dtdd.title}">DoesTheDogDie — mapping</h3>
+    </div>
+
+    <!-- No current game or no mapping yet -->
+    <div th:if="${dtddIgdbId == null or dtddCurrent == null}">
+        <p class="text-muted" th:text="#{dashboard.dtdd.noMapping}">No DTDD data for the current game (yet).</p>
+    </div>
+
+    <!-- Pending proposal from this streamer -->
+    <div th:if="${dtddIgdbId != null and dtddCurrent != null and dtddPending != null}">
+        <p class="text-muted" th:text="#{dashboard.dtdd.pending}">Your correction is pending admin validation.</p>
+    </div>
+
+    <!-- Active mapping shown -->
+    <div th:if="${dtddIgdbId != null and dtddCurrent != null and dtddPending == null}">
+        <p>
+            <span th:text="#{dashboard.dtdd.currentMapping}">Current:</span>
+            <strong th:text="${dtddCurrent.name() != null ? dtddCurrent.name() : ('DTDD #' + dtddCurrent.dtddId())}">…</strong>
+            <span th:if="${dtddCurrent.dtddId() != null}"
+                  th:text="|(DTDD #${dtddCurrent.dtddId()})|"></span>
+        </p>
+        <p>
+            <span th:text="#{dashboard.dtdd.confidence(${#numbers.formatDecimal(dtddCurrent.confidence(), 1, 2)})}">Confidence: …</span>
+            <span th:if="${dtddCurrent.verified()}" class="badge-success" th:text="#{dashboard.dtdd.verified}">verified</span>
+            <span th:unless="${dtddCurrent.verified()}" class="badge-warning" th:text="#{dashboard.dtdd.unverified}">not verified</span>
+        </p>
+
+        <!-- Actions -->
+        <div class="btn-group" style="display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.75rem;">
+            <a th:if="${dtddCurrent.dtddId() != null}"
+               th:href="@{https://www.doesthedogdie.com/media/__${dtddCurrent.dtddId()}__}"
+               target="_blank" rel="noopener"
+               class="btn btn-sm" th:text="#{dashboard.dtdd.btn.viewExternal}">View on DoesTheDogDie</a>
+
+            <button th:if="${dtddCanValidate}" type="button" class="btn btn-sm btn-primary"
+                    th:attr="onclick=|dtddValidate('${dtddIgdbId}')|"
+                    th:text="#{dashboard.dtdd.btn.validate}">Yes, validate</button>
+
+            <button type="button" class="btn btn-sm"
+                    th:attr="onclick=|dtddOpenSearch('${dtddIgdbId}')|"
+                    th:text="#{dashboard.dtdd.btn.correct}">Correct</button>
+        </div>
+    </div>
+
+    <!-- Search modal (hidden by default) -->
+    <div id="dtddSearchModal" class="modal" hidden
+         style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:var(--card-bg, #1e1e2e); border-radius:8px; padding:2rem; max-width:520px; width:90%; position:relative;">
+            <button type="button"
+                    onclick="dtddCloseSearch()"
+                    style="position:absolute; top:0.75rem; right:0.75rem; background:none; border:none; font-size:1.25rem; cursor:pointer; color:inherit;">&#x2715;</button>
+            <h4 th:text="#{dashboard.dtdd.modal.title}" style="margin-top:0;">Search DoesTheDogDie</h4>
+            <input id="dtddSearchInput" type="text" class="form-input"
+                   th:placeholder="#{dashboard.dtdd.modal.placeholder}"
+                   oninput="dtddSearchDebounced(this.value)"
+                   style="width:100%; box-sizing:border-box;"/>
+            <ul id="dtddSearchResults" class="list-unstyled"
+                style="max-height:300px; overflow-y:auto; margin-top:.5rem; padding:0; list-style:none;"></ul>
+        </div>
+    </div>
+</section>
+
+<th:block th:fragment="dtdd-mapping-script">
+<script th:inline="javascript">
+(function(){
+    let _dtddIgdbId = null;
+    let _dtddDebounce = null;
+
+    window.dtddValidate = async function(igdbId) {
+        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+        const headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers[csrfHeader] = csrfToken;
+        const res = await fetch('/api/channel/dtdd-mapping/validate', {
+            method: 'POST', headers,
+            body: JSON.stringify({ igdbId })
+        });
+        if (res.ok || res.status === 204) {
+            window.location.reload();
+        }
+    };
+
+    window.dtddOpenSearch = function(igdbId) {
+        _dtddIgdbId = igdbId;
+        const modal = document.getElementById('dtddSearchModal');
+        modal.hidden = false;
+        modal.style.display = 'flex';
+        document.getElementById('dtddSearchInput').value = '';
+        document.getElementById('dtddSearchResults').innerHTML = '';
+    };
+
+    window.dtddCloseSearch = function() {
+        const modal = document.getElementById('dtddSearchModal');
+        modal.hidden = true;
+        modal.style.display = 'none';
+    };
+
+    window.dtddSearchDebounced = function(q) {
+        clearTimeout(_dtddDebounce);
+        _dtddDebounce = setTimeout(function() { dtddSearch(q); }, 300);
+    };
+
+    function dtddSearch(q) {
+        if (!q || q.length < 2) {
+            document.getElementById('dtddSearchResults').innerHTML = '';
+            return;
+        }
+        fetch('/api/channel/dtdd-mapping/search?q=' + encodeURIComponent(q))
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                var ul = document.getElementById('dtddSearchResults');
+                ul.innerHTML = '';
+                (data.results || []).forEach(function(r) {
+                    var li = document.createElement('li');
+                    li.style.cssText = 'padding:.5rem; cursor:pointer; border-bottom:1px solid var(--border);';
+                    li.textContent = r.name + (r.mediaType ? ' [' + r.mediaType + ']' : '');
+                    li.onclick = function() { dtddPropose(r.dtddId, r.name); };
+                    ul.appendChild(li);
+                });
+            });
+    }
+
+    function dtddPropose(dtddId, name) {
+        var csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+        var csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
+        var headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers[csrfHeader] = csrfToken;
+        fetch('/api/channel/dtdd-mapping/propose', {
+            method: 'POST', headers,
+            body: JSON.stringify({ igdbId: _dtddIgdbId, dtddId: dtddId, reason: 'Streamer correction: ' + name })
+        }).then(function(res) {
+            if (res.ok || res.status === 204) {
+                dtddCloseSearch();
+                window.location.reload();
+            }
+        });
+    }
+})();
+</script>
+</th:block>
+</body>
+</html>
