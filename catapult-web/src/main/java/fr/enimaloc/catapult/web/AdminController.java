@@ -203,7 +203,7 @@ public class AdminController {
     public String steamKeysPage(Model model) {
         SteamKeysPageDto data = apiClient.get("/api/admin/steam-keys", SteamKeysPageDto.class);
         if (data != null) {
-            model.addAttribute("keyStatuses", data.keyStatuses());
+            model.addAttribute("keys", data.keys());
             model.addAttribute("steamEnabled", data.steamEnabled());
         }
         return "admin/steam-keys";
@@ -216,8 +216,8 @@ public class AdminController {
     }
 
     @PostMapping("/steam-keys/delete")
-    public String deleteSteamKey(@RequestParam String apiKey) {
-        apiClient.post("/api/admin/steam-keys/delete", Map.of("apiKey", apiKey));
+    public String deleteSteamKey(@RequestParam String keyId) {
+        apiClient.post("/api/admin/steam-keys/delete", Map.of("keyId", keyId));
         return "redirect:/admin/steam-keys";
     }
 
@@ -233,7 +233,7 @@ public class AdminController {
     public String dtddKeysPage(Model model) {
         DtddKeysPageDto data = apiClient.get("/api/admin/dtdd-keys", DtddKeysPageDto.class);
         if (data != null) {
-            model.addAttribute("keyStatuses", data.keyStatuses());
+            model.addAttribute("keys", data.keys());
             model.addAttribute("dtddEnabled", data.dtddEnabled());
         }
         return "admin/dtdd-keys";
@@ -246,8 +246,8 @@ public class AdminController {
     }
 
     @PostMapping("/dtdd-keys/delete")
-    public String deleteDtddKey(@RequestParam String apiKey) {
-        apiClient.post("/api/admin/dtdd-keys/delete", Map.of("apiKey", apiKey));
+    public String deleteDtddKey(@RequestParam String keyId) {
+        apiClient.post("/api/admin/dtdd-keys/delete", Map.of("keyId", keyId));
         return "redirect:/admin/dtdd-keys";
     }
 
@@ -418,11 +418,11 @@ public class AdminController {
 
     record AdminMembersPageDto(List<MemberDto> members, Map<String, Boolean> liveStatus, boolean isMockProfile) {}
 
-    record KeyStatusDto(String masked, String owner, boolean blocked, long blockedForSeconds) {}
+    record KeyStatusDto(String id, String masked, String owner, boolean blocked, long blockedForSeconds) {}
 
-    record SteamKeysPageDto(Map<String, KeyStatusDto> keyStatuses, boolean steamEnabled) {}
+    record SteamKeysPageDto(java.util.List<KeyStatusDto> keys, boolean steamEnabled) {}
 
-    record DtddKeysPageDto(Map<String, KeyStatusDto> keyStatuses, boolean dtddEnabled) {}
+    record DtddKeysPageDto(java.util.List<KeyStatusDto> keys, boolean dtddEnabled) {}
 
     record MemberSummaryDto(UUID id, String twitchUsername) {}
 }
