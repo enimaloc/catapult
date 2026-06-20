@@ -257,6 +257,33 @@ public class AdminController {
         return "redirect:/admin/dtdd-keys";
     }
 
+    // ── DTDD Mapping ─────────────────────────────────────────────────────────
+
+    @GetMapping("/dtdd-mapping")
+    public String dtddMappingPage(@RequestParam(defaultValue = "PENDING") String status, Model model) {
+        @SuppressWarnings("unchecked")
+        java.util.List<java.util.Map<String, Object>> proposals = apiClient.get(
+            "/api/admin/dtdd-mapping/proposals?status={s}",
+            new org.springframework.core.ParameterizedTypeReference<java.util.List<java.util.Map<String, Object>>>() {},
+            status);
+        model.addAttribute("proposals", proposals != null ? proposals : java.util.List.of());
+        model.addAttribute("currentStatus", status);
+        return "admin/dtdd-mapping";
+    }
+
+    @PostMapping("/dtdd-mapping/proposals/{id}/approve")
+    public String approveDtddProposal(@PathVariable UUID id) {
+        apiClient.post("/api/admin/dtdd-mapping/proposals/" + id + "/approve", null);
+        return "redirect:/admin/dtdd-mapping";
+    }
+
+    @PostMapping("/dtdd-mapping/proposals/{id}/reject")
+    public String rejectDtddProposal(@PathVariable UUID id, @RequestParam(required = false) String reason) {
+        apiClient.post("/api/admin/dtdd-mapping/proposals/" + id + "/reject",
+            reason != null ? Map.of("reason", reason) : Map.of());
+        return "redirect:/admin/dtdd-mapping";
+    }
+
     // ── Experiments ──────────────────────────────────────────────────────────
 
     @GetMapping("/experiments")
