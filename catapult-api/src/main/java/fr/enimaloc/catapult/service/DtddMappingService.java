@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.repository.DtddSearchCacheRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ import java.util.Optional;
 
 @Service
 @RefreshScope
+@ConditionalOnBooleanProperty("dtdd.enabled")
 @RequiredArgsConstructor
 public class DtddMappingService {
 
