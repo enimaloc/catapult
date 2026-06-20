@@ -106,11 +106,18 @@ public class ApiAdminChatCommandsController {
     ) {}
 
     @GetMapping
-    @Transactional(readOnly = true)
+    @Transactional
     public ListResponse list(@AuthenticationPrincipal Jwt jwt) {
         UserAccount user = currentUser(jwt);
         gate(user);
-        List<CommandDto> commands = repository.findByUser(user).stream()
+        // First visit: bootstrap all presets (disabled). Subsequent calls find
+        // the existing rows and skip the bootstrap path.
+        List<ChatCommandDefinition> existing = repository.findByUser(user);
+        if (existing.isEmpty()) {
+            catalog.bootstrapDisabled(user, Locale.FRANCE);
+            existing = repository.findByUser(user);
+        }
+        List<CommandDto> commands = existing.stream()
             .map(CommandDto::fromEntity).toList();
         SystemTwitchAccountService.BotModStatus s = checkBotMod(user);
         List<BuiltinDto> builtins = staticCommands.stream()

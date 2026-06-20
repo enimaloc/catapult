@@ -18,12 +18,11 @@
         </div>
 
         <section style="margin-top:1.5rem;">
-            <h3 th:text="#{chat_commands.presets.title}">Available presets</h3>
-            <ul id="presets-list" class="card-list"></ul>
-        </section>
-
-        <section style="margin-top:1.5rem;">
             <h3 th:text="#{chat_commands.commands.title}">Your commands</h3>
+            <p style="opacity:.8; font-size:.9em;">
+                Tous les presets sont pré-enregistrés désactivés. Coche
+                « enabled » et clique « Save » pour activer.
+            </p>
             <ul id="commands-list" class="card-list"></ul>
         </section>
 
@@ -161,26 +160,6 @@
             };
 
             commandsList.appendChild(node);
-        }
-
-        // ── Presets (Add button) ──────────────────────────────────────────────
-        const presetsList = document.getElementById('presets-list');
-        for (const k of (data.presets || [])) {
-            const li = document.createElement('li');
-            li.textContent = '!' + k + ' ';
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'btn btn-sm';
-            btn.textContent = 'Add';
-            btn.onclick = async () => {
-                const r = await fetch('/chat-commands/api/presets/' + encodeURIComponent(k), {
-                    method: 'POST',
-                    headers: csrfHeaders()
-                });
-                if (r.ok) window.location.reload(); else await reportError(r);
-            };
-            li.appendChild(btn);
-            presetsList.appendChild(li);
         }
 
         // ── Built-in commands (read-only) ─────────────────────────────────────
