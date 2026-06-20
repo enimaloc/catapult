@@ -28,7 +28,11 @@ public class PlaceholderResolver {
         "game.store.xbox",
         "game.store.battlenet",
         "game.store.official",
-        "game.igdb.url"
+        "game.igdb.url",
+        "dtdd.yes",
+        "dtdd.no",
+        "dtdd.mostly",
+        "game.agerating"
     );
 
     private final MeterRegistry meterRegistry;
@@ -83,8 +87,17 @@ public class PlaceholderResolver {
             case "game.store.official"  -> ctx.stores() == null ? null : ctx.stores().get("official");
             case "game.igdb.url"      -> ctx.igdbSlug() == null ? null
                 : "https://www.igdb.com/games/" + ctx.igdbSlug();
+            case "dtdd.yes"           -> joinNullIfEmpty(ctx.dtddTopics() == null ? null : ctx.dtddTopics().yesTopics());
+            case "dtdd.no"            -> joinNullIfEmpty(ctx.dtddTopics() == null ? null : ctx.dtddTopics().noTopics());
+            case "dtdd.mostly"        -> joinNullIfEmpty(ctx.dtddTopics() == null ? null : ctx.dtddTopics().mostlyTopics());
+            case "game.agerating"     -> ctx.ageRating();
             default -> null;
         };
+    }
+
+    private static String joinNullIfEmpty(java.util.List<String> items) {
+        if (items == null || items.isEmpty()) return null;
+        return String.join(", ", items);
     }
 
     /** Renvoie les paths inconnus présents dans un template (pour validation à l'écriture). */
