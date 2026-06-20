@@ -52,11 +52,6 @@
             </form>
         </section>
 
-        <section style="margin-top:1.5rem;">
-            <h3>Built-in commands (read-only)</h3>
-            <ul id="builtin-list" class="card-list"></ul>
-        </section>
-
         <aside class="placeholder-catalog" style="margin-top:1.5rem;">
             <h3 th:text="#{chat_commands.placeholders.title}">Available placeholders</h3>
             <ul>
@@ -69,6 +64,7 @@
                 <li><code>{game.store.battlenet}</code></li>
                 <li><code>{game.store.official}</code></li>
                 <li><code>{game.igdb.url}</code></li>
+                <li><code>{args}</code> <em>(uniquement !setgame)</em></li>
             </ul>
             <p style="font-size:.9em; opacity:.8">
                 Use <code>{path|fallback}</code> to provide a fallback text.
@@ -134,6 +130,18 @@
             card.querySelector('.permission-select').value = cmd.permission;
             card.querySelector('.enabled-toggle').checked = cmd.enabled;
 
+            const isBuiltin = cmd.presetKey && cmd.presetKey.indexOf('builtin:') === 0;
+            if (isBuiltin) {
+                const nameInput = card.querySelector('.cmd-name');
+                nameInput.readOnly = true;
+                nameInput.title = 'Commande Java — nom non modifiable';
+                card.querySelector('.delete-btn').remove();
+                const badge = document.createElement('span');
+                badge.textContent = 'built-in';
+                badge.style.cssText = 'font-size:.75em; padding:.1em .4em; border:1px solid; border-radius:.25em; opacity:.7;';
+                nameInput.parentElement.insertBefore(badge, nameInput.nextSibling);
+            }
+
             card.querySelector('.save-btn').onclick = async () => {
                 const body = {
                     name: card.querySelector('.cmd-name').value,
@@ -162,21 +170,6 @@
             commandsList.appendChild(node);
         }
 
-        // ── Built-in commands (read-only) ─────────────────────────────────────
-        const builtinList = document.getElementById('builtin-list');
-        for (const b of (data.builtins || [])) {
-            const li = document.createElement('li');
-            li.className = 'card';
-            const code = document.createElement('code');
-            code.textContent = b.name;
-            const meta = document.createElement('span');
-            meta.style.marginLeft = '.5rem';
-            meta.style.opacity = '.7';
-            meta.textContent = '— ' + b.permission;
-            li.appendChild(code);
-            li.appendChild(meta);
-            builtinList.appendChild(li);
-        }
     })();
 
     // ── Custom command creation ──────────────────────────────────────────────
