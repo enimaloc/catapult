@@ -104,6 +104,23 @@ public class ExperimentService {
             .orElse(false);
     }
 
+    /**
+     * Évalue le gate "rolled out" pour {@code experimentKey}, en déclenchant la
+     * création de l'assignation depuis un éventuel override admin si l'experiment
+     * est ACTIVE. Contrairement à {@link #isRolledOut}, lit pas seulement les
+     * assignations existantes.
+     * <p>
+     * Encapsule l'accès au {@code variant.isControl} dans la même transaction
+     * que {@code getVariant} pour éviter les {@code LazyInitializationException}
+     * sur les proxys Hibernate côté caller.
+     */
+    @Transactional
+    public boolean evaluateGate(UserAccount user, String experimentKey) {
+        return self.getVariant(user, experimentKey)
+            .map(v -> !v.isControl())
+            .orElse(false);
+    }
+
     public void markKnown(String key) {
         knownKeys.add(key);
     }

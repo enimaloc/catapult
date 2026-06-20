@@ -48,6 +48,7 @@ public class GlobalModelAdvice {
         model.addAttribute("isPendingDeletion",
                 principal != null && "PENDING_DELETION".equals(principal.getStatus()));
         model.addAttribute("invitePlacementVariant", resolveInvitePlacementVariant(principal));
+        model.addAttribute("chatCommandsRolledOut", isChatCommandsRolledOut(principal));
 
         try {
             Map<?, ?> raw = apiClient.get("/api/config/app", Map.class);
@@ -81,6 +82,23 @@ public class GlobalModelAdvice {
             log.debug("Could not fetch invite-button-placement variant: {}", e.getMessage());
         }
         return "nav-default";
+    }
+
+    /**
+     * Returns true if the {@code chat.commands} experiment resolves to a non-control
+     * variant for the current user — gates the nav link and the page-level UX.
+     */
+    private boolean isChatCommandsRolledOut(CatapultWebUser principal) {
+        if (principal == null) return false;
+        try {
+            Map<?, ?> raw = apiClient.get("/api/experiments/me/variant/chat.commands", Map.class);
+            if (raw != null && raw.get("variant") instanceof String v) {
+                return "enabled".equals(v);
+            }
+        } catch (Exception e) {
+            log.debug("Could not fetch chat.commands variant: {}", e.getMessage());
+        }
+        return false;
     }
 
     public record GitData(String branch, String commit, String repositoryUrl) {}
