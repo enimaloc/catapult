@@ -7,8 +7,10 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import lombok.RequiredArgsConstructor;
+import fr.enimaloc.catapult.getter.DtddApiClient;
+import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
@@ -21,11 +23,22 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class GameContextService {
 
     private final IgdbService igdbService;
     private final IgdbGameDetailsService igdbGameDetailsService;
+    private final IgdbGameCclRepository igdbGameCclRepository;
+    private final DtddService dtddService;
+
+    public GameContextService(IgdbService igdbService,
+                              IgdbGameDetailsService igdbGameDetailsService,
+                              IgdbGameCclRepository igdbGameCclRepository,
+                              @Autowired(required = false) DtddService dtddService) {
+        this.igdbService = igdbService;
+        this.igdbGameDetailsService = igdbGameDetailsService;
+        this.igdbGameCclRepository = igdbGameCclRepository;
+        this.dtddService = dtddService;
+    }
 
     private final Map<UUID, GameContext> contexts = new ConcurrentHashMap<>();
 
@@ -51,9 +64,19 @@ public class GameContextService {
         String activeStoreUrl = stores.get(GameContext.storeKey(detected.getSourceType()));
         String slug = details != null ? details.getSlug() : null;
 
+        DtddApiClient.DtddTopics dtddTopics = (dtddService != null && igdbId != null)
+            ? dtddService.getTopics(igdbId, detected.getSourceName()).orElse(null)
+            : null;
+        String ageRating = igdbId == null ? null
+            : igdbGameCclRepository.findById(igdbId)
+                .map(c -> c.getAgeRatings())
+                .filter(s -> s != null && !s.isBlank())
+                .orElse(null);
+
         GameContext ctx = new GameContext(
             detected, igdbId, detected.getSourceName(),
-            summary, releaseDate, stores, activeStoreUrl, slug
+            summary, releaseDate, stores, activeStoreUrl, slug,
+            dtddTopics, ageRating
         );
         contexts.put(event.getUser().getId(), ctx);
     }
