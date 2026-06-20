@@ -88,6 +88,7 @@ class ApiAdminChatCommandsControllerTest {
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
         when(repository.findByUser(any())).thenReturn(List.of());
         when(catalog.allKeys()).thenReturn(Set.of("game", "store"));
+        when(systemAccount.getSystemTwitchId()).thenReturn("bot-id");
         when(systemAccount.check(any(), any()))
                 .thenReturn(new SystemTwitchAccountService.BotModStatus(false, Instant.now()));
 
