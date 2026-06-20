@@ -11,5 +11,6 @@ import java.util.UUID;
 public interface ChatCommandDefinitionRepository extends JpaRepository<ChatCommandDefinition, UUID> {
     List<ChatCommandDefinition> findByUser(UserAccount user);
     Optional<ChatCommandDefinition> findByUserAndName(UserAccount user, String name);
+    Optional<ChatCommandDefinition> findByUserAndPresetKey(UserAccount user, String presetKey);
     boolean existsByUserAndName(UserAccount user, String name);
 }

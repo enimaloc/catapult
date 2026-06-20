@@ -37,7 +37,8 @@ class DynamicCommandResolverTest {
     @BeforeEach
     void setup() {
         placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry());
-        resolver = new DynamicCommandResolver(repository, placeholderResolver, gameContextService);
+        resolver = new DynamicCommandResolver(repository, placeholderResolver, gameContextService,
+            java.util.List.of());
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
