@@ -93,7 +93,7 @@ public class GlobalModelAdvice {
         try {
             Map<?, ?> raw = apiClient.get("/api/experiments/me/variant/chat.commands", Map.class);
             if (raw != null && raw.get("variant") instanceof String v) {
-                return !"control".equals(v);
+                return "enabled".equals(v);
             }
         } catch (Exception e) {
             log.debug("Could not fetch chat.commands variant: {}", e.getMessage());
