@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.getter.DtddApiClient;
 import fr.enimaloc.catapult.getter.DtddApiClient.DtddSearchResult;
 import fr.enimaloc.catapult.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,6 +20,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/channel/dtdd-mapping")
 @RequiredArgsConstructor
+@ConditionalOnBooleanProperty("dtdd.enabled")
 public class ApiChannelDtddMappingController {
 
     private final DtddGameMappingRepository mappingRepo;
