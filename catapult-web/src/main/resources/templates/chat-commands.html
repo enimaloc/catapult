@@ -23,7 +23,18 @@
                 Tous les presets sont pré-enregistrés désactivés. Coche
                 « enabled » et clique « Save » pour activer.
             </p>
-            <ul id="commands-list" class="card-list"></ul>
+            <table class="commands-table" style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr style="text-align:left; border-bottom:1px solid currentColor; opacity:.7;">
+                        <th style="padding:.5rem .5rem;">Nom</th>
+                        <th style="padding:.5rem .5rem;">Réponse</th>
+                        <th style="padding:.5rem .5rem;">Permission</th>
+                        <th style="padding:.5rem .5rem; text-align:center;">Activé</th>
+                        <th style="padding:.5rem .5rem;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="commands-tbody"></tbody>
+            </table>
         </section>
 
         <section style="margin-top:1.5rem;">
@@ -73,24 +84,33 @@
         </aside>
     </section>
 
-    <template id="command-card-tpl">
-        <li class="card" style="display:flex; flex-direction:column; gap:.5rem; padding:1rem;">
-            <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+    <template id="command-row-tpl">
+        <tr style="border-bottom:1px solid currentColor; vertical-align:top;">
+            <td style="padding:.5rem .5rem; white-space:nowrap;">
                 <input type="text" class="cmd-name" pattern="^![a-z][a-z0-9_]{0,30}$"
-                       required style="font-family:monospace; width:12em">
+                       required style="font-family:monospace; width:9em;">
+                <span class="builtin-badge" hidden
+                      style="display:inline-block; font-size:.7em; margin-left:.25em; padding:.1em .35em; border:1px solid; border-radius:.25em; opacity:.7;">built-in</span>
+            </td>
+            <td style="padding:.5rem .5rem;">
+                <textarea class="cmd-template" rows="2" maxlength="500"
+                          style="width:100%; min-width:18em; box-sizing:border-box;"></textarea>
+            </td>
+            <td style="padding:.5rem .5rem;">
                 <select class="permission-select">
                     <option value="EVERYONE">EVERYONE</option>
                     <option value="MODERATOR">MODERATOR</option>
                     <option value="BROADCASTER">BROADCASTER</option>
                 </select>
-                <label><input type="checkbox" class="enabled-toggle"> enabled</label>
-            </div>
-            <textarea class="cmd-template" rows="2" maxlength="500" style="width:100%"></textarea>
-            <div style="display:flex; gap:.5rem;">
+            </td>
+            <td style="padding:.5rem .5rem; text-align:center;">
+                <input type="checkbox" class="enabled-toggle">
+            </td>
+            <td style="padding:.5rem .5rem; white-space:nowrap;">
                 <button type="button" class="btn save-btn">Save</button>
-                <button type="button" class="btn delete-btn" style="margin-left:auto">Delete</button>
-            </div>
-        </li>
+                <button type="button" class="btn delete-btn">Delete</button>
+            </td>
+        </tr>
     </template>
 
     <script th:inline="javascript">
@@ -119,23 +139,23 @@
         }
 
         // ── Existing commands (editable) ──────────────────────────────────────
-        const commandsList = document.getElementById('commands-list');
-        const tpl = document.getElementById('command-card-tpl').content;
+        const tbody = document.getElementById('commands-tbody');
+        const tpl = document.getElementById('command-row-tpl').content;
         for (const cmd of (data.commands || [])) {
             const node = tpl.cloneNode(true);
-            const card = node.querySelector('li');
-            card.dataset.id = cmd.id;
-            card.querySelector('.cmd-name').value = cmd.name;
-            card.querySelector('.cmd-template').value = cmd.template;
-            card.querySelector('.permission-select').value = cmd.permission;
-            card.querySelector('.enabled-toggle').checked = cmd.enabled;
+            const row = node.querySelector('tr');
+            row.dataset.id = cmd.id;
+            row.querySelector('.cmd-name').value = cmd.name;
+            row.querySelector('.cmd-template').value = cmd.template;
+            row.querySelector('.permission-select').value = cmd.permission;
+            row.querySelector('.enabled-toggle').checked = cmd.enabled;
 
-            card.querySelector('.save-btn').onclick = async () => {
+            row.querySelector('.save-btn').onclick = async () => {
                 const body = {
-                    name: card.querySelector('.cmd-name').value,
-                    template: card.querySelector('.cmd-template').value,
-                    permission: card.querySelector('.permission-select').value,
-                    enabled: card.querySelector('.enabled-toggle').checked,
+                    name: row.querySelector('.cmd-name').value,
+                    template: row.querySelector('.cmd-template').value,
+                    permission: row.querySelector('.permission-select').value,
+                    enabled: row.querySelector('.enabled-toggle').checked,
                     fallbacks: {}
                 };
                 const r = await fetch('/chat-commands/api/' + cmd.id, {
@@ -146,7 +166,7 @@
                 if (r.ok) window.location.reload(); else await reportError(r);
             };
 
-            const deleteBtn = card.querySelector('.delete-btn');
+            const deleteBtn = row.querySelector('.delete-btn');
             deleteBtn.onclick = async () => {
                 if (!confirm('Supprimer ' + cmd.name + ' ?')) return;
                 const r = await fetch('/chat-commands/api/' + cmd.id, {
@@ -156,23 +176,17 @@
                 if (r.ok) window.location.reload(); else await reportError(r);
             };
 
-            // Built-ins : verrouiller le nom, masquer Delete (l'event handler
-            // est attaché plus haut mais l'utilisateur ne le voit pas).
             const isBuiltin = cmd.presetKey && cmd.presetKey.indexOf('builtin:') === 0;
             if (isBuiltin) {
-                const nameInput = card.querySelector('.cmd-name');
+                const nameInput = row.querySelector('.cmd-name');
                 nameInput.readOnly = true;
                 nameInput.title = 'Commande Java — nom non modifiable';
+                row.querySelector('.builtin-badge').hidden = false;
                 deleteBtn.remove();
-                const badge = document.createElement('span');
-                badge.textContent = 'built-in';
-                badge.style.cssText = 'font-size:.75em; padding:.1em .4em; border:1px solid; border-radius:.25em; opacity:.7;';
-                nameInput.parentElement.insertBefore(badge, nameInput.nextSibling);
             }
 
-            commandsList.appendChild(node);
+            tbody.appendChild(node);
         }
-
     })();
 
     // ── Custom command creation ──────────────────────────────────────────────

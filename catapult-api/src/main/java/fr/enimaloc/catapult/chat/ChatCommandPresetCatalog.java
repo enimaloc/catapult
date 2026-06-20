@@ -122,7 +122,7 @@ public class ChatCommandPresetCatalog {
             def.setName(name);
             def.setTemplate(template);
             def.setPermission(cmd.getRequiredPermission());
-            def.setEnabled(true);
+            def.setEnabled(false); // désactivé par défaut comme les presets
             def.setPresetKey(BUILTIN_PRESET_KEY_PREFIX + name.replaceFirst("^!", ""));
             repository.save(def);
         }
