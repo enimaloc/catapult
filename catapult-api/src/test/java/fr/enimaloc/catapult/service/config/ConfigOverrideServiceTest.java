@@ -43,7 +43,7 @@ class ConfigOverrideServiceTest {
     void setUp() {
         source = new DatabaseOverridePropertySource();
         props = new ConfigCatalogProperties();
-        props.setExposedPrefixes(List.of("app.", "twitch."));
+        props.setExposedPrefixes(List.of("app.", "twitch.", "dtdd."));
         props.setSecretPatterns(List.of(".*\\.secret$"));
         props.setTabooKeys(List.of("app.jwt.secret"));
         actor = new UserAccount();
@@ -98,6 +98,41 @@ class ConfigOverrideServiceTest {
         assertThatThrownBy(() -> service.apply("spring.datasource.url", "x", actor))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("404");
+    }
+
+    @Test
+    void apply_dtddMinConfidence_outOfRange_throwsBadRequest() {
+        assertThatThrownBy(() -> service.apply("dtdd.match.min-confidence", "1.5", actor))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400");
+    }
+
+    @Test
+    void apply_dtddMinConfidence_inRange_accepted() {
+        when(overrideRepo.findByIdModuleAndIdKey("api", "dtdd.match.min-confidence")).thenReturn(Optional.empty());
+        service.apply("dtdd.match.min-confidence", "0.9", actor);
+        verify(overrideRepo).save(any());
+    }
+
+    @Test
+    void apply_dtddWeight_negative_throwsBadRequest() {
+        assertThatThrownBy(() -> service.apply("dtdd.match.weight-name", "-0.1", actor))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400");
+    }
+
+    @Test
+    void apply_dtddCacheTtl_zero_throwsBadRequest() {
+        assertThatThrownBy(() -> service.apply("dtdd.cache.topics-ttl-hours", "0", actor))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400");
+    }
+
+    @Test
+    void apply_dtddCacheTtl_nonNumeric_throwsBadRequest() {
+        assertThatThrownBy(() -> service.apply("dtdd.cache.topics-ttl-hours", "abc", actor))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400");
     }
 
     @Test
