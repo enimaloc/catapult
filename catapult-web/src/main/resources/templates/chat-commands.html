@@ -130,18 +130,6 @@
             card.querySelector('.permission-select').value = cmd.permission;
             card.querySelector('.enabled-toggle').checked = cmd.enabled;
 
-            const isBuiltin = cmd.presetKey && cmd.presetKey.indexOf('builtin:') === 0;
-            if (isBuiltin) {
-                const nameInput = card.querySelector('.cmd-name');
-                nameInput.readOnly = true;
-                nameInput.title = 'Commande Java — nom non modifiable';
-                card.querySelector('.delete-btn').remove();
-                const badge = document.createElement('span');
-                badge.textContent = 'built-in';
-                badge.style.cssText = 'font-size:.75em; padding:.1em .4em; border:1px solid; border-radius:.25em; opacity:.7;';
-                nameInput.parentElement.insertBefore(badge, nameInput.nextSibling);
-            }
-
             card.querySelector('.save-btn').onclick = async () => {
                 const body = {
                     name: card.querySelector('.cmd-name').value,
@@ -158,7 +146,8 @@
                 if (r.ok) window.location.reload(); else await reportError(r);
             };
 
-            card.querySelector('.delete-btn').onclick = async () => {
+            const deleteBtn = card.querySelector('.delete-btn');
+            deleteBtn.onclick = async () => {
                 if (!confirm('Supprimer ' + cmd.name + ' ?')) return;
                 const r = await fetch('/chat-commands/api/' + cmd.id, {
                     method: 'DELETE',
@@ -166,6 +155,20 @@
                 });
                 if (r.ok) window.location.reload(); else await reportError(r);
             };
+
+            // Built-ins : verrouiller le nom, masquer Delete (l'event handler
+            // est attaché plus haut mais l'utilisateur ne le voit pas).
+            const isBuiltin = cmd.presetKey && cmd.presetKey.indexOf('builtin:') === 0;
+            if (isBuiltin) {
+                const nameInput = card.querySelector('.cmd-name');
+                nameInput.readOnly = true;
+                nameInput.title = 'Commande Java — nom non modifiable';
+                deleteBtn.remove();
+                const badge = document.createElement('span');
+                badge.textContent = 'built-in';
+                badge.style.cssText = 'font-size:.75em; padding:.1em .4em; border:1px solid; border-radius:.25em; opacity:.7;';
+                nameInput.parentElement.insertBefore(badge, nameInput.nextSibling);
+            }
 
             commandsList.appendChild(node);
         }
