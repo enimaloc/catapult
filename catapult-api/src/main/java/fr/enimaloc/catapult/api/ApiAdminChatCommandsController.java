@@ -61,7 +61,6 @@ public class ApiAdminChatCommandsController {
     private final SystemTwitchAccountService systemAccount;
     private final UserAccountRepository userRepo;
     private final ApplicationEventPublisher eventPublisher;
-    private final List<fr.enimaloc.catapult.chat.ChatCommand> staticCommands;
 
     public record FallbackDto(String placeholder, String fallbackText) {}
 
@@ -85,13 +84,9 @@ public class ApiAdminChatCommandsController {
 
     public record BotModStatusDto(boolean modded, Instant checkedAt) {}
 
-    /** Read-only view on a Java-coded ChatCommand (not editable by the streamer). */
-    public record BuiltinDto(String name, ChatCommandEvent.SenderRole permission) {}
-
     public record ListResponse(
         List<String> presets,
         List<CommandDto> commands,
-        List<BuiltinDto> builtins,
         BotModStatusDto botModStatus
     ) {}
 
@@ -120,14 +115,9 @@ public class ApiAdminChatCommandsController {
         List<CommandDto> commands = existing.stream()
             .map(CommandDto::fromEntity).toList();
         SystemTwitchAccountService.BotModStatus s = checkBotMod(user);
-        List<BuiltinDto> builtins = staticCommands.stream()
-            .map(c -> new BuiltinDto(c.getName(), c.getRequiredPermission()))
-            .sorted((a, b) -> a.name().compareTo(b.name()))
-            .toList();
         return new ListResponse(
             new ArrayList<>(catalog.allKeys()),
             commands,
-            builtins,
             new BotModStatusDto(s.modded(), s.checkedAt())
         );
     }
@@ -204,6 +194,9 @@ public class ApiAdminChatCommandsController {
         ChatCommandDefinition def = repository.findById(id)
             .filter(d -> d.getUser().getId().equals(user.getId()))
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (ChatCommandPresetCatalog.isBuiltin(def)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Built-in commands cannot be deleted");
+        }
         repository.delete(def);
         publishChanged(user);
         return ResponseEntity.noContent().build();
@@ -252,7 +245,11 @@ public class ApiAdminChatCommandsController {
     }
 
     private void applyRequest(ChatCommandDefinition def, UpsertRequest req) {
-        def.setName(req.name());
+        // Built-ins ont leur nom verrouillé (la dispatch Java cherche un nom
+        // fixe — renommer briserait le lien).
+        if (!ChatCommandPresetCatalog.isBuiltin(def)) {
+            def.setName(req.name());
+        }
         def.setTemplate(req.template());
         def.setPermission(req.permission());
         def.setEnabled(req.enabled());
