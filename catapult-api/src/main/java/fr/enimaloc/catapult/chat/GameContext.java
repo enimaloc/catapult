@@ -19,10 +19,12 @@ public record GameContext(
     LocalDate releaseDate,
     Map<String, String> stores,
     String activeStoreUrl,
-    String igdbSlug
+    String igdbSlug,
+    fr.enimaloc.catapult.getter.DtddApiClient.DtddTopics dtddTopics,
+    String ageRating
 ) {
     public static GameContext empty() {
-        return new GameContext(null, null, null, null, null, Collections.emptyMap(), null, null);
+        return new GameContext(null, null, null, null, null, Collections.emptyMap(), null, null, null, null);
     }
 
     public static String storeKey(GameBinding.SourceType sourceType) {
