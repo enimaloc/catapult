@@ -5,7 +5,7 @@
     <title>Catapult — DoesTheDogDie API Keys</title>
 </head>
 <body>
-<!--/*@thymesvar id="keyStatuses" type="java.util.Map"*/-->
+<!--/*@thymesvar id="keys" type="java.util.List"*/-->
 <!--/*@thymesvar id="dtddEnabled" type="java.lang.Boolean"*/-->
     <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
         <h2 th:text="#{admin.dtdd_keys.title}" style="margin:0">Administration — DoesTheDogDie API Keys</h2>
@@ -34,11 +34,11 @@
             </form>
         </div>
 
-        <div th:if="${keyStatuses.isEmpty()}" class="text-muted">
+        <div th:if="${keys.isEmpty()}" class="text-muted">
             <p th:text="#{admin.dtdd_keys.empty}">No DoesTheDogDie API keys configured.</p>
         </div>
 
-        <div th:unless="${keyStatuses.isEmpty()}" class="card">
+        <div th:unless="${keys.isEmpty()}" class="card">
             <div class="table-container">
                 <table class="table">
                     <thead>
@@ -50,9 +50,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!--/*@thymesvar id="status" type="fr.enimaloc.catapult.web.AdminController.KeyStatusDto"*/-->
-                        <tr th:each="entry : ${keyStatuses.entrySet()}">
-                            <th:block th:with="status=${entry.value}">
+                        <tr th:each="status : ${keys}">
                             <td>
                                 <span class="badge" th:text="${status.masked()}"></span>
                             </td>
@@ -68,11 +66,10 @@
                             <td>
                                 <form th:action="@{/admin/dtdd-keys/delete}" method="post"> <!-- nosemgrep -->
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <input type="hidden" name="apiKey" th:value="${entry.key}"/>
+                                    <input type="hidden" name="keyId" th:value="${status.id()}"/>
                                     <button type="submit" class="btn btn-sm" th:text="#{admin.dtdd_keys.action.delete}">Delete</button>
                                 </form>
                             </td>
-                            </th:block>
                         </tr>
                     </tbody>
                 </table>

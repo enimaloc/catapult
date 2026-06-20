@@ -46,21 +46,39 @@ class ApiAdminDtddKeysControllerTest {
     }
 
     @Test
-    void page_returnsMaskedStatuses() {
+    void page_returnsMaskedStatuses_withoutLeakingRawKey() {
         when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of(
             new DtddApiKeyEntry("ABCDEFGHIJKLMNOP")
         ));
         when(rotator.getKeyBlockedUntil()).thenReturn(Map.of());
         var page = controller.page();
         assertThat(page.dtddEnabled()).isTrue();
-        assertThat(page.keyStatuses()).containsKey("ABCDEFGHIJKLMNOP");
-        assertThat(page.keyStatuses().get("ABCDEFGHIJKLMNOP").masked()).contains("…");
+        assertThat(page.keys()).hasSize(1);
+        var status = page.keys().get(0);
+        assertThat(status.masked()).contains("…");
+        assertThat(status.id()).hasSize(16); // 64-bit hex prefix
+        assertThat(status.id()).doesNotContain("ABCDEFGHIJKLMNOP");
     }
 
     @Test
-    void delete_removesAndRefreshes() {
-        controller.delete(new ApiAdminDtddKeysController.DeleteKeyRequest("KEY_X"));
-        verify(repository).deleteById("KEY_X");
+    void delete_resolvesKeyIdToRawAndDeletes() {
+        when(repository.findByExclusiveFalse()).thenReturn(List.of(
+            new DtddApiKeyEntry("ABCDEFGHIJKLMNOP")
+        ));
+        String id = ApiKeyHasher.id("ABCDEFGHIJKLMNOP");
+
+        controller.delete(new ApiAdminDtddKeysController.DeleteKeyRequest(id));
+
+        verify(repository).deleteById("ABCDEFGHIJKLMNOP");
         verify(rotator).refreshKeys();
+    }
+
+    @Test
+    void delete_unknownKeyId_throwsNotFound() {
+        when(repository.findByExclusiveFalse()).thenReturn(List.of());
+        assertThatThrownBy(() ->
+                controller.delete(new ApiAdminDtddKeysController.DeleteKeyRequest("0000000000000000")))
+            .isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).deleteById(any());
     }
 }

@@ -8,9 +8,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
@@ -40,7 +41,7 @@ public class ApiAdminDtddKeysController {
         Map<String, Long> blockedUntil = rotator != null ? rotator.getKeyBlockedUntil() : Map.of();
         long now = System.currentTimeMillis();
 
-        Map<String, KeyStatus> keyStatuses = new LinkedHashMap<>();
+        List<KeyStatus> keys = new ArrayList<>();
         for (DtddApiKeyEntry entry : entries) {
             String key = entry.getApiKey();
             String masked = key.length() > 8
@@ -50,9 +51,9 @@ public class ApiAdminDtddKeysController {
             long until = blockedUntil.getOrDefault(key, 0L);
             boolean blocked = until > now;
             long remainingSec = blocked ? TimeUnit.MILLISECONDS.toSeconds(until - now) : 0L;
-            keyStatuses.put(key, new KeyStatus(masked, owner, blocked, remainingSec));
+            keys.add(new KeyStatus(ApiKeyHasher.id(key), masked, owner, blocked, remainingSec));
         }
-        return new DtddKeysPageData(keyStatuses, rotator != null);
+        return new DtddKeysPageData(keys, rotator != null);
     }
 
     @PostMapping("/add")
@@ -71,7 +72,14 @@ public class ApiAdminDtddKeysController {
     @PostMapping("/delete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@RequestBody DeleteKeyRequest body) {
-        repository.deleteById(body.apiKey());
+        Optional<String> raw = repository.findByExclusiveFalse().stream()
+            .map(DtddApiKeyEntry::getApiKey)
+            .filter(k -> ApiKeyHasher.id(k).equals(body.keyId()))
+            .findFirst();
+        if (raw.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown keyId");
+        }
+        repository.deleteById(raw.get());
         if (rotator != null) rotator.refreshKeys();
     }
 
@@ -81,8 +89,8 @@ public class ApiAdminDtddKeysController {
         if (rotator != null) rotator.refreshKeys();
     }
 
-    public record DtddKeysPageData(Map<String, KeyStatus> keyStatuses, boolean dtddEnabled) {}
-    public record KeyStatus(String masked, String owner, boolean blocked, long blockedForSeconds) {}
+    public record DtddKeysPageData(List<KeyStatus> keys, boolean dtddEnabled) {}
+    public record KeyStatus(String id, String masked, String owner, boolean blocked, long blockedForSeconds) {}
     public record AddKeyRequest(String apiKey) {}
-    public record DeleteKeyRequest(String apiKey) {}
+    public record DeleteKeyRequest(String keyId) {}
 }
