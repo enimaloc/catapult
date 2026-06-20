@@ -71,6 +71,8 @@
            th:classappend="${active_page == 'steam-keys'} ? ' active'" th:text="#{nav.admin_steam_keys}">Steam Keys</a>
         <a th:href="@{/admin/dtdd-keys}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'dtdd-keys'} ? ' active'" th:text="#{nav.admin_dtdd_keys}">DTDD Keys</a>
+        <a th:href="@{/admin/dtdd-mapping}" sec:authorize="hasRole('ADMIN')"
+           th:classappend="${active_page == 'dtdd-mapping'} ? ' active'" th:text="#{nav.admin_dtdd_mapping}">DTDD Mapping</a>
         <a th:href="@{/admin/config}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'config'} ? ' active'" th:text="#{nav.admin_config}">Configuration</a>
         <a th:href="@{/admin/notifications}" sec:authorize="hasRole('ADMIN')"
