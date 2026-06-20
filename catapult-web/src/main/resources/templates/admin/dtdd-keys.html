@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'dtdd-keys', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title>Catapult — DoesTheDogDie API Keys</title>
+</head>
+<body>
+<!--/*@thymesvar id="keyStatuses" type="java.util.Map"*/-->
+<!--/*@thymesvar id="dtddEnabled" type="java.lang.Boolean"*/-->
+    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
+        <h2 th:text="#{admin.dtdd_keys.title}" style="margin:0">Administration — DoesTheDogDie API Keys</h2>
+        <form th:if="${dtddEnabled}" th:action="@{/admin/dtdd-keys/refresh}" method="post"> <!-- nosemgrep -->
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn btn-sm" th:text="#{admin.dtdd_keys.refresh}">↺ Refresh</button>
+        </form>
+    </div>
+
+    <div th:unless="${dtddEnabled}" class="text-muted">
+        <p th:utext="#{admin.dtdd_keys.disabled}">DoesTheDogDie integration is disabled. Enable it with <code>dtdd.enabled=true</code>.</p>
+    </div>
+
+    <div th:if="${dtddEnabled}">
+        <div th:if="${param.error != null}" class="text-danger" style="margin-bottom:0.5rem;">
+            <span th:text="#{admin.dtdd_keys.error.invalid}">Invalid API key format.</span>
+        </div>
+
+        <div class="card" style="margin-bottom:1rem; padding:1rem;">
+            <form th:action="@{/admin/dtdd-keys/add}" method="post" style="display:flex; gap:0.5rem; align-items:center;"> <!-- nosemgrep -->
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="password" name="apiKey" required
+                       th:placeholder="#{admin.dtdd_keys.add.placeholder}"
+                       style="flex:1; max-width:320px;"/>
+                <button type="submit" class="btn btn-primary" th:text="#{admin.dtdd_keys.add.button}">Add</button>
+            </form>
+        </div>
+
+        <div th:if="${keyStatuses.isEmpty()}" class="text-muted">
+            <p th:text="#{admin.dtdd_keys.empty}">No DoesTheDogDie API keys configured.</p>
+        </div>
+
+        <div th:unless="${keyStatuses.isEmpty()}" class="card">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.dtdd_keys.column.api_key}">API Key</th>
+                            <th th:text="#{admin.dtdd_keys.column.owner}">Owner</th>
+                            <th th:text="#{admin.dtdd_keys.column.status}">Status</th>
+                            <th th:text="#{admin.dtdd_keys.column.actions}">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!--/*@thymesvar id="status" type="fr.enimaloc.catapult.web.AdminController.KeyStatusDto"*/-->
+                        <tr th:each="entry : ${keyStatuses.entrySet()}">
+                            <th:block th:with="status=${entry.value}">
+                            <td>
+                                <span class="badge" th:text="${status.masked()}"></span>
+                            </td>
+                            <td>
+                                <span th:if="${status.owner() != null}" class="badge badge-default" th:text="${status.owner()}"></span>
+                                <span th:if="${status.owner() == null}" class="text-muted" th:text="#{admin.dtdd_keys.owner.admin}">Admin</span>
+                            </td>
+                            <td>
+                                <span th:if="${!status.blocked()}" class="badge badge-connected" th:text="#{admin.dtdd_keys.status.available}">Available</span>
+                                <span th:if="${status.blocked()}" class="badge badge-warning"
+                                      th:text="#{admin.dtdd_keys.status.blocked} + ' ' + ${status.blockedForSeconds()} + 's'">Blocked</span>
+                            </td>
+                            <td>
+                                <form th:action="@{/admin/dtdd-keys/delete}" method="post"> <!-- nosemgrep -->
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="apiKey" th:value="${entry.key}"/>
+                                    <button type="submit" class="btn btn-sm" th:text="#{admin.dtdd_keys.action.delete}">Delete</button>
+                                </form>
+                            </td>
+                            </th:block>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

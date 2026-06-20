@@ -227,6 +227,36 @@ public class AdminController {
         return "redirect:/admin/steam-keys";
     }
 
+    // ── DTDD Keys ────────────────────────────────────────────────────────────
+
+    @GetMapping("/dtdd-keys")
+    public String dtddKeysPage(Model model) {
+        DtddKeysPageDto data = apiClient.get("/api/admin/dtdd-keys", DtddKeysPageDto.class);
+        if (data != null) {
+            model.addAttribute("keyStatuses", data.keyStatuses());
+            model.addAttribute("dtddEnabled", data.dtddEnabled());
+        }
+        return "admin/dtdd-keys";
+    }
+
+    @PostMapping("/dtdd-keys/add")
+    public String addDtddKey(@RequestParam String apiKey) {
+        apiClient.post("/api/admin/dtdd-keys/add", Map.of("apiKey", apiKey));
+        return "redirect:/admin/dtdd-keys";
+    }
+
+    @PostMapping("/dtdd-keys/delete")
+    public String deleteDtddKey(@RequestParam String apiKey) {
+        apiClient.post("/api/admin/dtdd-keys/delete", Map.of("apiKey", apiKey));
+        return "redirect:/admin/dtdd-keys";
+    }
+
+    @PostMapping("/dtdd-keys/refresh")
+    public String refreshDtddKeys() {
+        apiClient.post("/api/admin/dtdd-keys/refresh", null);
+        return "redirect:/admin/dtdd-keys";
+    }
+
     // ── Experiments ──────────────────────────────────────────────────────────
 
     @GetMapping("/experiments")
@@ -364,6 +394,8 @@ public class AdminController {
     record KeyStatusDto(String masked, String owner, boolean blocked, long blockedForSeconds) {}
 
     record SteamKeysPageDto(Map<String, KeyStatusDto> keyStatuses, boolean steamEnabled) {}
+
+    record DtddKeysPageDto(Map<String, KeyStatusDto> keyStatuses, boolean dtddEnabled) {}
 
     record MemberSummaryDto(UUID id, String twitchUsername) {}
 }
