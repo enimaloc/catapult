@@ -1,10 +1,16 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.domain.DtddGameCache;
+import fr.enimaloc.catapult.domain.DtddGameMapping;
+import fr.enimaloc.catapult.domain.DtddMappingProposal;
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.SteamApiClient;
+import fr.enimaloc.catapult.repository.DtddGameCacheRepository;
+import fr.enimaloc.catapult.repository.DtddGameMappingRepository;
+import fr.enimaloc.catapult.repository.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
@@ -15,6 +21,7 @@ import fr.enimaloc.catapult.service.ChannelAccessService;
 import fr.enimaloc.catapult.service.ConnectionEventService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
+import fr.enimaloc.catapult.service.IgdbService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchService;
@@ -61,6 +68,10 @@ public class ApiChannelDataController {
     private final TwitchService twitchService;
     private final ActivityLogService activityLogService;
     private final ConnectionEventService connectionEventService;
+    private final IgdbService igdbService;
+    private final DtddGameMappingRepository dtddMappingRepo;
+    private final DtddGameCacheRepository dtddGameCacheRepo;
+    private final DtddMappingProposalRepository dtddProposalRepo;
 
     @GetMapping(value = "/logs", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter logs(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
@@ -318,6 +329,62 @@ public class ApiChannelDataController {
         if (q.isBlank()) return List.of();
         return twitchService.searchCategories(viewer, q);
     }
+
+    @GetMapping("/dtdd-mapping")
+    public DtddMappingStatusDto dtddMappingStatus(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UUID viewerId = UUID.fromString(jwt.getSubject());
+        UserAccount viewer = userAccountRepository.findById(viewerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!channelAccessService.canAccess(viewer, channelUser)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+
+        Optional<DetectedGame> currentGame = gameStateService.getLastKnownGame(channelUser);
+        if (currentGame.isEmpty()) {
+            return new DtddMappingStatusDto(null, null, false, null);
+        }
+
+        DetectedGame game = currentGame.get();
+        Optional<IgdbService.IgdbGame> igdbGame;
+        if (game.getSourceType() == GameBinding.SourceType.STEAM) {
+            igdbGame = igdbService.findBySteamAppId(game.getSourceId());
+        } else {
+            igdbGame = igdbService.findByName(game.getSourceName());
+        }
+        if (igdbGame.isEmpty()) {
+            return new DtddMappingStatusDto(null, null, false, null);
+        }
+
+        String igdbId = igdbGame.get().id();
+        Optional<DtddGameMapping> mappingOpt = dtddMappingRepo.findById(igdbId);
+        Optional<DtddMappingProposal> myProposal = dtddProposalRepo
+                .findFirstByProposerAndIgdbIdAndStatus(viewer, igdbId, DtddMappingProposal.Status.PENDING);
+        long otherPending = dtddProposalRepo.countByIgdbIdAndStatus(igdbId, DtddMappingProposal.Status.PENDING);
+        boolean canValidate = mappingOpt.isPresent()
+                && !mappingOpt.get().isVerified()
+                && otherPending == 0;
+
+        DtddMappingCurrentDto current = mappingOpt.map(m -> {
+            String name = m.getDtddId() != null
+                    ? dtddGameCacheRepo.findById(m.getDtddId()).map(DtddGameCache::getName).orElse(null)
+                    : null;
+            return new DtddMappingCurrentDto(m.getDtddId(), name, m.getConfidence(), m.isVerified());
+        }).orElse(null);
+
+        DtddMappingProposalDto pending = myProposal.map(p ->
+                new DtddMappingProposalDto(p.getId(), p.getProposedDtddId(), p.getReason())).orElse(null);
+
+        return new DtddMappingStatusDto(current, pending, canValidate, igdbId);
+    }
+
+    public record DtddMappingStatusDto(DtddMappingCurrentDto current, DtddMappingProposalDto myPendingProposal, boolean canValidateDirectly, String igdbId) {}
+    public record DtddMappingCurrentDto(Long dtddId, String name, double confidence, boolean verified) {}
+    public record DtddMappingProposalDto(java.util.UUID id, Long proposedDtddId, String reason) {}
 
     public record CclDto(String id, String name) {}
 
