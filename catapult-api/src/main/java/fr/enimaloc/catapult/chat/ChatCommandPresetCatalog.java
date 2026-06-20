@@ -55,4 +55,30 @@ public class ChatCommandPresetCatalog {
         def.setPresetKey(presetKey);
         return repository.save(def);
     }
+
+    /**
+     * Pré-enregistre tous les presets pour {@code user}, désactivés par défaut.
+     * Idempotent : ignore les presets qui ont déjà une définition (même nom).
+     * Appelé au premier affichage de la page côté liste afin que l'utilisateur
+     * voie d'emblée toutes les commandes pré-configurées et n'ait qu'à les
+     * activer.
+     */
+    public void bootstrapDisabled(UserAccount user, Locale locale) {
+        for (Map.Entry<String, Preset> entry : PRESETS.entrySet()) {
+            String presetKey = entry.getKey();
+            Preset preset = entry.getValue();
+            String name = messageSource.getMessage("chat.preset." + presetKey + ".name", null, locale);
+            if (repository.existsByUserAndName(user, name)) continue;
+
+            String template = messageSource.getMessage("chat.preset." + presetKey + ".template", null, locale);
+            ChatCommandDefinition def = new ChatCommandDefinition();
+            def.setUser(user);
+            def.setName(name);
+            def.setTemplate(template);
+            def.setPermission(preset.defaultPermission());
+            def.setEnabled(false);
+            def.setPresetKey(presetKey);
+            repository.save(def);
+        }
+    }
 }
