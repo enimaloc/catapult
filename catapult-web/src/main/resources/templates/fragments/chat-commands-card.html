@@ -15,9 +15,9 @@
         Tous les presets sont pré-enregistrés désactivés. Coche « Activé » et clique « Enregistrer ».
     </p>
 
-    <div id="chatCommandsBotModBanner" class="banner banner-warning" hidden style="margin-bottom:.75rem;">
-        <span th:text="#{chat_commands.bot_not_modded}">The Catapult bot is not a moderator.</span>
-    </div>
+<!--    <div id="chatCommandsBotModBanner" class="banner banner-warning" hidden style="margin-bottom:.75rem;">-->
+<!--        <span th:text="#{chat_commands.bot_not_modded}">The Catapult bot is not a moderator.</span>-->
+<!--    </div>-->
 
     <table class="commands-table" style="width:100%; border-collapse:collapse;">
         <thead>
@@ -116,9 +116,9 @@
             if (!res.ok) { await reportError(res); return; }
             const data = await res.json();
 
-            if (data.botModStatus && data.botModStatus.modded === false) {
-                document.getElementById('chatCommandsBotModBanner').hidden = false;
-            }
+            // if (data.botModStatus && data.botModStatus.modded === false) {
+            //     document.getElementById('chatCommandsBotModBanner').hidden = false;
+            // }
 
             const tbody = document.getElementById('chatCommandsTbody');
             const tpl = document.getElementById('chatCommandsRowTpl').content;
