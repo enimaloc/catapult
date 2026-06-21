@@ -150,6 +150,8 @@ public class ChannelPageController {
             model.addAttribute("bindings", data.bindings());
             model.addAttribute("availableCcls", data.availableCcls());
             model.addAttribute("blockedCcls", data.blockedCcls());
+            model.addAttribute("availableTws", data.availableTws());
+            model.addAttribute("blockedTws", data.blockedTws());
             model.addAttribute("filterStatus", data.filterStatus());
             model.addAttribute("filterSource", data.filterSource());
         }
@@ -219,6 +221,8 @@ public class ChannelPageController {
         model.addAttribute("bindings", data.bindings());
         model.addAttribute("availableCcls", data.availableCcls());
         model.addAttribute("blockedCcls", data.blockedCcls());
+        model.addAttribute("availableTws", data.availableTws());
+        model.addAttribute("blockedTws", data.blockedTws());
         model.addAttribute("filterStatus", data.filterStatus());
         model.addAttribute("filterSource", data.filterSource());
         model.addAttribute("hasSteamProvider", data.hasSteamProvider());
@@ -247,6 +251,8 @@ public class ChannelPageController {
             PagedBindings bindings,
             List<CclDto> availableCcls,
             Set<String> blockedCcls,
+            List<TwDto> availableTws,
+            Set<String> blockedTws,
             String filterStatus,
             String filterSource,
             boolean hasSteamProvider,
@@ -280,7 +286,10 @@ public class ChannelPageController {
             String twitchGameName,
             boolean ignored,
             boolean cclEnabled,
-            Set<String> ccls
+            Set<String> ccls,
+            boolean twEnabled,
+            boolean twOverride,
+            Set<String> tws
     ) {}
 
     public enum BindingStatus {
