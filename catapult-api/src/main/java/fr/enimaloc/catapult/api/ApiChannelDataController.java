@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.DtddGameCacheRepository;
 import fr.enimaloc.catapult.repository.DtddGameMappingRepository;
 import fr.enimaloc.catapult.repository.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.TwDefinitionRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
@@ -62,6 +63,7 @@ public class ApiChannelDataController {
     private final StreamStateService streamStateService;
     private final GameStateService gameStateService;
     private final AdminCclService adminCclService;
+    private final TwDefinitionRepository twDefinitionRepository;
     private final TokenEncryptionService tokenEncryptionService;
     private final SteamApiKeyRotator steamApiKeyRotator;
     private final Optional<SteamApiClient> steamApiClient;
@@ -296,6 +298,10 @@ public class ApiChannelDataController {
                 .map(c -> new CclDto(c.getId(), c.getName()))
                 .toList();
 
+        List<TwDto> tws = twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc().stream()
+                .map(t -> new TwDto(t.getId(), t.getLabel()))
+                .toList();
+
         return new UserSettingsDto(
                 settings.isCclFeatureEnabled(),
                 settings.getBlockedCcls(),
@@ -308,7 +314,10 @@ public class ApiChannelDataController {
                 settings.getIncompleteFallbackTwitchGameId(),
                 settings.getIncompleteFallbackTwitchGameName(),
                 settings.getIncompleteFallbackCcls(),
-                ccls
+                ccls,
+                settings.isTwFeatureEnabled(),
+                settings.getBlockedTws(),
+                tws
         );
     }
 
@@ -451,6 +460,11 @@ public class ApiChannelDataController {
             String incompleteFallbackTwitchGameId,
             String incompleteFallbackTwitchGameName,
             Set<String> incompleteFallbackCcls,
-            List<CclDto> availableCcls
+            List<CclDto> availableCcls,
+            boolean twFeatureEnabled,
+            Set<String> blockedTws,
+            List<TwDto> availableTws
     ) {}
+
+    public record TwDto(String id, String label) {}
 }

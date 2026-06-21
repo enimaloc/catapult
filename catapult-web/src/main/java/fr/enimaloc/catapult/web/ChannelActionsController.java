@@ -77,6 +77,16 @@ public class ChannelActionsController {
         return "redirect:/channels/" + username;
     }
 
+    @PostMapping("/settings/tws")
+    public String saveTwSettings(
+            @PathVariable String username,
+            @RequestParam(defaultValue = "false") boolean twEnabled,
+            @RequestParam(required = false) Set<String> blockedTws) {
+        apiClient.post("/api/channels/{username}/settings/tws",
+                new TwSettingsBody(twEnabled, blockedTws), username);
+        return "redirect:/channels/" + username;
+    }
+
     @PostMapping("/settings/no-game")
     public String saveNoGameSettings(
             @PathVariable String username,
@@ -158,6 +168,7 @@ public class ChannelActionsController {
     record IgnoredToggleBody(boolean ignored) {}
     record UpdateBindingBody(String twitchGameId, String twitchGameName, Set<String> ccls) {}
     record CclSettingsBody(boolean cclEnabled, Set<String> blockedCcls) {}
+    record TwSettingsBody(boolean enabled, Set<String> blockedTws) {}
     record NoGameSettingsBody(String twitchGameId, String twitchGameName, Set<String> ccls,
                               boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {}
     record IncompleteFallbackBody(String twitchGameId, String twitchGameName, Set<String> ccls) {}
