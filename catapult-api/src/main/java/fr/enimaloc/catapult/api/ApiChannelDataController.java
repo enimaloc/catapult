@@ -145,7 +145,10 @@ public class ApiChannelDataController {
                         b.getTwitchGameName(),
                         b.isIgnored(),
                         b.isCclEnabled(),
-                        b.getCcls()
+                        b.getCcls(),
+                        b.isTwEnabled(),
+                        b.isTwOverride(),
+                        b.getTws()
                 ))
                 .toList();
 
@@ -158,6 +161,10 @@ public class ApiChannelDataController {
 
         Set<String> blockedCcls = userSettingsRepository.findById(channelUser.getId())
                 .map(UserSettings::getBlockedCcls)
+                .orElse(Set.of());
+
+        Set<String> blockedTws = userSettingsRepository.findById(channelUser.getId())
+                .map(UserSettings::getBlockedTws)
                 .orElse(Set.of());
 
         boolean hasSteamProvider = steamApiClient.isPresent();
@@ -200,6 +207,10 @@ public class ApiChannelDataController {
                 channelUser.getProfileImageUrl()
         );
 
+        List<TwDto> availableTws = twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc().stream()
+                .map(t -> new TwDto(t.getId(), t.getLabel()))
+                .toList();
+
         return new ChannelPageData(
                 channelUserDto,
                 username,
@@ -212,6 +223,8 @@ public class ApiChannelDataController {
                         .map(c -> new CclDto(c.getId(), c.getName()))
                         .toList(),
                 blockedCcls,
+                availableTws,
+                blockedTws,
                 status,
                 source,
                 hasSteamProvider,
@@ -407,6 +420,8 @@ public class ApiChannelDataController {
             PagedBindings bindings,
             List<CclDto> availableCcls,
             Set<String> blockedCcls,
+            List<TwDto> availableTws,
+            Set<String> blockedTws,
             String filterStatus,
             String filterSource,
             boolean hasSteamProvider,
@@ -437,7 +452,10 @@ public class ApiChannelDataController {
             String twitchGameName,
             boolean ignored,
             boolean cclEnabled,
-            Set<String> ccls
+            Set<String> ccls,
+            boolean twEnabled,
+            boolean twOverride,
+            Set<String> tws
     ) {}
 
     public record StatusData(
