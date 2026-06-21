@@ -36,7 +36,9 @@ class DynamicCommandResolverTest {
 
     @BeforeEach
     void setup() {
-        placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry());
+        TwPlaceholderRegistry twRegistry = org.mockito.Mockito.mock(TwPlaceholderRegistry.class);
+        org.mockito.Mockito.when(twRegistry.getKnownPaths()).thenReturn(java.util.Set.of());
+        placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry(), twRegistry);
         resolver = new DynamicCommandResolver(repository, placeholderResolver, gameContextService,
             java.util.List.of());
         user = new UserAccount();

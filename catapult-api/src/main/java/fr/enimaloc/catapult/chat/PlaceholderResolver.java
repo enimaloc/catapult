@@ -5,9 +5,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -29,13 +31,12 @@ public class PlaceholderResolver {
         "game.store.battlenet",
         "game.store.official",
         "game.igdb.url",
-        "dtdd.yes",
-        "dtdd.no",
-        "dtdd.mostly",
-        "game.agerating"
+        "game.agerating",
+        "tw.active"
     );
 
     private final MeterRegistry meterRegistry;
+    private final TwPlaceholderRegistry twPlaceholderRegistry;
 
     public Optional<String> resolve(String template, GameContext ctx,
                                     Map<String, String> dbFallbacks, Locale locale) {
@@ -87,11 +88,20 @@ public class PlaceholderResolver {
             case "game.store.official"  -> ctx.stores() == null ? null : ctx.stores().get("official");
             case "game.igdb.url"      -> ctx.igdbSlug() == null ? null
                 : "https://www.igdb.com/games/" + ctx.igdbSlug();
-            case "dtdd.yes"           -> joinNullIfEmpty(ctx.dtddTopics() == null ? null : ctx.dtddTopics().yesTopics());
-            case "dtdd.no"            -> joinNullIfEmpty(ctx.dtddTopics() == null ? null : ctx.dtddTopics().noTopics());
-            case "dtdd.mostly"        -> joinNullIfEmpty(ctx.dtddTopics() == null ? null : ctx.dtddTopics().mostlyTopics());
             case "game.agerating"     -> ctx.ageRating();
-            default -> null;
+            case "tw.active"          -> joinNullIfEmpty(ctx.activeTws() == null ? null
+                : ctx.activeTws().stream()
+                    .map(id -> ctx.twLabels() == null ? null : ctx.twLabels().get(id))
+                    .filter(Objects::nonNull)
+                    .sorted(Comparator.naturalOrder())
+                    .toList());
+            default -> {
+                if (path.startsWith("tw.") && ctx.activeTws() != null
+                        && ctx.activeTws().contains(path.substring(3))) {
+                    yield ctx.twLabels() == null ? null : ctx.twLabels().get(path.substring(3));
+                }
+                yield null;
+            }
         };
     }
 
@@ -106,7 +116,13 @@ public class PlaceholderResolver {
         Matcher m = PLACEHOLDER.matcher(template);
         while (m.find()) {
             String path = m.group(1);
-            if (!KNOWN_PATHS.contains(path)) unknown.add(path);
+            if (KNOWN_PATHS.contains(path)) continue;
+            if (path.startsWith("tw.")) {
+                String slug = path.substring(3);
+                if (twPlaceholderRegistry != null
+                        && twPlaceholderRegistry.getKnownPaths().contains(slug)) continue;
+            }
+            unknown.add(path);
         }
         return unknown;
     }

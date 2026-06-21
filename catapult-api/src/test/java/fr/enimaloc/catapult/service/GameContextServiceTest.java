@@ -4,14 +4,16 @@ import fr.enimaloc.catapult.chat.GameContext;
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.IgdbGameDetails;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
+import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -19,11 +21,15 @@ import org.mockito.quality.Strictness;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,13 +45,23 @@ class GameContextServiceTest {
     @Mock
     private IgdbGameCclRepository igdbGameCclRepository;
 
+    @Mock
+    private GameBindingRepository gameBindingRepository;
+
+    @Mock
+    private UserSettingsRepository userSettingsRepository;
+
+    @Mock
+    private TwLabelService twLabelService;
+
     private GameContextService service;
 
     private UserAccount user;
 
     @BeforeEach
     void setUp() {
-        service = new GameContextService(igdbService, igdbGameDetailsService, igdbGameCclRepository, null);
+        service = new GameContextService(igdbService, igdbGameDetailsService, igdbGameCclRepository,
+            gameBindingRepository, userSettingsRepository, twLabelService);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
@@ -76,6 +92,8 @@ class GameContextServiceTest {
         assertThat(ctx.igdbSlug()).isEqualTo("dota-2");
         assertThat(ctx.stores()).containsEntry("steam", "https://steam/570");
         assertThat(ctx.detected()).isSameAs(detected);
+        assertThat(ctx.activeTws()).isEmpty();
+        assertThat(ctx.twLabels()).isEmpty();
     }
 
     @Test
@@ -95,6 +113,8 @@ class GameContextServiceTest {
         assertThat(ctx.activeStoreUrl()).isNull();
         assertThat(ctx.igdbSlug()).isNull();
         assertThat(ctx.stores()).isEmpty();
+        assertThat(ctx.activeTws()).isEmpty();
+        assertThat(ctx.twLabels()).isEmpty();
     }
 
     @Test
@@ -115,5 +135,88 @@ class GameContextServiceTest {
 
         service.onNoGameDetected(new NoGameDetectedEvent(this, user));
         assertThat(service.get(user)).isEmpty();
+    }
+
+    @Test
+    void activeTws_filteredByBlockedTws_andLabelsResolved_whenFeatureEnabled() {
+        DetectedGame detected = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+        when(igdbService.findBySteamAppId("570"))
+            .thenReturn(Optional.of(new IgdbService.IgdbGame("8173", "Dota 2")));
+        when(igdbGameDetailsService.getDetails("8173")).thenReturn(Optional.empty());
+
+        GameBinding binding = new GameBinding();
+        binding.setTwEnabled(true);
+        binding.setTws(new HashSet<>(Set.of("violence_graphic", "death_of_animal", "vomit")));
+        when(gameBindingRepository.findByUserAndSourceIdAndSourceType(
+                user, "570", GameBinding.SourceType.STEAM))
+            .thenReturn(Optional.of(binding));
+
+        UserSettings settings = new UserSettings();
+        settings.setTwFeatureEnabled(true);
+        settings.setBlockedTws(new HashSet<>(Set.of("vomit")));
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        when(twLabelService.resolve(any(String.class), any(Locale.class)))
+            .thenAnswer(inv -> "label-" + inv.getArgument(0));
+
+        service.onGameDetected(new GameDetectedEvent(this, user, detected));
+
+        GameContext ctx = service.get(user).orElseThrow();
+        assertThat(ctx.activeTws()).containsExactlyInAnyOrder("violence_graphic", "death_of_animal");
+        assertThat(ctx.activeTws()).doesNotContain("vomit");
+        assertThat(ctx.twLabels())
+            .containsEntry("violence_graphic", "label-violence_graphic")
+            .containsEntry("death_of_animal", "label-death_of_animal")
+            .doesNotContainKey("vomit");
+    }
+
+    @Test
+    void activeTws_emptyWhenTwDisabledOnBinding() {
+        DetectedGame detected = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+        when(igdbService.findBySteamAppId("570"))
+            .thenReturn(Optional.of(new IgdbService.IgdbGame("8173", "Dota 2")));
+        when(igdbGameDetailsService.getDetails("8173")).thenReturn(Optional.empty());
+
+        GameBinding binding = new GameBinding();
+        binding.setTwEnabled(false);
+        binding.setTws(new HashSet<>(Set.of("violence_graphic")));
+        when(gameBindingRepository.findByUserAndSourceIdAndSourceType(
+                user, "570", GameBinding.SourceType.STEAM))
+            .thenReturn(Optional.of(binding));
+
+        UserSettings settings = new UserSettings();
+        settings.setTwFeatureEnabled(true);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        service.onGameDetected(new GameDetectedEvent(this, user, detected));
+
+        GameContext ctx = service.get(user).orElseThrow();
+        assertThat(ctx.activeTws()).isEmpty();
+        assertThat(ctx.twLabels()).isEmpty();
+    }
+
+    @Test
+    void activeTws_emptyWhenUserFeatureDisabled() {
+        DetectedGame detected = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+        when(igdbService.findBySteamAppId("570"))
+            .thenReturn(Optional.of(new IgdbService.IgdbGame("8173", "Dota 2")));
+        when(igdbGameDetailsService.getDetails("8173")).thenReturn(Optional.empty());
+
+        GameBinding binding = new GameBinding();
+        binding.setTwEnabled(true);
+        binding.setTws(new HashSet<>(Set.of("violence_graphic")));
+        when(gameBindingRepository.findByUserAndSourceIdAndSourceType(
+                user, "570", GameBinding.SourceType.STEAM))
+            .thenReturn(Optional.of(binding));
+
+        UserSettings settings = new UserSettings();
+        settings.setTwFeatureEnabled(false);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        service.onGameDetected(new GameDetectedEvent(this, user, detected));
+
+        GameContext ctx = service.get(user).orElseThrow();
+        assertThat(ctx.activeTws()).isEmpty();
+        assertThat(ctx.twLabels()).isEmpty();
     }
 }
