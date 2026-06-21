@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.AppState;
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.repository.AppStateRepository;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -69,7 +70,7 @@ class TwBackfillServiceTest {
 
     private TwBackfillService build(AppStateRepository app, GameBindingRepository b,
                                     IgdbService igdb, TwResolverService res) {
-        TwBackfillService s = new TwBackfillService(app, b, igdb, res);
+        TwBackfillService s = new TwBackfillService(app, b, igdb, res, new SimpleMeterRegistry());
         s.setBatchSize(50);
         s.setThrottle(1000);
         return s;
