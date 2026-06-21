@@ -22,6 +22,7 @@ public class BindingService {
     private final GameBindingRepository gameBindingRepository;
     private final IgdbService igdbService;
     private final TwitchService twitchService;
+    private final TwResolverService twResolverService;
 
     @Transactional
     public GameBinding resolveOrCreate(UserAccount user, DetectedGame detectedGame) {
@@ -83,6 +84,16 @@ public class BindingService {
             binding.getCcls().clear();
             binding.getCcls().addAll(ccls);
 
+            if (!binding.isTwOverride()) {
+                Set<Long> descriptorIds = igdbService.fetchDescriptorIds(igdbId);
+                String steamAppId = detectedGame.getSourceType() == GameBinding.SourceType.STEAM
+                        ? detectedGame.getSourceId() : null;
+                Set<String> tws = twResolverService.suggest(new TwResolverService.SuggestInput(
+                        igdbId, descriptorIds, steamAppId, detectedGame.getSourceName()));
+                binding.getTws().clear();
+                binding.getTws().addAll(tws);
+            }
+
             if (twitchId == null) {
                 binding.setStatus(GameBinding.Status.INCOMPLETE);
                 log.info("Binding updated as INCOMPLETE for user {} — game '{}' found on IGDB, but no twitch id found",
@@ -111,11 +122,22 @@ public class BindingService {
     @Transactional
     public void updateBinding(UserAccount user, UUID bindingId, String twitchGameId,
                               String twitchGameName, Set<String> ccls, boolean ignored) {
+        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding ->
+            updateBinding(user, bindingId, twitchGameId, twitchGameName, ccls, binding.getTws(), ignored)
+        );
+    }
+
+    @Transactional
+    public void updateBinding(UserAccount user, UUID bindingId, String twitchGameId,
+                              String twitchGameName, Set<String> ccls, Set<String> tws, boolean ignored) {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             binding.setTwitchGameId(twitchGameId);
             binding.setTwitchGameName(twitchGameName);
             binding.getCcls().clear();
             binding.getCcls().addAll(ccls);
+            binding.getTws().clear();
+            binding.getTws().addAll(tws);
+            binding.setTwOverride(true);
             binding.setIgnored(ignored);
             if (twitchGameId != null && !twitchGameId.isBlank()) {
                 binding.setStatus(GameBinding.Status.MANUAL);
@@ -132,6 +154,49 @@ public class BindingService {
             gameBindingRepository.save(binding);
             twitchService.updateChannel(user, binding);
         });
+    }
+
+    @Transactional
+    public void toggleTwEnabled(UserAccount user, UUID bindingId, boolean enabled) {
+        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
+            binding.setTwEnabled(enabled);
+            gameBindingRepository.save(binding);
+            twitchService.updateChannel(user, binding);
+        });
+    }
+
+    @Transactional
+    public void resetTws(UserAccount user, UUID bindingId) {
+        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
+            binding.setTwOverride(false);
+            DetectedGame detected = new DetectedGame(
+                binding.getSourceId(), binding.getSourceType(), binding.getSourceName());
+            updateWithIgdbResolution(user, detected, binding);
+        });
+    }
+
+    @Transactional
+    public void setTwsForBinding(UserAccount user, UUID bindingId, Set<String> tws) {
+        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
+            binding.getTws().clear();
+            binding.getTws().addAll(tws);
+            binding.setTwOverride(true);
+            gameBindingRepository.save(binding);
+            twitchService.updateChannel(user, binding);
+        });
+    }
+
+    public Set<String> previewTws(UserAccount user, UUID bindingId) {
+        return gameBindingRepository.findByIdAndUser(bindingId, user)
+            .flatMap(binding -> igdbService.resolveIgdbIdForBinding(binding)
+                .map(igdbId -> {
+                    Set<Long> descriptorIds = igdbService.fetchDescriptorIds(igdbId);
+                    String steamAppId = binding.getSourceType() == GameBinding.SourceType.STEAM
+                            ? binding.getSourceId() : null;
+                    return twResolverService.suggest(new TwResolverService.SuggestInput(
+                            igdbId, descriptorIds, steamAppId, binding.getSourceName()));
+                }))
+            .orElse(Set.of());
     }
 
     @Transactional
