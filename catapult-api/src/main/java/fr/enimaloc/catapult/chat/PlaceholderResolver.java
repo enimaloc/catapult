@@ -50,6 +50,10 @@ public class PlaceholderResolver {
             boolean inlinePresent = m.group(2) != null;
 
             String value = lookup(ctx, path, locale);
+            if (path.startsWith("tw.")) {
+                meterRegistry.counter("catapult.tw.placeholder.usage",
+                    "path", path).increment();
+            }
             String replacement;
             if (value != null && !value.isBlank()) {
                 replacement = value;
