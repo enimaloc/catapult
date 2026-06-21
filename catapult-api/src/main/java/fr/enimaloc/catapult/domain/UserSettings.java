@@ -26,6 +26,17 @@ public class UserSettings {
     @Column(name = "ccl_feature_enabled", nullable = false)
     private boolean cclFeatureEnabled = true;
 
+    @Column(name = "tw_feature_enabled", nullable = false)
+    private boolean twFeatureEnabled = true;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "user_settings_blocked_tws",
+        joinColumns = @JoinColumn(name = "user_id")
+    )
+    @Column(name = "tw_id")
+    private Set<String> blockedTws = new HashSet<>();
+
     @Column(name = "no_game_twitch_game_id")
     private String noGameTwitchGameId;
 
