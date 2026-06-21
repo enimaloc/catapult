@@ -176,6 +176,17 @@ public class ChannelPageController {
         return "fragments/ccl-settings :: ccl-settings";
     }
 
+    @GetMapping("/fragments/tw-settings")
+    public String twSettings(@PathVariable String username, Model model) {
+        model.addAttribute("channelUsername", username);
+        UserSettingsDto settings = apiClient.get("/api/channels/{username}/settings", UserSettingsDto.class, username);
+        if (settings != null) {
+            model.addAttribute("twSettings", settings);
+            model.addAttribute("availableTws", settings.availableTws());
+        }
+        return "fragments/tw-settings :: tw-settings";
+    }
+
     @GetMapping("/fragments/no-game-settings")
     public String noGameSettings(@PathVariable String username, Model model) {
         model.addAttribute("channelUsername", username);
@@ -289,8 +300,14 @@ public class ChannelPageController {
             String incompleteFallbackTwitchGameId,
             String incompleteFallbackTwitchGameName,
             Set<String> incompleteFallbackCcls,
-            List<CclDto> availableCcls
+            List<CclDto> availableCcls,
+            boolean twFeatureEnabled,
+            Set<String> blockedTws,
+            List<TwDto> availableTws
     ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record TwDto(String id, String label) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record StatusData(
