@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.AppState;
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.repository.AppStateRepository;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ public class TwBackfillService {
     private final GameBindingRepository bindingRepo;
     private final IgdbService igdbService;
     private final TwResolverService resolver;
+    private final MeterRegistry meterRegistry;
 
     @Setter
     @Value("${tw.backfill.throttle-per-second:2}")
@@ -58,6 +60,7 @@ public class TwBackfillService {
             for (GameBinding b : batch) {
                 if (b.isTwOverride() || !b.getTws().isEmpty()) {
                     skipped++;
+                    meterRegistry.counter("catapult.tw.backfill.skipped").increment();
                     continue;
                 }
                 try {
@@ -69,9 +72,11 @@ public class TwBackfillService {
                     b.setTws(tws);
                     bindingRepo.save(b);
                     processed++;
+                    meterRegistry.counter("catapult.tw.backfill.processed").increment();
                 } catch (Exception e) {
                     log.warn("TW backfill failed for binding {}: {}", b.getId(), e.getMessage());
                     failed++;
+                    meterRegistry.counter("catapult.tw.backfill.failed").increment();
                 }
                 try {
                     Thread.sleep(sleepMs);
