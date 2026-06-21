@@ -53,6 +53,30 @@ public class AdminController {
         return "redirect:/admin/ccl";
     }
 
+    // ── TW ───────────────────────────────────────────────────────────────────
+
+    @GetMapping("/tw")
+    public String twPage(Model model) {
+        List<?> definitions = apiClient.get("/api/admin/tw",
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        model.addAttribute("definitions", definitions != null ? definitions : List.of());
+        return "admin/tw";
+    }
+
+    @PostMapping("/tw/add")
+    public String addTw(@RequestParam String id,
+                        @RequestParam String label,
+                        @RequestParam(required = false) String description,
+                        @RequestParam(defaultValue = "0") int sortOrder) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("id", id);
+        body.put("label", label);
+        body.put("description", description);
+        body.put("sortOrder", sortOrder);
+        apiClient.post("/api/admin/tw", body);
+        return "redirect:/admin/tw";
+    }
+
     // ── Members ──────────────────────────────────────────────────────────────
 
     @GetMapping("/members")
