@@ -140,6 +140,11 @@ public class ConfigOverrideService {
             if (n <= 0) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, key + " must be > 0");
             }
+        } else if (key.equals("tw.backfill.batch-size") || key.equals("tw.backfill.throttle-per-second")) {
+            long n = parseLong(key, value);
+            if (n <= 0 || n > Integer.MAX_VALUE) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, key + " must be a positive integer");
+            }
         }
     }
 
