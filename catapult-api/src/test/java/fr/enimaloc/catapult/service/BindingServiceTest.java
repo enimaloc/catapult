@@ -29,6 +29,7 @@ class BindingServiceTest {
     @Mock private GameBindingRepository gameBindingRepository;
     @Mock private IgdbService igdbService;
     @Mock private TwitchService twitchService;
+    @Mock private TwResolverService twResolverService;
 
     private BindingService bindingService;
 
@@ -38,7 +39,7 @@ class BindingServiceTest {
 
     @BeforeEach
     void setup() {
-        bindingService = new BindingService(gameBindingRepository, igdbService, twitchService);
+        bindingService = new BindingService(gameBindingRepository, igdbService, twitchService, twResolverService);
 
         user = new UserAccount();
         bindingId = UUID.randomUUID();
@@ -274,5 +275,63 @@ class BindingServiceTest {
         bindingService.refreshIncompleteBindings();
 
         assertThat(incomplete.getStatus()).isEqualTo(GameBinding.Status.INCOMPLETE);
+    }
+
+    @Test
+    void updateBindingFromIgdb_setsTwsFromResolver_whenNotOverridden() {
+        DetectedGame game = new DetectedGame("steam-123", GameBinding.SourceType.STEAM, "Portal");
+        when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "steam-123", GameBinding.SourceType.STEAM))
+            .thenReturn(Optional.empty());
+        IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("1234", "Portal");
+        when(igdbService.findBySteamAppId("steam-123")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.findTwitchGameId("1234")).thenReturn(Optional.of("twitch-123"));
+        when(igdbService.suggestCcls("1234")).thenReturn(Set.of());
+        when(igdbService.fetchDescriptorIds("1234")).thenReturn(Set.of(10L, 11L));
+        when(twResolverService.suggest(any(TwResolverService.SuggestInput.class)))
+            .thenReturn(Set.of("violence_graphic"));
+
+        GameBinding result = bindingService.resolveOrCreate(user, game);
+
+        assertThat(result.getTws()).containsExactly("violence_graphic");
+        assertThat(result.isTwOverride()).isFalse();
+    }
+
+    @Test
+    void updateBindingFromIgdb_skipsTwResolver_whenTwOverrideTrue() {
+        GameBinding overridden = new GameBinding();
+        overridden.setUser(user);
+        overridden.setSourceId("steam-555");
+        overridden.setSourceType(GameBinding.SourceType.STEAM);
+        overridden.setSourceName("Half-Life");
+        overridden.setStatus(GameBinding.Status.INCOMPLETE);
+        overridden.getTws().add("x");
+        overridden.setTwOverride(true);
+
+        when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
+            .thenReturn(List.of(overridden));
+        IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("777", "Half-Life");
+        when(igdbService.findBySteamAppId("steam-555")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.findTwitchGameId("777")).thenReturn(Optional.of("twitch-777"));
+        when(igdbService.suggestCcls("777")).thenReturn(Set.of());
+        when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        bindingService.refreshIncompleteBindings();
+
+        assertThat(overridden.getTws()).containsExactly("x");
+        assertThat(overridden.isTwOverride()).isTrue();
+        verify(twResolverService, never()).suggest(any());
+    }
+
+    @Test
+    void updateBinding_newOverload_setsTwOverrideTrueAndPersists() {
+        Set<String> newCcls = Set.of("SexualThemes");
+        Set<String> newTws = Set.of("violence_graphic");
+
+        bindingService.updateBinding(user, bindingId, "new-id", "New Game", newCcls, newTws, false);
+
+        assertThat(binding.getTws()).containsExactly("violence_graphic");
+        assertThat(binding.isTwOverride()).isTrue();
+        verify(gameBindingRepository).save(binding);
+        verify(twitchService).updateChannel(user, binding);
     }
 }

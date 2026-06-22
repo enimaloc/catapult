@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.DtddGameCacheRepository;
 import fr.enimaloc.catapult.repository.DtddGameMappingRepository;
 import fr.enimaloc.catapult.repository.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.TwDefinitionRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
@@ -62,6 +63,7 @@ public class ApiChannelDataController {
     private final StreamStateService streamStateService;
     private final GameStateService gameStateService;
     private final AdminCclService adminCclService;
+    private final TwDefinitionRepository twDefinitionRepository;
     private final TokenEncryptionService tokenEncryptionService;
     private final SteamApiKeyRotator steamApiKeyRotator;
     private final Optional<SteamApiClient> steamApiClient;
@@ -143,7 +145,10 @@ public class ApiChannelDataController {
                         b.getTwitchGameName(),
                         b.isIgnored(),
                         b.isCclEnabled(),
-                        b.getCcls()
+                        b.getCcls(),
+                        b.isTwEnabled(),
+                        b.isTwOverride(),
+                        b.getTws()
                 ))
                 .toList();
 
@@ -156,6 +161,10 @@ public class ApiChannelDataController {
 
         Set<String> blockedCcls = userSettingsRepository.findById(channelUser.getId())
                 .map(UserSettings::getBlockedCcls)
+                .orElse(Set.of());
+
+        Set<String> blockedTws = userSettingsRepository.findById(channelUser.getId())
+                .map(UserSettings::getBlockedTws)
                 .orElse(Set.of());
 
         boolean hasSteamProvider = steamApiClient.isPresent();
@@ -198,6 +207,10 @@ public class ApiChannelDataController {
                 channelUser.getProfileImageUrl()
         );
 
+        List<TwDto> availableTws = twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc().stream()
+                .map(t -> new TwDto(t.getId(), t.getLabel()))
+                .toList();
+
         return new ChannelPageData(
                 channelUserDto,
                 username,
@@ -210,6 +223,8 @@ public class ApiChannelDataController {
                         .map(c -> new CclDto(c.getId(), c.getName()))
                         .toList(),
                 blockedCcls,
+                availableTws,
+                blockedTws,
                 status,
                 source,
                 hasSteamProvider,
@@ -296,6 +311,10 @@ public class ApiChannelDataController {
                 .map(c -> new CclDto(c.getId(), c.getName()))
                 .toList();
 
+        List<TwDto> tws = twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc().stream()
+                .map(t -> new TwDto(t.getId(), t.getLabel()))
+                .toList();
+
         return new UserSettingsDto(
                 settings.isCclFeatureEnabled(),
                 settings.getBlockedCcls(),
@@ -308,7 +327,10 @@ public class ApiChannelDataController {
                 settings.getIncompleteFallbackTwitchGameId(),
                 settings.getIncompleteFallbackTwitchGameName(),
                 settings.getIncompleteFallbackCcls(),
-                ccls
+                ccls,
+                settings.isTwFeatureEnabled(),
+                settings.getBlockedTws(),
+                tws
         );
     }
 
@@ -398,6 +420,8 @@ public class ApiChannelDataController {
             PagedBindings bindings,
             List<CclDto> availableCcls,
             Set<String> blockedCcls,
+            List<TwDto> availableTws,
+            Set<String> blockedTws,
             String filterStatus,
             String filterSource,
             boolean hasSteamProvider,
@@ -428,7 +452,10 @@ public class ApiChannelDataController {
             String twitchGameName,
             boolean ignored,
             boolean cclEnabled,
-            Set<String> ccls
+            Set<String> ccls,
+            boolean twEnabled,
+            boolean twOverride,
+            Set<String> tws
     ) {}
 
     public record StatusData(
@@ -451,6 +478,11 @@ public class ApiChannelDataController {
             String incompleteFallbackTwitchGameId,
             String incompleteFallbackTwitchGameName,
             Set<String> incompleteFallbackCcls,
-            List<CclDto> availableCcls
+            List<CclDto> availableCcls,
+            boolean twFeatureEnabled,
+            Set<String> blockedTws,
+            List<TwDto> availableTws
     ) {}
+
+    public record TwDto(String id, String label) {}
 }

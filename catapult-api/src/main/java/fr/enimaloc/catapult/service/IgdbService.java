@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.IgdbGameCacheEntry;
 import fr.enimaloc.catapult.domain.IgdbGameCcl;
 import fr.enimaloc.catapult.domain.IgdbGameExternalId;
@@ -77,6 +80,9 @@ public class IgdbService {
 
     // CCL cache: igdbId → suggested CCLs (stable, no TTL needed)
     private final Map<String, Set<String>> cclCache = new ConcurrentHashMap<>();
+
+    // JSON serializer for descriptor ids persisted on IgdbGameCcl
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // App-level Twitch token
     private volatile String appAccessToken;
@@ -378,11 +384,75 @@ public class IgdbService {
         Set<String> suggested = new HashSet<>(extractCcls(game));
         suggested.addAll(steamCcls);
         String ageRatingsLabel = extractAgeRatingsLabel(game);
-        log.debug("IGDB+Steam CCL for {}: ratings={}, suggested={}", igdbGameId, ageRatingsLabel, suggested);
-        cclRepository.save(new IgdbGameCcl(igdbGameId, suggested, ageRatingsLabel));
+
+        Set<Long> descriptorIds = game.getAgeRatingsList().stream()
+            .map(AgeRating::getRatingContentDescriptionsList)
+            .flatMap(Collection::stream)
+            .map(AgeRatingContentDescriptionV2::getId)
+            .filter(id -> id > 0)
+            .collect(Collectors.toSet());
+
+        log.debug("IGDB+Steam CCL for {}: ratings={}, suggested={}, descriptorIds={}",
+            igdbGameId, ageRatingsLabel, suggested, descriptorIds);
+        IgdbGameCcl entity = new IgdbGameCcl(igdbGameId, suggested, ageRatingsLabel);
+        try {
+            entity.setDescriptorIdsJson(objectMapper.writeValueAsString(descriptorIds));
+        } catch (Exception ex) {
+            log.warn("Cannot serialize descriptor ids for igdbId={}: {}", igdbGameId, ex.getMessage());
+        }
+        cclRepository.save(entity);
         Set<String> result = Collections.unmodifiableSet(suggested);
         cclCache.put(igdbGameId, result);
         return result;
+    }
+
+    /**
+     * Returns the IGDB age-rating descriptor ids contributing to a game's CCLs.
+     * Reads from the cached {@link IgdbGameCcl#getDescriptorIdsJson()} when present,
+     * otherwise re-fetches from IGDB. Returns an empty set on any failure.
+     */
+    public Set<Long> fetchDescriptorIds(String igdbGameId) {
+        Optional<IgdbGameCcl> cached = cclRepository.findById(igdbGameId);
+        if (cached.isPresent() && cached.get().getDescriptorIdsJson() != null) {
+            try {
+                return objectMapper.readValue(
+                    cached.get().getDescriptorIdsJson(),
+                    new TypeReference<Set<Long>>() {});
+            } catch (Exception e) {
+                log.warn("Bad descriptor_ids JSON for igdbId={}: {}", igdbGameId, e.getMessage());
+            }
+        }
+
+        if (clientId.isBlank()) return Set.of();
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return Set.of();
+
+        try {
+            List<Game> results = igdbClient.fetchGameById(igdbGameId, CCL_FIELDS, token);
+            if (results.isEmpty()) return Set.of();
+            return results.get(0).getAgeRatingsList().stream()
+                .map(AgeRating::getRatingContentDescriptionsList)
+                .flatMap(Collection::stream)
+                .map(AgeRatingContentDescriptionV2::getId)
+                .filter(id -> id > 0)
+                .collect(Collectors.toSet());
+        } catch (Exception e) {
+            log.warn("fetchDescriptorIds failed for igdbId={}: {}", igdbGameId, e.getMessage());
+            return Set.of();
+        }
+    }
+
+    /**
+     * Re-applies the same IGDB resolution logic as BindingService: for STEAM bindings with a
+     * non-null sourceId, try Steam appId lookup first and fall back to name search.
+     * Returns the resolved {@link IgdbGame#id()} or empty if none found.
+     */
+    public Optional<String> resolveIgdbIdForBinding(GameBinding b) {
+        if (b.getSourceType() == GameBinding.SourceType.STEAM && b.getSourceId() != null) {
+            Optional<IgdbGame> byApp = findBySteamAppId(b.getSourceId());
+            if (byApp.isPresent()) return byApp.map(IgdbGame::id);
+        }
+        return findByName(b.getSourceName()).map(IgdbGame::id);
     }
 
     private Set<String> extractCcls(Game game) {

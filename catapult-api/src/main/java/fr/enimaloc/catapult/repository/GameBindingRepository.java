@@ -29,4 +29,15 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
     void deleteByUser(UserAccount user);
 
     List<GameBinding> findAllByStatusAndIgnoredFalse(GameBinding.Status status);
+
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT COUNT(b) > 0 FROM GameBinding b JOIN b.tws t WHERE t = :twId")
+    boolean existsByTwsContaining(@org.springframework.data.repository.query.Param("twId") String twId);
+
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT b FROM GameBinding b WHERE b.ignored = false " +
+        "AND b.twOverride = false AND b.status IN ('AUTO','MANUAL') " +
+        "AND SIZE(b.tws) = 0")
+    org.springframework.data.domain.Page<GameBinding> findCandidatesForTwBackfill(
+        org.springframework.data.domain.Pageable pageable);
 }

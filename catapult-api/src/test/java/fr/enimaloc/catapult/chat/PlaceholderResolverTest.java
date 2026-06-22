@@ -3,19 +3,31 @@ package fr.enimaloc.catapult.chat;
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class PlaceholderResolverTest {
 
-    private final PlaceholderResolver resolver =
-        new PlaceholderResolver(new SimpleMeterRegistry());
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+    private TwPlaceholderRegistry twRegistry;
+    private PlaceholderResolver resolver;
+
+    @BeforeEach
+    void setUp() {
+        twRegistry = mock(TwPlaceholderRegistry.class);
+        when(twRegistry.getKnownPaths()).thenReturn(Set.of());
+        resolver = new PlaceholderResolver(meterRegistry, twRegistry);
+    }
 
     @Test
     void simple_substitution() {
@@ -89,42 +101,57 @@ class PlaceholderResolverTest {
             new DetectedGame("1", GameBinding.SourceType.STEAM, "Halo"),
             "100", "Halo", null,
             LocalDate.of(2024, 3, 14),
-            Map.of(), null, null, null, null);
+            Map.of(), null, null, Set.of(), Map.of(), null);
         Optional<String> result = resolver.resolve(
             "{game.release_date}", ctx, Map.of(), Locale.FRANCE);
         assertThat(result).contains("14/03/2024");
     }
 
     @Test
-    void resolves_dtddYes() {
-        var topics = new fr.enimaloc.catapult.getter.DtddApiClient.DtddTopics(
-            java.util.List.of("A dog dies", "Flashing lights"),
-            java.util.List.of(), java.util.List.of());
-        GameContext ctx = new GameContext(
-            new DetectedGame("1", GameBinding.SourceType.STEAM, "Stardew"),
-            "100", "Stardew", null, null, Map.of(), null, null, topics, null);
-        assertThat(resolver.resolve("Triggers: {dtdd.yes}", ctx, Map.of(), Locale.ENGLISH))
-            .contains("Triggers: A dog dies, Flashing lights");
-    }
-
-    @Test
     void resolves_gameAgerating() {
         GameContext ctx = new GameContext(
             new DetectedGame("1", GameBinding.SourceType.STEAM, "Stardew"),
-            "100", "Stardew", null, null, Map.of(), null, null, null, "PEGI 12 — Violence");
+            "100", "Stardew", null, null, Map.of(), null, null,
+            Set.of(), Map.of(), "PEGI 12 — Violence");
         assertThat(resolver.resolve("Rated: {game.agerating}", ctx, Map.of(), Locale.ENGLISH))
             .contains("Rated: PEGI 12 — Violence");
     }
 
     @Test
-    void resolves_dtddYesEmpty_skipsWhenNoFallback() {
-        var topics = new fr.enimaloc.catapult.getter.DtddApiClient.DtddTopics(
-            java.util.List.of(), java.util.List.of(), java.util.List.of());
-        GameContext ctx = new GameContext(
-            new DetectedGame("1", GameBinding.SourceType.STEAM, "Stardew"),
-            "100", "Stardew", null, null, Map.of(), null, null, topics, null);
-        assertThat(resolver.resolve("Just {dtdd.yes}", ctx, Map.of(), Locale.ENGLISH))
+    void resolvesTwActive_joinsLabels() {
+        GameContext ctx = ctxWithTws(
+            Set.of("violence_graphic", "death_of_animal"),
+            Map.of("violence_graphic", "Violence (graphic)",
+                "death_of_animal", "Death of animal"));
+        assertThat(resolver.resolve("{tw.active}", ctx, Map.of(), Locale.ENGLISH))
+            .hasValueSatisfying(s -> assertThat(s)
+                .contains("Violence (graphic)")
+                .contains("Death of animal"));
+    }
+
+    @Test
+    void resolvesTwActive_isEmptyWhenNoneActive_skipsWhenNoFallback() {
+        GameContext ctx = ctxWithTws(Set.of(), Map.of());
+        assertThat(resolver.resolve("Just {tw.active}", ctx, Map.of(), Locale.ENGLISH))
             .isEmpty();
+    }
+
+    @Test
+    void resolvesTwSpecific_returnsLabelIfActive() {
+        when(twRegistry.getKnownPaths()).thenReturn(Set.of("violence_graphic"));
+        GameContext ctx = ctxWithTws(Set.of("violence_graphic"),
+            Map.of("violence_graphic", "Violence"));
+        assertThat(resolver.resolve("{tw.violence_graphic}", ctx, Map.of(), Locale.ENGLISH))
+            .hasValue("Violence");
+    }
+
+    @Test
+    void resolvesTwSpecific_returnsEmptyIfInactive() {
+        when(twRegistry.getKnownPaths()).thenReturn(Set.of("flashing_lights"));
+        GameContext ctx = ctxWithTws(Set.of("violence_graphic"),
+            Map.of("violence_graphic", "Violence"));
+        assertThat(resolver.resolve("{tw.flashing_lights|none}", ctx, Map.of(), Locale.ENGLISH))
+            .hasValue("none");
     }
 
     @Test
@@ -136,14 +163,30 @@ class PlaceholderResolverTest {
 
     @Test
     void find_unknown_paths_returns_unknown_only() {
-        java.util.Set<String> unknown = resolver.findUnknownPaths(
+        Set<String> unknown = resolver.findUnknownPaths(
             "Hi {game.name} {game.unknown|x} {game.also_unknown}");
         assertThat(unknown).containsExactlyInAnyOrder("game.unknown", "game.also_unknown");
+    }
+
+    @Test
+    void findUnknownPaths_acceptsTwActiveAndKnownSlugs_rejectsUnknown() {
+        when(twRegistry.getKnownPaths()).thenReturn(Set.of("violence_graphic"));
+        Set<String> unknown = resolver.findUnknownPaths(
+            "{tw.active} {tw.violence_graphic} {tw.nonexistent}");
+        assertThat(unknown).containsExactly("tw.nonexistent");
     }
 
     private GameContext contextWithName(String name) {
         return new GameContext(
             new DetectedGame("1", GameBinding.SourceType.STEAM, name),
-            "100", name, null, null, Map.of(), null, null, null, null);
+            "100", name, null, null, Map.of(), null, null,
+            Set.of(), Map.of(), null);
+    }
+
+    private GameContext ctxWithTws(Set<String> tws, Map<String, String> labels) {
+        return new GameContext(
+            new DetectedGame("1", GameBinding.SourceType.STEAM, "Stardew"),
+            "100", "Stardew", null, null, Map.of(), null, null,
+            tws, labels, null);
     }
 }
