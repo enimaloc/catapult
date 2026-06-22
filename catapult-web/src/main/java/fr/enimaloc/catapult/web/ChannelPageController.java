@@ -150,6 +150,8 @@ public class ChannelPageController {
             model.addAttribute("bindings", data.bindings());
             model.addAttribute("availableCcls", data.availableCcls());
             model.addAttribute("blockedCcls", data.blockedCcls());
+            model.addAttribute("availableTws", data.availableTws());
+            model.addAttribute("blockedTws", data.blockedTws());
             model.addAttribute("filterStatus", data.filterStatus());
             model.addAttribute("filterSource", data.filterSource());
         }
@@ -174,6 +176,17 @@ public class ChannelPageController {
             model.addAttribute("availableCcls", settings.availableCcls());
         }
         return "fragments/ccl-settings :: ccl-settings";
+    }
+
+    @GetMapping("/fragments/tw-settings")
+    public String twSettings(@PathVariable String username, Model model) {
+        model.addAttribute("channelUsername", username);
+        UserSettingsDto settings = apiClient.get("/api/channels/{username}/settings", UserSettingsDto.class, username);
+        if (settings != null) {
+            model.addAttribute("twSettings", settings);
+            model.addAttribute("availableTws", settings.availableTws());
+        }
+        return "fragments/tw-settings :: tw-settings";
     }
 
     @GetMapping("/fragments/no-game-settings")
@@ -208,6 +221,8 @@ public class ChannelPageController {
         model.addAttribute("bindings", data.bindings());
         model.addAttribute("availableCcls", data.availableCcls());
         model.addAttribute("blockedCcls", data.blockedCcls());
+        model.addAttribute("availableTws", data.availableTws());
+        model.addAttribute("blockedTws", data.blockedTws());
         model.addAttribute("filterStatus", data.filterStatus());
         model.addAttribute("filterSource", data.filterSource());
         model.addAttribute("hasSteamProvider", data.hasSteamProvider());
@@ -236,6 +251,8 @@ public class ChannelPageController {
             PagedBindings bindings,
             List<CclDto> availableCcls,
             Set<String> blockedCcls,
+            List<TwDto> availableTws,
+            Set<String> blockedTws,
             String filterStatus,
             String filterSource,
             boolean hasSteamProvider,
@@ -269,7 +286,10 @@ public class ChannelPageController {
             String twitchGameName,
             boolean ignored,
             boolean cclEnabled,
-            Set<String> ccls
+            Set<String> ccls,
+            boolean twEnabled,
+            boolean twOverride,
+            Set<String> tws
     ) {}
 
     public enum BindingStatus {
@@ -289,8 +309,14 @@ public class ChannelPageController {
             String incompleteFallbackTwitchGameId,
             String incompleteFallbackTwitchGameName,
             Set<String> incompleteFallbackCcls,
-            List<CclDto> availableCcls
+            List<CclDto> availableCcls,
+            boolean twFeatureEnabled,
+            Set<String> blockedTws,
+            List<TwDto> availableTws
     ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record TwDto(String id, String label) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record StatusData(

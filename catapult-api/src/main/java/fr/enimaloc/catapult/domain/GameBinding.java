@@ -67,6 +67,20 @@ public class GameBinding {
     @Column(name = "ccl")
     private Set<String> ccls = new HashSet<>();
 
+    @Column(name = "tw_enabled", nullable = false)
+    private boolean twEnabled = true;
+
+    @Column(name = "tw_override", nullable = false)
+    private boolean twOverride = false;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "binding_tw",
+        joinColumns = @JoinColumn(name = "binding_id")
+    )
+    @Column(name = "tw")
+    private Set<String> tws = new HashSet<>();
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

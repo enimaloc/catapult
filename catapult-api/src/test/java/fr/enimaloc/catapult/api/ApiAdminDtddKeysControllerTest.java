@@ -39,8 +39,8 @@ class ApiAdminDtddKeysControllerTest {
 
     @Test
     void add_persistsAndRefreshes() {
-        when(repository.existsById("abcdef1234567890ABCDEF")).thenReturn(false);
-        controller.add(new ApiAdminDtddKeysController.AddKeyRequest("abcdef1234567890ABCDEF"));
+        when(repository.existsById("ddd_abcdef1234567890ABCD")).thenReturn(false);
+        controller.add(new ApiAdminDtddKeysController.AddKeyRequest("ddd_abcdef1234567890ABCD"));
         verify(repository).save(any(DtddApiKeyEntry.class));
         verify(rotator).refreshKeys();
     }

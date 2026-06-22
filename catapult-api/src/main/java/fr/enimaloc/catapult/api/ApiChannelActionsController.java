@@ -145,6 +145,22 @@ public class ApiChannelActionsController {
         userSettingsRepository.save(settings);
     }
 
+    @PostMapping("/settings/tws")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveTwSettings(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody TwSettingsRequest body) {
+
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        UserSettings settings = getOrCreateSettings(channelUser);
+        settings.setTwFeatureEnabled(body.enabled());
+        settings.getBlockedTws().clear();
+        if (body.blockedTws() != null) settings.getBlockedTws().addAll(body.blockedTws());
+        userSettingsRepository.save(settings);
+    }
+
     @PostMapping("/settings/no-game")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveNoGameSettings(
@@ -326,6 +342,7 @@ public class ApiChannelActionsController {
     public record IgnoredToggleRequest(boolean ignored) {}
     public record UpdateBindingRequest(String twitchGameId, String twitchGameName, Set<String> ccls) {}
     public record CclSettingsRequest(boolean cclEnabled, Set<String> blockedCcls) {}
+    public record TwSettingsRequest(boolean enabled, Set<String> blockedTws) {}
     public record NoGameSettingsRequest(
             String twitchGameId, String twitchGameName, Set<String> ccls,
             boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {}

@@ -21,4 +21,9 @@ public class MockSteamStoreService implements SteamStoreService {
     public Optional<String> resolveFullGameAppId(String appId) {
         return Optional.empty();
     }
+
+    @Override
+    public Map<String, SteamTwSignals> fetchTwSignals(Collection<String> appIds) {
+        return Map.of();
+    }
 }

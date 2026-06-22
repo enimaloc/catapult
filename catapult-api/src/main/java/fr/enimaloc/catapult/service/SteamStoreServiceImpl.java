@@ -65,6 +65,56 @@ public class SteamStoreServiceImpl implements SteamStoreService {
     }
 
     @Override
+    public Map<String, SteamTwSignals> fetchTwSignals(Collection<String> appIds) {
+        if (appIds.isEmpty()) return Map.of();
+
+        String uri = appIds.stream()
+            .collect(Collectors.joining("&appids=", APP_DETAILS_URL + "?appids=", ""));
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restClient.get()
+                .uri(uri)
+                .retrieve()
+                .body(Map.class);
+
+            if (response == null) return Map.of();
+
+            Map<String, SteamTwSignals> result = new HashMap<>();
+            for (String appId : appIds) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> entry = (Map<String, Object>) response.get(appId);
+                if (entry == null || !Boolean.TRUE.equals(entry.get("success")) || entry.get("data") == null) continue;
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> data = (Map<String, Object>) entry.get("data");
+                result.put(appId, extractTwSignals(data));
+            }
+            return result;
+
+        } catch (Exception e) {
+            log.warn("Steam fetchTwSignals failed for appIds={}: {}", appIds, e.getMessage());
+            return Map.of();
+        }
+    }
+
+    /** Package-private for unit testing. */
+    @SuppressWarnings("unchecked")
+    static SteamTwSignals extractTwSignals(Map<String, Object> data) {
+        Map<String, Object> cd = (Map<String, Object>) data.get("content_descriptors");
+        if (cd == null) return SteamTwSignals.empty();
+        Set<Integer> ids = new HashSet<>();
+        Object rawIds = cd.get("ids");
+        if (rawIds instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Number n) ids.add(n.intValue());
+            }
+        }
+        String notes = String.valueOf(cd.getOrDefault("notes", "")).toLowerCase(Locale.ROOT);
+        return new SteamTwSignals(ids, notes);
+    }
+
+    @Override
     @SuppressWarnings("unchecked")
     public Optional<String> resolveFullGameAppId(String appId) {
         String uri = APP_DETAILS_URL + "?appids=" + appId;

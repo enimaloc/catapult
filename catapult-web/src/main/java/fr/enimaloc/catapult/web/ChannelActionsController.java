@@ -59,6 +59,27 @@ public class ChannelActionsController {
         return "redirect:/channels/" + username;
     }
 
+    @PostMapping("/bindings/{id}/tws")
+    public String saveTws(
+            @PathVariable String username,
+            @PathVariable String id,
+            @RequestParam(required = false) Set<String> tws,
+            @RequestParam(defaultValue = "false") boolean twEnabled) {
+        apiClient.post("/api/channel/bindings/{id}/tws",
+                new TwSaveBody(tws == null ? Set.of() : tws), id);
+        apiClient.post("/api/channel/bindings/{id}/tw-enabled",
+                new TwEnabledBody(twEnabled), id);
+        return "redirect:/channels/" + username;
+    }
+
+    @PostMapping("/bindings/{id}/tws/reset")
+    public String resetTws(
+            @PathVariable String username,
+            @PathVariable String id) {
+        apiClient.post("/api/channel/bindings/{id}/tws/reset", null, id);
+        return "redirect:/channels/" + username;
+    }
+
     // ── Settings ──────────────────────────────────────────────────────────────
 
     @PostMapping("/settings/bot")
@@ -74,6 +95,16 @@ public class ChannelActionsController {
             @RequestParam(required = false) Set<String> blockedCcls) {
         apiClient.post("/api/channels/{username}/settings/ccl",
                 new CclSettingsBody(cclEnabled, blockedCcls), username);
+        return "redirect:/channels/" + username;
+    }
+
+    @PostMapping("/settings/tws")
+    public String saveTwSettings(
+            @PathVariable String username,
+            @RequestParam(defaultValue = "false") boolean twEnabled,
+            @RequestParam(required = false) Set<String> blockedTws) {
+        apiClient.post("/api/channels/{username}/settings/tws",
+                new TwSettingsBody(twEnabled, blockedTws), username);
         return "redirect:/channels/" + username;
     }
 
@@ -158,6 +189,9 @@ public class ChannelActionsController {
     record IgnoredToggleBody(boolean ignored) {}
     record UpdateBindingBody(String twitchGameId, String twitchGameName, Set<String> ccls) {}
     record CclSettingsBody(boolean cclEnabled, Set<String> blockedCcls) {}
+    record TwSettingsBody(boolean enabled, Set<String> blockedTws) {}
+    record TwSaveBody(Set<String> tws) {}
+    record TwEnabledBody(boolean enabled) {}
     record NoGameSettingsBody(String twitchGameId, String twitchGameName, Set<String> ccls,
                               boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {}
     record IncompleteFallbackBody(String twitchGameId, String twitchGameName, Set<String> ccls) {}
