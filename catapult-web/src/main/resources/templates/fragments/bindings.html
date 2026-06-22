@@ -6,6 +6,8 @@
 <!--/*@thymesvar id="filterSource" type="java.lang.String"*/-->
 <!--/*@thymesvar id="availableCcls" type="java.util.List"*/-->
 <!--/*@thymesvar id="blockedCcls" type="java.util.Set"*/-->
+<!--/*@thymesvar id="availableTws" type="java.util.List"*/-->
+<!--/*@thymesvar id="blockedTws" type="java.util.Set"*/-->
 <div th:fragment="bindings" class="card"
      th:attr="hx-get=@{/channels/{u}/fragments/bindings(u=${channelUsername},page=${bindings.number},status=${filterStatus},source=${filterSource})}"
      hx-trigger="every 10s [!isEditing()]"
@@ -92,6 +94,13 @@
                                 th:text="#{common.edit}">
                             Modifier
                         </button>
+                        <button th:if="${availableTws != null}"
+                                class="btn btn-sm btn-outline"
+                                th:data-id="${binding.id}"
+                                onclick="toggleTwEdit(this.dataset.id)"
+                                th:text="#{bindings.tw.edit}">
+                            TW
+                        </button>
                         <form th:action="@{/channels/{u}/bindings/{id}/delete(u=${channelUsername},id=${binding.id})}" method="post" style="display:inline"> <!-- nosemgrep -->
                             <button type="submit" class="btn btn-sm btn-danger" th:text="#{common.delete}">Supprimer</button>
                         </form>
@@ -141,6 +150,52 @@
                                 <button type="button"
                                         th:data-id="${binding.id}"
                                         onclick="toggleEdit(this.dataset.id)"
+                                        class="btn btn-sm btn-outline"
+                                        th:text="#{common.cancel}">Annuler</button>
+                                <button type="submit" class="btn btn-sm btn-primary" th:text="#{common.save}">Enregistrer</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+                <tr th:if="${availableTws != null}" th:id="'tw-row-' + ${binding.id}" class="edit-row" style="display:none">
+                    <td colspan="7">
+                        <form th:action="@{/channels/{u}/bindings/{id}/tws(u=${channelUsername},id=${binding.id})}" method="post"> <!-- nosemgrep -->
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div class="inline-edit-fields">
+                                <div class="inline-edit-field">
+                                    <label>
+                                        <input type="checkbox" name="twEnabled" th:checked="${binding.twEnabled}">
+                                        <span th:text="#{bindings.tw.enable}">Enable TW for this game</span>
+                                    </label>
+                                </div>
+                                <div class="inline-edit-field">
+                                    <label th:text="#{bindings.tw.title}">Trigger Warnings</label>
+                                    <div class="ccl-checkboxes">
+                                        <div th:each="tw : ${availableTws}">
+                                            <label th:title="${blockedTws != null and blockedTws.contains(tw.id)} ? #{tw_settings.blocked_tooltip} : ''">
+                                                <input th:if="${blockedTws != null and blockedTws.contains(tw.id) and binding.tws.contains(tw.id)}"
+                                                       type="hidden" name="tws" th:value="${tw.id}">
+                                                <input type="checkbox" name="tws"
+                                                       th:value="${tw.id}"
+                                                       th:checked="${binding.tws.contains(tw.id)}"
+                                                       th:disabled="${blockedTws != null and blockedTws.contains(tw.id)}">
+                                                <span th:text="${tw.label}"
+                                                      th:classappend="${blockedTws != null and blockedTws.contains(tw.id)} ? 'text-muted' : ''"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div th:if="${binding.twOverride}" class="text-muted mb-16" style="margin-top:8px">
+                                <span th:text="#{bindings.tw.override.notice}">You overrode this binding's TWs.</span>
+                                <button th:formaction="@{/channels/{u}/bindings/{id}/tws/reset(u=${channelUsername},id=${binding.id})}"
+                                        formmethod="post" type="submit" class="btn btn-sm btn-outline"
+                                        th:text="#{bindings.tw.reset}">Reset to auto</button>
+                            </div>
+                            <div class="inline-edit-actions">
+                                <button type="button"
+                                        th:data-id="${binding.id}"
+                                        onclick="toggleTwEdit(this.dataset.id)"
                                         class="btn btn-sm btn-outline"
                                         th:text="#{common.cancel}">Annuler</button>
                                 <button type="submit" class="btn btn-sm btn-primary" th:text="#{common.save}">Enregistrer</button>

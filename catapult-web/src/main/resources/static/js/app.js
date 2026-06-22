@@ -53,6 +53,11 @@ function toggleEdit(id) {
     row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
 }
 
+function toggleTwEdit(id) {
+    const row = document.getElementById('tw-row-' + id);
+    if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+}
+
 function isEditing() {
     return Array.from(document.querySelectorAll('.edit-row'))
         .some(r => r.style.display === 'table-row');

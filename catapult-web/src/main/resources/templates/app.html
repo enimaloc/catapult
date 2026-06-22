@@ -11,6 +11,9 @@
         <div th:attr="hx-get=@{/channels/{u}/fragments/ccl-settings(u=${channelUsername})}" hx-trigger="load" hx-swap="outerHTML">
             <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
         </div>
+        <div th:attr="hx-get=@{/channels/{u}/fragments/tw-settings(u=${channelUsername})}" hx-trigger="load" hx-swap="outerHTML">
+            <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
+        </div>
         <div th:attr="hx-get=@{/channels/{u}/fragments/no-game-settings(u=${channelUsername})}" hx-trigger="load" hx-swap="outerHTML">
             <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
         </div>
