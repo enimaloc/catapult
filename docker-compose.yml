@@ -17,6 +17,7 @@ services:
       - WHITELIST=${WHITELIST}
       - JWT_SECRET=${JWT_SECRET}
       - CATAPULT_WEB_URL=${CATAPULT_WEB_URL}
+      - REDIS_HOST=catapult-redis
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health || exit 1"]
       interval: 10s
@@ -39,6 +40,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       # Empty = use relative URL for OAuth so nginx routes /oauth2/** to catapult-api correctly
       - CATAPULT_API_PUBLIC_URL=
+      - REDIS_HOST=catapult-redis
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8081/actuator/health || exit 1"]
       interval: 10s
