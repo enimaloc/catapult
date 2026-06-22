@@ -61,4 +61,12 @@ class WsHubIntegrationTest {
         assertThat(resp).contains("\"type\":\"error\"").contains("\"code\":\"INVALID_FRAME\"");
         ws.close();
     }
+
+    @Test
+    void receives_ping_within_20_seconds() throws Exception {
+        WebSocketSession ws = connect();
+        String resp = received.poll(20, TimeUnit.SECONDS);
+        assertThat(resp).contains("\"type\":\"ping\"");
+        ws.close();
+    }
 }
