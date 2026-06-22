@@ -14,9 +14,11 @@ import fr.enimaloc.catapult.web.ws.codec.msg.SubscribeMessage;
 import fr.enimaloc.catapult.web.ws.codec.msg.UnsubscribeMessage;
 import fr.enimaloc.catapult.web.ws.codec.msg.WsIncoming;
 import fr.enimaloc.catapult.web.ws.codec.msg.WsOutgoing;
+import fr.enimaloc.catapult.web.ws.codec.msg.PingMessage;
 import fr.enimaloc.catapult.web.ws.dispatch.ChannelResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -89,6 +91,14 @@ public class WsHub extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession springSession, CloseStatus status) {
         registry.remove(springSession.getId());
         log.debug("ws closed: id={} status={} total={}", springSession.getId(), status, registry.size());
+    }
+
+    @Scheduled(fixedRate = 15_000)
+    public void heartbeat() {
+        var ping = new PingMessage(System.currentTimeMillis());
+        for (WsSession s : registry.allSessions()) {
+            send(s, ping);
+        }
     }
 
     public void broadcast(String internalChannel, EventMessage event) {
