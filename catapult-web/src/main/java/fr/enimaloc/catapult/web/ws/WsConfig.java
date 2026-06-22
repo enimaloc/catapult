@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.web.ws;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -17,11 +18,12 @@ public class WsConfig implements WebSocketConfigurer {
 
     private final WsHub hub;
 
+    @Value("${catapult.ws.allowed-origin-patterns:*}")
+    private String[] allowedOriginPatterns;
+
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(hub, "/ws").setAllowedOriginPatterns("*");
-        // NOTE: origin check tightened in Phase 3 with HandshakeInterceptor.
-        // For now, app is dev-only on this branch.
+        registry.addHandler(hub, "/ws").setAllowedOriginPatterns(allowedOriginPatterns);
     }
 
     @Bean
