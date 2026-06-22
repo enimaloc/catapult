@@ -43,7 +43,7 @@
                     <a th:href="${s.gitlabIssueUrl}" target="_blank" rel="noopener"
                        th:text="'#' + ${s.gitlabIssueIid}">Issue</a>
                 </td>
-                <td th:text="${#temporals.format(s.createdAt, 'dd/MM/yyyy HH:mm')}"></td>
+                <td th:text="${#temporals.format(s.createdAt, #messages.msg('common.datetime-format'))}"></td>
                 <td>
                     <span th:if="${!s.subscribed}" style="color:var(--muted); font-size:0.85rem;">Désabonné</span>
                     <form th:if="${s.subscribed}" th:action="@{/feedback/{id}/unsubscribe(id=${s.id})}" method="post" style="display:inline"> <!-- nosemgrep -->

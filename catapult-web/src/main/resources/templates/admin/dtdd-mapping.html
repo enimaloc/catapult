@@ -38,7 +38,7 @@
         </thead>
         <tbody>
             <tr th:each="p : ${proposals}" style="border-bottom:1px solid var(--border);">
-                <td th:text="${p.createdAt}">2026-06-20</td>
+                <td th:text="${#temporals.format(p.createdAt, #messages.msg('common.datetime-format'))}">2026-06-20</td>
                 <td th:text="${p.igdbId}">100</td>
                 <td th:text="${p.proposedDtddId}">4521</td>
                 <td th:text="${p.proposer != null ? p.proposer.twitchUsername : '?'}">user</td>
