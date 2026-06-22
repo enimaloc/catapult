@@ -89,7 +89,7 @@
                                 </form>
                             </th:block>
                         </td>
-                        <td th:text="${member.createdAt}"></td>
+                        <td th:text="${#temporals.format(member.createdAt, #messages.msg('common.datetime-format'))}"></td>
                         <td th:if="${canMockSteam}">
                             <div th:if="${member.steamId != null}" style="display:flex;gap:6px;align-items:flex-end">
                                 <form th:action="@{/admin/members/{id}/steam/set(id=${member.id})}" method="post"> <!-- nosemgrep -->
