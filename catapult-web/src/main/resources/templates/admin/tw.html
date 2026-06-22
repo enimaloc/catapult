@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'tw', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title>Catapult — Admin Trigger Warnings</title>
+</head>
+<body>
+<!--/*@thymesvar id="definitions" type="java.util.List"*/-->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 th:text="#{admin.tw.title}" style="margin:0">Administration — Trigger Warnings</h2>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem; padding:1rem;">
+        <form th:action="@{/admin/tw/add}" method="post" style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;"> <!-- nosemgrep -->
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <input type="text" name="id" required pattern="^[a-z0-9_]{1,40}$"
+                   th:placeholder="#{admin.tw.add.id_placeholder}"
+                   style="flex:0 0 200px;"/>
+            <input type="text" name="label" required maxlength="80"
+                   th:placeholder="#{admin.tw.add.label_placeholder}"
+                   style="flex:1; min-width:200px;"/>
+            <input type="number" name="sortOrder" value="0" min="0"
+                   th:placeholder="#{admin.tw.add.sort_order_placeholder}"
+                   style="flex:0 0 100px;"/>
+            <button type="submit" class="btn btn-primary" th:text="#{admin.tw.add.button}">+ Add</button>
+        </form>
+    </div>
+
+    <div th:if="${definitions == null or definitions.isEmpty()}" class="text-muted">
+        <p th:text="#{admin.tw.empty}">No trigger warning defined.</p>
+    </div>
+
+    <div th:unless="${definitions == null or definitions.isEmpty()}" class="card">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.tw.column.id}">ID</th>
+                        <th th:text="#{admin.tw.column.label}">Label</th>
+                        <th th:text="#{admin.tw.column.enabled}">Enabled</th>
+                        <th th:text="#{admin.tw.column.sort_order}">Order</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="d : ${definitions}">
+                        <td>
+                            <span class="badge" th:text="${d.id}"></span>
+                        </td>
+                        <td th:text="${d.label}"></td>
+                        <td>
+                            <span th:if="${d.enabled}" class="badge badge-connected" th:text="#{admin.tw.status.enabled}">✓</span>
+                            <span th:unless="${d.enabled}" class="badge badge-warning" th:text="#{admin.tw.status.disabled}">✗</span>
+                        </td>
+                        <td th:text="${d.sortOrder}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

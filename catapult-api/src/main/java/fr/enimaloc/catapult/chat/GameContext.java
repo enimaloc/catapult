@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.getter.DetectedGame;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Snapshot du jeu en cours pour un user, hydraté par GameContextService et lu par PlaceholderResolver.
@@ -20,11 +21,13 @@ public record GameContext(
     Map<String, String> stores,
     String activeStoreUrl,
     String igdbSlug,
-    fr.enimaloc.catapult.getter.DtddApiClient.DtddTopics dtddTopics,
+    Set<String> activeTws,
+    Map<String, String> twLabels,
     String ageRating
 ) {
     public static GameContext empty() {
-        return new GameContext(null, null, null, null, null, Collections.emptyMap(), null, null, null, null);
+        return new GameContext(null, null, null, null, null, Collections.emptyMap(), null, null,
+            Collections.emptySet(), Collections.emptyMap(), null);
     }
 
     public static String storeKey(GameBinding.SourceType sourceType) {

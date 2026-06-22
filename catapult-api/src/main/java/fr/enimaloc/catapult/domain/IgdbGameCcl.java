@@ -34,6 +34,9 @@ public class IgdbGameCcl {
     @Column(name = "cached_at", nullable = false)
     private Instant cachedAt;
 
+    @Column(name = "descriptor_ids", columnDefinition = "TEXT")
+    private String descriptorIdsJson;
+
     public IgdbGameCcl(String igdbId, Set<String> ccls, String ageRatings) {
         this.igdbId     = igdbId;
         this.ccls       = ccls;
