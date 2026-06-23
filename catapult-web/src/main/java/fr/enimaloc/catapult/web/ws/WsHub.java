@@ -12,10 +12,14 @@ import fr.enimaloc.catapult.web.ws.codec.msg.SubDeniedMessage;
 import fr.enimaloc.catapult.web.ws.codec.msg.SubOkMessage;
 import fr.enimaloc.catapult.web.ws.codec.msg.SubscribeMessage;
 import fr.enimaloc.catapult.web.ws.codec.msg.UnsubscribeMessage;
+import fr.enimaloc.catapult.web.ws.auth.WsTicketStore;
+import fr.enimaloc.catapult.web.ws.codec.msg.AuthOkMessage;
 import fr.enimaloc.catapult.web.ws.codec.msg.WsIncoming;
 import fr.enimaloc.catapult.web.ws.codec.msg.WsOutgoing;
 import fr.enimaloc.catapult.web.ws.codec.msg.PingMessage;
 import fr.enimaloc.catapult.web.ws.dispatch.ChannelResolver;
+
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -35,6 +39,7 @@ public class WsHub extends TextWebSocketHandler {
     private final WsSessionRegistry registry;
     private final ChannelResolver channelResolver;
     private final JsonMessageCodec codec;
+    private final WsTicketStore ticketStore;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession springSession) {
@@ -66,10 +71,25 @@ public class WsHub extends TextWebSocketHandler {
             }
             case SubscribeMessage s -> handleSubscribe(session, s);
             case UnsubscribeMessage u -> handleUnsubscribe(session, u);
-            case AuthMessage ignored -> send(session, new ErrorMessage("NOT_YET_IMPLEMENTED", "auth handler in phase 3"));
+            case AuthMessage a -> handleAuth(session, a);
             case RequestMessage r -> send(session, ResponseMessage.error(r.id(), "UNKNOWN_ACTION", "No handlers registered"));
             case CommandMessage ignored -> send(session, new ErrorMessage("UNKNOWN_ACTION", "No handlers registered"));
         }
+    }
+
+    private void handleAuth(WsSession session, AuthMessage msg) {
+        var snapshot = ticketStore.consume(msg.token());
+        if (snapshot.isEmpty()) {
+            send(session, new ErrorMessage("INVALID_TICKET", "Auth ticket invalid or already consumed"));
+            try {
+                session.springSession().close(CloseStatus.NORMAL);
+            } catch (IOException e) {
+                log.debug("close after invalid ticket failed for {}: {}", session.id(), e.getMessage());
+            }
+            return;
+        }
+        session.authenticate(snapshot.get().userId(), snapshot.get().roles());
+        send(session, new AuthOkMessage(snapshot.get().userId(), List.copyOf(snapshot.get().roles())));
     }
 
     private void handleSubscribe(WsSession session, SubscribeMessage msg) {
