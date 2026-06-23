@@ -5,8 +5,6 @@ import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.IgdbGameDetails;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
-import fr.enimaloc.catapult.event.GameDetectedEvent;
-import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
@@ -30,11 +28,16 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class GameContextServiceTest {
+
+    @Mock
+    private GameStateService gameStateService;
 
     @Mock
     private IgdbService igdbService;
@@ -60,15 +63,16 @@ class GameContextServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new GameContextService(igdbService, igdbGameDetailsService, igdbGameCclRepository,
-            gameBindingRepository, userSettingsRepository, twLabelService);
+        service = new GameContextService(gameStateService, igdbService, igdbGameDetailsService,
+            igdbGameCclRepository, gameBindingRepository, userSettingsRepository, twLabelService);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
 
     @Test
-    void on_game_detected_steam_hydrates_full_context() {
+    void steam_game_hydrates_full_context() {
         DetectedGame detected = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(igdbService.findBySteamAppId("570"))
             .thenReturn(Optional.of(new IgdbService.IgdbGame("8173", "Dota 2")));
 
@@ -78,8 +82,6 @@ class GameContextServiceTest {
         details.setWebsites(Map.of("steam", "https://steam/570"));
         details.setFirstReleaseDate(Instant.parse("2013-07-09T00:00:00Z"));
         when(igdbGameDetailsService.getDetails("8173")).thenReturn(Optional.of(details));
-
-        service.onGameDetected(new GameDetectedEvent(this, user, detected));
 
         Optional<GameContext> ctxOpt = service.get(user);
         assertThat(ctxOpt).isPresent();
@@ -99,9 +101,8 @@ class GameContextServiceTest {
     @Test
     void igdb_miss_keeps_name_from_detected() {
         DetectedGame detected = new DetectedGame("xbox-id-1", GameBinding.SourceType.XBOX, "Unknown");
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(igdbService.findByName("Unknown")).thenReturn(Optional.empty());
-
-        service.onGameDetected(new GameDetectedEvent(this, user, detected));
 
         Optional<GameContext> ctxOpt = service.get(user);
         assertThat(ctxOpt).isPresent();
@@ -118,28 +119,63 @@ class GameContextServiceTest {
     }
 
     @Test
-    void no_game_detected_clears_context() {
-        DetectedGame detected = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+    void no_game_in_state_returns_empty() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+
+        assertThat(service.get(user)).isEmpty();
+    }
+
+    @Test
+    void game_change_invalidates_cache() {
+        DetectedGame first = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+        DetectedGame second = new DetectedGame("440", GameBinding.SourceType.STEAM, "Team Fortress 2");
+        when(gameStateService.getLastKnownGame(user))
+            .thenReturn(Optional.of(first))
+            .thenReturn(Optional.of(second));
         when(igdbService.findBySteamAppId("570"))
             .thenReturn(Optional.of(new IgdbService.IgdbGame("8173", "Dota 2")));
+        when(igdbService.findBySteamAppId("440"))
+            .thenReturn(Optional.of(new IgdbService.IgdbGame("206", "Team Fortress 2")));
+        when(igdbGameDetailsService.getDetails(any())).thenReturn(Optional.empty());
 
-        IgdbGameDetails details = new IgdbGameDetails();
-        details.setSlug("dota-2");
-        details.setSummary("MOBA");
-        details.setWebsites(Map.of("steam", "https://steam/570"));
-        details.setFirstReleaseDate(Instant.parse("2013-07-09T00:00:00Z"));
-        when(igdbGameDetailsService.getDetails("8173")).thenReturn(Optional.of(details));
+        assertThat(service.get(user).orElseThrow().name()).isEqualTo("Dota 2");
+        assertThat(service.get(user).orElseThrow().name()).isEqualTo("Team Fortress 2");
+        verify(igdbService).findBySteamAppId("570");
+        verify(igdbService).findBySteamAppId("440");
+    }
 
-        service.onGameDetected(new GameDetectedEvent(this, user, detected));
-        assertThat(service.get(user)).isPresent();
+    @Test
+    void cache_hit_skips_igdb_lookup_when_same_game() {
+        DetectedGame detected = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
+        when(igdbService.findBySteamAppId("570"))
+            .thenReturn(Optional.of(new IgdbService.IgdbGame("8173", "Dota 2")));
+        when(igdbGameDetailsService.getDetails("8173")).thenReturn(Optional.empty());
 
-        service.onNoGameDetected(new NoGameDetectedEvent(this, user));
-        assertThat(service.get(user)).isEmpty();
+        service.get(user);
+        service.get(user);
+        service.get(user);
+
+        verify(igdbService, times(1)).findBySteamAppId("570");
+    }
+
+    @Test
+    void igdb_throws_returns_minimal_context_with_name() {
+        DetectedGame detected = new DetectedGame("zwaard-id", GameBinding.SourceType.XBOX, "Zwaard");
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
+        when(igdbService.findByName("Zwaard")).thenThrow(new RuntimeException("IGDB down"));
+
+        GameContext ctx = service.get(user).orElseThrow();
+        assertThat(ctx.name()).isEqualTo("Zwaard");
+        assertThat(ctx.detected()).isSameAs(detected);
+        assertThat(ctx.igdbId()).isNull();
+        assertThat(ctx.activeTws()).isEmpty();
     }
 
     @Test
     void activeTws_filteredByBlockedTws_andLabelsResolved_whenFeatureEnabled() {
         DetectedGame detected = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(igdbService.findBySteamAppId("570"))
             .thenReturn(Optional.of(new IgdbService.IgdbGame("8173", "Dota 2")));
         when(igdbGameDetailsService.getDetails("8173")).thenReturn(Optional.empty());
@@ -159,8 +195,6 @@ class GameContextServiceTest {
         when(twLabelService.resolve(any(String.class), any(Locale.class)))
             .thenAnswer(inv -> "label-" + inv.getArgument(0));
 
-        service.onGameDetected(new GameDetectedEvent(this, user, detected));
-
         GameContext ctx = service.get(user).orElseThrow();
         assertThat(ctx.activeTws()).containsExactlyInAnyOrder("violence_graphic", "death_of_animal");
         assertThat(ctx.activeTws()).doesNotContain("vomit");
@@ -173,6 +207,7 @@ class GameContextServiceTest {
     @Test
     void activeTws_emptyWhenTwDisabledOnBinding() {
         DetectedGame detected = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(igdbService.findBySteamAppId("570"))
             .thenReturn(Optional.of(new IgdbService.IgdbGame("8173", "Dota 2")));
         when(igdbGameDetailsService.getDetails("8173")).thenReturn(Optional.empty());
@@ -188,8 +223,6 @@ class GameContextServiceTest {
         settings.setTwFeatureEnabled(true);
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
 
-        service.onGameDetected(new GameDetectedEvent(this, user, detected));
-
         GameContext ctx = service.get(user).orElseThrow();
         assertThat(ctx.activeTws()).isEmpty();
         assertThat(ctx.twLabels()).isEmpty();
@@ -198,6 +231,7 @@ class GameContextServiceTest {
     @Test
     void activeTws_emptyWhenUserFeatureDisabled() {
         DetectedGame detected = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(igdbService.findBySteamAppId("570"))
             .thenReturn(Optional.of(new IgdbService.IgdbGame("8173", "Dota 2")));
         when(igdbGameDetailsService.getDetails("8173")).thenReturn(Optional.empty());
@@ -212,8 +246,6 @@ class GameContextServiceTest {
         UserSettings settings = new UserSettings();
         settings.setTwFeatureEnabled(false);
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
-
-        service.onGameDetected(new GameDetectedEvent(this, user, detected));
 
         GameContext ctx = service.get(user).orElseThrow();
         assertThat(ctx.activeTws()).isEmpty();
