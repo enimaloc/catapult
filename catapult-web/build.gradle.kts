@@ -31,6 +31,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    // Used by HtmxWsDispatcher: MockHttpServletRequest/Response forwarded to DispatcherServlet.
+    implementation("org.springframework:spring-test")
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("com.bucket4j:bucket4j-core:8.10.1")
     implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")

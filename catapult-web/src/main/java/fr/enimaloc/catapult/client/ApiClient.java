@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.client;
 
+import fr.enimaloc.catapult.web.ws.auth.WsAuthContext;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -197,6 +198,10 @@ public class ApiClient {
     }
 
     private static String currentJwt() {
+        // WS dispatch threads have no HTTP RequestContext; the WS layer stashes
+        // the session JWT in WsAuthContext before invoking handlers/dispatcher.
+        String wsJwt = WsAuthContext.get();
+        if (wsJwt != null) return wsJwt;
         try {
             ServletRequestAttributes attrs =
                     (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
