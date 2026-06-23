@@ -5,13 +5,13 @@ import fr.enimaloc.catapult.domain.ExperimentAssignment;
 import fr.enimaloc.catapult.domain.ExperimentVariant;
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.ExperimentAssignmentRepository;
 import fr.enimaloc.catapult.repository.ExperimentRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
 import fr.enimaloc.catapult.service.AdminCclService;
+import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.MockTwitchChatService;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * End-to-end integration test for the chat-commands flow:
  *   1. The streamer instantiates a preset (creates a {@code ChatCommandDefinition}).
- *   2. A {@link GameDetectedEvent} hydrates the {@code GameContext} for the user.
+ *   2. {@link GameStateService} holds the current game (populated in prod by the scheduler).
  *   3. A {@link ChatCommandEvent} reaches the {@link ChatCommandListener}, which
  *      checks the {@code chat.commands} experiment gate then dispatches.
  *   4. The dynamic command is resolved, its template is rendered, and the result
@@ -57,6 +57,7 @@ class ChatCommandsIntegrationTest {
     @Autowired ApplicationEventPublisher publisher;
     @Autowired MockTwitchChatService mockChat;
     @Autowired ChatCommandPresetCatalog presets;
+    @Autowired GameStateService gameStateService;
     @Autowired TransactionTemplate transactionTemplate;
 
     private UserAccount user;
@@ -74,9 +75,10 @@ class ChatCommandsIntegrationTest {
         presets.instantiate(user, "game", Locale.FRANCE);
 
         // 2. Game detected (Steam, Dota 2). With IGDB disabled (mock-web), the
-        //    GameContext is hydrated with only the detected name — no JSONB write.
-        publisher.publishEvent(new GameDetectedEvent(this, user,
-            new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2")));
+        //    GameContext is hydrated lazily from GameStateService with only the
+        //    detected name — no JSONB write.
+        gameStateService.updateState(user,
+            new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2"));
 
         // 3. Chat command received from a viewer
         publisher.publishEvent(new ChatCommandEvent(this, user, "!game",
