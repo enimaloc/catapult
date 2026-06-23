@@ -35,6 +35,7 @@ val springCloudContextVersion = "5.0.3-SNAPSHOT"
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-client")
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
@@ -47,6 +48,7 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("io.github.husnjak:igdb-api-jvm:$igdbApiVersion")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("com.bucket4j:bucket4j-core:8.10.1")
     implementation("io.getunleash:unleash-client-java:$unleashVersion")
     implementation("com.github.growthbook:growthbook-sdk-java:$growthbookVersion")
     implementation("com.ibm.icu:icu4j:$icuVersion")
@@ -72,6 +74,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-thymeleaf-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

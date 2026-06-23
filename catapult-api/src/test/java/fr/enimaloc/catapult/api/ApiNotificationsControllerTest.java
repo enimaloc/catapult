@@ -4,7 +4,6 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.notification.NotificationDto;
 import fr.enimaloc.catapult.service.notification.NotificationService;
-import fr.enimaloc.catapult.service.notification.SseEmitterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -40,7 +39,6 @@ class ApiNotificationsControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean NotificationService service;
-    @MockitoBean SseEmitterRegistry registry;
     @MockitoBean UserAccountRepository userRepo;
 
     @Test

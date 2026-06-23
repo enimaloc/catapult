@@ -20,9 +20,13 @@ public class WebSecurityConfig {
         http
                 .addFilterBefore(jwtFilter, AnonymousAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
+                        // /ws/auth-ticket is technically auth-only but stays permitAll so
+                        // unauthenticated requests get a clean 401 from the controller instead of
+                        // a 302 redirect to /login from the entry point.
                         .requestMatchers("/", "/login", "/auth/callback", "/join", "/privacy", "/error",
                                 "/css/**", "/js/**", "/images/**", "/webjars/**",
-                                "/changelog", "/changelog/**", "/actuator/**", "/status").permitAll()
+                                "/changelog", "/changelog/**", "/actuator/**", "/status",
+                                "/ws", "/ws/**").permitAll()
                         .requestMatchers("/admin/impersonate/exit").hasAuthority("ROLE_PREVIOUS_ADMINISTRATOR")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
