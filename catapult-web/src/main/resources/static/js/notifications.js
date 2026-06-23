@@ -10,7 +10,6 @@
   bell.hidden = false;
 
   let unread = 0;
-  let backoff = 1000;
 
   function setUnread(n) {
     unread = Math.max(0, n);
@@ -71,21 +70,15 @@
     } catch (_) { /* anonymous or backend down — keep bell hidden state untouched */ }
   }
 
-  function connect() {
-    const src = new EventSource('/notifications/api/stream');
-    src.addEventListener('notification', (ev) => {
+  function subscribeToNotifications() {
+    if (!window.catapultWs) return;
+    window.catapultWs.subscribe('notifications.user', (msg) => {
+      if (msg.name !== 'notification.created') return;
       try {
-        const n = JSON.parse(ev.data);
-        prependNotif(n);
+        prependNotif(msg.data);
         setUnread(unread + 1);
-      } catch (_) {}
+      } catch (_) { /* swallow */ }
     });
-    src.onopen = () => { backoff = 1000; };
-    src.onerror = () => {
-      src.close();
-      setTimeout(connect, backoff);
-      backoff = Math.min(backoff * 2, 30000);
-    };
   }
 
   btn.addEventListener('click', () => { dropdown.hidden = !dropdown.hidden; });
@@ -102,5 +95,5 @@
     b.parentElement.classList.add('read');
   });
 
-  loadInitial().then(connect);
+  loadInitial().then(subscribeToNotifications);
 })();
