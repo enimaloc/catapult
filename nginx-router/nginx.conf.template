@@ -37,17 +37,22 @@ server {
 
     # ── Twitch OAuth2 flow ────────────────────────────────────────────────────
     # Routed directly to catapult-api; the browser never reaches catapult-api:8080.
+    # Fall back to the maintenance page if catapult-api is down so the user
+    # doesn't see a raw 502 mid-login.
     location /oauth2/ {
         proxy_pass http://backend;
+        error_page 502 503 504 = @maintenance;
     }
 
     location /login/oauth2/ {
         proxy_pass http://backend;
+        error_page 502 503 504 = @maintenance;
     }
 
     # ── Steam OpenID callback (Steam redirects the browser here directly) ─────
     location = /api/connect/steam/callback {
         proxy_pass http://backend;
+        error_page 502 503 504 = @maintenance;
     }
 
     # ── Probe used by maintenance page to detect catapult-web recovery ──────────
