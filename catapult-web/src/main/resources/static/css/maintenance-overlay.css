@@ -47,6 +47,10 @@
     opacity: 1;
 }
 
+#maintenance-overlay[hidden] {
+    display: none;
+}
+
 #maintenance-overlay.fading-out {
     opacity: 0;
     transition: opacity 300ms ease-in;
