@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'broadcast', ~{::body}, ~{::head/script}, 'container', null, null)}">
+<head>
+    <title>Catapult — Admin Broadcast</title>
+    <script th:src="@{/js/admin-broadcast.js}" defer></script>
+</head>
+<body>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 style="margin:0">Administration — Broadcast</h2>
+    </div>
+
+    <p class="text-muted" style="margin-bottom:1rem;">
+        Émet un évènement sur le bus Redis. Tous les onglets connectés au WebSocket reçoivent
+        le message immédiatement. Le champ « name » détermine la forme du payload attendue.
+    </p>
+
+    <div class="card" style="padding:1rem;">
+        <form id="broadcast-form" autocomplete="off">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+            <label class="label">Type d'évènement (name)
+                <select id="broadcast-name" name="name" required>
+                    <option value="" disabled selected>— Choisir —</option>
+                    <option th:each="n : ${broadcastNames}" th:value="${n}" th:text="${n}"></option>
+                </select>
+            </label>
+
+            <!-- Per-name fields. Visibility is toggled by admin-broadcast.js on `name` change. -->
+            <fieldset data-name="maintenance.scheduled" hidden style="border:none; padding:0; margin:0.75rem 0;">
+                <label class="label">Début (ISO 8601)
+                    <input type="datetime-local" name="startsAt">
+                </label>
+                <label class="label">Durée (minutes)
+                    <input type="number" name="durationMinutes" min="1" value="15">
+                </label>
+                <label class="label">Message
+                    <input type="text" name="message" maxlength="500" placeholder="Déploiement v0.8.0">
+                </label>
+            </fieldset>
+
+            <fieldset data-name="maintenance.cancelled" hidden style="border:none; padding:0; margin:0.75rem 0;">
+                <label class="label">Début initialement prévu
+                    <input type="datetime-local" name="originalStartsAt">
+                </label>
+                <label class="label">Raison
+                    <input type="text" name="reason" maxlength="500" placeholder="Annulée par admin">
+                </label>
+            </fieldset>
+
+            <fieldset data-name="version.deployed" hidden style="border:none; padding:0; margin:0.75rem 0;">
+                <label class="label">Version
+                    <input type="text" name="version" maxlength="64" placeholder="0.8.0">
+                </label>
+                <label class="label">
+                    <input type="checkbox" name="promptReload">
+                    Inviter à recharger la page
+                </label>
+            </fieldset>
+
+            <fieldset data-name="alert.info" hidden style="border:none; padding:0; margin:0.75rem 0;">
+                <label class="label">Titre
+                    <input type="text" name="title" maxlength="120">
+                </label>
+                <label class="label">Corps
+                    <textarea name="body" rows="3" maxlength="2000"></textarea>
+                </label>
+                <label class="label">TTL (secondes)
+                    <input type="number" name="ttlSeconds" min="0" value="60">
+                </label>
+            </fieldset>
+
+            <fieldset data-name="alert.warning" hidden style="border:none; padding:0; margin:0.75rem 0;">
+                <label class="label">Titre
+                    <input type="text" name="title" maxlength="120">
+                </label>
+                <label class="label">Corps
+                    <textarea name="body" rows="3" maxlength="2000"></textarea>
+                </label>
+                <label class="label">TTL (secondes)
+                    <input type="number" name="ttlSeconds" min="0" value="300">
+                </label>
+            </fieldset>
+
+            <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem;">
+                <button type="submit" class="btn btn-primary">Diffuser</button>
+            </div>
+        </form>
+
+        <p id="broadcast-status" class="text-muted" style="margin-top:0.75rem;" hidden></p>
+    </div>
+
+    <h3 style="margin-top:2rem;">Diffusions récentes</h3>
+    <p class="text-muted">
+        Les diffusions de cet admin apparaissent dans le flux d'activité du dashboard.
+    </p>
+</body>
+</html>
