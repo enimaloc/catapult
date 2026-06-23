@@ -37,6 +37,31 @@ class JsonMessageCodecTest {
     }
 
     @Test
+    void request_message_decodes_htmx_envelope_from_top_level_fields() throws Exception {
+        String json = """
+                {
+                  "type": "request",
+                  "id": "h-1",
+                  "action": "htmx",
+                  "method": "GET",
+                  "path": "/channels/enimaloc/fragments/status",
+                  "headers": {"HX-Trigger": "load"},
+                  "params": {},
+                  "csrfToken": "tok-abc"
+                }
+                """;
+        WsIncoming decoded = codec.decodeIncoming(json);
+        assertThat(decoded).isInstanceOf(RequestMessage.class);
+        RequestMessage req = (RequestMessage) decoded;
+        assertThat(req.id()).isEqualTo("h-1");
+        assertThat(req.action()).isEqualTo("htmx");
+        assertThat(req.method()).isEqualTo("GET");
+        assertThat(req.path()).isEqualTo("/channels/enimaloc/fragments/status");
+        assertThat(req.headers()).containsEntry("HX-Trigger", "load");
+        assertThat(req.csrfToken()).isEqualTo("tok-abc");
+    }
+
+    @Test
     void roundtrip_event_message() throws Exception {
         var msg = new EventMessage("events.global", "maintenance.scheduled", Map.of("startsAt", "2026-01-01T00:00:00Z"));
         String json = codec.encode(msg);
