@@ -27,9 +27,14 @@ import java.util.UUID;
 public class WsTicketStore {
 
     /** Information the WebSocket session needs after auth.ok. */
-    public record AuthSnapshot(UUID userId, Set<String> roles) {
+    public record AuthSnapshot(UUID userId, Set<String> roles, String jwt) {
         public AuthSnapshot {
             roles = roles == null ? Set.of() : Set.copyOf(roles);
+        }
+
+        /** Convenience constructor for tests / callers that don't carry a JWT yet. */
+        public AuthSnapshot(UUID userId, Set<String> roles) {
+            this(userId, roles, null);
         }
     }
 
@@ -56,10 +61,19 @@ public class WsTicketStore {
 
     /** Returns a new ticket bound to the given identity. */
     public String issue(UUID userId, Set<String> roles) {
+        return issue(userId, roles, null);
+    }
+
+    /**
+     * Returns a new ticket bound to the given identity and JWT. The JWT is
+     * stashed so the WS dispatcher can propagate it to {@code ApiClient} when
+     * forwarding handler calls to upstream REST endpoints.
+     */
+    public String issue(UUID userId, Set<String> roles, String jwt) {
         byte[] bytes = new byte[TOKEN_BYTES];
         RANDOM.nextBytes(bytes);
         String token = ENCODER.encodeToString(bytes);
-        cache.put(token, new AuthSnapshot(userId, roles == null ? Set.of() : roles));
+        cache.put(token, new AuthSnapshot(userId, roles == null ? Set.of() : roles, jwt));
         return token;
     }
 

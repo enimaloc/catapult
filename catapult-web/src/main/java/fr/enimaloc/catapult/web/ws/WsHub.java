@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.web.ws.codec.msg.SubDeniedMessage;
 import fr.enimaloc.catapult.web.ws.codec.msg.SubOkMessage;
 import fr.enimaloc.catapult.web.ws.codec.msg.SubscribeMessage;
 import fr.enimaloc.catapult.web.ws.codec.msg.UnsubscribeMessage;
+import fr.enimaloc.catapult.web.ws.auth.WsAuthContext;
 import fr.enimaloc.catapult.web.ws.auth.WsTicketStore;
 import fr.enimaloc.catapult.web.ws.codec.msg.AuthOkMessage;
 import fr.enimaloc.catapult.web.ws.codec.msg.WsIncoming;
@@ -83,6 +84,7 @@ public class WsHub extends TextWebSocketHandler {
     }
 
     private void handleRequest(WsSession session, RequestMessage msg) {
+        WsAuthContext.set(session.jwt());
         try {
             Object result = dispatcher.dispatch(session, msg.action(), msg.params());
             send(session, ResponseMessage.ok(msg.id(), result));
@@ -91,16 +93,21 @@ public class WsHub extends TextWebSocketHandler {
         } catch (Exception ex) {
             log.warn("request {} action={} failed: {}", msg.id(), msg.action(), ex.toString());
             send(session, ResponseMessage.error(msg.id(), "INTERNAL_ERROR", "Server error"));
+        } finally {
+            WsAuthContext.clear();
         }
     }
 
     private void handleCommand(WsSession session, CommandMessage msg) {
+        WsAuthContext.set(session.jwt());
         try {
             dispatcher.dispatch(session, msg.action(), msg.params());
         } catch (WsBusinessException ex) {
             log.debug("command action={} rejected: {} {}", msg.action(), ex.code(), ex.getMessage());
         } catch (Exception ex) {
             log.warn("command action={} failed: {}", msg.action(), ex.toString());
+        } finally {
+            WsAuthContext.clear();
         }
     }
 
@@ -115,7 +122,7 @@ public class WsHub extends TextWebSocketHandler {
             }
             return;
         }
-        session.authenticate(snapshot.get().userId(), snapshot.get().roles());
+        session.authenticate(snapshot.get().userId(), snapshot.get().roles(), snapshot.get().jwt());
         send(session, new AuthOkMessage(snapshot.get().userId(), List.copyOf(snapshot.get().roles())));
     }
 
