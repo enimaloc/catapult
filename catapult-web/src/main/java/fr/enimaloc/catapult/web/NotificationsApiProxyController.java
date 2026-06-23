@@ -4,7 +4,6 @@ import fr.enimaloc.catapult.client.ApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,7 +12,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Map;
 
@@ -54,13 +52,5 @@ public class NotificationsApiProxyController {
     public ResponseEntity<Void> markAllRead() {
         apiClient.post("/api/notifications/read-all", null);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-    }
-
-    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @ResponseBody
-    public SseEmitter stream() {
-        SseEmitter emitter = new SseEmitter(java.time.Duration.ofMinutes(30).toMillis());
-        apiClient.streamSse("/api/notifications/stream", emitter);
-        return emitter;
     }
 }
