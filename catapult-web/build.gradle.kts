@@ -31,6 +31,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("com.github.ben-manes.caffeine:caffeine")
+    implementation("com.bucket4j:bucket4j-core:8.10.1")
     implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
     implementation("org.webjars.npm:chart.js:$chartjsVersion")
     implementation("org.webjars.npm:htmx.org:$htmxVersion")
