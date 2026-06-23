@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.client.ApiClient;
 import fr.enimaloc.catapult.web.ws.WsSession;
 import fr.enimaloc.catapult.web.ws.dispatch.RequestHandler;
 import fr.enimaloc.catapult.web.ws.dispatch.WsBusinessException;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -19,14 +19,19 @@ import java.util.UUID;
  * never distinguishes the two on the handler side, only the response shape.</p>
  */
 @Component
-@RequiredArgsConstructor
 public class NotificationReadHandler implements RequestHandler {
 
     private final ApiClient apiClient;
     private final ObjectMapper mapper;
 
+    @Autowired
     public NotificationReadHandler(ApiClient apiClient) {
         this(apiClient, JsonMapper.builder().build());
+    }
+
+    NotificationReadHandler(ApiClient apiClient, ObjectMapper mapper) {
+        this.apiClient = apiClient;
+        this.mapper = mapper;
     }
 
     public record Params(UUID notificationId) {

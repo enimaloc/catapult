@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.client.ApiClient;
 import fr.enimaloc.catapult.web.ws.WsSession;
 import fr.enimaloc.catapult.web.ws.dispatch.RequestHandler;
 import fr.enimaloc.catapult.web.ws.dispatch.WsBusinessException;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -22,7 +22,6 @@ import java.util.Map;
  * ({@code { "results": [ { dtddId, name, mediaType, posterUrl }, ... ] }}).</p>
  */
 @Component
-@RequiredArgsConstructor
 public class SearchDtddHandler implements RequestHandler {
 
     private static final int MAX_LIMIT = 50;
@@ -32,8 +31,14 @@ public class SearchDtddHandler implements RequestHandler {
     private final ApiClient apiClient;
     private final ObjectMapper mapper;
 
+    @Autowired
     public SearchDtddHandler(ApiClient apiClient) {
         this(apiClient, JsonMapper.builder().build());
+    }
+
+    SearchDtddHandler(ApiClient apiClient, ObjectMapper mapper) {
+        this.apiClient = apiClient;
+        this.mapper = mapper;
     }
 
     public record Params(String q, Integer limit) {
