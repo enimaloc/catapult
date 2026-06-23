@@ -25,10 +25,16 @@ val htmxVersion = "2.0.4"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    // Used by HtmxWsDispatcher: MockHttpServletRequest/Response forwarded to DispatcherServlet.
+    implementation("org.springframework:spring-test")
+    implementation("com.github.ben-manes.caffeine:caffeine")
+    implementation("com.bucket4j:bucket4j-core:8.10.1")
     implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
     implementation("org.webjars.npm:chart.js:$chartjsVersion")
     implementation("org.webjars.npm:htmx.org:$htmxVersion")
@@ -44,6 +50,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-thymeleaf-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
