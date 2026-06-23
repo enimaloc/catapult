@@ -50,9 +50,21 @@ public class GracefulShutdownBroadcaster {
 
     private final WsHub hub;
     private final ChannelResolver channelResolver;
+    private final java.util.concurrent.atomic.AtomicBoolean alreadyBroadcast =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
 
     @EventListener
-    public void onContextClosed(ContextClosedEvent ignored) {
+    public void onContextClosed(ContextClosedEvent event) {
+        // Spring Boot fires ContextClosedEvent on both the main application
+        // context and the management (actuator) child context, which made the
+        // browser see the imminent frame twice. Skip the child context and
+        // also guard with a single-fire flag for any other re-entrancy path.
+        if (event.getApplicationContext().getParent() != null) {
+            return;
+        }
+        if (!alreadyBroadcast.compareAndSet(false, true)) {
+            return;
+        }
         broadcastImminent();
         sleepForFrameFlush();
     }

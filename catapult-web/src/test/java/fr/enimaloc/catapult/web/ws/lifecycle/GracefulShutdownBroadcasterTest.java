@@ -13,7 +13,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class GracefulShutdownBroadcasterTest {
 
@@ -44,5 +47,34 @@ class GracefulShutdownBroadcasterTest {
 
         // Must not throw — shutdown sequence is allowed to be best-effort.
         broadcaster.onContextClosed(new ContextClosedEvent(mock(org.springframework.context.ApplicationContext.class)));
+    }
+
+    @Test
+    void child_context_close_is_ignored() {
+        WsHub hub = mock(WsHub.class);
+        var broadcaster = new GracefulShutdownBroadcaster(hub, new ChannelResolver());
+
+        // Simulate the management (actuator) context whose parent is the main app context.
+        var childCtx = mock(org.springframework.context.ApplicationContext.class);
+        var parentCtx = mock(org.springframework.context.ApplicationContext.class);
+        when(childCtx.getParent()).thenReturn(parentCtx);
+
+        broadcaster.onContextClosed(new ContextClosedEvent(childCtx));
+
+        verify(hub, never()).broadcast(any(), any());
+    }
+
+    @Test
+    void single_fire_guard_blocks_duplicate_broadcasts() {
+        WsHub hub = mock(WsHub.class);
+        var broadcaster = new GracefulShutdownBroadcaster(hub, new ChannelResolver());
+
+        var rootCtx = mock(org.springframework.context.ApplicationContext.class);
+        // root context: getParent() returns null by default
+        broadcaster.onContextClosed(new ContextClosedEvent(rootCtx));
+        broadcaster.onContextClosed(new ContextClosedEvent(rootCtx));
+
+        // Only the first call should reach the hub.
+        verify(hub, times(1)).broadcast(any(), any());
     }
 }
