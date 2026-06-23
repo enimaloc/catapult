@@ -3,9 +3,12 @@ package fr.enimaloc.catapult.web.ws.dispatch;
 import fr.enimaloc.catapult.web.ws.WsSession;
 import fr.enimaloc.catapult.web.ws.codec.msg.ResponseMessage;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.annotation.PostConstruct;
+import jakarta.servlet.ServletContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockServletConfig;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -56,15 +59,34 @@ public class HtmxWsDispatcher {
 
     private final DispatcherServlet dispatcherServlet;
     private final ObjectMapper mapper;
+    private final ServletContext servletContext;
 
     @Autowired
-    public HtmxWsDispatcher(DispatcherServlet dispatcherServlet) {
-        this(dispatcherServlet, JsonMapper.builder().build());
+    public HtmxWsDispatcher(DispatcherServlet dispatcherServlet, ServletContext servletContext) {
+        this(dispatcherServlet, servletContext, JsonMapper.builder().build());
     }
 
-    HtmxWsDispatcher(DispatcherServlet dispatcherServlet, ObjectMapper mapper) {
+    HtmxWsDispatcher(DispatcherServlet dispatcherServlet, ServletContext servletContext, ObjectMapper mapper) {
         this.dispatcherServlet = dispatcherServlet;
+        this.servletContext = servletContext;
         this.mapper = mapper;
+    }
+
+    /**
+     * Ensures the dispatcher servlet is initialised even when the first request
+     * arrives via the WS path (no HTTP request has warmed it up yet). Without
+     * this, {@code service()} either NPEs on a null servletConfig or routes to
+     * the empty default mappings list.
+     */
+    @PostConstruct
+    public void ensureDispatcherInitialised() {
+        try {
+            if (dispatcherServlet.getServletConfig() == null) {
+                dispatcherServlet.init(new MockServletConfig(servletContext, "dispatcherServlet"));
+            }
+        } catch (Exception e) {
+            log.warn("DispatcherServlet pre-init for HTMX-over-WS failed: {}", e.toString());
+        }
     }
 
     /**
@@ -89,6 +111,10 @@ public class HtmxWsDispatcher {
         try {
             dispatcherServlet.service(httpReq, httpResp);
         } catch (Exception e) {
+            int forbiddenStatus = forbiddenStatusOrZero(e);
+            if (forbiddenStatus != 0) {
+                return ResponseMessage.htmx(id, forbiddenStatus, null, null, "", null, null);
+            }
             log.warn("htmx dispatch {} {} failed: {}", req.method(), req.path(), e.toString());
             return ResponseMessage.error(id, "INTERNAL_ERROR", "Server error");
         } finally {
@@ -195,9 +221,35 @@ public class HtmxWsDispatcher {
         return httpReq;
     }
 
+    /**
+     * Translates Spring Security access/authentication exceptions raised during
+     * controller invocation into the HTTP status the equivalent HTTP request
+     * would have produced. Returns 0 when the exception is unrelated.
+     */
+    private static int forbiddenStatusOrZero(Throwable t) {
+        Throwable cur = t;
+        while (cur != null) {
+            if (cur instanceof org.springframework.security.access.AccessDeniedException) return 403;
+            if (cur instanceof org.springframework.security.authentication.AuthenticationCredentialsNotFoundException) {
+                return 403;
+            }
+            if (cur instanceof org.springframework.security.core.AuthenticationException) return 401;
+            cur = cur.getCause();
+        }
+        return 0;
+    }
+
     private void installSecurityContext(WsSession session) {
+        SecurityContext ctx = new SecurityContextImpl();
         if (session == null || session.userId().isEmpty()) {
-            SecurityContextHolder.clearContext();
+            // Mirror Spring Security's AnonymousAuthenticationFilter so @PreAuthorize
+            // checks against role-based rules produce AccessDenied (HTTP 403) instead
+            // of AuthenticationCredentialsNotFoundException (HTTP 500-equivalent).
+            ctx.setAuthentication(new org.springframework.security.authentication.AnonymousAuthenticationToken(
+                    "ws-anon",
+                    "anonymousUser",
+                    List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
+            SecurityContextHolder.setContext(ctx);
             return;
         }
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
@@ -206,7 +258,6 @@ public class HtmxWsDispatcher {
         }
         Authentication auth = new UsernamePasswordAuthenticationToken(
                 session.userId().get(), null, authorities);
-        SecurityContext ctx = new SecurityContextImpl();
         ctx.setAuthentication(auth);
         SecurityContextHolder.setContext(ctx);
     }
