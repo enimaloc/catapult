@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.web.ws.dispatch;
 
 import fr.enimaloc.catapult.web.ws.WsSession;
+import fr.enimaloc.catapult.web.ws.ratelimit.WsRateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -22,9 +23,11 @@ public class WsRequestDispatcher {
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
 
     private final Map<String, RequestHandler> handlers;
+    private final WsRateLimiter rateLimiter;
 
-    public WsRequestDispatcher(List<RequestHandler> handlers) {
+    public WsRequestDispatcher(List<RequestHandler> handlers, WsRateLimiter rateLimiter) {
         this.handlers = new HashMap<>(handlers.size());
+        this.rateLimiter = rateLimiter;
         for (RequestHandler h : handlers) {
             RequestHandler prev = this.handlers.put(h.action(), h);
             if (prev != null) {
@@ -33,6 +36,11 @@ public class WsRequestDispatcher {
             }
         }
         log.info("ws request dispatcher registered {} actions: {}", this.handlers.size(), this.handlers.keySet());
+    }
+
+    /** Convenience for unit tests that don't care about rate limiting. */
+    public WsRequestDispatcher(List<RequestHandler> handlers) {
+        this(handlers, new WsRateLimiter());
     }
 
     /**
@@ -53,6 +61,13 @@ public class WsRequestDispatcher {
         }
         if (handler.requiresAdmin() && !session.roles().contains(ROLE_ADMIN)) {
             throw new WsBusinessException("FORBIDDEN", "Action requires admin role");
+        }
+        String sessionId = session == null ? null : session.id();
+        if (!rateLimiter.tryAcquire(sessionId, WsRateLimiter.BUCKET_GLOBAL)) {
+            throw new WsBusinessException("RATE_LIMITED", "Too many requests");
+        }
+        if (action.startsWith("search.") && !rateLimiter.tryAcquire(sessionId, WsRateLimiter.BUCKET_SEARCH)) {
+            throw new WsBusinessException("RATE_LIMITED", "Search rate limit exceeded");
         }
         return handler.handle(session, params);
     }
