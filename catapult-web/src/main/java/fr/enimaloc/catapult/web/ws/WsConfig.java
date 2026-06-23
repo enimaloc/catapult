@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.web.ws;
 
+import fr.enimaloc.catapult.web.ws.config.OriginCheckInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -17,13 +18,16 @@ import org.springframework.web.socket.server.standard.ServletServerContainerFact
 public class WsConfig implements WebSocketConfigurer {
 
     private final WsHub hub;
+    private final OriginCheckInterceptor originCheckInterceptor;
 
     @Value("${catapult.ws.allowed-origin-patterns:*}")
     private String[] allowedOriginPatterns;
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(hub, "/ws").setAllowedOriginPatterns(allowedOriginPatterns);
+        registry.addHandler(hub, "/ws")
+                .setAllowedOriginPatterns(allowedOriginPatterns)
+                .addInterceptors(originCheckInterceptor);
     }
 
     @Bean
