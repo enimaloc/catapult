@@ -58,12 +58,38 @@
   function onOpen() {
     attempts = 0;
     armWatchdog();
-    // Re-subscribe to all channels we still care about.
+    document.dispatchEvent(new CustomEvent("ws:open"));
+    // Promote the anonymous WS session by trading the session cookie for a
+    // one-shot ticket. Subscriptions wait for ws:auth.ok so auth-gated
+    // channels (notifications.user, events.admin) resolve correctly; on 401
+    // we fall back to anonymous mode and still send them — public channels
+    // succeed, private ones get sub.denied.
+    authenticate();
+  }
+
+  function authenticate() {
+    fetch("/ws/auth-ticket", { credentials: "same-origin" })
+      .then(function (res) {
+        if (!res.ok) { resubscribeAll(); return; }
+        return res.json().then(function (body) {
+          if (body && body.ticket) {
+            send({ type: "auth", token: body.ticket });
+            // resubscribeAll() runs from the ws:auth.ok listener below.
+          } else {
+            resubscribeAll();
+          }
+        });
+      })
+      .catch(function () { resubscribeAll(); });
+  }
+
+  function resubscribeAll() {
     subscribers.forEach(function (_cbs, ch) {
       send({ type: "subscribe", channel: ch });
     });
-    document.dispatchEvent(new CustomEvent("ws:open"));
   }
+
+  document.addEventListener("ws:auth.ok", resubscribeAll);
 
   function armWatchdog() {
     if (watchdog) clearTimeout(watchdog);
