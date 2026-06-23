@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.web.ws.auth.WsTicketStore;
 import fr.enimaloc.catapult.web.ws.codec.JsonMessageCodec;
 import fr.enimaloc.catapult.web.ws.codec.msg.AuthMessage;
 import fr.enimaloc.catapult.web.ws.dispatch.ChannelResolver;
+import fr.enimaloc.catapult.web.ws.dispatch.HtmxWsDispatcher;
 import fr.enimaloc.catapult.web.ws.dispatch.WsRequestDispatcher;
 import fr.enimaloc.catapult.web.ws.ratelimit.WsRateLimiter;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +50,8 @@ class WsHubAuthTest {
         ticketStore = mock(WsTicketStore.class);
         WsRateLimiter rateLimiter = new WsRateLimiter();
         WsRequestDispatcher dispatcher = new WsRequestDispatcher(java.util.List.of(), rateLimiter);
-        hub = new WsHub(registry, channelResolver, codec, ticketStore, dispatcher, rateLimiter);
+        HtmxWsDispatcher htmxDispatcher = mock(HtmxWsDispatcher.class);
+        hub = new WsHub(registry, channelResolver, codec, ticketStore, dispatcher, rateLimiter, htmxDispatcher);
 
         springSession = mock(WebSocketSession.class);
         when(springSession.getId()).thenReturn("ws-1");

@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.web.ws.codec.msg.WsIncoming;
 import fr.enimaloc.catapult.web.ws.codec.msg.WsOutgoing;
 import fr.enimaloc.catapult.web.ws.codec.msg.PingMessage;
 import fr.enimaloc.catapult.web.ws.dispatch.ChannelResolver;
+import fr.enimaloc.catapult.web.ws.dispatch.HtmxWsDispatcher;
 import fr.enimaloc.catapult.web.ws.dispatch.WsBusinessException;
 import fr.enimaloc.catapult.web.ws.dispatch.WsRequestDispatcher;
 import fr.enimaloc.catapult.web.ws.ratelimit.WsRateLimiter;
@@ -46,6 +47,7 @@ public class WsHub extends TextWebSocketHandler {
     private final WsTicketStore ticketStore;
     private final WsRequestDispatcher dispatcher;
     private final WsRateLimiter rateLimiter;
+    private final HtmxWsDispatcher htmxDispatcher;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession springSession) {
@@ -86,6 +88,15 @@ public class WsHub extends TextWebSocketHandler {
     private void handleRequest(WsSession session, RequestMessage msg) {
         WsAuthContext.set(session.jwt());
         try {
+            if (HtmxWsDispatcher.ACTION.equals(msg.action())) {
+                if (!rateLimiter.tryAcquire(session.id(), WsRateLimiter.BUCKET_GLOBAL)
+                        || !rateLimiter.tryAcquire(session.id(), WsRateLimiter.BUCKET_HTMX)) {
+                    send(session, ResponseMessage.error(msg.id(), "RATE_LIMITED", "HTMX rate limit exceeded"));
+                    return;
+                }
+                send(session, htmxDispatcher.dispatch(msg.id(), session, msg.params()));
+                return;
+            }
             Object result = dispatcher.dispatch(session, msg.action(), msg.params());
             send(session, ResponseMessage.ok(msg.id(), result));
         } catch (WsBusinessException ex) {
