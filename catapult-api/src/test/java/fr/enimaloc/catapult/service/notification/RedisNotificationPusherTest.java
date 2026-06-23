@@ -14,13 +14,13 @@ import java.util.UUID;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-class NotificationSsePusherTest {
+class RedisNotificationPusherTest {
 
-    @Mock SseEmitterRegistry registry;
+    @Mock RedisEventPublisher publisher;
 
     @Test
-    void onAfterCommit_pushesToEachRecipient() {
-        NotificationSsePusher pusher = new NotificationSsePusher(registry);
+    void onCommitted_publishes_one_event_per_recipient() {
+        RedisNotificationPusher pusher = new RedisNotificationPusher(publisher);
         UUID u1 = UUID.randomUUID();
         UUID u2 = UUID.randomUUID();
         NotificationDto dto = new NotificationDto(UUID.randomUUID(), "T", "<p>B</p>",
@@ -29,7 +29,7 @@ class NotificationSsePusherTest {
 
         pusher.onCommitted(ev);
 
-        verify(registry).pushToUser(u1, "notification", dto);
-        verify(registry).pushToUser(u2, "notification", dto);
+        verify(publisher).publishUser(u1, "notification.created", dto);
+        verify(publisher).publishUser(u2, "notification.created", dto);
     }
 }
