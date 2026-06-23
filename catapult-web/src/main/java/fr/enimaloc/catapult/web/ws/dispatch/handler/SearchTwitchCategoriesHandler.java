@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.client.ApiClient;
 import fr.enimaloc.catapult.web.ws.WsSession;
 import fr.enimaloc.catapult.web.ws.dispatch.RequestHandler;
 import fr.enimaloc.catapult.web.ws.dispatch.WsBusinessException;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -28,7 +28,6 @@ import java.util.Map;
  * 401/403 from the API and we surface that as an empty result).</p>
  */
 @Component
-@RequiredArgsConstructor
 public class SearchTwitchCategoriesHandler implements RequestHandler {
 
     private static final int MAX_LIMIT = 50;
@@ -38,10 +37,15 @@ public class SearchTwitchCategoriesHandler implements RequestHandler {
     private final ApiClient apiClient;
     private final ObjectMapper mapper;
 
-    // Spring won't always have a global ObjectMapper before our codec module is loaded;
-    // fall back to a fresh JsonMapper so the bean is always constructible.
+    @Autowired
     public SearchTwitchCategoriesHandler(ApiClient apiClient) {
         this(apiClient, JsonMapper.builder().build());
+    }
+
+    // Visible for tests so they can inject a deterministic ObjectMapper.
+    SearchTwitchCategoriesHandler(ApiClient apiClient, ObjectMapper mapper) {
+        this.apiClient = apiClient;
+        this.mapper = mapper;
     }
 
     public record Params(String channelId, String q, Integer limit) {
