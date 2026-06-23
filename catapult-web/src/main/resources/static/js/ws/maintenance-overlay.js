@@ -112,8 +112,21 @@
   }
 
   function applyInert(on) {
-    var mains = document.querySelectorAll("main");
-    mains.forEach(function (m) {
+    // Prefer <main>(s) when the template uses them. Fall back to every direct
+    // child of <body> except the overlay/banner/toast scaffolding so pages
+    // without an explicit <main> still get a real interaction lock.
+    var targets = document.querySelectorAll("main");
+    if (targets.length === 0) {
+      var fallback = [];
+      var excluded = { "maintenance-overlay": 1, "maintenance-banner": 1, "toast-container": 1 };
+      var children = document.body ? document.body.children : [];
+      for (var i = 0; i < children.length; i++) {
+        var el = children[i];
+        if (!excluded[el.id]) fallback.push(el);
+      }
+      targets = fallback;
+    }
+    targets.forEach(function (m) {
       if (on) m.setAttribute("inert", "");
       else    m.removeAttribute("inert");
     });
