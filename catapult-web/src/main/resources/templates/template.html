@@ -216,20 +216,11 @@
 
     function updatePosition() {
         const footerRect = footer.getBoundingClientRect();
-
-        const windowHeight = window.innerHeight;
-
-        const overlap = windowHeight - footerRect.top;
-
-        if (overlap > 0) {
-            // Le footer entre dans l'écran → on remonte
-            themeSwitcher.style.bottom = `${16 + overlap}px`;
-            feedback.style.bottom = `${66 + overlap}px`;
-        } else {
-            // Position normale
-            themeSwitcher.style.bottom = `16px`;
-            feedback.style.bottom = `66px`;
-        }
+        const overlap = window.innerHeight - footerRect.top;
+        const offset = overlap > 0 ? overlap : 0;
+        themeSwitcher.style.bottom = `${16 + offset}px`;
+        // #feedback-widget only renders for authenticated users with a configured gitlab.token.
+        if (feedback) feedback.style.bottom = `${66 + offset}px`;
     }
 
     window.addEventListener("scroll", updatePosition);
