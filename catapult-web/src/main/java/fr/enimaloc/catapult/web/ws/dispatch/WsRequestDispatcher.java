@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.web.ws.dispatch;
 import fr.enimaloc.catapult.web.ws.WsSession;
 import fr.enimaloc.catapult.web.ws.ratelimit.WsRateLimiter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -25,6 +26,7 @@ public class WsRequestDispatcher {
     private final Map<String, RequestHandler> handlers;
     private final WsRateLimiter rateLimiter;
 
+    @Autowired
     public WsRequestDispatcher(List<RequestHandler> handlers, WsRateLimiter rateLimiter) {
         this.handlers = new HashMap<>(handlers.size());
         this.rateLimiter = rateLimiter;
