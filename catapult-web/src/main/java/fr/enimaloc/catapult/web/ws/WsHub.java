@@ -26,7 +26,9 @@ import fr.enimaloc.catapult.web.ws.ratelimit.WsRateLimiter;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -96,7 +98,7 @@ public class WsHub extends TextWebSocketHandler {
                     send(session, ResponseMessage.error(msg.id(), "RATE_LIMITED", "HTMX rate limit exceeded"));
                     return;
                 }
-                send(session, htmxDispatcher.dispatch(msg.id(), session, msg.params()));
+                send(session, htmxDispatcher.dispatch(msg.id(), session, htmxEnvelope(msg)));
                 return;
             }
             Object result = dispatcher.dispatch(session, msg.action(), msg.params());
@@ -184,6 +186,16 @@ public class WsHub extends TextWebSocketHandler {
             log.debug("send failed, removing session {}: {}", session.id(), ex.getMessage());
             registry.remove(session.id());
         }
+    }
+
+    private static Map<String, Object> htmxEnvelope(RequestMessage msg) {
+        Map<String, Object> env = new HashMap<>();
+        env.put("method", msg.method());
+        env.put("path", msg.path());
+        env.put("headers", msg.headers());
+        env.put("params", msg.params());
+        env.put("csrfToken", msg.csrfToken());
+        return env;
     }
 
     private static final SecureRandom CSRF_RNG = new SecureRandom();
