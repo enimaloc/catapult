@@ -20,6 +20,7 @@ import fr.enimaloc.catapult.web.ws.codec.msg.PingMessage;
 import fr.enimaloc.catapult.web.ws.dispatch.ChannelResolver;
 import fr.enimaloc.catapult.web.ws.dispatch.WsBusinessException;
 import fr.enimaloc.catapult.web.ws.dispatch.WsRequestDispatcher;
+import fr.enimaloc.catapult.web.ws.ratelimit.WsRateLimiter;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class WsHub extends TextWebSocketHandler {
     private final JsonMessageCodec codec;
     private final WsTicketStore ticketStore;
     private final WsRequestDispatcher dispatcher;
+    private final WsRateLimiter rateLimiter;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession springSession) {
@@ -135,6 +137,7 @@ public class WsHub extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession springSession, CloseStatus status) {
         registry.remove(springSession.getId());
+        rateLimiter.cleanup(springSession.getId());
         log.debug("ws closed: id={} status={} total={}", springSession.getId(), status, registry.size());
     }
 
