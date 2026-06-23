@@ -1,0 +1,56 @@
+<!--
+  Maintenance overlay + preventive banner + toast container.
+  Included once from template.html. Driven by maintenance-overlay.js and
+  maintenance-banner.js which listen to ws-client.js custom events.
+
+  The overlay applies `inert` on <main> when visible, blocking clicks and focus
+  on the rest of the page. This is interaction-only — script listeners inside
+  <main> (HTMX swaps, ws:event handlers) keep running normally.
+-->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!-- Blocking overlay. Hidden by default; shown by maintenance-overlay.js. -->
+<div th:fragment="overlay"
+     id="maintenance-overlay"
+     hidden
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="m-title"
+     aria-describedby="m-msg">
+    <div class="overlay-backdrop"></div>
+    <div class="overlay-card" data-cause="default">
+        <div class="overlay-spinner" aria-hidden="true"></div>
+        <h2 id="m-title" tabindex="-1">Connexion perdue</h2>
+        <p id="m-msg" aria-live="polite">Tentative de reconnexion…</p>
+        <p id="m-countdown" class="overlay-countdown" hidden></p>
+        <p id="m-retry-info" class="overlay-muted">
+            Réessai dans <span id="m-retry-in">3</span>s ·
+            tentative <span id="m-retry-n">1</span>
+        </p>
+    </div>
+</div>
+
+<!-- Preventive, dismissible banner. Hidden by default; shown by maintenance-banner.js. -->
+<div th:fragment="banner"
+     id="maintenance-banner"
+     hidden
+     role="status"
+     aria-live="polite">
+    <span class="banner-icon" aria-hidden="true">⚠</span>
+    <span class="banner-msg">
+        Maintenance prévue à <strong id="b-time"></strong>
+        (<span id="b-countdown"></span>)<span id="b-message" class="banner-detail"></span>
+    </span>
+    <button id="b-dismiss" type="button" aria-label="Masquer">×</button>
+</div>
+
+<!-- Toast container (transient messages). -->
+<div th:fragment="toasts"
+     id="toast-container"
+     aria-live="polite"
+     aria-atomic="false"></div>
+
+</body>
+</html>
