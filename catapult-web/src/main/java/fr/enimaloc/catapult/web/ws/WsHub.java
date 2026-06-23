@@ -18,6 +18,8 @@ import fr.enimaloc.catapult.web.ws.codec.msg.WsIncoming;
 import fr.enimaloc.catapult.web.ws.codec.msg.WsOutgoing;
 import fr.enimaloc.catapult.web.ws.codec.msg.PingMessage;
 import fr.enimaloc.catapult.web.ws.dispatch.ChannelResolver;
+import fr.enimaloc.catapult.web.ws.dispatch.WsBusinessException;
+import fr.enimaloc.catapult.web.ws.dispatch.WsRequestDispatcher;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +42,7 @@ public class WsHub extends TextWebSocketHandler {
     private final ChannelResolver channelResolver;
     private final JsonMessageCodec codec;
     private final WsTicketStore ticketStore;
+    private final WsRequestDispatcher dispatcher;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession springSession) {
@@ -72,8 +75,30 @@ public class WsHub extends TextWebSocketHandler {
             case SubscribeMessage s -> handleSubscribe(session, s);
             case UnsubscribeMessage u -> handleUnsubscribe(session, u);
             case AuthMessage a -> handleAuth(session, a);
-            case RequestMessage r -> send(session, ResponseMessage.error(r.id(), "UNKNOWN_ACTION", "No handlers registered"));
-            case CommandMessage ignored -> send(session, new ErrorMessage("UNKNOWN_ACTION", "No handlers registered"));
+            case RequestMessage r -> handleRequest(session, r);
+            case CommandMessage c -> handleCommand(session, c);
+        }
+    }
+
+    private void handleRequest(WsSession session, RequestMessage msg) {
+        try {
+            Object result = dispatcher.dispatch(session, msg.action(), msg.params());
+            send(session, ResponseMessage.ok(msg.id(), result));
+        } catch (WsBusinessException ex) {
+            send(session, ResponseMessage.error(msg.id(), ex.code(), ex.getMessage()));
+        } catch (Exception ex) {
+            log.warn("request {} action={} failed: {}", msg.id(), msg.action(), ex.toString());
+            send(session, ResponseMessage.error(msg.id(), "INTERNAL_ERROR", "Server error"));
+        }
+    }
+
+    private void handleCommand(WsSession session, CommandMessage msg) {
+        try {
+            dispatcher.dispatch(session, msg.action(), msg.params());
+        } catch (WsBusinessException ex) {
+            log.debug("command action={} rejected: {} {}", msg.action(), ex.code(), ex.getMessage());
+        } catch (Exception ex) {
+            log.warn("command action={} failed: {}", msg.action(), ex.toString());
         }
     }
 
