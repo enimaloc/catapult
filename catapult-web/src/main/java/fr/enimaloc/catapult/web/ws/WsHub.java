@@ -24,6 +24,8 @@ import fr.enimaloc.catapult.web.ws.dispatch.WsBusinessException;
 import fr.enimaloc.catapult.web.ws.dispatch.WsRequestDispatcher;
 import fr.enimaloc.catapult.web.ws.ratelimit.WsRateLimiter;
 
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -134,7 +136,9 @@ public class WsHub extends TextWebSocketHandler {
             return;
         }
         session.authenticate(snapshot.get().userId(), snapshot.get().roles(), snapshot.get().jwt());
-        send(session, new AuthOkMessage(snapshot.get().userId(), List.copyOf(snapshot.get().roles())));
+        String csrf = generateCsrfToken();
+        session.setCsrfToken(csrf);
+        send(session, new AuthOkMessage(snapshot.get().userId(), List.copyOf(snapshot.get().roles()), csrf));
     }
 
     private void handleSubscribe(WsSession session, SubscribeMessage msg) {
@@ -180,5 +184,13 @@ public class WsHub extends TextWebSocketHandler {
             log.debug("send failed, removing session {}: {}", session.id(), ex.getMessage());
             registry.remove(session.id());
         }
+    }
+
+    private static final SecureRandom CSRF_RNG = new SecureRandom();
+
+    private static String generateCsrfToken() {
+        byte[] bytes = new byte[32];
+        CSRF_RNG.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

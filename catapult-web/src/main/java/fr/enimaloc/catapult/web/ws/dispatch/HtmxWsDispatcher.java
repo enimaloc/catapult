@@ -102,6 +102,17 @@ public class HtmxWsDispatcher {
             return ResponseMessage.error(id, "MULTIPART_FALLBACK",
                     "Multipart uploads must use plain HTTP, not WS");
         }
+        // CSRF check for authenticated sessions: compare client-supplied token
+        // to the server-issued token bound to this WS session at auth-frame
+        // time. Anonymous sessions skip the check (no authenticated state to
+        // CSRF against; the WS handshake is already Origin-checked).
+        if (session != null && session.userId().isPresent()) {
+            String expected = session.csrfToken();
+            String supplied = req.csrfToken();
+            if (expected == null || supplied == null || !constantTimeEquals(expected, supplied)) {
+                return ResponseMessage.error(id, "CSRF_INVALID", "CSRF token mismatch");
+            }
+        }
 
         MockHttpServletRequest httpReq = buildRequest(req);
         MockHttpServletResponse httpResp = new MockHttpServletResponse();
@@ -339,6 +350,17 @@ public class HtmxWsDispatcher {
             idx = nextClose + close.length();
         }
         return -1;
+    }
+
+    /** Constant-time string comparison to avoid CSRF token timing oracles. */
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null) return false;
+        if (a.length() != b.length()) return false;
+        int diff = 0;
+        for (int i = 0; i < a.length(); i++) {
+            diff |= a.charAt(i) ^ b.charAt(i);
+        }
+        return diff == 0;
     }
 
     private static int indexOfIgnoreCase(String hay, String needle, int from) {

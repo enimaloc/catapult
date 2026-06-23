@@ -43,9 +43,22 @@
     return "h-" + (nextId++) + "-" + Math.random().toString(36).slice(2, 8);
   }
 
+  // CSRF token bound to the WS session, received from the server in the
+  // auth.ok frame. Never derived from a Thymeleaf meta tag: the server is
+  // the sole source of truth so an attacker cannot pre-supply a "valid"
+  // token. Stays null for anonymous sessions (server skips CSRF check).
+  var wsCsrfToken = null;
+  document.addEventListener("ws:auth.ok", function (evt) {
+    if (evt && evt.detail && evt.detail.csrfToken) {
+      wsCsrfToken = evt.detail.csrfToken;
+    }
+  });
+  document.addEventListener("ws:closed", function () {
+    wsCsrfToken = null;
+  });
+
   function csrfToken() {
-    var meta = document.querySelector("meta[name='_csrf']");
-    return meta ? meta.getAttribute("content") : null;
+    return wsCsrfToken;
   }
 
   function isMultipartElt(elt) {
