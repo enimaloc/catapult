@@ -156,12 +156,43 @@ class HtmxWsDispatcherTest {
 
     @Test
     void authenticated_session_propagates_security_context_to_controller() {
-        ResponseMessage resp = dispatcher.dispatch("h-10", adminSession(),
-                Map.of("method", "GET", "path", "/__htmx-test/admin-only"));
+        WsSession admin = adminSession();
+        ResponseMessage resp = dispatcher.dispatch("h-10", admin,
+                Map.of("method", "GET", "path", "/__htmx-test/admin-only",
+                        "csrfToken", admin.csrfToken()));
 
         assertThat(resp.ok()).isTrue();
         assertThat(resp.status()).isEqualTo(200);
         assertThat(resp.html()).contains("admin ok");
+    }
+
+    @Test
+    void authenticated_session_missing_csrf_token_is_rejected() {
+        ResponseMessage resp = dispatcher.dispatch("h-csrf-1", adminSession(),
+                Map.of("method", "POST", "path", "/__htmx-test/echo",
+                        "params", Map.of("k", "v")));
+
+        assertThat(resp.ok()).isFalse();
+        assertThat(resp.error().code()).isEqualTo("CSRF_INVALID");
+    }
+
+    @Test
+    void authenticated_session_wrong_csrf_token_is_rejected() {
+        ResponseMessage resp = dispatcher.dispatch("h-csrf-2", adminSession(),
+                Map.of("method", "POST", "path", "/__htmx-test/echo",
+                        "csrfToken", "definitely-not-the-server-token"));
+
+        assertThat(resp.ok()).isFalse();
+        assertThat(resp.error().code()).isEqualTo("CSRF_INVALID");
+    }
+
+    @Test
+    void anonymous_session_skips_csrf_check() {
+        ResponseMessage resp = dispatcher.dispatch("h-csrf-3", anonymousSession(),
+                Map.of("method", "GET", "path", "/__htmx-test/hello"));
+
+        assertThat(resp.ok()).isTrue();
+        assertThat(resp.status()).isEqualTo(200);
     }
 
     private static WsSession anonymousSession() {
@@ -175,6 +206,7 @@ class HtmxWsDispatcherTest {
         when(spring.getId()).thenReturn("test-admin-" + UUID.randomUUID());
         WsSession ws = new WsSession(spring);
         ws.authenticate(UUID.randomUUID(), Set.of("ROLE_USER", "ROLE_ADMIN"));
+        ws.setCsrfToken("server-issued-test-csrf-" + UUID.randomUUID());
         return ws;
     }
 
