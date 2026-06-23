@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<ul>
+  <li th:each="entry : ${entries}" th:text="${entry.key + '=' + entry.value}">k=v</li>
+</ul>
+</body>
+</html>
