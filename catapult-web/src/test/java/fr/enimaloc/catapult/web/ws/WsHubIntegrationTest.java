@@ -1,14 +1,19 @@
 package fr.enimaloc.catapult.web.ws;
 
+import fr.enimaloc.catapult.client.ApiClient;
 import fr.enimaloc.catapult.web.ws.auth.WsTicketStore;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketHandler;
+import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -16,6 +21,9 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -23,6 +31,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
@@ -42,6 +51,9 @@ class WsHubIntegrationTest {
 
     @Autowired
     WsTicketStore ticketStore;
+
+    @MockitoBean
+    ApiClient apiClient;
 
     private BlockingQueue<String> received;
 
@@ -119,5 +131,75 @@ class WsHubIntegrationTest {
         // Server should close the socket; give it a moment then verify the session is no longer open.
         Thread.sleep(200);
         assertThat(ws.isOpen()).isFalse();
+    }
+
+    @Test
+    void search_twitch_categories_returns_results() throws Exception {
+        when(apiClient.get(
+                ArgumentMatchers.eq("/api/channels/{channelId}/games/search?q={q}"),
+                ArgumentMatchers.<ParameterizedTypeReference<List<Map<String, Object>>>>any(),
+                ArgumentMatchers.<Object>any(),
+                ArgumentMatchers.<Object>any()))
+                .thenReturn(List.of(
+                        Map.of("id", "12345", "name", "Skyrim", "boxArtUrl", "url-1"),
+                        Map.of("id", "67890", "name", "Skyrim SE", "boxArtUrl", "url-2")));
+
+        WebSocketSession ws = connect();
+        ws.sendMessage(new TextMessage(
+                "{\"type\":\"request\",\"id\":\"r-1\",\"action\":\"search.twitch.categories\","
+                        + "\"params\":{\"channelId\":\"abc\",\"q\":\"skyr\"}}"));
+        String resp = received.poll(3, TimeUnit.SECONDS);
+        assertThat(resp)
+                .contains("\"type\":\"response\"")
+                .contains("\"id\":\"r-1\"")
+                .contains("\"ok\":true")
+                .contains("Skyrim");
+        ws.close();
+    }
+
+    @Test
+    void rate_limit_kicks_in_after_burst() throws Exception {
+        when(apiClient.get(
+                ArgumentMatchers.<String>any(),
+                ArgumentMatchers.<ParameterizedTypeReference<List<Map<String, Object>>>>any(),
+                ArgumentMatchers.<Object>any(),
+                ArgumentMatchers.<Object>any()))
+                .thenReturn(List.of());
+
+        WebSocketSession ws = connect();
+        // Fire 12 search calls — limit is 10/s/session.
+        int rateLimited = 0;
+        for (int i = 0; i < 12; i++) {
+            ws.sendMessage(new TextMessage(
+                    "{\"type\":\"request\",\"id\":\"r-" + i + "\",\"action\":\"search.twitch.categories\","
+                            + "\"params\":{\"channelId\":\"abc\",\"q\":\"x\"}}"));
+        }
+        // Drain responses; tally RATE_LIMITED.
+        long deadline = System.currentTimeMillis() + 5000;
+        int collected = 0;
+        while (collected < 12 && System.currentTimeMillis() < deadline) {
+            String resp = received.poll(500, TimeUnit.MILLISECONDS);
+            if (resp == null) break;
+            if (resp.contains("RATE_LIMITED")) rateLimited++;
+            if (resp.contains("\"type\":\"response\"")) collected++;
+        }
+        assertThat(rateLimited).as("at least one of 12 search bursts must be rate-limited").isGreaterThanOrEqualTo(1);
+        ws.close();
+    }
+
+    @Test
+    void origin_check_accepts_handshake_with_origin_when_wildcard_allowed() throws Exception {
+        // Default profile allows-origin-patterns=*; verify a request with an Origin still completes
+        // (regression guard for the interceptor mistakenly blocking everything).
+        var headers = new WebSocketHttpHeaders();
+        headers.set("Origin", "https://example.com");
+
+        var client = new StandardWebSocketClient();
+        WebSocketHandler handler = new TextWebSocketHandler() {};
+
+        var session = client.execute(handler, headers,
+                URI.create("ws://localhost:" + port + "/ws")).get(5, TimeUnit.SECONDS);
+        assertThat(session.isOpen()).isTrue();
+        session.close();
     }
 }
