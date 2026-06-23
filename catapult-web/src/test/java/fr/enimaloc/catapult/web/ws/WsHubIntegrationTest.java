@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.web.ws;
 
+import fr.enimaloc.catapult.web.ws.auth.WsTicketStore;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -14,6 +16,8 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +39,9 @@ class WsHubIntegrationTest {
 
     @LocalServerPort
     int port;
+
+    @Autowired
+    WsTicketStore ticketStore;
 
     private BlockingQueue<String> received;
 
@@ -83,5 +90,34 @@ class WsHubIntegrationTest {
         String resp = received.poll(20, TimeUnit.SECONDS);
         assertThat(resp).contains("\"type\":\"ping\"");
         ws.close();
+    }
+
+    @Test
+    void auth_flow_with_valid_ticket_grants_notifications_user_subscription() throws Exception {
+        WebSocketSession ws = connect();
+        UUID userId = UUID.randomUUID();
+        String ticket = ticketStore.issue(userId, Set.of("ROLE_USER"));
+
+        ws.sendMessage(new TextMessage("{\"type\":\"auth\",\"token\":\"" + ticket + "\"}"));
+        String authResp = received.poll(3, TimeUnit.SECONDS);
+        assertThat(authResp).contains("\"type\":\"auth.ok\"").contains(userId.toString());
+
+        ws.sendMessage(new TextMessage("{\"type\":\"subscribe\",\"channel\":\"notifications.user\"}"));
+        String subResp = received.poll(3, TimeUnit.SECONDS);
+        assertThat(subResp).contains("\"type\":\"sub.ok\"").contains("notifications.user");
+        ws.close();
+    }
+
+    @Test
+    void auth_flow_with_invalid_ticket_disconnects() throws Exception {
+        WebSocketSession ws = connect();
+
+        ws.sendMessage(new TextMessage("{\"type\":\"auth\",\"token\":\"bogus-not-issued\"}"));
+        String err = received.poll(3, TimeUnit.SECONDS);
+        assertThat(err).contains("\"type\":\"error\"").contains("INVALID_TICKET");
+
+        // Server should close the socket; give it a moment then verify the session is no longer open.
+        Thread.sleep(200);
+        assertThat(ws.isOpen()).isFalse();
     }
 }
