@@ -14,6 +14,7 @@ public final class WsSession {
     private volatile UUID userId;
     private volatile Set<String> roles = Set.of();
     private volatile String jwt;
+    private volatile String csrfToken;
 
     public WsSession(WebSocketSession springSession) {
         this.springSession = springSession;
@@ -42,6 +43,20 @@ public final class WsSession {
     /** Bearer token captured at ticket issuance, propagated to upstream REST calls. */
     public String jwt() {
         return jwt;
+    }
+
+    /**
+     * Server-issued CSRF token bound to this WS session, set at auth-frame time.
+     * Sent to the client via {@code auth.ok} so it can echo it on every HTMX-over-WS
+     * mutation request; {@code HtmxWsDispatcher} compares the client-supplied
+     * value to this expected value before forwarding to the MVC dispatcher.
+     */
+    public String csrfToken() {
+        return csrfToken;
+    }
+
+    public void setCsrfToken(String csrfToken) {
+        this.csrfToken = csrfToken;
     }
 
     public void authenticate(UUID userId, Set<String> roles) {
