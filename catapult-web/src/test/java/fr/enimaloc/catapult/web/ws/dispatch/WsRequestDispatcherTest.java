@@ -98,4 +98,17 @@ class WsRequestDispatcherTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Duplicate WS handler");
     }
+
+    @Test
+    void search_action_burst_rate_limits_after_10() throws Exception {
+        var d = new WsRequestDispatcher(List.of(handler("search.foo", false, false, "ok")));
+        WsSession sess = authenticatedSession(false);
+        // 10 must pass; 11th hits the per-session search bucket.
+        for (int i = 0; i < 10; i++) {
+            d.dispatch(sess, "search.foo", null);
+        }
+        assertThatThrownBy(() -> d.dispatch(sess, "search.foo", null))
+                .isInstanceOf(WsBusinessException.class)
+                .satisfies(e -> assertThat(((WsBusinessException) e).code()).isEqualTo("RATE_LIMITED"));
+    }
 }
