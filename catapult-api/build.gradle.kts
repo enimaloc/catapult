@@ -48,6 +48,7 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("io.github.husnjak:igdb-api-jvm:$igdbApiVersion")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("com.bucket4j:bucket4j-core:8.10.1")
     implementation("io.getunleash:unleash-client-java:$unleashVersion")
     implementation("com.github.growthbook:growthbook-sdk-java:$growthbookVersion")
     implementation("com.ibm.icu:icu4j:$icuVersion")
