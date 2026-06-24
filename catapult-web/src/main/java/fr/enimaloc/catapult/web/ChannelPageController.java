@@ -8,7 +8,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -41,40 +40,8 @@ public class ChannelPageController {
         if (data == null) {
             return "redirect:/channels";
         }
-        populateModel(model, data);
+        populateModel(model, data, username);
         return "app";
-    }
-
-    @GetMapping("/fragments/dtdd-mapping")
-    public String dtddMappingFragment(@PathVariable String username, Model model) {
-        model.addAttribute("channelUsername", username);
-        DtddMappingStatusDto status = apiClient.get(
-                "/api/channels/{username}/dtdd-mapping", DtddMappingStatusDto.class, username);
-        if (status != null) {
-            model.addAttribute("dtddCurrent", status.current());
-            model.addAttribute("dtddPending", status.myPendingProposal());
-            model.addAttribute("dtddCanValidate", status.canValidateDirectly());
-            model.addAttribute("dtddIgdbId", status.igdbId());
-        } else {
-            model.addAttribute("dtddCurrent", null);
-            model.addAttribute("dtddPending", null);
-            model.addAttribute("dtddCanValidate", false);
-            model.addAttribute("dtddIgdbId", null);
-        }
-        return "fragments/dtdd-mapping :: dtdd-mapping";
-    }
-
-    @GetMapping("/fragments/status")
-    public String statusFragment(@PathVariable String username, Model model) {
-        StatusData data = apiClient.get("/api/channels/{username}/status", StatusData.class, username);
-        if (data != null) {
-            model.addAttribute("channelUsername", data.channelUsername());
-            model.addAttribute("isOwner", data.isOwner());
-            model.addAttribute("botEnabled", data.botEnabled());
-            model.addAttribute("isLive", data.isLive());
-            model.addAttribute("currentGame", data.currentGame());
-        }
-        return "fragments/status :: status";
     }
 
     @GetMapping(value = "/api/games/search", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -99,65 +66,6 @@ public class ChannelPageController {
         return emitter;
     }
 
-    // ── Lazy-loaded HTMX fragments ─────────────────────────────────────────────
-
-    @GetMapping("/fragments/connections")
-    public String connectionsFragment(@PathVariable String username, Model model) {
-        ChannelPageData data = apiClient.get("/api/channels/{username}", ChannelPageData.class, username);
-        if (data != null) {
-            populateConnectionsModel(model, data);
-        }
-        return "fragments/connections :: connections";
-    }
-
-    @PostMapping("/settings/steam/refresh-profile-cache")
-    public String refreshSteamProfileCache(@PathVariable String username, Model model) {
-        apiClient.post("/api/channels/{username}/steam/refresh-profile-cache", null, username);
-        ChannelPageData data = apiClient.get("/api/channels/{username}", ChannelPageData.class, username);
-        if (data != null) {
-            populateConnectionsModel(model, data);
-        }
-        return "fragments/connections :: connections";
-    }
-
-    private void populateConnectionsModel(Model model, ChannelPageData data) {
-        model.addAttribute("channelUsername", data.channelUsername());
-        model.addAttribute("isOwner", data.isOwner());
-        model.addAttribute("hasSteamProvider", data.hasSteamProvider());
-        model.addAttribute("hasSteam", data.hasSteam());
-        model.addAttribute("hasSteamPersonalToken", data.hasSteamPersonalToken());
-        model.addAttribute("steamTokenShared", data.steamTokenShared());
-        model.addAttribute("steamProfilePrivate", data.steamProfilePrivate());
-        model.addAttribute("steamRateLimited", data.steamRateLimited());
-        model.addAttribute("steamOfflineMode", data.steamOfflineMode());
-        model.addAttribute("steamProfileCacheTtlMinutes", data.steamProfileCacheTtlMinutes());
-    }
-
-    @GetMapping("/fragments/bindings")
-    public String bindingsFragment(
-            @PathVariable String username,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String source,
-            Model model) {
-        StringBuilder url = new StringBuilder("/api/channels/{username}?page={page}");
-        if (status != null && !status.isBlank()) url.append("&status={status}");
-        if (source != null && !source.isBlank()) url.append("&source={source}");
-        Object[] vars = buildVars(username, page, status, source);
-        ChannelPageData data = apiClient.get(url.toString(), ChannelPageData.class, vars);
-        if (data != null) {
-            model.addAttribute("channelUsername", data.channelUsername());
-            model.addAttribute("bindings", data.bindings());
-            model.addAttribute("availableCcls", data.availableCcls());
-            model.addAttribute("blockedCcls", data.blockedCcls());
-            model.addAttribute("availableTws", data.availableTws());
-            model.addAttribute("blockedTws", data.blockedTws());
-            model.addAttribute("filterStatus", data.filterStatus());
-            model.addAttribute("filterSource", data.filterSource());
-        }
-        return "fragments/bindings :: bindings";
-    }
-
     private static Object[] buildVars(String username, int page, String status, String source) {
         java.util.List<Object> vars = new java.util.ArrayList<>();
         vars.add(username);
@@ -167,51 +75,14 @@ public class ChannelPageController {
         return vars.toArray();
     }
 
-    @GetMapping("/fragments/ccl-settings")
-    public String cclSettings(@PathVariable String username, Model model) {
-        model.addAttribute("channelUsername", username);
-        UserSettingsDto settings = apiClient.get("/api/channels/{username}/settings", UserSettingsDto.class, username);
-        if (settings != null) {
-            model.addAttribute("cclSettings", settings);
-            model.addAttribute("availableCcls", settings.availableCcls());
-        }
-        return "fragments/ccl-settings :: ccl-settings";
-    }
-
-    @GetMapping("/fragments/tw-settings")
-    public String twSettings(@PathVariable String username, Model model) {
-        model.addAttribute("channelUsername", username);
-        UserSettingsDto settings = apiClient.get("/api/channels/{username}/settings", UserSettingsDto.class, username);
-        if (settings != null) {
-            model.addAttribute("twSettings", settings);
-            model.addAttribute("availableTws", settings.availableTws());
-        }
-        return "fragments/tw-settings :: tw-settings";
-    }
-
-    @GetMapping("/fragments/no-game-settings")
-    public String noGameSettings(@PathVariable String username, Model model) {
-        model.addAttribute("channelUsername", username);
-        UserSettingsDto settings = apiClient.get("/api/channels/{username}/settings", UserSettingsDto.class, username);
-        if (settings != null) {
-            model.addAttribute("noGameSettings", settings);
-            model.addAttribute("availableCcls", settings.availableCcls());
-        }
-        return "fragments/no-game-settings :: no-game-settings";
-    }
-
-    @GetMapping("/fragments/incomplete-fallback-settings")
-    public String incompleteFallbackSettings(@PathVariable String username, Model model) {
-        model.addAttribute("channelUsername", username);
-        UserSettingsDto settings = apiClient.get("/api/channels/{username}/settings", UserSettingsDto.class, username);
-        if (settings != null) {
-            model.addAttribute("incompleteFallbackSettings", settings);
-            model.addAttribute("availableCcls", settings.availableCcls());
-        }
-        return "fragments/incomplete-fallback-settings :: incomplete-fallback-settings";
-    }
-
-    private void populateModel(Model model, ChannelPageData data) {
+    /**
+     * Populates every model attribute the channel page (and all inlined fragments)
+     * needs. Replaces the former per-fragment lazy controllers — the page now
+     * renders in a single round-trip with the complete state, and subsequent
+     * updates arrive as WS events handled client-side.
+     */
+    private void populateModel(Model model, ChannelPageData data, String username) {
+        // Core channel data
         model.addAttribute("channelUser", data.channelUser());
         model.addAttribute("channelUsername", data.channelUsername());
         model.addAttribute("isOwner", data.isOwner());
@@ -233,6 +104,24 @@ public class ChannelPageController {
         model.addAttribute("steamRateLimited", data.steamRateLimited());
         model.addAttribute("steamOfflineMode", data.steamOfflineMode());
         model.addAttribute("steamProfileCacheTtlMinutes", data.steamProfileCacheTtlMinutes());
+
+        // Settings — single API call, exposed under four template attribute names
+        // because each of the *Settings panels references different fields of the
+        // same UserSettingsDto. Null tolerated: templates already check via th:if.
+        UserSettingsDto settings = apiClient.get(
+                "/api/channels/{username}/settings", UserSettingsDto.class, username);
+        model.addAttribute("cclSettings", settings);
+        model.addAttribute("twSettings", settings);
+        model.addAttribute("noGameSettings", settings);
+        model.addAttribute("incompleteFallbackSettings", settings);
+
+        // DTDD mapping panel
+        DtddMappingStatusDto dtdd = apiClient.get(
+                "/api/channels/{username}/dtdd-mapping", DtddMappingStatusDto.class, username);
+        model.addAttribute("dtddCurrent", dtdd == null ? null : dtdd.current());
+        model.addAttribute("dtddPending", dtdd == null ? null : dtdd.myPendingProposal());
+        model.addAttribute("dtddCanValidate", dtdd != null && dtdd.canValidateDirectly());
+        model.addAttribute("dtddIgdbId", dtdd == null ? null : dtdd.igdbId());
     }
 
     // ── DTOs ──────────────────────────────────────────────────────────────────
@@ -317,15 +206,6 @@ public class ChannelPageController {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record TwDto(String id, String label) {}
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record StatusData(
-            String channelUsername,
-            boolean isOwner,
-            boolean botEnabled,
-            boolean isLive,
-            GameDto currentGame
-    ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record DtddMappingStatusDto(DtddMappingCurrentDto current, DtddMappingProposalDto myPendingProposal, boolean canValidateDirectly, String igdbId) {}
