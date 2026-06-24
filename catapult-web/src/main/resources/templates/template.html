@@ -13,6 +13,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="_csrf" th:content="${_csrf.token}"/>
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <!--/*@thymesVar id="channelUser" type="fr.enimaloc.catapult.web.ChannelPageController$ChannelUserDto"*/-->
+    <meta th:if="${channelUser != null}" name="channel-owner-id" th:content="${channelUser.id}"/>
     <title th:replace="${title}">Catapult</title>
     <script>(function () {
         const t = localStorage.getItem('theme');
