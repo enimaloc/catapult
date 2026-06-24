@@ -144,7 +144,16 @@ public class WsHub extends TextWebSocketHandler {
     }
 
     private void handleSubscribe(WsSession session, SubscribeMessage msg) {
-        var resolved = channelResolver.resolvePublicToInternal(msg.channel(), session);
+        // ChannelResolver may now reach the upstream API (channel.viewed.<uuid>
+        // calls /api/users/.../channel-access via ApiClient), and ApiClient
+        // needs the session JWT bound on the thread to attach the Bearer header.
+        WsAuthContext.set(session.jwt());
+        java.util.Optional<String> resolved;
+        try {
+            resolved = channelResolver.resolvePublicToInternal(msg.channel(), session);
+        } finally {
+            WsAuthContext.clear();
+        }
         if (resolved.isEmpty()) {
             send(session, new SubDeniedMessage(msg.channel(), "FORBIDDEN_OR_UNKNOWN"));
             return;
@@ -154,7 +163,13 @@ public class WsHub extends TextWebSocketHandler {
     }
 
     private void handleUnsubscribe(WsSession session, UnsubscribeMessage msg) {
-        var resolved = channelResolver.resolvePublicToInternal(msg.channel(), session);
+        WsAuthContext.set(session.jwt());
+        java.util.Optional<String> resolved;
+        try {
+            resolved = channelResolver.resolvePublicToInternal(msg.channel(), session);
+        } finally {
+            WsAuthContext.clear();
+        }
         resolved.ifPresent(internal -> registry.unsubscribe(session.id(), internal));
     }
 

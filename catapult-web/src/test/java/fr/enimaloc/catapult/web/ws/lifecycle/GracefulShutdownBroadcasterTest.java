@@ -23,7 +23,7 @@ class GracefulShutdownBroadcasterTest {
     @Test
     void on_context_closed_broadcasts_maintenance_imminent_directly() {
         WsHub hub = mock(WsHub.class);
-        ChannelResolver resolver = new ChannelResolver();
+        ChannelResolver resolver = new ChannelResolver(mock(fr.enimaloc.catapult.client.ApiClient.class));
         var broadcaster = new GracefulShutdownBroadcaster(hub, resolver);
 
         broadcaster.onContextClosed(new ContextClosedEvent(mock(org.springframework.context.ApplicationContext.class)));
@@ -43,7 +43,7 @@ class GracefulShutdownBroadcasterTest {
     void hub_failure_does_not_propagate() {
         WsHub hub = mock(WsHub.class);
         org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(hub).broadcast(any(), any());
-        var broadcaster = new GracefulShutdownBroadcaster(hub, new ChannelResolver());
+        var broadcaster = new GracefulShutdownBroadcaster(hub, new ChannelResolver(mock(fr.enimaloc.catapult.client.ApiClient.class)));
 
         // Must not throw — shutdown sequence is allowed to be best-effort.
         broadcaster.onContextClosed(new ContextClosedEvent(mock(org.springframework.context.ApplicationContext.class)));
@@ -52,7 +52,7 @@ class GracefulShutdownBroadcasterTest {
     @Test
     void child_context_close_is_ignored() {
         WsHub hub = mock(WsHub.class);
-        var broadcaster = new GracefulShutdownBroadcaster(hub, new ChannelResolver());
+        var broadcaster = new GracefulShutdownBroadcaster(hub, new ChannelResolver(mock(fr.enimaloc.catapult.client.ApiClient.class)));
 
         // Simulate the management (actuator) context whose parent is the main app context.
         var childCtx = mock(org.springframework.context.ApplicationContext.class);
@@ -67,7 +67,7 @@ class GracefulShutdownBroadcasterTest {
     @Test
     void single_fire_guard_blocks_duplicate_broadcasts() {
         WsHub hub = mock(WsHub.class);
-        var broadcaster = new GracefulShutdownBroadcaster(hub, new ChannelResolver());
+        var broadcaster = new GracefulShutdownBroadcaster(hub, new ChannelResolver(mock(fr.enimaloc.catapult.client.ApiClient.class)));
 
         var rootCtx = mock(org.springframework.context.ApplicationContext.class);
         // root context: getParent() returns null by default
