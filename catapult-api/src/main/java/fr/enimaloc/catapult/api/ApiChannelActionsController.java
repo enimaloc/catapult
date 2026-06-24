@@ -68,6 +68,7 @@ public class ApiChannelActionsController {
         UserAccount viewer = resolveViewer(jwt);
         UserAccount channelUser = resolveChannel(username, viewer);
         bindingService.toggleCclEnabled(channelUser, id, body.enabled());
+        channelEventPublisher.bindingUpserted(channelUser.getId(), id);
     }
 
     @PostMapping("/bindings/{id}/ignored-toggle")
@@ -81,6 +82,7 @@ public class ApiChannelActionsController {
         UserAccount viewer = resolveViewer(jwt);
         UserAccount channelUser = resolveChannel(username, viewer);
         bindingService.toggleIgnored(channelUser, id, body.ignored());
+        channelEventPublisher.bindingUpserted(channelUser.getId(), id);
     }
 
     @PostMapping("/bindings/{id}/delete")
@@ -93,6 +95,7 @@ public class ApiChannelActionsController {
         UserAccount viewer = resolveViewer(jwt);
         UserAccount channelUser = resolveChannel(username, viewer);
         bindingService.deleteBinding(channelUser, id);
+        channelEventPublisher.bindingDeleted(channelUser.getId(), id);
     }
 
     @PostMapping("/bindings/{id}")
@@ -107,6 +110,7 @@ public class ApiChannelActionsController {
         UserAccount channelUser = resolveChannel(username, viewer);
         Set<String> ccls = body.ccls() != null ? body.ccls() : Set.of();
         bindingService.updateBinding(channelUser, id, body.twitchGameId(), body.twitchGameName(), ccls, false);
+        channelEventPublisher.bindingUpserted(channelUser.getId(), id);
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
@@ -145,6 +149,7 @@ public class ApiChannelActionsController {
         settings.getBlockedCcls().clear();
         if (body.blockedCcls() != null) settings.getBlockedCcls().addAll(body.blockedCcls());
         userSettingsRepository.save(settings);
+        channelEventPublisher.settingsUpdated(channelUser.getId());
     }
 
     @PostMapping("/settings/tws")
@@ -161,6 +166,7 @@ public class ApiChannelActionsController {
         settings.getBlockedTws().clear();
         if (body.blockedTws() != null) settings.getBlockedTws().addAll(body.blockedTws());
         userSettingsRepository.save(settings);
+        channelEventPublisher.settingsUpdated(channelUser.getId());
     }
 
     @PostMapping("/settings/no-game")
@@ -184,6 +190,7 @@ public class ApiChannelActionsController {
         if (gameStateService.getLastKnownGame(channelUser).isEmpty()) {
             twitchService.resetToDefault(channelUser);
         }
+        channelEventPublisher.settingsUpdated(channelUser.getId());
     }
 
     @PostMapping("/settings/incomplete-fallback")
@@ -201,6 +208,7 @@ public class ApiChannelActionsController {
         settings.getIncompleteFallbackCcls().clear();
         if (body.ccls() != null) settings.getIncompleteFallbackCcls().addAll(body.ccls());
         userSettingsRepository.save(settings);
+        channelEventPublisher.settingsUpdated(channelUser.getId());
     }
 
     @PostMapping("/settings/steam-personal-token")
@@ -219,6 +227,7 @@ public class ApiChannelActionsController {
         channelUser.setSteamTokenShared(body.shared());
         userAccountRepository.save(channelUser);
         syncTokenToPool(channelUser, trimmed, body.shared());
+        channelEventPublisher.steamProfileChanged(channelUser.getId());
     }
 
     @PostMapping("/settings/steam-personal-token/sharing")
@@ -236,6 +245,7 @@ public class ApiChannelActionsController {
         userAccountRepository.save(channelUser);
         String decryptedToken = tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken());
         syncTokenToPool(channelUser, decryptedToken, body.shared());
+        channelEventPublisher.steamProfileChanged(channelUser.getId());
     }
 
     @Transactional
@@ -253,6 +263,7 @@ public class ApiChannelActionsController {
         userAccountRepository.save(channelUser);
         steamApiKeyRepository.deleteByOwner(channelUser);
         if (rotator != null) rotator.refreshKeys();
+        channelEventPublisher.steamProfileChanged(channelUser.getId());
     }
 
     @PostMapping("/settings/delete-account")
@@ -294,6 +305,7 @@ public class ApiChannelActionsController {
         requireOwner(viewer, channelUser);
         OAuthToken.Provider provider = OAuthToken.Provider.valueOf(body.provider().toUpperCase());
         accountService.disconnectProvider(channelUser, provider);
+        channelEventPublisher.connectionChanged(channelUser.getId(), provider.name(), false);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
