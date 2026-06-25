@@ -74,6 +74,8 @@ public class RedisEventSubscriber {
         }
         JsonNode data = envelope.path("data");
         String publicChannel = toPublicChannel(internalChannel);
+        log.debug("redis→ws fanout: redis={} internal={} public={} name={}",
+                redisChannel, internalChannel, publicChannel, name);
         hub.broadcast(internalChannel, new EventMessage(publicChannel, name, data));
     }
 

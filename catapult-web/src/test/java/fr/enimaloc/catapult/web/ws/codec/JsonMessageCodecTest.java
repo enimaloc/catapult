@@ -42,7 +42,7 @@ class JsonMessageCodecTest {
                 {
                   "type": "request",
                   "id": "h-1",
-                  "action": "htmx",
+                  "action": "mvc",
                   "method": "GET",
                   "path": "/channels/enimaloc/fragments/status",
                   "headers": {"HX-Trigger": "load"},
@@ -54,7 +54,7 @@ class JsonMessageCodecTest {
         assertThat(decoded).isInstanceOf(RequestMessage.class);
         RequestMessage req = (RequestMessage) decoded;
         assertThat(req.id()).isEqualTo("h-1");
-        assertThat(req.action()).isEqualTo("htmx");
+        assertThat(req.action()).isEqualTo("mvc");
         assertThat(req.method()).isEqualTo("GET");
         assertThat(req.path()).isEqualTo("/channels/enimaloc/fragments/status");
         assertThat(req.headers()).containsEntry("HX-Trigger", "load");
