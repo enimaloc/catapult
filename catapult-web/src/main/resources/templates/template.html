@@ -184,6 +184,10 @@
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeHelpPanel();
     });
+    // ws:after="help-loaded" → after the help fragment is swapped into
+    // #help-panel-body, the page bubbles a 'help-loaded' CustomEvent which
+    // this listener turns into the panel-open visual change.
+    document.addEventListener('help-loaded', openHelpPanel);
 </script>
 
 <!--<div th:if="${user != null and activeExperimentAssignments != null}"-->
