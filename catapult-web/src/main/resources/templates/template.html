@@ -15,6 +15,7 @@
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
     <!--/*@thymesVar id="channelUser" type="fr.enimaloc.catapult.web.ChannelPageController$ChannelUserDto"*/-->
     <meta th:if="${channelUser != null}" name="channel-owner-id" th:content="${channelUser.id}"/>
+    <meta th:if="${channelUsername != null}" name="channel-username" th:content="${channelUsername}"/>
     <title th:replace="${title}">Catapult</title>
     <script>(function () {
         const t = localStorage.getItem('theme');

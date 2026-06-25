@@ -4,6 +4,12 @@
 <!--/*@thymesvar id="botEnabled" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="isLive" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="currentGame" type="fr.enimaloc.catapult.getter.DetectedGame"*/-->
+<!--
+    The status fragment renders BOTH states of each toggleable block (bot
+    enabled/disabled, stream live/offline, game detected/cleared) and hides
+    the inactive one with hidden=true. channel-page.js toggles the visibility
+    on WS events without needing a server round-trip or client-side i18n.
+-->
 <div th:fragment="status" id="status-card">
     <div class="card">
         <div class="card-header">
@@ -15,13 +21,13 @@
                     hx-on::after-request="openHelpPanel()"
                     th:title="#{help.panel.title}">?</button>
         </div>
-        <div th:if="${botEnabled}" class="status status-active">
+        <div id="bot-status-active" class="status status-active" th:hidden="${!botEnabled}">
             <span class="status-dot"></span> <span th:text="#{status.active}">Actif</span>
             <form th:action="@{/channels/{u}/settings/bot(u=${channelUsername})}" method="post" > <!-- nosemgrep -->
                 <button type="submit" class="btn btn-primary" th:text="#{common.disable}">Désactiver</button>
             </form>
         </div>
-        <div th:unless="${botEnabled}" class="status status-inactive">
+        <div id="bot-status-inactive" class="status status-inactive" th:hidden="${botEnabled}">
             <span class="status-dot"></span> <span th:text="#{status.inactive}">Inactif</span>
             <form th:action="@{/channels/{u}/settings/bot(u=${channelUsername})}" method="post" > <!-- nosemgrep -->
                 <button type="submit" class="btn btn-primary" th:text="#{common.enable}">Activer</button>
@@ -29,21 +35,21 @@
         </div>
         <div class="divider"></div>
         <h3 th:text="#{status.stream_title}">Stream</h3>
-        <div th:if="${isLive}" class="status status-active">
+        <div id="stream-status-live" class="status status-active" th:hidden="${!isLive}">
             <span class="status-dot"></span> <span th:text="#{status.live}">En live</span>
         </div>
-        <div th:unless="${isLive}" class="status status-inactive">
+        <div id="stream-status-offline" class="status status-inactive" th:hidden="${isLive}">
             <span class="status-dot"></span> <span th:text="#{status.offline}">Hors ligne</span>
         </div>
         <div class="divider"></div>
         <h3 th:text="#{status.current_game_title}">Jeu en cours</h3>
-        <div th:if="${currentGame != null}">
+        <div id="current-game-info" th:hidden="${currentGame == null}">
             <p>
-                <strong th:text="${currentGame.sourceName}"></strong>
-                <span class="badge" th:text="${currentGame.sourceType}"></span>
+                <strong id="current-game-name" th:text="${currentGame != null ? currentGame.sourceName : ''}"></strong>
+                <span class="badge" id="current-game-source" th:text="${currentGame != null ? currentGame.sourceType : ''}"></span>
             </p>
         </div>
-        <div th:unless="${currentGame != null}">
+        <div id="current-game-none" th:hidden="${currentGame != null}">
             <p class="text-muted" th:text="#{status.no_game}">Aucun jeu détecté</p>
         </div>
     </div>
