@@ -8,10 +8,7 @@
 <!--/*@thymesvar id="blockedCcls" type="java.util.Set"*/-->
 <!--/*@thymesvar id="availableTws" type="java.util.List"*/-->
 <!--/*@thymesvar id="blockedTws" type="java.util.Set"*/-->
-<div th:fragment="bindings" class="card"
-     th:attr="hx-get=@{/channels/{u}/fragments/bindings(u=${channelUsername},page=${bindings.number},status=${filterStatus},source=${filterSource})}"
-     hx-trigger="every 10s [!isEditing()]"
-     hx-swap="outerHTML">
+<div th:fragment="bindings" id="bindings-card" class="card">
 
     <div class="card-header">
         <h3 th:text="#{bindings.title}">Bindings</h3>
