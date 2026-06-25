@@ -10,10 +10,7 @@
 <!--/*@thymesvar id="isOwner" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="hasSteamPersonalToken" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="steamTokenShared" type="java.lang.Boolean"*/-->
-<section th:fragment="connections" id="connections-section" class="card"
-         th:attr="hx-get=@{/channels/{u}/fragments/connections(u=${channelUsername})}"
-         hx-trigger="every 30s"
-         hx-swap="outerHTML">
+<section th:fragment="connections" id="connections-section" class="card">
     <div class="card-header">
         <h3 th:text="#{connections.title}">Connexions</h3>
         <button class="btn-help"
