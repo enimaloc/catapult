@@ -1,13 +1,17 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.domain.*;
+import fr.enimaloc.catapult.event.NotificationAllReadEvent;
 import fr.enimaloc.catapult.event.NotificationCreatedEvent;
+import fr.enimaloc.catapult.event.NotificationDeletedEvent;
+import fr.enimaloc.catapult.event.NotificationReadEvent;
 import fr.enimaloc.catapult.repository.NotificationRecipientRepository;
 import fr.enimaloc.catapult.repository.NotificationRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -82,15 +86,35 @@ public class NotificationService {
         if (r.getReadAt() == null) {
             r.setReadAt(Instant.now());
         }
+        long unread = recipientRepo.countByUserIdAndReadAtIsNull(userId);
+        publisher.publishEvent(new NotificationReadEvent(userId, notificationId, unread));
     }
 
     @Transactional
     public void markAllRead(UUID userId) {
         recipientRepo.markAllReadForUser(userId, Instant.now());
+        publisher.publishEvent(new NotificationAllReadEvent(userId));
+    }
+
+    @Transactional
+    public void delete(UUID userId, UUID notificationId) {
+        recipientRepo.findById(new NotificationRecipientId(notificationId, userId))
+                .ifPresent(recipientRepo::delete);
+        publisher.publishEvent(new NotificationDeletedEvent(userId, notificationId));
     }
 
     public long unreadCount(UUID userId) {
         return recipientRepo.countByUserIdAndReadAtIsNull(userId);
+    }
+
+    public long countUnread(UUID userId) {
+        return unreadCount(userId);
+    }
+
+    public List<NotificationDto> findRecent(UUID userId, int size) {
+        return recipientRepo.findByUserIdOrderByNotificationCreatedAtDesc(userId, PageRequest.of(0, size))
+                .map(r -> toDto(r.getNotification(), r.getReadAt() != null))
+                .toList();
     }
 
     private NotificationDto toDto(Notification n, boolean read) {

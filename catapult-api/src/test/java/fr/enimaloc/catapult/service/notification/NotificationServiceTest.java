@@ -1,7 +1,10 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.domain.*;
+import fr.enimaloc.catapult.event.NotificationAllReadEvent;
 import fr.enimaloc.catapult.event.NotificationCreatedEvent;
+import fr.enimaloc.catapult.event.NotificationDeletedEvent;
+import fr.enimaloc.catapult.event.NotificationReadEvent;
 import fr.enimaloc.catapult.repository.NotificationRecipientRepository;
 import fr.enimaloc.catapult.repository.NotificationRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
@@ -38,7 +41,7 @@ class NotificationServiceTest {
         service = new NotificationService(notifRepo, recipientRepo, userRepo, renderer, publisher);
         admin = new UserAccount();
         admin.setId(UUID.randomUUID());
-        when(renderer.render(any())).thenAnswer(inv -> "<p>" + inv.getArgument(0) + "</p>");
+        lenient().when(renderer.render(any())).thenAnswer(inv -> "<p>" + inv.getArgument(0) + "</p>");
     }
 
     @Test
@@ -86,6 +89,44 @@ class NotificationServiceTest {
         ArgumentCaptor<List<NotificationRecipient>> cap = ArgumentCaptor.forClass(List.class);
         verify(recipientRepo).saveAll(cap.capture());
         assertThat(cap.getValue()).hasSize(2);
+    }
+
+    @Test
+    void markRead_firesNotificationReadEvent() {
+        UUID userId = UUID.randomUUID();
+        UUID notifId = UUID.randomUUID();
+        NotificationRecipient recipient = new NotificationRecipient();
+        recipient.setId(new NotificationRecipientId(notifId, userId));
+        when(recipientRepo.findById(new NotificationRecipientId(notifId, userId)))
+                .thenReturn(Optional.of(recipient));
+        when(recipientRepo.countByUserIdAndReadAtIsNull(userId)).thenReturn(2L);
+
+        service.markRead(userId, notifId);
+
+        ArgumentCaptor<NotificationReadEvent> cap = ArgumentCaptor.forClass(NotificationReadEvent.class);
+        verify(publisher).publishEvent(cap.capture());
+        assertThat(cap.getValue().userId()).isEqualTo(userId);
+        assertThat(cap.getValue().notificationId()).isEqualTo(notifId);
+        assertThat(cap.getValue().newUnreadCount()).isEqualTo(2L);
+    }
+
+    @Test
+    void markAllRead_firesNotificationAllReadEvent() {
+        UUID userId = UUID.randomUUID();
+        service.markAllRead(userId);
+        verify(publisher).publishEvent(new NotificationAllReadEvent(userId));
+    }
+
+    @Test
+    void delete_firesNotificationDeletedEvent() {
+        UUID userId = UUID.randomUUID();
+        UUID notifId = UUID.randomUUID();
+        when(recipientRepo.findById(new NotificationRecipientId(notifId, userId)))
+                .thenReturn(Optional.of(mock(NotificationRecipient.class)));
+
+        service.delete(userId, notifId);
+
+        verify(publisher).publishEvent(new NotificationDeletedEvent(userId, notifId));
     }
 
     private UserAccount userWithStatus(UserAccount.Status s) {

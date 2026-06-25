@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.notification.NotificationDto;
 import fr.enimaloc.catapult.service.notification.NotificationService;
+import fr.enimaloc.catapult.service.notification.NotificationSnapshotDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -48,6 +50,14 @@ public class ApiNotificationsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void markAllRead(@AuthenticationPrincipal Jwt jwt) {
         service.markAllRead(currentUser(jwt).getId());
+    }
+
+    @GetMapping("/snapshot")
+    public NotificationSnapshotDto snapshot(@AuthenticationPrincipal Jwt jwt) {
+        UUID userId = currentUser(jwt).getId();
+        List<NotificationDto> items = service.findRecent(userId, 10);
+        long unread = service.countUnread(userId);
+        return new NotificationSnapshotDto(items, unread);
     }
 
     private UserAccount currentUser(Jwt jwt) {
