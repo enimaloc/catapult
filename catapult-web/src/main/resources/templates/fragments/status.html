@@ -23,13 +23,15 @@
         </div>
         <div id="bot-status-active" class="status status-active" th:hidden="${!botEnabled}">
             <span class="status-dot"></span> <span th:text="#{status.active}">Actif</span>
-            <form th:action="@{/channels/{u}/settings/bot(u=${channelUsername})}" method="post" > <!-- nosemgrep -->
+            <form th:action="@{/channels/{u}/settings/bot(u=${channelUsername})}" method="post" th:attr="hx-post=@{/channels/{u}/settings/bot(u=${channelUsername})}" hx-swap="none"> <!-- nosemgrep -->
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <button type="submit" class="btn btn-primary" th:text="#{common.disable}">Désactiver</button>
             </form>
         </div>
         <div id="bot-status-inactive" class="status status-inactive" th:hidden="${botEnabled}">
             <span class="status-dot"></span> <span th:text="#{status.inactive}">Inactif</span>
-            <form th:action="@{/channels/{u}/settings/bot(u=${channelUsername})}" method="post" > <!-- nosemgrep -->
+            <form th:action="@{/channels/{u}/settings/bot(u=${channelUsername})}" method="post" th:attr="hx-post=@{/channels/{u}/settings/bot(u=${channelUsername})}" hx-swap="none"> <!-- nosemgrep -->
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <button type="submit" class="btn btn-primary" th:text="#{common.enable}">Activer</button>
             </form>
         </div>
