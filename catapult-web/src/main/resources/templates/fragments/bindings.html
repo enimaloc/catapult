@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
 <!--/*@thymesvar id="bindings" type="org.springframework.data.domain.Page"*/-->
 <!--/*@thymesvar id="filterStatus" type="java.lang.String"*/-->
@@ -66,7 +66,7 @@
                               th:text="${binding.status}"></span>
                     </td>
                     <td>
-                        <form th:action="@{/channels/{u}/bindings/{id}/ccl-toggle(u=${channelUsername},id=${binding.id})}" method="post"> <!-- nosemgrep -->
+                        <form th:action="@{/channels/{u}/bindings/{id}/ccl-toggle(u=${channelUsername},id=${binding.id})}" method="post" ws:post="@{/channels/{u}/bindings/{id}/ccl-toggle(u=${channelUsername},id=${binding.id})}" ws:swap="none"> <!-- nosemgrep -->
                             <label class="toggle-label">
                                 <input type="checkbox" name="enabled"
                                        th:checked="${binding.cclEnabled}"
@@ -76,7 +76,7 @@
                         </form>
                     </td>
                     <td>
-                        <form th:action="@{/channels/{u}/bindings/{id}/ignored-toggle(u=${channelUsername},id=${binding.id})}" method="post"> <!-- nosemgrep -->
+                        <form th:action="@{/channels/{u}/bindings/{id}/ignored-toggle(u=${channelUsername},id=${binding.id})}" method="post" ws:post="@{/channels/{u}/bindings/{id}/ignored-toggle(u=${channelUsername},id=${binding.id})}" ws:swap="none"> <!-- nosemgrep -->
                             <label class="toggle-label">
                                 <input type="checkbox" name="ignored"
                                        th:checked="${binding.ignored}"
@@ -99,14 +99,14 @@
                                 th:text="#{bindings.tw.edit}">
                             TW
                         </button>
-                        <form th:action="@{/channels/{u}/bindings/{id}/delete(u=${channelUsername},id=${binding.id})}" method="post" style="display:inline"> <!-- nosemgrep -->
+                        <form th:action="@{/channels/{u}/bindings/{id}/delete(u=${channelUsername},id=${binding.id})}" method="post" ws:post="@{/channels/{u}/bindings/{id}/delete(u=${channelUsername},id=${binding.id})}" ws:swap="none" style="display:inline"> <!-- nosemgrep -->
                             <button type="submit" class="btn btn-sm btn-danger" th:text="#{common.delete}">Supprimer</button>
                         </form>
                     </td>
                 </tr>
                 <tr th:id="'edit-row-' + ${binding.id}" class="edit-row" style="display:none">
                     <td colspan="7">
-                        <form th:action="@{/channels/{u}/bindings/{id}(u=${channelUsername},id=${binding.id})}" method="post"> <!-- nosemgrep -->
+                        <form th:action="@{/channels/{u}/bindings/{id}(u=${channelUsername},id=${binding.id})}" method="post" ws:post="@{/channels/{u}/bindings/{id}(u=${channelUsername},id=${binding.id})}" ws:swap="none"> <!-- nosemgrep -->
                             <div class="inline-edit-fields">
                                 <div class="inline-edit-field">
                                     <label th:for="'gameSearch-' + ${binding.id}" th:text="#{bindings.edit.twitch_category}">Catégorie Twitch</label>
@@ -157,7 +157,7 @@
                 </tr>
                 <tr th:if="${availableTws != null}" th:id="'tw-row-' + ${binding.id}" class="edit-row" style="display:none">
                     <td colspan="7">
-                        <form th:action="@{/channels/{u}/bindings/{id}/tws(u=${channelUsername},id=${binding.id})}" method="post"> <!-- nosemgrep -->
+                        <form th:action="@{/channels/{u}/bindings/{id}/tws(u=${channelUsername},id=${binding.id})}" method="post" ws:post="@{/channels/{u}/bindings/{id}/tws(u=${channelUsername},id=${binding.id})}" ws:swap="none"> <!-- nosemgrep -->
                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                             <div class="inline-edit-fields">
                                 <div class="inline-edit-field">

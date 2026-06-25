@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
 <!--/*@thymesvar id="hasSteamProvider" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="hasSteam" type="java.lang.Boolean"*/-->
@@ -42,7 +42,7 @@
             <div th:if="${hasSteam and isOwner and steamOfflineMode}" class="provider-warning">
                 <p th:text="#{connections.steam.offline_warning}">Ton compte Steam est en mode hors-ligne — la détection de jeu ne fonctionne pas.</p>
                 <p class="text-muted text-sm" th:text="#{connections.steam.offline_cache_ttl(${steamProfileCacheTtlMinutes})}">Ce statut est mis en cache pour 15 minutes.</p>
-                <form th:action="@{/channels/{u}/settings/steam/refresh-profile-cache(u=${channelUsername})}" method="post" th:attr="hx-post=@{/channels/{u}/settings/steam/refresh-profile-cache(u=${channelUsername})}" hx-target="#connections-section" hx-swap="outerHTML" style="display:inline"> <!-- nosemgrep -->
+                <form th:action="@{/channels/{u}/settings/steam/refresh-profile-cache(u=${channelUsername})}" method="post" ws:post="@{/channels/{u}/settings/steam/refresh-profile-cache(u=${channelUsername})}" ws:swap="none" style="display:inline"> <!-- nosemgrep -->
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit" class="btn btn-sm" th:text="#{connections.steam.offline_refresh}">Rafraîchir</button>
                 </form>
@@ -59,7 +59,7 @@
             <!-- Personal token saved: sharing checkbox + delete -->
             <div th:if="${hasSteam and isOwner and hasSteamPersonalToken}" class="provider-info">
                 <span class="badge badge-connected" th:text="#{connections.steam.personal_token_set}">Token personnel ✓</span>
-                <form th:action="@{/channels/{u}/settings/steam-personal-token/sharing(u=${channelUsername})}" method="post" style="display:inline"> <!-- nosemgrep -->
+                <form th:action="@{/channels/{u}/settings/steam-personal-token/sharing(u=${channelUsername})}" method="post" ws:post="@{/channels/{u}/settings/steam-personal-token/sharing(u=${channelUsername})}" ws:swap="none" style="display:inline"> <!-- nosemgrep -->
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; cursor:pointer; margin-top:0.4rem;">
                         <input type="hidden" name="shared" value="false"/>
@@ -69,7 +69,7 @@
                         <span th:text="#{connections.steam.share_token}">Partager avec les autres profils</span>
                     </label>
                 </form>
-                <form th:action="@{/channels/{u}/settings/steam-personal-token/delete(u=${channelUsername})}" method="post" style="display:inline"> <!-- nosemgrep -->
+                <form th:action="@{/channels/{u}/settings/steam-personal-token/delete(u=${channelUsername})}" method="post" ws:post="@{/channels/{u}/settings/steam-personal-token/delete(u=${channelUsername})}" ws:swap="none" style="display:inline"> <!-- nosemgrep -->
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit" class="btn btn-sm btn-danger" th:text="#{connections.steam.delete_personal_token}">Supprimer le token</button>
                 </form>
@@ -83,7 +83,7 @@
             </div>
 
             <div th:if="${hasSteam and isOwner}">
-                <form th:action="@{/channels/{u}/settings/disconnect(u=${channelUsername})}" method="post"> <!-- nosemgrep -->
+                <form th:action="@{/channels/{u}/settings/disconnect(u=${channelUsername})}" method="post" ws:post="@{/channels/{u}/settings/disconnect(u=${channelUsername})}" ws:swap="none"> <!-- nosemgrep -->
                     <input type="hidden" name="provider" value="STEAM"/>
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit" class="btn btn-sm btn-danger" th:text="#{connections.disconnect}">Déconnecter</button>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
 <!--/*@thymesvar id="twSettings" type="fr.enimaloc.catapult.domain.UserSettings"*/-->
 <!--/*@thymesvar id="availableTws" type="java.util.List"*/-->
@@ -15,7 +15,7 @@
     </div>
     <p class="text-muted mb-16" th:text="#{tw_settings.subtitle}">Catégories affichées par ta commande !triggers et tes placeholders {tw.*}.</p>
 
-    <form th:action="@{/channels/{u}/settings/tws(u=${channelUsername})}" method="post"> <!-- nosemgrep -->
+    <form th:action="@{/channels/{u}/settings/tws(u=${channelUsername})}" method="post" ws:post="@{/channels/{u}/settings/tws(u=${channelUsername})}" ws:swap="none"> <!-- nosemgrep -->
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <div class="inline-edit-fields">
             <div class="inline-edit-field">
