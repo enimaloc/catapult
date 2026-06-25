@@ -42,7 +42,8 @@
                 </tr>
             </thead>
             <!--/*@thymesvar id="binding" type="fr.enimaloc.catapult.domain.GameBinding"*/-->
-            <tbody th:each="binding : ${bindings.content}">
+            <tbody th:each="binding : ${bindings.content}"
+                   th:attr="data-binding-id=${binding.id}">
                 <tr>
                     <td>
                         <span class="badge" th:text="${binding.sourceType}"></span>

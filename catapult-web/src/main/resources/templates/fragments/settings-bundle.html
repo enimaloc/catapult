@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+    Combined wrapper around the four settings panels (ccl / tw / no-game /
+    incomplete-fallback). Served by ChannelPageController.settingsFragment
+    so channel-page.js can refetch + swap all four in one round-trip when
+    a settings.updated event arrives. Wrapped in a #settings-section div
+    so the client can swap the whole thing as one outerHTML replacement.
+-->
+<div th:fragment="settings-bundle" id="settings-section">
+    <div th:replace="~{fragments/ccl-settings :: ccl-settings}"></div>
+    <div th:replace="~{fragments/tw-settings :: tw-settings}"></div>
+    <div th:replace="~{fragments/no-game-settings :: no-game-settings}"></div>
+    <div th:replace="~{fragments/incomplete-fallback-settings :: incomplete-fallback-settings}"></div>
+</div>
+</body>
+</html>
