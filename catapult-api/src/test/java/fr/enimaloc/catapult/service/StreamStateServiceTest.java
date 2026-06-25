@@ -16,7 +16,8 @@ class StreamStateServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StreamStateService();
+        service = new StreamStateService(
+                org.mockito.Mockito.mock(fr.enimaloc.catapult.service.notification.ChannelEventPublisher.class));
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
