@@ -189,7 +189,10 @@ public class WsHub extends TextWebSocketHandler {
     }
 
     public void broadcast(String internalChannel, EventMessage event) {
-        for (WsSession s : registry.subscribersOf(internalChannel)) {
+        var subs = registry.subscribersOf(internalChannel);
+        log.debug("broadcast {} → {} subscriber(s) event={}",
+                internalChannel, subs.size(), event.name());
+        for (WsSession s : subs) {
             send(s, event);
         }
     }

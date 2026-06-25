@@ -99,7 +99,7 @@
     let frame = {
       type: "request",
       id: id,
-      action: "htmx",
+      action: "mvc",
       method: method,
       path: path,
       headers: headers,
@@ -139,7 +139,14 @@
   function applyResponse(el, msg) {
     if (msg.ok === false) return; // error envelope — leave UI untouched
     let swap = (el.dataset.wsSwap || "outerHTML").toLowerCase();
-    if (swap === "none" || !msg.html) return;
+    if (swap === "none") {
+      runAfter(el);
+      return;
+    }
+    if (!msg.html) {
+      runAfter(el);
+      return;
+    }
     let targetSelector = el.dataset.wsTarget;
     let target = targetSelector ? document.querySelector(targetSelector) : el;
     if (!target) return;
@@ -169,6 +176,16 @@
       bodyChildren.forEach(function (n) { target.insertBefore(n, first); });
       bind(target);
     }
+    runAfter(el);
+  }
+
+  function runAfter(el) {
+    let name = el.dataset.wsAfter;
+    if (!name) return;
+    // ws:after carries an event NAME, not JS code — dispatched as a bubbling
+    // CustomEvent so the page can listen for it anywhere up the tree. Avoids
+    // any new Function / eval code-injection sink.
+    el.dispatchEvent(new CustomEvent(name, { bubbles: true }));
   }
 
   // Capture the WS-issued CSRF token so we can echo it on every mutation —
