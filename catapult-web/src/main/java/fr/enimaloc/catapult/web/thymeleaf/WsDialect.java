@@ -59,6 +59,9 @@ public class WsDialect extends AbstractProcessorDialect {
         out.add(new WsValueAttributeProcessor(dialectPrefix, "target",  "target"));
         out.add(new WsValueAttributeProcessor(dialectPrefix, "swap",    "swap"));
         out.add(new WsValueAttributeProcessor(dialectPrefix, "trigger", "trigger"));
+        // ws:after — JS expression evaluated after a successful swap completes.
+        // Used by help-panel buttons: ws:after="openHelpPanel()".
+        out.add(new WsValueAttributeProcessor(dialectPrefix, "after",   "after"));
         return out;
     }
 }
