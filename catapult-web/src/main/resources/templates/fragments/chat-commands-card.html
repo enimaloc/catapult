@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
 <section th:fragment="chat-commands-card" class="card">
     <div class="card-header">
         <h3 th:text="#{chat_commands.page.title}">Chat commands</h3>
         <button class="btn-help"
-                hx-get="/help/chat-commands"
-                hx-target="#help-panel-body"
-                hx-swap="innerHTML"
-                hx-on::after-request="openHelpPanel()"
+                ws:get="@{/help/chat-commands}"
+                ws:target="#help-panel-body"
+                ws:swap="innerHTML"
+                ws:after="help-loaded"
                 th:title="#{help.panel.title}">?</button>
     </div>
     <p class="text-muted mb-16" th:text="#{chat_commands.intro}">
