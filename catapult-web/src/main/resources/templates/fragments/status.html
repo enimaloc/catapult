@@ -4,10 +4,7 @@
 <!--/*@thymesvar id="botEnabled" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="isLive" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="currentGame" type="fr.enimaloc.catapult.getter.DetectedGame"*/-->
-<div th:fragment="status"
-     th:attr="hx-get=@{/channels/{u}/fragments/status(u=${channelUsername})}"
-     hx-trigger="every 3s"
-     hx-swap="outerHTML">
+<div th:fragment="status" id="status-card">
     <div class="card">
         <div class="card-header">
             <h3 th:text="#{status.bot_title}">État du bot</h3>

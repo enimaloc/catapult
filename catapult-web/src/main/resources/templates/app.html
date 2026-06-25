@@ -8,23 +8,13 @@
 <body>
     <div id="main-content">
         <div th:replace="~{fragments/connections :: connections}"></div>
-        <div th:attr="hx-get=@{/channels/{u}/fragments/ccl-settings(u=${channelUsername})}" hx-trigger="load" hx-swap="outerHTML">
-            <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
-        </div>
-        <div th:attr="hx-get=@{/channels/{u}/fragments/tw-settings(u=${channelUsername})}" hx-trigger="load" hx-swap="outerHTML">
-            <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
-        </div>
-        <div th:attr="hx-get=@{/channels/{u}/fragments/no-game-settings(u=${channelUsername})}" hx-trigger="load" hx-swap="outerHTML">
-            <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
-        </div>
-        <div th:attr="hx-get=@{/channels/{u}/fragments/incomplete-fallback-settings(u=${channelUsername})}" hx-trigger="load" hx-swap="outerHTML">
-            <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
-        </div>
+        <div th:replace="~{fragments/ccl-settings :: ccl-settings}"></div>
+        <div th:replace="~{fragments/tw-settings :: tw-settings}"></div>
+        <div th:replace="~{fragments/no-game-settings :: no-game-settings}"></div>
+        <div th:replace="~{fragments/incomplete-fallback-settings :: incomplete-fallback-settings}"></div>
         <div th:replace="~{fragments/bindings :: bindings}"></div>
         <th:block th:if="${chatCommandsRolledOut}"><div th:replace="~{fragments/chat-commands-card :: chat-commands-card}"></div></th:block>
-        <div th:attr="hx-get=@{/channels/{u}/fragments/dtdd-mapping(u=${channelUsername})}" hx-trigger="load" hx-swap="outerHTML">
-            <div class="card"><p class="text-muted" style="padding:16px" th:text="#{app.loading}">Chargement…</p></div>
-        </div>
+        <div th:replace="~{fragments/dtdd-mapping :: dtdd-mapping}"></div>
         <div th:replace="~{fragments/danger-zone :: danger-zone}"></div>
 
         <!-- Modal Steam privacy -->
@@ -145,13 +135,10 @@
     <script th:inline="javascript">
         const channelUsername = /*[[${channelUsername}]]*/ '';
 
-        // Connections: refresh when a new account is linked
-        function refreshConnections() {
-            htmx.ajax('GET', '/channels/' + channelUsername + '/fragments/connections', {
-                target: '#connections-section',
-                swap: 'outerHTML'
-            });
-        }
+        // Connections: reload the page when a new provider is linked. The dedicated
+        // /fragments/connections endpoint has been removed (see event-driven migration);
+        // a connection.changed event will drive partial updates from Phase 4.7 onward.
+        function refreshConnections() { window.location.reload(); }
         // BroadcastChannel: receives the message from the popup (same browser, same origin)
         const connectionsBc = new BroadcastChannel('catapult-connections');
         connectionsBc.onmessage = function (e) {
