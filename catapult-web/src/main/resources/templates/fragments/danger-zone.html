@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
 <!--/*@thymesVar id="isPendingDeletion" type="java.lang.Boolean"*/-->
 <!--/*@thymesVar id="user" type="fr.enimaloc.catapult.domain.UserAccount"*/-->
@@ -10,10 +10,10 @@
         <div class="card-header">
             <h3 th:text="#{danger_zone.title}">Zone danger</h3>
             <button class="btn-help"
-                    hx-get="/help/danger-zone"
-                    hx-target="#help-panel-body"
-                    hx-swap="innerHTML"
-                    hx-on::after-request="openHelpPanel()"
+                    ws:get="@{/help/danger-zone}"
+                    ws:target="#help-panel-body"
+                    ws:swap="innerHTML"
+                    ws:after="help-loaded"
                     th:title="#{help.panel.title}">?</button>
         </div>
         <p th:utext="#{danger_zone.description(${app.account.deletionDelayDays})}">La suppression de compte est irréversible après <strong th:text="|${app.account.deletionDelayDays} jours|"></strong>.</p>
@@ -28,10 +28,10 @@
         <div class="card-header">
             <h3 th:text="#{danger_zone.pending_title}">Suppression en cours</h3>
             <button class="btn-help"
-                    hx-get="/help/danger-zone"
-                    hx-target="#help-panel-body"
-                    hx-swap="innerHTML"
-                    hx-on::after-request="openHelpPanel()"
+                    ws:get="@{/help/danger-zone}"
+                    ws:target="#help-panel-body"
+                    ws:swap="innerHTML"
+                    ws:after="help-loaded"
                     th:title="#{help.panel.title}">?</button>
         </div>
         <p>
