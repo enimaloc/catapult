@@ -13,10 +13,10 @@
     <div class="card-header">
         <h3 th:text="#{bindings.title}">Bindings</h3>
         <button class="btn-help"
-                hx-get="/help/bindings"
-                hx-target="#help-panel-body"
-                hx-swap="innerHTML"
-                hx-on::after-request="openHelpPanel()"
+                ws:get="@{/help/bindings}"
+                ws:target="#help-panel-body"
+                ws:swap="innerHTML"
+                ws:after="help-loaded"
                 th:title="#{help.panel.title}">?</button>
     </div>
 

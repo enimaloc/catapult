@@ -7,10 +7,10 @@
     <div class="card-header">
         <h3 th:text="#{tw_settings.title}">Trigger Warnings</h3>
         <button class="btn-help"
-                hx-get="/help/tw-settings"
-                hx-target="#help-panel-body"
-                hx-swap="innerHTML"
-                hx-on::after-request="openHelpPanel()"
+                ws:get="@{/help/tw-settings}"
+                ws:target="#help-panel-body"
+                ws:swap="innerHTML"
+                ws:after="help-loaded"
                 th:title="#{help.panel.title}">?</button>
     </div>
     <p class="text-muted mb-16" th:text="#{tw_settings.subtitle}">Catégories affichées par ta commande !triggers et tes placeholders {tw.*}.</p>

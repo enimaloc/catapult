@@ -47,7 +47,14 @@ import java.util.regex.Pattern;
 @Component
 public class HtmxWsDispatcher {
 
-    public static final String ACTION = "htmx";
+    /**
+     * Wire action name for any request that needs to land in the Spring MVC
+     * dispatcher servlet — i.e. anything authored as a normal controller
+     * endpoint. Originally {@code "htmx"} when this class only fronted htmx
+     * requests; renamed to {@code "mvc"} once the {@code ws:} Thymeleaf
+     * dialect started using the same path for non-htmx forms too.
+     */
+    public static final String ACTION = "mvc";
     /** Hard ceiling on rendered HTML size — keeps WS frames from exploding. */
     public static final int MAX_RESPONSE_BYTES = 256 * 1024;
 
