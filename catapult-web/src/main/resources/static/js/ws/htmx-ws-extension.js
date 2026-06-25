@@ -119,7 +119,7 @@
     return {
       type: "request",
       id: newId(),
-      action: "htmx",
+      action: "mvc",
       method: method,
       path: cfg.path,
       headers: headers,

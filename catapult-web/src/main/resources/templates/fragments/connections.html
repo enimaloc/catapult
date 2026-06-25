@@ -14,10 +14,10 @@
     <div class="card-header">
         <h3 th:text="#{connections.title}">Connexions</h3>
         <button class="btn-help"
-                hx-get="/help/connections"
-                hx-target="#help-panel-body"
-                hx-swap="innerHTML"
-                hx-on::after-request="openHelpPanel()"
+                ws:get="@{/help/connections}"
+                ws:target="#help-panel-body"
+                ws:swap="innerHTML"
+                ws:after="help-loaded"
                 th:title="#{help.panel.title}">?</button>
     </div>
     <div class="provider-grid">
