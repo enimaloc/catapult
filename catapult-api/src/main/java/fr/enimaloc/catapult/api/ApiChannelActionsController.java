@@ -50,6 +50,7 @@ public class ApiChannelActionsController {
     private final AccountService accountService;
     private final TokenEncryptionService tokenEncryptionService;
     private final SteamApiKeyRepository steamApiKeyRepository;
+    private final fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
 
     @Autowired(required = false)
     private SteamApiKeyRotator rotator;
@@ -127,6 +128,7 @@ public class ApiChannelActionsController {
         } else {
             twitchEventSubService.disconnect(user);
         }
+        channelEventPublisher.botToggled(user.getId(), newState);
     }
 
     @PostMapping("/settings/ccl")
