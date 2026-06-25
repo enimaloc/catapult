@@ -2,12 +2,16 @@ package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.client.ApiClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.net.URI;
 import java.util.Set;
 
 @Controller
@@ -83,9 +87,25 @@ public class ChannelActionsController {
     // ── Settings ──────────────────────────────────────────────────────────────
 
     @PostMapping("/settings/bot")
-    public String toggleBot(@PathVariable String username) {
+    public ResponseEntity<Void> toggleBot(
+            @PathVariable String username,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest) {
         apiClient.post("/api/channels/{username}/settings/bot", null, username);
-        return "redirect:/channels/" + username;
+        return ackOrRedirect(hxRequest, username);
+    }
+
+    /**
+     * htmx-over-WS callers set HX-Request=true and want a 204 (the UI updates
+     * from the bot.toggled event the server publishes). Plain browser submits
+     * still need the 302 redirect so the user lands back on the channel page.
+     */
+    private static ResponseEntity<Void> ackOrRedirect(String hxRequest, String username) {
+        if ("true".equalsIgnoreCase(hxRequest)) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create("/channels/" + username))
+                .build();
     }
 
     @PostMapping("/settings/ccl")
