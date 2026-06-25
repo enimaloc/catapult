@@ -45,7 +45,7 @@ class WsHubAuthTest {
     @BeforeEach
     void setUp() throws Exception {
         registry = new WsSessionRegistry();
-        channelResolver = new ChannelResolver();
+        channelResolver = new ChannelResolver(mock(fr.enimaloc.catapult.client.ApiClient.class));
         codec = new JsonMessageCodec();
         ticketStore = mock(WsTicketStore.class);
         WsRateLimiter rateLimiter = new WsRateLimiter();
