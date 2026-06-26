@@ -17,6 +17,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.UUID;
 
 /**
  * HTTP client for catapult-api. Automatically attaches the JWT Bearer token
@@ -127,6 +128,26 @@ public class ApiClient {
         } catch (Exception e) {
             log.warn("DELETE {} failed: {}", path, e.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Returns the notification snapshot for the given user.
+     * The session JWT must be active in {@link WsAuthContext} so the interceptor
+     * can attach the correct Bearer token.
+     *
+     * @param userId the UUID of the user whose snapshot is requested (used for logging)
+     * @return the snapshot, or {@code null} if the upstream call fails
+     */
+    public NotificationSnapshotDto notificationSnapshot(UUID userId) {
+        try {
+            return restClient.get()
+                    .uri("/api/notifications/snapshot")
+                    .retrieve()
+                    .body(NotificationSnapshotDto.class);
+        } catch (Exception e) {
+            log.warn("GET /api/notifications/snapshot failed for user {}: {}", userId, e.getMessage());
+            return null;
         }
     }
 

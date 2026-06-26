@@ -20,6 +20,7 @@ import fr.enimaloc.catapult.web.ws.codec.msg.WsOutgoing;
 import fr.enimaloc.catapult.web.ws.codec.msg.PingMessage;
 import fr.enimaloc.catapult.web.ws.dispatch.ChannelResolver;
 import fr.enimaloc.catapult.web.ws.dispatch.HtmxWsDispatcher;
+import fr.enimaloc.catapult.web.ws.dispatch.SubscriptionInitializer;
 import fr.enimaloc.catapult.web.ws.dispatch.WsBusinessException;
 import fr.enimaloc.catapult.web.ws.dispatch.WsRequestDispatcher;
 import fr.enimaloc.catapult.web.ws.ratelimit.WsRateLimiter;
@@ -29,7 +30,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -42,7 +43,6 @@ import java.io.IOException;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class WsHub extends TextWebSocketHandler {
 
     private final WsSessionRegistry registry;
@@ -52,6 +52,23 @@ public class WsHub extends TextWebSocketHandler {
     private final WsRequestDispatcher dispatcher;
     private final WsRateLimiter rateLimiter;
     private final HtmxWsDispatcher htmxDispatcher;
+    private final Map<String, List<SubscriptionInitializer>> initializersByChannel;
+
+    public WsHub(WsSessionRegistry registry, ChannelResolver channelResolver,
+                 JsonMessageCodec codec, WsTicketStore ticketStore,
+                 WsRequestDispatcher dispatcher, WsRateLimiter rateLimiter,
+                 HtmxWsDispatcher htmxDispatcher,
+                 List<SubscriptionInitializer> initializers) {
+        this.registry = registry;
+        this.channelResolver = channelResolver;
+        this.codec = codec;
+        this.ticketStore = ticketStore;
+        this.dispatcher = dispatcher;
+        this.rateLimiter = rateLimiter;
+        this.htmxDispatcher = htmxDispatcher;
+        this.initializersByChannel = initializers.stream()
+                .collect(Collectors.groupingBy(SubscriptionInitializer::publicChannel));
+    }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession springSession) {
@@ -81,7 +98,7 @@ public class WsHub extends TextWebSocketHandler {
             case PongMessage ignored -> {
                 /* no-op, client liveness signal */
             }
-            case SubscribeMessage s -> handleSubscribe(session, s);
+            case SubscribeMessage s -> handleSubscribe(session, s.channel());
             case UnsubscribeMessage u -> handleUnsubscribe(session, u);
             case AuthMessage a -> handleAuth(session, a);
             case RequestMessage r -> handleRequest(session, r);
@@ -143,23 +160,47 @@ public class WsHub extends TextWebSocketHandler {
         send(session, new AuthOkMessage(snapshot.get().userId(), List.copyOf(snapshot.get().roles()), csrf));
     }
 
-    private void handleSubscribe(WsSession session, SubscribeMessage msg) {
+    void handleSubscribe(WsSession session, String publicChannel) {
         // ChannelResolver may now reach the upstream API (channel.viewed.<uuid>
         // calls /api/users/.../channel-access via ApiClient), and ApiClient
         // needs the session JWT bound on the thread to attach the Bearer header.
         WsAuthContext.set(session.jwt());
         java.util.Optional<String> resolved;
         try {
-            resolved = channelResolver.resolvePublicToInternal(msg.channel(), session);
+            resolved = channelResolver.resolvePublicToInternal(publicChannel, session);
         } finally {
             WsAuthContext.clear();
         }
         if (resolved.isEmpty()) {
-            send(session, new SubDeniedMessage(msg.channel(), "FORBIDDEN_OR_UNKNOWN"));
+            send(session, new SubDeniedMessage(publicChannel, "FORBIDDEN_OR_UNKNOWN"));
             return;
         }
         registry.subscribe(session.id(), resolved.get());
-        send(session, new SubOkMessage(msg.channel()));
+        try {
+            session.send(codec.encode(new SubOkMessage(publicChannel)));
+        } catch (Exception e) {
+            log.debug("send sub.ok failed, removing session {}: {}", session.id(), e.getMessage());
+            registry.remove(session.id());
+            return;
+        }
+
+        List<SubscriptionInitializer> hooks =
+                initializersByChannel.getOrDefault(publicChannel, List.of());
+        if (!hooks.isEmpty()) {
+            WsAuthContext.set(session.jwt());
+            try {
+                for (SubscriptionInitializer h : hooks) {
+                    try {
+                        h.onSubscribe(session);
+                    } catch (Exception e) {
+                        log.warn("initializer {} failed for channel {}: {}",
+                                h.getClass().getSimpleName(), publicChannel, e.toString());
+                    }
+                }
+            } finally {
+                WsAuthContext.clear();
+            }
+        }
     }
 
     private void handleUnsubscribe(WsSession session, UnsubscribeMessage msg) {

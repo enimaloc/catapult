@@ -1,7 +1,10 @@
 package fr.enimaloc.catapult.web.ws;
 
+import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -26,6 +29,19 @@ public final class WsSession {
 
     public WebSocketSession springSession() {
         return springSession;
+    }
+
+    /**
+     * Sends a pre-serialised text frame to this session.
+     *
+     * @throws UncheckedIOException if the underlying WebSocket send fails
+     */
+    public void send(String frame) {
+        try {
+            springSession.sendMessage(new TextMessage(frame));
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
     }
 
     public Optional<UUID> userId() {
