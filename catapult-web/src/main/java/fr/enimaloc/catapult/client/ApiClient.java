@@ -243,11 +243,12 @@ public class ApiClient {
      */
     public java.util.Map<String, Object> adminBroadcastSend(java.util.Map<String, Object> body) {
         try {
-            return restClient.post()
+            org.springframework.http.ResponseEntity<Void> resp = restClient.post()
                     .uri("/api/admin/broadcast")
                     .body(body)
                     .retrieve()
-                    .body(new ParameterizedTypeReference<java.util.Map<String, Object>>() {});
+                    .toBodilessEntity();
+            return resp.getStatusCode().is2xxSuccessful() ? java.util.Map.of("accepted", true) : null;
         } catch (Exception e) {
             log.warn("POST /api/admin/broadcast failed: {}", e.getMessage());
             return null;
