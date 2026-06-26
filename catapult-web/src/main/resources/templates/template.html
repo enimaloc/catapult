@@ -152,10 +152,11 @@
         <span>Changelog</span>
         <button class="help-panel-close" onclick="closeChangelogPanel()" title="Fermer">✕</button>
     </div>
-    <div class="help-panel-body"
-         hx-get="/changelog/fragment"
-         hx-trigger="load"
-         hx-swap="innerHTML">
+    <div id="changelog-content" class="help-panel-body"
+         ws:get="@{/changelog/fragment}"
+         ws:trigger="load"
+         ws:swap="innerHTML"
+         ws:target="#changelog-content">
         <span style="color:var(--muted);">Chargement…</span>
     </div>
 </div>
