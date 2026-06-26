@@ -40,4 +40,15 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
         "AND SIZE(b.tws) = 0")
     org.springframework.data.domain.Page<GameBinding> findCandidatesForTwBackfill(
         org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Wider net than {@link #findCandidatesForTwBackfill} — includes bindings
+     * that already have a TW set, as long as the streamer hasn't pinned it
+     * manually. Drives the admin "rebuild TW suggestions" action.
+     */
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT b FROM GameBinding b WHERE b.ignored = false " +
+        "AND b.twOverride = false AND b.status IN ('AUTO','MANUAL')")
+    org.springframework.data.domain.Page<GameBinding> findCandidatesForTwRebuild(
+        org.springframework.data.domain.Pageable pageable);
 }
