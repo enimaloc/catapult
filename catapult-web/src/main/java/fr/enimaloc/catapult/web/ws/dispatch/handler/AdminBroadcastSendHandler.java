@@ -10,6 +10,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -74,10 +75,10 @@ public class AdminBroadcastSendHandler implements RequestHandler {
         if (p.name() == null || p.name().isBlank()) {
             throw new WsBusinessException("VALIDATION", "name is required");
         }
-        Params normalized = p.data() == null
-                ? new Params(p.channel(), p.name(), Collections.emptyMap())
-                : p;
-        Map<String, Object> result = apiClient.adminBroadcastSend(normalized);
+        Map<String, Object> body = new HashMap<>();
+        if (p.data() != null) body.putAll(p.data());
+        body.put("name", p.name());
+        Map<String, Object> result = apiClient.adminBroadcastSend(body);
         if (result == null) {
             throw new WsBusinessException("INTERNAL", "Upstream API call failed");
         }
