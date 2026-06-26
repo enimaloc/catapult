@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.binding.BindingDto;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,7 @@ public class GameEventListener {
     private final TwitchService twitchService;
     private final UserSettingsRepository userSettingsRepository;
     private final StreamStateService streamStateService;
+    private final ChannelEventPublisher channelEventPublisher;
 
     @EventListener
     public void onGameDetected(GameDetectedEvent event) {
@@ -28,6 +31,11 @@ public class GameEventListener {
         log.debug("GameDetectedEvent for user {}: {}", user.getId(), event.getDetectedGame().getSourceName());
 
         GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
+        // resolveOrCreate may have just inserted a new row (new game ever detected
+        // for this user) or refreshed an INCOMPLETE one. Either way the channel
+        // page needs to see it — ApiChannelActionsController only publishes for
+        // user-initiated mutations, not for scheduler-triggered creations.
+        channelEventPublisher.bindingUpserted(user.getId(), BindingDto.from(binding));
 
         if (binding.isIgnored()) {
             log.debug("Binding is ignored — applying no-game fallback for user {}", user.getId());
