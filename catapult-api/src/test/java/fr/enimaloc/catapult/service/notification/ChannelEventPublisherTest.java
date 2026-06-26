@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.service.binding.BindingDto;
+import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
+import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -62,5 +64,39 @@ class ChannelEventPublisherTest {
         Map<String, Object> payload = captor.getValue();
         assertThat(payload).containsKey("settings");
         assertThat(payload.get("settings")).isEqualTo(dto);
+    }
+
+    @Test
+    void steamProfileChanged_publishesFullDto() {
+        RedisEventPublisher redis = mock(RedisEventPublisher.class);
+        ChannelEventPublisher publisher = new ChannelEventPublisher(redis);
+        UUID ownerId = UUID.randomUUID();
+        SteamProfileDto dto = new SteamProfileDto(true, false, true, false, 15L, true, false);
+
+        publisher.steamProfileChanged(ownerId, dto);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(redis).publishChannel(eq(ownerId), eq("steam.profile.changed"), captor.capture());
+        Map<String, Object> payload = captor.getValue();
+        assertThat(payload).containsKey("profile");
+        assertThat(payload.get("profile")).isEqualTo(dto);
+    }
+
+    @Test
+    void connectionChanged_publishesFullDto() {
+        RedisEventPublisher redis = mock(RedisEventPublisher.class);
+        ChannelEventPublisher publisher = new ChannelEventPublisher(redis);
+        UUID ownerId = UUID.randomUUID();
+        ProviderConnectionsDto dto = new ProviderConnectionsDto("TWITCH", false, null);
+
+        publisher.connectionChanged(ownerId, dto);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(redis).publishChannel(eq(ownerId), eq("connection.changed"), captor.capture());
+        Map<String, Object> payload = captor.getValue();
+        assertThat(payload).containsKey("provider");
+        assertThat(payload.get("provider")).isEqualTo(dto);
     }
 }
