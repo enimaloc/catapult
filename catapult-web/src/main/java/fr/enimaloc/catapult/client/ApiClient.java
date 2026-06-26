@@ -241,11 +241,11 @@ public class ApiClient {
      * @param params the broadcast parameters (channel, name, data)
      * @return the API response as a map, or {@code null} if the upstream call fails
      */
-    public java.util.Map<String, Object> adminBroadcastSend(fr.enimaloc.catapult.web.ws.dispatch.handler.AdminBroadcastSendHandler.Params params) {
+    public java.util.Map<String, Object> adminBroadcastSend(java.util.Map<String, Object> body) {
         try {
             return restClient.post()
                     .uri("/api/admin/broadcast")
-                    .body(params)
+                    .body(body)
                     .retrieve()
                     .body(new ParameterizedTypeReference<java.util.Map<String, Object>>() {});
         } catch (Exception e) {

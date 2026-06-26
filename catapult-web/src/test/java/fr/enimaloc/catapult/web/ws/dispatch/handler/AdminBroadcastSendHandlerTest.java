@@ -115,8 +115,23 @@ class AdminBroadcastSendHandlerTest {
                 "channel", "events.global",
                 "name", "version.deployed"));
 
-        verify(apiClient).adminBroadcastSend(
-                new AdminBroadcastSendHandler.Params("events.global", "version.deployed", Collections.emptyMap()));
+        verify(apiClient).adminBroadcastSend(Map.of("name", "version.deployed"));
+    }
+
+    @Test
+    void send_flattensDataIntoApiBody() {
+        when(apiClient.adminBroadcastSend(any())).thenReturn(Map.of("accepted", true));
+
+        handler.handle(adminSession(), Map.of(
+                "channel", "events.global",
+                "name", "alert.info",
+                "data", Map.of("title", "Hi", "body", "msg", "ttlSeconds", 60)));
+
+        verify(apiClient).adminBroadcastSend(Map.of(
+                "name", "alert.info",
+                "title", "Hi",
+                "body", "msg",
+                "ttlSeconds", 60));
     }
 
     @Test
