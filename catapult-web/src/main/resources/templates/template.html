@@ -111,7 +111,7 @@
         </form>
     </div>
     <div class="nav-links" th:unless="${user != null}">
-        <a th:href="@{/oauth2/authorization/twitch}"
+        <a th:href="@{/oauth2/authorization/twitch}" hx-boost="false"
            th:classappend="${active_page == 'login'} ? ' active'">Login</a>
     </div>
     <div class="theme-switcher" id="theme-switcher">
