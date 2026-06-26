@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
@@ -42,12 +41,6 @@ public class ChannelPageController {
         }
         populateModel(model, data, username);
         return "app";
-    }
-
-    @GetMapping(value = "/api/games/search", produces = MediaType.APPLICATION_JSON_VALUE)
-    @ResponseBody
-    public Object gamesSearch(@PathVariable String username, @RequestParam(defaultValue = "") String q) {
-        return apiClient.get("/api/channels/{username}/games/search?q={q}", Object.class, username, q);
     }
 
     // ── Event-driven on-demand fragments ──────────────────────────────────────
