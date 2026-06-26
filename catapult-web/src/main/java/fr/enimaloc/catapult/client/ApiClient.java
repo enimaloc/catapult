@@ -192,6 +192,69 @@ public class ApiClient {
     }
 
     /**
+     * Returns a page of notifications for admin review.
+     * The session JWT must be active in {@link WsAuthContext} so the interceptor
+     * can attach the correct Bearer token.
+     *
+     * @param page zero-based page index
+     * @param size page size (caller is responsible for capping)
+     * @return the Spring Page serialised as a map, or {@code null} if the upstream call fails
+     */
+    public java.util.Map<String, Object> adminNotificationList(int page, int size) {
+        try {
+            return restClient.get()
+                    .uri("/api/admin/notifications?page={page}&size={size}", page, size)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<java.util.Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.warn("GET /api/admin/notifications failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Creates a new notification via the admin API.
+     * The session JWT must be active in {@link WsAuthContext} so the interceptor
+     * can attach the correct Bearer token.
+     *
+     * @param body the notification fields (serialised by Jackson)
+     * @return the created notification as a map, or {@code null} if the upstream call fails
+     */
+    public java.util.Map<String, Object> adminNotificationCreate(Object body) {
+        try {
+            return restClient.post()
+                    .uri("/api/admin/notifications")
+                    .body(body)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<java.util.Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.warn("POST /api/admin/notifications failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Deletes a notification by its ID via the admin API.
+     * The session JWT must be active in {@link WsAuthContext} so the interceptor
+     * can attach the correct Bearer token.
+     *
+     * @param id the notification UUID to delete
+     * @return {@code true} on success, {@code false} if the notification was not found or the call failed
+     */
+    public boolean adminNotificationDelete(UUID id) {
+        try {
+            restClient.delete()
+                    .uri("/api/admin/notifications/{id}", id)
+                    .retrieve()
+                    .toBodilessEntity();
+            return true;
+        } catch (Exception e) {
+            log.warn("DELETE /api/admin/notifications/{} failed: {}", id, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Exchanges a one-time code (received from catapult-api's OAuth2 redirect) for a JWT.
      * This call is server-to-server: the JWT itself never travels through the browser.
      * Returns null if the code is expired, already used, or the exchange request fails.
