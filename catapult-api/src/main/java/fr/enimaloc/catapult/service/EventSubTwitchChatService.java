@@ -74,8 +74,9 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @PostConstruct
     public void init() {
-        userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)
-            .forEach(this::connect);
+        var users = userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
+        log.info("[EventSub Chat] Bootstrapping connections for {} active bot-enabled user(s)", users.size());
+        users.forEach(this::connect);
     }
 
     @PreDestroy
@@ -99,7 +100,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
             .ifPresentOrElse(
                 token -> openConnection(user, token, WS_URL, 1L),
-                () -> log.debug("[EventSub Chat] No token for user {}", user.getId())
+                () -> log.warn("[EventSub Chat] No Twitch token for user {} ({}) — chat events disabled",
+                        user.getId(), user.getTwitchUsername())
             );
     }
 
@@ -172,6 +174,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                     String sessionId = session.path("id").asText();
                     long timeout = session.path("keepalive_timeout_seconds").asLong(DEFAULT_KEEPALIVE_SECONDS);
                     keepaliveTimeoutSeconds.put(user.getId(), timeout);
+                    log.info("[EventSub Chat] session_welcome for user {} ({}) — subscribing (sessionId={}, keepalive={}s)",
+                            user.getId(), user.getTwitchUsername(), sessionId, timeout);
                     subscribe(user, token, sessionId);
                 }
                 case "session_reconnect" -> {
@@ -203,6 +207,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
             List<String> args = parts.length > 1 ? List.of(parts[1].split(" ")) : List.of();
             ChatCommandEvent.SenderRole role = extractRole(event);
 
+            log.info("[EventSub Chat] {} in #{}: {} (sender role={})",
+                    command, user.getTwitchUsername(), text, role);
             eventPublisher.publishEvent(new ChatCommandEvent(this, user, command, args, role));
 
         } else if ("channel.channel_points_custom_reward_redemption.add".equals(subscriptionType)) {
@@ -246,7 +252,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                     "transport", Map.of("method", "websocket", "session_id", sessionId)))
                 .retrieve()
                 .toBodilessEntity();
-            log.debug("[EventSub Chat] Subscribed to {} for user {}", type, user.getId());
+            log.info("[EventSub Chat] Subscribed {} for user {} ({})",
+                    type, user.getId(), user.getTwitchUsername());
         } catch (Exception e) {
             log.warn("[EventSub Chat] Failed to subscribe to {} for user {}: {}",
                 type, user.getId(), e.getMessage());
