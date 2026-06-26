@@ -23,23 +23,25 @@ import fr.enimaloc.catapult.web.ws.dispatch.HtmxWsDispatcher;
 import fr.enimaloc.catapult.web.ws.dispatch.SubscriptionInitializer;
 import fr.enimaloc.catapult.web.ws.dispatch.WsBusinessException;
 import fr.enimaloc.catapult.web.ws.dispatch.WsRequestDispatcher;
+import fr.enimaloc.catapult.web.ws.metrics.WsMetrics;
 import fr.enimaloc.catapult.web.ws.ratelimit.WsRateLimiter;
 
+import java.io.IOException;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
-
-import java.io.IOException;
 
 @Slf4j
 @Component
@@ -53,12 +55,16 @@ public class WsHub extends TextWebSocketHandler {
     private final WsRateLimiter rateLimiter;
     private final HtmxWsDispatcher htmxDispatcher;
     private final Map<String, List<SubscriptionInitializer>> initializersByChannel;
+    private final WsMetrics metrics;
 
+    /** Spring-wired constructor (includes WsMetrics). */
+    @Autowired
     public WsHub(WsSessionRegistry registry, ChannelResolver channelResolver,
                  JsonMessageCodec codec, WsTicketStore ticketStore,
                  WsRequestDispatcher dispatcher, WsRateLimiter rateLimiter,
                  HtmxWsDispatcher htmxDispatcher,
-                 List<SubscriptionInitializer> initializers) {
+                 List<SubscriptionInitializer> initializers,
+                 WsMetrics metrics) {
         this.registry = registry;
         this.channelResolver = channelResolver;
         this.codec = codec;
@@ -68,11 +74,23 @@ public class WsHub extends TextWebSocketHandler {
         this.htmxDispatcher = htmxDispatcher;
         this.initializersByChannel = initializers.stream()
                 .collect(Collectors.groupingBy(SubscriptionInitializer::publicChannel));
+        this.metrics = metrics;
+    }
+
+    /** Convenience constructor for unit tests (metrics not wired). */
+    public WsHub(WsSessionRegistry registry, ChannelResolver channelResolver,
+                 JsonMessageCodec codec, WsTicketStore ticketStore,
+                 WsRequestDispatcher dispatcher, WsRateLimiter rateLimiter,
+                 HtmxWsDispatcher htmxDispatcher,
+                 List<SubscriptionInitializer> initializers) {
+        this(registry, channelResolver, codec, ticketStore, dispatcher, rateLimiter,
+                htmxDispatcher, initializers, null);
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession springSession) {
         registry.add(new WsSession(springSession));
+        if (metrics != null) metrics.recordSessionOpened(false);
         log.debug("ws connected: id={} total={}", springSession.getId(), registry.size());
     }
 
@@ -94,6 +112,7 @@ public class WsHub extends TextWebSocketHandler {
     }
 
     private void dispatch(WsSession session, WsIncoming msg) {
+        if (metrics != null) metrics.recordFrameIn(classifyIncoming(msg));
         switch (msg) {
             case PongMessage ignored -> {
                 /* no-op, client liveness signal */
@@ -104,6 +123,17 @@ public class WsHub extends TextWebSocketHandler {
             case RequestMessage r -> handleRequest(session, r);
             case CommandMessage c -> handleCommand(session, c);
         }
+    }
+
+    private static String classifyIncoming(WsIncoming msg) {
+        return switch (msg) {
+            case AuthMessage ignored        -> "auth";
+            case SubscribeMessage ignored   -> "subscribe";
+            case UnsubscribeMessage ignored -> "unsubscribe";
+            case RequestMessage ignored     -> "request";
+            case CommandMessage ignored     -> "command";
+            case PongMessage ignored        -> "pong";
+        };
     }
 
     private void handleRequest(WsSession session, RequestMessage msg) {
@@ -146,6 +176,10 @@ public class WsHub extends TextWebSocketHandler {
     private void handleAuth(WsSession session, AuthMessage msg) {
         var snapshot = ticketStore.consume(msg.token());
         if (snapshot.isEmpty()) {
+            if (metrics != null) {
+                String outcome = (msg.token() == null || msg.token().isBlank()) ? "missing" : "replay";
+                metrics.recordTicket(outcome);
+            }
             send(session, new ErrorMessage("INVALID_TICKET", "Auth ticket invalid or already consumed"));
             try {
                 session.springSession().close(CloseStatus.NORMAL);
@@ -154,6 +188,7 @@ public class WsHub extends TextWebSocketHandler {
             }
             return;
         }
+        if (metrics != null) metrics.recordTicket("consumed");
         session.authenticate(snapshot.get().userId(), snapshot.get().roles(), snapshot.get().jwt());
         String csrf = generateCsrfToken();
         session.setCsrfToken(csrf);
@@ -172,10 +207,12 @@ public class WsHub extends TextWebSocketHandler {
             WsAuthContext.clear();
         }
         if (resolved.isEmpty()) {
+            // sub_denied is recorded by the generic send() path
             send(session, new SubDeniedMessage(publicChannel, "FORBIDDEN_OR_UNKNOWN"));
             return;
         }
         registry.subscribe(session.id(), resolved.get());
+        if (metrics != null) metrics.recordFrameOut("sub_ok");
         try {
             session.send(codec.encode(new SubOkMessage(publicChannel)));
         } catch (Exception e) {
@@ -190,9 +227,19 @@ public class WsHub extends TextWebSocketHandler {
             WsAuthContext.set(session.jwt());
             try {
                 for (SubscriptionInitializer h : hooks) {
+                    long startNanos = System.nanoTime();
                     try {
                         h.onSubscribe(session);
+                        if (metrics != null) {
+                            metrics.recordSnapshotDuration(publicChannel,
+                                    Duration.ofNanos(System.nanoTime() - startNanos));
+                        }
                     } catch (Exception e) {
+                        if (metrics != null) {
+                            metrics.recordSnapshotDuration(publicChannel,
+                                    Duration.ofNanos(System.nanoTime() - startNanos));
+                            metrics.recordSnapshotFailure(publicChannel);
+                        }
                         log.warn("initializer {} failed for channel {}: {}",
                                 h.getClass().getSimpleName(), publicChannel, e.toString());
                     }
@@ -216,6 +263,7 @@ public class WsHub extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession springSession, CloseStatus status) {
+        if (metrics != null) metrics.recordSessionClosed(status);
         registry.remove(springSession.getId());
         rateLimiter.cleanup(springSession.getId());
         log.debug("ws closed: id={} status={} total={}", springSession.getId(), status, registry.size());
@@ -239,6 +287,7 @@ public class WsHub extends TextWebSocketHandler {
     }
 
     private void send(WsSession session, WsOutgoing msg) {
+        if (metrics != null) metrics.recordFrameOut(WsMetrics.classifyOutgoing(msg));
         try {
             session.springSession().sendMessage(new TextMessage(codec.encode(msg)));
         } catch (IOException ex) {

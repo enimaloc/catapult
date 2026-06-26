@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.service.metrics.CatapultApiMetrics;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -33,6 +34,9 @@ public class RedisEventPublisher {
 
     private final StringRedisTemplate redis;
     private final ObjectMapper jackson;
+
+    @Autowired(required = false)
+    private CatapultApiMetrics apiMetrics;
 
     public RedisEventPublisher(StringRedisTemplate redis) {
         this(redis, JsonMapper.builder().build());
@@ -69,6 +73,7 @@ public class RedisEventPublisher {
             envelope.put("ts", System.currentTimeMillis());
             String json = jackson.writeValueAsString(envelope);
             redis.convertAndSend(channel, json);
+            if (apiMetrics != null) apiMetrics.recordRedisPublished(channel);
         } catch (Exception e) {
             log.error("Failed to publish event '{}' to {}: {}", name, channel, e.getMessage(), e);
         }
