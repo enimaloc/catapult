@@ -21,11 +21,12 @@
             <div class="inline-edit-field">
                 <label th:text="#{ccl_settings.enabled}">Activer les labels de contenu</label>
                 <input type="checkbox" name="cclEnabled"
+                       data-setting="ccl.enabled"
                        th:checked="${cclSettings.cclFeatureEnabled}">
             </div>
             <div class="inline-edit-field">
                 <label th:text="#{ccl_settings.blocked}">Labels à ne jamais appliquer</label>
-                <div class="ccl-checkboxes">
+                <div class="ccl-checkboxes" data-settings-group="ccl.blockedCcls">
                     <div th:each="ccl : ${availableCcls}">
                         <label>
                             <input type="checkbox" name="blockedCcls"
