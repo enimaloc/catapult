@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.service.binding.BindingDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -48,8 +49,8 @@ public class ChannelEventPublisher {
         publish(channelOwnerId, "game.cleared", Map.of());
     }
 
-    public void bindingUpserted(UUID channelOwnerId, UUID bindingId) {
-        publish(channelOwnerId, "binding.upserted", Map.of("bindingId", bindingId.toString()));
+    public void bindingUpserted(UUID channelOwnerId, BindingDto binding) {
+        publish(channelOwnerId, "binding.upserted", Map.of("binding", binding));
     }
 
     public void bindingDeleted(UUID channelOwnerId, UUID bindingId) {
