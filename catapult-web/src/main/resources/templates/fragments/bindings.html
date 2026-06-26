@@ -113,7 +113,7 @@
                                     <div class="search-wrapper">
                                         <input type="text"
                                                th:id="'gameSearch-' + ${binding.id}"
-                                               th:attr="data-search-url=@{/channels/{u}/api/games/search(u=${channelUsername})},data-results-id=|gameResults-${binding.id}|,data-gameid-field=|twitchGameId-${binding.id}|,data-gamename-field=|twitchGameName-${binding.id}|"
+                                               th:attr="data-channel-id=${channelUsername},data-results-id=|gameResults-${binding.id}|,data-gameid-field=|twitchGameId-${binding.id}|,data-gamename-field=|twitchGameName-${binding.id}|"
                                                th:value="${binding.twitchGameName}"
                                                th:placeholder="#{common.search_placeholder}"
                                                autocomplete="off"

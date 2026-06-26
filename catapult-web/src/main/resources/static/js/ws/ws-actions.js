@@ -188,10 +188,8 @@
     el.dispatchEvent(new CustomEvent(name, { bubbles: true }));
   }
 
-  // Capture the WS-issued CSRF token so we can echo it on every mutation —
-  // ws-client.js currently keeps it inside the htmx-ws-extension; expose it
-  // via window so this script can use the same value without coupling to that
-  // extension.
+  // Capture the WS-issued CSRF token from the ws:auth.ok event so it can be
+  // echoed on every mutation request without coupling to ws-client.js internals.
   document.addEventListener("ws:auth.ok", function (evt) {
     if (evt && evt.detail && evt.detail.csrfToken) {
       window.__wsCsrfToken = evt.detail.csrfToken;
@@ -205,4 +203,8 @@
   } else {
     init();
   }
+
+  // Expose bind so dynamically inserted elements (e.g. JS-built binding rows)
+  // can register their data-ws-* attributes after insertion.
+  window.catapultWsActions = { bind: bind };
 }());

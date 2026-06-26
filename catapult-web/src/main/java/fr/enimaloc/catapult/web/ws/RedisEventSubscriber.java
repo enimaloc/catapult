@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.web.ws;
 
 import fr.enimaloc.catapult.web.ws.codec.msg.EventMessage;
 import fr.enimaloc.catapult.web.ws.dispatch.ChannelResolver;
+import fr.enimaloc.catapult.web.ws.metrics.WsMetrics;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -30,14 +31,20 @@ public class RedisEventSubscriber {
 
     private final WsHub hub;
     private final ChannelResolver channelResolver;
+    private final WsSessionRegistry sessionRegistry;
+    private final WsMetrics metrics;
     private final ObjectMapper jackson;
 
     @Autowired
     public RedisEventSubscriber(WsHub hub,
                                 ChannelResolver channelResolver,
+                                WsSessionRegistry sessionRegistry,
+                                WsMetrics metrics,
                                 @Autowired(required = false) ObjectMapper jackson) {
         this.hub = hub;
         this.channelResolver = channelResolver;
+        this.sessionRegistry = sessionRegistry;
+        this.metrics = metrics;
         this.jackson = jackson != null ? jackson : JsonMapper.builder().build();
     }
 
@@ -76,7 +83,10 @@ public class RedisEventSubscriber {
         String publicChannel = toPublicChannel(internalChannel);
         log.debug("redis→ws fanout: redis={} internal={} public={} name={}",
                 redisChannel, internalChannel, publicChannel, name);
+        metrics.recordRedisEventReceived(redisChannel);
+        int fanoutCount = sessionRegistry.subscribersOf(internalChannel).size();
         hub.broadcast(internalChannel, new EventMessage(publicChannel, name, data));
+        metrics.recordFanoutTargets(redisChannel, fanoutCount);
     }
 
     /**
