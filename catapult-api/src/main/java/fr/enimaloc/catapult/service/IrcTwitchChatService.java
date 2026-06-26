@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
+import fr.enimaloc.catapult.chat.ChatMessageSplitter;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
@@ -200,7 +201,12 @@ public class IrcTwitchChatService implements TwitchChatService {
             log.warn("[IRC] Cannot send message for user {} — not connected", user.getId());
             return;
         }
-        writer.println("PRIVMSG #" + user.getTwitchUsername().toLowerCase() + " :" + message);
+        String channel = "#" + user.getTwitchUsername().toLowerCase();
+        // Twitch caps a chat line at 500 chars; split + prefix so long
+        // responses are delivered intact rather than silently truncated.
+        for (String part : ChatMessageSplitter.split(message)) {
+            writer.println("PRIVMSG " + channel + " :" + part);
+        }
     }
 
     @Override
