@@ -31,6 +31,7 @@
     <script th:src="@{/js/ws/maintenance-overlay.js}" defer></script>
     <script th:src="@{/js/ws/maintenance-banner.js}" defer></script>
     <script th:if="${user != null}" th:src="@{/js/notifications.js}" defer></script>
+    <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/bindings.js}" defer></script>
     <script th:if="${channelUser != null}" th:src="@{/js/channel-page.js}" defer></script>
     <th:block th:replace="${additional_head} ?: ~{}"></th:block>
 </head>

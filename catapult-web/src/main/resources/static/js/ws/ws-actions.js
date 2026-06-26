@@ -205,4 +205,8 @@
   } else {
     init();
   }
+
+  // Expose bind so dynamically inserted elements (e.g. JS-built binding rows)
+  // can register their data-ws-* attributes after insertion.
+  window.catapultWsActions = { bind: bind };
 }());
