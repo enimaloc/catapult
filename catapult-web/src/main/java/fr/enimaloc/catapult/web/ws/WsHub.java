@@ -137,30 +137,48 @@ public class WsHub extends TextWebSocketHandler {
     }
 
     private void handleRequest(WsSession session, RequestMessage msg) {
+        if (log.isTraceEnabled()) {
+            log.trace("ws req in  id={} action={} session={} params={}",
+                    msg.id(), msg.action(), session.id(), truncate(msg.params()));
+        }
         WsAuthContext.set(session.jwt());
         try {
             if (HtmxWsDispatcher.ACTION.equals(msg.action())) {
                 if (!rateLimiter.tryAcquire(session.id(), WsRateLimiter.BUCKET_GLOBAL)
                         || !rateLimiter.tryAcquire(session.id(), WsRateLimiter.BUCKET_HTMX)) {
-                    send(session, ResponseMessage.error(msg.id(), "RATE_LIMITED", "HTMX rate limit exceeded"));
+                    ResponseMessage rl = ResponseMessage.error(msg.id(), "RATE_LIMITED", "HTMX rate limit exceeded");
+                    traceResponse(msg, rl);
+                    send(session, rl);
                     return;
                 }
-                send(session, htmxDispatcher.dispatch(msg.id(), session, htmxEnvelope(msg)));
+                ResponseMessage htmxResp = htmxDispatcher.dispatch(msg.id(), session, htmxEnvelope(msg));
+                traceResponse(msg, htmxResp);
+                send(session, htmxResp);
                 return;
             }
             Object result = dispatcher.dispatch(session, msg.action(), msg.params());
-            send(session, ResponseMessage.ok(msg.id(), result));
+            ResponseMessage ok = ResponseMessage.ok(msg.id(), result);
+            traceResponse(msg, ok);
+            send(session, ok);
         } catch (WsBusinessException ex) {
-            send(session, ResponseMessage.error(msg.id(), ex.code(), ex.getMessage()));
+            ResponseMessage err = ResponseMessage.error(msg.id(), ex.code(), ex.getMessage());
+            traceResponse(msg, err);
+            send(session, err);
         } catch (Exception ex) {
             log.warn("request {} action={} failed: {}", msg.id(), msg.action(), ex.toString());
-            send(session, ResponseMessage.error(msg.id(), "INTERNAL_ERROR", "Server error"));
+            ResponseMessage err = ResponseMessage.error(msg.id(), "INTERNAL_ERROR", "Server error");
+            traceResponse(msg, err);
+            send(session, err);
         } finally {
             WsAuthContext.clear();
         }
     }
 
     private void handleCommand(WsSession session, CommandMessage msg) {
+        if (log.isTraceEnabled()) {
+            log.trace("ws cmd in  action={} session={} params={}",
+                    msg.action(), session.id(), truncate(msg.params()));
+        }
         WsAuthContext.set(session.jwt());
         try {
             dispatcher.dispatch(session, msg.action(), msg.params());
@@ -171,6 +189,27 @@ public class WsHub extends TextWebSocketHandler {
         } finally {
             WsAuthContext.clear();
         }
+    }
+
+    private static void traceResponse(RequestMessage req, ResponseMessage resp) {
+        if (!log.isTraceEnabled()) return;
+        log.trace("ws req out id={} action={} response={}",
+                req.id(), req.action(), truncate(resp));
+    }
+
+    /**
+     * Caps the string form of a payload so a single oversize frame (HTMX HTML
+     * body, large result map) cannot blow the log line. 2KB is a comfortable
+     * upper bound for diagnostic context — beyond that, content is suffixed
+     * with {@code …(+N bytes)} and the full frame is available via the
+     * upstream API tracing if needed.
+     */
+    private static String truncate(Object o) {
+        if (o == null) return "null";
+        String s = o.toString();
+        int max = 2048;
+        if (s.length() <= max) return s;
+        return s.substring(0, max) + "…(+" + (s.length() - max) + " bytes)";
     }
 
     private void handleAuth(WsSession session, AuthMessage msg) {
