@@ -66,11 +66,11 @@ class RedisNotificationPusherTest {
         RedisNotificationPusher pusher = new RedisNotificationPusher(publisher);
         UUID userId = UUID.randomUUID();
         UUID notifId = UUID.randomUUID();
-        NotificationDeletedEvent ev = new NotificationDeletedEvent(userId, notifId);
+        NotificationDeletedEvent ev = new NotificationDeletedEvent(userId, notifId, 2L);
 
         pusher.onDeleted(ev);
 
         verify(publisher).publishUser(userId, "notification.deleted",
-                Map.of("notificationId", notifId.toString()));
+                Map.of("notificationId", notifId.toString(), "unreadCount", 2L));
     }
 }

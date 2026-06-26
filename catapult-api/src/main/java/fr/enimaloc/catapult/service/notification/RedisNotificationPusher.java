@@ -45,6 +45,7 @@ public class RedisNotificationPusher {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onDeleted(NotificationDeletedEvent ev) {
         publisher.publishUser(ev.userId(), "notification.deleted",
-                Map.of("notificationId", ev.notificationId().toString()));
+                Map.of("notificationId", ev.notificationId().toString(),
+                       "unreadCount", ev.newUnreadCount()));
     }
 }

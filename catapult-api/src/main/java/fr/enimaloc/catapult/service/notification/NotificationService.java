@@ -100,7 +100,8 @@ public class NotificationService {
     public void delete(UUID userId, UUID notificationId) {
         recipientRepo.findById(new NotificationRecipientId(notificationId, userId))
                 .ifPresent(recipientRepo::delete);
-        publisher.publishEvent(new NotificationDeletedEvent(userId, notificationId));
+        long unread = recipientRepo.countByUserIdAndReadAtIsNull(userId);
+        publisher.publishEvent(new NotificationDeletedEvent(userId, notificationId, unread));
     }
 
     public long unreadCount(UUID userId) {
