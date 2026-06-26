@@ -213,4 +213,8 @@ public class BindingService {
         gameBindingRepository.findByIdAndUser(bindingId, user)
             .ifPresent(gameBindingRepository::delete);
     }
+
+    public Optional<GameBinding> findBinding(UserAccount user, UUID bindingId) {
+        return gameBindingRepository.findByIdAndUser(bindingId, user);
+    }
 }

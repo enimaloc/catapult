@@ -23,8 +23,7 @@ import java.util.UUID;
  * Server-side proxy for the chat-commands API. The browser hits these URLs
  * on catapult-web (since nginx routes {@code /} to catapult-web), and this
  * controller forwards them to catapult-api via the JWT-bearing
- * {@link ApiClient}. Mirrors the pattern used by
- * {@code NotificationsApiProxyController}.
+ * {@link ApiClient}.
  */
 @Slf4j
 @Controller

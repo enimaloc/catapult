@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -60,6 +62,7 @@ public class ApiSteamConnectController {
 
     private final UserAccountRepository userAccountRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final ChannelEventPublisher channelEventPublisher;
     private final RestClient restClient;
 
     @GetMapping("/start")
@@ -116,6 +119,8 @@ public class ApiSteamConnectController {
         userAccountRepository.save(account);
         log.info("Steam linked for user {}, steamId={}", account.getId(), steamId);
         eventPublisher.publishEvent(new SteamLinkedEvent(this, account));
+        channelEventPublisher.connectionChanged(account.getId(),
+                new ProviderConnectionsDto("STEAM", true, null));
 
         return redirect(webBaseUrl + "/connect/steam/close");
     }
@@ -135,6 +140,8 @@ public class ApiSteamConnectController {
         account.setSteamId(null);
         userAccountRepository.save(account);
         log.info("Steam disconnected for user {}", account.getId());
+        channelEventPublisher.connectionChanged(account.getId(),
+                new ProviderConnectionsDto("STEAM", false, null));
     }
 
     private static String generateNonce() {

@@ -11,34 +11,49 @@ function gameSearch(event) {
     clearTimeout(_gameSearchTimers[resultsId]);
     if (q.length < 2) { results.style.display = 'none'; return; }
 
+    const renderGames = data => {
+        results.replaceChildren();
+        if (!data.length) { results.style.display = 'none'; return; }
+        data.forEach(game => {
+            const li = document.createElement('li');
+            if (game.boxArtUrl) {
+                const img = document.createElement('img');
+                img.src = game.boxArtUrl.replace('{width}', '30').replace('{height}', '40');
+                img.alt = '';
+                li.appendChild(img);
+            }
+            const span = document.createElement('span');
+            span.textContent = game.name;
+            li.appendChild(span);
+            li.addEventListener('click', () => {
+                document.getElementById(gameIdId).value = game.id;
+                document.getElementById(gameNameId).value = game.name;
+                input.value = game.name;
+                results.style.display = 'none';
+            });
+            results.appendChild(li);
+        });
+        results.style.display = 'block';
+    };
+
     _gameSearchTimers[resultsId] = setTimeout(() => {
-        fetch((input.dataset.searchUrl || '/api/games/search') + '?q=' + encodeURIComponent(q))
-            .then(r => r.json())
-            .then(data => {
-                results.replaceChildren();
-                if (!data.length) { results.style.display = 'none'; return; }
-                data.forEach(game => {
-                    const li = document.createElement('li');
-                    if (game.boxArtUrl) {
-                        const img = document.createElement('img');
-                        img.src = game.boxArtUrl.replace('{width}', '30').replace('{height}', '40');
-                        img.alt = '';
-                        li.appendChild(img);
-                    }
-                    const span = document.createElement('span');
-                    span.textContent = game.name;
-                    li.appendChild(span);
-                    li.addEventListener('click', () => {
-                        document.getElementById(gameIdId).value = game.id;
-                        document.getElementById(gameNameId).value = game.name;
-                        input.value = game.name;
-                        results.style.display = 'none';
-                    });
-                    results.appendChild(li);
-                });
-                results.style.display = 'block';
-            })
-            .catch(() => { results.style.display = 'none'; });
+        const channelId = input.dataset.channelId;
+        const searchUrl = input.dataset.searchUrl;
+        if (channelId && window.catapultWs) {
+            catapultWs.request('search.twitch.categories', { channelId, q, limit: 10 })
+                .then(resp => {
+                    if (!resp.ok || !Array.isArray(resp.result)) { results.style.display = 'none'; return; }
+                    renderGames(resp.result);
+                })
+                .catch(() => { results.style.display = 'none'; });
+        } else if (searchUrl) {
+            fetch(searchUrl + '?q=' + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(data => renderGames(Array.isArray(data) ? data : []))
+                .catch(() => { results.style.display = 'none'; });
+        } else {
+            results.style.display = 'none';
+        }
     }, 300);
 }
 
