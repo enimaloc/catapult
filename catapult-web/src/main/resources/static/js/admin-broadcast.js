@@ -3,10 +3,7 @@
  *
  *  - toggles the per-name fieldset visibility when the `name` dropdown changes
  *  - on submit, collects only the fields belonging to the selected name,
- *    sends a JSON POST to /admin/broadcast/api/send, and surfaces the status
- *  - kept JS-only (no HTMX yet on this page) until the WS-HTMX extension
- *    is wired in Phase 4 onwards; once that is live, swap the form's submit
- *    for `hx-post` and the page will naturally route over the WebSocket
+ *    sends the payload via admin.broadcast.send WS action, and surfaces status
  */
 (function () {
   "use strict";
@@ -14,6 +11,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     var form = document.getElementById("broadcast-form");
     var nameSelect = document.getElementById("broadcast-name");
+    var channelSelect = document.getElementById("broadcast-channel");
     var statusEl = document.getElementById("broadcast-status");
     if (!form || !nameSelect) return;
 
@@ -38,44 +36,37 @@
       var name = nameSelect.value;
       if (!name) return;
 
-      var payload = { name: name };
+      var channel = channelSelect ? channelSelect.value : "events.global";
+      var data = {};
       var active = form.querySelector('fieldset[data-name="' + name + '"]');
       if (active) {
         var inputs = active.querySelectorAll("input, textarea, select");
         inputs.forEach(function (el) {
           if (!el.name) return;
           if (el.type === "checkbox") {
-            payload[el.name] = el.checked;
+            data[el.name] = el.checked;
           } else if (el.type === "number") {
             var v = el.value === "" ? null : Number(el.value);
-            if (v !== null && !Number.isNaN(v)) payload[el.name] = v;
+            if (v !== null && !Number.isNaN(v)) data[el.name] = v;
           } else if (el.type === "datetime-local" && el.value) {
             // Local datetime → ISO 8601 with the browser's offset; the API
             // parses Instant from any ISO string so this is acceptable.
-            payload[el.name] = new Date(el.value).toISOString();
+            data[el.name] = new Date(el.value).toISOString();
           } else if (el.value !== "") {
-            payload[el.name] = el.value;
+            data[el.name] = el.value;
           }
         });
       }
 
       setStatus("Envoi…", false);
-      var csrfToken = form.querySelector('input[name="_csrf"]');
-      var headers = { "Content-Type": "application/json" };
-      if (csrfToken && csrfToken.value) headers["X-CSRF-TOKEN"] = csrfToken.value;
-      fetch("/admin/broadcast/api/send", {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(payload)
-      }).then(function (res) {
-        if (res.ok || res.status === 202) {
+      catapultWs.request("admin.broadcast.send", { channel: channel, name: name, data: data })
+        .then(function (resp) {
           setStatus("Diffusion '" + name + "' acceptée.", false);
-        } else {
-          setStatus("Erreur HTTP " + res.status + " — voir logs serveur.", true);
-        }
-      }).catch(function (err) {
-        setStatus("Erreur réseau : " + err.message, true);
-      });
+        }, function (err) {
+          var code = err && err.error && err.error.code ? err.error.code : (err && err.code ? err.code : "?");
+          var msg = err && err.error && err.error.message ? err.error.message : (err && err.message ? err.message : "Erreur inconnue");
+          setStatus("Erreur " + code + " : " + msg, true);
+        });
     });
 
     function setStatus(msg, isError) {
