@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
+import fr.enimaloc.catapult.chat.ChatMessageSplitter;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
@@ -254,20 +255,31 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void sendMessage(UserAccount user, String message) {
+        // Twitch caps a single chat message at 500 chars. Anything longer is
+        // sliced into [i/N]-prefixed parts so the streamer's full response
+        // reaches the channel instead of being silently truncated by Helix.
+        List<String> parts = ChatMessageSplitter.split(message);
+        if (parts.isEmpty()) return;
+
         // 1. Si un compte système est configuré (i.e. promu via /admin/members
         //    et donc présent dans oauth_token), on envoie via lui. Le bot peut
         //    poster même sans être mod du canal — Twitch ne bloque pas
         //    l'envoi, il applique simplement un rate-limit plus strict pour
-        //    les non-mods.
+        //    les non-mods. La décision bot-ou-streamer est prise sur le 1er
+        //    part : si le bot l'envoie OK, on garde le bot pour la suite
+        //    (ordre garanti par les appels synchrones via RestClient).
         String botAccess = systemTwitchAccountService.getAccessToken();
         String botTwitchId = systemTwitchAccountService.getSystemTwitchId();
         if (botAccess != null && botTwitchId != null
-            && trySend(user, message, botAccess, botTwitchId, "bot")) {
+            && trySend(user, parts.get(0), botAccess, botTwitchId, "bot")) {
+            for (int i = 1; i < parts.size(); i++) {
+                trySend(user, parts.get(i), botAccess, botTwitchId, "bot");
+            }
             return;
         }
 
         // 2. Fallback : pas de compte système OU l'envoi via bot a échoué.
-        //    On utilise le token Twitch du streamer.
+        //    On utilise le token Twitch du streamer pour tous les parts.
         Optional<OAuthToken> streamerToken = oAuthTokenRepository
             .findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
         if (streamerToken.isEmpty()) {
@@ -276,7 +288,9 @@ public class EventSubTwitchChatService implements TwitchChatService {
             return;
         }
         String streamerAccess = tokenEncryptionService.decrypt(streamerToken.get().getAccessToken());
-        trySend(user, message, streamerAccess, user.getTwitchId(), "streamer");
+        for (String part : parts) {
+            trySend(user, part, streamerAccess, user.getTwitchId(), "streamer");
+        }
     }
 
     private boolean trySend(UserAccount user, String message, String accessToken,
