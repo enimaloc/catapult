@@ -123,10 +123,11 @@ class NotificationServiceTest {
         UUID notifId = UUID.randomUUID();
         when(recipientRepo.findById(new NotificationRecipientId(notifId, userId)))
                 .thenReturn(Optional.of(mock(NotificationRecipient.class)));
+        when(recipientRepo.countByUserIdAndReadAtIsNull(userId)).thenReturn(3L);
 
         service.delete(userId, notifId);
 
-        verify(publisher).publishEvent(new NotificationDeletedEvent(userId, notifId));
+        verify(publisher).publishEvent(new NotificationDeletedEvent(userId, notifId, 3L));
     }
 
     private UserAccount userWithStatus(UserAccount.Status s) {
