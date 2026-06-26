@@ -51,7 +51,7 @@ class WsHubAuthTest {
         WsRateLimiter rateLimiter = new WsRateLimiter();
         WsRequestDispatcher dispatcher = new WsRequestDispatcher(java.util.List.of(), rateLimiter);
         HtmxWsDispatcher htmxDispatcher = mock(HtmxWsDispatcher.class);
-        hub = new WsHub(registry, channelResolver, codec, ticketStore, dispatcher, rateLimiter, htmxDispatcher);
+        hub = new WsHub(registry, channelResolver, codec, ticketStore, dispatcher, rateLimiter, htmxDispatcher, java.util.List.of());
 
         springSession = mock(WebSocketSession.class);
         when(springSession.getId()).thenReturn("ws-1");
