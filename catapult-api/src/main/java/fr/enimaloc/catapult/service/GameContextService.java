@@ -60,6 +60,11 @@ public class GameContextService {
     public Optional<GameContext> get(UserAccount user) {
         Optional<DetectedGame> detectedOpt = gameStateService.getLastKnownGame(user);
         if (detectedOpt.isEmpty()) {
+            // INFO not DEBUG: chat commands silently rendering empty {game.*}
+            // placeholders is hard to spot otherwise. Demoted later once we are
+            // confident the scheduler→chat handoff is reliable.
+            log.info("[GameContext] no last-known game for user {} (twitchId={}) — placeholders will be empty",
+                    user.getId(), user.getTwitchId());
             cache.remove(user.getId());
             return Optional.empty();
         }
