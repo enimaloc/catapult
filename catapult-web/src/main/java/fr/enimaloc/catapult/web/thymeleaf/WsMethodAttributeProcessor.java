@@ -51,5 +51,8 @@ class WsMethodAttributeProcessor extends AbstractAttributeTagProcessor {
         String path = resolved == null ? "" : resolved.toString();
         handler.setAttribute("data-ws-method", httpMethod);
         handler.setAttribute("data-ws-path", path);
+        // Prevent htmx boost from intercepting ws-driven elements — ws-actions.js
+        // handles their submit/click via WebSocket, not via HTTP.
+        handler.setAttribute("hx-boost", "false");
     }
 }
