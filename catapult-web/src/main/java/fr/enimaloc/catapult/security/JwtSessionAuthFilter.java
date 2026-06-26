@@ -35,25 +35,44 @@ public class JwtSessionAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
             HttpSession session = request.getSession(false);
-            String jwt = session != null ? (String) session.getAttribute(ApiClient.SESSION_JWT_KEY) : null;
-
-            if (jwt != null) {
-                try {
-                    CatapultWebUser user = validateWithApi(jwt);
-                    if (user != null && user.isEnabled()) {
-                        var auth = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-                        SecurityContextHolder.getContext().setAuthentication(auth);
-                    }
-                } catch (Exception e) {
-                    log.debug("JWT validation failed, clearing session token: {}", e.getMessage());
-                    if (session != null) {
-                        session.removeAttribute(ApiClient.SESSION_JWT_KEY);
-                    }
-                }
+            if (session != null) {
+                refreshFromSession(session);
             }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Validate the JWT currently stored on the session and install the
+     * resulting principal on {@link SecurityContextHolder}. Clears the context
+     * when no JWT is present or validation throws (so a stale token does not
+     * keep flooding the API every request).
+     *
+     * <p>Exposed so callers that swap the session JWT mid-request — i.e.
+     * {@code AdminImpersonateController} — can rebuild the SecurityContext in
+     * the same request instead of relying on the next one to pick it up via
+     * the filter chain.</p>
+     */
+    public void refreshFromSession(HttpSession session) {
+        String jwt = (String) session.getAttribute(ApiClient.SESSION_JWT_KEY);
+        if (jwt == null) {
+            SecurityContextHolder.clearContext();
+            return;
+        }
+        try {
+            CatapultWebUser user = validateWithApi(jwt);
+            if (user != null && user.isEnabled()) {
+                var auth = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            } else {
+                SecurityContextHolder.clearContext();
+            }
+        } catch (Exception e) {
+            log.debug("JWT validation failed, clearing session token: {}", e.getMessage());
+            session.removeAttribute(ApiClient.SESSION_JWT_KEY);
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @SuppressWarnings("unchecked")
