@@ -4,7 +4,10 @@ import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
+import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
+import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
+import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
@@ -21,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import java.util.concurrent.TimeUnit;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -56,6 +60,9 @@ public class ApiChannelActionsController {
 
     @Autowired(required = false)
     private SteamApiKeyRotator rotator;
+
+    @Autowired(required = false)
+    private SteamApiClient steamApiClient;
 
     // ── Binding actions ───────────────────────────────────────────────────────
 
@@ -235,7 +242,7 @@ public class ApiChannelActionsController {
         channelUser.setSteamTokenShared(body.shared());
         userAccountRepository.save(channelUser);
         syncTokenToPool(channelUser, trimmed, body.shared());
-        channelEventPublisher.steamProfileChanged(channelUser.getId());
+        channelEventPublisher.steamProfileChanged(channelUser.getId(), buildSteamProfile(channelUser));
     }
 
     @PostMapping("/settings/steam-personal-token/sharing")
@@ -253,7 +260,7 @@ public class ApiChannelActionsController {
         userAccountRepository.save(channelUser);
         String decryptedToken = tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken());
         syncTokenToPool(channelUser, decryptedToken, body.shared());
-        channelEventPublisher.steamProfileChanged(channelUser.getId());
+        channelEventPublisher.steamProfileChanged(channelUser.getId(), buildSteamProfile(channelUser));
     }
 
     @Transactional
@@ -271,7 +278,7 @@ public class ApiChannelActionsController {
         userAccountRepository.save(channelUser);
         steamApiKeyRepository.deleteByOwner(channelUser);
         if (rotator != null) rotator.refreshKeys();
-        channelEventPublisher.steamProfileChanged(channelUser.getId());
+        channelEventPublisher.steamProfileChanged(channelUser.getId(), buildSteamProfile(channelUser));
     }
 
     @PostMapping("/settings/delete-account")
@@ -313,10 +320,53 @@ public class ApiChannelActionsController {
         requireOwner(viewer, channelUser);
         OAuthToken.Provider provider = OAuthToken.Provider.valueOf(body.provider().toUpperCase());
         accountService.disconnectProvider(channelUser, provider);
-        channelEventPublisher.connectionChanged(channelUser.getId(), provider.name(), false);
+        channelEventPublisher.connectionChanged(channelUser.getId(),
+                new ProviderConnectionsDto(provider.name(), false, null));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Builds a {@link SteamProfileDto} snapshot from the given channel user.
+     * Calls the Steam API to determine profile visibility and offline mode,
+     * mirroring the logic in {@code ApiChannelDataController}.
+     */
+    private SteamProfileDto buildSteamProfile(UserAccount channelUser) {
+        boolean hasSteam = channelUser.getSteamId() != null;
+        boolean hasPersonalToken = channelUser.getSteamPersonalToken() != null;
+        boolean tokenShared = channelUser.isSteamTokenShared();
+        long ttlMinutes = steamApiClient != null
+                ? steamApiClient.getProfileCacheTtl().toMinutes() : 15L;
+
+        boolean profilePrivate = false;
+        boolean offlineMode = false;
+        boolean rateLimited = false;
+
+        if (hasSteam && steamApiClient != null) {
+            String decryptedToken = hasPersonalToken
+                    ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
+                    : null;
+            try {
+                SteamApiClient.SteamProfileStatus status = steamApiClient
+                        .getProfileStatus(channelUser.getSteamId(), decryptedToken)
+                        .orTimeout(2, TimeUnit.SECONDS)
+                        .exceptionally(e -> new SteamApiClient.SteamProfileStatus(false, false))
+                        .join();
+                profilePrivate = !status.profilePublic();
+                offlineMode = status.offlineMode();
+            } catch (Exception ignored) {
+            }
+            boolean isRateLimited = steamApiClient.isRateLimited()
+                    || (rotator != null && rotator.isAllKeysBlocked());
+            if (profilePrivate && isRateLimited) {
+                rateLimited = true;
+                profilePrivate = false;
+            }
+        }
+
+        return new SteamProfileDto(hasSteam, profilePrivate, offlineMode, rateLimited,
+                ttlMinutes, hasPersonalToken, tokenShared);
+    }
 
     private UserAccount resolveViewer(Jwt jwt) {
         UUID viewerId = UUID.fromString(jwt.getSubject());
