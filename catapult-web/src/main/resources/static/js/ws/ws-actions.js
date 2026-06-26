@@ -40,7 +40,13 @@
   });
   // Conservative back-compat: if the client only ever sees ws:auth.ok (older
   // ws-client without the resolved event), treat that as resolution too.
-  document.addEventListener("ws:auth.ok", function () {
+  // CSRF capture must happen here (and not in a separate listener) so the
+  // token is set BEFORE pending load triggers fire — otherwise sendFor() reads
+  // a null window.__wsCsrfToken and the server returns CSRF_INVALID.
+  document.addEventListener("ws:auth.ok", function (evt) {
+    if (evt && evt.detail && evt.detail.csrfToken) {
+      window.__wsCsrfToken = evt.detail.csrfToken;
+    }
     if (!authResolved) {
       authResolved = true;
       pendingLoadElements.forEach(function (el) { sendFor(el); });
@@ -188,13 +194,8 @@
     el.dispatchEvent(new CustomEvent(name, { bubbles: true }));
   }
 
-  // Capture the WS-issued CSRF token from the ws:auth.ok event so it can be
-  // echoed on every mutation request without coupling to ws-client.js internals.
-  document.addEventListener("ws:auth.ok", function (evt) {
-    if (evt && evt.detail && evt.detail.csrfToken) {
-      window.__wsCsrfToken = evt.detail.csrfToken;
-    }
-  });
+  // CSRF capture lives in the ws:auth.ok handler above (ordering matters so
+  // pending load triggers see the token). Reset on disconnect.
   document.addEventListener("ws:closed", function () { window.__wsCsrfToken = null; });
 
   function init() { bind(document); }
