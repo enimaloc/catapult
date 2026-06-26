@@ -11,9 +11,9 @@
  *    both states of each toggleable block with hidden=true on the inactive
  *    one; handlers flip visibility on event.
  *
- *  - Fetch-and-swap (event triggers a server re-render of a small section):
- *    steam.profile.changed + connection.changed (complex provider-state UI).
- *    Endpoint URLs are scoped to one section, not the full page.
+ *  - Pure client-side (event data enriched with full DTO snapshots):
+ *    steam.profile.changed + connection.changed. The CatapultConnections helper
+ *    (channel-handlers/connections.js) toggles the connections panel in-place.
  *
  * Event envelope (S → C):
  *   { type:"event", channel:"channel.viewed.<uuid>", name:"...",
@@ -26,10 +26,6 @@
   if (!meta || !meta.content) return; // not on a channel page
   var channelOwnerId = meta.content;
   var publicChannel = "channel.viewed." + channelOwnerId;
-
-  // channelUsername drives the fetch URLs for refetch-and-swap handlers.
-  var usernameMeta = document.querySelector('meta[name="channel-username"]');
-  var channelUsername = usernameMeta ? usernameMeta.content : null;
 
   // ── Pure client-side handlers ─────────────────────────────────────────────
 
@@ -69,19 +65,7 @@
     if (row) row.remove();
   }
 
-  // ── Fetch-and-swap handlers ───────────────────────────────────────────────
-
-  function refetchAndSwap(path, targetSelector) {
-    if (!channelUsername) return;
-    catapultWs.mvc({ method: "GET", path: path }).then(function (msg) {
-      if (!msg.ok || !msg.html) return;
-      var target = document.querySelector(targetSelector);
-      if (!target) return;
-      var parsed = new DOMParser().parseFromString(msg.html, "text/html");
-      var rep = parsed.querySelector(targetSelector);
-      if (rep) target.replaceWith(rep);
-    });
-  }
+  // ── Composite handlers (delegate to per-domain helpers) ───────────────────
 
   function onBindingUpserted(data) {
     if (!data || !data.binding) return;
@@ -107,9 +91,14 @@
     if (window.CatapultSettings) window.CatapultSettings.applySettings(data.settings);
   }
 
-  function onConnectionsChanged() {
-    refetchAndSwap("/channels/" + encodeURIComponent(channelUsername) + "/fragments/connections",
-                   "#connections-section");
+  function onSteamProfileChanged(data) {
+    if (!data || !data.profile) return;
+    if (window.CatapultConnections) window.CatapultConnections.applySteamProfile(data.profile);
+  }
+
+  function onConnectionChanged(data) {
+    if (!data || !data.provider) return;
+    if (window.CatapultConnections) window.CatapultConnections.applyProvider(data.provider);
   }
 
   // ── Dispatch ──────────────────────────────────────────────────────────────
@@ -122,8 +111,8 @@
     "binding.deleted":       onBindingDeleted,
     "binding.upserted":      onBindingUpserted,
     "settings.updated":      onSettingsUpdated,
-    "steam.profile.changed": onConnectionsChanged,
-    "connection.changed":    onConnectionsChanged
+    "steam.profile.changed": onSteamProfileChanged,
+    "connection.changed":    onConnectionChanged
   };
 
   function onEvent(msg) {
