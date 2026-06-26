@@ -19,11 +19,6 @@ import java.util.Set;
  *   &lt;form ws:post="@{/channels/{u}/settings/bot(u=${channelUsername})}"&gt;
  *       &lt;button&gt;Toggle&lt;/button&gt;
  *   &lt;/form&gt;
- *
- *   &lt;div ws:get="@{/channels/{u}/fragments/connections(u=${channelUsername})}"
- *        ws:target="#connections-section"
- *        ws:swap="outerHTML"
- *        ws:trigger="load"&gt;...&lt;/div&gt;
  * </pre>
  *
  * <p>Each attribute reads the Thymeleaf expression on the right-hand side

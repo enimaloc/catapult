@@ -1,11 +1,13 @@
 package fr.enimaloc.catapult.web.ws.dispatch;
 
 import fr.enimaloc.catapult.web.ws.WsSession;
+import fr.enimaloc.catapult.web.ws.metrics.WsMetrics;
 import fr.enimaloc.catapult.web.ws.ratelimit.WsRateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,11 +27,13 @@ public class WsRequestDispatcher {
 
     private final Map<String, RequestHandler> handlers;
     private final WsRateLimiter rateLimiter;
+    private final WsMetrics wsMetrics;
 
     @Autowired
-    public WsRequestDispatcher(List<RequestHandler> handlers, WsRateLimiter rateLimiter) {
+    public WsRequestDispatcher(List<RequestHandler> handlers, WsRateLimiter rateLimiter, WsMetrics wsMetrics) {
         this.handlers = new HashMap<>(handlers.size());
         this.rateLimiter = rateLimiter;
+        this.wsMetrics = wsMetrics;
         for (RequestHandler h : handlers) {
             RequestHandler prev = this.handlers.put(h.action(), h);
             if (prev != null) {
@@ -40,9 +44,14 @@ public class WsRequestDispatcher {
         log.info("ws request dispatcher registered {} actions: {}", this.handlers.size(), this.handlers.keySet());
     }
 
+    /** Convenience for unit tests that don't care about rate limiting or metrics. */
+    public WsRequestDispatcher(List<RequestHandler> handlers, WsRateLimiter rateLimiter) {
+        this(handlers, rateLimiter, null);
+    }
+
     /** Convenience for unit tests that don't care about rate limiting. */
     public WsRequestDispatcher(List<RequestHandler> handlers) {
-        this(handlers, new WsRateLimiter());
+        this(handlers, new WsRateLimiter(), null);
     }
 
     /**
@@ -66,11 +75,34 @@ public class WsRequestDispatcher {
         }
         String sessionId = session == null ? null : session.id();
         if (!rateLimiter.tryAcquire(sessionId, WsRateLimiter.BUCKET_GLOBAL)) {
+            if (wsMetrics != null) wsMetrics.recordRateLimitRejection(WsRateLimiter.BUCKET_GLOBAL);
             throw new WsBusinessException("RATE_LIMITED", "Too many requests");
         }
         if (action.startsWith("search.") && !rateLimiter.tryAcquire(sessionId, WsRateLimiter.BUCKET_SEARCH)) {
+            if (wsMetrics != null) wsMetrics.recordRateLimitRejection(WsRateLimiter.BUCKET_SEARCH);
             throw new WsBusinessException("RATE_LIMITED", "Search rate limit exceeded");
         }
-        return handler.handle(session, params);
+        long startNanos = System.nanoTime();
+        try {
+            Object result = handler.handle(session, params);
+            if (wsMetrics != null) {
+                wsMetrics.recordActionRequest(action, true);
+                wsMetrics.recordActionDuration(action, Duration.ofNanos(System.nanoTime() - startNanos));
+            }
+            return result;
+        } catch (WsBusinessException ex) {
+            if (wsMetrics != null) {
+                wsMetrics.recordActionRequest(action, false);
+                wsMetrics.recordActionError(action, ex.code());
+                wsMetrics.recordActionDuration(action, Duration.ofNanos(System.nanoTime() - startNanos));
+            }
+            throw ex;
+        } catch (Exception ex) {
+            if (wsMetrics != null) {
+                wsMetrics.recordActionRequest(action, false);
+                wsMetrics.recordActionDuration(action, Duration.ofNanos(System.nanoTime() - startNanos));
+            }
+            throw ex;
+        }
     }
 }

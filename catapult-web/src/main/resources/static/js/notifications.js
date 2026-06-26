@@ -1,99 +1,139 @@
 (function () {
-  const bell = document.getElementById('notif-bell');
-  const btn = document.getElementById('notif-bell-btn');
-  const dropdown = document.getElementById('notif-dropdown');
-  const list = document.getElementById('notif-list');
-  const badge = document.getElementById('notif-badge');
-  const markAll = document.getElementById('notif-mark-all');
+  var subscriptions = [];
 
-  if (!bell) return;
-  bell.hidden = false;
+  function init() {
+    // Tear down previous DOM listeners and WS subscriptions
+    subscriptions.forEach(function (unsub) { try { unsub(); } catch (e) {} });
+    subscriptions.length = 0;
 
-  let unread = 0;
+    var bell = document.getElementById('notif-bell');
+    if (!bell) return;
+    bell.hidden = false;
 
-  function setUnread(n) {
-    unread = Math.max(0, n);
-    if (unread === 0) { badge.hidden = true; }
-    else { badge.hidden = false; badge.textContent = unread > 99 ? '99+' : String(unread); }
-  }
+    var btn = document.getElementById('notif-bell-btn');
+    var dropdown = document.getElementById('notif-dropdown');
+    var list = document.getElementById('notif-list');
+    var badge = document.getElementById('notif-badge');
+    var markAll = document.getElementById('notif-mark-all');
+    var unread = 0;
 
-  function prependNotif(n) {
-    const li = document.createElement('li');
-    li.dataset.id = n.id;
-    li.className = `sev-${(n.severity || 'INFO').toLowerCase()}`;
-    // Trust contract: n.bodyHtml is HTML pre-sanitized server-side by jsoup Safelist.basic()
-    // (see NotificationRenderer). All other dynamic fields MUST go through textContent.
-    // Do NOT replace bodyHtml with textContent — markdown formatting would be lost.
-    const titleEl = document.createElement('strong');
-    titleEl.textContent = n.title;
-    const bodyEl = document.createElement('div');
-    bodyEl.className = 'body';
-    bodyEl.innerHTML = n.bodyHtml; // intentional: pre-sanitized
-    li.appendChild(titleEl);
-    li.appendChild(bodyEl);
-    if (n.ctaUrl && n.ctaLabel && /^https?:\/\//.test(n.ctaUrl)) {
-      const a = document.createElement('a');
-      a.className = 'cta';
-      a.href = n.ctaUrl;
-      a.rel = 'noopener';
-      a.textContent = n.ctaLabel;
-      li.appendChild(a);
+    function setUnread(n) {
+      unread = Math.max(0, n);
+      if (unread === 0) { badge.hidden = true; }
+      else { badge.hidden = false; badge.textContent = unread > 99 ? '99+' : String(unread); }
     }
-    const readBtn = document.createElement('button');
-    readBtn.dataset.action = 'read';
-    readBtn.type = 'button';
-    readBtn.textContent = '✓';
-    li.appendChild(readBtn);
-    list.prepend(li);
-  }
 
-  const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-  const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
-  function authHeaders(extra) {
-    const h = Object.assign({}, extra || {});
-    if (csrfToken) h[csrfHeader] = csrfToken;
-    return h;
-  }
+    function cssEscape(s) {
+      if (window.CSS && CSS.escape) return CSS.escape(s);
+      return String(s).replace(/[^a-zA-Z0-9_-]/g, function (c) { return '\\' + c.charCodeAt(0).toString(16) + ' '; });
+    }
 
-  async function loadInitial() {
-    try {
-      const [listRes, countRes] = await Promise.all([
-        fetch('/notifications/api/list?page=0&size=10', { credentials: 'same-origin' }),
-        fetch('/notifications/api/unread-count', { credentials: 'same-origin' })
-      ]);
-      if (countRes.ok) setUnread(parseInt(await countRes.text(), 10) || 0);
-      if (listRes.ok) {
-        const page = await listRes.json();
-        while (list.firstChild) list.removeChild(list.firstChild);
-        for (const n of (page.content || [])) prependNotif(n);
+    function prependNotif(n) {
+      if (list.querySelector('li[data-id="' + cssEscape(n.id) + '"]')) return; // idempotent
+      var li = document.createElement('li');
+      li.dataset.id = n.id;
+      li.className = 'sev-' + (n.severity || 'INFO').toLowerCase();
+      // Trust contract: n.bodyHtml is HTML pre-sanitized server-side by jsoup Safelist.basic()
+      // (see NotificationRenderer). All other dynamic fields MUST go through textContent.
+      // Do NOT replace bodyHtml with textContent — markdown formatting would be lost.
+      var titleEl = document.createElement('strong');
+      titleEl.textContent = n.title;
+      var bodyEl = document.createElement('div');
+      bodyEl.className = 'body';
+      bodyEl.innerHTML = n.bodyHtml; // intentional: pre-sanitized
+      li.appendChild(titleEl);
+      li.appendChild(bodyEl);
+      if (n.ctaUrl && n.ctaLabel && /^https?:\/\//.test(n.ctaUrl)) {
+        var a = document.createElement('a');
+        a.className = 'cta';
+        a.href = n.ctaUrl; a.rel = 'noopener'; a.textContent = n.ctaLabel;
+        li.appendChild(a);
       }
-    } catch (_) { /* anonymous or backend down — keep bell hidden state untouched */ }
-  }
+      var readBtn = document.createElement('button');
+      readBtn.dataset.action = 'read';
+      readBtn.type = 'button';
+      readBtn.textContent = '✓';
+      li.appendChild(readBtn);
+      list.prepend(li);
+    }
 
-  function subscribeToNotifications() {
-    if (!window.catapultWs) return;
-    window.catapultWs.subscribe('notifications.user', (msg) => {
-      if (msg.name !== 'notification.created') return;
-      try {
-        prependNotif(msg.data);
-        setUnread(unread + 1);
-      } catch (_) { /* swallow */ }
+    function populateSnapshot(data) {
+      while (list.firstChild) list.removeChild(list.firstChild);
+      (data.items || []).forEach(prependNotif);
+      setUnread(data.unreadCount || 0);
+    }
+
+    function markReadInDom(notifId) {
+      var li = list.querySelector('li[data-id="' + cssEscape(notifId) + '"]');
+      if (li) li.classList.add('read');
+    }
+
+    function markAllReadInDom() {
+      list.querySelectorAll('li').forEach(function (li) { li.classList.add('read'); });
+    }
+
+    function removeFromDom(notifId) {
+      var li = list.querySelector('li[data-id="' + cssEscape(notifId) + '"]');
+      if (li) li.remove();
+    }
+
+    function onEvent(msg) {
+      if (!msg) return;
+      switch (msg.name) {
+        case 'notification.snapshot':     populateSnapshot(msg.data); break;
+        case 'notification.created':      prependNotif(msg.data); setUnread(unread + 1); break;
+        case 'notification.read.changed': markReadInDom(msg.data.notificationId); setUnread(msg.data.unreadCount); break;
+        case 'notification.all.read':     markAllReadInDom(); setUnread(0); break;
+        case 'notification.deleted':      removeFromDom(msg.data.notificationId);
+                                          if (typeof msg.data.unreadCount === 'number') setUnread(msg.data.unreadCount);
+                                          break;
+      }
+    }
+
+    var onBtnClick = function () { dropdown.hidden = !dropdown.hidden; };
+    var onMarkAllClick = function () {
+      if (window.catapultWs) window.catapultWs.command('notification.markAll');
+    };
+    var onListClick = function (ev) {
+      var b = ev.target.closest('button[data-action="read"]');
+      if (!b) return;
+      var id = b.parentElement.dataset.id;
+      if (window.catapultWs) window.catapultWs.command('notification.read', { notificationId: id });
+    };
+
+    btn.addEventListener('click', onBtnClick);
+    markAll.addEventListener('click', onMarkAllClick);
+    list.addEventListener('click', onListClick);
+
+    subscriptions.push(function () {
+      btn.removeEventListener('click', onBtnClick);
+      markAll.removeEventListener('click', onMarkAllClick);
+      list.removeEventListener('click', onListClick);
     });
+
+    var subscribed = false;
+    function subscribe() {
+      if (subscribed || !window.catapultWs) return;
+      subscribed = true;
+      window.catapultWs.subscribe('notifications.user', onEvent);
+      subscriptions.push(function () {
+        window.catapultWs.unsubscribe('notifications.user', onEvent);
+        subscribed = false;
+      });
+    }
+
+    var onAuthOk = function () { subscribe(); };
+    document.addEventListener('ws:auth.ok', onAuthOk, { once: true });
+    subscriptions.push(function () { document.removeEventListener('ws:auth.ok', onAuthOk); });
+
+    // Immediate subscribe if WS is already connected and authenticated
+    subscribe();
   }
 
-  btn.addEventListener('click', () => { dropdown.hidden = !dropdown.hidden; });
-  markAll.addEventListener('click', async () => {
-    await fetch('/notifications/api/read-all', { method: 'POST', credentials: 'same-origin', headers: authHeaders() });
-    setUnread(0);
-  });
-  list.addEventListener('click', async (ev) => {
-    const b = ev.target.closest('button[data-action="read"]');
-    if (!b) return;
-    const id = b.parentElement.dataset.id;
-    await fetch(`/notifications/api/${encodeURIComponent(id)}/read`, { method: 'POST', credentials: 'same-origin', headers: authHeaders() });
-    setUnread(unread - 1);
-    b.parentElement.classList.add('read');
-  });
-
-  loadInitial().then(subscribeToNotifications);
-})();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  document.addEventListener('page:loaded', init);
+}());

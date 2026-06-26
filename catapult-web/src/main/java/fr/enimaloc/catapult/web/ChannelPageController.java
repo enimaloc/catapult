@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
@@ -42,81 +41,6 @@ public class ChannelPageController {
         }
         populateModel(model, data, username);
         return "app";
-    }
-
-    @GetMapping(value = "/api/games/search", produces = MediaType.APPLICATION_JSON_VALUE)
-    @ResponseBody
-    public Object gamesSearch(@PathVariable String username, @RequestParam(defaultValue = "") String q) {
-        return apiClient.get("/api/channels/{username}/games/search?q={q}", Object.class, username, q);
-    }
-
-    // ── Event-driven on-demand fragments ──────────────────────────────────────
-    // These are NOT lazy-loaded on page render (the page renders complete in
-    // channelPage()). They exist so channel-page.js can refetch a single section
-    // in response to a WS event without reloading the whole page. Each handler
-    // does the same data fetch + populateModel + return-fragment dance as the
-    // main controller, scoped to one panel.
-
-    @GetMapping("/fragments/bindings")
-    public String bindingsFragment(
-            @PathVariable String username,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String source,
-            Model model) {
-        StringBuilder url = new StringBuilder("/api/channels/{username}?page={page}");
-        if (status != null && !status.isBlank()) url.append("&status={status}");
-        if (source != null && !source.isBlank()) url.append("&source={source}");
-        Object[] vars = buildVars(username, page, status, source);
-        ChannelPageData data = apiClient.get(url.toString(), ChannelPageData.class, vars);
-        model.addAttribute("channelUsername", username);
-        if (data != null) {
-            model.addAttribute("bindings", data.bindings());
-            model.addAttribute("availableCcls", data.availableCcls());
-            model.addAttribute("blockedCcls", data.blockedCcls());
-            model.addAttribute("availableTws", data.availableTws());
-            model.addAttribute("blockedTws", data.blockedTws());
-            model.addAttribute("filterStatus", data.filterStatus());
-            model.addAttribute("filterSource", data.filterSource());
-        }
-        return "fragments/bindings :: bindings";
-    }
-
-    @GetMapping("/fragments/connections")
-    public String connectionsFragment(@PathVariable String username, Model model) {
-        ChannelPageData data = apiClient.get("/api/channels/{username}", ChannelPageData.class, username);
-        model.addAttribute("channelUsername", username);
-        if (data != null) {
-            model.addAttribute("isOwner", data.isOwner());
-            model.addAttribute("hasSteamProvider", data.hasSteamProvider());
-            model.addAttribute("hasSteam", data.hasSteam());
-            model.addAttribute("hasSteamPersonalToken", data.hasSteamPersonalToken());
-            model.addAttribute("steamTokenShared", data.steamTokenShared());
-            model.addAttribute("steamProfilePrivate", data.steamProfilePrivate());
-            model.addAttribute("steamRateLimited", data.steamRateLimited());
-            model.addAttribute("steamOfflineMode", data.steamOfflineMode());
-            model.addAttribute("steamProfileCacheTtlMinutes", data.steamProfileCacheTtlMinutes());
-        }
-        return "fragments/connections :: connections";
-    }
-
-    @GetMapping("/fragments/settings")
-    public String settingsFragment(@PathVariable String username, Model model) {
-        UserSettingsDto settings = apiClient.get(
-                "/api/channels/{username}/settings", UserSettingsDto.class, username);
-        ChannelPageData data = apiClient.get("/api/channels/{username}", ChannelPageData.class, username);
-        model.addAttribute("channelUsername", username);
-        model.addAttribute("cclSettings", settings);
-        model.addAttribute("twSettings", settings);
-        model.addAttribute("noGameSettings", settings);
-        model.addAttribute("incompleteFallbackSettings", settings);
-        if (data != null) {
-            model.addAttribute("availableCcls", data.availableCcls());
-            model.addAttribute("availableTws", data.availableTws());
-            model.addAttribute("blockedCcls", data.blockedCcls());
-            model.addAttribute("blockedTws", data.blockedTws());
-        }
-        return "fragments/settings-bundle :: settings-bundle";
     }
 
     // ── SSE proxies ────────────────────────────────────────────────────────────
