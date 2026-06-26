@@ -32,7 +32,11 @@ public class WebSecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"))
+                        // Home page (HomeController -> home.html) carries the
+                        // "Se connecter avec Twitch" entry; sending unauthenticated
+                        // traffic there beats the standalone /login template that
+                        // duplicated the same CTA.
+                        .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/"))
                 )
                 .logout(logout -> logout
                         .logoutUrl("/logout")
