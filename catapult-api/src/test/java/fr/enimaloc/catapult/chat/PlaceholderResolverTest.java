@@ -155,10 +155,32 @@ class PlaceholderResolverTest {
     }
 
     @Test
-    void no_recursive_expansion_in_fallbacks() {
+    void inline_fallback_is_recursively_expanded() {
         Optional<String> result = resolver.resolve(
             "{game.summary|see {game.name}}", contextWithName("Halo"), Map.of(), Locale.FRANCE);
-        assertThat(result).contains("see {game.name}");
+        assertThat(result).contains("see Halo");
+    }
+
+    @Test
+    void nested_placeholder_in_fallback_resolves_inner_value() {
+        // The shipped !triggers preset uses {tw.active|{game.agerating|none}}
+        // exactly to surface the age rating when no TW signals applied.
+        GameContext ctx = new GameContext(
+            new DetectedGame("g1", GameBinding.SourceType.STEAM, "Halo"),
+            "igdb-1", "Halo", null, null, Map.of(), null, null,
+            Set.of(), Map.of(), "PEGI 12");
+        Optional<String> result = resolver.resolve(
+            "{tw.active|{game.agerating|aucune information disponible}}",
+            ctx, Map.of(), Locale.FRANCE);
+        assertThat(result).contains("PEGI 12");
+    }
+
+    @Test
+    void nested_placeholder_falls_through_to_inner_fallback() {
+        Optional<String> result = resolver.resolve(
+            "{tw.active|{game.agerating|aucune information disponible}}",
+            contextWithName("Halo"), Map.of(), Locale.FRANCE);
+        assertThat(result).contains("aucune information disponible");
     }
 
     @Test
