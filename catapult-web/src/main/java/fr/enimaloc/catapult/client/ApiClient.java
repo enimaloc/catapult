@@ -255,6 +255,51 @@ public class ApiClient {
     }
 
     /**
+     * Returns the config catalog from catapult-api for the given module.
+     * The session JWT must be active in {@link WsAuthContext} so the interceptor
+     * can attach the correct Bearer token.
+     *
+     * @param module the config module (e.g. "api")
+     * @return the list of config entries, or {@code null} if the upstream call fails
+     */
+    public java.util.List<java.util.Map<String, Object>> adminConfigCatalog(String module) {
+        try {
+            return restClient.get()
+                    .uri("/api/admin/config?module={module}", module)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+        } catch (Exception e) {
+            log.warn("GET /api/admin/config failed for module {}: {}", module, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Sets a config value via the admin API.
+     * The session JWT must be active in {@link WsAuthContext} so the interceptor
+     * can attach the correct Bearer token.
+     *
+     * @param key   the config key
+     * @param value the new value (serialised as JSON)
+     * @return {@code true} on success, {@code false} if the call failed
+     */
+    public boolean adminConfigSet(String key, Object value) {
+        return put("/api/admin/config/{key}", java.util.Map.of("value", value), key);
+    }
+
+    /**
+     * Resets a config value to its default via the admin API.
+     * The session JWT must be active in {@link WsAuthContext} so the interceptor
+     * can attach the correct Bearer token.
+     *
+     * @param key the config key to reset
+     * @return {@code true} on success, {@code false} if the call failed
+     */
+    public boolean adminConfigReset(String key) {
+        return delete("/api/admin/config/{key}", key);
+    }
+
+    /**
      * Deletes a notification by its ID via the admin API.
      * The session JWT must be active in {@link WsAuthContext} so the interceptor
      * can attach the correct Bearer token.
