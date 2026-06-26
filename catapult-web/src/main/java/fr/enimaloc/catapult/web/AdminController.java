@@ -77,6 +77,12 @@ public class AdminController {
         return "redirect:/admin/tw";
     }
 
+    @PostMapping("/tw/rebuild")
+    public String rebuildTw() {
+        apiClient.post("/api/admin/tw/rebuild", null);
+        return "redirect:/admin/tw";
+    }
+
     // ── Members ──────────────────────────────────────────────────────────────
 
     @GetMapping("/members")
