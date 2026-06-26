@@ -112,6 +112,7 @@ public class NotificationService {
         return unreadCount(userId);
     }
 
+    @Transactional(readOnly = true)
     public List<NotificationDto> findRecent(UUID userId, int size) {
         return recipientRepo.findByUserIdOrderByNotificationCreatedAtDesc(userId, PageRequest.of(0, size))
                 .map(r -> toDto(r.getNotification(), r.getReadAt() != null))
