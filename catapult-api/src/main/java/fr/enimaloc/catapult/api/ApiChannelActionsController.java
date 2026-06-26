@@ -332,7 +332,7 @@ public class ApiChannelActionsController {
      * mirroring the logic in {@code ApiChannelDataController}.
      */
     private SteamProfileDto buildSteamProfile(UserAccount channelUser) {
-        boolean hasSteam = channelUser.getSteamId() != null;
+        boolean hasSteam = steamApiClient != null && channelUser.getSteamId() != null;
         boolean hasPersonalToken = channelUser.getSteamPersonalToken() != null;
         boolean tokenShared = channelUser.isSteamTokenShared();
         long ttlMinutes = steamApiClient != null
