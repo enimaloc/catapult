@@ -30,8 +30,11 @@ public class RealDtddApiClient implements DtddApiClient {
 
     @Autowired
     public RealDtddApiClient(@Value("${dtdd.api-base-url}") String baseUrl,
+                             RestClient.Builder builder,
                              DtddApiKeyRotator rotator) {
-        this(RestClient.builder().baseUrl(baseUrl).build(), rotator);
+        // Take the Boot-managed builder so the trace-logging customizer +
+        // buffering request factory wired in WebClientConfig apply here too.
+        this(builder.baseUrl(baseUrl).build(), rotator);
     }
 
     // visible for tests

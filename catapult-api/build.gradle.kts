@@ -40,6 +40,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-client")
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    // Exposes RestClientCustomizer + the auto-configured RestClient.Builder bean
+    // used by WebClientConfig to install the trace-logging interceptor.
+    implementation("org.springframework.boot:spring-boot-restclient")
     // Thymeleaf kept for the experiment dialect (custom th:* processors and tests)
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
