@@ -34,7 +34,8 @@
 
     <details style="margin-top:1.25rem;">
         <summary style="cursor:pointer; font-weight:600;" th:text="#{chat_commands.add_custom}">Add custom command</summary>
-        <form id="chatCommandsCustomForm" style="display:flex; flex-direction:column; gap:.75rem; margin-top:.75rem; max-width:600px;">
+        <form id="chatCommandsCustomForm" hx-boost="false"
+              style="display:flex; flex-direction:column; gap:.75rem; margin-top:.75rem; max-width:600px;">
             <div class="form-field">
                 <label for="customChatCmdName" th:text="#{chat_commands.column.name}">Name</label>
                 <input id="customChatCmdName" class="form-input" type="text" name="name"
@@ -102,7 +103,18 @@
         function reportError(err) {
             const code = err && err.error ? err.error.code : 'ERROR';
             const message = err && err.error ? err.error.message : String(err);
-            alert(code + ' : ' + message);
+            const text = code + ' : ' + message;
+            if (window.catapultOverlay && window.catapultOverlay.showToast) {
+                window.catapultOverlay.showToast(text, { kind: 'error', duration: 6000 });
+            } else {
+                alert(text);
+            }
+        }
+
+        function reportSuccess(msg) {
+            if (window.catapultOverlay && window.catapultOverlay.showToast) {
+                window.catapultOverlay.showToast(msg, { kind: 'success', duration: 2500 });
+            }
         }
 
         function buildRow(tpl, cmd) {
@@ -114,7 +126,10 @@
             row.querySelector('.permission-select').value = cmd.permission;
             row.querySelector('.enabled-toggle').checked = cmd.enabled;
 
-            row.querySelector('.save-btn').onclick = async () => {
+            const saveBtn = row.querySelector('.save-btn');
+            saveBtn.onclick = async () => {
+                if (saveBtn.disabled) return;
+                saveBtn.disabled = true;
                 try {
                     const resp = await window.catapultWs.request('chat-commands.update', {
                         id: cmd.id,
@@ -127,16 +142,24 @@
                     // Keep the in-memory cmd snapshot in sync so subsequent
                     // saves diff against the latest server state.
                     Object.assign(cmd, resp.result);
+                    reportSuccess(cmd.name + ' enregistrée');
                 } catch (err) { reportError(err); }
+                finally { saveBtn.disabled = false; }
             };
 
             const deleteBtn = row.querySelector('.delete-btn');
             deleteBtn.onclick = async () => {
                 if (!confirm(I18N.deleteConfirm.replace('  ', ' ' + cmd.name + ' '))) return;
+                if (deleteBtn.disabled) return;
+                deleteBtn.disabled = true;
                 try {
                     await window.catapultWs.request('chat-commands.delete', { id: cmd.id });
                     row.remove();
-                } catch (err) { reportError(err); }
+                    reportSuccess(cmd.name + ' supprimée');
+                } catch (err) {
+                    reportError(err);
+                    deleteBtn.disabled = false;
+                }
             };
 
             const isBuiltin = cmd.presetKey && cmd.presetKey.indexOf('builtin:') === 0;
@@ -178,6 +201,7 @@
                 const tpl = document.getElementById('chatCommandsRowTpl').content;
                 tbody.appendChild(buildRow(tpl, resp.result));
                 e.target.reset();
+                reportSuccess(resp.result.name + ' créée');
             } catch (err) { reportError(err); }
         };
 
