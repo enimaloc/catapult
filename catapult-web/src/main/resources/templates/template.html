@@ -28,6 +28,7 @@
     <script th:src="@{/js/ws/ws-actions.js}" defer></script>
     <script th:src="@{/js/ws/maintenance-overlay.js}" defer></script>
     <script th:src="@{/js/ws/maintenance-banner.js}" defer></script>
+    <script th:src="@{/webjars/htmx.org/dist/htmx.min.js}" defer></script>
     <script th:if="${user != null}" th:src="@{/js/notifications.js}" defer></script>
     <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/bindings.js}" defer></script>
     <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/settings.js}" defer></script>
@@ -35,7 +36,7 @@
     <script th:if="${channelUser != null}" th:src="@{/js/channel-page.js}" defer></script>
     <th:block th:replace="${additional_head} ?: ~{}"></th:block>
 </head>
-<body>
+<body hx-boost="true">
 
 <div th:if="${user != null and isPendingDeletion}" class="banner banner-danger">
     <strong th:text="#{app.banner.pending}">⚠ Suppression de compte en cours.</strong>
@@ -94,7 +95,7 @@
            th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
         <a th:if="${invitePlacementVariant == 'nav-end'}"
            th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
-        <div id="notif-bell" hidden>
+        <div id="notif-bell" hidden hx-preserve="true">
             <button id="notif-bell-btn" type="button" aria-label="Notifications">🔔<span id="notif-badge" hidden>0</span></button>
             <div id="notif-dropdown" hidden>
                 <ul id="notif-list"></ul>
@@ -144,8 +145,8 @@
 
 
 <!-- Changelog panel -->
-<div id="changelog-overlay" class="help-overlay" onclick="closeChangelogPanel()"></div>
-<div id="changelog-panel" class="help-panel">
+<div id="changelog-overlay" class="help-overlay" onclick="closeChangelogPanel()" hx-preserve="true"></div>
+<div id="changelog-panel" class="help-panel" hx-preserve="true">
     <div class="help-panel-header">
         <span>Changelog</span>
         <button class="help-panel-close" onclick="closeChangelogPanel()" title="Fermer">✕</button>
@@ -159,8 +160,8 @@
     </div>
 </div>
 
-<div id="help-overlay" class="help-overlay" onclick="closeHelpPanel()"></div>
-<div id="help-panel" class="help-panel">
+<div id="help-overlay" class="help-overlay" onclick="closeHelpPanel()" hx-preserve="true"></div>
+<div id="help-panel" class="help-panel" hx-preserve="true">
     <div class="help-panel-header">
         <span id="help-panel-title" th:text="#{help.panel.title}">Aide</span>
         <button class="help-panel-close" onclick="closeHelpPanel()" title="Fermer">✕</button>
@@ -169,27 +170,33 @@
 </div>
 
 <script>
-    let _openPanels = 0;
-    function _lockScroll()   { if (++_openPanels === 1) document.body.style.overflow = 'hidden'; }
-    function _unlockScroll() { if (--_openPanels <= 0)  { _openPanels = 0; document.body.style.overflow = ''; } }
+    // Wrapped in IIFE so re-execution on hx-boost swap doesn't clash with prior
+    // top-level let/const bindings.
+    (function () {
+        if (window.__helpPanelInit) return;
+        window.__helpPanelInit = true;
+        let openPanels = 0;
+        function lockScroll()   { if (++openPanels === 1) document.body.style.overflow = 'hidden'; }
+        function unlockScroll() { if (--openPanels <= 0)  { openPanels = 0; document.body.style.overflow = ''; } }
 
-    function openHelpPanel() {
-        document.getElementById('help-panel').classList.add('open');
-        document.getElementById('help-overlay').classList.add('open');
-        _lockScroll();
-    }
-    function closeHelpPanel() {
-        document.getElementById('help-panel').classList.remove('open');
-        document.getElementById('help-overlay').classList.remove('open');
-        _unlockScroll();
-    }
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeHelpPanel();
-    });
-    // ws:after="help-loaded" → after the help fragment is swapped into
-    // #help-panel-body, the page bubbles a 'help-loaded' CustomEvent which
-    // this listener turns into the panel-open visual change.
-    document.addEventListener('help-loaded', openHelpPanel);
+        window.openHelpPanel = function () {
+            document.getElementById('help-panel').classList.add('open');
+            document.getElementById('help-overlay').classList.add('open');
+            lockScroll();
+        };
+        window.closeHelpPanel = function () {
+            document.getElementById('help-panel').classList.remove('open');
+            document.getElementById('help-overlay').classList.remove('open');
+            unlockScroll();
+        };
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') window.closeHelpPanel();
+        });
+        // ws:after="help-loaded" → after the help fragment is swapped into
+        // #help-panel-body, the page bubbles a 'help-loaded' CustomEvent which
+        // this listener turns into the panel-open visual change.
+        document.addEventListener('help-loaded', window.openHelpPanel);
+    }());
 </script>
 
 <!--<div th:if="${user != null and activeExperimentAssignments != null}"-->
@@ -221,48 +228,70 @@
 </footer>
 
 <script>
-    const themeSwitcher = document.getElementById("theme-switcher");
-    const feedback = document.getElementById("feedback-widget");
-    const footer = document.getElementById("footer");
-
-    function updatePosition() {
-        const footerRect = footer.getBoundingClientRect();
-        const overlap = window.innerHeight - footerRect.top;
-        const offset = overlap > 0 ? overlap : 0;
-        themeSwitcher.style.bottom = `${16 + offset}px`;
-        // #feedback-widget only renders for authenticated users with a configured gitlab.token.
-        if (feedback) feedback.style.bottom = `${66 + offset}px`;
-    }
-
-    window.addEventListener("scroll", updatePosition);
-    window.addEventListener("resize", updatePosition);
-
-    updatePosition();
-
-    function openChangelogPanel() {
-        document.getElementById('changelog-panel').classList.add('open');
-        document.getElementById('changelog-overlay').classList.add('open');
-        _lockScroll();
-    }
-    function closeChangelogPanel() {
-        document.getElementById('changelog-panel').classList.remove('open');
-        document.getElementById('changelog-overlay').classList.remove('open');
-        _unlockScroll();
-    }
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') { closeHelpPanel(); closeChangelogPanel(); }
-    });
-
-    // Auto-show changelog when app version changes
-    (function() {
-        const currentVersion = document.querySelector('.footer-version')?.textContent?.trim();
-        if (!currentVersion || currentVersion === 'dev') return;
-        const seenVersion = localStorage.getItem('catapult_seen_version');
-        if (seenVersion !== currentVersion) {
-            localStorage.setItem('catapult_seen_version', currentVersion);
-            if (seenVersion !== null) openChangelogPanel();
+    // Wrapped in IIFE so re-execution on hx-boost swap doesn't clash with prior
+    // top-level let/const bindings. Theme switcher position + changelog panel.
+    (function () {
+        // Reposition can re-run safely on each boost since the DOM nodes are
+        // hx-preserve'd or rebuilt by Thymeleaf; just refresh the references.
+        function pos() {
+            const themeSwitcher = document.getElementById("theme-switcher");
+            const feedback = document.getElementById("feedback-widget");
+            const footer = document.getElementById("footer");
+            if (!themeSwitcher || !footer) return;
+            const footerRect = footer.getBoundingClientRect();
+            const overlap = window.innerHeight - footerRect.top;
+            const offset = overlap > 0 ? overlap : 0;
+            themeSwitcher.style.bottom = `${16 + offset}px`;
+            // #feedback-widget only renders for authenticated users with a configured gitlab.token.
+            if (feedback) feedback.style.bottom = `${66 + offset}px`;
         }
-    })();
+        if (!window.__themePosInit) {
+            window.__themePosInit = true;
+            window.addEventListener("scroll", pos);
+            window.addEventListener("resize", pos);
+            document.addEventListener('page:loaded', pos);
+        }
+        pos();
+
+        // openChangelogPanel/closeChangelogPanel are referenced from inline
+        // onclick handlers so they must remain global.
+        window.openChangelogPanel = function () {
+            document.getElementById('changelog-panel').classList.add('open');
+            document.getElementById('changelog-overlay').classList.add('open');
+            // Reuse the help panel's scroll lock (same global counter).
+            document.body.style.overflow = 'hidden';
+        };
+        window.closeChangelogPanel = function () {
+            document.getElementById('changelog-panel').classList.remove('open');
+            document.getElementById('changelog-overlay').classList.remove('open');
+            document.body.style.overflow = '';
+        };
+        if (!window.__escListenerBound) {
+            window.__escListenerBound = true;
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') { window.closeHelpPanel(); window.closeChangelogPanel(); }
+            });
+        }
+
+        // Auto-show changelog when app version changes (run once per session).
+        if (!window.__changelogVersionChecked) {
+            window.__changelogVersionChecked = true;
+            const currentVersion = document.querySelector('.footer-version')?.textContent?.trim();
+            if (currentVersion && currentVersion !== 'dev') {
+                const seenVersion = localStorage.getItem('catapult_seen_version');
+                if (seenVersion !== currentVersion) {
+                    localStorage.setItem('catapult_seen_version', currentVersion);
+                    if (seenVersion !== null) window.openChangelogPanel();
+                }
+            }
+        }
+    }());
+</script>
+
+<script>
+    document.addEventListener('htmx:afterSettle', function () {
+        document.dispatchEvent(new CustomEvent('page:loaded'));
+    });
 </script>
 </body>
 </html>

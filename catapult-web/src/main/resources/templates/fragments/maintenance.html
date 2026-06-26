@@ -14,6 +14,7 @@
 <!-- Blocking overlay. Hidden by default; shown by maintenance-overlay.js. -->
 <div th:fragment="overlay"
      id="maintenance-overlay"
+     hx-preserve="true"
      hidden
      role="dialog"
      aria-modal="true"
@@ -35,6 +36,7 @@
 <!-- Preventive, dismissible banner. Hidden by default; shown by maintenance-banner.js. -->
 <div th:fragment="banner"
      id="maintenance-banner"
+     hx-preserve="true"
      hidden
      role="status"
      aria-live="polite">
@@ -49,6 +51,7 @@
 <!-- Toast container (transient messages). -->
 <div th:fragment="toasts"
      id="toast-container"
+     hx-preserve="true"
      aria-live="polite"
      aria-atomic="false"></div>
 
