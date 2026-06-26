@@ -21,11 +21,12 @@
             <div class="inline-edit-field">
                 <label th:text="#{tw_settings.enabled}">Activer la fonctionnalité TW</label>
                 <input type="checkbox" name="twEnabled"
+                       data-setting="tw.enabled"
                        th:checked="${twSettings.twFeatureEnabled}">
             </div>
             <div class="inline-edit-field">
                 <label th:text="#{tw_settings.blocked}">TW à toujours masquer</label>
-                <div class="ccl-checkboxes">
+                <div class="ccl-checkboxes" data-settings-group="tw.blockedTws">
                     <div th:each="tw : ${availableTws}">
                         <label>
                             <input type="checkbox" name="blockedTws"

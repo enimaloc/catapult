@@ -131,6 +131,7 @@
 
     <script th:inline="javascript">
         const channelUsername = /*[[${channelUsername}]]*/ '';
+        const channelBlockedCcls = /*[[${blockedCcls}]]*/ [];
 
         // Connections: reload the page when a new provider is linked. The dedicated
         // /fragments/connections endpoint has been removed (see event-driven migration);

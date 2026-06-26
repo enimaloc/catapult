@@ -21,49 +21,68 @@
                 th:title="#{help.panel.title}">?</button>
     </div>
     <div class="provider-grid">
-        <div class="provider-card">
+        <div class="provider-card" data-provider="TWITCH">
             <strong>Twitch</strong>
             <span class="badge badge-connected" th:text="#{connections.connected}">Connecté</span>
             <p class="text-muted text-sm" th:text="#{connections.twitch_note}">Provider principal — déconnexion via logout</p>
         </div>
-        <div th:if="${hasSteamProvider}" class="provider-card">
+        <div th:if="${hasSteamProvider}" class="provider-card" data-provider="STEAM">
             <div style="display:flex; align-items:center; gap:0.5rem;">
                 <strong>Steam</strong>
-                <span th:if="${hasSteam}" class="badge badge-connected" th:text="#{connections.connected}">Connecté</span>
-                <span th:unless="${hasSteam}" class="badge badge-disconnected" th:text="#{connections.not_connected}">Non connecté</span>
-                <!-- Rate-limited indicator -->
-                <button th:if="${hasSteam and isOwner and steamRateLimited}"
+                <!-- Connection badges — always in DOM so JS can toggle them -->
+                <span data-conn-block="steam-connected"
+                      class="badge badge-connected connection-status"
+                      th:attr="hidden=${hasSteam ? null : 'hidden'}"
+                      th:text="#{connections.connected}">Connecté</span>
+                <span data-conn-block="steam-disconnected"
+                      class="badge badge-disconnected connection-status"
+                      th:attr="hidden=${!hasSteam ? null : 'hidden'}"
+                      th:text="#{connections.not_connected}">Non connecté</span>
+                <!-- Rate-limited indicator: only rendered for owners; JS toggles visibility -->
+                <button th:if="${isOwner}"
+                        data-conn-block="steam-rate-limit-btn"
+                        th:attr="hidden=${hasSteam and steamRateLimited ? null : 'hidden'}"
                         type="button" class="btn-help"
                         onclick="document.getElementById('steamRateLimitModal').style.display='flex'"
                         th:title="#{connections.steam.rate_limited.help_title}">!</button>
             </div>
 
-            <!-- Offline mode warning -->
-            <div th:if="${hasSteam and isOwner and steamOfflineMode}" class="provider-warning">
+            <!-- Offline mode warning: only rendered for owners; JS toggles visibility -->
+            <div th:if="${isOwner}"
+                 data-conn-block="steam-offline-warning"
+                 th:attr="hidden=${hasSteam and steamOfflineMode ? null : 'hidden'}"
+                 class="provider-warning">
                 <p th:text="#{connections.steam.offline_warning}">Ton compte Steam est en mode hors-ligne — la détection de jeu ne fonctionne pas.</p>
-                <p class="text-muted text-sm" th:text="#{connections.steam.offline_cache_ttl(${steamProfileCacheTtlMinutes})}">Ce statut est mis en cache pour 15 minutes.</p>
+                <p class="text-muted text-sm">Ce statut est mis en cache pour <span data-field="steam-ttl-minutes" th:text="${steamProfileCacheTtlMinutes}">15</span> minutes.</p>
                 <form th:action="@{/channels/{u}/settings/steam/refresh-profile-cache(u=${channelUsername})}" method="post" ws:post="@{/channels/{u}/settings/steam/refresh-profile-cache(u=${channelUsername})}" ws:swap="none" style="display:inline"> <!-- nosemgrep -->
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit" class="btn btn-sm" th:text="#{connections.steam.offline_refresh}">Rafraîchir</button>
                 </form>
             </div>
 
-            <!-- Private warning with resolve button -->
-            <div th:if="${hasSteam and isOwner and steamProfilePrivate and !hasSteamPersonalToken}" class="provider-warning">
+            <!-- Private warning with resolve button: only rendered for owners; JS toggles visibility -->
+            <div th:if="${isOwner}"
+                 data-conn-block="steam-private-warning"
+                 th:attr="hidden=${hasSteam and steamProfilePrivate and !hasSteamPersonalToken ? null : 'hidden'}"
+                 class="provider-warning">
                 <p th:text="#{connections.steam.private_warning}">Your Steam profile is private — game detection won't work.</p>
                 <button type="button" class="btn btn-sm btn-primary"
                         onclick="document.getElementById('steamPrivacyModal').style.display='flex'"
                         th:text="#{connections.steam.resolve}">Résoudre →</button>
             </div>
 
-            <!-- Personal token saved: sharing checkbox + delete -->
-            <div th:if="${hasSteam and isOwner and hasSteamPersonalToken}" class="provider-info">
+            <!-- Personal token saved: sharing checkbox + delete: only rendered for owners; JS toggles visibility -->
+            <div th:if="${isOwner}"
+                 data-conn-block="steam-personal-token-ui"
+                 th:attr="hidden=${hasSteam and hasSteamPersonalToken ? null : 'hidden'}"
+                 class="provider-info">
                 <span class="badge badge-connected" th:text="#{connections.steam.personal_token_set}">Token personnel ✓</span>
                 <form th:action="@{/channels/{u}/settings/steam-personal-token/sharing(u=${channelUsername})}" method="post" ws:post="@{/channels/{u}/settings/steam-personal-token/sharing(u=${channelUsername})}" ws:swap="none" style="display:inline"> <!-- nosemgrep -->
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; cursor:pointer; margin-top:0.4rem;">
                         <input type="hidden" name="shared" value="false"/>
                         <input type="checkbox" name="shared" value="true"
+                               data-field="steam-token-shared"
                                th:checked="${steamTokenShared}"
                                onchange="this.previousElementSibling.disabled=this.checked; this.form.submit()"/>
                         <span th:text="#{connections.steam.share_token}">Partager avec les autres profils</span>
@@ -75,21 +94,31 @@
                 </form>
             </div>
 
-            <!-- Invite to add a token even when profile is public -->
-            <div th:if="${hasSteam and isOwner and !hasSteamPersonalToken and !steamProfilePrivate}" style="margin-top:0.4rem;">
+            <!-- Invite to add a token even when profile is public: only rendered for owners; JS toggles visibility -->
+            <div th:if="${isOwner}"
+                 data-conn-block="steam-add-token-btn"
+                 th:attr="hidden=${hasSteam and !hasSteamPersonalToken and !steamProfilePrivate ? null : 'hidden'}"
+                 style="margin-top:0.4rem;">
                 <button type="button" class="btn btn-sm"
                         onclick="document.getElementById('steamPrivacyModal').style.display='flex'"
                         th:text="#{connections.steam.add_personal_token}">Ajouter un token →</button>
             </div>
 
-            <div th:if="${hasSteam and isOwner}">
+            <!-- Disconnect form: only rendered for owners; JS toggles visibility -->
+            <div th:if="${isOwner}"
+                 data-conn-block="steam-disconnect-form"
+                 th:attr="hidden=${hasSteam ? null : 'hidden'}">
                 <form th:action="@{/channels/{u}/settings/disconnect(u=${channelUsername})}" method="post" ws:post="@{/channels/{u}/settings/disconnect(u=${channelUsername})}" ws:swap="none"> <!-- nosemgrep -->
                     <input type="hidden" name="provider" value="STEAM"/>
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit" class="btn btn-sm btn-danger" th:text="#{connections.disconnect}">Déconnecter</button>
                 </form>
             </div>
-            <div th:if="${isOwner and !hasSteam}">
+
+            <!-- Connect link: only rendered for owners; JS toggles visibility -->
+            <div th:if="${isOwner}"
+                 data-conn-block="steam-connect-link"
+                 th:attr="hidden=${!hasSteam ? null : 'hidden'}">
                 <a target="_blank" th:href="@{/connect/steam}" class="btn btn-primary" th:text="#{connections.connect}">Connecter</a>
             </div>
         </div>

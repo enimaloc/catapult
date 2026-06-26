@@ -2,9 +2,11 @@ package fr.enimaloc.catapult.web.ws.auth;
 
 import fr.enimaloc.catapult.client.ApiClient;
 import fr.enimaloc.catapult.security.CatapultWebUser;
+import fr.enimaloc.catapult.web.ws.metrics.WsMetrics;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -29,6 +31,9 @@ public class WsAuthTicketController {
 
     private final WsTicketStore ticketStore;
 
+    @Autowired(required = false)
+    private WsMetrics wsMetrics;
+
     @GetMapping("/ws/auth-ticket")
     @ResponseBody
     public ResponseEntity<TicketResponse> issue(@AuthenticationPrincipal CatapultWebUser user,
@@ -40,6 +45,7 @@ public class WsAuthTicketController {
         user.getAuthorities().forEach(a -> roles.add(a.getAuthority()));
         String jwt = currentJwt(request);
         String token = ticketStore.issue(user.getId(), roles, jwt);
+        if (wsMetrics != null) wsMetrics.recordTicket("issued");
         long ttlSeconds = WsTicketStore.TTL.toSeconds();
         return ResponseEntity.ok(new TicketResponse(token, ttlSeconds));
     }
