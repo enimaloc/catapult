@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.service.binding.BindingDto;
+import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -39,5 +40,27 @@ class ChannelEventPublisherTest {
         Map<String, Object> payload = captor.getValue();
         assertThat(payload).containsKey("binding");
         assertThat(payload.get("binding")).isEqualTo(dto);
+    }
+
+    @Test
+    void settingsUpdated_publishesFullDto() {
+        RedisEventPublisher redis = mock(RedisEventPublisher.class);
+        ChannelEventPublisher publisher = new ChannelEventPublisher(redis);
+        UUID ownerId = UUID.randomUUID();
+        UserSettingsDto dto = new UserSettingsDto(
+                new UserSettingsDto.Ccl(true, Set.of("ccl1")),
+                new UserSettingsDto.Tw(false, Set.of()),
+                new UserSettingsDto.NoGame("123", "Just Chatting", Set.of("ccl2"), true, true, false),
+                new UserSettingsDto.IncompleteFallback("456", "Science & Technology", Set.of())
+        );
+
+        publisher.settingsUpdated(ownerId, dto);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(redis).publishChannel(eq(ownerId), eq("settings.updated"), captor.capture());
+        Map<String, Object> payload = captor.getValue();
+        assertThat(payload).containsKey("settings");
+        assertThat(payload.get("settings")).isEqualTo(dto);
     }
 }

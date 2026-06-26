@@ -12,8 +12,6 @@
  *    one; handlers flip visibility on event.
  *
  *  - Fetch-and-swap (event triggers a server re-render of a small section):
- *    binding.upserted (row HTML can't be reconstructed from {bindingId} alone),
- *    settings.updated (4 panels share one DTO that isn't in the event payload),
  *    steam.profile.changed + connection.changed (complex provider-state UI).
  *    Endpoint URLs are scoped to one section, not the full page.
  *
@@ -104,9 +102,9 @@
     }
   }
 
-  function onSettingsUpdated() {
-    refetchAndSwap("/channels/" + encodeURIComponent(channelUsername) + "/fragments/settings",
-                   "#settings-section");
+  function onSettingsUpdated(data) {
+    if (!data || !data.settings) return;
+    if (window.CatapultSettings) window.CatapultSettings.applySettings(data.settings);
   }
 
   function onConnectionsChanged() {
