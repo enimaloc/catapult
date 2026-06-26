@@ -2,6 +2,8 @@ package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.BindingDto;
+import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
+import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -62,17 +64,16 @@ public class ChannelEventPublisher {
         publish(channelOwnerId, "settings.updated", Map.of("settings", settings));
     }
 
-    public void steamProfileChanged(UUID channelOwnerId) {
-        publish(channelOwnerId, "steam.profile.changed", Map.of());
+    public void steamProfileChanged(UUID channelOwnerId, SteamProfileDto profile) {
+        publish(channelOwnerId, "steam.profile.changed", Map.of("profile", profile));
     }
 
     public void dtddMappingChanged(UUID channelOwnerId) {
         publish(channelOwnerId, "dtdd.mapping.changed", Map.of());
     }
 
-    public void connectionChanged(UUID channelOwnerId, String provider, boolean connected) {
-        publish(channelOwnerId, "connection.changed",
-                Map.of("provider", provider, "connected", connected));
+    public void connectionChanged(UUID channelOwnerId, ProviderConnectionsDto provider) {
+        publish(channelOwnerId, "connection.changed", Map.of("provider", provider));
     }
 
     private void publish(UUID channelOwnerId, String name, Map<String, Object> data) {
