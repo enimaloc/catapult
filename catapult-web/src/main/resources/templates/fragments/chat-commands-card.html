@@ -94,91 +94,100 @@
 
     <script th:inline="javascript">
     (function () {
-        const CSRF_HEADER = /*[[${_csrf.headerName}]]*/ 'X-CSRF-TOKEN';
-        const CSRF_TOKEN  = /*[[${_csrf.token}]]*/ '';
         const I18N = {
             deleteConfirm: /*[[#{chat_commands.action.delete_confirm(' ')}]]*/ 'Supprimer  ?',
             builtinTooltip: /*[[#{chat_commands.badge.builtin.tooltip}]]*/ 'Java command — name not editable'
         };
-        function csrfHeaders(extra) {
-            const h = Object.assign({}, extra || {});
-            h[CSRF_HEADER] = CSRF_TOKEN;
-            return h;
-        }
-        function jsonHeaders() { return csrfHeaders({ 'Content-Type': 'application/json' }); }
-        async function reportError(r) {
-            const body = await r.text().catch(() => '');
-            alert('Erreur ' + r.status + ' : ' + body);
+
+        function reportError(err) {
+            const code = err && err.error ? err.error.code : 'ERROR';
+            const message = err && err.error ? err.error.message : String(err);
+            alert(code + ' : ' + message);
         }
 
-        (async function () {
-            const res = await fetch('/chat-commands/api');
-            if (!res.ok) { await reportError(res); return; }
-            const data = await res.json();
+        function buildRow(tpl, cmd) {
+            const node = tpl.cloneNode(true);
+            const row = node.querySelector('tr');
+            row.dataset.id = cmd.id;
+            row.querySelector('.cmd-name').value = cmd.name;
+            row.querySelector('.cmd-template').value = cmd.template;
+            row.querySelector('.permission-select').value = cmd.permission;
+            row.querySelector('.enabled-toggle').checked = cmd.enabled;
 
-            // if (data.botModStatus && data.botModStatus.modded === false) {
-            //     document.getElementById('chatCommandsBotModBanner').hidden = false;
-            // }
-
-            const tbody = document.getElementById('chatCommandsTbody');
-            const tpl = document.getElementById('chatCommandsRowTpl').content;
-            for (const cmd of (data.commands || [])) {
-                const node = tpl.cloneNode(true);
-                const row = node.querySelector('tr');
-                row.dataset.id = cmd.id;
-                row.querySelector('.cmd-name').value = cmd.name;
-                row.querySelector('.cmd-template').value = cmd.template;
-                row.querySelector('.permission-select').value = cmd.permission;
-                row.querySelector('.enabled-toggle').checked = cmd.enabled;
-
-                row.querySelector('.save-btn').onclick = async () => {
-                    const body = {
+            row.querySelector('.save-btn').onclick = async () => {
+                try {
+                    const resp = await window.catapultWs.request('chat-commands.update', {
+                        id: cmd.id,
                         name: row.querySelector('.cmd-name').value,
                         template: row.querySelector('.cmd-template').value,
                         permission: row.querySelector('.permission-select').value,
                         enabled: row.querySelector('.enabled-toggle').checked,
                         fallbacks: {}
-                    };
-                    const r = await fetch('/chat-commands/api/' + cmd.id, {
-                        method: 'PUT', headers: jsonHeaders(), body: JSON.stringify(body)
                     });
-                    if (r.ok) window.location.reload(); else await reportError(r);
-                };
-                const deleteBtn = row.querySelector('.delete-btn');
-                deleteBtn.onclick = async () => {
-                    if (!confirm(I18N.deleteConfirm.replace('  ', ' ' + cmd.name + ' '))) return;
-                    const r = await fetch('/chat-commands/api/' + cmd.id, {
-                        method: 'DELETE', headers: csrfHeaders()
-                    });
-                    if (r.ok) window.location.reload(); else await reportError(r);
-                };
-                const isBuiltin = cmd.presetKey && cmd.presetKey.indexOf('builtin:') === 0;
-                if (isBuiltin) {
-                    const badge = row.querySelector('.builtin-badge');
-                    badge.hidden = false;
-                    badge.title = I18N.builtinTooltip;
-                    row.querySelector('.cmd-name').disabled = true;
-                    deleteBtn.remove();
-                }
-                tbody.appendChild(node);
+                    // Keep the in-memory cmd snapshot in sync so subsequent
+                    // saves diff against the latest server state.
+                    Object.assign(cmd, resp.result);
+                } catch (err) { reportError(err); }
+            };
+
+            const deleteBtn = row.querySelector('.delete-btn');
+            deleteBtn.onclick = async () => {
+                if (!confirm(I18N.deleteConfirm.replace('  ', ' ' + cmd.name + ' '))) return;
+                try {
+                    await window.catapultWs.request('chat-commands.delete', { id: cmd.id });
+                    row.remove();
+                } catch (err) { reportError(err); }
+            };
+
+            const isBuiltin = cmd.presetKey && cmd.presetKey.indexOf('builtin:') === 0;
+            if (isBuiltin) {
+                const badge = row.querySelector('.builtin-badge');
+                badge.hidden = false;
+                badge.title = I18N.builtinTooltip;
+                row.querySelector('.cmd-name').disabled = true;
+                deleteBtn.remove();
             }
-        })();
+            return node;
+        }
+
+        async function loadList() {
+            try {
+                const resp = await window.catapultWs.request('chat-commands.list', {});
+                const data = resp.result || {};
+                const tbody = document.getElementById('chatCommandsTbody');
+                const tpl = document.getElementById('chatCommandsRowTpl').content;
+                tbody.replaceChildren();
+                for (const cmd of (data.commands || [])) {
+                    tbody.appendChild(buildRow(tpl, cmd));
+                }
+            } catch (err) { reportError(err); }
+        }
 
         document.getElementById('chatCommandsCustomForm').onsubmit = async (e) => {
             e.preventDefault();
             const fd = new FormData(e.target);
-            const body = {
-                name: fd.get('name'),
-                template: fd.get('template'),
-                permission: fd.get('permission'),
-                enabled: true,
-                fallbacks: {}
-            };
-            const r = await fetch('/chat-commands/api', {
-                method: 'POST', headers: jsonHeaders(), body: JSON.stringify(body)
-            });
-            if (r.ok) window.location.reload(); else await reportError(r);
+            try {
+                const resp = await window.catapultWs.request('chat-commands.create', {
+                    name: fd.get('name'),
+                    template: fd.get('template'),
+                    permission: fd.get('permission'),
+                    enabled: true,
+                    fallbacks: {}
+                });
+                const tbody = document.getElementById('chatCommandsTbody');
+                const tpl = document.getElementById('chatCommandsRowTpl').content;
+                tbody.appendChild(buildRow(tpl, resp.result));
+                e.target.reset();
+            } catch (err) { reportError(err); }
         };
+
+        // Wait for the WS session to be authenticated before the first list
+        // call — chat-commands.list requires an auth-ok session.
+        if (window.__wsCsrfToken) {
+            loadList();
+        } else {
+            document.addEventListener('ws:auth.ok', loadList, { once: true });
+        }
     })();
     </script>
 </section>
