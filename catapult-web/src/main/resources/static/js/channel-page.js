@@ -85,9 +85,23 @@
     });
   }
 
-  function onBindingUpserted() {
-    refetchAndSwap("/channels/" + encodeURIComponent(channelUsername) + "/fragments/bindings",
-                   "#bindings-card");
+  function onBindingUpserted(data) {
+    if (!data || !data.binding) return;
+    var bindingId = data.binding.id;
+    var existing = document.querySelector(
+        'tbody[data-binding-id="' + cssEscape(bindingId) + '"]');
+    var fresh = window.CatapultBindings.renderBindingRow(data.binding);
+    if (existing) {
+      // Preserve hidden edit rows — they contain server-rendered CCL checkboxes
+      // that we don't reconstruct from the event payload.
+      Array.from(existing.querySelectorAll("tr.edit-row")).forEach(function (r) {
+        fresh.appendChild(r);
+      });
+      existing.replaceWith(fresh);
+    } else {
+      var table = document.querySelector("#bindings-card table");
+      if (table) table.appendChild(fresh);
+    }
   }
 
   function onSettingsUpdated() {
