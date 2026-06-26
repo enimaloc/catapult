@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.web.ws.WsSession;
 import fr.enimaloc.catapult.web.ws.dispatch.RequestHandler;
 import fr.enimaloc.catapult.web.ws.dispatch.WsBusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
@@ -79,7 +78,7 @@ public class AdminConfigResetHandler implements RequestHandler {
             try {
                 webConfigOverrideService.clear(p.key());
             } catch (ResponseStatusException e) {
-                throw translateResponseStatus(e);
+                throw WsBusinessException.fromResponseStatus(e);
             }
         } else {
             boolean ok = apiClient.adminConfigReset(p.key());
@@ -88,16 +87,5 @@ public class AdminConfigResetHandler implements RequestHandler {
             }
         }
         return Map.of("ok", true);
-    }
-
-    private static WsBusinessException translateResponseStatus(ResponseStatusException e) {
-        HttpStatus status = HttpStatus.resolve(e.getStatusCode().value());
-        if (status == HttpStatus.FORBIDDEN) {
-            return new WsBusinessException("FORBIDDEN", e.getReason() != null ? e.getReason() : "Forbidden");
-        }
-        if (status == HttpStatus.NOT_FOUND) {
-            return new WsBusinessException("NOT_FOUND", e.getReason() != null ? e.getReason() : "Not found");
-        }
-        return new WsBusinessException("INTERNAL", e.getReason() != null ? e.getReason() : "Internal error");
     }
 }

@@ -98,6 +98,13 @@ class AdminConfigSetHandlerTest {
     }
 
     @Test
+    void set_nullValue_throwsValidation() {
+        assertThatThrownBy(() -> handler.handle(adminSession(), Map.of("module", "api", "key", "k")))
+                .isInstanceOf(WsBusinessException.class)
+                .satisfies(ex -> assertThat(((WsBusinessException) ex).code()).isEqualTo("VALIDATION"));
+    }
+
+    @Test
     void set_apiClientFails_throwsInternal() {
         when(apiClient.adminConfigSet("k", "v")).thenReturn(false);
 
