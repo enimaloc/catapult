@@ -77,7 +77,9 @@
       case 'notification.created':      prependNotif(msg.data); setUnread(unread + 1); break;
       case 'notification.read.changed': markReadInDom(msg.data.notificationId); setUnread(msg.data.unreadCount); break;
       case 'notification.all.read':     markAllReadInDom(); setUnread(0); break;
-      case 'notification.deleted':      removeFromDom(msg.data.notificationId); break;
+      case 'notification.deleted':      removeFromDom(msg.data.notificationId);
+                                        if (typeof msg.data.unreadCount === 'number') setUnread(msg.data.unreadCount);
+                                        break;
     }
   }
 
