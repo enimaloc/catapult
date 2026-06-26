@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,7 @@ class GameEventListenerLiveCheckTest {
     @Mock private TwitchService twitchService;
     @Mock private StreamStateService streamStateService;
     @Mock private UserSettingsRepository userSettingsRepository;
+    @Mock private ChannelEventPublisher channelEventPublisher;
 
     @InjectMocks private GameEventListener listener;
 
@@ -41,7 +43,11 @@ class GameEventListenerLiveCheckTest {
         user.setId(UUID.randomUUID());
 
         binding = new GameBinding();
+        binding.setId(UUID.randomUUID());
+        binding.setUser(user);
         binding.setStatus(GameBinding.Status.AUTO);
+        binding.setSourceType(GameBinding.SourceType.STEAM);
+        binding.setSourceName("Game");
     }
 
     @Test
