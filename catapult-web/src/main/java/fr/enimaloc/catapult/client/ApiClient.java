@@ -132,6 +132,46 @@ public class ApiClient {
     }
 
     /**
+     * Returns a page of notifications for the given user.
+     * The session JWT must be active in {@link WsAuthContext} so the interceptor
+     * can attach the correct Bearer token.
+     *
+     * @param userId the UUID of the user (used for logging)
+     * @param page   zero-based page index
+     * @param size   page size (caller is responsible for capping)
+     * @return the Spring Page serialised as a map, or {@code null} if the upstream call fails
+     */
+    public java.util.Map<String, Object> notificationList(UUID userId, int page, int size) {
+        try {
+            return restClient.get()
+                    .uri("/api/notifications?page={page}&size={size}", page, size)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<java.util.Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.warn("GET /api/notifications failed for user {}: {}", userId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Marks all notifications as read for the given user.
+     * The session JWT must be active in {@link WsAuthContext} so the interceptor
+     * can attach the correct Bearer token.
+     *
+     * @param userId the UUID of the user (used for logging)
+     */
+    public void notificationMarkAll(UUID userId) {
+        try {
+            restClient.post()
+                    .uri("/api/notifications/read-all")
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            log.warn("POST /api/notifications/read-all failed for user {}: {}", userId, e.getMessage());
+        }
+    }
+
+    /**
      * Returns the notification snapshot for the given user.
      * The session JWT must be active in {@link WsAuthContext} so the interceptor
      * can attach the correct Bearer token.
