@@ -73,21 +73,16 @@
 
   // ── Fetch-and-swap handlers ───────────────────────────────────────────────
 
-  function refetchAndSwap(url, targetSelector) {
+  function refetchAndSwap(path, targetSelector) {
     if (!channelUsername) return;
-    fetch(url, { credentials: "same-origin", headers: { "Accept": "text/html" } })
-      .then(function (r) { return r.ok ? r.text() : null; })
-      .then(function (html) {
-        if (html == null) return;
-        var target = document.querySelector(targetSelector);
-        if (!target) return;
-        // The server returns just the fragment; DOMParser wraps it in html/body.
-        // We re-extract the same selector to get the fragment root for swap.
-        var parsed = new DOMParser().parseFromString(html, "text/html");
-        var replacement = parsed.querySelector(targetSelector);
-        if (replacement) target.replaceWith(replacement);
-      })
-      .catch(function () { /* network blip — UI stays on previous state */ });
+    catapultWs.mvc({ method: "GET", path: path }).then(function (msg) {
+      if (!msg.ok || !msg.html) return;
+      var target = document.querySelector(targetSelector);
+      if (!target) return;
+      var parsed = new DOMParser().parseFromString(msg.html, "text/html");
+      var rep = parsed.querySelector(targetSelector);
+      if (rep) target.replaceWith(rep);
+    });
   }
 
   function onBindingUpserted() {

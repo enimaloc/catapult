@@ -225,6 +225,39 @@
     command: command
   };
 
+  /**
+   * Send a MVC request over WebSocket and return a Promise that resolves with
+   * the response frame (`{ok, html, status, target?, swap?, oob?, triggers?}`).
+   * Falls back to `{ok: false, error: {code: "WS_CLOSED"}}` when the socket is
+   * not open.
+   * @param opts  {method?, path, headers?, params?}
+   */
+  global.catapultWs.mvc = function (opts) {
+    return new Promise(function (resolve) {
+      var id = "m-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6);
+      var frame = {
+        type: "request",
+        id: id,
+        action: "mvc",
+        method: (opts.method || "GET").toUpperCase(),
+        path: opts.path,
+        headers: Object.assign({ "HX-Request": "true" }, opts.headers || {}),
+        params: opts.params || {},
+        csrfToken: window.__wsCsrfToken || null
+      };
+      var onResp = function (e) {
+        if (!e.detail || e.detail.id !== id) return;
+        document.removeEventListener("ws:response", onResp);
+        resolve(e.detail);
+      };
+      document.addEventListener("ws:response", onResp);
+      if (!global.catapultWs.send(frame)) {
+        document.removeEventListener("ws:response", onResp);
+        resolve({ ok: false, error: { code: "WS_CLOSED" } });
+      }
+    });
+  };
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", connect);
   } else {
