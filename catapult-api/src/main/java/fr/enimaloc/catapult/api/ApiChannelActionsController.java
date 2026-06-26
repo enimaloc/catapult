@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.ChannelAccessService;
+import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.EventSubService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.TwitchService;
@@ -68,7 +69,9 @@ public class ApiChannelActionsController {
         UserAccount viewer = resolveViewer(jwt);
         UserAccount channelUser = resolveChannel(username, viewer);
         bindingService.toggleCclEnabled(channelUser, id, body.enabled());
-        channelEventPublisher.bindingUpserted(channelUser.getId(), id);
+        bindingService.findBinding(channelUser, id)
+                .map(BindingDto::from)
+                .ifPresent(dto -> channelEventPublisher.bindingUpserted(channelUser.getId(), dto));
     }
 
     @PostMapping("/bindings/{id}/ignored-toggle")
@@ -82,7 +85,9 @@ public class ApiChannelActionsController {
         UserAccount viewer = resolveViewer(jwt);
         UserAccount channelUser = resolveChannel(username, viewer);
         bindingService.toggleIgnored(channelUser, id, body.ignored());
-        channelEventPublisher.bindingUpserted(channelUser.getId(), id);
+        bindingService.findBinding(channelUser, id)
+                .map(BindingDto::from)
+                .ifPresent(dto -> channelEventPublisher.bindingUpserted(channelUser.getId(), dto));
     }
 
     @PostMapping("/bindings/{id}/delete")
@@ -110,7 +115,9 @@ public class ApiChannelActionsController {
         UserAccount channelUser = resolveChannel(username, viewer);
         Set<String> ccls = body.ccls() != null ? body.ccls() : Set.of();
         bindingService.updateBinding(channelUser, id, body.twitchGameId(), body.twitchGameName(), ccls, false);
-        channelEventPublisher.bindingUpserted(channelUser.getId(), id);
+        bindingService.findBinding(channelUser, id)
+                .map(BindingDto::from)
+                .ifPresent(dto -> channelEventPublisher.bindingUpserted(channelUser.getId(), dto));
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
