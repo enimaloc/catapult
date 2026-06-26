@@ -90,6 +90,8 @@ public class BindingService {
                         ? detectedGame.getSourceId() : null;
                 Set<String> tws = twResolverService.suggest(new TwResolverService.SuggestInput(
                         igdbId, descriptorIds, steamAppId, detectedGame.getSourceName()));
+                log.debug("[TW] mapping for user {} game '{}' (igdb={}): {}",
+                        user.getId(), detectedGame.getSourceName(), igdbId, tws);
                 binding.getTws().clear();
                 binding.getTws().addAll(tws);
             }
