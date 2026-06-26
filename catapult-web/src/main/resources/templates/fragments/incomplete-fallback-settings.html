@@ -17,7 +17,7 @@
                 <div class="search-wrapper">
                     <input type="text"
                            id="gameSearch-incompleteGame"
-                           th:attr="data-search-url=@{/channels/{u}/api/games/search(u=${channelUsername})}"
+                           th:attr="data-channel-id=${channelUsername}"
                            data-results-id="gameResults-incompleteGame"
                            data-gameid-field="twitchGameId-incompleteGame"
                            data-gamename-field="twitchGameName-incompleteGame"
