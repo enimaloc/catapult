@@ -3,8 +3,8 @@
  *
  * Exposes window.CatapultBindings.renderBindingRow(b) that reconstructs a
  * <tbody data-binding-id="…"> from a BindingDto payload (as delivered by the
- * binding.upserted WS event), matching the structure of
- * templates/fragments/bindings.html.
+ * binding.upserted WS event), matching the DOM structure rendered by the
+ * Thymeleaf bindings fragment template.
  *
  * blockedCcls context is read from the page-level variable channelBlockedCcls
  * injected by app.html so that badge styling stays consistent with the
