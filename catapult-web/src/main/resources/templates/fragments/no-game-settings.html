@@ -23,6 +23,7 @@
                 <div class="search-wrapper">
                     <input type="text"
                            id="gameSearch-noGame"
+                           data-setting="noGame.twitchGameName"
                            th:attr="data-channel-id=${channelUsername}"
                            data-results-id="gameResults-noGame"
                            data-gameid-field="twitchGameId-noGame"
@@ -35,14 +36,16 @@
                 </div>
                 <input type="hidden" id="twitchGameId-noGame"
                        name="twitchGameId"
+                       data-setting="noGame.twitchGameId"
                        th:value="${noGameSettings.noGameTwitchGameId}">
                 <input type="hidden" id="twitchGameName-noGame"
                        name="twitchGameName"
+                       data-setting="noGame.twitchGameName"
                        th:value="${noGameSettings.noGameTwitchGameName}">
             </div>
             <div class="inline-edit-field">
                 <label th:text="#{bindings.edit.ccls}">CCLs</label>
-                <div class="ccl-checkboxes">
+                <div class="ccl-checkboxes" data-settings-group="noGame.ccls">
                     <div th:each="ccl : ${availableCcls}">
                         <label>
                             <input type="checkbox" name="ccls"
@@ -56,16 +59,19 @@
             <div class="inline-edit-field">
                 <label th:text="#{no_game.apply_on_stream_start}">Appliquer au début du stream</label>
                 <input type="checkbox" name="applyOnStreamStart"
+                       data-setting="noGame.applyOnStreamStart"
                        th:checked="${noGameSettings.applyDefaultOnStreamStart}">
             </div>
             <div class="inline-edit-field">
                 <label th:text="#{no_game.apply_on_no_game}">Appliquer quand aucun jeu n'est détecté</label>
                 <input type="checkbox" name="applyOnNoGame"
+                       data-setting="noGame.applyOnNoGame"
                        th:checked="${noGameSettings.applyDefaultOnNoGame}">
             </div>
             <div class="inline-edit-field">
                 <label th:text="#{no_game.apply_on_stream_end}">Appliquer à la fin du stream</label>
                 <input type="checkbox" name="applyOnStreamEnd"
+                       data-setting="noGame.applyOnStreamEnd"
                        th:checked="${noGameSettings.applyDefaultOnStreamEnd}">
             </div>
         </div>

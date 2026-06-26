@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.BindingDto;
+import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -57,8 +58,8 @@ public class ChannelEventPublisher {
         publish(channelOwnerId, "binding.deleted", Map.of("bindingId", bindingId.toString()));
     }
 
-    public void settingsUpdated(UUID channelOwnerId) {
-        publish(channelOwnerId, "settings.updated", Map.of());
+    public void settingsUpdated(UUID channelOwnerId, UserSettingsDto settings) {
+        publish(channelOwnerId, "settings.updated", Map.of("settings", settings));
     }
 
     public void steamProfileChanged(UUID channelOwnerId) {
