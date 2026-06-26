@@ -234,6 +234,27 @@ public class ApiClient {
     }
 
     /**
+     * Sends a broadcast event via the admin API.
+     * The session JWT must be active in {@link WsAuthContext} so the interceptor
+     * can attach the correct Bearer token.
+     *
+     * @param params the broadcast parameters (channel, name, data)
+     * @return the API response as a map, or {@code null} if the upstream call fails
+     */
+    public java.util.Map<String, Object> adminBroadcastSend(fr.enimaloc.catapult.web.ws.dispatch.handler.AdminBroadcastSendHandler.Params params) {
+        try {
+            return restClient.post()
+                    .uri("/api/admin/broadcast")
+                    .body(params)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<java.util.Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.warn("POST /api/admin/broadcast failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Deletes a notification by its ID via the admin API.
      * The session JWT must be active in {@link WsAuthContext} so the interceptor
      * can attach the correct Bearer token.
