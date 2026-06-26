@@ -2,7 +2,10 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.domain.TwDefinition;
 import fr.enimaloc.catapult.service.AdminTwService;
+import fr.enimaloc.catapult.service.TwBackfillService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,6 +28,12 @@ import java.util.Set;
 public class ApiAdminTwController {
 
     private final AdminTwService service;
+
+    // Optional so the controller still loads when tw.enabled=false disables
+    // the backfill bean — the rebuild endpoint then 404s rather than crashing
+    // wiring.
+    @Autowired(required = false)
+    private TwBackfillService backfillService;
 
     public record CreateBody(String id, String label, String description, Integer sortOrder) {}
     public record UpdateBody(String label, String description, Integer sortOrder, Boolean enabled) {}
@@ -78,5 +87,14 @@ public class ApiAdminTwController {
     public ResponseEntity<Void> setSteamKw(@PathVariable String id, @RequestBody SteamKeywordsBody b) {
         service.replaceSteamKeywords(id, b.keywords() == null ? Set.of() : b.keywords());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/rebuild")
+    public ResponseEntity<Void> rebuildMappings() {
+        if (backfillService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+        backfillService.rebuildAllNonOverridden();
+        return ResponseEntity.accepted().build();
     }
 }
