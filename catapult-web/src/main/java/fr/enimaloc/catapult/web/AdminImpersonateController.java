@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.client.ApiClient;
+import fr.enimaloc.catapult.security.JwtSessionAuthFilter;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ public class AdminImpersonateController {
     static final String SESSION_ORIGINAL_JWT_KEY = "originalJwt";
 
     private final ApiClient apiClient;
+    private final JwtSessionAuthFilter jwtFilter;
 
     @PostMapping
     public String impersonate(@RequestParam String username, HttpSession session) {
@@ -56,15 +58,15 @@ public class AdminImpersonateController {
 
     /**
      * Spring stores the resolved {@code SecurityContext} on the {@code HttpSession}
-     * across requests, so the cached admin principal would survive a JWT swap and
-     * the new roles ({@code ROLE_PREVIOUS_ADMINISTRATOR}, the target user's roles)
-     * would never reach the page — every following request would short-circuit
-     * inside {@link JwtSessionAuthFilter} because the authentication is non-null.
-     * Drop both the in-memory and session-stored contexts so the filter
-     * re-validates the freshly-stored JWT on the next request.
+     * across requests, so the cached admin principal would survive a JWT swap
+     * and the new roles ({@code ROLE_PREVIOUS_ADMINISTRATOR}, the target user's
+     * roles) would never reach the page. We clear the session-stored copy AND
+     * re-run validation on the freshly-stored JWT so the redirect response in
+     * the same request stream already sees the new principal.
      */
-    private static void forceAuthReload(HttpSession session) {
+    private void forceAuthReload(HttpSession session) {
         SecurityContextHolder.clearContext();
         session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+        jwtFilter.refreshFromSession(session);
     }
 }
