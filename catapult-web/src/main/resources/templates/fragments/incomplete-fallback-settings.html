@@ -17,6 +17,7 @@
                 <div class="search-wrapper">
                     <input type="text"
                            id="gameSearch-incompleteGame"
+                           data-setting="incompleteFallback.twitchGameName"
                            th:attr="data-channel-id=${channelUsername}"
                            data-results-id="gameResults-incompleteGame"
                            data-gameid-field="twitchGameId-incompleteGame"
@@ -29,14 +30,16 @@
                 </div>
                 <input type="hidden" id="twitchGameId-incompleteGame"
                        name="twitchGameId"
+                       data-setting="incompleteFallback.twitchGameId"
                        th:value="${incompleteFallbackSettings.incompleteFallbackTwitchGameId}">
                 <input type="hidden" id="twitchGameName-incompleteGame"
                        name="twitchGameName"
+                       data-setting="incompleteFallback.twitchGameName"
                        th:value="${incompleteFallbackSettings.incompleteFallbackTwitchGameName}">
             </div>
             <div class="inline-edit-field">
                 <label th:text="#{bindings.edit.ccls}">CCLs</label>
-                <div class="ccl-checkboxes">
+                <div class="ccl-checkboxes" data-settings-group="incompleteFallback.ccls">
                     <div th:each="ccl : ${availableCcls}">
                         <label>
                             <input type="checkbox" name="ccls"

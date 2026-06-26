@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.ChannelAccessService;
 import fr.enimaloc.catapult.service.binding.BindingDto;
+import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import fr.enimaloc.catapult.service.EventSubService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.TwitchService;
@@ -156,7 +157,7 @@ public class ApiChannelActionsController {
         settings.getBlockedCcls().clear();
         if (body.blockedCcls() != null) settings.getBlockedCcls().addAll(body.blockedCcls());
         userSettingsRepository.save(settings);
-        channelEventPublisher.settingsUpdated(channelUser.getId());
+        channelEventPublisher.settingsUpdated(channelUser.getId(), UserSettingsDto.from(settings));
     }
 
     @PostMapping("/settings/tws")
@@ -173,7 +174,7 @@ public class ApiChannelActionsController {
         settings.getBlockedTws().clear();
         if (body.blockedTws() != null) settings.getBlockedTws().addAll(body.blockedTws());
         userSettingsRepository.save(settings);
-        channelEventPublisher.settingsUpdated(channelUser.getId());
+        channelEventPublisher.settingsUpdated(channelUser.getId(), UserSettingsDto.from(settings));
     }
 
     @PostMapping("/settings/no-game")
@@ -197,7 +198,7 @@ public class ApiChannelActionsController {
         if (gameStateService.getLastKnownGame(channelUser).isEmpty()) {
             twitchService.resetToDefault(channelUser);
         }
-        channelEventPublisher.settingsUpdated(channelUser.getId());
+        channelEventPublisher.settingsUpdated(channelUser.getId(), UserSettingsDto.from(settings));
     }
 
     @PostMapping("/settings/incomplete-fallback")
@@ -215,7 +216,7 @@ public class ApiChannelActionsController {
         settings.getIncompleteFallbackCcls().clear();
         if (body.ccls() != null) settings.getIncompleteFallbackCcls().addAll(body.ccls());
         userSettingsRepository.save(settings);
-        channelEventPublisher.settingsUpdated(channelUser.getId());
+        channelEventPublisher.settingsUpdated(channelUser.getId(), UserSettingsDto.from(settings));
     }
 
     @PostMapping("/settings/steam-personal-token")
