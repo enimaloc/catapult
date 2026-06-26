@@ -1,8 +1,10 @@
 package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.client.ApiClient;
+import fr.enimaloc.catapult.security.CatapultWebUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -86,7 +88,9 @@ public class AdminController {
     // ── Members ──────────────────────────────────────────────────────────────
 
     @GetMapping("/members")
-    public String membersPage(Model model) {
+    public String membersPage(Model model,
+                              @AuthenticationPrincipal CatapultWebUser principal,
+                              @RequestParam(required = false) String error) {
         AdminMembersPageDto data = apiClient.get("/api/admin/members", AdminMembersPageDto.class);
         if (data != null) {
             // Convert string UUID keys to UUID so the template lookup works
@@ -100,6 +104,11 @@ public class AdminController {
             model.addAttribute("liveStatus", liveStatus);
             model.addAttribute("isMockProfile", data.isMockProfile());
         }
+        // Drives the th:disabled guard on the "Impersonner" button — clicking
+        // on yourself is rejected upstream with 403 "Cannot impersonate yourself"
+        // and previously produced silent ?error=impersonateFailed redirects.
+        model.addAttribute("currentUserTwitchId", principal == null ? null : principal.getTwitchId());
+        model.addAttribute("impersonateError", error);
         return "admin/members";
     }
 

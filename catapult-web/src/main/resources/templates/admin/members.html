@@ -12,6 +12,10 @@
 <!--/*@thymesvar id="privateSteamProfiles" type="java.util.Set"*/-->
 <!--/*@thymesvar id="steamRateLimited" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="currentUserTwitchId" type="java.lang.String"*/-->
+    <div th:if="${impersonateError == 'impersonateFailed'}" class="banner banner-danger" style="margin-bottom:1rem;">
+        <span th:text="#{admin.members.impersonate.error}">Impersonation refusée par l'API (utilisateur cible introuvable, inactif, ou self-impersonation).</span>
+    </div>
+
     <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
         <h2 th:text="#{admin.members.title}" style="margin:0">Administration — Membres</h2>
         <form th:if="${canMockSteam}" th:action="@{/admin/members/steam/toggle-rate-limit}" method="post"> <!-- nosemgrep -->
