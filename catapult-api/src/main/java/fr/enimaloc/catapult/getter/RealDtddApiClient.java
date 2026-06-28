@@ -1,8 +1,10 @@
 package fr.enimaloc.catapult.getter;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -44,7 +46,7 @@ public class RealDtddApiClient implements DtddApiClient {
     }
 
     @Override
-    public Optional<List<DtddSearchResult>> search(String query) {
+    public Optional<List<DtddSearchResult>> search(String query, @Nullable String mediaType) {
         return callWithRetry(key -> client.get()
                 .uri(uri -> uri.path("/v3/items").queryParam("q", query).build())
                 .header("X-API-KEY", key)
@@ -57,11 +59,24 @@ public class RealDtddApiClient implements DtddApiClient {
 
     @Override
     public Optional<DtddTopics> fetchTopics(long dtddId) {
+        return item(dtddId).map(item -> {
+            List<String> yes = new ArrayList<>(), no = new ArrayList<>(), mostly = new ArrayList<>();
+            for (DtddTopicItemStat topicItemStat : item.topicItemStats()) {
+                if (topicItemStat.yesSum() > topicItemStat.noSum()) yes.add(topicItemStat.topicName());
+                else if (topicItemStat.yesSum() < topicItemStat.noSum()) no.add(topicItemStat.topicName());
+                else mostly.add(topicItemStat.topicName());
+            }
+            return new DtddTopics(yes, no, mostly);
+        });
+    }
+
+    @Override
+    public Optional<DtddItem> item(long dtddId) {
         return callWithRetry(key -> client.get()
                 .uri("/v3/items/" + dtddId)
                 .header("X-API-KEY", key)
                 .retrieve()
-            .body(String.class), this::parseTopics);
+                .body(String.class), this::parseItem);
     }
 
     private <T> Optional<T> callWithRetry(Function<String, String> call, Function<String, T> parser) {
@@ -77,7 +92,7 @@ public class RealDtddApiClient implements DtddApiClient {
                 if (status.value() == 404) return Optional.empty();
                 if (status.value() == 429) {
                     String retryAfter = e.getResponseHeaders() != null
-                        ? e.getResponseHeaders().getFirst("Retry-After") : null;
+                            ? e.getResponseHeaders().getFirst("Retry-After") : null;
                     int seconds = parseRetryAfter(retryAfter);
                     rotator.onKeyRateLimited(key, seconds);
                     continue; // retry once
@@ -94,22 +109,32 @@ public class RealDtddApiClient implements DtddApiClient {
 
     private int parseRetryAfter(String header) {
         if (header == null || header.isBlank()) return 60;
-        try { return Math.max(1, Integer.parseInt(header.trim())); }
-        catch (NumberFormatException e) { return 60; }
+        try {
+            return Math.max(1, Integer.parseInt(header.trim()));
+        } catch (NumberFormatException e) {
+            return 60;
+        }
+    }
+
+    private DtddItem parseItem(String body) {
+        try {
+            return MAPPER.readValue(body, DtddItem.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private List<DtddSearchResult> parseSearch(String body) {
         try {
             JsonNode root = MAPPER.readTree(body);
-            JsonNode items = root.path("items");
             List<DtddSearchResult> out = new ArrayList<>();
-            for (JsonNode it : items) {
+            for (JsonNode it : root) {
                 out.add(new DtddSearchResult(
-                    it.path("id").asLong(),
-                    it.path("name").asText(null),
-                    it.path("slug").asText(null),
-                    it.path("type").asText(null),
-                    it.path("posterUrl").isNull() ? null : it.path("posterUrl").asText(null)
+                        it.path("id").asLong(),
+                        it.path("name").asText(null),
+                        "https://www.doesthedogdie.com/media/" + it.path("id").asLong(),
+                        it.path("itemTypeName").asText(null),
+                        it.path("posterUrl").isNull() ? null : it.path("posterUrl").asText(null)
                 ));
             }
             return out;
@@ -129,9 +154,9 @@ public class RealDtddApiClient implements DtddApiClient {
                 if (name == null) continue;
                 int y = s.path("yesSum").asInt(0);
                 int n = s.path("noSum").asInt(0);
-                if (y > n)      yes.add(name);
+                if (y > n) yes.add(name);
                 else if (n > y) no.add(name);
-                else            mostly.add(name);
+                else mostly.add(name);
             }
             return new DtddTopics(yes, no, mostly);
         } catch (Exception e) {
