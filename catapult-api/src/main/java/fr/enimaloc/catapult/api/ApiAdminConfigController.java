@@ -31,7 +31,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/admin/config")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
 @RequiredArgsConstructor
 public class ApiAdminConfigController {
 
