@@ -27,5 +27,5 @@ public interface DtddApiClient {
                     long tmdbId, String imdbID, String backgroundImage, String posterImage, String overview,
                     DtddTopicItemStat[] topicItemStats) {}
 
-    record DtddTopicItemStat(long topicItemId, long yesSum, long noSum, long numComment, long topicId, String topicName, long itemId) {}
+    record DtddTopicItemStat(long topicItemId, long yesSum, long noSum, long numComments, long topicId, String topicName, long itemId) {}
 }
