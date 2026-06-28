@@ -46,18 +46,21 @@ public class RealDtddApiClient implements DtddApiClient {
     @Override
     public Optional<List<DtddSearchResult>> search(String query) {
         return callWithRetry(key -> client.get()
-            .uri(uri -> uri.path("/v1/search").queryParam("q", query).build())
-            .header("X-API-KEY", key)
-            .retrieve()
-            .body(String.class), this::parseSearch);
+                .uri(uri -> uri.path("/v3/items").queryParam("q", query).build())
+                .header("X-API-KEY", key)
+                .retrieve()
+                .body(String.class), this::parseSearch)
+                .map(list -> list.stream()
+                        .filter(result -> mediaType == null || result.mediaType().equals(mediaType))
+                        .toList());
     }
 
     @Override
     public Optional<DtddTopics> fetchTopics(long dtddId) {
         return callWithRetry(key -> client.get()
-            .uri("/v1/media/" + dtddId)
-            .header("X-API-KEY", key)
-            .retrieve()
+                .uri("/v3/items/" + dtddId)
+                .header("X-API-KEY", key)
+                .retrieve()
             .body(String.class), this::parseTopics);
     }
 
