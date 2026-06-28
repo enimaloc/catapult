@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.getter;
 
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -38,12 +39,17 @@ public class MockDtddApiClient implements DtddApiClient {
     );
 
     @Override
-    public Optional<List<DtddSearchResult>> search(String query) {
+    public Optional<List<DtddSearchResult>> search(String query, @Nullable String mediaType) {
         return Optional.of(FIXTURES_SEARCH.getOrDefault(query.toLowerCase(), List.of()));
     }
 
     @Override
     public Optional<DtddTopics> fetchTopics(long dtddId) {
         return Optional.ofNullable(FIXTURES_TOPICS.get(dtddId));
+    }
+
+    @Override
+    public Optional<DtddItem> item(long dtddId) {
+        return Optional.empty();
     }
 }
