@@ -234,7 +234,7 @@ class HtmxWsDispatcherTest {
 
         @GetMapping("/__htmx-test/admin-only")
         @ResponseBody
-        @PreAuthorize("hasRole('ADMIN')")
+        @PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
         String adminOnly() {
             return "<p>admin ok</p>";
         }
