@@ -70,6 +70,19 @@ public class TwBackfillService {
         log.info("TW rebuild done: processed={} skipped={} failed={}", c.processed, c.skipped, c.failed);
     }
 
+    /**
+     * Admin-triggered rebuild: re-resolve TW suggestions for every binding
+     * whose streamer has not pinned them ({@code twOverride=false}), including
+     * those that already carry a non-empty TW set. Used after the mapping
+     * tables change so existing bindings pick up the new signals.
+     */
+    @Async
+    public void rebuildAll() {
+        log.info("TW rebuild starting (throttle={}/s, batchSize={})", throttle, batchSize);
+        Counts c = process(true);
+        log.info("TW rebuild done: processed={} skipped={} failed={}", c.processed, c.skipped, c.failed);
+    }
+
     private static class Counts {
         int processed;
         int skipped;
