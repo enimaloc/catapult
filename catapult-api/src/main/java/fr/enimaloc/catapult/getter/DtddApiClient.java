@@ -24,7 +24,7 @@ public interface DtddApiClient {
     record DtddTopics(List<String> yesTopics, List<String> noTopics, List<String> mostlyTopics) {}
 
     record DtddItem(long id, String name, String[] genres, long releaseYear, long itemTypeId, String itemTypeName,
-                    long tmdbId, String imdbID, String backgroundImage, String posterImage, String overview,
+                    long tmdbId, String imdbId, String backgroundImage, String posterImage, String overview,
                     DtddTopicItemStat[] topicItemStats) {}
 
     record DtddTopicItemStat(long topicItemId, long yesSum, long noSum, long numComments, long topicId, String topicName, long itemId) {}
