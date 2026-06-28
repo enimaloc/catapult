@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.security;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -16,6 +17,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 
 import javax.crypto.SecretKey;
 import java.util.Collection;
@@ -33,6 +35,27 @@ import java.util.stream.Stream;
 public class ApiSecurityConfig {
 
     @Bean
+    @Profile("dev")
+    public SecurityFilterChain devApiSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/api/**")
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/health", "/api/config/**", "/api/changelog").permitAll()
+                        .requestMatchers("/api/auth/exchange").permitAll()
+                        .requestMatchers("/api/connect/steam/callback").permitAll()
+                        .requestMatchers("/api/admin/**").permitAll()
+                        .anyRequest().permitAll()
+                )
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
+                        jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                .csrf(csrf -> csrf.disable());
+
+        return http.build();
+    }
+
+    @Bean
+    @Profile("!dev")
     public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .securityMatcher("/api/**")
@@ -40,8 +63,12 @@ public class ApiSecurityConfig {
                         .requestMatchers("/api/health", "/api/config/**", "/api/changelog").permitAll()
                         .requestMatchers("/api/auth/exchange").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/admin/**").access(new WebExpressionAuthorizationManager(
+                                "hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')"
+                        ))
+                        .anyRequest().access(new WebExpressionAuthorizationManager(
+                                "isAuthenticated() or hasIpAddress('127.0.0.1') or hasIpAddress('::1')"
+                        ))
                 )
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
