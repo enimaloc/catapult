@@ -18,6 +18,7 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
+RUN apk add --no-cache curl jq
 RUN addgroup -S catapult && adduser -S catapult -G catapult
 
 COPY --from=builder /app/catapult-api/build/libs/*.jar app.jar
