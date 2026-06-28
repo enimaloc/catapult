@@ -90,11 +90,20 @@ public class ApiAdminTwController {
     }
 
     @PostMapping("/rebuild")
-    public ResponseEntity<Void> rebuildMappings() {
+    public ResponseEntity<Void> rebuildNonOverriddenMappings() {
         if (backfillService == null) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
         backfillService.rebuildAllNonOverridden();
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/rebuild/force")
+    public ResponseEntity<Void> rebuildMappings() {
+        if (backfillService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+        backfillService.rebuildAll();
         return ResponseEntity.accepted().build();
     }
 }
