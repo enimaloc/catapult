@@ -24,6 +24,6 @@ public class UserFlag {
     @Column(name = "flag_key", nullable = false)
     private String flagKey;
 
-    @Column(name = "flag_value")
+    @Column(name = "flag_value", length = 1024)
     private String flagValue;
 }
