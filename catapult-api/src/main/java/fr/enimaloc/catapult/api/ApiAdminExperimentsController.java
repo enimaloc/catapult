@@ -195,12 +195,14 @@ public class ApiAdminExperimentsController {
         rule.setExperiment(exp);
         rule.setRuleType(body.ruleType());
         rule.setPriority(body.priority());
-        if (body.ruleType() == ExperimentAssignmentRule.RuleType.RANDOM) {
-            rule.setPercentage(body.percentage());
-        } else if (body.ruleType() == ExperimentAssignmentRule.RuleType.ATTRIBUTE) {
-            rule.setAttributeKey(body.attributeKey());
-            rule.setAttributeOperator(body.attributeOperator());
-            rule.setAttributeValue(body.attributeValue());
+        switch (body.ruleType()) {
+            case RANDOM -> rule.setPercentage(body.percentage());
+            case ATTRIBUTE, GROUP, EXPERIMENT -> {
+                rule.setAttributeKey(body.attributeKey());
+                rule.setAttributeOperator(body.attributeOperator());
+                rule.setAttributeValue(body.attributeValue());
+            }
+            case MANUAL -> { /* no extra fields */ }
         }
         ruleRepository.save(rule);
     }
