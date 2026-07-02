@@ -46,7 +46,7 @@ public class ApiAdminGroupsController {
     }
 
     @PostMapping("/{id}/rename")
-    @Transactional(readOnly = true)
+    @Transactional
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void rename(@PathVariable UUID id, @RequestBody RenameRequest body) {
         UserGroup group = findOrThrow(id);
