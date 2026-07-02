@@ -22,6 +22,7 @@ public class ApiAdminGroupsController {
     private final UserAccountRepository userAccountRepository;
 
     @GetMapping
+    @Transactional(readOnly = true)
     public List<GroupSummary> list() {
         return groupRepository.findAll().stream()
             .map(g -> new GroupSummary(g.getId(), g.getKey(), g.getName(), g.getDescription(), g.getMembers().size()))
@@ -45,6 +46,7 @@ public class ApiAdminGroupsController {
     }
 
     @PostMapping("/{id}/rename")
+    @Transactional(readOnly = true)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void rename(@PathVariable UUID id, @RequestBody RenameRequest body) {
         UserGroup group = findOrThrow(id);
