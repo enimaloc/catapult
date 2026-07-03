@@ -135,6 +135,9 @@
                                         th:data-menu-id="${member.id}"
                                         onclick="toggleDropdown('menu-' + this.dataset.menuId)">⋮</button>
                                 <div class="dropdown-menu" th:id="'menu-' + ${member.id}">
+                                    <a th:href="@{/admin/members/{id}/targeting(id=${member.id})}"
+                                       class="dropdown-item"
+                                       th:text="#{admin.members.action.targeting}">Targeting</a>
                                     <form th:action="@{/admin/impersonate}" method="post"> <!-- nosemgrep -->
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <input type="hidden" name="username" th:value="${member.twitchUsername ?: ''}"/>
