@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.*;
+import fr.enimaloc.catapult.experiment.targeting.AttributeEvaluator;
 import fr.enimaloc.catapult.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,17 +26,21 @@ public class ExperimentService {
     private final ExperimentEventRepository eventRepository;
     private final ExperimentOverrideRepository overrideRepository;
     private final ExperimentService self;
+    private final AttributeEvaluator attributeEvaluator;
+    private final UserGroupRepository userGroupRepository;
 
     private static final String CONTROL_KEY = "control";
     private final Set<String> knownKeys = ConcurrentHashMap.newKeySet();
 
     @Autowired
-    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, @Lazy ExperimentService self) {
+    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, @Lazy ExperimentService self, AttributeEvaluator attributeEvaluator, UserGroupRepository userGroupRepository) {
         this.experimentRepository = experimentRepository;
         this.assignmentRepository = assignmentRepository;
         this.eventRepository = eventRepository;
         this.overrideRepository = overrideRepository;
         this.self = self;
+        this.attributeEvaluator = attributeEvaluator;
+        this.userGroupRepository = userGroupRepository;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -217,42 +222,17 @@ public class ExperimentService {
 
     private boolean ruleMatches(UserAccount user, ExperimentAssignmentRule rule) {
         return switch (rule.getRuleType()) {
-            case RANDOM    -> fnvBucket(user.getId().toString(), rule.getExperiment().getKey()) < rule.getPercentage();
-            case ATTRIBUTE -> evaluateAttribute(user,
-                              rule.getAttributeKey(),
-                              rule.getAttributeOperator(),
-                              rule.getAttributeValue());
-            case MANUAL    -> false;
+            case RANDOM     -> fnvBucket(user.getId().toString(), rule.getExperiment().getKey()) < rule.getPercentage();
+            case ATTRIBUTE  -> evaluateAttribute(user, rule.getAttributeKey(), rule.getAttributeOperator(), rule.getAttributeValue());
+            case GROUP      -> userGroupRepository.existsByKey(rule.getAttributeValue())
+                              && evaluateAttribute(user, "group", rule.getAttributeOperator(), rule.getAttributeValue());
+            case EXPERIMENT -> evaluateAttribute(user, "experiment:" + rule.getAttributeKey(), rule.getAttributeOperator(), rule.getAttributeValue());
+            case MANUAL     -> false;
         };
     }
 
     private boolean evaluateAttribute(UserAccount user, String key, String op, String val) {
-        double actual = switch (key) {
-            case "account_age_days"          -> (System.currentTimeMillis() - user.getCreatedAt().toEpochMilli()) / 86_400_000.0;
-            case "has_steam"                 -> user.getSteamId() != null ? 1.0 : 0.0;
-            case "has_xbox", "has_battlenet" -> 0.0;
-            default -> {
-                log.warn("Unknown attribute key '{}', defaulting to no-match", key);
-                yield Double.NaN;
-            }
-        };
-        if (Double.isNaN(actual)) return false;
-        double expected;
-        try {
-            expected = Double.parseDouble(val);
-        } catch (NumberFormatException e) {
-            log.warn("Invalid attribute value '{}', defaulting to no-match", val);
-            return false;
-        }
-        return switch (op) {
-            case "eq",  "==" -> actual == expected;
-            case "neq", "!=" -> actual != expected;
-            case "gt",  ">"  -> actual >  expected;
-            case "gte", ">=" -> actual >= expected;
-            case "lt",  "<"  -> actual <  expected;
-            case "lte", "<=" -> actual <= expected;
-            default          -> false;
-        };
+        return attributeEvaluator.matches(user, key, op, val);
     }
 
     private ExperimentVariant createVariant(Experiment exp, String key, boolean control, int internalId) {

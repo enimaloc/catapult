@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'members', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title th:text="#{admin.member_targeting.title}">Administration — Ciblage membre</title>
+</head>
+<body>
+<!--/*@thymesvar id="member" type="fr.enimaloc.catapult.web.AdminController.MemberSummaryDto"*/-->
+<!--/*@thymesvar id="memberId" type="java.util.UUID"*/-->
+<!--/*@thymesvar id="flags" type="java.util.List"*/-->
+<!--/*@thymesvar id="memberGroupKeys" type="java.util.List"*/-->
+<!--/*@thymesvar id="allGroups" type="java.util.List"*/-->
+
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
+        <a th:href="@{/admin/members}" class="btn btn-sm" th:text="#{admin.member_targeting.back}">← Retour</a>
+        <h2 style="margin:0">
+            <span th:text="#{admin.member_targeting.header}">Ciblage —</span>
+            <strong th:text="${member.twitchUsername ?: '—'}"></strong>
+        </h2>
+    </div>
+
+    <!-- ── Flags ────────────────────────────────────────────────────────────── -->
+    <div class="card" style="margin-bottom:1.5rem">
+        <h3 th:text="#{admin.member_targeting.flags.title}" style="margin-bottom:0.75rem">Flags personnalisés</h3>
+
+        <div th:if="${#lists.isEmpty(flags)}" class="text-muted" style="margin-bottom:0.75rem">
+            <p th:text="#{admin.member_targeting.flags.empty}">Aucun flag défini.</p>
+        </div>
+
+        <div th:unless="${#lists.isEmpty(flags)}" class="table-container" style="margin-bottom:0.75rem">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.member_targeting.flags.column.key}">Clé</th>
+                        <th th:text="#{admin.member_targeting.flags.column.value}">Valeur</th>
+                        <th th:text="#{admin.member_targeting.flags.column.actions}">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="f : ${flags}">
+                        <td><code th:text="${f.key}"></code></td>
+                        <td th:text="${f.value ?: '—'}"></td>
+                        <td>
+                            <form th:action="@{/admin/members/{id}/flags/{key}/delete(id=${memberId},key=${f.key})}" method="post"> <!-- nosemgrep -->
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                        th:text="#{admin.member_targeting.flags.action.delete}">Supprimer</button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h4 th:text="#{admin.member_targeting.flags.add.title}" style="margin-bottom:0.5rem">Ajouter un flag</h4>
+        <form th:action="@{/admin/members/{id}/flags(id=${memberId})}" method="post"> <!-- nosemgrep -->
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
+                <div class="form-group" style="margin:0">
+                    <label th:for="flag-key" th:text="#{admin.member_targeting.flags.column.key}">Clé</label>
+                    <input id="flag-key" type="text" name="key" class="form-control"
+                           th:placeholder="#{admin.member_targeting.flags.add.key_placeholder}" required/>
+                </div>
+                <div class="form-group" style="margin:0">
+                    <label th:for="flag-value" th:text="#{admin.member_targeting.flags.column.value}">Valeur</label>
+                    <input id="flag-value" type="text" name="value" class="form-control"
+                           th:placeholder="#{admin.member_targeting.flags.add.value_placeholder}"/>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary"
+                        th:text="#{admin.member_targeting.flags.add.button}">Ajouter</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── Groups ───────────────────────────────────────────────────────────── -->
+    <div class="card">
+        <h3 th:text="#{admin.member_targeting.groups.title}" style="margin-bottom:0.75rem">Groupes</h3>
+
+        <div th:if="${#lists.isEmpty(memberGroupKeys)}" class="text-muted" style="margin-bottom:0.75rem">
+            <p th:text="#{admin.member_targeting.groups.empty}">Aucun groupe.</p>
+        </div>
+
+        <div th:unless="${#lists.isEmpty(memberGroupKeys)}" class="table-container" style="margin-bottom:0.75rem">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.member_targeting.groups.column.key}">Clé</th>
+                        <th th:text="#{admin.member_targeting.groups.column.actions}">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="gk : ${memberGroupKeys}">
+                        <td><code th:text="${gk}"></code></td>
+                        <td>
+                            <!--
+                              groupKey→UUID resolution: iterate allGroups and render the remove form
+                              only for the group whose key matches the current membership key.
+                              The th:with binds the matched group so the form URL gets its UUID.
+                            -->
+                            <th:block th:each="g : ${allGroups}" th:if="${g.key == gk}">
+                                <form th:action="@{/admin/members/{id}/groups/{groupId}/delete(id=${memberId},groupId=${g.id})}" method="post"> <!-- nosemgrep -->
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button type="submit" class="btn btn-sm btn-danger"
+                                            th:text="#{admin.member_targeting.groups.action.remove}">Retirer</button>
+                                </form>
+                            </th:block>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h4 th:text="#{admin.member_targeting.groups.add.title}" style="margin-bottom:0.5rem">Ajouter à un groupe</h4>
+        <form th:action="@{/admin/members/{id}/groups(id=${memberId})}" method="post"> <!-- nosemgrep -->
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
+                <div class="form-group" style="margin:0">
+                    <label th:for="group-select" th:text="#{admin.member_targeting.groups.add.label}">Groupe</label>
+                    <select id="group-select" name="groupKey" class="form-control" required>
+                        <th:block th:each="g : ${allGroups}">
+                            <option th:value="${g.key}" th:text="${g.name}"></option>
+                        </th:block>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary"
+                        th:text="#{admin.member_targeting.groups.add.button}">Ajouter</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
