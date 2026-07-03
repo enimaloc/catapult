@@ -14,7 +14,7 @@ import java.util.UUID;
 public class ExperimentAssignmentRule {
 
     public enum RuleType {
-        RANDOM, ATTRIBUTE, MANUAL
+        RANDOM, ATTRIBUTE, MANUAL, GROUP, EXPERIMENT
     }
 
     @Id

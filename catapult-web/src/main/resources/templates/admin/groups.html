@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'groups', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title th:text="#{admin.groups.title}">Administration — Groupes</title>
+</head>
+<body>
+<!--/*@thymesvar id="groups" type="java.util.List"*/-->
+
+    <h2 th:text="#{admin.groups.title}" style="margin-bottom:1rem">Administration — Groupes</h2>
+
+    <div class="card" style="margin-bottom:1.5rem">
+        <h3 th:text="#{admin.groups.create.title}" style="margin-bottom:0.75rem">Créer un groupe</h3>
+        <form th:action="@{/admin/groups}" method="post"> <!-- nosemgrep -->
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
+                <div class="form-group" style="margin:0">
+                    <label th:for="create-key" th:text="#{admin.groups.column.key}">Clé</label>
+                    <input id="create-key" type="text" name="key" class="form-control"
+                           th:placeholder="#{admin.groups.create.key_placeholder}" required/>
+                </div>
+                <div class="form-group" style="margin:0">
+                    <label th:for="create-name" th:text="#{admin.groups.column.name}">Nom</label>
+                    <input id="create-name" type="text" name="name" class="form-control"
+                           th:placeholder="#{admin.groups.create.name_placeholder}" required/>
+                </div>
+                <div class="form-group" style="margin:0">
+                    <label th:for="create-desc" th:text="#{admin.groups.column.description}">Description</label>
+                    <input id="create-desc" type="text" name="description" class="form-control"
+                           th:placeholder="#{admin.groups.create.desc_placeholder}"/>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary" th:text="#{admin.groups.create.button}">+ Créer</button>
+            </div>
+        </form>
+    </div>
+
+    <div th:if="${#lists.isEmpty(groups)}" class="text-muted">
+        <p th:text="#{admin.groups.empty}">Aucun groupe défini.</p>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(groups)}" class="card">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.groups.column.key}">Clé</th>
+                        <th th:text="#{admin.groups.column.name}">Nom</th>
+                        <th th:text="#{admin.groups.column.description}">Description</th>
+                        <th th:text="#{admin.groups.column.member_count}">Membres</th>
+                        <th th:text="#{admin.groups.column.actions}">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="g : ${groups}">
+                        <td><code th:text="${g.key}"></code></td>
+                        <td th:text="${g.name}"></td>
+                        <td th:text="${g.description ?: '—'}"></td>
+                        <td th:text="${g.memberCount}"></td>
+                        <td>
+                            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-start">
+
+                                <!-- Rename form -->
+                                <details>
+                                    <summary class="btn btn-sm" th:text="#{admin.groups.action.rename}">Renommer</summary>
+                                    <div style="margin-top:0.5rem;padding:0.5rem;background:var(--card-bg,#fff);border:1px solid var(--border,#ddd);border-radius:4px">
+                                        <form th:action="@{/admin/groups/{id}/rename(id=${g.id})}" method="post"> <!-- nosemgrep -->
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <div class="form-group" style="margin-bottom:0.4rem">
+                                                <label th:text="#{admin.groups.column.name}">Nom</label>
+                                                <input type="text" name="name" class="form-control"
+                                                       th:value="${g.name}" required/>
+                                            </div>
+                                            <div class="form-group" style="margin-bottom:0.4rem">
+                                                <label th:text="#{admin.groups.column.description}">Description</label>
+                                                <input type="text" name="description" class="form-control"
+                                                       th:value="${g.description}"/>
+                                            </div>
+                                            <button type="submit" class="btn btn-sm btn-primary"
+                                                    th:text="#{admin.groups.action.rename.save}">Enregistrer</button>
+                                        </form>
+                                    </div>
+                                </details>
+
+                                <!-- Add member form -->
+                                <details>
+                                    <summary class="btn btn-sm" th:text="#{admin.groups.action.add_member}">+ Membre</summary>
+                                    <div style="margin-top:0.5rem;padding:0.5rem;background:var(--card-bg,#fff);border:1px solid var(--border,#ddd);border-radius:4px">
+                                        <form th:action="@{/admin/groups/{id}/members(id=${g.id})}" method="post"> <!-- nosemgrep -->
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <div class="form-group" style="margin-bottom:0.4rem">
+                                                <label th:text="#{admin.groups.add_member.label}">Twitch username</label>
+                                                <input type="text" name="twitchUsername" class="form-control"
+                                                       th:placeholder="#{admin.groups.add_member.placeholder}" required/>
+                                            </div>
+                                            <button type="submit" class="btn btn-sm btn-primary"
+                                                    th:text="#{admin.groups.action.add_member.submit}">Ajouter</button>
+                                        </form>
+                                    </div>
+                                </details>
+
+                                <!-- Delete form -->
+                                <form th:action="@{/admin/groups/{id}/delete(id=${g.id})}" method="post"> <!-- nosemgrep -->
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button type="submit" class="btn btn-sm btn-danger"
+                                            th:text="#{admin.groups.action.delete}"
+                                            th:data-confirm="#{admin.groups.action.delete.confirm(${g.name})}"
+                                            onclick="return confirm(this.dataset.confirm)">Supprimer</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
