@@ -3,8 +3,11 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.domain.TwDefinition;
 import fr.enimaloc.catapult.service.AdminTwService;
 import fr.enimaloc.catapult.service.TwBackfillService;
+import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,6 +38,9 @@ public class ApiAdminTwController {
     @Autowired(required = false)
     private TwBackfillService backfillService;
 
+    @Autowired(required = false)
+    private AdminEventPublisher events;
+
     public record CreateBody(String id, String label, String description, Integer sortOrder) {}
     public record UpdateBody(String label, String description, Integer sortOrder, Boolean enabled) {}
     public record DtddTopicsBody(Set<String> topics) {}
@@ -51,6 +57,13 @@ public class ApiAdminTwController {
     public ResponseEntity<TwDefinition> create(@RequestBody CreateBody b) {
         TwDefinition d = service.create(b.id(), b.label(), b.description(),
                 b.sortOrder() == null ? 0 : b.sortOrder());
+        if (events != null) {
+            events.twDefinitionAdded(Map.of(
+                    "id", d.getId(),
+                    "label", d.getLabel(),
+                    "enabled", d.isEnabled(),
+                    "sortOrder", d.getSortOrder()));
+        }
         return ResponseEntity.status(201).body(d);
     }
 

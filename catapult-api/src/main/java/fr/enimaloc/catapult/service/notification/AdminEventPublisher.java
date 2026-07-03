@@ -38,4 +38,19 @@ public class AdminEventPublisher {
     public void keysRefreshed(String provider, List<?> keys) {
         redisPublisher.publishAdmin(provider + ".keys.refreshed", Map.of("keys", keys));
     }
+
+    /** A trigger-warning definition was created. {@code definition} is a clean view map. */
+    public void twDefinitionAdded(Object definition) {
+        redisPublisher.publishAdmin("tw.definition.added", Map.of("definition", definition));
+    }
+
+    /** A CCL's IGDB descriptor mappings changed. {@code ccl} is a clean view map. */
+    public void cclMappingsUpdated(Object ccl) {
+        redisPublisher.publishAdmin("ccl.mappings.updated", Map.of("ccl", ccl));
+    }
+
+    /** The CCL catalog was re-synced from Twitch. Carries the full ccl list and descriptor catalog. */
+    public void cclRefreshed(Object ccls, Object descriptors) {
+        redisPublisher.publishAdmin("ccl.refreshed", Map.of("ccls", ccls, "igdbDescriptors", descriptors));
+    }
 }

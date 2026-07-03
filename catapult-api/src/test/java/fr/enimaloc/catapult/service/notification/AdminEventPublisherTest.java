@@ -59,4 +59,38 @@ class AdminEventPublisherTest {
         verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("steam.keys.refreshed"), data.capture());
         assertThat(data.getValue()).isEqualTo(Map.of("keys", keys));
     }
+
+    @Test
+    void twDefinitionAdded_publishesDefinition() {
+        Object def = Map.of("id", "gore", "label", "Gore", "enabled", true, "sortOrder", 0);
+
+        publisher.twDefinitionAdded(def);
+
+        ArgumentCaptor<Object> data = ArgumentCaptor.forClass(Object.class);
+        verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("tw.definition.added"), data.capture());
+        assertThat(data.getValue()).isEqualTo(Map.of("definition", def));
+    }
+
+    @Test
+    void cclMappingsUpdated_publishesCcl() {
+        Object ccl = Map.of("id", "DrugsIntoxication", "name", "Drugs", "mappedDescriptions", List.of("Alcohol"));
+
+        publisher.cclMappingsUpdated(ccl);
+
+        ArgumentCaptor<Object> data = ArgumentCaptor.forClass(Object.class);
+        verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("ccl.mappings.updated"), data.capture());
+        assertThat(data.getValue()).isEqualTo(Map.of("ccl", ccl));
+    }
+
+    @Test
+    void cclRefreshed_publishesCclsAndDescriptors() {
+        List<Object> ccls = List.of(Map.of("id", "a"));
+        List<Object> descriptors = List.of(Map.of("id", 1L, "description", "Violence"));
+
+        publisher.cclRefreshed(ccls, descriptors);
+
+        ArgumentCaptor<Object> data = ArgumentCaptor.forClass(Object.class);
+        verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("ccl.refreshed"), data.capture());
+        assertThat(data.getValue()).isEqualTo(Map.of("ccls", ccls, "igdbDescriptors", descriptors));
+    }
 }
