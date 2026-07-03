@@ -34,6 +34,7 @@
     <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/settings.js}" defer></script>
     <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/connections.js}" defer></script>
     <script th:if="${channelUser != null}" th:src="@{/js/channel-page.js}" defer></script>
+    <script th:if="${active_page == 'steam-keys' or active_page == 'dtdd-keys'}" th:src="@{/js/admin-keys.js}" defer></script>
     <th:block th:replace="${additional_head} ?: ~{}"></th:block>
 </head>
 <body hx-boost="true">
