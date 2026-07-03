@@ -27,6 +27,7 @@ class ExperimentServiceTest {
     @Mock ExperimentEventRepository eventRepository;
     @Mock ExperimentOverrideRepository overrideRepository;
     @Mock fr.enimaloc.catapult.experiment.targeting.AttributeEvaluator attributeEvaluator;
+    @Mock UserGroupRepository userGroupRepository;
     @InjectMocks ExperimentService experimentService;
 
     private UserAccount user;
@@ -485,9 +486,26 @@ class ExperimentServiceTest {
 
         when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
         when(assignmentRepository.findByExperimentAndUser(experiment, user)).thenReturn(Optional.empty());
+        when(userGroupRepository.existsByKey("beta")).thenReturn(true);
         when(attributeEvaluator.matches(user, "group", "in", "beta")).thenReturn(true);
 
         assertThat(experimentService.getVariant(user, "test-exp")).isPresent();
+    }
+
+    @Test
+    void groupRule_withDeletedGroup_doesNotMatch() {
+        ExperimentAssignmentRule rule = new ExperimentAssignmentRule();
+        rule.setRuleType(ExperimentAssignmentRule.RuleType.GROUP);
+        rule.setAttributeOperator("not_in");
+        rule.setAttributeValue("ghost");
+        rule.setExperiment(experiment);
+        experiment.setRules(new java.util.ArrayList<>(List.of(rule)));
+
+        when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
+        when(assignmentRepository.findByExperimentAndUser(experiment, user)).thenReturn(Optional.empty());
+        when(userGroupRepository.existsByKey("ghost")).thenReturn(false);
+
+        assertThat(experimentService.getVariant(user, "test-exp")).isEmpty();
     }
 
     @Test
