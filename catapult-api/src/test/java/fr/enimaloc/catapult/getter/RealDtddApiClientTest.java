@@ -50,9 +50,9 @@ class RealDtddApiClientTest {
         server.enqueue(new MockResponse()
             .setHeader("Content-Type", "application/json")
             .setBody("""
-                { "items": [
-                  { "id": 4521, "name": "Stardew Valley", "slug": "stardew-valley", "type": "Video Game", "posterUrl": null }
-                ] }
+                [
+                  { "id": 4521, "name": "Stardew Valley", "itemTypeName": "Video Game", "posterUrl": null }
+                ]
                 """));
 
         Optional<List<DtddApiClient.DtddSearchResult>> result = client.search("stardew");
@@ -73,7 +73,7 @@ class RealDtddApiClientTest {
         server.enqueue(new MockResponse().setResponseCode(429).setHeader("Retry-After", "60"));
         server.enqueue(new MockResponse()
             .setHeader("Content-Type", "application/json")
-            .setBody("{ \"items\": [] }"));
+            .setBody("[]"));
 
         Optional<List<DtddApiClient.DtddSearchResult>> result = client.search("stardew");
 
@@ -115,9 +115,9 @@ class RealDtddApiClientTest {
             .setHeader("Content-Type", "application/json")
             .setBody("""
                 { "topicItemStats": [
-                    { "topic": { "name": "A dog dies" }, "yesSum": 5, "noSum": 1 },
-                    { "topic": { "name": "Flashing lights" }, "yesSum": 1, "noSum": 1 },
-                    { "topic": { "name": "Bad ending" }, "yesSum": 0, "noSum": 4 }
+                    { "topicName": "A dog dies", "yesSum": 5, "noSum": 1 },
+                    { "topicName": "Flashing lights", "yesSum": 1, "noSum": 1 },
+                    { "topicName": "Bad ending", "yesSum": 0, "noSum": 4 }
                 ] }
                 """));
 
