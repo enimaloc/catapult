@@ -121,6 +121,49 @@ public class AdminController {
         return "redirect:/channels/" + member.twitchUsername();
     }
 
+    @GetMapping("/members/{id}/targeting")
+    public String memberTargeting(@PathVariable UUID id, Model model) {
+        MemberSummaryDto member = apiClient.get("/api/admin/members/{id}", MemberSummaryDto.class, id);
+        if (member == null) {
+            return "redirect:/admin/members";
+        }
+        MemberTargetingDto targeting = apiClient.get("/api/admin/members/{id}/targeting", MemberTargetingDto.class, id);
+        List<GroupOptionDto> allGroups = apiClient.get("/api/admin/groups",
+                new ParameterizedTypeReference<List<GroupOptionDto>>() {});
+        model.addAttribute("member", member);
+        model.addAttribute("memberId", id);
+        model.addAttribute("flags", targeting != null && targeting.flags() != null ? targeting.flags() : List.of());
+        model.addAttribute("memberGroupKeys", targeting != null && targeting.groupKeys() != null ? targeting.groupKeys() : List.of());
+        model.addAttribute("allGroups", allGroups != null ? allGroups : List.of());
+        return "admin/member-targeting";
+    }
+
+    @PostMapping("/members/{id}/flags")
+    public String setMemberFlag(@PathVariable UUID id,
+                                @RequestParam String key,
+                                @RequestParam(required = false) String value) {
+        apiClient.post("/api/admin/members/{id}/flags", new SetFlagBody(key, value), id);
+        return "redirect:/admin/members/" + id + "/targeting";
+    }
+
+    @PostMapping("/members/{id}/flags/{key}/delete")
+    public String deleteMemberFlag(@PathVariable UUID id, @PathVariable String key) {
+        apiClient.post("/api/admin/members/{id}/flags/{key}/delete", null, id, key);
+        return "redirect:/admin/members/" + id + "/targeting";
+    }
+
+    @PostMapping("/members/{id}/groups")
+    public String addMemberToGroup(@PathVariable UUID id, @RequestParam String groupKey) {
+        apiClient.post("/api/admin/members/{id}/groups", new AddToGroupBody(groupKey), id);
+        return "redirect:/admin/members/" + id + "/targeting";
+    }
+
+    @PostMapping("/members/{id}/groups/{groupId}/delete")
+    public String removeMemberFromGroup(@PathVariable UUID id, @PathVariable UUID groupId) {
+        apiClient.post("/api/admin/members/{id}/groups/{groupId}/delete", null, id, groupId);
+        return "redirect:/admin/members/" + id + "/targeting";
+    }
+
     @PostMapping("/members/{id}/bot/toggle")
     public String toggleMemberBot(@PathVariable UUID id) {
         apiClient.post("/api/admin/members/{id}/bot/toggle", null, id);
@@ -347,6 +390,12 @@ public class AdminController {
             model.addAttribute("participantPage", data.get("participantPage"));
             model.addAttribute("overrides", data.get("overrides"));
         }
+        List<GroupOptionDto> allGroups = apiClient.get("/api/admin/groups",
+                new ParameterizedTypeReference<List<GroupOptionDto>>() {});
+        List<Map<String, Object>> allExperiments = apiClient.get("/api/admin/experiments",
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        model.addAttribute("allGroups", allGroups != null ? allGroups : List.of());
+        model.addAttribute("allExperiments", allExperiments != null ? allExperiments : List.of());
         return "admin/experiment-detail";
     }
 
@@ -439,6 +488,10 @@ public class AdminController {
 
     // ── Request bodies ────────────────────────────────────────────────────────
 
+    record SetFlagBody(String key, String value) {}
+
+    record AddToGroupBody(String groupKey) {}
+
     record MigrateRequest(UUID targetId, boolean migrateSettings, boolean migrateGetters, boolean migrateBindings) {}
 
     record AddRuleRequest(String ruleType, int priority, Integer percentage,
@@ -464,4 +517,10 @@ public class AdminController {
     record DtddKeysPageDto(java.util.List<KeyStatusDto> keys, boolean dtddEnabled) {}
 
     record MemberSummaryDto(UUID id, String twitchUsername) {}
+
+    record FlagViewDto(String key, String value) {}
+
+    record MemberTargetingDto(List<FlagViewDto> flags, List<String> groupKeys) {}
+
+    record GroupOptionDto(UUID id, String key, String name, String description, int memberCount) {}
 }

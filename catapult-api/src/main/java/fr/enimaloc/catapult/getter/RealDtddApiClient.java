@@ -53,7 +53,7 @@ public class RealDtddApiClient implements DtddApiClient {
                 .retrieve()
                 .body(String.class), this::parseSearch)
                 .map(list -> list.stream()
-                        .filter(result -> mediaType == null || result.mediaType().equals(mediaType))
+                        .filter(result -> mediaType == null || mediaType.equals(result.mediaType()))
                         .toList());
     }
 
