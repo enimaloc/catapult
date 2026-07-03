@@ -35,12 +35,13 @@ public class ApiAdminGroupsController {
         if (body.key() == null || body.key().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing key");
         }
-        if (groupRepository.existsByKey(body.key())) {
+        String key = body.key().trim();
+        if (groupRepository.existsByKey(key)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Group key already exists");
         }
         UserGroup group = new UserGroup();
-        group.setKey(body.key().trim());
-        group.setName(body.name() == null || body.name().isBlank() ? body.key() : body.name());
+        group.setKey(key);
+        group.setName(body.name() == null || body.name().isBlank() ? key : body.name());
         group.setDescription(body.description());
         groupRepository.save(group);
     }
