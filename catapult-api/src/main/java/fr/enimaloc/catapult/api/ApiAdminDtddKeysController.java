@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.domain.DtddApiKeyEntry;
 import fr.enimaloc.catapult.getter.DtddApiKeyRotator;
 import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
+import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -23,16 +24,29 @@ public class ApiAdminDtddKeysController {
 
     private final DtddApiKeyRepository repository;
     private final DtddApiKeyRotator rotator;
+    private final AdminEventPublisher events;
 
     public ApiAdminDtddKeysController(DtddApiKeyRepository repository) {
-        this(repository, null);
+        this(repository, null, null);
+    }
+
+    public ApiAdminDtddKeysController(DtddApiKeyRepository repository, DtddApiKeyRotator rotator) {
+        this(repository, rotator, null);
     }
 
     @Autowired
     public ApiAdminDtddKeysController(DtddApiKeyRepository repository,
-                                      @Autowired(required = false) DtddApiKeyRotator rotator) {
+                                      @Autowired(required = false) DtddApiKeyRotator rotator,
+                                      @Autowired(required = false) AdminEventPublisher events) {
         this.repository = repository;
         this.rotator = rotator;
+        this.events = events;
+    }
+
+    private static String mask(String key) {
+        return key.length() > 8
+                ? key.substring(0, 4) + "…" + key.substring(key.length() - 4)
+                : "…";
     }
 
     @GetMapping
@@ -44,9 +58,7 @@ public class ApiAdminDtddKeysController {
         List<KeyStatus> keys = new ArrayList<>();
         for (DtddApiKeyEntry entry : entries) {
             String key = entry.getApiKey();
-            String masked = key.length() > 8
-                ? key.substring(0, 4) + "…" + key.substring(key.length() - 4)
-                : "…";
+            String masked = mask(key);
             String owner = entry.getOwner() != null ? entry.getOwner().getTwitchUsername() : null;
             long until = blockedUntil.getOrDefault(key, 0L);
             boolean blocked = until > now;
@@ -66,6 +78,10 @@ public class ApiAdminDtddKeysController {
         if (!repository.existsById(trimmed)) {
             repository.save(new DtddApiKeyEntry(trimmed));
             if (rotator != null) rotator.refreshKeys();
+            if (events != null) {
+                events.keyAdded(AdminEventPublisher.PROVIDER_DTDD,
+                        new KeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
+            }
         }
     }
 
@@ -81,12 +97,14 @@ public class ApiAdminDtddKeysController {
         }
         repository.deleteById(raw.get());
         if (rotator != null) rotator.refreshKeys();
+        if (events != null) events.keyDeleted(AdminEventPublisher.PROVIDER_DTDD, body.keyId());
     }
 
     @PostMapping("/refresh")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void refresh() {
         if (rotator != null) rotator.refreshKeys();
+        if (events != null) events.keysRefreshed(AdminEventPublisher.PROVIDER_DTDD, page().keys());
     }
 
     public record DtddKeysPageData(List<KeyStatus> keys, boolean dtddEnabled) {}
