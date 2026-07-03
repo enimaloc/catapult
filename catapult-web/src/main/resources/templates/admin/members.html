@@ -107,7 +107,7 @@
                                                th:attr="data-results-id='steam-results-' + ${member.id},
                                                         data-gameid-field='steam-gameId-' + ${member.id},
                                                         data-gamename-field='steam-gameName-' + ${member.id}"
-                                               data-search-url="/admin/members/igdb/search"
+                                               data-ws-search="game"
                                                style="width:180px;padding:2px 4px">
                                         <ul th:id="'steam-results-' + ${member.id}" class="game-results"></ul>
                                     </div>
