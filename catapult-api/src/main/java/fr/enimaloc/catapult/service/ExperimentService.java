@@ -27,18 +27,20 @@ public class ExperimentService {
     private final ExperimentOverrideRepository overrideRepository;
     private final ExperimentService self;
     private final AttributeEvaluator attributeEvaluator;
+    private final UserGroupRepository userGroupRepository;
 
     private static final String CONTROL_KEY = "control";
     private final Set<String> knownKeys = ConcurrentHashMap.newKeySet();
 
     @Autowired
-    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, @Lazy ExperimentService self, AttributeEvaluator attributeEvaluator) {
+    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, @Lazy ExperimentService self, AttributeEvaluator attributeEvaluator, UserGroupRepository userGroupRepository) {
         this.experimentRepository = experimentRepository;
         this.assignmentRepository = assignmentRepository;
         this.eventRepository = eventRepository;
         this.overrideRepository = overrideRepository;
         this.self = self;
         this.attributeEvaluator = attributeEvaluator;
+        this.userGroupRepository = userGroupRepository;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -222,7 +224,8 @@ public class ExperimentService {
         return switch (rule.getRuleType()) {
             case RANDOM     -> fnvBucket(user.getId().toString(), rule.getExperiment().getKey()) < rule.getPercentage();
             case ATTRIBUTE  -> evaluateAttribute(user, rule.getAttributeKey(), rule.getAttributeOperator(), rule.getAttributeValue());
-            case GROUP      -> evaluateAttribute(user, "group", rule.getAttributeOperator(), rule.getAttributeValue());
+            case GROUP      -> userGroupRepository.existsByKey(rule.getAttributeValue())
+                              && evaluateAttribute(user, "group", rule.getAttributeOperator(), rule.getAttributeValue());
             case EXPERIMENT -> evaluateAttribute(user, "experiment:" + rule.getAttributeKey(), rule.getAttributeOperator(), rule.getAttributeValue());
             case MANUAL     -> false;
         };
