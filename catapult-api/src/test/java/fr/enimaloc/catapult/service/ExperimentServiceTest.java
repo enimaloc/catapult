@@ -26,6 +26,8 @@ class ExperimentServiceTest {
     @Mock ExperimentAssignmentRepository assignmentRepository;
     @Mock ExperimentEventRepository eventRepository;
     @Mock ExperimentOverrideRepository overrideRepository;
+    @Mock fr.enimaloc.catapult.experiment.targeting.AttributeEvaluator attributeEvaluator;
+    @Mock UserGroupRepository userGroupRepository;
     @InjectMocks ExperimentService experimentService;
 
     private UserAccount user;
@@ -196,6 +198,7 @@ class ExperimentServiceTest {
 
         when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
         when(assignmentRepository.findByExperimentAndUser(experiment, user)).thenReturn(Optional.empty());
+        when(attributeEvaluator.matches(user, "has_steam", "eq", "0.0")).thenReturn(true);
 
         Optional<ExperimentVariant> result = experimentService.getVariant(user, "test-exp");
         assertThat(result).isPresent();
@@ -216,6 +219,7 @@ class ExperimentServiceTest {
 
         when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
         when(assignmentRepository.findByExperimentAndUser(experiment, user)).thenReturn(Optional.empty());
+        when(attributeEvaluator.matches(user, "has_steam", "eq", "0.0")).thenReturn(false);
 
         assertThat(experimentService.getVariant(user, "test-exp")).isEmpty();
         verify(assignmentRepository, never()).save(any());
@@ -469,5 +473,55 @@ class ExperimentServiceTest {
             .when(experimentRepository).save(any());
 
         assertThatNoException().isThrownBy(() -> experimentService.ensureExists("race-exp"));
+    }
+
+    @Test
+    void groupRule_matches_whenEvaluatorTrue() {
+        ExperimentAssignmentRule rule = new ExperimentAssignmentRule();
+        rule.setRuleType(ExperimentAssignmentRule.RuleType.GROUP);
+        rule.setAttributeOperator("in");
+        rule.setAttributeValue("beta");
+        rule.setExperiment(experiment);
+        experiment.setRules(new java.util.ArrayList<>(List.of(rule)));
+
+        when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
+        when(assignmentRepository.findByExperimentAndUser(experiment, user)).thenReturn(Optional.empty());
+        when(userGroupRepository.existsByKey("beta")).thenReturn(true);
+        when(attributeEvaluator.matches(user, "group", "in", "beta")).thenReturn(true);
+
+        assertThat(experimentService.getVariant(user, "test-exp")).isPresent();
+    }
+
+    @Test
+    void groupRule_withDeletedGroup_doesNotMatch() {
+        ExperimentAssignmentRule rule = new ExperimentAssignmentRule();
+        rule.setRuleType(ExperimentAssignmentRule.RuleType.GROUP);
+        rule.setAttributeOperator("not_in");
+        rule.setAttributeValue("ghost");
+        rule.setExperiment(experiment);
+        experiment.setRules(new java.util.ArrayList<>(List.of(rule)));
+
+        when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
+        when(assignmentRepository.findByExperimentAndUser(experiment, user)).thenReturn(Optional.empty());
+        when(userGroupRepository.existsByKey("ghost")).thenReturn(false);
+
+        assertThat(experimentService.getVariant(user, "test-exp")).isEmpty();
+    }
+
+    @Test
+    void experimentRule_usesPrefixedKey() {
+        ExperimentAssignmentRule rule = new ExperimentAssignmentRule();
+        rule.setRuleType(ExperimentAssignmentRule.RuleType.EXPERIMENT);
+        rule.setAttributeKey("darkmode");
+        rule.setAttributeOperator("eq");
+        rule.setAttributeValue("on");
+        rule.setExperiment(experiment);
+        experiment.setRules(new java.util.ArrayList<>(List.of(rule)));
+
+        when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
+        when(assignmentRepository.findByExperimentAndUser(experiment, user)).thenReturn(Optional.empty());
+        when(attributeEvaluator.matches(user, "experiment:darkmode", "eq", "on")).thenReturn(false);
+
+        assertThat(experimentService.getVariant(user, "test-exp")).isEmpty();
     }
 }
