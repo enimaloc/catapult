@@ -390,6 +390,12 @@ public class AdminController {
             model.addAttribute("participantPage", data.get("participantPage"));
             model.addAttribute("overrides", data.get("overrides"));
         }
+        List<GroupOptionDto> allGroups = apiClient.get("/api/admin/groups",
+                new ParameterizedTypeReference<List<GroupOptionDto>>() {});
+        List<Map<String, Object>> allExperiments = apiClient.get("/api/admin/experiments",
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        model.addAttribute("allGroups", allGroups != null ? allGroups : List.of());
+        model.addAttribute("allExperiments", allExperiments != null ? allExperiments : List.of());
         return "admin/experiment-detail";
     }
 
