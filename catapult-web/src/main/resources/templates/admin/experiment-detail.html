@@ -212,6 +212,14 @@
                       th:text="${r.attributeKey} + ' ' + ${r.attributeOperator} + ' ' + ${r.attributeValue}"></span>
                 <span th:if="${r.ruleType == 'MANUAL'}" class="text-muted"
                       th:text="#{admin.experiment.rule.manual}">—</span>
+                <span th:if="${r.ruleType == 'GROUP'}"
+                      th:text="'group ' + ${r.attributeOperator} + ' ' + ${r.attributeValue}"></span>
+                <span th:if="${r.ruleType == 'GROUP' and !#lists.contains(allGroups.![key], r.attributeValue)}"
+                      class="badge" th:title="#{admin.experiment.rule.inert}">⚠</span>
+                <span th:if="${r.ruleType == 'EXPERIMENT'}"
+                      th:text="${r.attributeKey} + ' ' + ${r.attributeOperator} + ' ' + ${r.attributeValue}"></span>
+                <span th:if="${r.ruleType == 'EXPERIMENT' and !#lists.contains(allExperiments.![key], r.attributeKey)}"
+                      class="badge" th:title="#{admin.experiment.rule.inert}">⚠</span>
             </td>
             <td th:text="${r.priority}"></td>
             <td>
@@ -240,6 +248,8 @@
                     <option value="RANDOM">RANDOM</option>
                     <option value="ATTRIBUTE">ATTRIBUTE</option>
                     <option value="MANUAL">MANUAL</option>
+                    <option value="GROUP">GROUP</option>
+                    <option value="EXPERIMENT">EXPERIMENT</option>
                 </select>
             </label>
             <label>
@@ -255,13 +265,18 @@
             <span id="rule-field-attr" style="display:none; gap:0.5rem; align-items:flex-end;">
                     <label>
                         <span th:text="#{admin.experiment.attribute.key}">Attribut</span>
-                        <select name="attributeKey"
-                                style="display:block; padding:0.25rem; border:1px solid var(--border); border-radius:3px;">
-                            <option value="account_age_days">account_age_days</option>
-                            <option value="has_steam">has_steam</option>
-                            <option value="has_xbox">has_xbox</option>
-                            <option value="has_battlenet">has_battlenet</option>
-                        </select>
+                        <input list="rule-attr-keys" name="attributeKey"
+                               style="display:block; padding:0.25rem; border:1px solid var(--border); border-radius:3px;"/>
+                        <datalist id="rule-attr-keys">
+                            <option value="account_age_days"/>
+                            <option value="has_steam"/>
+                            <option value="has_twitch"/>
+                            <option value="account_status"/>
+                            <option value="is_system"/>
+                            <option value="bot_enabled"/>
+                            <option value="in_active_experiment"/>
+                            <option value="active_experiment_count"/>
+                        </datalist>
                     </label>
                     <label>
                         <span th:text="#{admin.experiment.attribute.op}">Op.</span>
@@ -279,6 +294,45 @@
                         <span th:text="#{admin.experiment.attribute.value}">Valeur</span>
                         <input type="text" name="attributeValue"
                                style="display:block; width:80px; padding:0.25rem; border:1px solid var(--border); border-radius:3px;"/>
+                    </label>
+                </span>
+            <span id="rule-field-group" style="display:none; gap:0.5rem; align-items:flex-end;">
+                    <label>
+                        <span th:text="#{admin.experiment.attribute.op}">Op.</span>
+                        <select name="attributeOperator"
+                                style="display:block; padding:0.25rem; border:1px solid var(--border); border-radius:3px;">
+                            <option value="in">in</option>
+                            <option value="not_in">not_in</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span th:text="#{admin.experiment.rule.group.label}">Groupe</span>
+                        <select name="attributeValue"
+                                style="display:block; padding:0.25rem; border:1px solid var(--border); border-radius:3px;">
+                            <option th:each="g : ${allGroups}" th:value="${g.key}" th:text="${g.name}"></option>
+                        </select>
+                    </label>
+                </span>
+            <span id="rule-field-experiment" style="display:none; gap:0.5rem; align-items:flex-end;">
+                    <label>
+                        <span th:text="#{admin.experiment.rule.experiment.target}">Expérience cible</span>
+                        <select name="attributeKey"
+                                style="display:block; padding:0.25rem; border:1px solid var(--border); border-radius:3px;">
+                            <option th:each="e : ${allExperiments}" th:value="${e.key}" th:text="${e.key}"></option>
+                        </select>
+                    </label>
+                    <label>
+                        <span th:text="#{admin.experiment.attribute.op}">Op.</span>
+                        <select name="attributeOperator"
+                                style="display:block; padding:0.25rem; border:1px solid var(--border); border-radius:3px;">
+                            <option value="eq">eq</option>
+                            <option value="neq">neq</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span th:text="#{admin.experiment.rule.experiment.variant}">Variante</span>
+                        <input type="text" name="attributeValue" placeholder="control / on / unassigned"
+                               style="display:block; width:120px; padding:0.25rem; border:1px solid var(--border); border-radius:3px;"/>
                     </label>
                 </span>
             <button type="submit" class="btn btn-sm btn-primary" style="align-self:flex-end;"
@@ -463,12 +517,26 @@
 
 <script>
     function toggleRuleFields(sel, prefix) {
-        const pct = document.getElementById(prefix + '-field-pct');
-        const attr = document.getElementById(prefix + '-field-attr');
-        if (!pct || !attr) return;
-        pct.style.display = (sel.value === 'RANDOM') ? '' : 'none';
-        attr.style.display = (sel.value === 'ATTRIBUTE') ? 'flex' : 'none';
+        const blocks = {
+            RANDOM:     prefix + '-field-pct',
+            ATTRIBUTE:  prefix + '-field-attr',
+            GROUP:      prefix + '-field-group',
+            EXPERIMENT: prefix + '-field-experiment'
+        };
+        Object.entries(blocks).forEach(([type, elId]) => {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            const active = (sel.value === type);
+            el.style.display = active ? ((type === 'RANDOM') ? '' : 'flex') : 'none';
+            el.querySelectorAll('input, select').forEach(f => { f.disabled = !active; });
+            if (el.tagName === 'INPUT' || el.tagName === 'SELECT') el.disabled = !active;
+        });
     }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const ruleTypeSel = document.querySelector('select[name="ruleType"]');
+        if (ruleTypeSel) toggleRuleFields(ruleTypeSel, 'rule');
+    });
 
     function toggleOverrideFields(sel) {
         const userField = document.getElementById('override-field-user');

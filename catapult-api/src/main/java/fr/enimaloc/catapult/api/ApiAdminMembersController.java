@@ -2,7 +2,11 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserFlag;
+import fr.enimaloc.catapult.domain.UserGroup;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.repository.UserFlagRepository;
+import fr.enimaloc.catapult.repository.UserGroupRepository;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.StreamStateService;
@@ -38,6 +42,8 @@ public class ApiAdminMembersController {
     private final AccountService accountService;
     private final AdminMigrationService adminMigrationService;
     private final Environment environment;
+    private final UserFlagRepository userFlagRepository;
+    private final UserGroupRepository userGroupRepository;
 
     @GetMapping
     public MembersPageData page() {
@@ -150,6 +156,68 @@ public class ApiAdminMembersController {
         return new MemberSummary(user.getId(), user.getTwitchUsername());
     }
 
+    @PostMapping("/{id}/flags")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void setFlag(@PathVariable UUID id, @RequestBody SetFlagRequest body) {
+        UserAccount user = userAccountRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (body.key() == null || body.key().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing key");
+        }
+        UserFlag flag = userFlagRepository.findByUserAndFlagKey(user, body.key().trim())
+                .orElseGet(() -> {
+                    UserFlag f = new UserFlag();
+                    f.setUser(user);
+                    f.setFlagKey(body.key().trim());
+                    return f;
+                });
+        flag.setFlagValue(body.value());
+        userFlagRepository.save(flag);
+    }
+
+    @PostMapping("/{id}/flags/{key}/delete")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteFlag(@PathVariable UUID id, @PathVariable String key) {
+        UserAccount user = userAccountRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        userFlagRepository.findByUserAndFlagKey(user, key).ifPresent(userFlagRepository::delete);
+    }
+
+    @PostMapping("/{id}/groups")
+    @org.springframework.transaction.annotation.Transactional
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void addToGroup(@PathVariable UUID id, @RequestBody AddToGroupRequest body) {
+        UserAccount user = userAccountRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        UserGroup group = userGroupRepository.findByKey(body.groupKey())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+        group.getMembers().add(user);
+        userGroupRepository.save(group);
+    }
+
+    @PostMapping("/{id}/groups/{groupId}/delete")
+    @org.springframework.transaction.annotation.Transactional
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeFromGroup(@PathVariable UUID id, @PathVariable UUID groupId) {
+        UserGroup group = userGroupRepository.findById(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        group.getMembers().removeIf(m -> m.getId().equals(id));
+        userGroupRepository.save(group);
+    }
+
+    @GetMapping("/{id}/targeting")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public MemberTargeting targeting(@PathVariable UUID id) {
+        UserAccount user = userAccountRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        List<FlagView> flags = userFlagRepository.findByUser(user).stream()
+                .map(f -> new FlagView(f.getFlagKey(), f.getFlagValue())).toList();
+        List<String> groups = userGroupRepository.findAll().stream()
+                .filter(g -> g.getMembers().stream().anyMatch(m -> m.getId().equals(id)))
+                .map(UserGroup::getKey).toList();
+        return new MemberTargeting(flags, groups);
+    }
+
     private UserAccount findOrThrow(UUID id) {
         return userAccountRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -160,4 +228,12 @@ public class ApiAdminMembersController {
     public record MemberSummary(UUID id, String twitchUsername) {}
 
     public record MigrateRequest(UUID targetId, boolean migrateSettings, boolean migrateGetters, boolean migrateBindings) {}
+
+    public record SetFlagRequest(String key, String value) {}
+
+    public record AddToGroupRequest(String groupKey) {}
+
+    public record FlagView(String key, String value) {}
+
+    public record MemberTargeting(List<FlagView> flags, List<String> groupKeys) {}
 }
