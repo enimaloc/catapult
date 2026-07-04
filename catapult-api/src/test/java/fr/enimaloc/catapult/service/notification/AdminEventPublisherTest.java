@@ -93,4 +93,13 @@ class AdminEventPublisherTest {
         verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("ccl.refreshed"), data.capture());
         assertThat(data.getValue()).isEqualTo(Map.of("ccls", ccls, "igdbDescriptors", descriptors));
     }
+
+    @Test
+    void dtddProposalResolved_publishesIdAndStatus() {
+        publisher.dtddProposalResolved("prop-1", "APPROVED");
+
+        ArgumentCaptor<Object> data = ArgumentCaptor.forClass(Object.class);
+        verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("dtdd.proposal.resolved"), data.capture());
+        assertThat(data.getValue()).isEqualTo(Map.of("proposalId", "prop-1", "status", "APPROVED"));
+    }
 }

@@ -53,4 +53,10 @@ public class AdminEventPublisher {
     public void cclRefreshed(Object ccls, Object descriptors) {
         redisPublisher.publishAdmin("ccl.refreshed", Map.of("ccls", ccls, "igdbDescriptors", descriptors));
     }
+
+    /** A DTDD mapping proposal was approved or rejected (leaves the PENDING list). */
+    public void dtddProposalResolved(String proposalId, String status) {
+        redisPublisher.publishAdmin("dtdd.proposal.resolved",
+                Map.of("proposalId", proposalId, "status", status));
+    }
 }
