@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'whitelist', ~{::body}, null, 'container', null, null)}">
 <head>
     <title>Catapult — Whitelist</title>
@@ -14,9 +14,11 @@
 <!--/*@thymesvar id="defaultCanReinvite" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="globalCapReached" type="java.lang.Boolean"*/-->
 <!--/*@thymesvar id="invites" type="java.util.List"*/-->
+    <div id="whitelist-body" th:fragment="whitelistBody">
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
         <h2 th:text="#{admin.whitelist.title}">Administration — Whitelist</h2>
-        <form th:action="@{/admin/whitelist/toggle}" method="post"> <!-- nosemgrep -->
+        <form th:action="@{/admin/whitelist/toggle}" method="post"
+              ws:post="@{/admin/whitelist/toggle}" ws:target="#whitelist-body" ws:swap="outerHTML"> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <div class="pill-toggle"
                  th:classappend="${whitelistEnabled ? 'pill-toggle--active' : 'pill-toggle--inactive'}">
@@ -32,7 +34,8 @@
        th:text="${whitelistEnabled} ? #{admin.whitelist.status.enabled} : #{admin.whitelist.status.disabled}"></p>
 
     <div class="card" style="margin-bottom:1rem; padding:1rem;">
-        <form th:action="@{/admin/whitelist/add}" method="post" style="display:flex; gap:0.5rem; align-items:center;"> <!-- nosemgrep -->
+        <form th:action="@{/admin/whitelist/add}" method="post" style="display:flex; gap:0.5rem; align-items:center;"
+              ws:post="@{/admin/whitelist/add}" ws:target="#whitelist-body" ws:swap="outerHTML"> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <input type="text" name="twitchId" required
                    th:placeholder="#{admin.whitelist.add.placeholder}"
@@ -45,7 +48,8 @@
     <div th:if="${whitelistEnabled}" class="card" style="margin-bottom:1rem; padding:1rem;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
             <h3 th:text="#{admin.whitelist.invite.title}" style="margin:0;">Invitations</h3>
-            <form th:action="@{/admin/whitelist/invite/toggle}" method="post"> <!-- nosemgrep -->
+            <form th:action="@{/admin/whitelist/invite/toggle}" method="post"
+                  ws:post="@{/admin/whitelist/invite/toggle}" ws:target="#whitelist-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <div class="pill-toggle"
                      th:classappend="${inviteEnabled ? 'pill-toggle--active' : 'pill-toggle--inactive'}">
@@ -55,7 +59,8 @@
             </form>
         </div>
         <div th:if="${inviteEnabled}">
-            <form th:action="@{/admin/whitelist/invite/settings}" method="post" style="display:grid; grid-template-columns:1fr 1fr auto; gap:1rem; align-items:end; margin-bottom:0.75rem;"> <!-- nosemgrep -->
+            <form th:action="@{/admin/whitelist/invite/settings}" method="post" style="display:grid; grid-template-columns:1fr 1fr auto; gap:1rem; align-items:end; margin-bottom:0.75rem;"
+                  ws:post="@{/admin/whitelist/invite/settings}" ws:target="#whitelist-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <div>
                     <label class="label" th:text="#{admin.invite.settings.global_max}">Cap global</label>
@@ -110,7 +115,8 @@
                                 <details>
                                     <summary class="btn btn-sm">Quota</summary>
                                     <div style="padding:0.5rem; background:var(--card-bg); border-radius:4px; margin-top:0.3rem; min-width:200px;">
-                                        <form th:action="@{/admin/whitelist/invite/{id}/quota(id=${inv.id})}" method="post"> <!-- nosemgrep -->
+                                        <form th:action="@{/admin/whitelist/invite/{id}/quota(id=${inv.id})}" method="post"
+                                              ws:post="@{/admin/whitelist/invite/{id}/quota(id=${inv.id})}" ws:target="#whitelist-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <div style="display:flex; flex-direction:column; gap:0.4rem;">
                                                 <label class="label" style="font-size:0.8rem;" th:text="#{admin.invite.column.max_uses}">Max</label>
@@ -153,7 +159,8 @@
                         <td><span class="badge" th:text="${entry.twitchId}"></span></td>
                         <td th:text="${resolvedUsernames[entry.twitchId]}">—</td>
                         <td>
-                            <form th:action="@{/admin/whitelist/{id}/delete(id=${entry.twitchId})}" method="post"> <!-- nosemgrep -->
+                            <form th:action="@{/admin/whitelist/{id}/delete(id=${entry.twitchId})}" method="post"
+                                  ws:post="@{/admin/whitelist/{id}/delete(id=${entry.twitchId})}" ws:target="#whitelist-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn btn-sm"
                                         th:text="#{admin.whitelist.action.delete}">Delete</button>
@@ -163,6 +170,7 @@
                 </tbody>
             </table>
         </div>
+    </div>
     </div>
 </body>
 </html>
