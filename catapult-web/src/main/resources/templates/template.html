@@ -37,6 +37,7 @@
     <script th:if="${active_page == 'steam-keys' or active_page == 'dtdd-keys'}" th:src="@{/js/admin-keys.js}" defer></script>
     <script th:if="${active_page == 'ccl'}" th:src="@{/js/admin-ccl.js}" defer></script>
     <script th:if="${active_page == 'tw'}" th:src="@{/js/admin-tw.js}" defer></script>
+    <script th:if="${active_page == 'dtdd-mapping'}" th:src="@{/js/admin-dtdd-mapping.js}" defer></script>
     <th:block th:replace="${additional_head} ?: ~{}"></th:block>
 </head>
 <body hx-boost="true">
