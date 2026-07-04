@@ -10,6 +10,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -215,6 +216,15 @@ public class AdminController {
 
     @GetMapping("/whitelist")
     public String whitelistPage(Model model) {
+        populateWhitelistModel(model);
+        return "admin/whitelist";
+    }
+
+    /**
+     * Populates the whitelist model. Shared by the GET page and the POST actions
+     * that re-render the {@code body} fragment over WebSocket (ws:* dialect).
+     */
+    private void populateWhitelistModel(Model model) {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = apiClient.get("/api/admin/whitelist", Map.class);
         if (data != null) {
@@ -228,55 +238,71 @@ public class AdminController {
             model.addAttribute("globalCapReached", Boolean.TRUE.equals(data.get("globalCapReached")));
             model.addAttribute("invites", data.get("invites"));
         }
-        return "admin/whitelist";
+    }
+
+    /**
+     * For ws:* form actions the client sends the {@code HX-Request} header; we
+     * then re-render only the {@code body} fragment so ws-actions can swap it in
+     * place. Plain (JS-less) POSTs still get the PRG redirect.
+     */
+    private String whitelistResult(String hxRequest, Model model) {
+        if (hxRequest != null) {
+            populateWhitelistModel(model);
+            return "admin/whitelist :: body";
+        }
+        return "redirect:/admin/whitelist";
     }
 
     @PostMapping("/whitelist/toggle")
-    public String toggleWhitelist() {
+    public String toggleWhitelist(@RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/whitelist/toggle", null);
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     @PostMapping("/whitelist/add")
-    public String addWhitelist(@RequestParam String twitchId) {
+    public String addWhitelist(@RequestParam String twitchId,
+                               @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/whitelist/add", Map.of("twitchId", twitchId));
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     @PostMapping("/whitelist/{id}/delete")
-    public String deleteWhitelist(@PathVariable String id) {
+    public String deleteWhitelist(@PathVariable String id,
+                                  @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/whitelist/{id}/delete", null, id);
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     @PostMapping("/whitelist/invite/toggle")
-    public String toggleInvites() {
+    public String toggleInvites(@RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/whitelist/invite/toggle", null);
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     @PostMapping("/whitelist/invite/settings")
     public String updateInviteSettings(
             @RequestParam(required = false) Integer globalMaxMembers,
             @RequestParam(required = false) Integer defaultMaxUses,
-            @RequestParam(defaultValue = "false") boolean defaultCanReinvite) {
+            @RequestParam(defaultValue = "false") boolean defaultCanReinvite,
+            @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("globalMaxMembers", globalMaxMembers);
         body.put("defaultMaxUses", defaultMaxUses);
         body.put("defaultCanReinvite", defaultCanReinvite);
         apiClient.post("/api/admin/whitelist/invite/settings", body);
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     @PostMapping("/whitelist/invite/{inviteId}/quota")
     public String updateWhitelistInviteQuota(@PathVariable UUID inviteId,
                                              @RequestParam(required = false) Integer maxUses,
-                                             @RequestParam(required = false) Boolean canReinvite) {
+                                             @RequestParam(required = false) Boolean canReinvite,
+                                             @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("maxUses", maxUses);
         body.put("canReinvite", canReinvite);
         apiClient.post("/api/admin/whitelist/invite/{inviteId}/quota", body, inviteId);
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     // ── Steam Keys ───────────────────────────────────────────────────────────
