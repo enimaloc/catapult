@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'groups', ~{::body}, null, 'container', null, null)}">
 <head>
     <title th:text="#{admin.groups.title}">Administration — Groupes</title>
@@ -11,7 +11,8 @@
 
     <div class="card" style="margin-bottom:1.5rem">
         <h3 th:text="#{admin.groups.create.title}" style="margin-bottom:0.75rem">Créer un groupe</h3>
-        <form th:action="@{/admin/groups}" method="post"> <!-- nosemgrep -->
+        <form th:action="@{/admin/groups}" method="post"
+              ws:post="@{/admin/groups}" ws:swap="none" data-groups-create-form> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
                 <div class="form-group" style="margin:0">
@@ -34,84 +35,47 @@
         </form>
     </div>
 
-    <div th:if="${#lists.isEmpty(groups)}" class="text-muted">
-        <p th:text="#{admin.groups.empty}">Aucun groupe défini.</p>
-    </div>
+    <div data-groups-card>
+        <div class="text-muted" data-groups-empty th:style="${#lists.isEmpty(groups)} ? '' : 'display:none'">
+            <p th:text="#{admin.groups.empty}">Aucun groupe défini.</p>
+        </div>
 
-    <div th:unless="${#lists.isEmpty(groups)}" class="card">
-        <div class="table-container">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.groups.column.key}">Clé</th>
-                        <th th:text="#{admin.groups.column.name}">Nom</th>
-                        <th th:text="#{admin.groups.column.description}">Description</th>
-                        <th th:text="#{admin.groups.column.member_count}">Membres</th>
-                        <th th:text="#{admin.groups.column.actions}">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="g : ${groups}">
-                        <td><code th:text="${g.key}"></code></td>
-                        <td th:text="${g.name}"></td>
-                        <td th:text="${g.description ?: '—'}"></td>
-                        <td th:text="${g.memberCount}"></td>
-                        <td>
-                            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-start">
-
-                                <!-- Rename form -->
-                                <details>
-                                    <summary class="btn btn-sm" th:text="#{admin.groups.action.rename}">Renommer</summary>
-                                    <div style="margin-top:0.5rem;padding:0.5rem;background:var(--card-bg,#fff);border:1px solid var(--border,#ddd);border-radius:4px">
-                                        <form th:action="@{/admin/groups/{id}/rename(id=${g.id})}" method="post"> <!-- nosemgrep -->
-                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                            <div class="form-group" style="margin-bottom:0.4rem">
-                                                <label th:text="#{admin.groups.column.name}">Nom</label>
-                                                <input type="text" name="name" class="form-control"
-                                                       th:value="${g.name}" required/>
-                                            </div>
-                                            <div class="form-group" style="margin-bottom:0.4rem">
-                                                <label th:text="#{admin.groups.column.description}">Description</label>
-                                                <input type="text" name="description" class="form-control"
-                                                       th:value="${g.description}"/>
-                                            </div>
-                                            <button type="submit" class="btn btn-sm btn-primary"
-                                                    th:text="#{admin.groups.action.rename.save}">Enregistrer</button>
-                                        </form>
-                                    </div>
-                                </details>
-
-                                <!-- Add member form -->
-                                <details>
-                                    <summary class="btn btn-sm" th:text="#{admin.groups.action.add_member}">+ Membre</summary>
-                                    <div style="margin-top:0.5rem;padding:0.5rem;background:var(--card-bg,#fff);border:1px solid var(--border,#ddd);border-radius:4px">
-                                        <form th:action="@{/admin/groups/{id}/members(id=${g.id})}" method="post"> <!-- nosemgrep -->
-                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                            <div class="form-group" style="margin-bottom:0.4rem">
-                                                <label th:text="#{admin.groups.add_member.label}">Twitch username</label>
-                                                <input type="text" name="twitchUsername" class="form-control"
-                                                       th:placeholder="#{admin.groups.add_member.placeholder}" required/>
-                                            </div>
-                                            <button type="submit" class="btn btn-sm btn-primary"
-                                                    th:text="#{admin.groups.action.add_member.submit}">Ajouter</button>
-                                        </form>
-                                    </div>
-                                </details>
-
-                                <!-- Delete form -->
-                                <form th:action="@{/admin/groups/{id}/delete(id=${g.id})}" method="post"> <!-- nosemgrep -->
-                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <button type="submit" class="btn btn-sm btn-danger"
-                                            th:text="#{admin.groups.action.delete}"
-                                            th:data-confirm="#{admin.groups.action.delete.confirm(${g.name})}"
-                                            onclick="return confirm(this.dataset.confirm)">Supprimer</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        <div class="card" data-groups-table th:style="${#lists.isEmpty(groups)} ? 'display:none' : ''">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.groups.column.key}">Clé</th>
+                            <th th:text="#{admin.groups.column.name}">Nom</th>
+                            <th th:text="#{admin.groups.column.description}">Description</th>
+                            <th th:text="#{admin.groups.column.member_count}">Membres</th>
+                            <th th:text="#{admin.groups.column.actions}">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody data-groups-body>
+                        <tr th:each="g : ${groups}" th:attr="data-group-id=${g.id}">
+                            <td><code data-field="key" th:text="${g.key}"></code></td>
+                            <td data-field="name" th:text="${g.name}"></td>
+                            <td data-field="description" th:text="${g.description ?: '—'}"></td>
+                            <td data-field="memberCount" th:text="${g.memberCount}"></td>
+                            <td th:insert="~{fragments/admin-groups :: actions(${g.id}, ${g.name}, ${g.description})}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
+
+    <!-- Row template cloned by admin-groups.js on group.created. __ID__ is
+         replaced with the real group id and [data-field] cells are filled. -->
+    <template data-groups-row-tpl>
+        <tr data-group-id="">
+            <td><code data-field="key"></code></td>
+            <td data-field="name"></td>
+            <td data-field="description"></td>
+            <td data-field="memberCount"></td>
+            <td th:insert="~{fragments/admin-groups :: actions('__ID__', '', '')}"></td>
+        </tr>
+    </template>
 </body>
 </html>
