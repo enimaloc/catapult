@@ -59,4 +59,19 @@ public class AdminEventPublisher {
         redisPublisher.publishAdmin("dtdd.proposal.resolved",
                 Map.of("proposalId", proposalId, "status", status));
     }
+
+    /** A user group was created. {@code group} is a clean summary view. */
+    public void groupCreated(Object group) {
+        redisPublisher.publishAdmin("group.created", Map.of("group", group));
+    }
+
+    /** A user group changed (rename or membership). {@code group} is the fresh summary. */
+    public void groupUpdated(Object group) {
+        redisPublisher.publishAdmin("group.updated", Map.of("group", group));
+    }
+
+    /** A user group was deleted. */
+    public void groupDeleted(String groupId) {
+        redisPublisher.publishAdmin("group.deleted", Map.of("groupId", groupId));
+    }
 }

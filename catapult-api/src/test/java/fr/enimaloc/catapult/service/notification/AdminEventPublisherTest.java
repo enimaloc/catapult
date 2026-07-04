@@ -102,4 +102,19 @@ class AdminEventPublisherTest {
         verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("dtdd.proposal.resolved"), data.capture());
         assertThat(data.getValue()).isEqualTo(Map.of("proposalId", "prop-1", "status", "APPROVED"));
     }
+
+    @Test
+    void groupCreated_updated_deleted_publishOnDedicatedEvents() {
+        Object group = Map.of("id", "g1", "key", "vip", "name", "VIP", "memberCount", 0);
+
+        publisher.groupCreated(group);
+        publisher.groupUpdated(group);
+        publisher.groupDeleted("g1");
+
+        ArgumentCaptor<Object> data = ArgumentCaptor.forClass(Object.class);
+        verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("group.created"), data.capture());
+        assertThat(data.getValue()).isEqualTo(Map.of("group", group));
+        verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("group.updated"), org.mockito.ArgumentMatchers.eq(Map.of("group", group)));
+        verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("group.deleted"), org.mockito.ArgumentMatchers.eq(Map.of("groupId", "g1")));
+    }
 }
