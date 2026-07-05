@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,7 @@ public class IrcTwitchChatService implements TwitchChatService {
     private final TokenEncryptionService tokenEncryptionService;
     private final ApplicationEventPublisher eventPublisher;
     private final RestClient restClient;
+    private final MeterRegistry meterRegistry;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -172,6 +174,8 @@ public class IrcTwitchChatService implements TwitchChatService {
         int colonIdx = rest.indexOf(':', 1);
         if (colonIdx == -1) return;
         String message = rest.substring(colonIdx + 1).trim();
+
+        meterRegistry.counter("catapult.chat.messages", "transport", "irc").increment();
 
         if (!message.startsWith("!")) return;
 
