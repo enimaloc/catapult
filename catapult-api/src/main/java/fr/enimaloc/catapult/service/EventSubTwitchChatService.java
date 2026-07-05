@@ -202,6 +202,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
         if ("channel.chat.message".equals(subscriptionType)) {
             String text = event.path("message").path("text").asText();
+            meterRegistry.counter("catapult.chat.messages", "transport", "eventsub").increment();
             if (!text.startsWith("!")) return;
 
             String[] parts = text.substring(1).split(" ", 2);
