@@ -138,7 +138,9 @@
                                     <a th:href="@{/admin/members/{id}/targeting(id=${member.id})}"
                                        class="dropdown-item"
                                        th:text="#{admin.members.action.targeting}">Targeting</a>
-                                    <form th:action="@{/admin/impersonate}" method="post"> <!-- nosemgrep -->
+                                    <!-- hx-boost=false: impersonation swaps the session JWT and redirects; a
+                                         boosted POST would change the session without navigating the page. -->
+                                    <form th:action="@{/admin/impersonate}" method="post" hx-boost="false"> <!-- nosemgrep -->
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <input type="hidden" name="username" th:value="${member.twitchUsername ?: ''}"/>
                                         <button type="submit" class="dropdown-item"
