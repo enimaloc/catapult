@@ -92,6 +92,11 @@ public class AdminController {
     public String membersPage(Model model,
                               @AuthenticationPrincipal CatapultWebUser principal,
                               @RequestParam(required = false) String error) {
+        populateMembersModel(model, principal, error);
+        return "admin/members";
+    }
+
+    private void populateMembersModel(Model model, CatapultWebUser principal, String error) {
         AdminMembersPageDto data = apiClient.get("/api/admin/members", AdminMembersPageDto.class);
         if (data != null) {
             // Convert string UUID keys to UUID so the template lookup works
@@ -110,7 +115,18 @@ public class AdminController {
         // and previously produced silent ?error=impersonateFailed redirects.
         model.addAttribute("currentUserTwitchId", principal == null ? null : principal.getTwitchId());
         model.addAttribute("impersonateError", error);
-        return "admin/members";
+    }
+
+    /**
+     * Row actions re-render only the {@code membersBody} fragment over WebSocket
+     * (ws:* dialect sends the HX-Request header); JS-less POSTs keep the PRG redirect.
+     */
+    private String membersResult(String hxRequest, CatapultWebUser principal, Model model) {
+        if (hxRequest != null) {
+            populateMembersModel(model, principal, null);
+            return "admin/members :: membersBody";
+        }
+        return "redirect:/admin/members";
     }
 
     @GetMapping("/members/{id}/settings")
@@ -166,9 +182,11 @@ public class AdminController {
     }
 
     @PostMapping("/members/{id}/bot/toggle")
-    public String toggleMemberBot(@PathVariable UUID id) {
+    public String toggleMemberBot(@PathVariable UUID id,
+                                  @RequestHeader(value = "HX-Request", required = false) String hx,
+                                  @AuthenticationPrincipal CatapultWebUser principal, Model model) {
         apiClient.post("/api/admin/members/{id}/bot/toggle", null, id);
-        return "redirect:/admin/members";
+        return membersResult(hx, principal, model);
     }
 
     /**
@@ -178,27 +196,35 @@ public class AdminController {
      * démarqué côté API.
      */
     @PostMapping("/members/{id}/promote-to-system")
-    public String promoteToSystem(@PathVariable UUID id) {
+    public String promoteToSystem(@PathVariable UUID id,
+                                  @RequestHeader(value = "HX-Request", required = false) String hx,
+                                  @AuthenticationPrincipal CatapultWebUser principal, Model model) {
         apiClient.post("/api/admin/members/{id}/promote-to-system", null, id);
-        return "redirect:/admin/members";
+        return membersResult(hx, principal, model);
     }
 
     @PostMapping("/members/{id}/delete")
-    public String deleteMember(@PathVariable UUID id) {
+    public String deleteMember(@PathVariable UUID id,
+                               @RequestHeader(value = "HX-Request", required = false) String hx,
+                               @AuthenticationPrincipal CatapultWebUser principal, Model model) {
         apiClient.post("/api/admin/members/{id}/delete", null, id);
-        return "redirect:/admin/members";
+        return membersResult(hx, principal, model);
     }
 
     @PostMapping("/members/{id}/steam/unlink")
-    public String unlinkMemberSteam(@PathVariable UUID id) {
+    public String unlinkMemberSteam(@PathVariable UUID id,
+                                    @RequestHeader(value = "HX-Request", required = false) String hx,
+                                    @AuthenticationPrincipal CatapultWebUser principal, Model model) {
         apiClient.post("/api/admin/members/{id}/steam/unlink", null, id);
-        return "redirect:/admin/members";
+        return membersResult(hx, principal, model);
     }
 
     @PostMapping("/members/{id}/twitch/unlink")
-    public String unlinkMemberTwitch(@PathVariable UUID id) {
+    public String unlinkMemberTwitch(@PathVariable UUID id,
+                                     @RequestHeader(value = "HX-Request", required = false) String hx,
+                                     @AuthenticationPrincipal CatapultWebUser principal, Model model) {
         apiClient.post("/api/admin/members/{id}/twitch/unlink", null, id);
-        return "redirect:/admin/members";
+        return membersResult(hx, principal, model);
     }
 
     @PostMapping("/members/{id}/migrate")
