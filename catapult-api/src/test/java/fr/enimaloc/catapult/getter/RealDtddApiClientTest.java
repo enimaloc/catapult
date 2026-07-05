@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.getter;
 
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -30,7 +33,8 @@ class RealDtddApiClientTest {
         server = new MockWebServer();
         server.start();
         RestClient restClient = RestClient.builder().baseUrl(server.url("/").toString()).build();
-        client = new RealDtddApiClient(restClient, rotator);
+        ExternalApiObservations apiObservations = new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry());
+        client = new RealDtddApiClient(restClient, rotator, apiObservations);
     }
 
     @AfterEach

@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -57,6 +58,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private final ObjectMapper objectMapper;
     private final SystemTwitchAccountService systemTwitchAccountService;
     private final MeterRegistry meterRegistry;
+    private final ExternalApiObservations apiObservations;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -71,6 +73,10 @@ public class EventSubTwitchChatService implements TwitchChatService {
         t.setDaemon(true);
         return t;
     });
+
+    public int connectionCount() {
+        return connections.size();
+    }
 
     @PostConstruct
     public void init() {
@@ -200,6 +206,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
         if ("channel.chat.message".equals(subscriptionType)) {
             String text = event.path("message").path("text").asText();
+            meterRegistry.counter("catapult.chat.messages", "transport", "eventsub").increment();
             if (!text.startsWith("!")) return;
 
             String[] parts = text.substring(1).split(" ", 2);
@@ -244,14 +251,16 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private void subscribeEvent(UserAccount user, String accessToken, String sessionId,
                                 String type, Map<String, String> condition) {
         try {
-            restClient.post()
-                .uri(EVENTSUB_API)
-                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                .header(CLIENT_ID, twitchClientId)
-                .body(Map.of("type", type, "version", "1", "condition", condition,
-                    "transport", Map.of("method", "websocket", "session_id", sessionId)))
-                .retrieve()
-                .toBodilessEntity();
+            apiObservations.observeRun("eventsub", "subscribe", () ->
+                restClient.post()
+                    .uri(EVENTSUB_API)
+                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                    .header(CLIENT_ID, twitchClientId)
+                    .body(Map.of("type", type, "version", "1", "condition", condition,
+                        "transport", Map.of("method", "websocket", "session_id", sessionId)))
+                    .retrieve()
+                    .toBodilessEntity()
+            );
             log.info("[EventSub Chat] Subscribed {} for user {} ({})",
                     type, user.getId(), user.getTwitchUsername());
         } catch (Exception e) {
