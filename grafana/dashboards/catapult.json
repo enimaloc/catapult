@@ -71,7 +71,7 @@
     {
       "type": "marcusolsson-hourly-heatmap-panel",
       "id": 201,
-      "title": "Streams en cours - jour x heure (30j)",
+      "title": "Streams en cours — jour × heure (30j)",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
