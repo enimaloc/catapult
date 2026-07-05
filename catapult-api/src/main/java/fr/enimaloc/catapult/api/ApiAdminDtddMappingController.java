@@ -3,7 +3,9 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.domain.*;
 import fr.enimaloc.catapult.domain.DtddMappingProposal.Status;
 import fr.enimaloc.catapult.repository.*;
+import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,9 @@ public class ApiAdminDtddMappingController {
     private final DtddMappingProposalRepository proposalRepo;
     private final DtddGameMappingRepository mappingRepo;
     private final DtddTopicsCacheRepository topicsRepo;
+
+    @Autowired(required = false)
+    private AdminEventPublisher events;
 
     @GetMapping("/proposals")
     public List<DtddMappingProposal> pending(@RequestParam(defaultValue = "PENDING") String status) {
@@ -59,6 +64,7 @@ public class ApiAdminDtddMappingController {
         p.setResolver(admin);
         p.setResolvedAt(Instant.now());
         proposalRepo.save(p);
+        if (events != null) events.dtddProposalResolved(id.toString(), Status.APPROVED.name());
     }
 
     @PostMapping("/proposals/{id}/reject")
@@ -75,6 +81,7 @@ public class ApiAdminDtddMappingController {
         p.setResolver(admin);
         p.setResolvedAt(Instant.now());
         proposalRepo.save(p);
+        if (events != null) events.dtddProposalResolved(id.toString(), Status.REJECTED.name());
     }
 
     public record RejectRequest(String reason) {}

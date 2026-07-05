@@ -4,7 +4,9 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserGroup;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserGroupRepository;
+import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +22,13 @@ public class ApiAdminGroupsController {
 
     private final UserGroupRepository groupRepository;
     private final UserAccountRepository userAccountRepository;
+
+    @Autowired(required = false)
+    private AdminEventPublisher events;
+
+    private static GroupSummary summaryOf(UserGroup g) {
+        return new GroupSummary(g.getId(), g.getKey(), g.getName(), g.getDescription(), g.getMembers().size());
+    }
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -43,7 +52,10 @@ public class ApiAdminGroupsController {
         group.setKey(key);
         group.setName(body.name() == null || body.name().isBlank() ? key : body.name());
         group.setDescription(body.description());
-        groupRepository.save(group);
+        UserGroup saved = groupRepository.save(group);
+        if (events != null) {
+            events.groupCreated(new GroupSummary(saved.getId(), saved.getKey(), saved.getName(), saved.getDescription(), 0));
+        }
     }
 
     @PostMapping("/{id}/rename")
@@ -54,12 +66,14 @@ public class ApiAdminGroupsController {
         if (body.name() != null && !body.name().isBlank()) group.setName(body.name());
         group.setDescription(body.description());
         groupRepository.save(group);
+        if (events != null) events.groupUpdated(summaryOf(group));
     }
 
     @PostMapping("/{id}/delete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID id) {
         groupRepository.delete(findOrThrow(id));
+        if (events != null) events.groupDeleted(id.toString());
     }
 
     @PostMapping("/{id}/members")
@@ -71,6 +85,7 @@ public class ApiAdminGroupsController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         group.getMembers().add(user);
         groupRepository.save(group);
+        if (events != null) events.groupUpdated(summaryOf(group));
     }
 
     @PostMapping("/{id}/members/{userId}/delete")
@@ -80,6 +95,7 @@ public class ApiAdminGroupsController {
         UserGroup group = findOrThrow(id);
         group.getMembers().removeIf(m -> m.getId().equals(userId));
         groupRepository.save(group);
+        if (events != null) events.groupUpdated(summaryOf(group));
     }
 
     private UserGroup findOrThrow(UUID id) {

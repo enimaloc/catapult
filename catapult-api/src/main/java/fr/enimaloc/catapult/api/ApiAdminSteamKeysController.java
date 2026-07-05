@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
+import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,16 +26,29 @@ public class ApiAdminSteamKeysController {
 
     private final SteamApiKeyRepository repository;
     private final SteamApiKeyRotator rotator;
+    private final AdminEventPublisher events;
 
     public ApiAdminSteamKeysController(SteamApiKeyRepository repository) {
-        this(repository, null);
+        this(repository, null, null);
+    }
+
+    public ApiAdminSteamKeysController(SteamApiKeyRepository repository, SteamApiKeyRotator rotator) {
+        this(repository, rotator, null);
     }
 
     @Autowired
     public ApiAdminSteamKeysController(SteamApiKeyRepository repository,
-                                       @Autowired(required = false) SteamApiKeyRotator rotator) {
+                                       @Autowired(required = false) SteamApiKeyRotator rotator,
+                                       @Autowired(required = false) AdminEventPublisher events) {
         this.repository = repository;
         this.rotator = rotator;
+        this.events = events;
+    }
+
+    private static String mask(String key) {
+        return key.length() > 8
+                ? key.substring(0, 4) + "…" + key.substring(key.length() - 4)
+                : "…";
     }
 
     @GetMapping
@@ -46,9 +60,7 @@ public class ApiAdminSteamKeysController {
         List<KeyStatus> keys = new ArrayList<>();
         for (SteamApiKeyEntry entry : entries) {
             String key = entry.getApiKey();
-            String masked = key.length() > 8
-                    ? key.substring(0, 4) + "…" + key.substring(key.length() - 4)
-                    : "…";
+            String masked = mask(key);
             String owner = entry.getOwner() != null ? entry.getOwner().getTwitchUsername() : null;
             long until = blockedUntil.getOrDefault(key, 0L);
             boolean blocked = until > now;
@@ -69,6 +81,10 @@ public class ApiAdminSteamKeysController {
         if (!repository.existsById(trimmed)) {
             repository.save(new SteamApiKeyEntry(trimmed));
             if (rotator != null) rotator.refreshKeys();
+            if (events != null) {
+                events.keyAdded(AdminEventPublisher.PROVIDER_STEAM,
+                        new KeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
+            }
         }
     }
 
@@ -84,12 +100,14 @@ public class ApiAdminSteamKeysController {
         }
         repository.deleteById(raw.get());
         if (rotator != null) rotator.refreshKeys();
+        if (events != null) events.keyDeleted(AdminEventPublisher.PROVIDER_STEAM, body.keyId());
     }
 
     @PostMapping("/refresh")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void refresh() {
         if (rotator != null) rotator.refreshKeys();
+        if (events != null) events.keysRefreshed(AdminEventPublisher.PROVIDER_STEAM, page().keys());
     }
 
     public record SteamKeysPageData(List<KeyStatus> keys, boolean steamEnabled) {}
