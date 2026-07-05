@@ -58,6 +58,10 @@ public class IrcTwitchChatService implements TwitchChatService {
     private final Set<UUID> intentionallyDisconnected = ConcurrentHashMap.newKeySet();
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
+    public int connectionCount() {
+        return sockets.size();
+    }
+
     @PostConstruct
     public void init() {
         userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)
