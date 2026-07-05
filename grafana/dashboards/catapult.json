@@ -161,7 +161,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "catapult_streams_live{application=\"catapult\"}",
+          "expr": "catapult_streams_live{application=\"catapult-api\"}",
           "instant": true,
           "legendFormat": "Live",
           "refId": "A"
@@ -221,7 +221,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_game_detected_total{application=\"catapult\"}[24h])",
+          "expr": "increase(catapult_game_detected_total{application=\"catapult-api\"}[24h])",
           "instant": true,
           "legendFormat": "Détections",
           "refId": "A"
@@ -281,7 +281,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_account_created_total{application=\"catapult\"}[7d])",
+          "expr": "increase(catapult_account_created_total{application=\"catapult-api\"}[7d])",
           "instant": true,
           "legendFormat": "Comptes",
           "refId": "A"
@@ -341,7 +341,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_game_no_detected_total{application=\"catapult\"}[24h])",
+          "expr": "increase(catapult_game_no_detected_total{application=\"catapult-api\"}[24h])",
           "instant": true,
           "legendFormat": "Sans jeu",
           "refId": "A"
@@ -401,7 +401,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_channel_category_changed_total{application=\"catapult\"}[24h])",
+          "expr": "increase(catapult_channel_category_changed_total{application=\"catapult-api\"}[24h])",
           "instant": true,
           "legendFormat": "Catégorie",
           "refId": "A"
@@ -461,7 +461,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_channel_ccl_changed_total{application=\"catapult\"}[24h])",
+          "expr": "increase(catapult_channel_ccl_changed_total{application=\"catapult-api\"}[24h])",
           "instant": true,
           "legendFormat": "CCL",
           "refId": "A"
@@ -519,7 +519,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (source) (catapult_game_detected_total{application=\"catapult\"})",
+          "expr": "sum by (source) (catapult_game_detected_total{application=\"catapult-api\"})",
           "instant": true,
           "legendFormat": "{{source}}",
           "refId": "A"
@@ -607,7 +607,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_stream_online_total{application=\"catapult\"}[$__rate_interval])",
+          "expr": "increase(catapult_stream_online_total{application=\"catapult-api\"}[$__rate_interval])",
           "legendFormat": "En ligne",
           "refId": "A"
         },
@@ -616,7 +616,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_stream_offline_total{application=\"catapult\"}[$__rate_interval])",
+          "expr": "increase(catapult_stream_offline_total{application=\"catapult-api\"}[$__rate_interval])",
           "legendFormat": "Hors ligne",
           "refId": "B"
         }
@@ -1246,7 +1246,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "jvm_memory_used_bytes{application=\"catapult\", area=\"heap\"}",
+          "expr": "jvm_memory_used_bytes{application=~\"catapult-.*\", area=\"heap\"}",
           "legendFormat": "{{id}}",
           "refId": "A"
         },
@@ -1255,7 +1255,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "jvm_memory_max_bytes{application=\"catapult\", area=\"heap\"}",
+          "expr": "jvm_memory_max_bytes{application=~\"catapult-.*\", area=\"heap\"}",
           "legendFormat": "Max {{id}}",
           "refId": "B"
         }
@@ -1345,7 +1345,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (uri, method) (rate(http_server_requests_seconds_count{application=\"catapult\"}[$__rate_interval]))",
+          "expr": "sum by (uri, method) (rate(http_server_requests_seconds_count{application=~\"catapult-.*\"}[$__rate_interval]))",
           "legendFormat": "{{method}} {{uri}}",
           "refId": "A"
         }
@@ -1533,7 +1533,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(http_server_requests_seconds_count{application=\"catapult\", status=~\"5..\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{application=~\"catapult-.*\", status=~\"5..\"}[$__rate_interval]))",
           "legendFormat": "5xx/s",
           "refId": "A"
         }
@@ -1623,7 +1623,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "hikaricp_connections_active{application=\"catapult\"}",
+          "expr": "hikaricp_connections_active{application=~\"catapult-.*\"}",
           "legendFormat": "Actives",
           "refId": "A"
         },
@@ -1632,7 +1632,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "hikaricp_connections_pending{application=\"catapult\"}",
+          "expr": "hikaricp_connections_pending{application=~\"catapult-.*\"}",
           "legendFormat": "En attente",
           "refId": "B"
         },
@@ -1641,7 +1641,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "hikaricp_connections_max{application=\"catapult\"}",
+          "expr": "hikaricp_connections_max{application=~\"catapult-.*\"}",
           "legendFormat": "Max",
           "refId": "C"
         }
@@ -1700,7 +1700,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_uptime_seconds{application=\"catapult\"}",
+          "expr": "process_uptime_seconds{application=~\"catapult-.*\"}",
           "instant": true,
           "legendFormat": "Uptime",
           "refId": "A"
@@ -1760,7 +1760,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "catapult_sessions_active{application=\"catapult\"}",
+          "expr": "catapult_sessions_active{application=\"catapult-api\"}",
           "instant": true,
           "legendFormat": "Sessions",
           "refId": "A"
@@ -1820,7 +1820,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_auth_login_total{application=\"catapult\", provider=\"twitch\"}[24h])",
+          "expr": "increase(catapult_auth_login_total{application=\"catapult-api\", provider=\"twitch\"}[24h])",
           "instant": true,
           "legendFormat": "Connexions",
           "refId": "A"
@@ -1911,7 +1911,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (status) (rate(http_server_requests_seconds_count{application=\"catapult\"}[$__rate_interval]))",
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{application=~\"catapult-.*\"}[$__rate_interval]))",
           "legendFormat": "{{status}}",
           "refId": "A"
         }
@@ -2161,7 +2161,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "catapult_users_active{application=\"catapult\"}",
+          "expr": "catapult_users_active{application=\"catapult-api\"}",
           "instant": true,
           "legendFormat": "Actifs",
           "refId": "A"
@@ -2249,7 +2249,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(catapult_igdb_cache_lookup_total{application=\"catapult\"}[$__rate_interval])",
+          "expr": "rate(catapult_igdb_cache_lookup_total{application=\"catapult-api\"}[$__rate_interval])",
           "legendFormat": "{{method}} / {{result}}",
           "refId": "A"
         }
@@ -2339,7 +2339,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(catapult_scheduler_poll_duration_seconds_sum{application=\"catapult\"}[$__rate_interval]) / rate(catapult_scheduler_poll_duration_seconds_count{application=\"catapult\"}[$__rate_interval])",
+          "expr": "rate(catapult_scheduler_poll_duration_seconds_sum{application=\"catapult-api\"}[$__rate_interval]) / rate(catapult_scheduler_poll_duration_seconds_count{application=\"catapult-api\"}[$__rate_interval])",
           "legendFormat": "Durée moyenne",
           "refId": "A"
         },
@@ -2348,7 +2348,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "catapult_scheduler_poll_duration_seconds_max{application=\"catapult\"}",
+          "expr": "catapult_scheduler_poll_duration_seconds_max{application=\"catapult-api\"}",
           "legendFormat": "Max",
           "refId": "B"
         }
@@ -2437,7 +2437,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_scheduler_users_polled_total{application=\"catapult\"}[$__rate_interval])",
+          "expr": "increase(catapult_scheduler_users_polled_total{application=\"catapult-api\"}[$__rate_interval])",
           "legendFormat": "Utilisateurs",
           "refId": "A"
         }
@@ -2526,7 +2526,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_experiment_activated_total{application=\"catapult\"}[$__rate_interval])",
+          "expr": "increase(catapult_experiment_activated_total{application=\"catapult-api\"}[$__rate_interval])",
           "legendFormat": "{{experiment}}",
           "refId": "A"
         }
