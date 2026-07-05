@@ -48,7 +48,7 @@
       }
     ]
   },
-  "description": "Dashboard de monitoring Catapult \u2014 m\u00e9triques m\u00e9tier et techniques",
+  "description": "Dashboard de monitoring Catapult — métriques métier et techniques",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -56,6 +56,9 @@
   "links": [],
   "panels": [
     {
+      "type": "row",
+      "id": 200,
+      "title": "Activité",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -63,9 +66,107 @@
         "x": 0,
         "y": 0
       },
-      "id": 100,
-      "title": "M\u00e9tier",
-      "type": "row"
+      "panels": []
+    },
+    {
+      "type": "marcusolsson-hourly-heatmap-panel",
+      "id": 201,
+      "title": "Streams en cours - jour x heure (30j)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "catapult_streams_live{application=\"catapult-api\"}",
+          "legendFormat": "streams",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": "30d",
+      "options": {
+        "calculation": {
+          "aggregation": "mean"
+        },
+        "showLegend": true,
+        "showValueIndicator": true,
+        "from": "0",
+        "to": "24"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "id": 104,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "title": "Streams live",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "catapult_streams_live{application=\"catapult\"}",
+          "instant": true,
+          "legendFormat": "Live",
+          "refId": "A"
+        }
+      ]
     },
     {
       "datasource": {
@@ -92,9 +193,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 0,
+        "h": 5,
+        "w": 4,
+        "x": 16,
         "y": 1
       },
       "id": 1,
@@ -112,7 +213,7 @@
         },
         "textMode": "auto"
       },
-      "title": "D\u00e9tections de jeu (24h)",
+      "title": "Détections de jeu (24h)",
       "type": "stat",
       "targets": [
         {
@@ -122,67 +223,7 @@
           },
           "expr": "increase(catapult_game_detected_total{application=\"catapult\"}[24h])",
           "instant": true,
-          "legendFormat": "D\u00e9tections",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "yellow",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 8,
-        "y": 1
-      },
-      "id": 2,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "title": "Aucun jeu d\u00e9tect\u00e9 (24h)",
-      "type": "stat",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "increase(catapult_game_no_detected_total{application=\"catapult\"}[24h])",
-          "instant": true,
-          "legendFormat": "Sans jeu",
+          "legendFormat": "Détections",
           "refId": "A"
         }
       ]
@@ -212,9 +253,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 16,
+        "h": 5,
+        "w": 4,
+        "x": 20,
         "y": 1
       },
       "id": 3,
@@ -232,7 +273,7 @@
         },
         "textMode": "auto"
       },
-      "title": "Comptes cr\u00e9\u00e9s (7j)",
+      "title": "Comptes créés (7j)",
       "type": "stat",
       "targets": [
         {
@@ -243,6 +284,186 @@
           "expr": "increase(catapult_account_created_total{application=\"catapult\"}[7d])",
           "instant": true,
           "legendFormat": "Comptes",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 12,
+        "y": 6
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "title": "Aucun jeu détecté (24h)",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "increase(catapult_game_no_detected_total{application=\"catapult\"}[24h])",
+          "instant": true,
+          "legendFormat": "Sans jeu",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 16,
+        "y": 6
+      },
+      "id": 108,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "title": "Changements catégorie Twitch (24h)",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "increase(catapult_channel_category_changed_total{application=\"catapult\"}[24h])",
+          "instant": true,
+          "legendFormat": "Catégorie",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 20,
+        "y": 6
+      },
+      "id": 109,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "title": "Changements CCL Twitch (24h)",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "increase(catapult_channel_ccl_changed_total{application=\"catapult\"}[24h])",
+          "instant": true,
+          "legendFormat": "CCL",
           "refId": "A"
         }
       ]
@@ -269,9 +490,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 12,
         "x": 0,
-        "y": 5
+        "y": 11
       },
       "id": 4,
       "options": {
@@ -290,7 +511,7 @@
           "sort": "none"
         }
       },
-      "title": "D\u00e9tections par plateforme",
+      "title": "Détections par plateforme",
       "type": "piechart",
       "targets": [
         {
@@ -361,9 +582,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 16,
-        "x": 8,
-        "y": 5
+        "w": 12,
+        "x": 12,
+        "y": 11
       },
       "id": 5,
       "options": {
@@ -378,7 +599,7 @@
           "sort": "none"
         }
       },
-      "title": "Activit\u00e9 stream",
+      "title": "Activité stream",
       "type": "timeseries",
       "targets": [
         {
@@ -402,136 +623,544 @@
       ]
     },
     {
+      "type": "timeseries",
+      "id": 202,
+      "title": "Durée de stream (p50/p95)",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
       "gridPos": {
-        "h": 4,
-        "w": 8,
+        "h": 8,
+        "w": 24,
         "x": 0,
-        "y": 13
-      },
-      "id": 108,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "title": "Changements cat\u00e9gorie Twitch (24h)",
-      "type": "stat",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "increase(catapult_channel_category_changed_total{application=\"catapult\"}[24h])",
-          "instant": true,
-          "legendFormat": "Cat\u00e9gorie",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
+        "y": 19
       },
       "fieldConfig": {
         "defaults": {
+          "unit": "s",
           "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 8,
-        "y": 13
-      },
-      "id": 109,
       "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "tooltip": {
+          "mode": "multi"
         },
-        "textMode": "auto"
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
-      "title": "Changements CCL Twitch (24h)",
-      "type": "stat",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_channel_ccl_changed_total{application=\"catapult\"}[24h])",
-          "instant": true,
-          "legendFormat": "CCL",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(catapult_stream_duration_seconds_bucket[6h])))",
+          "legendFormat": "p50",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(catapult_stream_duration_seconds_bucket[6h])))",
+          "legendFormat": "p95",
+          "refId": "B"
         }
       ]
     },
     {
+      "type": "row",
+      "id": 203,
+      "title": "Intégrations externes",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 27
       },
-      "id": 101,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 204,
+      "title": "Latence p95 par API",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, api) (rate(catapult_external_api_seconds_bucket[5m])))",
+          "legendFormat": "{{api}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Verifier au premier deploiement sur /actuator/prometheus quelles series existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne."
+    },
+    {
+      "type": "timeseries",
+      "id": 205,
+      "title": "Appels par API",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (api) (rate(catapult_external_api_seconds_count[5m]))",
+          "legendFormat": "{{api}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Verifier au premier deploiement sur /actuator/prometheus quelles series existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne."
+    },
+    {
+      "type": "timeseries",
+      "id": 206,
+      "title": "Erreurs par API/opération",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (api, operation) (rate(catapult_external_api_seconds_count{outcome=\"error\"}[5m]))",
+          "legendFormat": "{{api}}/{{operation}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Verifier au premier deploiement sur /actuator/prometheus quelles series existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne."
+    },
+    {
+      "type": "stat",
+      "id": 207,
+      "title": "Rate limits (1h)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 36
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (api) (increase(catapult_external_rate_limited_total[1h]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": 208,
+      "title": "Top opérations lentes",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 36
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "sortBy": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "topk(10, histogram_quantile(0.95, sum by (le, api, operation) (rate(catapult_external_api_seconds_bucket[30m]))))",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Verifier au premier deploiement sur /actuator/prometheus quelles series existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne."
+    },
+    {
+      "type": "row",
+      "id": 209,
+      "title": "Chat",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 210,
+      "title": "Messages chat/s",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 45
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "mps",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (transport) (rate(catapult_chat_messages_total[5m]))",
+          "legendFormat": "{{transport}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 211,
+      "title": "Connexions chat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 45
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "catapult_chat_connections",
+          "legendFormat": "{{transport}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": 212,
+      "title": "Top commandes (24h)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 53
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "sortBy": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "topk(10, sum by (name) (increase(catapult_chat_commands_dispatch_total[24h])))",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 213,
+      "title": "Résultats de dispatch",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 8,
+        "y": 53
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (outcome) (rate(catapult_chat_commands_dispatch_total[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "id": 214,
+      "title": "Commandes dynamiques enregistrées",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 53
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "catapult_commands_registered",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 215,
       "title": "Technique",
-      "type": "row"
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "panels": []
     },
     {
       "datasource": {
@@ -591,7 +1220,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 62
       },
       "id": 6,
       "options": {
@@ -609,7 +1238,7 @@
           "sort": "none"
         }
       },
-      "title": "JVM Heap utilis\u00e9",
+      "title": "JVM Heap utilisé",
       "type": "timeseries",
       "targets": [
         {
@@ -690,7 +1319,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 62
       },
       "id": 7,
       "options": {
@@ -708,7 +1337,7 @@
           "sort": "none"
         }
       },
-      "title": "Requ\u00eates HTTP/s",
+      "title": "Requêtes HTTP/s",
       "type": "timeseries",
       "targets": [
         {
@@ -718,6 +1347,103 @@
           },
           "expr": "sum by (uri, method) (rate(http_server_requests_seconds_count{application=\"catapult\"}[$__rate_interval]))",
           "legendFormat": "{{method}} {{uri}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 216,
+      "title": "HTTP server p95/p99",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 70
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, application) (rate(http_server_requests_seconds_bucket[5m])))",
+          "legendFormat": "{{application}} p95",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, application) (rate(http_server_requests_seconds_bucket[5m])))",
+          "legendFormat": "{{application}} p99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 217,
+      "title": "HTTP client p95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 70
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, application) (rate(http_client_requests_seconds_bucket[5m])))",
+          "legendFormat": "{{application}}",
           "refId": "A"
         }
       ]
@@ -784,7 +1510,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 26
+        "y": 78
       },
       "id": 8,
       "options": {
@@ -871,7 +1597,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 26
+        "y": 78
       },
       "id": 9,
       "options": {
@@ -949,7 +1675,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 26
+        "y": 78
       },
       "id": 10,
       "options": {
@@ -1007,9 +1733,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 8,
+        "w": 6,
         "x": 0,
-        "y": 34
+        "y": 86
       },
       "id": 110,
       "options": {
@@ -1067,9 +1793,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 8,
-        "x": 8,
-        "y": 34
+        "w": 6,
+        "x": 6,
+        "y": 86
       },
       "id": 111,
       "options": {
@@ -1159,7 +1885,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 90
       },
       "id": 112,
       "options": {
@@ -1177,7 +1903,7 @@
           "sort": "none"
         }
       },
-      "title": "Requ\u00eates par code HTTP",
+      "title": "Requêtes par code HTTP",
       "type": "timeseries",
       "targets": [
         {
@@ -1192,16 +1918,195 @@
       ]
     },
     {
+      "type": "timeseries",
+      "id": 218,
+      "title": "Requêtes Hibernate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 98
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(hibernate_query_executions_total{application=\"catapult-api\"}[5m])",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "description": "Note : verifier les noms exacts des series hibernate_* sur /actuator/prometheus au premier run. Micrometer expose hibernate_query_executions_total via HibernateMetrics ; ajuster si le suffixe differe."
+    },
+    {
+      "type": "timeseries",
+      "id": 219,
+      "title": "Temps max requête Hibernate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 98
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "hibernate_query_executions_max_seconds{application=\"catapult-api\"}",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "description": "Note : verifier les noms exacts des series hibernate_* sur /actuator/prometheus au premier run. Micrometer expose hibernate_query_executions_total via HibernateMetrics ; ajuster si le suffixe differe."
+    },
+    {
+      "type": "timeseries",
+      "id": 220,
+      "title": "Pauses GC",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 106
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (application, action) (rate(jvm_gc_pause_seconds_sum[5m]))",
+          "legendFormat": "{{application}} {{action}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 221,
+      "title": "Détection de jeu (durée)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 106
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (resolved_by) (rate(catapult_game_detection_duration_seconds_sum[5m])) / sum by (resolved_by) (rate(catapult_game_detection_duration_seconds_count[5m]))",
+          "legendFormat": "{{resolved_by}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 222,
+      "title": "Métriques détaillées",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 114
       },
-      "id": 102,
-      "title": "M\u00e9triques d\u00e9taill\u00e9es",
-      "type": "row"
+      "panels": []
     },
     {
       "datasource": {
@@ -1231,7 +2136,7 @@
         "h": 4,
         "w": 8,
         "x": 0,
-        "y": 47
+        "y": 115
       },
       "id": 103,
       "options": {
@@ -1259,66 +2164,6 @@
           "expr": "catapult_users_active{application=\"catapult\"}",
           "instant": true,
           "legendFormat": "Actifs",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 8,
-        "y": 47
-      },
-      "id": 104,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "title": "Streams live",
-      "type": "stat",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "catapult_streams_live{application=\"catapult\"}",
-          "instant": true,
-          "legendFormat": "Live",
           "refId": "A"
         }
       ]
@@ -1381,7 +2226,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 51
+        "y": 119
       },
       "id": 105,
       "options": {
@@ -1396,7 +2241,7 @@
           "sort": "none"
         }
       },
-      "title": "Cache IGDB \u2014 hits/misses",
+      "title": "Cache IGDB — hits/misses",
       "type": "timeseries",
       "targets": [
         {
@@ -1468,7 +2313,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 51
+        "y": 119
       },
       "id": 106,
       "options": {
@@ -1486,7 +2331,7 @@
           "sort": "none"
         }
       },
-      "title": "Dur\u00e9e polling scheduler",
+      "title": "Durée polling scheduler",
       "type": "timeseries",
       "targets": [
         {
@@ -1495,7 +2340,7 @@
             "uid": "${datasource}"
           },
           "expr": "rate(catapult_scheduler_poll_duration_seconds_sum{application=\"catapult\"}[$__rate_interval]) / rate(catapult_scheduler_poll_duration_seconds_count{application=\"catapult\"}[$__rate_interval])",
-          "legendFormat": "Dur\u00e9e moyenne",
+          "legendFormat": "Durée moyenne",
           "refId": "A"
         },
         {
@@ -1567,7 +2412,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 127
       },
       "id": 107,
       "options": {
@@ -1584,7 +2429,7 @@
           "sort": "none"
         }
       },
-      "title": "Utilisateurs poll\u00e9s/tick",
+      "title": "Utilisateurs pollés/tick",
       "type": "timeseries",
       "targets": [
         {
@@ -1656,7 +2501,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 67
+        "y": 135
       },
       "id": 114,
       "options": {
@@ -1673,7 +2518,7 @@
           "sort": "none"
         }
       },
-      "title": "Exp\u00e9riences activ\u00e9es",
+      "title": "Expériences activées",
       "type": "timeseries",
       "targets": [
         {
