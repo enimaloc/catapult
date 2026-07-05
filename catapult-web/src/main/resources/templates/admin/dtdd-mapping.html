@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'dtdd-mapping', ~{::body}, null, 'container', null, null)}">
 <head>
     <title>Catapult — DoesTheDogDie Mapping</title>
@@ -21,40 +21,44 @@
            class="btn btn-sm" th:text="#{admin.dtdd_mapping.tab.rejected}">Rejected</a>
     </div>
 
-    <div th:if="${#lists.isEmpty(proposals)}" class="text-muted">
-        <p th:text="#{admin.dtdd_mapping.empty}">No proposals.</p>
-    </div>
+    <div data-dtdd-card>
+        <div class="text-muted" data-dtdd-empty th:style="${#lists.isEmpty(proposals)} ? '' : 'display:none'">
+            <p th:text="#{admin.dtdd_mapping.empty}">No proposals.</p>
+        </div>
 
-    <table th:unless="${#lists.isEmpty(proposals)}" class="table" style="width:100%;">
-        <thead>
-            <tr style="border-bottom:1px solid var(--border);">
-                <th th:text="#{admin.dtdd_mapping.column.created}">Created</th>
-                <th th:text="#{admin.dtdd_mapping.column.igdb}">IGDB id</th>
-                <th th:text="#{admin.dtdd_mapping.column.dtdd}">Proposed DTDD id</th>
-                <th th:text="#{admin.dtdd_mapping.column.proposer}">Proposer</th>
-                <th th:text="#{admin.dtdd_mapping.column.reason}">Reason</th>
-                <th th:if="${currentStatus == 'PENDING'}" th:text="#{admin.dtdd_mapping.column.actions}">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="p : ${proposals}" style="border-bottom:1px solid var(--border);">
-                <td th:text="${#temporals.format(p.createdAt, #messages.msg('common.datetime-format'))}">2026-06-20</td>
-                <td th:text="${p.igdbId}">100</td>
-                <td th:text="${p.proposedDtddId}">4521</td>
-                <td th:text="${p.proposer != null ? p.proposer.twitchUsername : '?'}">user</td>
-                <td th:text="${p.reason}">…</td>
-                <td th:if="${currentStatus == 'PENDING'}">
-                    <form th:action="@{|/admin/dtdd-mapping/proposals/${p.id}/approve|}" method="post" style="display:inline;"> <!-- nosemgrep -->
-                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <button type="submit" class="btn btn-sm btn-primary" th:text="#{admin.dtdd_mapping.action.approve}">Approve</button>
-                    </form>
-                    <form th:action="@{|/admin/dtdd-mapping/proposals/${p.id}/reject|}" method="post" style="display:inline;"> <!-- nosemgrep -->
-                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <button type="submit" class="btn btn-sm" th:text="#{admin.dtdd_mapping.action.reject}">Reject</button>
-                    </form>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+        <table class="table" style="width:100%;" data-dtdd-table th:style="${#lists.isEmpty(proposals)} ? 'display:none' : ''">
+            <thead>
+                <tr style="border-bottom:1px solid var(--border);">
+                    <th th:text="#{admin.dtdd_mapping.column.created}">Created</th>
+                    <th th:text="#{admin.dtdd_mapping.column.igdb}">IGDB id</th>
+                    <th th:text="#{admin.dtdd_mapping.column.dtdd}">Proposed DTDD id</th>
+                    <th th:text="#{admin.dtdd_mapping.column.proposer}">Proposer</th>
+                    <th th:text="#{admin.dtdd_mapping.column.reason}">Reason</th>
+                    <th th:if="${currentStatus == 'PENDING'}" th:text="#{admin.dtdd_mapping.column.actions}">Actions</th>
+                </tr>
+            </thead>
+            <tbody data-dtdd-body>
+                <tr th:each="p : ${proposals}" style="border-bottom:1px solid var(--border);" th:attr="data-proposal-id=${p.id}">
+                    <td th:text="${#temporals.format(p.createdAt, #messages.msg('common.datetime-format'))}">2026-06-20</td>
+                    <td th:text="${p.igdbId}">100</td>
+                    <td th:text="${p.proposedDtddId}">4521</td>
+                    <td th:text="${p.proposer != null ? p.proposer.twitchUsername : '?'}">user</td>
+                    <td th:text="${p.reason}">…</td>
+                    <td th:if="${currentStatus == 'PENDING'}">
+                        <form th:action="@{|/admin/dtdd-mapping/proposals/${p.id}/approve|}" method="post" style="display:inline;"
+                              ws:post="@{|/admin/dtdd-mapping/proposals/${p.id}/approve|}" ws:swap="none"> <!-- nosemgrep -->
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit" class="btn btn-sm btn-primary" th:text="#{admin.dtdd_mapping.action.approve}">Approve</button>
+                        </form>
+                        <form th:action="@{|/admin/dtdd-mapping/proposals/${p.id}/reject|}" method="post" style="display:inline;"
+                              ws:post="@{|/admin/dtdd-mapping/proposals/${p.id}/reject|}" ws:swap="none"> <!-- nosemgrep -->
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit" class="btn btn-sm" th:text="#{admin.dtdd_mapping.action.reject}">Reject</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </body>
 </html>

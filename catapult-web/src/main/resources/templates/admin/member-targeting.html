@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'members', ~{::body}, null, 'container', null, null)}">
 <head>
     <title th:text="#{admin.member_targeting.title}">Administration — Ciblage membre</title>
@@ -19,6 +19,7 @@
         </h2>
     </div>
 
+    <div id="targeting-body" th:fragment="targetingBody">
     <!-- ── Flags ────────────────────────────────────────────────────────────── -->
     <div class="card" style="margin-bottom:1.5rem">
         <h3 th:text="#{admin.member_targeting.flags.title}" style="margin-bottom:0.75rem">Flags personnalisés</h3>
@@ -41,7 +42,8 @@
                         <td><code th:text="${f.key}"></code></td>
                         <td th:text="${f.value ?: '—'}"></td>
                         <td>
-                            <form th:action="@{/admin/members/{id}/flags/{key}/delete(id=${memberId},key=${f.key})}" method="post"> <!-- nosemgrep -->
+                            <form th:action="@{/admin/members/{id}/flags/{key}/delete(id=${memberId},key=${f.key})}" method="post"
+                                  ws:post="@{/admin/members/{id}/flags/{key}/delete(id=${memberId},key=${f.key})}" ws:target="#targeting-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn btn-sm btn-danger"
                                         th:text="#{admin.member_targeting.flags.action.delete}">Supprimer</button>
@@ -53,7 +55,8 @@
         </div>
 
         <h4 th:text="#{admin.member_targeting.flags.add.title}" style="margin-bottom:0.5rem">Ajouter un flag</h4>
-        <form th:action="@{/admin/members/{id}/flags(id=${memberId})}" method="post"> <!-- nosemgrep -->
+        <form th:action="@{/admin/members/{id}/flags(id=${memberId})}" method="post"
+              ws:post="@{/admin/members/{id}/flags(id=${memberId})}" ws:target="#targeting-body" ws:swap="outerHTML"> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
                 <div class="form-group" style="margin:0">
@@ -98,7 +101,8 @@
                               The th:with binds the matched group so the form URL gets its UUID.
                             -->
                             <th:block th:each="g : ${allGroups}" th:if="${g.key == gk}">
-                                <form th:action="@{/admin/members/{id}/groups/{groupId}/delete(id=${memberId},groupId=${g.id})}" method="post"> <!-- nosemgrep -->
+                                <form th:action="@{/admin/members/{id}/groups/{groupId}/delete(id=${memberId},groupId=${g.id})}" method="post"
+                                      ws:post="@{/admin/members/{id}/groups/{groupId}/delete(id=${memberId},groupId=${g.id})}" ws:target="#targeting-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button type="submit" class="btn btn-sm btn-danger"
                                             th:text="#{admin.member_targeting.groups.action.remove}">Retirer</button>
@@ -111,7 +115,8 @@
         </div>
 
         <h4 th:text="#{admin.member_targeting.groups.add.title}" style="margin-bottom:0.5rem">Ajouter à un groupe</h4>
-        <form th:action="@{/admin/members/{id}/groups(id=${memberId})}" method="post"> <!-- nosemgrep -->
+        <form th:action="@{/admin/members/{id}/groups(id=${memberId})}" method="post"
+              ws:post="@{/admin/members/{id}/groups(id=${memberId})}" ws:target="#targeting-body" ws:swap="outerHTML"> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
                 <div class="form-group" style="margin:0">
@@ -126,6 +131,7 @@
                         th:text="#{admin.member_targeting.groups.add.button}">Ajouter</button>
             </div>
         </form>
+    </div>
     </div>
 </body>
 </html>
