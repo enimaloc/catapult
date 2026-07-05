@@ -30,15 +30,22 @@
     <script th:src="@{/js/ws/maintenance-banner.js}" defer></script>
     <script th:src="@{/webjars/htmx.org/dist/htmx.min.js}" defer></script>
     <script th:if="${user != null}" th:src="@{/js/notifications.js}" defer></script>
-    <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/bindings.js}" defer></script>
-    <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/settings.js}" defer></script>
-    <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/connections.js}" defer></script>
-    <script th:if="${channelUser != null}" th:src="@{/js/channel-page.js}" defer></script>
-    <script th:if="${active_page == 'steam-keys' or active_page == 'dtdd-keys'}" th:src="@{/js/admin-keys.js}" defer></script>
-    <script th:if="${active_page == 'ccl'}" th:src="@{/js/admin-ccl.js}" defer></script>
-    <script th:if="${active_page == 'tw'}" th:src="@{/js/admin-tw.js}" defer></script>
-    <script th:if="${active_page == 'dtdd-mapping'}" th:src="@{/js/admin-dtdd-mapping.js}" defer></script>
-    <script th:if="${active_page == 'groups'}" th:src="@{/js/admin-groups.js}" defer></script>
+    <!-- Loaded for any logged-in user (not only on a channel page) so channel-page.js
+         re-inits correctly when a channel page is reached via hx-boost navigation.
+         channel-page.js no-ops when there is no channel-owner-id meta. -->
+    <script th:if="${user != null}" th:src="@{/js/channel-handlers/bindings.js}" defer></script>
+    <script th:if="${user != null}" th:src="@{/js/channel-handlers/settings.js}" defer></script>
+    <script th:if="${user != null}" th:src="@{/js/channel-handlers/connections.js}" defer></script>
+    <script th:if="${user != null}" th:src="@{/js/channel-page.js}" defer></script>
+    <!-- Admin event-driven scripts: loaded globally for admins (not per active_page)
+         so their events.admin subscription survives hx-boost navigation. -->
+    <th:block th:if="${user != null and user.admin}">
+        <script th:src="@{/js/admin-keys.js}" defer></script>
+        <script th:src="@{/js/admin-ccl.js}" defer></script>
+        <script th:src="@{/js/admin-tw.js}" defer></script>
+        <script th:src="@{/js/admin-dtdd-mapping.js}" defer></script>
+        <script th:src="@{/js/admin-groups.js}" defer></script>
+    </th:block>
     <th:block th:replace="${additional_head} ?: ~{}"></th:block>
 </head>
 <body hx-boost="true">

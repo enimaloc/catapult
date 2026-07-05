@@ -13,8 +13,8 @@
 (function () {
   "use strict";
 
-  var card = document.querySelector("[data-ccl-card]");
-  if (!card) return;
+  // Loaded globally for admins; re-resolved per event so it survives hx-boost swaps.
+  var card = null;
 
   function cssEscape(s) {
     if (window.CSS && CSS.escape) return CSS.escape(s);
@@ -130,6 +130,8 @@
 
   function onEvent(msg) {
     if (!msg || !msg.name) return;
+    card = document.querySelector("[data-ccl-card]");
+    if (!card) return;
     var data = msg.data || {};
     if (msg.name === "ccl.mappings.updated") onMappingsUpdated(data.ccl);
     else if (msg.name === "ccl.refreshed") onRefreshed(data.ccls, data.igdbDescriptors);

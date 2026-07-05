@@ -12,8 +12,8 @@
 (function () {
   "use strict";
 
-  var card = document.querySelector("[data-tw-card]");
-  if (!card) return;
+  // Loaded globally for admins; re-resolved per event so it survives hx-boost swaps.
+  var card = null;
 
   function cssEscape(s) {
     if (window.CSS && CSS.escape) return CSS.escape(s);
@@ -71,6 +71,8 @@
 
   function onEvent(msg) {
     if (!msg || msg.name !== "tw.definition.added") return;
+    card = document.querySelector("[data-tw-card]");
+    if (!card) return;
     onDefinitionAdded((msg.data || {}).definition);
   }
 

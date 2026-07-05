@@ -10,8 +10,8 @@
 (function () {
   "use strict";
 
-  var card = document.querySelector("[data-dtdd-card]");
-  if (!card) return;
+  // Loaded globally for admins; re-resolved per event so it survives hx-boost swaps.
+  var card = null;
 
   function cssEscape(s) {
     if (window.CSS && CSS.escape) return CSS.escape(s);
@@ -40,6 +40,8 @@
 
   function onEvent(msg) {
     if (!msg || msg.name !== "dtdd.proposal.resolved") return;
+    card = document.querySelector("[data-dtdd-card]");
+    if (!card) return;
     onResolved((msg.data || {}).proposalId);
   }
 
