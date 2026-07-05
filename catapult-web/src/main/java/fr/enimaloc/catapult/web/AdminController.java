@@ -10,6 +10,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -91,6 +92,11 @@ public class AdminController {
     public String membersPage(Model model,
                               @AuthenticationPrincipal CatapultWebUser principal,
                               @RequestParam(required = false) String error) {
+        populateMembersModel(model, principal, error);
+        return "admin/members";
+    }
+
+    private void populateMembersModel(Model model, CatapultWebUser principal, String error) {
         AdminMembersPageDto data = apiClient.get("/api/admin/members", AdminMembersPageDto.class);
         if (data != null) {
             // Convert string UUID keys to UUID so the template lookup works
@@ -109,7 +115,18 @@ public class AdminController {
         // and previously produced silent ?error=impersonateFailed redirects.
         model.addAttribute("currentUserTwitchId", principal == null ? null : principal.getTwitchId());
         model.addAttribute("impersonateError", error);
-        return "admin/members";
+    }
+
+    /**
+     * Row actions re-render only the {@code membersBody} fragment over WebSocket
+     * (ws:* dialect sends the HX-Request header); JS-less POSTs keep the PRG redirect.
+     */
+    private String membersResult(String hxRequest, CatapultWebUser principal, Model model) {
+        if (hxRequest != null) {
+            populateMembersModel(model, principal, null);
+            return "admin/members :: membersBody";
+        }
+        return "redirect:/admin/members";
     }
 
     @GetMapping("/members/{id}/settings")
@@ -123,9 +140,17 @@ public class AdminController {
 
     @GetMapping("/members/{id}/targeting")
     public String memberTargeting(@PathVariable UUID id, Model model) {
+        if (!populateTargetingModel(id, model)) {
+            return "redirect:/admin/members";
+        }
+        return "admin/member-targeting";
+    }
+
+    /** Returns false if the member cannot be resolved (caller should redirect). */
+    private boolean populateTargetingModel(UUID id, Model model) {
         MemberSummaryDto member = apiClient.get("/api/admin/members/{id}", MemberSummaryDto.class, id);
         if (member == null) {
-            return "redirect:/admin/members";
+            return false;
         }
         MemberTargetingDto targeting = apiClient.get("/api/admin/members/{id}/targeting", MemberTargetingDto.class, id);
         List<GroupOptionDto> allGroups = apiClient.get("/api/admin/groups",
@@ -135,39 +160,53 @@ public class AdminController {
         model.addAttribute("flags", targeting != null && targeting.flags() != null ? targeting.flags() : List.of());
         model.addAttribute("memberGroupKeys", targeting != null && targeting.groupKeys() != null ? targeting.groupKeys() : List.of());
         model.addAttribute("allGroups", allGroups != null ? allGroups : List.of());
-        return "admin/member-targeting";
+        return true;
+    }
+
+    /** Re-renders only the {@code targetingBody} fragment for ws:* actions; PRG redirect otherwise. */
+    private String targetingResult(UUID id, String hxRequest, Model model) {
+        if (hxRequest != null && populateTargetingModel(id, model)) {
+            return "admin/member-targeting :: targetingBody";
+        }
+        return "redirect:/admin/members/" + id + "/targeting";
     }
 
     @PostMapping("/members/{id}/flags")
     public String setMemberFlag(@PathVariable UUID id,
                                 @RequestParam String key,
-                                @RequestParam(required = false) String value) {
+                                @RequestParam(required = false) String value,
+                                @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/members/{id}/flags", new SetFlagBody(key, value), id);
-        return "redirect:/admin/members/" + id + "/targeting";
+        return targetingResult(id, hx, model);
     }
 
     @PostMapping("/members/{id}/flags/{key}/delete")
-    public String deleteMemberFlag(@PathVariable UUID id, @PathVariable String key) {
+    public String deleteMemberFlag(@PathVariable UUID id, @PathVariable String key,
+                                   @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/members/{id}/flags/{key}/delete", null, id, key);
-        return "redirect:/admin/members/" + id + "/targeting";
+        return targetingResult(id, hx, model);
     }
 
     @PostMapping("/members/{id}/groups")
-    public String addMemberToGroup(@PathVariable UUID id, @RequestParam String groupKey) {
+    public String addMemberToGroup(@PathVariable UUID id, @RequestParam String groupKey,
+                                   @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/members/{id}/groups", new AddToGroupBody(groupKey), id);
-        return "redirect:/admin/members/" + id + "/targeting";
+        return targetingResult(id, hx, model);
     }
 
     @PostMapping("/members/{id}/groups/{groupId}/delete")
-    public String removeMemberFromGroup(@PathVariable UUID id, @PathVariable UUID groupId) {
+    public String removeMemberFromGroup(@PathVariable UUID id, @PathVariable UUID groupId,
+                                        @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/members/{id}/groups/{groupId}/delete", null, id, groupId);
-        return "redirect:/admin/members/" + id + "/targeting";
+        return targetingResult(id, hx, model);
     }
 
     @PostMapping("/members/{id}/bot/toggle")
-    public String toggleMemberBot(@PathVariable UUID id) {
+    public String toggleMemberBot(@PathVariable UUID id,
+                                  @RequestHeader(value = "HX-Request", required = false) String hx,
+                                  @AuthenticationPrincipal CatapultWebUser principal, Model model) {
         apiClient.post("/api/admin/members/{id}/bot/toggle", null, id);
-        return "redirect:/admin/members";
+        return membersResult(hx, principal, model);
     }
 
     /**
@@ -177,27 +216,35 @@ public class AdminController {
      * démarqué côté API.
      */
     @PostMapping("/members/{id}/promote-to-system")
-    public String promoteToSystem(@PathVariable UUID id) {
+    public String promoteToSystem(@PathVariable UUID id,
+                                  @RequestHeader(value = "HX-Request", required = false) String hx,
+                                  @AuthenticationPrincipal CatapultWebUser principal, Model model) {
         apiClient.post("/api/admin/members/{id}/promote-to-system", null, id);
-        return "redirect:/admin/members";
+        return membersResult(hx, principal, model);
     }
 
     @PostMapping("/members/{id}/delete")
-    public String deleteMember(@PathVariable UUID id) {
+    public String deleteMember(@PathVariable UUID id,
+                               @RequestHeader(value = "HX-Request", required = false) String hx,
+                               @AuthenticationPrincipal CatapultWebUser principal, Model model) {
         apiClient.post("/api/admin/members/{id}/delete", null, id);
-        return "redirect:/admin/members";
+        return membersResult(hx, principal, model);
     }
 
     @PostMapping("/members/{id}/steam/unlink")
-    public String unlinkMemberSteam(@PathVariable UUID id) {
+    public String unlinkMemberSteam(@PathVariable UUID id,
+                                    @RequestHeader(value = "HX-Request", required = false) String hx,
+                                    @AuthenticationPrincipal CatapultWebUser principal, Model model) {
         apiClient.post("/api/admin/members/{id}/steam/unlink", null, id);
-        return "redirect:/admin/members";
+        return membersResult(hx, principal, model);
     }
 
     @PostMapping("/members/{id}/twitch/unlink")
-    public String unlinkMemberTwitch(@PathVariable UUID id) {
+    public String unlinkMemberTwitch(@PathVariable UUID id,
+                                     @RequestHeader(value = "HX-Request", required = false) String hx,
+                                     @AuthenticationPrincipal CatapultWebUser principal, Model model) {
         apiClient.post("/api/admin/members/{id}/twitch/unlink", null, id);
-        return "redirect:/admin/members";
+        return membersResult(hx, principal, model);
     }
 
     @PostMapping("/members/{id}/migrate")
@@ -215,6 +262,15 @@ public class AdminController {
 
     @GetMapping("/whitelist")
     public String whitelistPage(Model model) {
+        populateWhitelistModel(model);
+        return "admin/whitelist";
+    }
+
+    /**
+     * Populates the whitelist model. Shared by the GET page and the POST actions
+     * that re-render the {@code body} fragment over WebSocket (ws:* dialect).
+     */
+    private void populateWhitelistModel(Model model) {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = apiClient.get("/api/admin/whitelist", Map.class);
         if (data != null) {
@@ -228,55 +284,71 @@ public class AdminController {
             model.addAttribute("globalCapReached", Boolean.TRUE.equals(data.get("globalCapReached")));
             model.addAttribute("invites", data.get("invites"));
         }
-        return "admin/whitelist";
+    }
+
+    /**
+     * For ws:* form actions the client sends the {@code HX-Request} header; we
+     * then re-render only the {@code body} fragment so ws-actions can swap it in
+     * place. Plain (JS-less) POSTs still get the PRG redirect.
+     */
+    private String whitelistResult(String hxRequest, Model model) {
+        if (hxRequest != null) {
+            populateWhitelistModel(model);
+            return "admin/whitelist :: body";
+        }
+        return "redirect:/admin/whitelist";
     }
 
     @PostMapping("/whitelist/toggle")
-    public String toggleWhitelist() {
+    public String toggleWhitelist(@RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/whitelist/toggle", null);
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     @PostMapping("/whitelist/add")
-    public String addWhitelist(@RequestParam String twitchId) {
+    public String addWhitelist(@RequestParam String twitchId,
+                               @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/whitelist/add", Map.of("twitchId", twitchId));
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     @PostMapping("/whitelist/{id}/delete")
-    public String deleteWhitelist(@PathVariable String id) {
+    public String deleteWhitelist(@PathVariable String id,
+                                  @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/whitelist/{id}/delete", null, id);
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     @PostMapping("/whitelist/invite/toggle")
-    public String toggleInvites() {
+    public String toggleInvites(@RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/whitelist/invite/toggle", null);
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     @PostMapping("/whitelist/invite/settings")
     public String updateInviteSettings(
             @RequestParam(required = false) Integer globalMaxMembers,
             @RequestParam(required = false) Integer defaultMaxUses,
-            @RequestParam(defaultValue = "false") boolean defaultCanReinvite) {
+            @RequestParam(defaultValue = "false") boolean defaultCanReinvite,
+            @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("globalMaxMembers", globalMaxMembers);
         body.put("defaultMaxUses", defaultMaxUses);
         body.put("defaultCanReinvite", defaultCanReinvite);
         apiClient.post("/api/admin/whitelist/invite/settings", body);
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     @PostMapping("/whitelist/invite/{inviteId}/quota")
     public String updateWhitelistInviteQuota(@PathVariable UUID inviteId,
                                              @RequestParam(required = false) Integer maxUses,
-                                             @RequestParam(required = false) Boolean canReinvite) {
+                                             @RequestParam(required = false) Boolean canReinvite,
+                                             @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("maxUses", maxUses);
         body.put("canReinvite", canReinvite);
         apiClient.post("/api/admin/whitelist/invite/{inviteId}/quota", body, inviteId);
-        return "redirect:/admin/whitelist";
+        return whitelistResult(hx, model);
     }
 
     // ── Steam Keys ───────────────────────────────────────────────────────────
@@ -378,6 +450,11 @@ public class AdminController {
 
     @GetMapping("/experiments/{id}")
     public String experimentDetail(@PathVariable UUID id, Model model) {
+        populateExperimentDetailModel(id, model);
+        return "admin/experiment-detail";
+    }
+
+    private void populateExperimentDetailModel(UUID id, Model model) {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = apiClient.get("/api/admin/experiments/{id}", Map.class, id);
         if (data != null) {
@@ -396,7 +473,19 @@ public class AdminController {
                 new ParameterizedTypeReference<List<Map<String, Object>>>() {});
         model.addAttribute("allGroups", allGroups != null ? allGroups : List.of());
         model.addAttribute("allExperiments", allExperiments != null ? allExperiments : List.of());
-        return "admin/experiment-detail";
+    }
+
+    /**
+     * Detail-page actions re-render only the {@code detailBody} fragment over
+     * WebSocket (ws:* dialect); JS-less POSTs keep the PRG redirect. The page's
+     * inline scripts live outside the fragment so their global helpers survive.
+     */
+    private String experimentDetailResult(UUID id, String hxRequest, Model model) {
+        if (hxRequest != null) {
+            populateExperimentDetailModel(id, model);
+            return "admin/experiment-detail :: detailBody";
+        }
+        return "redirect:/admin/experiments/" + id;
     }
 
     @PostMapping("/experiments/{id}/activate")
@@ -418,14 +507,16 @@ public class AdminController {
     }
 
     @PostMapping("/experiments/{id}/assign")
-    public String assignUser(@PathVariable UUID id, @RequestParam String twitchUsername) {
+    public String assignUser(@PathVariable UUID id, @RequestParam String twitchUsername,
+                             @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/experiments/{id}/assign",
                 Map.of("twitchUsername", twitchUsername), id);
-        return "redirect:/admin/experiments/" + id;
+        return experimentDetailResult(id, hx, model);
     }
 
     @PostMapping("/experiments/{id}/variants/weights")
-    public String updateWeights(@PathVariable UUID id, @RequestParam Map<String, String> params) {
+    public String updateWeights(@PathVariable UUID id, @RequestParam Map<String, String> params,
+                                @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         // params contains "weight_<variantId>" keys — convert to UUID→Integer map
         Map<String, Integer> weights = new java.util.LinkedHashMap<>();
         params.forEach((k, v) -> {
@@ -436,7 +527,7 @@ public class AdminController {
             }
         });
         apiClient.post("/api/admin/experiments/{id}/variants/weights", weights, id);
-        return "redirect:/admin/experiments/" + id;
+        return experimentDetailResult(id, hx, model);
     }
 
     @PostMapping("/experiments/{id}/rules")
@@ -446,16 +537,18 @@ public class AdminController {
                           @RequestParam(required = false) Integer percentage,
                           @RequestParam(required = false) String attributeKey,
                           @RequestParam(required = false) String attributeOperator,
-                          @RequestParam(required = false) String attributeValue) {
+                          @RequestParam(required = false) String attributeValue,
+                          @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/experiments/{id}/rules",
                 new AddRuleRequest(ruleType, priority, percentage, attributeKey, attributeOperator, attributeValue), id);
-        return "redirect:/admin/experiments/" + id;
+        return experimentDetailResult(id, hx, model);
     }
 
     @PostMapping("/experiments/{id}/rules/{ruleId}/delete")
-    public String deleteRule(@PathVariable UUID id, @PathVariable UUID ruleId) {
+    public String deleteRule(@PathVariable UUID id, @PathVariable UUID ruleId,
+                             @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/experiments/{id}/rules/{ruleId}/delete", null, id, ruleId);
-        return "redirect:/admin/experiments/" + id;
+        return experimentDetailResult(id, hx, model);
     }
 
     @PostMapping("/experiments/{id}/overrides")
@@ -467,23 +560,26 @@ public class AdminController {
                               @RequestParam(required = false) String attributeKey,
                               @RequestParam(required = false) String attributeOp,
                               @RequestParam(required = false) String attributeVal,
-                              @RequestParam(required = false) UUID targetVariantId) {
+                              @RequestParam(required = false) UUID targetVariantId,
+                              @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/experiments/{id}/overrides",
                 new AddOverrideRequest(overrideType, action, priority, twitchUsername,
                         attributeKey, attributeOp, attributeVal, targetVariantId), id);
-        return "redirect:/admin/experiments/" + id;
+        return experimentDetailResult(id, hx, model);
     }
 
     @PostMapping("/experiments/{id}/overrides/{overrideId}/delete")
-    public String deleteOverride(@PathVariable UUID id, @PathVariable UUID overrideId) {
+    public String deleteOverride(@PathVariable UUID id, @PathVariable UUID overrideId,
+                                 @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/experiments/{id}/overrides/{overrideId}/delete", null, id, overrideId);
-        return "redirect:/admin/experiments/" + id;
+        return experimentDetailResult(id, hx, model);
     }
 
     @PostMapping("/experiments/{id}/reassign")
-    public String reassign(@PathVariable UUID id) {
+    public String reassign(@PathVariable UUID id,
+                           @RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
         apiClient.post("/api/admin/experiments/{id}/reassign", null, id);
-        return "redirect:/admin/experiments/" + id;
+        return experimentDetailResult(id, hx, model);
     }
 
     // ── Request bodies ────────────────────────────────────────────────────────

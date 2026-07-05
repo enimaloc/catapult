@@ -38,18 +38,21 @@ function gameSearch(event) {
 
     _gameSearchTimers[resultsId] = setTimeout(() => {
         const channelId = input.dataset.channelId;
-        const searchUrl = input.dataset.searchUrl;
-        if (channelId && window.catapultWs) {
+        const wsSearch = input.dataset.wsSearch;
+        if (!window.catapultWs) { results.style.display = 'none'; return; }
+        if (channelId) {
             catapultWs.request('search.twitch.categories', { channelId, q, limit: 10 })
                 .then(resp => {
                     if (!resp.ok || !Array.isArray(resp.result)) { results.style.display = 'none'; return; }
                     renderGames(resp.result);
                 })
                 .catch(() => { results.style.display = 'none'; });
-        } else if (searchUrl) {
-            fetch(searchUrl + '?q=' + encodeURIComponent(q))
-                .then(r => r.json())
-                .then(data => renderGames(Array.isArray(data) ? data : []))
+        } else if (wsSearch === 'game') {
+            catapultWs.request('search.game', { q, limit: 10 })
+                .then(resp => {
+                    if (!resp.ok || !Array.isArray(resp.result)) { results.style.display = 'none'; return; }
+                    renderGames(resp.result);
+                })
                 .catch(() => { results.style.display = 'none'; });
         } else {
             results.style.display = 'none';

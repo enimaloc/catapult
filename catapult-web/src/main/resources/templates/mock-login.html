@@ -10,7 +10,7 @@
         <div class="login-card">
             <h1>🚀 Catapult</h1>
             <p class="subtitle">Mode développement — sélectionner un utilisateur</p>
-            <form method="post" th:action="@{/mock-login}"> <!-- nosemgrep -->
+            <form method="post" th:action="@{/mock-login}" hx-boost="false"> <!-- nosemgrep -->
                 <div class="form-group">
                     <select name="userId" class="form-control" aria-label="Utilisateur">
                         <option th:each="user : ${users}"
