@@ -1,11 +1,15 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.service.SteamStoreServiceImpl;
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -28,6 +32,9 @@ class SteamStoreServiceTest {
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
     @Mock private RestClient.ResponseSpec responseSpec;
+
+    @Spy
+    private ExternalApiObservations apiObservations = new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry());
 
     @InjectMocks private SteamStoreServiceImpl service;
 

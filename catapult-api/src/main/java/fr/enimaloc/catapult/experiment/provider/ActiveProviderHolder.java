@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.experiment.provider;
 import fr.enimaloc.catapult.config.ExperimentProviderProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
 
 @Slf4j
 @Component
@@ -13,11 +14,11 @@ public class ActiveProviderHolder {
     private final ExperimentProvider provider;
     private final String providerType;
 
-    public ActiveProviderHolder(ExperimentProviderProperties properties) {
+    public ActiveProviderHolder(ExperimentProviderProperties properties, RestClient.Builder restClientBuilder) {
         this.providerType = properties.getProvider();
         this.provider = switch (providerType) {
             case "unleash" -> new UnleashExperimentProvider(properties);
-            case "growthbook" -> new GrowthBookExperimentProvider(properties);
+            case "growthbook" -> new GrowthBookExperimentProvider(properties, restClientBuilder);
             default -> {
                 log.info("[Provider] Using internal experiment provider");
                 yield null;

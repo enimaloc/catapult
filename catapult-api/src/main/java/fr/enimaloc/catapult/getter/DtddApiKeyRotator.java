@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.getter;
 
 import fr.enimaloc.catapult.domain.DtddApiKeyEntry;
 import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Profile;
@@ -21,12 +22,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class DtddApiKeyRotator {
 
     private final DtddApiKeyRepository repository;
+    private final MeterRegistry meterRegistry;
     private final Map<String, Long> keyBlockedUntil = new ConcurrentHashMap<>();
     private final AtomicInteger counter = new AtomicInteger(0);
     private volatile List<String> keys = List.of();
 
-    public DtddApiKeyRotator(DtddApiKeyRepository repository) {
+    public DtddApiKeyRotator(DtddApiKeyRepository repository, MeterRegistry meterRegistry) {
         this.repository = repository;
+        this.meterRegistry = meterRegistry;
         refreshKeys();
     }
 
@@ -69,6 +72,7 @@ public class DtddApiKeyRotator {
 
     public void onKeyRateLimited(String key, int retryAfterSeconds) {
         keyBlockedUntil.put(key, System.currentTimeMillis() + retryAfterSeconds * 1000L);
+        meterRegistry.counter("catapult.external.rate_limited", "api", "dtdd", "scope", "key").increment();
         String masked = key.length() > 8
             ? key.substring(0, 4) + "…" + key.substring(key.length() - 4)
             : "…";
