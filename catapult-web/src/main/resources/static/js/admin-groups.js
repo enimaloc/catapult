@@ -13,9 +13,9 @@
 (function () {
   "use strict";
 
-  var card = document.querySelector("[data-groups-card]");
-  if (!card) return;
-  var tpl = document.querySelector("[data-groups-row-tpl]");
+  // Loaded globally for admins; re-resolved per event so it survives hx-boost swaps.
+  var card = null;
+  var tpl = null;
 
   function cssEscape(s) {
     if (window.CSS && CSS.escape) return CSS.escape(s);
@@ -84,6 +84,9 @@
 
   function onEvent(msg) {
     if (!msg || !msg.name) return;
+    card = document.querySelector("[data-groups-card]");
+    tpl = document.querySelector("[data-groups-row-tpl]");
+    if (!card) return;
     var data = msg.data || {};
     if (msg.name === "group.created") onCreated(data.group);
     else if (msg.name === "group.updated") onUpdated(data.group);
