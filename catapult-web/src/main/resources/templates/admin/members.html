@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'members', ~{::body}, null, 'container', null, null)}">
 <head>
     <title>Catapult — Membres</title>
@@ -16,6 +16,7 @@
         <span th:text="#{admin.members.impersonate.error}">Impersonation refusée par l'API (utilisateur cible introuvable, inactif, ou self-impersonation).</span>
     </div>
 
+    <div id="members-body" th:fragment="membersBody">
     <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
         <h2 th:text="#{admin.members.title}" style="margin:0">Administration — Membres</h2>
         <form th:if="${canMockSteam}" th:action="@{/admin/members/steam/toggle-rate-limit}" method="post"> <!-- nosemgrep -->
@@ -60,7 +61,8 @@
                         </td>
                         <td th:text="${member.steamId ?: '—'}"></td>
                         <td>
-                            <form th:action="@{/admin/members/{id}/bot/toggle(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                            <form th:action="@{/admin/members/{id}/bot/toggle(id=${member.id})}" method="post"
+                                  ws:post="@{/admin/members/{id}/bot/toggle(id=${member.id})}" ws:target="#members-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="pill-toggle"
                                      th:classappend="${member.botEnabled ? 'pill-toggle--active' : 'pill-toggle--inactive'}">
@@ -153,19 +155,22 @@
                                            th:text="#{admin.members.actions.edit_settings}">Modifier les settings…</a>
                                     </th:block>
                                     <th:block th:unless="${member.systemAccount}">
-                                        <form th:if="${member.twitchId != null}" th:action="@{/admin/members/{id}/promote-to-system(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                        <form th:if="${member.twitchId != null}" th:action="@{/admin/members/{id}/promote-to-system(id=${member.id})}" method="post"
+                                              ws:post="@{/admin/members/{id}/promote-to-system(id=${member.id})}" ws:target="#members-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="dropdown-item"
                                                     th:text="#{admin.members.actions.promote_to_system}"
                                                     th:data-confirm="#{admin.members.actions.promote_to_system.confirm(${member.twitchUsername ?: '—'})}"
                                                     onclick="return confirm(this.dataset.confirm)">Marquer comme compte système…</button>
                                         </form>
-                                        <form th:if="${member.steamId != null}" th:action="@{/admin/members/{id}/steam/unlink(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                        <form th:if="${member.steamId != null}" th:action="@{/admin/members/{id}/steam/unlink(id=${member.id})}" method="post"
+                                              ws:post="@{/admin/members/{id}/steam/unlink(id=${member.id})}" ws:target="#members-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="dropdown-item"
                                                     th:text="#{admin.members.actions.steam_unlink}">Délier Steam</button>
                                         </form>
-                                        <form th:if="${member.status.name() == 'ACTIVE'}" th:action="@{/admin/members/{id}/twitch/unlink(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                        <form th:if="${member.status.name() == 'ACTIVE'}" th:action="@{/admin/members/{id}/twitch/unlink(id=${member.id})}" method="post"
+                                              ws:post="@{/admin/members/{id}/twitch/unlink(id=${member.id})}" ws:target="#members-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="dropdown-item"
                                                     th:text="#{admin.members.actions.twitch_unlink}">Délier Twitch</button>
@@ -176,7 +181,8 @@
                                                 onclick="openMigrateModal(this)"
                                                 th:text="#{admin.members.actions.migrate}">Migrer…</button>
                                         <hr class="dropdown-divider"/>
-                                        <form th:action="@{/admin/members/{id}/delete(id=${member.id})}" method="post"> <!-- nosemgrep -->
+                                        <form th:action="@{/admin/members/{id}/delete(id=${member.id})}" method="post"
+                                              ws:post="@{/admin/members/{id}/delete(id=${member.id})}" ws:target="#members-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="dropdown-item dropdown-item--danger"
                                                     th:disabled="${member.twitchId == currentUserTwitchId}"
@@ -192,6 +198,7 @@
                 </tbody>
             </table>
         </div>
+    </div>
     </div>
 
     <div id="migrate-modal" class="modal" style="display:none">
