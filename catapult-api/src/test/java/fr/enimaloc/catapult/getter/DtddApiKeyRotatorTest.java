@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.getter;
 
 import fr.enimaloc.catapult.domain.DtddApiKeyEntry;
 import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,7 +23,7 @@ class DtddApiKeyRotatorTest {
     @BeforeEach
     void setUp() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of());
-        rotator = new DtddApiKeyRotator(repository);
+        rotator = new DtddApiKeyRotator(repository, new SimpleMeterRegistry());
     }
 
     @Test
