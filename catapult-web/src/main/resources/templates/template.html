@@ -30,10 +30,22 @@
     <script th:src="@{/js/ws/maintenance-banner.js}" defer></script>
     <script th:src="@{/webjars/htmx.org/dist/htmx.min.js}" defer></script>
     <script th:if="${user != null}" th:src="@{/js/notifications.js}" defer></script>
-    <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/bindings.js}" defer></script>
-    <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/settings.js}" defer></script>
-    <script th:if="${channelUser != null}" th:src="@{/js/channel-handlers/connections.js}" defer></script>
-    <script th:if="${channelUser != null}" th:src="@{/js/channel-page.js}" defer></script>
+    <!-- Loaded for any logged-in user (not only on a channel page) so channel-page.js
+         re-inits correctly when a channel page is reached via hx-boost navigation.
+         channel-page.js no-ops when there is no channel-owner-id meta. -->
+    <script th:if="${user != null}" th:src="@{/js/channel-handlers/bindings.js}" defer></script>
+    <script th:if="${user != null}" th:src="@{/js/channel-handlers/settings.js}" defer></script>
+    <script th:if="${user != null}" th:src="@{/js/channel-handlers/connections.js}" defer></script>
+    <script th:if="${user != null}" th:src="@{/js/channel-page.js}" defer></script>
+    <!-- Admin event-driven scripts: loaded globally for admins (not per active_page)
+         so their events.admin subscription survives hx-boost navigation. -->
+    <th:block th:if="${user != null and user.admin}">
+        <script th:src="@{/js/admin-keys.js}" defer></script>
+        <script th:src="@{/js/admin-ccl.js}" defer></script>
+        <script th:src="@{/js/admin-tw.js}" defer></script>
+        <script th:src="@{/js/admin-dtdd-mapping.js}" defer></script>
+        <script th:src="@{/js/admin-groups.js}" defer></script>
+    </th:block>
     <th:block th:replace="${additional_head} ?: ~{}"></th:block>
 </head>
 <body hx-boost="true">
@@ -52,7 +64,7 @@
      class="banner banner-warning">
     <span><span th:text="#{nav.impersonate_as}">Connecté en tant que</span> <strong
             sec:authentication="principal.username"></strong></span>
-    <form th:action="@{/admin/impersonate/exit}" method="post" style="display:inline"> <!-- nosemgrep -->
+    <form th:action="@{/admin/impersonate/exit}" method="post" style="display:inline" hx-boost="false"> <!-- nosemgrep -->
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <button type="submit" class="btn btn-sm" th:text="#{nav.back_to_admin}">Retour à l'admin</button>
     </form>
@@ -107,7 +119,9 @@
                 </div>
             </div>
         </div>
-        <form th:action="@{/logout}" method="post" style="display:inline"> <!-- nosemgrep -->
+        <!-- hx-boost=false: logout destroys the session and redirects; a boosted
+             AJAX POST logs out server-side but leaves the stale page on screen. -->
+        <form th:action="@{/logout}" method="post" style="display:inline" hx-boost="false"> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button type="submit" class="btn-link" th:text="#{nav.logout}">Déconnexion</button>
         </form>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
+<body>
+<!-- Actions cell for a user-group row. Shared by admin/groups.html server rows
+     and its JS clone template (gid='__ID__' placeholder, replaced client-side). -->
+<div th:fragment="actions(gid, gname, gdesc)" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-start">
+    <details>
+        <summary class="btn btn-sm" th:text="#{admin.groups.action.rename}">Renommer</summary>
+        <div style="margin-top:0.5rem;padding:0.5rem;background:var(--card-bg,#fff);border:1px solid var(--border,#ddd);border-radius:4px">
+            <form th:action="@{|/admin/groups/${gid}/rename|}" method="post"
+                  ws:post="@{|/admin/groups/${gid}/rename|}" ws:swap="none"> <!-- nosemgrep -->
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="form-group" style="margin-bottom:0.4rem">
+                    <label th:text="#{admin.groups.column.name}">Nom</label>
+                    <input type="text" name="name" class="form-control" th:value="${gname}" required/>
+                </div>
+                <div class="form-group" style="margin-bottom:0.4rem">
+                    <label th:text="#{admin.groups.column.description}">Description</label>
+                    <input type="text" name="description" class="form-control" th:value="${gdesc}"/>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary"
+                        th:text="#{admin.groups.action.rename.save}">Enregistrer</button>
+            </form>
+        </div>
+    </details>
+
+    <details>
+        <summary class="btn btn-sm" th:text="#{admin.groups.action.add_member}">+ Membre</summary>
+        <div style="margin-top:0.5rem;padding:0.5rem;background:var(--card-bg,#fff);border:1px solid var(--border,#ddd);border-radius:4px">
+            <form th:action="@{|/admin/groups/${gid}/members|}" method="post"
+                  ws:post="@{|/admin/groups/${gid}/members|}" ws:swap="none"> <!-- nosemgrep -->
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="form-group" style="margin-bottom:0.4rem">
+                    <label th:text="#{admin.groups.add_member.label}">Twitch username</label>
+                    <input type="text" name="twitchUsername" class="form-control"
+                           th:placeholder="#{admin.groups.add_member.placeholder}" required/>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary"
+                        th:text="#{admin.groups.action.add_member.submit}">Ajouter</button>
+            </form>
+        </div>
+    </details>
+
+    <form th:action="@{|/admin/groups/${gid}/delete|}" method="post"
+          ws:post="@{|/admin/groups/${gid}/delete|}" ws:swap="none"> <!-- nosemgrep -->
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <button type="submit" class="btn btn-sm btn-danger"
+                th:text="#{admin.groups.action.delete}"
+                th:data-confirm="#{admin.groups.action.delete.confirm(${gname})}"
+                onclick="return confirm(this.dataset.confirm)">Supprimer</button>
+    </form>
+</div>
+</body>
+</html>

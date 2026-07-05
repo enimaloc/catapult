@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'dtdd-keys', ~{::body}, null, 'container', null, null)}">
 <head>
     <title>Catapult — DoesTheDogDie API Keys</title>
@@ -9,7 +9,8 @@
 <!--/*@thymesvar id="dtddEnabled" type="java.lang.Boolean"*/-->
     <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
         <h2 th:text="#{admin.dtdd_keys.title}" style="margin:0">Administration — DoesTheDogDie API Keys</h2>
-        <form th:if="${dtddEnabled}" th:action="@{/admin/dtdd-keys/refresh}" method="post"> <!-- nosemgrep -->
+        <form th:if="${dtddEnabled}" th:action="@{/admin/dtdd-keys/refresh}" method="post"
+              ws:post="@{/admin/dtdd-keys/refresh}" ws:swap="none"> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button type="submit" class="btn btn-sm" th:text="#{admin.dtdd_keys.refresh}">↺ Refresh</button>
         </form>
@@ -25,21 +26,27 @@
         </div>
 
         <div class="card" style="margin-bottom:1rem; padding:1rem;">
-            <form th:action="@{/admin/dtdd-keys/add}" method="post" style="display:flex; gap:0.5rem; align-items:center;"> <!-- nosemgrep -->
+            <form th:action="@{/admin/dtdd-keys/add}" method="post"
+                  ws:post="@{/admin/dtdd-keys/add}" ws:swap="none"
+                  data-keys-add-form style="display:flex; gap:0.5rem; align-items:center;"> <!-- nosemgrep -->
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                <input type="password" name="apiKey" required
+                <input type="password" name="apiKey" required data-keys-add-input
                        th:placeholder="#{admin.dtdd_keys.add.placeholder}"
                        style="flex:1; max-width:320px;"/>
                 <button type="submit" class="btn btn-primary" th:text="#{admin.dtdd_keys.add.button}">Add</button>
             </form>
         </div>
 
-        <div th:if="${keys.isEmpty()}" class="text-muted">
-            <p th:text="#{admin.dtdd_keys.empty}">No DoesTheDogDie API keys configured.</p>
-        </div>
-
-        <div th:unless="${keys.isEmpty()}" class="card">
-            <div class="table-container">
+        <div class="card" data-keys-card data-provider="dtdd"
+             th:attr="data-delete-url=@{/admin/dtdd-keys/delete},
+                      data-i18n-owner-admin=#{admin.dtdd_keys.owner.admin},
+                      data-i18n-available=#{admin.dtdd_keys.status.available},
+                      data-i18n-blocked=#{admin.dtdd_keys.status.blocked},
+                      data-i18n-delete=#{admin.dtdd_keys.action.delete}">
+            <div class="text-muted" data-keys-empty th:style="${keys.isEmpty()} ? '' : 'display:none'">
+                <p th:text="#{admin.dtdd_keys.empty}" style="margin:0">No DoesTheDogDie API keys configured.</p>
+            </div>
+            <div class="table-container" data-keys-table th:style="${keys.isEmpty()} ? 'display:none' : ''">
                 <table class="table">
                     <thead>
                         <tr>
@@ -49,8 +56,8 @@
                             <th th:text="#{admin.dtdd_keys.column.actions}">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr th:each="status : ${keys}">
+                    <tbody data-keys-body>
+                        <tr th:each="status : ${keys}" th:attr="data-key-id=${status.id()}">
                             <td>
                                 <span class="badge" th:text="${status.masked()}"></span>
                             </td>
@@ -64,7 +71,8 @@
                                       th:text="#{admin.dtdd_keys.status.blocked} + ' ' + ${status.blockedForSeconds()} + 's'">Blocked</span>
                             </td>
                             <td>
-                                <form th:action="@{/admin/dtdd-keys/delete}" method="post"> <!-- nosemgrep -->
+                                <form th:action="@{/admin/dtdd-keys/delete}" method="post"
+                                      ws:post="@{/admin/dtdd-keys/delete}" ws:swap="none"> <!-- nosemgrep -->
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <input type="hidden" name="keyId" th:value="${status.id()}"/>
                                     <button type="submit" class="btn btn-sm" th:text="#{admin.dtdd_keys.action.delete}">Delete</button>

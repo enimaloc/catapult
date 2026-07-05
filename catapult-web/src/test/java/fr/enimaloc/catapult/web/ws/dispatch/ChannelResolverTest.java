@@ -63,8 +63,10 @@ class ChannelResolverTest {
     @Test
     void events_admin_requires_admin_role() {
         UUID uid = UUID.randomUUID();
-        assertThat(resolver.resolvePublicToInternal("events.admin", authSession(uid, "USER"))).isEmpty();
-        assertThat(resolver.resolvePublicToInternal("events.admin", authSession(uid, "ADMIN"))).contains("events.admin");
+        assertThat(resolver.resolvePublicToInternal("events.admin", authSession(uid, "ROLE_USER"))).isEmpty();
+        // Authorities carry the Spring "ROLE_" prefix (see WsAuthTicketController / CatapultWebUser),
+        // so the gate must match "ROLE_ADMIN" — a bare "ADMIN" never occurs in a real session.
+        assertThat(resolver.resolvePublicToInternal("events.admin", authSession(uid, "ROLE_ADMIN"))).contains("events.admin");
     }
 
     @Test
