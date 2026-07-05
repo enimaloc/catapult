@@ -26,7 +26,7 @@ public class ChannelResolver {
         }
         return switch (publicName) {
             case "events.global" -> Optional.of("events.global");
-            case "events.admin" -> session.userId().isPresent() && session.roles().contains("ADMIN")
+            case "events.admin" -> session.userId().isPresent() && session.roles().contains("ROLE_ADMIN")
                     ? Optional.of("events.admin")
                     : Optional.empty();
             case "notifications.user" -> session.userId().map(uuid -> "notifications.user." + uuid);
