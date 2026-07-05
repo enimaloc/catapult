@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.getter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,54 +30,63 @@ public class RealDtddApiClient implements DtddApiClient {
 
     private final RestClient client;
     private final DtddApiKeyRotator rotator;
+    private final ExternalApiObservations apiObservations;
 
     @Autowired
     public RealDtddApiClient(@Value("${dtdd.api-base-url}") String baseUrl,
                              RestClient.Builder builder,
-                             DtddApiKeyRotator rotator) {
+                             DtddApiKeyRotator rotator,
+                             ExternalApiObservations apiObservations) {
         // Take the Boot-managed builder so the trace-logging customizer +
         // buffering request factory wired in WebClientConfig apply here too.
-        this(builder.baseUrl(baseUrl).build(), rotator);
+        this(builder.baseUrl(baseUrl).build(), rotator, apiObservations);
     }
 
     // visible for tests
-    RealDtddApiClient(RestClient client, DtddApiKeyRotator rotator) {
+    RealDtddApiClient(RestClient client, DtddApiKeyRotator rotator, ExternalApiObservations apiObservations) {
         this.client = client;
         this.rotator = rotator;
+        this.apiObservations = apiObservations;
     }
 
     @Override
     public Optional<List<DtddSearchResult>> search(String query, @Nullable String mediaType) {
-        return callWithRetry(key -> client.get()
-                .uri(uri -> uri.path("/v3/items").queryParam("q", query).build())
-                .header("X-API-KEY", key)
-                .retrieve()
-                .body(String.class), this::parseSearch)
-                .map(list -> list.stream()
-                        .filter(result -> mediaType == null || mediaType.equals(result.mediaType()))
-                        .toList());
+        return apiObservations.observe("dtdd", "search", () ->
+            callWithRetry(key -> client.get()
+                    .uri(uri -> uri.path("/v3/items").queryParam("q", query).build())
+                    .header("X-API-KEY", key)
+                    .retrieve()
+                    .body(String.class), this::parseSearch)
+                    .map(list -> list.stream()
+                            .filter(result -> mediaType == null || mediaType.equals(result.mediaType()))
+                            .toList())
+        );
     }
 
     @Override
     public Optional<DtddTopics> fetchTopics(long dtddId) {
-        return item(dtddId).map(item -> {
-            List<String> yes = new ArrayList<>(), no = new ArrayList<>(), mostly = new ArrayList<>();
-            for (DtddTopicItemStat topicItemStat : item.topicItemStats()) {
-                if (topicItemStat.yesSum() > topicItemStat.noSum()) yes.add(topicItemStat.topicName());
-                else if (topicItemStat.yesSum() < topicItemStat.noSum()) no.add(topicItemStat.topicName());
-                else mostly.add(topicItemStat.topicName());
-            }
-            return new DtddTopics(yes, no, mostly);
-        });
+        return apiObservations.observe("dtdd", "fetch_topics", () ->
+            item(dtddId).map(item -> {
+                List<String> yes = new ArrayList<>(), no = new ArrayList<>(), mostly = new ArrayList<>();
+                for (DtddTopicItemStat topicItemStat : item.topicItemStats()) {
+                    if (topicItemStat.yesSum() > topicItemStat.noSum()) yes.add(topicItemStat.topicName());
+                    else if (topicItemStat.yesSum() < topicItemStat.noSum()) no.add(topicItemStat.topicName());
+                    else mostly.add(topicItemStat.topicName());
+                }
+                return new DtddTopics(yes, no, mostly);
+            })
+        );
     }
 
     @Override
     public Optional<DtddItem> item(long dtddId) {
-        return callWithRetry(key -> client.get()
-                .uri("/v3/items/" + dtddId)
-                .header("X-API-KEY", key)
-                .retrieve()
-                .body(String.class), this::parseItem);
+        return apiObservations.observe("dtdd", "item", () ->
+            callWithRetry(key -> client.get()
+                    .uri("/v3/items/" + dtddId)
+                    .header("X-API-KEY", key)
+                    .retrieve()
+                    .body(String.class), this::parseItem)
+        );
     }
 
     private <T> Optional<T> callWithRetry(Function<String, String> call, Function<String, T> parser) {
