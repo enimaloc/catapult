@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.getter;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -23,6 +24,7 @@ public class SteamRateLimiter {
     private final int permitsPerWindow;
     private final long maxWaitMs;
     private final long windowMs;
+    private final MeterRegistry meterRegistry;
 
     private final ConcurrentHashMap<String, Semaphore> keyPermits = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> keyBlockedUntil = new ConcurrentHashMap<>();
@@ -31,11 +33,13 @@ public class SteamRateLimiter {
     public SteamRateLimiter(
         @Value("${steam.rate-limit.permits-per-window:3}") int permitsPerWindow,
         @Value("${steam.rate-limit.max-wait-ms:2000}") long maxWaitMs,
-        @Value("${steam.rate-limit.window-ms:5000}") long windowMs
+        @Value("${steam.rate-limit.window-ms:5000}") long windowMs,
+        MeterRegistry meterRegistry
     ) {
         this.permitsPerWindow = permitsPerWindow;
         this.maxWaitMs = maxWaitMs;
         this.windowMs = windowMs;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -74,6 +78,7 @@ public class SteamRateLimiter {
     public void onRateLimitResponse(String key, int retryAfterSeconds) {
         semaphoreFor(key).drainPermits();
         keyBlockedUntil.put(key, System.currentTimeMillis() + retryAfterSeconds * 1000L);
+        meterRegistry.counter("catapult.external.rate_limited", "api", "steam", "scope", "key").increment();
         log.warn("Steam key rate limited — pausing for {}s", retryAfterSeconds);
     }
 
@@ -83,6 +88,7 @@ public class SteamRateLimiter {
     public void blockAll(int retryAfterSeconds) {
         globalBlockedUntil = System.currentTimeMillis() + retryAfterSeconds * 1000L;
         keyPermits.values().forEach(Semaphore::drainPermits);
+        meterRegistry.counter("catapult.external.rate_limited", "api", "steam", "scope", "global").increment();
         log.warn("Steam API global rate limit — pausing all keys for {}s", retryAfterSeconds);
     }
 

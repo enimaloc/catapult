@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.*;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +33,7 @@ public class TwitchServiceImpl implements TwitchService {
     private final RestClient restClient;
     private final TwitchCategoryService twitchCategoryService;
     private final TwitchTokenService twitchTokenService;
+    private final ExternalApiObservations apiObservations;
 
     public static final String CLIENT_ID = "Client-Id";
     public static final String AUTHORIZATION = "Authorization";
@@ -42,17 +44,19 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public void updateChannel(UserAccount user, GameBinding binding) {
-        if (binding.getStatus() == GameBinding.Status.INCOMPLETE || binding.isIgnored()) {
-            log.debug("Skipping Twitch update for user {} — binding is {} or ignored",
-                user.getId(), binding.getStatus());
-            return;
-        }
+        apiObservations.observeRun("twitch", "update_channel", () -> {
+            if (binding.getStatus() == GameBinding.Status.INCOMPLETE || binding.isIgnored()) {
+                log.debug("Skipping Twitch update for user {} — binding is {} or ignored",
+                    user.getId(), binding.getStatus());
+                return;
+            }
 
-        oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .ifPresentOrElse(
-                token -> doUpdateChannel(user, binding, token),
-                () -> log.warn("No Twitch token found for user {}", user.getId())
-            );
+            oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+                .ifPresentOrElse(
+                    token -> doUpdateChannel(user, binding, token),
+                    () -> log.warn("No Twitch token found for user {}", user.getId())
+                );
+        });
     }
 
     private void patchChannel(UserAccount user, String accessToken, Map<String, Object> body) {
@@ -115,49 +119,51 @@ public class TwitchServiceImpl implements TwitchService {
     @Override
     @SuppressWarnings("unchecked")
     public Optional<String> findCategoryIdByName(UserAccount user, String gameName) {
-        String accessToken = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .map(t -> twitchTokenService.resolveAccessToken(t, user))
-            .orElse("");
+        return apiObservations.observe("twitch", "find_category_by_name", () -> {
+            String accessToken = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+                .map(t -> twitchTokenService.resolveAccessToken(t, user))
+                .orElse("");
 
-        if (!accessToken.isBlank() && !twitchClientId.isBlank()) {
-            log.debug("findCategoryIdByName '{}' — trying exact match via user token", gameName);
-            try {
-                Map<String, Object> response = restClient.get()
-                    .uri(TWITCH_API_URL + "/games?name={name}", gameName)
-                        .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                        .header(CLIENT_ID, twitchClientId)
-                    .retrieve()
-                    .body(Map.class);
+            if (!accessToken.isBlank() && !twitchClientId.isBlank()) {
+                log.debug("findCategoryIdByName '{}' — trying exact match via user token", gameName);
+                try {
+                    Map<String, Object> response = restClient.get()
+                        .uri(TWITCH_API_URL + "/games?name={name}", gameName)
+                            .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                            .header(CLIENT_ID, twitchClientId)
+                        .retrieve()
+                        .body(Map.class);
 
-                if (response != null) {
-                    List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                    if (data != null && !data.isEmpty()) {
-                        String id = (String) data.get(0).get("id");
-                        log.debug("findCategoryIdByName '{}' — exact match found: {}", gameName, id);
-                        return Optional.ofNullable(id);
+                    if (response != null) {
+                        List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                        if (data != null && !data.isEmpty()) {
+                            String id = (String) data.get(0).get("id");
+                            log.debug("findCategoryIdByName '{}' — exact match found: {}", gameName, id);
+                            return Optional.ofNullable(id);
+                        }
+                        log.debug("findCategoryIdByName '{}' — exact match returned empty data", gameName);
                     }
-                    log.debug("findCategoryIdByName '{}' — exact match returned empty data", gameName);
+                } catch (Exception e) {
+                    log.warn("findCategoryIdByName '{}' — user-token exact match failed: {}", gameName, e.getMessage());
                 }
-            } catch (Exception e) {
-                log.warn("findCategoryIdByName '{}' — user-token exact match failed: {}", gameName, e.getMessage());
+            } else {
+                log.debug("findCategoryIdByName '{}' — no user token or client-id, skipping exact match", gameName);
             }
-        } else {
-            log.debug("findCategoryIdByName '{}' — no user token or client-id, skipping exact match", gameName);
-        }
 
-        log.debug("findCategoryIdByName '{}' — falling back to app-token search", gameName);
-        String normalizedQuery = normalizeTitle(gameName);
-        List<TwitchCategory> candidates = twitchCategoryService.searchCategories(gameName);
-        log.debug("findCategoryIdByName '{}' — search returned {} candidates: {}",
-                gameName, candidates.size(),
-                candidates.stream().map(c -> c.name() + "(" + c.id() + ")").toList());
-        return candidates.stream()
-            .filter(c -> normalizeTitle(c.name()).equals(normalizedQuery))
-            .findFirst()
-            .map(c -> {
-                log.debug("findCategoryIdByName '{}' — matched via normalize: {} → {}", gameName, c.name(), c.id());
-                return c.id();
-            });
+            log.debug("findCategoryIdByName '{}' — falling back to app-token search", gameName);
+            String normalizedQuery = normalizeTitle(gameName);
+            List<TwitchCategory> candidates = twitchCategoryService.searchCategories(gameName);
+            log.debug("findCategoryIdByName '{}' — search returned {} candidates: {}",
+                    gameName, candidates.size(),
+                    candidates.stream().map(c -> c.name() + "(" + c.id() + ")").toList());
+            return candidates.stream()
+                .filter(c -> normalizeTitle(c.name()).equals(normalizedQuery))
+                .findFirst()
+                .map(c -> {
+                    log.debug("findCategoryIdByName '{}' — matched via normalize: {} → {}", gameName, c.name(), c.id());
+                    return c.id();
+                });
+        });
     }
 
     private static String normalizeTitle(String name) {
@@ -166,7 +172,8 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public List<TwitchCategory> searchCategories(UserAccount user, String query) {
-        return twitchCategoryService.searchCategories(query);
+        return apiObservations.observe("twitch", "search_categories", () ->
+            twitchCategoryService.searchCategories(query));
     }
 
     // Twitch broadcaster-settable CCLs (MatureGame is set automatically by Twitch, not included)
@@ -182,17 +189,19 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public void resetToDefault(UserAccount user) {
-        userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
-            if (settings.getNoGameTwitchGameId() == null || settings.getNoGameTwitchGameId().isBlank()) {
-                log.debug("No default category configured for user {} — skipping reset", user.getId());
-                return;
-            }
-            oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-                .ifPresentOrElse(
-                    token -> doResetToDefault(user, settings, token),
-                    () -> log.warn("No Twitch token for user {} during reset", user.getId())
-                );
-        });
+        apiObservations.observeRun("twitch", "reset_to_default", () ->
+            userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+                if (settings.getNoGameTwitchGameId() == null || settings.getNoGameTwitchGameId().isBlank()) {
+                    log.debug("No default category configured for user {} — skipping reset", user.getId());
+                    return;
+                }
+                oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+                    .ifPresentOrElse(
+                        token -> doResetToDefault(user, settings, token),
+                        () -> log.warn("No Twitch token for user {} during reset", user.getId())
+                    );
+            })
+        );
     }
 
     private void doResetToDefault(UserAccount user, UserSettings settings, OAuthToken token) {
@@ -237,25 +246,27 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public List<String> getModeratedChannelIds(UserAccount viewer) {
-        return oAuthTokenRepository.findByUserAndProvider(viewer, OAuthToken.Provider.TWITCH)
-            .map(token -> {
-                try {
-                    String accessToken = twitchTokenService.resolveAccessToken(token, viewer);
-                    ModeratedChannelsResponse response = restClient.get()
-                        .uri(TWITCH_API_URL + "/moderation/channels?user_id=" + viewer.getTwitchId())
-                            .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                            .header(CLIENT_ID, twitchClientId)
-                        .retrieve()
-                        .body(ModeratedChannelsResponse.class);
-                    return response != null && response.data() != null
-                        ? response.data().stream().map(ModeratedChannel::broadcasterId).toList()
-                        : List.<String>of();
-                } catch (Exception e) {
-                    log.warn("Failed to get moderated channels for user {}: {}", viewer.getId(), e.getMessage());
-                    return List.<String>of();
-                }
-            })
-            .orElse(List.of());
+        return apiObservations.observe("twitch", "get_moderated_channels", () ->
+            oAuthTokenRepository.findByUserAndProvider(viewer, OAuthToken.Provider.TWITCH)
+                .map(token -> {
+                    try {
+                        String accessToken = twitchTokenService.resolveAccessToken(token, viewer);
+                        ModeratedChannelsResponse response = restClient.get()
+                            .uri(TWITCH_API_URL + "/moderation/channels?user_id=" + viewer.getTwitchId())
+                                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                                .header(CLIENT_ID, twitchClientId)
+                            .retrieve()
+                            .body(ModeratedChannelsResponse.class);
+                        return response != null && response.data() != null
+                            ? response.data().stream().map(ModeratedChannel::broadcasterId).toList()
+                            : List.<String>of();
+                    } catch (Exception e) {
+                        log.warn("Failed to get moderated channels for user {}: {}", viewer.getId(), e.getMessage());
+                        return List.<String>of();
+                    }
+                })
+                .orElse(List.of())
+        );
     }
 
     record ModeratedChannelsResponse(List<ModeratedChannel> data) {}
