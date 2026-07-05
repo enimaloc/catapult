@@ -18,9 +18,9 @@ public class GrowthBookExperimentProvider implements ExperimentProvider {
     private final ExperimentProviderProperties.GrowthBook config;
     private final RestClient restClient;
 
-    public GrowthBookExperimentProvider(ExperimentProviderProperties props) {
+    public GrowthBookExperimentProvider(ExperimentProviderProperties props, RestClient.Builder builder) {
         this.config = props.getGrowthbook();
-        this.restClient = RestClient.create();
+        this.restClient = builder.build();
     }
 
     GrowthBookExperimentProvider(ExperimentProviderProperties props, RestClient restClient) {
