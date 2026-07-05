@@ -60,7 +60,7 @@
     var row = tpl.content.firstElementChild.cloneNode(true);
     row.setAttribute("data-group-id", g.id);
     Array.prototype.forEach.call(row.querySelectorAll("[data-ws-path]"), function (el) {
-      el.setAttribute("data-ws-path", el.getAttribute("data-ws-path").replace("__ID__", g.id));
+      el.setAttribute("data-ws-path", el.getAttribute("data-ws-path").replace("IDPLACEHOLDER", g.id));
     });
     setField(row, "key", g.key);
     patchRow(row, g);

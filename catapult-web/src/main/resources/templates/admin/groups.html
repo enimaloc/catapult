@@ -66,15 +66,16 @@
         </div>
     </div>
 
-    <!-- Row template cloned by admin-groups.js on group.created. __ID__ is
-         replaced with the real group id and [data-field] cells are filled. -->
+    <!-- Row template cloned by admin-groups.js on group.created. IDPLACEHOLDER is
+         replaced with the real group id and [data-field] cells are filled.
+         (Avoid a __x__ token: Thymeleaf treats double underscores as preprocessing.) -->
     <template data-groups-row-tpl>
         <tr data-group-id="">
             <td><code data-field="key"></code></td>
             <td data-field="name"></td>
             <td data-field="description"></td>
             <td data-field="memberCount"></td>
-            <td th:insert="~{fragments/admin-groups :: actions('__ID__', '', '')}"></td>
+            <td th:insert="~{fragments/admin-groups :: actions('IDPLACEHOLDER', '', '')}"></td>
         </tr>
     </template>
 </body>
