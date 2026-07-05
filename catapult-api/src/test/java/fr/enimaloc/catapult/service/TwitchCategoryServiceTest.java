@@ -6,11 +6,15 @@ import fr.enimaloc.catapult.repository.IgdbGameExternalIdRepository;
 import fr.enimaloc.catapult.repository.TwitchCategoryCacheRepository;
 import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchCategoryServiceImpl;
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -35,6 +39,10 @@ class TwitchCategoryServiceTest {
     @Mock private IgdbGameExternalIdRepository   externalIdRepo;
     @Mock private IgdbService                    igdbService;
     @Mock private RestClient restClient;
+
+    @Spy
+    private ExternalApiObservations apiObservations =
+        new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry());
 
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
