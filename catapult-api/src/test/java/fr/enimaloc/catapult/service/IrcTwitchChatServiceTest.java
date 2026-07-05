@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -23,6 +25,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 class IrcTwitchChatServiceTest {
+
+    private static final MeterRegistry METER_REGISTRY = new SimpleMeterRegistry();
 
     @Test
     void extractRoleBroadcaster() {
@@ -123,7 +127,7 @@ class IrcTwitchChatServiceTest {
         doReturn(deleteResponseSpec).when(deleteSpec).retrieve();
 
         IrcTwitchChatService service = new IrcTwitchChatService(
-            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), restClient);
+            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), restClient, METER_REGISTRY);
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
 
         UserAccount user = new UserAccount();
@@ -165,7 +169,7 @@ class IrcTwitchChatServiceTest {
         doReturn(postResponseSpec).when(postBodySpec).retrieve();
 
         IrcTwitchChatService service = new IrcTwitchChatService(
-            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), restClient);
+            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), restClient, METER_REGISTRY);
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
 
         UserAccount user = new UserAccount();
@@ -183,6 +187,6 @@ class IrcTwitchChatServiceTest {
     }
 
     private IrcTwitchChatService buildService(ApplicationEventPublisher publisher) {
-        return new IrcTwitchChatService(null, null, null, publisher, null);
+        return new IrcTwitchChatService(null, null, null, publisher, null, METER_REGISTRY);
     }
 }
