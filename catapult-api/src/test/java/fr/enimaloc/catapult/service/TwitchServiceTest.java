@@ -10,12 +10,16 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchServiceImpl;
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -45,6 +49,10 @@ class TwitchServiceTest {
     @Mock private RestClient restClient;
     @Mock private TwitchCategoryService twitchCategoryService;
     @Mock private TwitchTokenService twitchTokenService;
+
+    @Spy
+    private ExternalApiObservations apiObservations =
+        new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry());
 
     @Mock private RestClient.RequestBodyUriSpec patchSpec;
     @Mock private RestClient.RequestBodySpec bodySpec;
