@@ -93,13 +93,15 @@
     form.appendChild(actions);
     tdForm.appendChild(form);
     tr.appendChild(tdForm);
-    if (window.catapultWsActions) window.catapultWsActions.bind(form);
 
     var tdBadges = el("td");
     tdBadges.setAttribute("data-ccl-badges", "");
     fillBadges(tdBadges, ccl.mappedDescriptions);
     tr.appendChild(tdBadges);
 
+    // Bind the whole row so ws-actions attaches to the mappings form (it scans
+    // descendants of its argument, never the argument itself).
+    if (window.catapultWsActions) window.catapultWsActions.bind(tr);
     return tr;
   }
 
