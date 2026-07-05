@@ -21,7 +21,7 @@ class ExternalApiObservationsTest {
         ObservationRegistry observationRegistry = ObservationRegistry.create();
         observationRegistry.observationConfig()
                 .observationHandler(new DefaultMeterObservationHandler(meterRegistry));
-        observations = new ExternalApiObservations(observationRegistry);
+        observations = new ExternalApiObservations(observationRegistry, meterRegistry);
     }
 
     @Test
@@ -65,5 +65,19 @@ class ExternalApiObservationsTest {
                 .tag("outcome", "success")
                 .timer();
         assertThat(timer.count()).isEqualTo(1);
+    }
+
+    @Test
+    void record_registers_timer_with_correct_tags_and_duration() {
+        observations.record("igdb", "find_sources_by_name", "success", "none", 500_000_000L);
+
+        Timer timer = meterRegistry.get("catapult.external.api")
+                .tag("api", "igdb")
+                .tag("operation", "find_sources_by_name")
+                .tag("outcome", "success")
+                .tag("error", "none")
+                .timer();
+        assertThat(timer.count()).isEqualTo(1);
+        assertThat(timer.totalTime(java.util.concurrent.TimeUnit.NANOSECONDS)).isEqualTo(500_000_000.0);
     }
 }

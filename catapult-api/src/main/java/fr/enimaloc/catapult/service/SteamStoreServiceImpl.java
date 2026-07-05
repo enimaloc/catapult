@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service;
 
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -26,76 +27,79 @@ public class SteamStoreServiceImpl implements SteamStoreService {
     );
 
     private final RestClient restClient;
+    private final ExternalApiObservations apiObservations;
 
     @Override
     public Map<String, Set<String>> fetchCcls(Collection<String> appIds) {
         if (appIds.isEmpty()) return Map.of();
+        return apiObservations.observe("steam_store", "fetch_ccls", () -> {
+            String uri = appIds.stream()
+                .collect(Collectors.joining("&appids=", APP_DETAILS_URL + "?appids=", ""));
 
-        String uri = appIds.stream()
-            .collect(Collectors.joining("&appids=", APP_DETAILS_URL + "?appids=", ""));
-
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> response = restClient.get()
-                .uri(uri)
-                .retrieve()
-                .body(Map.class);
-
-            if (response == null) return Map.of();
-
-            Map<String, Set<String>> result = new HashMap<>();
-            for (String appId : appIds) {
+            try {
                 @SuppressWarnings("unchecked")
-                Map<String, Object> entry = (Map<String, Object>) response.get(appId);
-                if (entry == null || !Boolean.TRUE.equals(entry.get("success")) || entry.get("data") == null) continue;
+                Map<String, Object> response = restClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .body(Map.class);
 
-                @SuppressWarnings("unchecked")
-                Map<String, Object> data = (Map<String, Object>) entry.get("data");
+                if (response == null) return Map.of();
 
-                Set<String> ccls = extractCcls(data);
-                if (!ccls.isEmpty()) result.put(appId, ccls);
+                Map<String, Set<String>> result = new HashMap<>();
+                for (String appId : appIds) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> entry = (Map<String, Object>) response.get(appId);
+                    if (entry == null || !Boolean.TRUE.equals(entry.get("success")) || entry.get("data") == null) continue;
+
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> data = (Map<String, Object>) entry.get("data");
+
+                    Set<String> ccls = extractCcls(data);
+                    if (!ccls.isEmpty()) result.put(appId, ccls);
+                }
+                log.debug("Steam store fetch for {} appIds: {} had rating data", appIds.size(), result.size());
+                return result;
+
+            } catch (Exception e) {
+                log.warn("Steam store appdetails failed for appIds={}: {}", appIds, e.getMessage());
+                return Map.of();
             }
-            log.debug("Steam store fetch for {} appIds: {} had rating data", appIds.size(), result.size());
-            return result;
-
-        } catch (Exception e) {
-            log.warn("Steam store appdetails failed for appIds={}: {}", appIds, e.getMessage());
-            return Map.of();
-        }
+        });
     }
 
     @Override
     public Map<String, SteamTwSignals> fetchTwSignals(Collection<String> appIds) {
         if (appIds.isEmpty()) return Map.of();
+        return apiObservations.observe("steam_store", "fetch_tw_signals", () -> {
+            String uri = appIds.stream()
+                .collect(Collectors.joining("&appids=", APP_DETAILS_URL + "?appids=", ""));
 
-        String uri = appIds.stream()
-            .collect(Collectors.joining("&appids=", APP_DETAILS_URL + "?appids=", ""));
-
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> response = restClient.get()
-                .uri(uri)
-                .retrieve()
-                .body(Map.class);
-
-            if (response == null) return Map.of();
-
-            Map<String, SteamTwSignals> result = new HashMap<>();
-            for (String appId : appIds) {
+            try {
                 @SuppressWarnings("unchecked")
-                Map<String, Object> entry = (Map<String, Object>) response.get(appId);
-                if (entry == null || !Boolean.TRUE.equals(entry.get("success")) || entry.get("data") == null) continue;
+                Map<String, Object> response = restClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .body(Map.class);
 
-                @SuppressWarnings("unchecked")
-                Map<String, Object> data = (Map<String, Object>) entry.get("data");
-                result.put(appId, extractTwSignals(data));
+                if (response == null) return Map.of();
+
+                Map<String, SteamTwSignals> result = new HashMap<>();
+                for (String appId : appIds) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> entry = (Map<String, Object>) response.get(appId);
+                    if (entry == null || !Boolean.TRUE.equals(entry.get("success")) || entry.get("data") == null) continue;
+
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> data = (Map<String, Object>) entry.get("data");
+                    result.put(appId, extractTwSignals(data));
+                }
+                return result;
+
+            } catch (Exception e) {
+                log.warn("Steam fetchTwSignals failed for appIds={}: {}", appIds, e.getMessage());
+                return Map.of();
             }
-            return result;
-
-        } catch (Exception e) {
-            log.warn("Steam fetchTwSignals failed for appIds={}: {}", appIds, e.getMessage());
-            return Map.of();
-        }
+        });
     }
 
     /** Package-private for unit testing. */
@@ -117,31 +121,33 @@ public class SteamStoreServiceImpl implements SteamStoreService {
     @Override
     @SuppressWarnings("unchecked")
     public Optional<String> resolveFullGameAppId(String appId) {
-        String uri = APP_DETAILS_URL + "?appids=" + appId;
-        try {
-            Map<String, Object> response = restClient.get().uri(uri).retrieve().body(Map.class);
-            if (response == null) return Optional.empty();
+        return apiObservations.observe("steam_store", "resolve_full_game", () -> {
+            String uri = APP_DETAILS_URL + "?appids=" + appId;
+            try {
+                Map<String, Object> response = restClient.get().uri(uri).retrieve().body(Map.class);
+                if (response == null) return Optional.empty();
 
-            Map<String, Object> entry = (Map<String, Object>) response.get(appId);
-            if (entry == null || !Boolean.TRUE.equals(entry.get("success"))) return Optional.empty();
+                Map<String, Object> entry = (Map<String, Object>) response.get(appId);
+                if (entry == null || !Boolean.TRUE.equals(entry.get("success"))) return Optional.empty();
 
-            Map<String, Object> data = (Map<String, Object>) entry.get("data");
-            if (data == null) return Optional.empty();
+                Map<String, Object> data = (Map<String, Object>) entry.get("data");
+                if (data == null) return Optional.empty();
 
-            @SuppressWarnings("unchecked")
-            Map<String, Object> fullgame = (Map<String, Object>) data.get("fullgame");
-            if (fullgame == null) return Optional.empty();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> fullgame = (Map<String, Object>) data.get("fullgame");
+                if (fullgame == null) return Optional.empty();
 
-            Object id = fullgame.get("appid");
-            if (id == null) return Optional.empty();
+                Object id = fullgame.get("appid");
+                if (id == null) return Optional.empty();
 
-            String resolved = String.valueOf(id);
-            log.debug("Steam appId={} is a beta — resolved to fullgame.id={}", appId, resolved);
-            return Optional.of(resolved);
-        } catch (Exception e) {
-            log.warn("Steam appdetails failed resolving parentid for appId={}: {}", appId, e.getMessage());
-            return Optional.empty();
-        }
+                String resolved = String.valueOf(id);
+                log.debug("Steam appId={} is a beta — resolved to fullgame.id={}", appId, resolved);
+                return Optional.of(resolved);
+            } catch (Exception e) {
+                log.warn("Steam appdetails failed resolving parentid for appId={}: {}", appId, e.getMessage());
+                return Optional.empty();
+            }
+        });
     }
 
     @SuppressWarnings("unchecked")
