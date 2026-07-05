@@ -74,6 +74,10 @@ public class EventSubTwitchChatService implements TwitchChatService {
         return t;
     });
 
+    public int connectionCount() {
+        return connections.size();
+    }
+
     @PostConstruct
     public void init() {
         var users = userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
