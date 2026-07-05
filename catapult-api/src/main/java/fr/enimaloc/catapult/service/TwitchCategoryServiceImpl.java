@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.IgdbGameExternalId;
 import fr.enimaloc.catapult.domain.TwitchCategoryCache;
 import fr.enimaloc.catapult.repository.IgdbGameExternalIdRepository;
 import fr.enimaloc.catapult.repository.TwitchCategoryCacheRepository;
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,6 +40,7 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
     private final IgdbGameExternalIdRepository  externalIdRepo;
     private final IgdbService                   igdbService;
     private final RestClient restClient;
+    private final ExternalApiObservations apiObservations;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -245,20 +247,22 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
 
     @Override
     public List<TwitchCategory> searchCategories(String query) {
-        if (query == null || query.isBlank()) return List.of();
+        return apiObservations.observe("twitch", "search_categories_global", () -> {
+            if (query == null || query.isBlank()) return List.of();
 
-        Instant cutoff = Instant.now().minusSeconds(cacheTtlHours * 3600L);
-        List<TwitchCategoryCache> fromDb = cacheRepo.findByNameContainingIgnoreCaseAndCachedAtAfter(
-                query, cutoff, PageRequest.of(0, AUTOCOMPLETE_MAX));
+            Instant cutoff = Instant.now().minusSeconds(cacheTtlHours * 3600L);
+            List<TwitchCategoryCache> fromDb = cacheRepo.findByNameContainingIgnoreCaseAndCachedAtAfter(
+                    query, cutoff, PageRequest.of(0, AUTOCOMPLETE_MAX));
 
-        if (!fromDb.isEmpty()) {
-            log.debug("Twitch category cache hit for '{}'", query);
-            return fromDb.stream()
-                    .map(e -> new TwitchCategory(e.getId(), e.getName(), e.getBoxArtUrl()))
-                    .toList();
-        }
+            if (!fromDb.isEmpty()) {
+                log.debug("Twitch category cache hit for '{}'", query);
+                return fromDb.stream()
+                        .map(e -> new TwitchCategory(e.getId(), e.getName(), e.getBoxArtUrl()))
+                        .toList();
+            }
 
-        return fetchFromSearchAndStore(query);
+            return fetchFromSearchAndStore(query);
+        });
     }
 
     @SuppressWarnings("unchecked")
