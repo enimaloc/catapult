@@ -1,9 +1,12 @@
 package fr.enimaloc.catapult.service.metrics;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
@@ -18,9 +21,11 @@ public class ExternalApiObservations {
     public static final String METRIC = "catapult.external.api";
 
     private final ObservationRegistry registry;
+    private final MeterRegistry meterRegistry;
 
-    public ExternalApiObservations(ObservationRegistry registry) {
+    public ExternalApiObservations(ObservationRegistry registry, MeterRegistry meterRegistry) {
         this.registry = registry;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -55,5 +60,16 @@ public class ExternalApiObservations {
             call.run();
             return null;
         });
+    }
+
+    /**
+     * Enregistrement manuel pour les méthodes à checked exceptions.
+     * Utilise directement le Timer pour conserver la durée réelle.
+     */
+    public void record(String api, String operation, String outcome, String error, long durationNanos) {
+        Timer.builder(METRIC)
+                .tags("api", api, "operation", operation, "outcome", outcome, "error", error)
+                .register(meterRegistry)
+                .record(durationNanos, TimeUnit.NANOSECONDS);
     }
 }
