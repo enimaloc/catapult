@@ -58,6 +58,9 @@
     tr.appendChild(tdStatus);
 
     tr.appendChild(renderDeleteCell(card, key.id));
+    // Bind the whole row: ws-actions.bind() scans descendants of its argument,
+    // so it must receive an ancestor of the form, not the form itself.
+    if (window.catapultWsActions) window.catapultWsActions.bind(tr);
     return tr;
   }
 
@@ -81,7 +84,6 @@
     form.appendChild(btn);
 
     td.appendChild(form);
-    if (window.catapultWsActions) window.catapultWsActions.bind(form);
     return td;
   }
 
