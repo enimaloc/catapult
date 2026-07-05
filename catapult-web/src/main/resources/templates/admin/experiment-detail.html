@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'experiments', ~{::body}, ~{::#extra-head}, 'container', null, null)}">
 <head>
     <title th:text="'Catapult — ' + ${experiment.name}">Catapult — Experiment</title>
@@ -29,6 +29,7 @@
 <!--/*@thymesvar id="feedbackPage" type="org.springframework.data.domain.Page"*/-->
 <!--/*@thymesvar id="participantPage" type="org.springframework.data.domain.Page"*/-->
 <!--/*@thymesvar id="overrides" type="java.util.List"*/-->
+<div id="experiment-detail-body" th:fragment="detailBody">
 <div style="margin-bottom:1rem;">
     <a th:href="@{/admin/experiments}" class="btn btn-sm btn-outline" th:text="#{admin.experiments.back}">← Retour</a>
     <h2 th:text="${experiment.name}" style="margin-top:0.5rem;"></h2>
@@ -39,7 +40,8 @@
 <!-- Bloc ① Variantes — poids éditables -->
 <div class="card" style="margin-bottom:1rem;">
     <h3 th:text="#{admin.experiment.section.variants}">Variantes</h3>
-    <form th:action="@{/admin/experiments/{id}/variants/weights(id=${experiment.id})}" method="post">
+    <form th:action="@{/admin/experiments/{id}/variants/weights(id=${experiment.id})}" method="post"
+          ws:post="@{/admin/experiments/{id}/variants/weights(id=${experiment.id})}" ws:target="#experiment-detail-body" ws:swap="outerHTML">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <table class="table">
             <thead>
@@ -223,7 +225,8 @@
             </td>
             <td th:text="${r.priority}"></td>
             <td>
-                <form th:action="@{/admin/experiments/{id}/rules/{ruleId}/delete(id=${experiment.id},ruleId=${r.id})}" method="post" style="display:inline;"> <!-- nosemgrep -->
+                <form th:action="@{/admin/experiments/{id}/rules/{ruleId}/delete(id=${experiment.id},ruleId=${r.id})}" method="post" style="display:inline;"
+                      ws:post="@{/admin/experiments/{id}/rules/{ruleId}/delete(id=${experiment.id},ruleId=${r.id})}" ws:target="#experiment-detail-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit" class="btn btn-sm" th:text="#{admin.experiment.delete}">Supprimer</button>
                 </form>
@@ -239,6 +242,7 @@
                  th:text="#{admin.experiment.rules.add}">+ Ajouter une règle
         </summary>
         <form th:action="@{/admin/experiments/{id}/rules(id=${experiment.id})}" method="post"
+              ws:post="@{/admin/experiments/{id}/rules(id=${experiment.id})}" ws:target="#experiment-detail-body" ws:swap="outerHTML"
               style="margin-top:0.75rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-end;">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <label>
@@ -374,7 +378,8 @@
             </td>
             <td th:text="${o.priority}"></td>
             <td>
-                <form th:action="@{/admin/experiments/{id}/overrides/{oid}/delete(id=${experiment.id},oid=${o.id})}" method="post" style="display:inline;"> <!-- nosemgrep -->
+                <form th:action="@{/admin/experiments/{id}/overrides/{oid}/delete(id=${experiment.id},oid=${o.id})}" method="post" style="display:inline;"
+                      ws:post="@{/admin/experiments/{id}/overrides/{oid}/delete(id=${experiment.id},oid=${o.id})}" ws:target="#experiment-detail-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit" class="btn btn-sm" th:text="#{admin.experiment.delete}">Supprimer</button>
                 </form>
@@ -390,6 +395,7 @@
                  th:text="#{admin.experiment.overrides.add}">+ Ajouter un override
         </summary>
         <form th:action="@{/admin/experiments/{id}/overrides(id=${experiment.id})}" method="post"
+              ws:post="@{/admin/experiments/{id}/overrides(id=${experiment.id})}" ws:target="#experiment-detail-body" ws:swap="outerHTML"
               style="margin-top:0.75rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-end;">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <label>
@@ -493,7 +499,8 @@
         <span th:if="${param.assignError[0] != 'userNotFound' and param.assignError[0] != 'alreadyAssigned'}" th:text="#{admin.experiment.assign.error.not_active}"></span>
     </div>
 
-    <form th:if="${hasManualRule}" th:action="@{/admin/experiments/{id}/assign(id=${experiment.id})}" method="post" style="display:flex; gap:0.5rem; margin-top:1rem; align-items:center;"> <!-- nosemgrep -->
+    <form th:if="${hasManualRule}" th:action="@{/admin/experiments/{id}/assign(id=${experiment.id})}" method="post" style="display:flex; gap:0.5rem; margin-top:1rem; align-items:center;"
+          ws:post="@{/admin/experiments/{id}/assign(id=${experiment.id})}" ws:target="#experiment-detail-body" ws:swap="outerHTML"> <!-- nosemgrep -->
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <input type="text" name="twitchUsername"
                th:placeholder="#{admin.experiment.assign.placeholder}"
@@ -504,7 +511,8 @@
         </button>
     </form>
 
-    <form th:if="${experiment.status == 'ACTIVE' or experiment.status == 'PAUSED'}" th:action="@{/admin/experiments/{id}/reassign(id=${experiment.id})}" method="post" style="margin-top:0.75rem;"> <!-- nosemgrep -->
+    <form th:if="${experiment.status == 'ACTIVE' or experiment.status == 'PAUSED'}" th:action="@{/admin/experiments/{id}/reassign(id=${experiment.id})}" method="post" style="margin-top:0.75rem;"
+          ws:post="@{/admin/experiments/{id}/reassign(id=${experiment.id})}" ws:target="#experiment-detail-body" ws:swap="outerHTML"> <!-- nosemgrep -->
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <button type="submit" class="btn btn-sm"
                 style="color:var(--error,red); border-color:var(--error,red);"
@@ -513,6 +521,7 @@
                 th:text="#{admin.experiment.reassign.button}">Réinitialiser et réassigner
         </button>
     </form>
+</div>
 </div>
 
 <script>
