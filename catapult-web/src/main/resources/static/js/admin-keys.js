@@ -10,16 +10,14 @@
  *   <provider>.key.deleted   { keyId }
  *   <provider>.keys.refreshed{ keys: [ ...KeyStatus ] }
  * where <provider> is "steam" or "dtdd".
+ *
+ * Loaded globally for admins (not per active_page): the events.admin
+ * subscription lives in ws-client and survives hx-boost body swaps, and each
+ * event re-resolves its card from the current DOM — so live updates keep
+ * working on pages reached through boosted navigation.
  */
 (function () {
   "use strict";
-
-  var cards = document.querySelectorAll("[data-keys-card][data-provider]");
-  if (!cards.length) return;
-
-  // provider -> card element (only the current page's provider is present).
-  var byProvider = {};
-  cards.forEach(function (card) { byProvider[card.dataset.provider] = card; });
 
   function cssEscape(s) {
     if (window.CSS && CSS.escape) return CSS.escape(s);
@@ -128,7 +126,8 @@
     if (!msg || !msg.name) return;
     var dot = msg.name.indexOf(".");
     var provider = dot > 0 ? msg.name.slice(0, dot) : "";
-    var card = byProvider[provider];
+    // Resolve fresh each event: after an hx-boost swap the card is a new node.
+    var card = document.querySelector('[data-keys-card][data-provider="' + provider + '"]');
     if (!card) return;
     var data = msg.data || {};
     if (msg.name === provider + ".key.added") onKeyAdded(card, data.key);
