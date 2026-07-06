@@ -921,6 +921,181 @@
       "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Verifier au premier deploiement sur /actuator/prometheus quelles series existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne."
     },
     {
+      "id": 230,
+      "type": "timeseries",
+      "title": "Codes retour par API",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (api, status) (rate(catapult_external_api_seconds_count{application=~\"catapult(-api)?\"}[5m]))",
+          "legendFormat": "{{api}} — {{status}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 231,
+      "type": "timeseries",
+      "title": "Expiration des tokens de service",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 44,
+        "w": 6,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "catapult_token_expiry_seconds{application=~\"catapult(-api)?\"}",
+          "legendFormat": "{{service}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 232,
+      "type": "timeseries",
+      "title": "Clés API — disponibles/bloquées",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 44,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "catapult_external_keys{application=~\"catapult(-api)?\"}",
+          "legendFormat": "{{api}} — {{state}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 233,
+      "type": "stat",
+      "title": "Tokens OAuth utilisateurs",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 48,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "value_and_name",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "expr": "catapult_tokens_oauth{application=~\"catapult(-api)?\"}",
+          "legendFormat": "{{state}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ]
+    },
+    {
       "type": "row",
       "id": 209,
       "title": "Chat",
@@ -929,7 +1104,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 44
+        "y": 52
       },
       "panels": []
     },
@@ -945,7 +1120,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 45
+        "y": 53
       },
       "fieldConfig": {
         "defaults": {
@@ -989,7 +1164,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 45
+        "y": 53
       },
       "fieldConfig": {
         "defaults": {
@@ -1031,7 +1206,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 53,
+        "y": 61,
         "w": 10,
         "h": 8
       },
@@ -1067,7 +1242,7 @@
       },
       "gridPos": {
         "x": 10,
-        "y": 53,
+        "y": 61,
         "w": 9,
         "h": 8
       },
@@ -1111,7 +1286,7 @@
       },
       "gridPos": {
         "x": 19,
-        "y": 53,
+        "y": 61,
         "w": 5,
         "h": 8
       },
@@ -1164,7 +1339,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 61
+        "y": 69
       },
       "panels": []
     },
@@ -1226,7 +1401,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 62
+        "y": 70
       },
       "id": 6,
       "options": {
@@ -1325,7 +1500,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 62
+        "y": 70
       },
       "id": 7,
       "options": {
@@ -1369,7 +1544,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 70
+        "y": 78
       },
       "fieldConfig": {
         "defaults": {
@@ -1422,7 +1597,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 70
+        "y": 78
       },
       "fieldConfig": {
         "defaults": {
@@ -1516,7 +1691,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 78
+        "y": 86
       },
       "id": 8,
       "options": {
@@ -1603,7 +1778,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 78
+        "y": 86
       },
       "id": 9,
       "options": {
@@ -1681,7 +1856,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 78
+        "y": 86
       },
       "id": 10,
       "options": {
@@ -1741,7 +1916,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 86
+        "y": 94
       },
       "id": 110,
       "options": {
@@ -1802,7 +1977,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 86
+        "y": 94
       },
       "id": 111,
       "options": {
@@ -1892,7 +2067,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 90
+        "y": 98
       },
       "id": 112,
       "options": {
@@ -1936,7 +2111,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 98
+        "y": 106
       },
       "fieldConfig": {
         "defaults": {
@@ -1981,7 +2156,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 98
+        "y": 106
       },
       "fieldConfig": {
         "defaults": {
@@ -2026,7 +2201,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 106
+        "y": 114
       },
       "fieldConfig": {
         "defaults": {
@@ -2070,7 +2245,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 106
+        "y": 114
       },
       "fieldConfig": {
         "defaults": {
@@ -2111,7 +2286,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 114
+        "y": 122
       },
       "panels": []
     },
@@ -2143,7 +2318,7 @@
         "h": 4,
         "w": 8,
         "x": 0,
-        "y": 115
+        "y": 123
       },
       "id": 103,
       "options": {
@@ -2233,7 +2408,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 119
+        "y": 127
       },
       "id": 105,
       "options": {
@@ -2320,7 +2495,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 119
+        "y": 127
       },
       "id": 106,
       "options": {
@@ -2419,7 +2594,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 127
+        "y": 135
       },
       "id": 107,
       "options": {
@@ -2508,7 +2683,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 135
+        "y": 143
       },
       "id": 114,
       "options": {
@@ -2545,7 +2720,7 @@
       "title": "WebSocket — WS Sessions",
       "gridPos": {
         "x": 0,
-        "y": 143,
+        "y": 151,
         "w": 24,
         "h": 1
       },
@@ -2699,7 +2874,7 @@
       "title": "WebSocket — Frames",
       "gridPos": {
         "x": 0,
-        "y": 144,
+        "y": 152,
         "w": 24,
         "h": 1
       },
@@ -2795,7 +2970,7 @@
       "title": "WebSocket — Actions",
       "gridPos": {
         "x": 0,
-        "y": 145,
+        "y": 153,
         "w": 24,
         "h": 1
       },
@@ -2937,7 +3112,7 @@
       "title": "WebSocket — Subscriptions & Redis",
       "gridPos": {
         "x": 0,
-        "y": 146,
+        "y": 154,
         "w": 24,
         "h": 1
       },
@@ -3075,7 +3250,7 @@
       "title": "WebSocket — Auth & Snapshot",
       "gridPos": {
         "x": 0,
-        "y": 147,
+        "y": 155,
         "w": 24,
         "h": 1
       },
@@ -3233,7 +3408,7 @@
       "title": "WebSocket — API Side",
       "gridPos": {
         "x": 0,
-        "y": 148,
+        "y": 156,
         "w": 24,
         "h": 1
       },
