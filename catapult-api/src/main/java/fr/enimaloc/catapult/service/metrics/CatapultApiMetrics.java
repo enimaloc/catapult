@@ -14,6 +14,10 @@ public class CatapultApiMetrics {
 
     public CatapultApiMetrics(MeterRegistry registry) {
         this.registry = registry;
+        // Pré-enregistre les actions connues pour qu'elles soient exportées à 0 dès le démarrage
+        for (String action : new String[] {"created", "read", "markAllRead", "deleted"}) {
+            registry.counter("catapult.notification.actions", "action", action);
+        }
     }
 
     // -------------------------------------------------------------------------
