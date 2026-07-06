@@ -64,6 +64,8 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     @PostConstruct
     public void init() {
+        // Pré-enregistre le compteur pour qu'il soit exporté à 0 avant le premier message
+        meterRegistry.counter("catapult.chat.messages", "transport", "irc");
         userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)
             .forEach(this::connect);
     }
