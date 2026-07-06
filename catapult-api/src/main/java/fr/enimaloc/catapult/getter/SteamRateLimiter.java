@@ -40,6 +40,9 @@ public class SteamRateLimiter {
         this.maxWaitMs = maxWaitMs;
         this.windowMs = windowMs;
         this.meterRegistry = meterRegistry;
+        // Pré-enregistre les compteurs pour qu'ils soient exportés à 0 avant le premier événement
+        meterRegistry.counter("catapult.external.rate_limited", "api", "steam", "scope", "key");
+        meterRegistry.counter("catapult.external.rate_limited", "api", "steam", "scope", "global");
     }
 
     /**

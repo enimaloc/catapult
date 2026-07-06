@@ -30,6 +30,8 @@ public class DtddApiKeyRotator {
     public DtddApiKeyRotator(DtddApiKeyRepository repository, MeterRegistry meterRegistry) {
         this.repository = repository;
         this.meterRegistry = meterRegistry;
+        // Pré-enregistre le compteur pour qu'il soit exporté à 0 avant le premier événement
+        meterRegistry.counter("catapult.external.rate_limited", "api", "dtdd", "scope", "key");
         refreshKeys();
     }
 

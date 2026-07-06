@@ -80,6 +80,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @PostConstruct
     public void init() {
+        // Pré-enregistre le compteur pour qu'il soit exporté à 0 avant le premier message
+        meterRegistry.counter("catapult.chat.messages", "transport", "eventsub");
         var users = userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
         log.info("[EventSub Chat] Bootstrapping connections for {} active bot-enabled user(s)", users.size());
         users.forEach(this::connect);
