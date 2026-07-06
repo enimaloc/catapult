@@ -34,6 +34,7 @@ class MetricsEventListenerTest {
 
         listener.onStreamOffline(new StreamOfflineEvent(this, user));
 
-        assertThat(registry.find("catapult.stream.duration").timer()).isNull();
+        // Le timer est pré-enregistré (exporté à 0) mais rien ne doit y être enregistré
+        assertThat(registry.get("catapult.stream.duration").timer().count()).isZero();
     }
 }
