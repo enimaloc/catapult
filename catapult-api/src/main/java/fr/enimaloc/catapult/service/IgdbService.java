@@ -88,6 +88,11 @@ public class IgdbService {
     private volatile String appAccessToken;
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
 
+    /** Expiration du token app Twitch/IGDB courant (EPOCH tant qu'aucun token obtenu). */
+    public Instant getTokenExpiresAt() {
+        return tokenExpiresAt;
+    }
+
     // ExternalGameSource IDs (-1 = not resolved)
     private volatile long steamSourceId = -1;
     private volatile long twitchSourceId = -1;
