@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,4 +13,10 @@ public interface OAuthTokenRepository extends JpaRepository<OAuthToken, UUID> {
     Optional<OAuthToken> findByUserAndProvider(UserAccount user, OAuthToken.Provider provider);
 
     Optional<OAuthToken> findByProviderAndUserIsNull(OAuthToken.Provider provider);
+
+    long countByExpiresAtAfter(Instant instant);
+
+    long countByExpiresAtBefore(Instant instant);
+
+    long countByRefreshTokenIsNull();
 }
