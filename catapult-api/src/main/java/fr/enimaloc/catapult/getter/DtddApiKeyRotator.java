@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.getter;
 
 import fr.enimaloc.catapult.domain.DtddApiKeyEntry;
 import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -30,7 +31,26 @@ public class DtddApiKeyRotator {
     public DtddApiKeyRotator(DtddApiKeyRepository repository, MeterRegistry meterRegistry) {
         this.repository = repository;
         this.meterRegistry = meterRegistry;
+        // Pré-enregistre le compteur pour qu'il soit exporté à 0 avant le premier événement
+        meterRegistry.counter("catapult.external.rate_limited", "api", "dtdd", "scope", "key");
+        Gauge.builder("catapult.external.keys", this, DtddApiKeyRotator::availableKeyCount)
+            .tag("api", "dtdd").tag("state", "available")
+            .description("Clés DTDD utilisables (pool partagé, hors rate limit)")
+            .register(meterRegistry);
+        Gauge.builder("catapult.external.keys", this, DtddApiKeyRotator::blockedKeyCount)
+            .tag("api", "dtdd").tag("state", "blocked")
+            .description("Clés DTDD bloquées par rate limit")
+            .register(meterRegistry);
         refreshKeys();
+    }
+
+    public int blockedKeyCount() {
+        long now = System.currentTimeMillis();
+        return (int) keys.stream().filter(k -> keyBlockedUntil.getOrDefault(k, 0L) > now).count();
+    }
+
+    public int availableKeyCount() {
+        return keys.size() - blockedKeyCount();
     }
 
     public void refreshKeys() {
