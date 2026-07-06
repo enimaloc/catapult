@@ -181,6 +181,14 @@ public class SystemTwitchAccountService {
         }
     }
 
+    /** Expiration du token du bot système, empty si le bot n'est pas lié. */
+    public Optional<Instant> tokenExpiry() {
+        return userAccountRepository.findBySystemAccountTrue()
+            .filter(a -> a.getTwitchId() != null)
+            .flatMap(a -> tokenRepo.findByUserAndProvider(a, OAuthToken.Provider.TWITCH))
+            .map(t -> t.getExpiresAt() != null ? t.getExpiresAt() : Instant.EPOCH);
+    }
+
     private Optional<TokenView> loadCurrentToken() {
         return userAccountRepository.findBySystemAccountTrue()
             .filter(a -> a.getTwitchId() != null)
