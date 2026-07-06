@@ -88,7 +88,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "catapult_streams_live{application=\"catapult-api\"}",
+          "expr": "catapult_streams_live{application=~\"catapult(-api)?\"}",
           "legendFormat": "streams",
           "refId": "A"
         }
@@ -161,7 +161,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "catapult_streams_live{application=\"catapult-api\"}",
+          "expr": "catapult_streams_live{application=~\"catapult(-api)?\"}",
           "instant": true,
           "legendFormat": "Live",
           "refId": "A"
@@ -188,7 +188,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -221,7 +222,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_game_detected_total{application=\"catapult-api\"}[24h])",
+          "expr": "increase(catapult_game_detected_total{application=~\"catapult(-api)?\"}[24h])",
           "instant": true,
           "legendFormat": "Détections",
           "refId": "A"
@@ -248,7 +249,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -281,7 +283,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_account_created_total{application=\"catapult-api\"}[7d])",
+          "expr": "increase(catapult_account_created_total{application=~\"catapult(-api)?\"}[7d])",
           "instant": true,
           "legendFormat": "Comptes",
           "refId": "A"
@@ -308,7 +310,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -341,7 +344,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_game_no_detected_total{application=\"catapult-api\"}[24h])",
+          "expr": "increase(catapult_game_no_detected_total{application=~\"catapult(-api)?\"}[24h])",
           "instant": true,
           "legendFormat": "Sans jeu",
           "refId": "A"
@@ -368,7 +371,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -401,7 +405,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_channel_category_changed_total{application=\"catapult-api\"}[24h])",
+          "expr": "increase(catapult_channel_category_changed_total{application=~\"catapult(-api)?\"}[24h])",
           "instant": true,
           "legendFormat": "Catégorie",
           "refId": "A"
@@ -428,7 +432,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -461,7 +466,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_channel_ccl_changed_total{application=\"catapult-api\"}[24h])",
+          "expr": "increase(catapult_channel_ccl_changed_total{application=~\"catapult(-api)?\"}[24h])",
           "instant": true,
           "legendFormat": "CCL",
           "refId": "A"
@@ -519,7 +524,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (source) (catapult_game_detected_total{application=\"catapult-api\"})",
+          "expr": "sum by (source) (catapult_game_detected_total{application=~\"catapult(-api)?\"})",
           "instant": true,
           "legendFormat": "{{source}}",
           "refId": "A"
@@ -607,7 +612,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_stream_online_total{application=\"catapult-api\"}[$__rate_interval])",
+          "expr": "increase(catapult_stream_online_total{application=~\"catapult(-api)?\"}[$__rate_interval])",
           "legendFormat": "En ligne",
           "refId": "A"
         },
@@ -616,7 +621,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_stream_offline_total{application=\"catapult-api\"}[$__rate_interval])",
+          "expr": "increase(catapult_stream_offline_total{application=~\"catapult(-api)?\"}[$__rate_interval])",
           "legendFormat": "Hors ligne",
           "refId": "B"
         }
@@ -787,10 +792,10 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 36
+        "y": 36,
+        "w": 8,
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -832,10 +837,10 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 12,
-        "y": 36
+        "x": 8,
+        "y": 36,
+        "w": 4,
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -852,7 +857,8 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -886,10 +892,10 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 18,
-        "y": 36
+        "x": 12,
+        "y": 36,
+        "w": 12,
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -915,6 +921,181 @@
       "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Verifier au premier deploiement sur /actuator/prometheus quelles series existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne."
     },
     {
+      "id": 230,
+      "type": "timeseries",
+      "title": "Codes retour par API",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (api, status) (rate(catapult_external_api_seconds_count{application=~\"catapult(-api)?\"}[5m]))",
+          "legendFormat": "{{api}} — {{status}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 231,
+      "type": "timeseries",
+      "title": "Expiration des tokens de service",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 44,
+        "w": 6,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "catapult_token_expiry_seconds{application=~\"catapult(-api)?\"}",
+          "legendFormat": "{{service}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 232,
+      "type": "timeseries",
+      "title": "Clés API — disponibles/bloquées",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 44,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "catapult_external_keys{application=~\"catapult(-api)?\"}",
+          "legendFormat": "{{api}} — {{state}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ]
+    },
+    {
+      "id": 233,
+      "type": "stat",
+      "title": "Tokens OAuth utilisateurs",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 48,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "value_and_name",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "expr": "catapult_tokens_oauth{application=~\"catapult(-api)?\"}",
+          "legendFormat": "{{state}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ]
+    },
+    {
       "type": "row",
       "id": 209,
       "title": "Chat",
@@ -923,7 +1104,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 44
+        "y": 52
       },
       "panels": []
     },
@@ -939,7 +1120,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 45
+        "y": 53
       },
       "fieldConfig": {
         "defaults": {
@@ -983,7 +1164,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 45
+        "y": 53
       },
       "fieldConfig": {
         "defaults": {
@@ -1024,10 +1205,10 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 0,
-        "y": 53
+        "y": 61,
+        "w": 10,
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -1060,10 +1241,10 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 10,
-        "x": 8,
-        "y": 53
+        "x": 10,
+        "y": 61,
+        "w": 9,
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -1104,10 +1285,10 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 18,
-        "y": 53
+        "x": 19,
+        "y": 61,
+        "w": 5,
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -1158,7 +1339,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 61
+        "y": 69
       },
       "panels": []
     },
@@ -1220,7 +1401,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 62
+        "y": 70
       },
       "id": 6,
       "options": {
@@ -1246,7 +1427,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "jvm_memory_used_bytes{application=~\"catapult-.*\", area=\"heap\"}",
+          "expr": "jvm_memory_used_bytes{application=~\"catapult(-.*)?\", area=\"heap\"}",
           "legendFormat": "{{id}}",
           "refId": "A"
         },
@@ -1255,7 +1436,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "jvm_memory_max_bytes{application=~\"catapult-.*\", area=\"heap\"}",
+          "expr": "jvm_memory_max_bytes{application=~\"catapult(-.*)?\", area=\"heap\"}",
           "legendFormat": "Max {{id}}",
           "refId": "B"
         }
@@ -1319,7 +1500,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 62
+        "y": 70
       },
       "id": 7,
       "options": {
@@ -1345,7 +1526,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (uri, method) (rate(http_server_requests_seconds_count{application=~\"catapult-.*\"}[$__rate_interval]))",
+          "expr": "sum by (uri, method) (rate(http_server_requests_seconds_count{application=~\"catapult(-.*)?\"}[$__rate_interval]))",
           "legendFormat": "{{method}} {{uri}}",
           "refId": "A"
         }
@@ -1363,7 +1544,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 70
+        "y": 78
       },
       "fieldConfig": {
         "defaults": {
@@ -1416,7 +1597,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 70
+        "y": 78
       },
       "fieldConfig": {
         "defaults": {
@@ -1510,7 +1691,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 78
+        "y": 86
       },
       "id": 8,
       "options": {
@@ -1533,7 +1714,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(http_server_requests_seconds_count{application=~\"catapult-.*\", status=~\"5..\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{application=~\"catapult(-.*)?\", status=~\"5..\"}[$__rate_interval]))",
           "legendFormat": "5xx/s",
           "refId": "A"
         }
@@ -1597,7 +1778,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 78
+        "y": 86
       },
       "id": 9,
       "options": {
@@ -1623,7 +1804,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "hikaricp_connections_active{application=~\"catapult-.*\"}",
+          "expr": "hikaricp_connections_active{application=~\"catapult(-.*)?\"}",
           "legendFormat": "Actives",
           "refId": "A"
         },
@@ -1632,7 +1813,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "hikaricp_connections_pending{application=~\"catapult-.*\"}",
+          "expr": "hikaricp_connections_pending{application=~\"catapult(-.*)?\"}",
           "legendFormat": "En attente",
           "refId": "B"
         },
@@ -1641,7 +1822,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "hikaricp_connections_max{application=~\"catapult-.*\"}",
+          "expr": "hikaricp_connections_max{application=~\"catapult(-.*)?\"}",
           "legendFormat": "Max",
           "refId": "C"
         }
@@ -1675,7 +1856,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 78
+        "y": 86
       },
       "id": 10,
       "options": {
@@ -1700,7 +1881,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_uptime_seconds{application=~\"catapult-.*\"}",
+          "expr": "process_uptime_seconds{application=~\"catapult(-.*)?\"}",
           "instant": true,
           "legendFormat": "Uptime",
           "refId": "A"
@@ -1735,7 +1916,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 86
+        "y": 94
       },
       "id": 110,
       "options": {
@@ -1760,7 +1941,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "catapult_sessions_active{application=\"catapult-api\"}",
+          "expr": "catapult_sessions_active{application=~\"catapult(-api)?\"}",
           "instant": true,
           "legendFormat": "Sessions",
           "refId": "A"
@@ -1787,7 +1968,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -1795,7 +1977,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 86
+        "y": 94
       },
       "id": 111,
       "options": {
@@ -1820,7 +2002,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_auth_login_total{application=\"catapult-api\", provider=\"twitch\"}[24h])",
+          "expr": "increase(catapult_auth_login_total{application=~\"catapult(-api)?\", provider=\"twitch\"}[24h])",
           "instant": true,
           "legendFormat": "Connexions",
           "refId": "A"
@@ -1885,7 +2067,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 90
+        "y": 98
       },
       "id": 112,
       "options": {
@@ -1911,7 +2093,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (status) (rate(http_server_requests_seconds_count{application=~\"catapult-.*\"}[$__rate_interval]))",
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{application=~\"catapult(-.*)?\"}[$__rate_interval]))",
           "legendFormat": "{{status}}",
           "refId": "A"
         }
@@ -1920,7 +2102,7 @@
     {
       "type": "timeseries",
       "id": 218,
-      "title": "Requêtes Hibernate",
+      "title": "Requêtes repository/s",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1929,7 +2111,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 98
+        "y": 106
       },
       "fieldConfig": {
         "defaults": {
@@ -1951,13 +2133,13 @@
       },
       "targets": [
         {
+          "expr": "sum by (repository) (rate(spring_data_repository_invocations_seconds_count{application=~\"catapult(-api)?\"}[5m]))",
+          "legendFormat": "{{repository}}",
+          "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          },
-          "expr": "rate(hibernate_query_executions_total{application=\"catapult-api\"}[5m])",
-          "legendFormat": "",
-          "refId": "A"
+          }
         }
       ],
       "description": "Note : verifier les noms exacts des series hibernate_* sur /actuator/prometheus au premier run. Micrometer expose hibernate_query_executions_total via HibernateMetrics ; ajuster si le suffixe differe."
@@ -1965,7 +2147,7 @@
     {
       "type": "timeseries",
       "id": 219,
-      "title": "Temps max requête Hibernate",
+      "title": "Temps max par repository",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1974,7 +2156,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 98
+        "y": 106
       },
       "fieldConfig": {
         "defaults": {
@@ -1996,13 +2178,13 @@
       },
       "targets": [
         {
+          "expr": "max by (repository) (spring_data_repository_invocations_seconds_max{application=~\"catapult(-api)?\"})",
+          "legendFormat": "{{repository}}",
+          "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          },
-          "expr": "hibernate_query_executions_max_seconds{application=\"catapult-api\"}",
-          "legendFormat": "",
-          "refId": "A"
+          }
         }
       ],
       "description": "Note : verifier les noms exacts des series hibernate_* sur /actuator/prometheus au premier run. Micrometer expose hibernate_query_executions_total via HibernateMetrics ; ajuster si le suffixe differe."
@@ -2019,7 +2201,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 106
+        "y": 114
       },
       "fieldConfig": {
         "defaults": {
@@ -2063,7 +2245,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 106
+        "y": 114
       },
       "fieldConfig": {
         "defaults": {
@@ -2104,7 +2286,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 114
+        "y": 122
       },
       "panels": []
     },
@@ -2136,7 +2318,7 @@
         "h": 4,
         "w": 8,
         "x": 0,
-        "y": 115
+        "y": 123
       },
       "id": 103,
       "options": {
@@ -2161,7 +2343,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "catapult_users_active{application=\"catapult-api\"}",
+          "expr": "catapult_users_active{application=~\"catapult(-api)?\"}",
           "instant": true,
           "legendFormat": "Actifs",
           "refId": "A"
@@ -2226,7 +2408,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 119
+        "y": 127
       },
       "id": 105,
       "options": {
@@ -2249,7 +2431,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(catapult_igdb_cache_lookup_total{application=\"catapult-api\"}[$__rate_interval])",
+          "expr": "rate(catapult_igdb_cache_lookup_total{application=~\"catapult(-api)?\"}[$__rate_interval])",
           "legendFormat": "{{method}} / {{result}}",
           "refId": "A"
         }
@@ -2313,7 +2495,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 119
+        "y": 127
       },
       "id": 106,
       "options": {
@@ -2339,7 +2521,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(catapult_scheduler_poll_duration_seconds_sum{application=\"catapult-api\"}[$__rate_interval]) / rate(catapult_scheduler_poll_duration_seconds_count{application=\"catapult-api\"}[$__rate_interval])",
+          "expr": "rate(catapult_scheduler_poll_duration_seconds_sum{application=~\"catapult(-api)?\"}[$__rate_interval]) / rate(catapult_scheduler_poll_duration_seconds_count{application=~\"catapult(-api)?\"}[$__rate_interval])",
           "legendFormat": "Durée moyenne",
           "refId": "A"
         },
@@ -2348,7 +2530,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "catapult_scheduler_poll_duration_seconds_max{application=\"catapult-api\"}",
+          "expr": "catapult_scheduler_poll_duration_seconds_max{application=~\"catapult(-api)?\"}",
           "legendFormat": "Max",
           "refId": "B"
         }
@@ -2412,7 +2594,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 127
+        "y": 135
       },
       "id": 107,
       "options": {
@@ -2437,7 +2619,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_scheduler_users_polled_total{application=\"catapult-api\"}[$__rate_interval])",
+          "expr": "increase(catapult_scheduler_users_polled_total{application=~\"catapult(-api)?\"}[$__rate_interval])",
           "legendFormat": "Utilisateurs",
           "refId": "A"
         }
@@ -2501,7 +2683,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 135
+        "y": 143
       },
       "id": 114,
       "options": {
@@ -2526,9 +2708,834 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(catapult_experiment_activated_total{application=\"catapult-api\"}[$__rate_interval])",
+          "expr": "increase(catapult_experiment_activated_total{application=~\"catapult(-api)?\"}[$__rate_interval])",
           "legendFormat": "{{experiment}}",
           "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 301,
+      "type": "row",
+      "title": "WebSocket — WS Sessions",
+      "gridPos": {
+        "x": 0,
+        "y": 151,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 302,
+          "type": "stat",
+          "title": "Active Sessions",
+          "gridPos": {
+            "x": 0,
+            "y": 1,
+            "w": 6,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "value": null,
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "catapult_ws_sessions_active{application=~\"catapult(-.*)?\"}",
+              "legendFormat": "active",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 303,
+          "type": "timeseries",
+          "title": "Session Open Rate",
+          "gridPos": {
+            "x": 6,
+            "y": 1,
+            "w": 9,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "rate(catapult_ws_sessions_opened_total{application=~\"catapult(-.*)?\"}[1m])",
+              "legendFormat": "{{auth}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 304,
+          "type": "timeseries",
+          "title": "Session Close Rate by Reason",
+          "gridPos": {
+            "x": 15,
+            "y": 1,
+            "w": 9,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "rate(catapult_ws_sessions_closed_total{application=~\"catapult(-.*)?\"}[1m])",
+              "legendFormat": "{{reason}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 310,
+      "type": "row",
+      "title": "WebSocket — Frames",
+      "gridPos": {
+        "x": 0,
+        "y": 152,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 311,
+          "type": "timeseries",
+          "title": "Incoming Frames by Type",
+          "gridPos": {
+            "x": 0,
+            "y": 6,
+            "w": 12,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum(rate(catapult_ws_frames_in_total{application=~\"catapult(-.*)?\"}[1m])) by (type)",
+              "legendFormat": "{{type}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 312,
+          "type": "timeseries",
+          "title": "Outgoing Frames by Type",
+          "gridPos": {
+            "x": 12,
+            "y": 6,
+            "w": 12,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum(rate(catapult_ws_frames_out_total{application=~\"catapult(-.*)?\"}[1m])) by (type)",
+              "legendFormat": "{{type}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 320,
+      "type": "row",
+      "title": "WebSocket — Actions",
+      "gridPos": {
+        "x": 0,
+        "y": 153,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 321,
+          "type": "table",
+          "title": "Action Requests (5m)",
+          "gridPos": {
+            "x": 0,
+            "y": 12,
+            "w": 8,
+            "h": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "sortBy": []
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum(increase(catapult_ws_action_requests_total{application=~\"catapult(-.*)?\"}[5m])) by (action, ok)",
+              "legendFormat": "{{action}} ok={{ok}}",
+              "refId": "A",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "renameByName": {
+                  "Value": "count"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 322,
+          "type": "heatmap",
+          "title": "Action Duration Heatmap",
+          "gridPos": {
+            "x": 8,
+            "y": 12,
+            "w": 8,
+            "h": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "options": {
+            "calculate": false,
+            "yAxis": {
+              "unit": "s"
+            },
+            "color": {
+              "scheme": "Oranges"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum(rate(catapult_ws_action_duration_seconds_bucket{application=~\"catapult(-.*)?\"}[1m])) by (le, action)",
+              "legendFormat": "{{le}}",
+              "refId": "A",
+              "format": "heatmap"
+            }
+          ]
+        },
+        {
+          "id": 323,
+          "type": "timeseries",
+          "title": "Action Errors by Code",
+          "gridPos": {
+            "x": 16,
+            "y": 12,
+            "w": 8,
+            "h": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum(rate(catapult_ws_action_errors_total{application=~\"catapult(-.*)?\"}[1m])) by (code)",
+              "legendFormat": "{{code}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 330,
+      "type": "row",
+      "title": "WebSocket — Subscriptions & Redis",
+      "gridPos": {
+        "x": 0,
+        "y": 154,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 331,
+          "type": "timeseries",
+          "title": "Active Subscriptions by Channel Class",
+          "gridPos": {
+            "x": 0,
+            "y": 19,
+            "w": 8,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "catapult_ws_subscriptions_active{application=~\"catapult(-.*)?\"}",
+              "legendFormat": "{{channel_class}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 332,
+          "type": "timeseries",
+          "title": "Redis Events Received Rate",
+          "gridPos": {
+            "x": 8,
+            "y": 19,
+            "w": 8,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "rate(catapult_ws_redis_events_received_total{application=~\"catapult(-.*)?\"}[1m])",
+              "legendFormat": "{{channel_class}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 333,
+          "type": "timeseries",
+          "title": "Average Fanout Factor",
+          "description": "Sessions reached per Redis event (fanout_targets / events_received)",
+          "gridPos": {
+            "x": 16,
+            "y": 19,
+            "w": 8,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "rate(catapult_ws_redis_fanout_targets_total{application=~\"catapult(-.*)?\"}[1m]) / rate(catapult_ws_redis_events_received_total{application=~\"catapult(-.*)?\"}[1m])",
+              "legendFormat": "{{channel_class}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 340,
+      "type": "row",
+      "title": "WebSocket — Auth & Snapshot",
+      "gridPos": {
+        "x": 0,
+        "y": 155,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 341,
+          "type": "timeseries",
+          "title": "Auth Ticket Outcomes",
+          "gridPos": {
+            "x": 0,
+            "y": 25,
+            "w": 8,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "rate(catapult_ws_auth_ticket_total{application=~\"catapult(-.*)?\"}[1m])",
+              "legendFormat": "{{outcome}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 342,
+          "type": "heatmap",
+          "title": "Snapshot Duration Heatmap",
+          "gridPos": {
+            "x": 8,
+            "y": 25,
+            "w": 8,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "options": {
+            "calculate": false,
+            "yAxis": {
+              "unit": "s"
+            },
+            "color": {
+              "scheme": "Blues"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum(rate(catapult_ws_snapshot_duration_seconds_bucket{application=~\"catapult(-.*)?\"}[1m])) by (le)",
+              "legendFormat": "{{le}}",
+              "refId": "A",
+              "format": "heatmap"
+            }
+          ]
+        },
+        {
+          "id": 343,
+          "type": "stat",
+          "title": "Snapshot Failure Rate",
+          "gridPos": {
+            "x": 16,
+            "y": 25,
+            "w": 8,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "value": null,
+                    "color": "green"
+                  },
+                  {
+                    "value": 0.01,
+                    "color": "red"
+                  }
+                ]
+              },
+              "noValue": "0"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum(rate(catapult_ws_snapshot_failures_total{application=~\"catapult(-.*)?\"}[1m]))",
+              "legendFormat": "failures/s",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 350,
+      "type": "row",
+      "title": "WebSocket — API Side",
+      "gridPos": {
+        "x": 0,
+        "y": 156,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 351,
+          "type": "timeseries",
+          "title": "Redis Events Published Rate",
+          "gridPos": {
+            "x": 0,
+            "y": 31,
+            "w": 8,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "rate(catapult_redis_events_published_total{application=~\"catapult(-.*)?\"}[1m])",
+              "legendFormat": "{{channel_class}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 352,
+          "type": "timeseries",
+          "title": "Notification Actions Rate",
+          "gridPos": {
+            "x": 8,
+            "y": 31,
+            "w": 8,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "rate(catapult_notification_actions_total{application=~\"catapult(-.*)?\"}[1m])",
+              "legendFormat": "{{action}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 353,
+          "type": "timeseries",
+          "title": "Broadcast Attempts Rate",
+          "gridPos": {
+            "x": 16,
+            "y": 31,
+            "w": 8,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineInterpolation": "smooth"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "rate(catapult_broadcast_attempts_total{application=~\"catapult(-.*)?\"}[1m])",
+              "legendFormat": "{{name}} accepted={{accepted}}",
+              "refId": "A"
+            }
+          ]
         }
       ]
     }

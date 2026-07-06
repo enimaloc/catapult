@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.getter;
 
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,6 +41,23 @@ public class SteamRateLimiter {
         this.maxWaitMs = maxWaitMs;
         this.windowMs = windowMs;
         this.meterRegistry = meterRegistry;
+        // Pré-enregistre les compteurs pour qu'ils soient exportés à 0 avant le premier événement
+        meterRegistry.counter("catapult.external.rate_limited", "api", "steam", "scope", "key");
+        meterRegistry.counter("catapult.external.rate_limited", "api", "steam", "scope", "global");
+        Gauge.builder("catapult.external.keys", this, SteamRateLimiter::blockedKeyCount)
+            .tag("api", "steam").tag("state", "blocked")
+            .description("Clés Steam bloquées par rate limit")
+            .register(meterRegistry);
+        Gauge.builder("catapult.external.blocked", this,
+                l -> l.globalBlockedUntil > System.currentTimeMillis() ? 1 : 0)
+            .tag("api", "steam").tag("scope", "global")
+            .description("1 si la pénalité globale Steam est active")
+            .register(meterRegistry);
+    }
+
+    public int blockedKeyCount() {
+        long now = System.currentTimeMillis();
+        return (int) keyBlockedUntil.values().stream().filter(until -> until > now).count();
     }
 
     /**
