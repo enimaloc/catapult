@@ -33,6 +33,7 @@ class MinecraftFriendServiceTest {
     @Mock private MinecraftTokenService tokenService;
     @Mock private MinecraftServiceAccountRepository accountRepository;
     @Mock private MinecraftFriendLinkRepository linkRepository;
+    @Mock private MinecraftAccountLimitMarker limitMarker;
 
     @InjectMocks private MinecraftFriendService service;
 
@@ -91,8 +92,7 @@ class MinecraftFriendServiceTest {
 
         var link = service.enroll(user, "jeb_");
 
-        assertThat(bot1.isFriendLimitReached()).isTrue();
-        verify(accountRepository).save(bot1);
+        verify(limitMarker).markFull(bot1);
         assertThat(link.getServiceAccount()).isSameAs(bot2);
     }
 
