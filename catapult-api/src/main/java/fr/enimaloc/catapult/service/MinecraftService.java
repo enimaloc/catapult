@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.net.URI;
@@ -15,6 +16,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -117,6 +119,18 @@ public class MinecraftService {
                 .body(PresenceList.class);
     }
 
+    public Optional<ProfileLookup> lookupProfile(String name) {
+        try {
+            return Optional.ofNullable(restClient.get()
+                    .uri(URI.create(MINECRAFT_SERVICE_URL + "/minecraft/profile/lookup/name/" + name))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(ProfileLookup.class));
+        } catch (HttpClientErrorException.NotFound e) {
+            return Optional.empty();
+        }
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Token(
             String username,
@@ -162,6 +176,17 @@ public class MinecraftService {
 
             @JsonIgnoreProperties(ignoreUnknown = true)
             public record JoinInfo(String value, boolean invited) {}
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ProfileLookup(String id, String name) {
+        /** L'endpoint lookup renvoie l'UUID sans tirets ; l'API friends attend le format avec tirets. */
+        public String dashedId() {
+            if (id.contains("-")) return id;
+            return id.replaceFirst(
+                    "(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{12})",
+                    "$1-$2-$3-$4-$5");
         }
     }
 }
