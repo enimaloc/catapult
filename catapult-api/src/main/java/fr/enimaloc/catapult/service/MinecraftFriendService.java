@@ -9,12 +9,18 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Cycle de vie des liens d'amitié entre utilisateurs et comptes de service.
@@ -79,6 +85,57 @@ public class MinecraftFriendService {
 
     public Optional<MinecraftFriendLink> getLink(UserAccount user) {
         return linkRepository.findByUser(user);
+    }
+
+    /**
+     * Réconcilie les liens locaux avec la friends list réelle de chaque compte :
+     * PENDING accepté en jeu → ACCEPTED ; ACCEPTED disparu → REMOVED ; pseudo rafraîchi.
+     */
+    @Scheduled(fixedRateString = "${minecraft.friends-sync-interval-ms:300000}")
+    @Transactional
+    public void syncFriendLinks() {
+        for (MinecraftServiceAccount account : accountRepository.findByEnabledTrueOrderByFillOrderAsc()) {
+            List<MinecraftFriendLink> links = linkRepository.findByServiceAccount(account);
+            if (links.isEmpty()) continue;
+
+            Optional<String> token = tokenService.getToken(account);
+            if (token.isEmpty()) continue; // compte en échec : on ne touche pas aux liens
+
+            MinecraftService.FriendsList friendsList;
+            try {
+                friendsList = minecraftService.getFriends(token.get());
+            } catch (Exception e) {
+                log.warn("getFriends en échec pour {}: {}", account.getLabel(), e.getMessage());
+                continue;
+            }
+
+            Map<String, MinecraftService.FriendsList.Friend> byProfileId =
+                    Arrays.stream(friendsList.friends())
+                            .collect(Collectors.toMap(
+                                    MinecraftService.FriendsList.Friend::profileId,
+                                    Function.identity()));
+
+            for (MinecraftFriendLink link : links) {
+                MinecraftService.FriendsList.Friend friend = byProfileId.get(link.getMinecraftProfileId());
+                boolean changed = false;
+
+                if (friend != null && link.getStatus() == MinecraftFriendLink.Status.PENDING) {
+                    link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
+                    link.setAcceptedAt(Instant.now());
+                    changed = true;
+                } else if (friend == null && link.getStatus() == MinecraftFriendLink.Status.ACCEPTED) {
+                    link.setStatus(MinecraftFriendLink.Status.REMOVED);
+                    changed = true;
+                }
+
+                if (friend != null && !friend.name().equals(link.getMinecraftName())) {
+                    link.setMinecraftName(friend.name());
+                    changed = true;
+                }
+
+                if (changed) linkRepository.save(link);
+            }
+        }
     }
 
     private void removeLink(MinecraftFriendLink link) {
