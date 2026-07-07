@@ -95,7 +95,7 @@ class TwitchEventSubServiceTest {
             }
             """;
 
-        service.handleMessage(user, token, message);
+        service.handleMessage(user, token, message, false);
 
         verify(streamStateService).setLive(user, true);
         ArgumentCaptor<StreamOnlineEvent> captor = ArgumentCaptor.forClass(StreamOnlineEvent.class);
@@ -112,7 +112,7 @@ class TwitchEventSubServiceTest {
             }
             """;
 
-        service.handleMessage(user, token, message);
+        service.handleMessage(user, token, message, false);
 
         verify(streamStateService).setLive(user, false);
         ArgumentCaptor<StreamOfflineEvent> captor = ArgumentCaptor.forClass(StreamOfflineEvent.class);
@@ -129,7 +129,7 @@ class TwitchEventSubServiceTest {
             }
             """;
 
-        service.handleMessage(user, token, message);
+        service.handleMessage(user, token, message, false);
 
         // One POST each for stream.online, stream.offline, channel.update
         verify(restClient, times(3)).post();
@@ -153,7 +153,7 @@ class TwitchEventSubServiceTest {
             }
             """;
 
-        service.handleMessage(user, token, message);
+        service.handleMessage(user, token, message, false);
 
         verify(streamStateService).setLive(user, true);
     }
@@ -175,7 +175,7 @@ class TwitchEventSubServiceTest {
             }
             """;
 
-        service.handleMessage(user, token, message);
+        service.handleMessage(user, token, message, false);
 
         verify(streamStateService).setLive(user, false);
     }
@@ -197,14 +197,14 @@ class TwitchEventSubServiceTest {
             }
             """;
 
-        assertThatNoException().isThrownBy(() -> service.handleMessage(user, token, message));
+        assertThatNoException().isThrownBy(() -> service.handleMessage(user, token, message, false));
         verify(streamStateService, never()).setLive(any(), anyBoolean());
     }
 
     @Test
     void handleMessage_invalidJson_doesNotThrow() {
         assertThatNoException().isThrownBy(
-            () -> service.handleMessage(user, token, "not-json")
+            () -> service.handleMessage(user, token, "not-json", false)
         );
     }
 
@@ -215,7 +215,7 @@ class TwitchEventSubServiceTest {
             """;
 
         assertThatNoException().isThrownBy(
-            () -> service.handleMessage(user, token, message)
+            () -> service.handleMessage(user, token, message, false)
         );
     }
 
@@ -228,7 +228,7 @@ class TwitchEventSubServiceTest {
             }
             """;
 
-        service.handleMessage(user, token, message);
+        service.handleMessage(user, token, message, false);
 
         Map<UUID, Long> timeouts = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "keepaliveTimeoutSeconds");
         assertThat(timeouts).containsEntry(user.getId(), 30L);
@@ -243,17 +243,65 @@ class TwitchEventSubServiceTest {
             }
             """;
 
-        service.handleMessage(user, token, message);
+        service.handleMessage(user, token, message, false);
 
         Map<UUID, Long> timeouts = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "keepaliveTimeoutSeconds");
         assertThat(timeouts).containsEntry(user.getId(), 10L);
     }
 
     @Test
+    void handleMessage_sessionWelcome_onReconnectedSession_doesNotResubscribe() {
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc", "keepalive_timeout_seconds": 30 } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, true);
+
+        // Subscriptions carry over when reconnecting via reconnect_url — no POST expected
+        verify(restClient, never()).post();
+        // But the keepalive timeout of the new session must still be recorded
+        Map<UUID, Long> timeouts = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "keepaliveTimeoutSeconds");
+        assertThat(timeouts).containsEntry(user.getId(), 30L);
+    }
+
+    @Test
+    void onClose_whenListenerWebSocketIsCurrent_deregistersConnection() {
+        WebSocket ws = mock(WebSocket.class);
+        TwitchEventSubService.EventSubListener listener =
+            service.new EventSubListener(user, token, 1L, false);
+
+        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
+        connections.put(user.getId(), ws);
+
+        listener.onClose(ws, WebSocket.NORMAL_CLOSURE, "server initiated");
+
+        assertThat(connections).doesNotContainKey(user.getId());
+    }
+
+    @Test
+    void onClose_whenListenerWebSocketHasBeenReplaced_leavesSuccessorRegistered() {
+        WebSocket staleWs = mock(WebSocket.class);
+        WebSocket freshWs = mock(WebSocket.class);
+        TwitchEventSubService.EventSubListener staleListener =
+            service.new EventSubListener(user, token, 1L, false);
+
+        // Simulate session_reconnect: connections now points to freshWs, staleListener is orphaned.
+        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
+        connections.put(user.getId(), freshWs);
+
+        staleListener.onClose(staleWs, WebSocket.NORMAL_CLOSURE, "replaced");
+
+        assertThat(connections).containsEntry(user.getId(), freshWs);
+    }
+
+    @Test
     void onWatchdogTrigger_whenListenerWebSocketIsCurrent_abortsAndRemovesFromConnections() {
         WebSocket ws = mock(WebSocket.class);
         TwitchEventSubService.EventSubListener listener =
-            service.new EventSubListener(user, token, "wss://eventsub.wss.twitch.tv/ws", 1L);
+            service.new EventSubListener(user, token, 1L, false);
         ReflectionTestUtils.setField(listener, "webSocket", ws);
 
         Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
@@ -270,7 +318,7 @@ class TwitchEventSubServiceTest {
         WebSocket staleWs = mock(WebSocket.class);
         WebSocket freshWs = mock(WebSocket.class);
         TwitchEventSubService.EventSubListener staleListener =
-            service.new EventSubListener(user, token, "wss://eventsub.wss.twitch.tv/ws", 1L);
+            service.new EventSubListener(user, token, 1L, false);
         ReflectionTestUtils.setField(staleListener, "webSocket", staleWs);
 
         // Simulate session_reconnect: connections now points to freshWs, staleListener is orphaned.
