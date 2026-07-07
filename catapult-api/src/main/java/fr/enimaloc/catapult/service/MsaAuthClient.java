@@ -68,7 +68,7 @@ public class MsaAuthClient {
         try {
             return Optional.of(postForm(URI.create(DEVICE_TOKEN_URL), form));
         } catch (HttpClientErrorException e) {
-            if (e.getResponseBodyAsString().contains("authorization_pending")) {
+            if (e.getResponseBodyAsString().matches("(?s).*\"error\"\\s*:\\s*\"authorization_pending\".*")) {
                 return Optional.empty();
             }
             throw new MsaAuthException("Device code flow failed: " + e.getResponseBodyAsString(), e);
