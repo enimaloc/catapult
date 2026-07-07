@@ -91,8 +91,14 @@ class MinecraftTokenServiceTest {
     @Test
     void evict_forcesRefreshOnNextCall() {
         service.getToken(account);
+
+        var xboxToken = new XboxService.Token(Instant.now(), Instant.now().plusSeconds(86400), "xbl", null);
+        when(msaAuthClient.refresh("refresh-new"))
+                .thenReturn(new MsaAuthClient.MsaTokens("msa-access-2", "refresh-newer", 3600));
+        when(xboxService.getXboxToken(anyString())).thenReturn(xboxToken);
+
         service.evict(account.getId());
-        service.getToken(account);
+        assertThat(service.getToken(account)).contains("mc-token");
 
         verify(msaAuthClient, times(2)).refresh(anyString());
     }
