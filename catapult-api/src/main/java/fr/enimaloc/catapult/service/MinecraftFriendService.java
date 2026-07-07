@@ -31,6 +31,7 @@ public class MinecraftFriendService {
     private final MinecraftTokenService tokenService;
     private final MinecraftServiceAccountRepository accountRepository;
     private final MinecraftFriendLinkRepository linkRepository;
+    private final MinecraftAccountLimitMarker limitMarker;
 
     @Transactional
     public MinecraftFriendLink enroll(UserAccount user, String pseudo) {
@@ -52,8 +53,7 @@ public class MinecraftFriendService {
                 // traité comme limite atteinte, body loggé pour affiner.
                 log.warn("addFriend refusé pour {} ({}): {}", account.getLabel(),
                         e.getStatusCode(), e.getResponseBodyAsString());
-                account.setFriendLimitReached(true);
-                accountRepository.save(account);
+                limitMarker.markFull(account);
                 continue;
             }
 
@@ -82,14 +82,18 @@ public class MinecraftFriendService {
     }
 
     private void removeLink(MinecraftFriendLink link) {
-        tokenService.getToken(link.getServiceAccount()).ifPresent(token -> {
+        Optional<String> token = tokenService.getToken(link.getServiceAccount());
+        if (token.isPresent()) {
             try {
-                minecraftService.removeFriend(token, null, link.getMinecraftProfileId());
+                minecraftService.removeFriend(token.get(), null, link.getMinecraftProfileId());
             } catch (Exception e) {
                 // best effort : le lien local est supprimé même si l'API refuse
                 log.warn("removeFriend en échec pour {}: {}", link.getMinecraftProfileId(), e.getMessage());
             }
-        });
+        } else {
+            log.warn("Pas de token pour {} — lien {} supprimé sans removeFriend côté API",
+                    link.getServiceAccount().getLabel(), link.getMinecraftProfileId());
+        }
         linkRepository.delete(link);
     }
 
