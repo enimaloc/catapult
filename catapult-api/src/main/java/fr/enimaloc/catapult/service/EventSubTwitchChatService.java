@@ -10,7 +10,6 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -22,6 +21,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.net.URI;
@@ -52,7 +52,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     private final OAuthTokenRepository oAuthTokenRepository;
     private final UserAccountRepository userAccountRepository;
-    private final TokenEncryptionService tokenEncryptionService;
+    private final TwitchTokenService twitchTokenService;
     private final ApplicationEventPublisher eventPublisher;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -92,8 +92,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
         watchdogs.values().forEach(f -> f.cancel(false));
         watchdogs.clear();
         watchdogExecutor.shutdownNow();
-        connections.forEach((id, ws) -> ws.sendClose(WebSocket.NORMAL_CLOSURE, "shutdown"));
-        connections.clear();
+        // De-register before closing so onClose sees a foreign socket and never reconnects
+        connections.keySet().forEach(id -> {
+            WebSocket ws = connections.remove(id);
+            if (ws != null) ws.sendClose(WebSocket.NORMAL_CLOSURE, "shutdown");
+        });
     }
 
     @EventListener
@@ -107,7 +110,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         disconnect(user);
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
             .ifPresentOrElse(
-                token -> openConnection(user, token, WS_URL, 1L),
+                token -> openConnection(user, token, WS_URL, 1L, false),
                 () -> log.warn("[EventSub Chat] No Twitch token for user {} ({}) — chat events disabled",
                         user.getId(), user.getTwitchUsername())
             );
@@ -122,20 +125,26 @@ public class EventSubTwitchChatService implements TwitchChatService {
         if (ws != null) ws.sendClose(WebSocket.NORMAL_CLOSURE, "bot disabled");
     }
 
-    private void openConnection(UserAccount user, OAuthToken token, String wsUrl, long retryDelaySeconds) {
+    private void openConnection(UserAccount user, OAuthToken token, String wsUrl,
+                                long retryDelaySeconds, boolean reconnectSession) {
         httpClient.newWebSocketBuilder()
-            .buildAsync(URI.create(wsUrl), new ChatListener(user, token, wsUrl, retryDelaySeconds))
+            .buildAsync(URI.create(wsUrl), new ChatListener(user, token, retryDelaySeconds, reconnectSession))
             .whenComplete((ws, ex) -> {
                 if (ex != null) {
                     log.warn("[EventSub Chat] Failed to connect for user {}: {}", user.getId(), ex.getMessage());
-                    scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
-                } else if (connections.putIfAbsent(user.getId(), ws) != null) {
-                    ws.sendClose(WebSocket.NORMAL_CLOSURE, "duplicate connection");
+                    scheduleReconnect(user, token, retryDelaySeconds);
+                } else {
+                    // A session_reconnect replaces the previous socket: register the new one
+                    // first, then close the old — its onClose sees a foreign socket and no-ops.
+                    WebSocket previous = connections.put(user.getId(), ws);
+                    if (previous != null && previous != ws) {
+                        previous.sendClose(WebSocket.NORMAL_CLOSURE, "replaced by newer session");
+                    }
                 }
             });
     }
 
-    private void scheduleReconnect(UserAccount user, OAuthToken token, String wsUrl, long delaySeconds) {
+    private void scheduleReconnect(UserAccount user, OAuthToken token, long delaySeconds) {
         long nextDelay = Math.min(delaySeconds * 2, MAX_RETRY_SECONDS);
         CompletableFuture.delayedExecutor(delaySeconds, TimeUnit.SECONDS).execute(() -> {
             if (connections.containsKey(user.getId())) return;
@@ -143,7 +152,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
             OAuthToken freshToken = oAuthTokenRepository
                 .findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
                 .orElse(token);
-            openConnection(user, freshToken, wsUrl, nextDelay);
+            // Always a brand-new session on the canonical URL: reconnect URLs are single-use
+            openConnection(user, freshToken, WS_URL, nextDelay, false);
         });
     }
 
@@ -169,10 +179,10 @@ public class EventSubTwitchChatService implements TwitchChatService {
         log.warn("[EventSub Chat] keepalive timeout for user {}, aborting and reconnecting", user.getId());
         listener.webSocket.abort();
         if (intentionallyDisconnected.contains(user.getId())) return;
-        scheduleReconnect(user, listener.token, WS_URL, listener.retryDelaySeconds);
+        scheduleReconnect(user, listener.token, listener.retryDelaySeconds);
     }
 
-    void handleMessage(UserAccount user, OAuthToken token, String message) {
+    void handleMessage(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {
         try {
             JsonNode root = objectMapper.readTree(message);
             String messageType = root.path("metadata").path("message_type").asText();
@@ -182,14 +192,24 @@ public class EventSubTwitchChatService implements TwitchChatService {
                     String sessionId = session.path("id").asText();
                     long timeout = session.path("keepalive_timeout_seconds").asLong(DEFAULT_KEEPALIVE_SECONDS);
                     keepaliveTimeoutSeconds.put(user.getId(), timeout);
-                    log.info("[EventSub Chat] session_welcome for user {} ({}) — subscribing (sessionId={}, keepalive={}s)",
-                            user.getId(), user.getTwitchUsername(), sessionId, timeout);
-                    subscribe(user, token, sessionId);
+                    if (reconnectSession) {
+                        // Reconnect via reconnect_url: Twitch carries subscriptions over,
+                        // re-subscribing would only yield 409 Conflict noise.
+                        log.info("[EventSub Chat] session_welcome for user {} ({}) — reconnected, subscriptions carried over (sessionId={}, keepalive={}s)",
+                                user.getId(), user.getTwitchUsername(), sessionId, timeout);
+                    } else {
+                        log.info("[EventSub Chat] session_welcome for user {} ({}) — subscribing (sessionId={}, keepalive={}s)",
+                                user.getId(), user.getTwitchUsername(), sessionId, timeout);
+                        subscribe(user, token, sessionId);
+                    }
                 }
                 case "session_reconnect" -> {
                     String reconnectUrl = root.path(PAYLOAD).path("session").path("reconnect_url").asText();
                     log.info("[EventSub Chat] session_reconnect for user {}", user.getId());
-                    openConnection(user, token, reconnectUrl, 1L);
+                    OAuthToken freshToken = oAuthTokenRepository
+                        .findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+                        .orElse(token);
+                    openConnection(user, freshToken, reconnectUrl, 1L, true);
                 }
                 case "notification" -> handleNotification(user, root);
                 case "session_keepalive" -> log.trace("[EventSub Chat] keepalive for user {}", user.getId());
@@ -242,33 +262,54 @@ public class EventSubTwitchChatService implements TwitchChatService {
     }
 
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
-        String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
-        subscribeEvent(user, accessToken, sessionId, "channel.chat.message",
+        String accessToken = twitchTokenService.resolveAccessToken(token, user);
+        subscribeEvent(user, token, accessToken, sessionId, "channel.chat.message",
             Map.of("broadcaster_user_id", user.getTwitchId(), "user_id", user.getTwitchId()));
-        subscribeEvent(user, accessToken, sessionId,
+        subscribeEvent(user, token, accessToken, sessionId,
             "channel.channel_points_custom_reward_redemption.add",
             Map.of("broadcaster_user_id", user.getTwitchId()));
     }
 
-    private void subscribeEvent(UserAccount user, String accessToken, String sessionId,
+    private void subscribeEvent(UserAccount user, OAuthToken token, String accessToken, String sessionId,
                                 String type, Map<String, String> condition) {
         try {
-            apiObservations.observeRun("eventsub", "subscribe", () ->
-                restClient.post()
-                    .uri(EVENTSUB_API)
-                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                    .header(CLIENT_ID, twitchClientId)
-                    .body(Map.of("type", type, "version", "1", "condition", condition,
-                        "transport", Map.of("method", "websocket", "session_id", sessionId)))
-                    .retrieve()
-                    .toBodilessEntity()
-            );
+            postSubscription(accessToken, sessionId, type, condition);
             log.info("[EventSub Chat] Subscribed {} for user {} ({})",
                     type, user.getId(), user.getTwitchUsername());
+        } catch (HttpClientErrorException.Unauthorized e) {
+            // Token revoked or expired despite expires_at: force a refresh and retry once
+            String refreshed = twitchTokenService.refreshAccessToken(token, user);
+            if (refreshed == null) {
+                log.warn("[EventSub Chat] Failed to subscribe to {} for user {}: token refresh failed",
+                    type, user.getId());
+                return;
+            }
+            try {
+                postSubscription(refreshed, sessionId, type, condition);
+                log.info("[EventSub Chat] Subscribed {} for user {} ({}) after token refresh",
+                        type, user.getId(), user.getTwitchUsername());
+            } catch (Exception retryEx) {
+                log.warn("[EventSub Chat] Failed to subscribe to {} for user {} after refresh: {}",
+                    type, user.getId(), retryEx.getMessage());
+            }
         } catch (Exception e) {
             log.warn("[EventSub Chat] Failed to subscribe to {} for user {}: {}",
                 type, user.getId(), e.getMessage());
         }
+    }
+
+    private void postSubscription(String accessToken, String sessionId,
+                                  String type, Map<String, String> condition) {
+        apiObservations.observeRun("eventsub", "subscribe", () ->
+            restClient.post()
+                .uri(EVENTSUB_API)
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
+                .body(Map.of("type", type, "version", "1", "condition", condition,
+                    "transport", Map.of("method", "websocket", "session_id", sessionId)))
+                .retrieve()
+                .toBodilessEntity()
+        );
     }
 
     @Override
@@ -305,7 +346,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
                 user.getId());
             return;
         }
-        String streamerAccess = tokenEncryptionService.decrypt(streamerToken.get().getAccessToken());
+        String streamerAccess = twitchTokenService.resolveAccessToken(streamerToken.get(), user);
         for (String part : parts) {
             trySend(user, part, streamerAccess, user.getTwitchId(), "streamer");
         }
@@ -349,7 +390,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
     public void unban(UserAccount user, String targetLogin) {
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
             .ifPresent(token -> {
-                String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+                String accessToken = twitchTokenService.resolveAccessToken(token, user);
                 String targetId = resolveUserId(accessToken, targetLogin);
                 if (targetId == null) return;
                 try {
@@ -372,7 +413,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private void moderate(UserAccount user, String targetLogin, int durationSeconds, String reason) {
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
             .ifPresent(token -> {
-                String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+                String accessToken = twitchTokenService.resolveAccessToken(token, user);
                 String targetId = resolveUserId(accessToken, targetLogin);
                 if (targetId == null) return;
 
@@ -418,20 +459,21 @@ public class EventSubTwitchChatService implements TwitchChatService {
         }
     }
 
-    private class ChatListener implements WebSocket.Listener {
+    // Package-private for testing
+    class ChatListener implements WebSocket.Listener {
         private final UserAccount user;
         private final OAuthToken token;
-        private final String wsUrl;
         private final long retryDelaySeconds;
+        private final boolean reconnectSession;
         private final StringBuilder buffer = new StringBuilder();
         @SuppressWarnings("java:S3077")
         private volatile WebSocket webSocket;
 
-        ChatListener(UserAccount user, OAuthToken token, String wsUrl, long retryDelaySeconds) {
+        ChatListener(UserAccount user, OAuthToken token, long retryDelaySeconds, boolean reconnectSession) {
             this.user = user;
             this.token = token;
-            this.wsUrl = wsUrl;
             this.retryDelaySeconds = retryDelaySeconds;
+            this.reconnectSession = reconnectSession;
         }
 
         @Override
@@ -447,7 +489,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
             if (last) {
                 String message = buffer.toString();
                 buffer.setLength(0);
-                handleMessage(user, token, message);
+                handleMessage(user, token, message, reconnectSession);
                 armWatchdog(user, this);
             }
             webSocket.request(1);
@@ -458,10 +500,14 @@ public class EventSubTwitchChatService implements TwitchChatService {
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             log.debug("[EventSub Chat] WebSocket closed for user {} ({}): {}",
                 user.getId(), statusCode, reason);
+            // Only the currently-registered socket may clean up and reconnect: after a
+            // session_reconnect this socket may already have been replaced by its successor.
+            if (!connections.remove(user.getId(), webSocket)) return null;
             cancelWatchdog(user.getId());
-            connections.remove(user.getId());
-            if (statusCode != WebSocket.NORMAL_CLOSURE) {
-                scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
+            // Self-initiated closes de-register before closing, so reaching this point
+            // means the server closed us — reconnect regardless of the status code.
+            if (!intentionallyDisconnected.contains(user.getId())) {
+                scheduleReconnect(user, token, retryDelaySeconds);
             }
             return null;
         }
@@ -469,10 +515,10 @@ public class EventSubTwitchChatService implements TwitchChatService {
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
             log.warn("[EventSub Chat] WebSocket error for user {}: {}", user.getId(), error.getMessage());
+            if (!connections.remove(user.getId(), webSocket)) return;
             cancelWatchdog(user.getId());
-            connections.remove(user.getId());
             if (!intentionallyDisconnected.contains(user.getId())) {
-                scheduleReconnect(user, token, wsUrl, retryDelaySeconds);
+                scheduleReconnect(user, token, retryDelaySeconds);
             }
         }
     }
