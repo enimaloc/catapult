@@ -134,4 +134,78 @@ class MinecraftFriendServiceTest {
         verify(minecraftService).removeFriend("mc-token", null, "profile-id");
         verify(linkRepository).delete(existing);
     }
+
+    @Test
+    void sync_pendingLinkPresentInFriends_becomesAccepted() {
+        var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
+        when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
+        when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());
+        when(minecraftService.getFriends("mc-token")).thenReturn(friendsListWith(
+                new MinecraftService.FriendsList.Friend("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_")));
+
+        service.syncFriendLinks();
+
+        assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.ACCEPTED);
+        assertThat(link.getAcceptedAt()).isNotNull();
+        verify(linkRepository).save(link);
+    }
+
+    @Test
+    void sync_acceptedLinkAbsentFromFriends_becomesRemoved() {
+        var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
+        link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
+        when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
+        when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());
+        when(minecraftService.getFriends("mc-token")).thenReturn(friendsListWith());
+
+        service.syncFriendLinks();
+
+        assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.REMOVED);
+        verify(linkRepository).save(link);
+    }
+
+    @Test
+    void sync_friendRenamed_updatesStoredName() {
+        var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "ancien_pseudo");
+        link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
+        when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
+        when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());
+        when(minecraftService.getFriends("mc-token")).thenReturn(friendsListWith(
+                new MinecraftService.FriendsList.Friend("069a79f4-44e9-4726-a5be-fca90e38aaf5", "nouveau_pseudo")));
+
+        service.syncFriendLinks();
+
+        assertThat(link.getMinecraftName()).isEqualTo("nouveau_pseudo");
+    }
+
+    @Test
+    void sync_accountWithoutToken_isSkippedWithoutTouchingLinks() {
+        var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
+        link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
+        when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
+        when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());
+        when(tokenService.getToken(bot1)).thenReturn(Optional.empty());
+
+        service.syncFriendLinks();
+
+        assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.ACCEPTED);
+        verify(linkRepository, never()).save(any());
+    }
+
+    private MinecraftFriendLink pendingLink(String profileId, String name) {
+        var link = new MinecraftFriendLink();
+        link.setUser(user);
+        link.setServiceAccount(bot1);
+        link.setMinecraftProfileId(profileId);
+        link.setMinecraftName(name);
+        link.setStatus(MinecraftFriendLink.Status.PENDING);
+        return link;
+    }
+
+    private MinecraftService.FriendsList friendsListWith(MinecraftService.FriendsList.Friend... friends) {
+        return new MinecraftService.FriendsList(friends,
+                new MinecraftService.FriendsList.Friend[0],
+                new MinecraftService.FriendsList.Friend[0],
+                friends.length == 0);
+    }
 }
