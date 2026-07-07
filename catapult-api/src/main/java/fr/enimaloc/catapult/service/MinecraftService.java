@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.time.Instant;
@@ -122,7 +123,11 @@ public class MinecraftService {
     public Optional<ProfileLookup> lookupProfile(String name) {
         try {
             return Optional.ofNullable(restClient.get()
-                    .uri(URI.create(MINECRAFT_SERVICE_URL + "/minecraft/profile/lookup/name/" + name))
+                    .uri(UriComponentsBuilder
+                            .fromUriString(MINECRAFT_SERVICE_URL)
+                            .path("/minecraft/profile/lookup/name/{name}")
+                            .buildAndExpand(name)
+                            .toUri())
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .body(ProfileLookup.class));
