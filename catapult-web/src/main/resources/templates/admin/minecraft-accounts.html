@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'minecraft-accounts', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title>Catapult — Minecraft accounts</title>
+</head>
+<body>
+<!--/*@thymesvar id="accounts" type="java.util.List"*/-->
+<!--/*@thymesvar id="minecraftAccountsError" type="java.lang.String"*/-->
+<section class="card">
+    <h4 th:text="#{admin.minecraft.title}">Comptes de service Minecraft</h4>
+
+    <div th:if="${minecraftAccountsError == 'links'}" class="alert alert-danger"
+         th:text="#{admin.minecraft.error.links}">Des utilisateurs sont liés à ce compte.</div>
+
+    <table class="table">
+        <thead>
+        <tr>
+            <th th:text="#{admin.minecraft.col.label}">Label</th>
+            <th th:text="#{admin.minecraft.col.username}">Pseudo</th>
+            <th th:text="#{admin.minecraft.col.order}">Ordre</th>
+            <th th:text="#{admin.minecraft.col.links}">Liens</th>
+            <th th:text="#{admin.minecraft.col.state}">État</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="a : ${accounts}">
+            <td th:text="${a.label}">Bot1</td>
+            <td th:text="${a.minecraftUsername}">CatapultBot1</td>
+            <td th:text="${a.fillOrder}">0</td>
+            <td th:text="${a.linkCount}">3</td>
+            <td>
+                <span th:if="${a.enabled}" class="badge bg-success" th:text="#{admin.minecraft.state.enabled}">Actif</span>
+                <span th:unless="${a.enabled}" class="badge bg-secondary" th:text="#{admin.minecraft.state.disabled}">Inactif</span>
+                <span th:if="${a.friendLimitReached}" class="badge bg-warning" th:text="#{admin.minecraft.state.full}">Plein</span>
+            </td>
+            <td class="text-end">
+                <form th:action="@{/admin/minecraft-accounts/{id}/toggle(id=${a.id})}" method="post" class="d-inline">
+                    <input type="hidden" name="enabled" th:value="${!a.enabled}"/>
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary"
+                            th:text="${a.enabled} ? #{admin.minecraft.action.disable} : #{admin.minecraft.action.enable}">Désactiver</button>
+                </form>
+                <form th:if="${a.friendLimitReached}" th:action="@{/admin/minecraft-accounts/{id}/reset-limit(id=${a.id})}"
+                      method="post" class="d-inline">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-sm btn-outline-warning" th:text="#{admin.minecraft.action.reset_limit}">Réinitialiser la limite</button>
+                </form>
+                <form th:action="@{/admin/minecraft-accounts/{id}/delete(id=${a.id})}" method="post" class="d-inline">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-sm btn-danger" th:text="#{admin.minecraft.action.delete}">Supprimer</button>
+                </form>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(accounts)}">
+            <td colspan="6" class="text-muted" th:text="#{admin.minecraft.empty}">Aucun compte de service.</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <!-- Enrôlement device-code : complété en Task 4 (JS) -->
+    <div id="mc-enroll" class="mt-3"></div>
+</section>
+</body>
+</html>
