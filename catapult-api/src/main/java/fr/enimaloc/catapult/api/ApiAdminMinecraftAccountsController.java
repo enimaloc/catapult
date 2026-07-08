@@ -98,9 +98,21 @@ public class ApiAdminMinecraftAccountsController {
     public AccountDto update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         MinecraftServiceAccount account = accountRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compte inconnu"));
-        if (body.containsKey("enabled")) account.setEnabled((Boolean) body.get("enabled"));
-        if (body.containsKey("friendLimitReached")) account.setFriendLimitReached((Boolean) body.get("friendLimitReached"));
-        if (body.containsKey("fillOrder")) account.setFillOrder(((Number) body.get("fillOrder")).intValue());
+        if (body.containsKey("enabled")) {
+            if (!(body.get("enabled") instanceof Boolean))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Type invalide pour enabled");
+            account.setEnabled((Boolean) body.get("enabled"));
+        }
+        if (body.containsKey("friendLimitReached")) {
+            if (!(body.get("friendLimitReached") instanceof Boolean))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Type invalide pour friendLimitReached");
+            account.setFriendLimitReached((Boolean) body.get("friendLimitReached"));
+        }
+        if (body.containsKey("fillOrder")) {
+            if (!(body.get("fillOrder") instanceof Number))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Type invalide pour fillOrder");
+            account.setFillOrder(((Number) body.get("fillOrder")).intValue());
+        }
         account.setUpdatedAt(Instant.now());
         MinecraftServiceAccount saved = accountRepository.save(account);
         return new AccountDto(saved.getId(), saved.getLabel(), saved.getMinecraftUsername(),
