@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{template::layout(~{::title}, 'minecraft-accounts', ~{::body}, null, 'container', null, null)}">
+      th:replace="~{template::layout(~{::title}, 'minecraft-accounts', ~{::body}, ~{::head/script}, 'container', null, null)}">
 <head>
     <title>Catapult — Minecraft accounts</title>
+    <script th:src="@{/js/admin-minecraft-accounts.js}" defer></script>
 </head>
 <body>
 <!--/*@thymesvar id="accounts" type="java.util.List"*/-->
@@ -59,8 +60,18 @@
         </tbody>
     </table>
 
-    <!-- Enrôlement device-code : complété en Task 4 (JS) -->
-    <div id="mc-enroll" class="mt-3"></div>
+    <div id="mc-enroll" class="mt-3"
+         th:attr="data-start-url=@{/admin/minecraft-accounts/device-code/start},
+                  data-complete-url=@{/admin/minecraft-accounts/device-code/complete},
+                  data-csrf-header=${_csrf.headerName}, data-csrf-token=${_csrf.token}">
+        <div class="d-flex gap-2">
+            <input type="text" id="mc-enroll-label" class="form-control form-control-sm"
+                   th:placeholder="#{admin.minecraft.enroll.label_placeholder}"/>
+            <button type="button" id="mc-enroll-start" class="btn btn-sm btn-primary"
+                    th:text="#{admin.minecraft.enroll.start}">Ajouter un compte</button>
+        </div>
+        <div id="mc-enroll-status" class="mt-2"></div>
+    </div>
 </section>
 </body>
 </html>
