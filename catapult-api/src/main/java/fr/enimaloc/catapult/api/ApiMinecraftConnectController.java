@@ -47,16 +47,17 @@ public class ApiMinecraftConnectController {
     @PostMapping
     public LinkStateResponse enroll(@AuthenticationPrincipal Jwt jwt, @RequestBody Map<String, String> body) {
         String name = body.get("name");
-        if (name == null || name.isBlank()) {
+        name = name == null ? null : name.trim();
+        if (name == null || name.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pseudo requis");
         }
         try {
-            return LinkStateResponse.of(friendService.enroll(currentUser(jwt), name.trim()));
+            return LinkStateResponse.of(friendService.enroll(currentUser(jwt), name));
         } catch (MinecraftFriendService.MinecraftEnrollmentException e) {
             throw switch (e.getReason()) {
-                case UNKNOWN_PLAYER -> new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+                case UNKNOWN_PLAYER -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Joueur introuvable");
                 case NO_CAPACITY, NO_ACCOUNT_AVAILABLE ->
-                        new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
+                        new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Aucune capacité disponible, contacte un administrateur");
             };
         }
     }
