@@ -136,6 +136,17 @@ public class MinecraftService {
         }
     }
 
+    /** Pseudo du compte authentifié (GET /minecraft/profile). */
+    public String getMinecraftProfileName(String token) {
+        Map<?, ?> profile = restClient.get()
+                .uri(URI.create(MINECRAFT_SERVICE_URL + "/minecraft/profile"))
+                .header("Authorization", "Bearer " + token)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(Map.class);
+        return profile == null ? null : String.valueOf(profile.get("name"));
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Token(
             String username,
