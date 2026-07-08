@@ -45,7 +45,23 @@ public class MinecraftFriendService {
                 .orElseThrow(() -> new MinecraftEnrollmentException(
                         MinecraftEnrollmentException.Reason.UNKNOWN_PLAYER, "Pseudo introuvable: " + pseudo));
 
-        linkRepository.findByUser(user).ifPresent(this::removeLink);
+        // Récupère le lien existant sans le supprimer — réutilisation in-place pour éviter
+        // la violation de contrainte unique user_id (Hibernate ordonne INSERT avant DELETE à la flush).
+        MinecraftFriendLink existing = linkRepository.findByUser(user).orElse(null);
+        if (existing != null) {
+            // Suppression best-effort côté API avec le token du compte de service actuel.
+            Optional<String> existingToken = tokenService.getToken(existing.getServiceAccount());
+            if (existingToken.isPresent()) {
+                try {
+                    minecraftService.removeFriend(existingToken.get(), null, existing.getMinecraftProfileId());
+                } catch (Exception e) {
+                    log.warn("removeFriend en échec pour {}: {}", existing.getMinecraftProfileId(), e.getMessage());
+                }
+            } else {
+                log.warn("Pas de token pour {} — ré-enrôlement sans removeFriend côté API",
+                        existing.getServiceAccount().getLabel());
+            }
+        }
 
         for (MinecraftServiceAccount account : accountRepository.findByEnabledTrueOrderByFillOrderAsc()) {
             if (account.isFriendLimitReached()) continue;
@@ -63,13 +79,15 @@ public class MinecraftFriendService {
                 continue;
             }
 
-            MinecraftFriendLink link = new MinecraftFriendLink();
+            // Réutilise l'instance existante si disponible pour conserver la même ligne BD.
+            MinecraftFriendLink link = existing != null ? existing : new MinecraftFriendLink();
             link.setUser(user);
             link.setServiceAccount(account);
             link.setMinecraftProfileId(profile.dashedId());
             link.setMinecraftName(profile.name());
             link.setStatus(MinecraftFriendLink.Status.PENDING);
             link.setRequestedAt(Instant.now());
+            link.setAcceptedAt(null);
             return linkRepository.save(link);
         }
 
