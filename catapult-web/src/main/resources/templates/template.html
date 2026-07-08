@@ -95,6 +95,9 @@
            th:classappend="${active_page == 'whitelist'} ? ' active'" th:text="#{nav.admin_whitelist}">Whitelist</a>
         <a th:href="@{/admin/steam-keys}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'steam-keys'} ? ' active'" th:text="#{nav.admin_steam_keys}">Steam Keys</a>
+        <a th:href="@{/admin/minecraft-accounts}" sec:authorize="hasRole('ADMIN')"
+           th:classappend="${active_page == 'minecraft-accounts'} ? ' active'"
+           th:text="#{nav.admin_minecraft_accounts}">Minecraft</a>
         <a th:href="@{/admin/dtdd-keys}" sec:authorize="hasRole('ADMIN')"
            th:classappend="${active_page == 'dtdd-keys'} ? ' active'" th:text="#{nav.admin_dtdd_keys}">DTDD Keys</a>
         <a th:href="@{/admin/dtdd-mapping}" sec:authorize="hasRole('ADMIN')"
