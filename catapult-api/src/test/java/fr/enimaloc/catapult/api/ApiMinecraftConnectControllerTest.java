@@ -105,4 +105,29 @@ class ApiMinecraftConnectControllerTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("503");
     }
+
+    @Test
+    void post_blankName_maps400() {
+        assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "   ")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400");
+    }
+
+    @Test
+    void post_noAccountAvailable_maps503() {
+        when(friendService.enroll(user, "jeb_")).thenThrow(
+                new MinecraftFriendService.MinecraftEnrollmentException(
+                        MinecraftFriendService.MinecraftEnrollmentException.Reason.NO_ACCOUNT_AVAILABLE, "aucun"));
+
+        assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "jeb_")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("503");
+    }
+
+    @Test
+    void delete_callsUnenroll() {
+        controller.unenroll(jwt);
+
+        org.mockito.Mockito.verify(friendService).unenroll(user);
+    }
 }
