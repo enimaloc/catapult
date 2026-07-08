@@ -381,6 +381,35 @@ public class AdminController {
         return "redirect:/admin/steam-keys";
     }
 
+    // ── Minecraft Service Accounts ───────────────────────────────────────────
+
+    @GetMapping("/minecraft-accounts")
+    public String minecraftAccountsPage(Model model) {
+        List<Map<String, Object>> accounts = apiClient.adminMinecraftAccounts();
+        model.addAttribute("accounts", accounts == null ? List.of() : accounts);
+        return "admin/minecraft-accounts";
+    }
+
+    @PostMapping("/minecraft-accounts/{id}/toggle")
+    public String toggleMinecraftAccount(@PathVariable UUID id, @RequestParam boolean enabled) {
+        apiClient.adminMinecraftPatch(id, Map.of("enabled", enabled));
+        return "redirect:/admin/minecraft-accounts";
+    }
+
+    @PostMapping("/minecraft-accounts/{id}/reset-limit")
+    public String resetMinecraftAccountLimit(@PathVariable UUID id) {
+        apiClient.adminMinecraftPatch(id, Map.of("friendLimitReached", false));
+        return "redirect:/admin/minecraft-accounts";
+    }
+
+    @PostMapping("/minecraft-accounts/{id}/delete")
+    public String deleteMinecraftAccount(@PathVariable UUID id, org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
+        if (apiClient.adminMinecraftDelete(id) == 409) {
+            redirectAttributes.addFlashAttribute("minecraftAccountsError", "links");
+        }
+        return "redirect:/admin/minecraft-accounts";
+    }
+
     // ── DTDD Keys ────────────────────────────────────────────────────────────
 
     @GetMapping("/dtdd-keys")
