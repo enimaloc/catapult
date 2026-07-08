@@ -109,4 +109,18 @@ class ApiClientMinecraftTest {
 
         assertThat(lastAuth.get()).isEqualTo("Bearer test-token");
     }
+
+    @Test
+    void adminMinecraftDeviceCodeStart_normalizesSnakeCaseForFrontend() {
+        respond("/api/admin/minecraft-accounts/device-code", 200,
+                "{\"device_code\":\"dc-1\",\"user_code\":\"ABCD-1234\",\"verification_uri\":\"https://microsoft.com/link\",\"interval\":5,\"expires_in\":900}");
+
+        Map<String, Object> dc = apiClient.adminMinecraftDeviceCodeStart();
+
+        assertThat(dc)
+                .containsEntry("deviceCode", "dc-1")
+                .containsEntry("userCode", "ABCD-1234")
+                .containsEntry("verificationUri", "https://microsoft.com/link")
+                .containsEntry("interval", 5);
+    }
 }
