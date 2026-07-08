@@ -29,12 +29,19 @@
     }
 
     startBtn.addEventListener("click", function () {
+        startBtn.disabled = true;
         stopPolling();
         const label = (labelInput.value || "").trim() || "Compte Minecraft";
         statusEl.textContent = "…";
         post(root.dataset.startUrl).then(function (dc) {
             if (!dc || dc.status === "ERROR" || !dc.deviceCode) {
                 statusEl.innerHTML = "<span class='text-danger'>Erreur</span>";
+                startBtn.disabled = false;
+                return;
+            }
+            if (typeof dc.verificationUri !== "string" || dc.verificationUri.indexOf("https://") !== 0) {
+                statusEl.innerHTML = "<span class='text-danger'>Erreur</span>";
+                startBtn.disabled = false;
                 return;
             }
             statusEl.innerHTML =
@@ -48,14 +55,16 @@
                         if (res.status === "PENDING") return; // on continue
                         stopPolling();
                         if (res.status === "CREATED") {
+                            startBtn.disabled = false;
                             window.location.reload();
                         } else {
+                            startBtn.disabled = false;
                             statusEl.innerHTML = "<span class='text-danger'>" +
                                 (res.message || "Erreur") + "</span>";
                         }
                     })
-                    .catch(stopPolling);
+                    .catch(function () { stopPolling(); startBtn.disabled = false; });
             }, intervalMs);
-        });
+        }).catch(function () { statusEl.innerHTML = "<span class='text-danger'>Erreur</span>"; startBtn.disabled = false; });
     });
 }());
