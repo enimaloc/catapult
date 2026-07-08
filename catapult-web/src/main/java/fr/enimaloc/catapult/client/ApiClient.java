@@ -418,10 +418,17 @@ public class ApiClient {
         return get("/api/admin/minecraft-accounts", new ParameterizedTypeReference<List<Map<String, Object>>>() {});
     }
 
+    /** Normalise la réponse snake_case de l'api (device_code, user_code…) en camelCase pour le front. */
     public Map<String, Object> adminMinecraftDeviceCodeStart() {
         ApiResult result = exchangeForResult(() -> restClient.post()
                 .uri("/api/admin/minecraft-accounts/device-code"));
-        return result.status() == 200 ? result.body() : null;
+        if (result.status() != 200) return null;
+        Map<String, Object> raw = result.body();
+        return Map.of(
+                "deviceCode", String.valueOf(raw.getOrDefault("device_code", "")),
+                "userCode", String.valueOf(raw.getOrDefault("user_code", "")),
+                "verificationUri", String.valueOf(raw.getOrDefault("verification_uri", "")),
+                "interval", raw.getOrDefault("interval", 5));
     }
 
     public ApiResult adminMinecraftCreate(String deviceCode, String label) {
