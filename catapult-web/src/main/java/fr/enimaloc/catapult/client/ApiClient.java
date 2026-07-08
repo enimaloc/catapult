@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * HTTP client for catapult-api. Automatically attaches the JWT Bearer token
@@ -386,6 +390,88 @@ public class ApiClient {
                 try { emitter.completeWithError(e); } catch (IllegalStateException ignored) {}
             }
         });
+    }
+
+    // ── Minecraft ────────────────────────────────────────────────────────────
+
+    /** Résultat brut d'un appel dont l'appelant doit brancher sur le code HTTP. */
+    public record ApiResult(int status, Map<String, Object> body) {}
+
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
+            new ParameterizedTypeReference<>() {};
+
+    public Map<String, Object> minecraftLinkState() {
+        return get("/api/connect/minecraft", MAP_TYPE);
+    }
+
+    public ApiResult minecraftEnroll(String name) {
+        return exchangeForResult(() -> restClient.post()
+                .uri("/api/connect/minecraft")
+                .body(Map.of("name", name)));
+    }
+
+    public boolean minecraftUnenroll() {
+        return delete("/api/connect/minecraft");
+    }
+
+    public List<Map<String, Object>> adminMinecraftAccounts() {
+        return get("/api/admin/minecraft-accounts", new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> adminMinecraftDeviceCodeStart() {
+        return (Map<String, Object>) (Map<?, ?>) post("/api/admin/minecraft-accounts/device-code", null, Map.class);
+    }
+
+    public ApiResult adminMinecraftCreate(String deviceCode, String label) {
+        return exchangeForResult(() -> restClient.post()
+                .uri("/api/admin/minecraft-accounts")
+                .body(Map.of("deviceCode", deviceCode, "label", label)));
+    }
+
+    public boolean adminMinecraftPatch(UUID id, Map<String, Object> body) {
+        try {
+            return restClient.method(HttpMethod.PATCH)
+                    .uri("/api/admin/minecraft-accounts/{id}", id)
+                    .body(body)
+                    .exchange((req, res) -> res.getStatusCode().is2xxSuccessful());
+        } catch (Exception e) {
+            log.warn("PATCH /api/admin/minecraft-accounts/{} failed: {}", id, e.getMessage());
+            return false;
+        }
+    }
+
+    public int adminMinecraftDelete(UUID id) {
+        try {
+            return restClient.delete()
+                    .uri("/api/admin/minecraft-accounts/{id}", id)
+                    .exchange((req, res) -> res.getStatusCode().value());
+        } catch (Exception e) {
+            log.warn("DELETE /api/admin/minecraft-accounts/{} failed: {}", id, e.getMessage());
+            return 500;
+        }
+    }
+
+    /**
+     * Exécute la requête et retourne statut + body sans lever d'exception sur
+     * 4xx/5xx (RestClient.exchange n'applique pas les status handlers) — pour
+     * les flux où l'appelant branche sur le code HTTP (404/503/202…).
+     */
+    private ApiResult exchangeForResult(Supplier<RestClient.RequestBodySpec> request) {
+        try {
+            return request.get().exchange((req, res) -> {
+                Map<String, Object> parsed;
+                try {
+                    parsed = res.bodyTo(MAP_TYPE);
+                } catch (Exception ignored) {
+                    parsed = Map.of();
+                }
+                return new ApiResult(res.getStatusCode().value(), parsed == null ? Map.of() : parsed);
+            });
+        } catch (Exception e) {
+            log.warn("Appel Minecraft en échec: {}", e.getMessage());
+            return new ApiResult(500, Map.of());
+        }
     }
 
     private static String currentJwt() {
