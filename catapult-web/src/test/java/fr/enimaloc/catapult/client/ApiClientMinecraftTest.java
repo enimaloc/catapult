@@ -21,6 +21,7 @@ class ApiClientMinecraftTest {
     private ApiClient apiClient;
     private final AtomicReference<String> lastMethod = new AtomicReference<>();
     private final AtomicReference<String> lastPath = new AtomicReference<>();
+    private final AtomicReference<String> lastAuth = new AtomicReference<>();
 
     @BeforeEach
     void setUp() throws Exception {
@@ -40,6 +41,7 @@ class ApiClientMinecraftTest {
         server.createContext(path, exchange -> {
             lastMethod.set(exchange.getRequestMethod());
             lastPath.set(exchange.getRequestURI().getPath());
+            lastAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
             byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, status == 204 ? -1 : bytes.length);
@@ -97,5 +99,14 @@ class ApiClientMinecraftTest {
         respond("/api/admin/minecraft-accounts/" + id, 409, "{\"error\":\"liens\"}");
 
         assertThat(apiClient.adminMinecraftDelete(id)).isEqualTo(409);
+    }
+
+    @Test
+    void minecraftEnroll_propagatesBearerOnExchangePath() {
+        respond("/api/connect/minecraft", 200, "{\"status\":\"PENDING\"}");
+
+        apiClient.minecraftEnroll("jeb_");
+
+        assertThat(lastAuth.get()).isEqualTo("Bearer test-token");
     }
 }
