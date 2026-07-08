@@ -418,9 +418,10 @@ public class ApiClient {
         return get("/api/admin/minecraft-accounts", new ParameterizedTypeReference<List<Map<String, Object>>>() {});
     }
 
-    @SuppressWarnings("unchecked")
     public Map<String, Object> adminMinecraftDeviceCodeStart() {
-        return (Map<String, Object>) (Map<?, ?>) post("/api/admin/minecraft-accounts/device-code", null, Map.class);
+        ApiResult result = exchangeForResult(() -> restClient.post()
+                .uri("/api/admin/minecraft-accounts/device-code"));
+        return result.status() == 200 ? result.body() : null;
     }
 
     public ApiResult adminMinecraftCreate(String deviceCode, String label) {
