@@ -146,9 +146,9 @@
 
             <!-- PENDING : demande envoyée, à accepter en jeu -->
             <div th:if="${minecraftStatus == 'PENDING'}" class="provider-warning">
-                <span th:utext="#{connections.minecraft.pending(${minecraftName}, ${minecraftBotUsername})}">
-                    Demande envoyée à jeb_ par <b>CatapultBot1</b> — accepte-la en jeu.
-                </span>
+                <span th:text="#{connections.minecraft.pending.sent(${minecraftName})}">Demande d'ami envoyée à jeb_ par</span>
+                <b th:text="${minecraftBotUsername}">CatapultBot1</b>
+                <span th:text="#{connections.minecraft.pending.accept}">— accepte-la en jeu (Social → demandes d'amis). Statut rafraîchi sous ~5 minutes.</span>
                 <a th:href="@{/channels/{u}(u=${channelUsername})}" class="btn btn-sm btn-outline-secondary"
                    th:text="#{connections.minecraft.refresh}">Vérifier</a>
             </div>
@@ -170,7 +170,7 @@
 
             <!-- Déconnexion : visible dès qu'un lien existe -->
             <form th:if="${minecraftStatus != 'NONE'}"
-                  th:action="@{/channels/{u}/settings/minecraft/disconnect(u=${channelUsername})}" method="post" style="margin-top:0.4rem;">
+                  th:action="@{/channels/{u}/settings/minecraft/disconnect(u=${channelUsername})}" method="post" class="mt-1">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <button type="submit" class="btn btn-sm btn-danger" th:text="#{connections.disconnect}">Déconnecter</button>
             </form>
