@@ -109,8 +109,9 @@ public class MinecraftFriendService {
      * Réconcilie les liens locaux avec la friends list réelle de chaque compte :
      * PENDING accepté en jeu → ACCEPTED ; ACCEPTED disparu → REMOVED ; pseudo rafraîchi.
      */
+    // Pas de @Transactional : évite de tenir une connexion BD pendant les appels HTTP getFriends ;
+    // chaque save() porte sa propre transaction et la réconciliation est idempotente.
     @Scheduled(fixedRateString = "${minecraft.friends-sync-interval-ms:300000}")
-    @Transactional
     public void syncFriendLinks() {
         for (MinecraftServiceAccount account : accountRepository.findByEnabledTrueOrderByFillOrderAsc()) {
             List<MinecraftFriendLink> links = linkRepository.findByServiceAccount(account);
