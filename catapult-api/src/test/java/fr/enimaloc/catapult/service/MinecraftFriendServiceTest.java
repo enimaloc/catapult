@@ -108,17 +108,21 @@ class MinecraftFriendServiceTest {
     }
 
     @Test
-    void enroll_existingLink_isRemovedBeforeReEnrollment() {
+    void enroll_existingLink_isReusedInPlace() {
         var existing = new MinecraftFriendLink();
         existing.setUser(user);
         existing.setServiceAccount(bot1);
         existing.setMinecraftProfileId("old-profile-id");
         when(linkRepository.findByUser(user)).thenReturn(Optional.of(existing));
 
-        service.enroll(user, "jeb_");
+        var result = service.enroll(user, "jeb_");
 
         verify(minecraftService).removeFriend("mc-token", null, "old-profile-id");
-        verify(linkRepository).delete(existing);
+        verify(linkRepository, never()).delete(any());
+        assertThat(result).isSameAs(existing);
+        assertThat(result.getStatus()).isEqualTo(MinecraftFriendLink.Status.PENDING);
+        assertThat(result.getAcceptedAt()).isNull();
+        assertThat(result.getMinecraftProfileId()).isEqualTo("069a79f4-44e9-4726-a5be-fca90e38aaf5");
     }
 
     @Test
