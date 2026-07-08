@@ -144,7 +144,8 @@ public class MinecraftService {
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .body(Map.class);
-        return profile == null ? null : String.valueOf(profile.get("name"));
+        if (profile == null || profile.get("name") == null) return null;
+        return profile.get("name").toString();
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
