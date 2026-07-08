@@ -42,7 +42,7 @@ public class ApiAdminMinecraftAccountsController {
         return accountRepository.findAll().stream()
                 .map(a -> new AccountDto(a.getId(), a.getLabel(), a.getMinecraftUsername(),
                         a.getFillOrder(), a.isFriendLimitReached(), a.isEnabled(),
-                        linkRepository.findByServiceAccount(a).size()))
+                        (int) linkRepository.countByServiceAccount(a)))
                 .toList();
     }
 
@@ -73,10 +73,19 @@ public class ApiAdminMinecraftAccountsController {
         account.setMinecraftUsername("(en attente)");
 
         // Déroule la chaîne une fois : valide le compte et récupère son pseudo.
-        String username = tokenService.getToken(account)
-                .map(minecraftService::getMinecraftProfileName)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                        "Chaîne d'auth Xbox/Minecraft en échec pour ce compte (profil Xbox ou Minecraft manquant ?)"));
+        String username;
+        try {
+            username = tokenService.getToken(account)
+                    .map(minecraftService::getMinecraftProfileName)
+                    .orElse(null);
+        } catch (org.springframework.web.client.RestClientException e) {
+            log.warn("Validation du compte de service Minecraft en échec: {}", e.getMessage());
+            username = null;
+        }
+        if (username == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Chaîne d'auth Xbox/Minecraft en échec pour ce compte (profil Xbox ou Minecraft manquant ?)");
+        }
         account.setMinecraftUsername(username);
         account.setUpdatedAt(Instant.now());
         MinecraftServiceAccount saved = accountRepository.save(account);
@@ -96,7 +105,7 @@ public class ApiAdminMinecraftAccountsController {
         MinecraftServiceAccount saved = accountRepository.save(account);
         return new AccountDto(saved.getId(), saved.getLabel(), saved.getMinecraftUsername(),
                 saved.getFillOrder(), saved.isFriendLimitReached(), saved.isEnabled(),
-                linkRepository.findByServiceAccount(saved).size());
+                (int) linkRepository.countByServiceAccount(saved));
     }
 
     @DeleteMapping("/{id}")
