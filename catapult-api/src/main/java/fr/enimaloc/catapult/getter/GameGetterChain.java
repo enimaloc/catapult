@@ -28,6 +28,7 @@ public class GameGetterChain {
     private final Optional<SteamGameGetter> steamGameGetter;
     private final Optional<XboxGameGetter> xboxGameGetter;
     private final Optional<BattleNetGameGetter> battleNetGameGetter;
+    private final Optional<MinecraftPresenceGetter> minecraftPresenceGetter;
     private final MeterRegistry meterRegistry;
 
     public Optional<DetectedGame> resolve(UserAccount user) {
@@ -68,6 +69,7 @@ public class GameGetterChain {
         steamGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.STEAM, g));
         xboxGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.XBOX, g));
         battleNetGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.BATTLENET, g));
+        minecraftPresenceGetter.ifPresent(g -> map.put(GetterConfig.Provider.MINECRAFT, g));
         return map;
     }
 }
