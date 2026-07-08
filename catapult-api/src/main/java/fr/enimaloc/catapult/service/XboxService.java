@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -16,7 +16,7 @@ import java.util.Arrays;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnBooleanProperty("xbox.enabled")
+@ConditionalOnExpression("${xbox.enabled:false} or ${minecraft.enabled:false}")
 public class XboxService {
     public static final String USER_AUTH_URL = "https://user.auth.xboxlive.com";
     public static final String XSTS_AUTH_URL = "https://xsts.auth.xboxlive.com";
