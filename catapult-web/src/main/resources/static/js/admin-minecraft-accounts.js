@@ -28,6 +28,29 @@
         if (pollTimer !== null) { clearInterval(pollTimer); pollTimer = null; }
     }
 
+    // Jamais d'innerHTML avec des valeurs dynamiques : DOM + textContent uniquement.
+    function showError(message) {
+        const span = document.createElement("span");
+        span.className = "text-danger";
+        span.textContent = message || "Erreur";
+        statusEl.replaceChildren(span);
+        startBtn.disabled = false;
+    }
+
+    function showDeviceCode(dc) {
+        const div = document.createElement("div");
+        div.className = "alert alert-info";
+        const b = document.createElement("b");
+        b.textContent = dc.userCode;
+        const a = document.createElement("a");
+        a.href = dc.verificationUri;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = dc.verificationUri;
+        div.append(b, document.createTextNode(" — "), a);
+        statusEl.replaceChildren(div);
+    }
+
     startBtn.addEventListener("click", function () {
         startBtn.disabled = true;
         stopPolling();
@@ -35,19 +58,14 @@
         statusEl.textContent = "…";
         post(root.dataset.startUrl).then(function (dc) {
             if (!dc || dc.status === "ERROR" || !dc.deviceCode) {
-                statusEl.innerHTML = "<span class='text-danger'>Erreur</span>";
-                startBtn.disabled = false;
+                showError();
                 return;
             }
             if (typeof dc.verificationUri !== "string" || dc.verificationUri.indexOf("https://") !== 0) {
-                statusEl.innerHTML = "<span class='text-danger'>Erreur</span>";
-                startBtn.disabled = false;
+                showError();
                 return;
             }
-            statusEl.innerHTML =
-                "<div class='alert alert-info'>" +
-                "<b>" + dc.userCode + "</b> — <a href='" + dc.verificationUri + "' target='_blank' rel='noopener'>" +
-                dc.verificationUri + "</a></div>";
+            showDeviceCode(dc);
             const intervalMs = Math.max(3, dc.interval || 5) * 1000;
             pollTimer = setInterval(function () {
                 post(root.dataset.completeUrl, { deviceCode: dc.deviceCode, label: label })
@@ -58,13 +76,11 @@
                             startBtn.disabled = false;
                             window.location.reload();
                         } else {
-                            startBtn.disabled = false;
-                            statusEl.innerHTML = "<span class='text-danger'>" +
-                                (res.message || "Erreur") + "</span>";
+                            showError(res.message);
                         }
                     })
                     .catch(function () { stopPolling(); startBtn.disabled = false; });
             }, intervalMs);
-        }).catch(function () { statusEl.innerHTML = "<span class='text-danger'>Erreur</span>"; startBtn.disabled = false; });
+        }).catch(function () { showError(); });
     });
 }());
