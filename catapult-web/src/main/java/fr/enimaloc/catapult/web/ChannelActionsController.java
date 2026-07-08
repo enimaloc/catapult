@@ -220,7 +220,12 @@ public class ChannelActionsController {
     public String minecraftEnroll(@PathVariable String username,
                                   @RequestParam String minecraftName,
                                   RedirectAttributes redirectAttributes) {
-        ApiClient.ApiResult result = apiClient.minecraftEnroll(minecraftName.trim());
+        String name = minecraftName.trim();
+        if (!name.matches("[A-Za-z0-9_]{3,16}")) {
+            redirectAttributes.addFlashAttribute("minecraftError", "unknown");
+            return "redirect:/channels/" + username;
+        }
+        ApiClient.ApiResult result = apiClient.minecraftEnroll(name);
         if (result.status() == 404) {
             redirectAttributes.addFlashAttribute("minecraftError", "unknown");
         } else if (result.status() == 503) {
