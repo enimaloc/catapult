@@ -41,4 +41,9 @@ public class MinecraftServiceAccount {
 
     @Column(nullable = false)
     private Instant updatedAt = Instant.now();
+
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = Instant.now();
+    }
 }
