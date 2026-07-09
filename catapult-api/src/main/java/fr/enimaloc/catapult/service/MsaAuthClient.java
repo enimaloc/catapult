@@ -47,6 +47,7 @@ public class MsaAuthClient {
     }
 
     public DeviceCodeStart startDeviceCode() {
+        log.debug("Device code flow démarré");
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("client_id", clientId);
         form.add("scope", SCOPE);
