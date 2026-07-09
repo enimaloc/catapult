@@ -124,7 +124,7 @@
         </div>
 
         <!-- ── Minecraft ─────────────────────────────────────────────── -->
-        <div class="provider-card" th:if="${isOwner}" data-provider="MINECRAFT">
+        <div class="provider-card" th:if="${isOwner and minecraftStatus != 'UNAVAILABLE'}" data-provider="MINECRAFT">
             <strong th:text="#{connections.minecraft.title}">Minecraft</strong>
 
             <div th:if="${minecraftError != null}" class="provider-warning">
