@@ -102,7 +102,7 @@ public class ChannelPageController {
         // Liaison Minecraft : uniquement pour le propriétaire (l'API est scoped au JWT courant)
         if (data.isOwner()) {
             Map<String, Object> mc = apiClient.minecraftLinkState();
-            model.addAttribute("minecraftStatus", mc == null ? "NONE" : String.valueOf(mc.getOrDefault("status", "NONE")));
+            model.addAttribute("minecraftStatus", mc == null ? "UNAVAILABLE" : String.valueOf(mc.getOrDefault("status", "NONE")));
             model.addAttribute("minecraftName", mc == null ? null : mc.get("minecraftName"));
             model.addAttribute("minecraftBotUsername", mc == null ? null : mc.get("serviceAccountUsername"));
         } else {
