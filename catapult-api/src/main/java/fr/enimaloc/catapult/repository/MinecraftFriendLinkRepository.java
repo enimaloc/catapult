@@ -13,6 +13,5 @@ public interface MinecraftFriendLinkRepository extends JpaRepository<MinecraftFr
     Optional<MinecraftFriendLink> findByUser(UserAccount user);
     List<MinecraftFriendLink> findByServiceAccount(MinecraftServiceAccount serviceAccount);
     long countByServiceAccount(MinecraftServiceAccount serviceAccount);
-    List<MinecraftFriendLink> findByStatus(MinecraftFriendLink.Status status);
     boolean existsByServiceAccountAndStatus(MinecraftServiceAccount serviceAccount, MinecraftFriendLink.Status status);
 }
