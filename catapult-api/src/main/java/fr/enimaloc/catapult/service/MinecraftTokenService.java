@@ -40,8 +40,8 @@ public class MinecraftTokenService {
     private final MinecraftServiceAccountRepository accountRepository;
 
     private final Map<UUID, CachedToken> cache = new ConcurrentHashMap<>();
-    // 1 = token OK, 0 = chaîne en échec ; par label de compte
-    private final Map<String, Integer> tokenState = new ConcurrentHashMap<>();
+    // 1 = token OK, 0 = chaîne en échec ; par UUID de compte
+    private final Map<UUID, Integer> tokenState = new ConcurrentHashMap<>();
     private final Map<UUID, Object> refreshLocks = new ConcurrentHashMap<>();
 
     public MinecraftTokenService(MsaAuthClient msaAuthClient,
@@ -71,6 +71,7 @@ public class MinecraftTokenService {
 
     public void evict(UUID accountId) {
         cache.remove(accountId);
+        tokenState.remove(accountId);
         refreshLocks.remove(accountId);
     }
 
@@ -93,10 +94,10 @@ public class MinecraftTokenService {
 
                 cache.put(account.getId(),
                         new CachedToken(mc.accessToken(), Instant.now().plusSeconds(mc.expiresIn())));
-                tokenState.put(account.getLabel(), 1);
+                tokenState.put(account.getId(), 1);
                 return Optional.of(mc.accessToken());
             } catch (Exception e) {
-                tokenState.put(account.getLabel(), 0);
+                tokenState.put(account.getId(), 0);
                 log.warn("Chaîne d'auth Minecraft en échec pour le compte {}: {}", account.getLabel(), e.getMessage());
                 return Optional.empty();
             }
