@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.MinecraftFriendService;
+import fr.enimaloc.catapult.service.MinecraftGateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.when;
 class ApiMinecraftConnectControllerTest {
 
     @Mock private MinecraftFriendService friendService;
+    @Mock private MinecraftGateService gateService;
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private Jwt jwt;
 
@@ -42,6 +44,7 @@ class ApiMinecraftConnectControllerTest {
         UUID userId = UUID.randomUUID();
         when(jwt.getSubject()).thenReturn(userId.toString());
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(gateService.isAvailableFor(user)).thenReturn(true);
     }
 
     private MinecraftFriendLink link(MinecraftFriendLink.Status status) {
@@ -129,5 +132,42 @@ class ApiMinecraftConnectControllerTest {
         controller.unenroll(jwt);
 
         org.mockito.Mockito.verify(friendService).unenroll(user);
+    }
+
+    @Test
+    void get_gateClosed_returnsUnavailable() {
+        when(gateService.isAvailableFor(user)).thenReturn(false);
+
+        var response = controller.status(jwt);
+
+        assertThat(response.status()).isEqualTo("UNAVAILABLE");
+        org.mockito.Mockito.verifyNoInteractions(friendService);
+    }
+
+    @Test
+    void post_gateClosed_maps403() {
+        when(gateService.isAvailableFor(user)).thenReturn(false);
+
+        assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "jeb_")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+    }
+
+    @Test
+    void sync_gateClosed_maps403() {
+        when(gateService.isAvailableFor(user)).thenReturn(false);
+
+        assertThatThrownBy(() -> controller.syncNow(jwt))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+    }
+
+    @Test
+    void delete_gateClosed_maps403() {
+        when(gateService.isAvailableFor(user)).thenReturn(false);
+
+        assertThatThrownBy(() -> controller.unenroll(jwt))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
     }
 }
