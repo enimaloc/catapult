@@ -66,13 +66,14 @@ public class ApiMinecraftConnectController {
 
     @PostMapping
     public LinkStateResponse enroll(@AuthenticationPrincipal Jwt jwt, @RequestBody Map<String, String> body) {
+        UserAccount user = gatedUser(jwt); // le gate prime sur la validation métier (403 avant 400)
         String name = body.get("name");
         name = name == null ? null : name.trim();
         if (name == null || name.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pseudo requis");
         }
         try {
-            return LinkStateResponse.of(friendService.enroll(gatedUser(jwt), name));
+            return LinkStateResponse.of(friendService.enroll(user, name));
         } catch (MinecraftFriendService.MinecraftEnrollmentException e) {
             throw switch (e.getReason()) {
                 case UNKNOWN_PLAYER -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Joueur introuvable");
