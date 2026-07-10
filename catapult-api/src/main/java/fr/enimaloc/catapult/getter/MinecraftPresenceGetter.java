@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.service.MinecraftGateService;
 import fr.enimaloc.catapult.service.MinecraftService;
 import fr.enimaloc.catapult.service.MinecraftTokenService;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class MinecraftPresenceGetter implements GameGetter {
     private final MinecraftTokenService tokenService;
     private final MinecraftServiceAccountRepository accountRepository;
     private final MinecraftFriendLinkRepository linkRepository;
+    private final MinecraftGateService gateService;
 
     /** Au-delà de cet âge, une présence est considérée périmée (jeu fermé sans OFFLINE). */
     @Value("${minecraft.presence-max-age-seconds:120}")
@@ -84,6 +86,9 @@ public class MinecraftPresenceGetter implements GameGetter {
 
     @Override
     public Optional<DetectedGame> getCurrentGame(UserAccount user) {
+        if (!gateService.isAvailableReadOnly(user)) {
+            return Optional.empty();
+        }
         return linkRepository.findByUser(user)
                 .filter(link -> link.getStatus() == MinecraftFriendLink.Status.ACCEPTED)
                 .map(link -> cycleCache.get(MinecraftService.normalizeProfileId(link.getMinecraftProfileId())))
