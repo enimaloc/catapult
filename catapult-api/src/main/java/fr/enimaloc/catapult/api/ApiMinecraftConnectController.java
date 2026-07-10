@@ -37,6 +37,13 @@ public class ApiMinecraftConnectController {
         }
     }
 
+    /** Vérification immédiate : force la sync des liens puis retourne l'état à jour. */
+    @PostMapping("/sync")
+    public LinkStateResponse syncNow(@AuthenticationPrincipal Jwt jwt) {
+        friendService.syncFriendLinks();
+        return status(jwt);
+    }
+
     @GetMapping
     public LinkStateResponse status(@AuthenticationPrincipal Jwt jwt) {
         return friendService.getLink(currentUser(jwt))
