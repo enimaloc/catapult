@@ -1,8 +1,10 @@
 package fr.enimaloc.catapult.service;
 
+import fr.enimaloc.catapult.domain.GetterConfig;
 import fr.enimaloc.catapult.domain.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
 import lombok.Getter;
@@ -38,6 +40,7 @@ public class MinecraftFriendService {
     private final MinecraftServiceAccountRepository accountRepository;
     private final MinecraftFriendLinkRepository linkRepository;
     private final MinecraftAccountLimitMarker limitMarker;
+    private final GetterConfigRepository getterConfigRepository;
 
     @Transactional
     public MinecraftFriendLink enroll(UserAccount user, String pseudo) {
@@ -88,6 +91,7 @@ public class MinecraftFriendService {
             link.setStatus(MinecraftFriendLink.Status.PENDING);
             link.setRequestedAt(Instant.now());
             link.setAcceptedAt(null);
+            enableMinecraftGetter(user);
             return linkRepository.save(link);
         }
 
@@ -99,6 +103,29 @@ public class MinecraftFriendService {
     @Transactional
     public void unenroll(UserAccount user) {
         linkRepository.findByUser(user).ifPresent(this::removeLink);
+        getterConfigRepository.findByUserAndProvider(user, GetterConfig.Provider.MINECRAFT)
+                .ifPresent(config -> {
+                    config.setEnabled(false);
+                    getterConfigRepository.save(config);
+                });
+    }
+
+    /**
+     * La chaîne de détection ne consulte que les providers ayant une ligne
+     * GetterConfig : l'enrôlement crée/active celle de MINECRAFT (les comptes
+     * créés avant l'ajout du provider n'en ont pas).
+     */
+    private void enableMinecraftGetter(UserAccount user) {
+        GetterConfig config = getterConfigRepository.findByUserAndProvider(user, GetterConfig.Provider.MINECRAFT)
+                .orElseGet(() -> {
+                    GetterConfig created = new GetterConfig();
+                    created.setUser(user);
+                    created.setProvider(GetterConfig.Provider.MINECRAFT);
+                    created.setPriority(getterConfigRepository.findByUserOrderByPriorityAsc(user).size() + 1);
+                    return created;
+                });
+        config.setEnabled(true);
+        getterConfigRepository.save(config);
     }
 
     public Optional<MinecraftFriendLink> getLink(UserAccount user) {
