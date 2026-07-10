@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -47,8 +48,16 @@ public class ApiAdminMinecraftAccountsController {
     }
 
     @PostMapping("/device-code")
-    public MsaAuthClient.DeviceCodeStart startDeviceCode() {
-        return msaAuthClient.startDeviceCode();
+    public ResponseEntity<?> startDeviceCode() {
+        try {
+            return ResponseEntity.ok(msaAuthClient.startDeviceCode());
+        } catch (HttpClientErrorException e) {
+            // ex. AADSTS70002 (app Azure non déclarée client public) : le message doit
+            // remonter jusqu'à l'UI admin au lieu de mourir en 500 dans les logs
+            log.warn("Device-code Microsoft refusé: {}", e.getResponseBodyAsString());
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(Map.of("message", "Device-code Microsoft refusé: " + e.getResponseBodyAsString()));
+        }
     }
 
     /** 202 tant que l'admin n'a pas validé le code sur microsoft.com/link ; 200 + compte créé ensuite. */
