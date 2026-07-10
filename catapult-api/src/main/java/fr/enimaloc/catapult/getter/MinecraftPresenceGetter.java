@@ -54,7 +54,8 @@ public class MinecraftPresenceGetter implements GameGetter {
                         MinecraftService.PresenceList presences =
                                 minecraftService.updatePresence(token, MinecraftService.PresenceStatus.ONLINE);
                         for (MinecraftService.PresenceList.Presence presence : presences.presence()) {
-                            cache.put(presence.profileId(), presence.status());
+                            // clé normalisée : le format d'UUID varie selon les endpoints Mojang
+                            cache.put(MinecraftService.normalizeProfileId(presence.profileId()), presence.status());
                         }
                     } catch (Exception e) {
                         log.warn("Presence Minecraft en échec pour {}: {}", account.getLabel(), e.getMessage());
@@ -73,7 +74,7 @@ public class MinecraftPresenceGetter implements GameGetter {
     public Optional<DetectedGame> getCurrentGame(UserAccount user) {
         return linkRepository.findByUser(user)
                 .filter(link -> link.getStatus() == MinecraftFriendLink.Status.ACCEPTED)
-                .map(link -> cycleCache.get(link.getMinecraftProfileId()))
+                .map(link -> cycleCache.get(MinecraftService.normalizeProfileId(link.getMinecraftProfileId())))
                 .filter(status -> status != MinecraftService.PresenceStatus.OFFLINE)
                 .map(status -> new DetectedGame("minecraft", GameBinding.SourceType.MINECRAFT, "Minecraft"));
     }
