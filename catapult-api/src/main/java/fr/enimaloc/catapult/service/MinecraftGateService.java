@@ -27,7 +27,7 @@ public class MinecraftGateService {
                                 @Value("${minecraft.msa-client-id:}") String msaClientId) {
         this.experimentService = experimentService;
         this.minecraftEnabled = minecraftEnabled;
-        this.msaClientId = msaClientId;
+        this.msaClientId = msaClientId == null ? "" : msaClientId.trim();
     }
 
     @PostConstruct
