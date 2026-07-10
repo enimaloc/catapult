@@ -102,7 +102,8 @@ public class MinecraftFriendService {
     }
 
     public Optional<MinecraftFriendLink> getLink(UserAccount user) {
-        return linkRepository.findByUser(user);
+        // fetch du compte de service inclus : le contrôleur lit son pseudo hors session (OSIV désactivé)
+        return linkRepository.findWithServiceAccountByUser(user);
     }
 
     /**
