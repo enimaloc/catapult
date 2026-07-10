@@ -34,6 +34,7 @@ class MinecraftFriendServiceTest {
     @Mock private MinecraftServiceAccountRepository accountRepository;
     @Mock private MinecraftFriendLinkRepository linkRepository;
     @Mock private MinecraftAccountLimitMarker limitMarker;
+    @Mock private fr.enimaloc.catapult.repository.GetterConfigRepository getterConfigRepository;
 
     @InjectMocks private MinecraftFriendService service;
 
@@ -53,6 +54,8 @@ class MinecraftFriendServiceTest {
                 .thenReturn(Optional.of(new MinecraftService.ProfileLookup("069a79f444e94726a5befca90e38aaf5", "jeb_")));
         when(linkRepository.findByUser(user)).thenReturn(Optional.empty());
         when(linkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(getterConfigRepository.findByUserAndProvider(any(), any())).thenReturn(Optional.empty());
+        when(getterConfigRepository.findByUserOrderByPriorityAsc(any())).thenReturn(List.of());
     }
 
     private MinecraftServiceAccount account(String label, int order) {
@@ -207,6 +210,30 @@ class MinecraftFriendServiceTest {
 
         assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.PENDING);
         verify(linkRepository, never()).save(any());
+    }
+
+    @Test
+    void enroll_enablesMinecraftGetterConfig() {
+        service.enroll(user, "jeb_");
+
+        verify(getterConfigRepository).save(org.mockito.ArgumentMatchers.argThat(config ->
+                config.getProvider() == fr.enimaloc.catapult.domain.GetterConfig.Provider.MINECRAFT
+                        && config.isEnabled()
+                        && config.getPriority() == 1));
+    }
+
+    @Test
+    void unenroll_disablesMinecraftGetterConfig() {
+        var config = new fr.enimaloc.catapult.domain.GetterConfig();
+        config.setProvider(fr.enimaloc.catapult.domain.GetterConfig.Provider.MINECRAFT);
+        config.setEnabled(true);
+        when(getterConfigRepository.findByUserAndProvider(user, fr.enimaloc.catapult.domain.GetterConfig.Provider.MINECRAFT))
+                .thenReturn(Optional.of(config));
+
+        service.unenroll(user);
+
+        assertThat(config.isEnabled()).isFalse();
+        verify(getterConfigRepository).save(config);
     }
 
     @Test
