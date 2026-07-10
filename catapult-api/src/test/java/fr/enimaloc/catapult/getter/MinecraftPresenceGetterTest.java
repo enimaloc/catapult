@@ -133,6 +133,18 @@ class MinecraftPresenceGetterTest {
     }
 
     @Test
+    void profileIdFormatMismatch_stillDetected() {
+        // lien stocké avec tirets, presence sans tirets : normalisation des deux côtés
+        link.setMinecraftProfileId("069a79f4-44e9-4726-a5be-fca90e38aaf5");
+        when(minecraftService.updatePresence(eq("mc-token"), any(MinecraftService.PresenceStatus.class)))
+                .thenReturn(presenceOf("069a79f444e94726a5befca90e38aaf5", MinecraftService.PresenceStatus.PLAYING_SERVER));
+
+        getter.prefetchBatch().join();
+
+        assertThat(getter.getCurrentGame(user)).isPresent();
+    }
+
+    @Test
     void clearCycleCache_emptiesDetection() {
         when(minecraftService.updatePresence(eq("mc-token"), any(MinecraftService.PresenceStatus.class)))
                 .thenReturn(presenceOf("profile-1", MinecraftService.PresenceStatus.PLAYING_SERVER));
