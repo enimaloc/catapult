@@ -60,14 +60,15 @@ class ApiAdminMinecraftAccountsControllerTest {
     void create_validatedDeviceCode_createsAccountWithEncryptedRefreshAndUsername() {
         when(msaAuthClient.pollDeviceCode("device-1"))
                 .thenReturn(Optional.of(new MsaAuthClient.MsaTokens("access", "refresh-1", 3600)));
-        when(tokenService.getToken(any(MinecraftServiceAccount.class))).thenReturn(Optional.of("mc-token"));
+        when(tokenService.validateChain("enc:refresh-1")).thenReturn(Optional.of(
+                new MinecraftTokenService.ValidatedChain("mc-token", "enc:refresh-rotated", 86400)));
         when(minecraftService.getMinecraftProfileName("mc-token")).thenReturn("CatapultBot1");
 
         ResponseEntity<?> response = controller.create(Map.of("deviceCode", "device-1", "label", "Bot1"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(accountRepository).save(org.mockito.ArgumentMatchers.argThat(account ->
-                account.getMsaRefreshToken().equals("enc:refresh-1")
+                account.getMsaRefreshToken().equals("enc:refresh-rotated")
                         && account.getMinecraftUsername().equals("CatapultBot1")
                         && account.getLabel().equals("Bot1")));
     }

@@ -102,4 +102,26 @@ class MinecraftTokenServiceTest {
 
         verify(msaAuthClient, times(2)).refresh(anyString());
     }
+
+    @Test
+    void getToken_transientAccountWithoutId_validatesWithoutPersistingOrCaching() {
+        // compte pas encore persisté (validation d'enrôlement) : id null ne doit ni NPE ni écrire en base
+        var transientAccount = new MinecraftServiceAccount();
+        transientAccount.setLabel("Nouveau");
+        transientAccount.setMsaRefreshToken("enc-refresh");
+
+        assertThat(service.getToken(transientAccount)).contains("mc-token");
+
+        verify(accountRepository, never()).save(any());
+    }
+
+    @Test
+    void validateChain_returnsRotatedRefreshEncrypted() {
+        var chain = service.validateChain("enc-refresh");
+
+        assertThat(chain).isPresent();
+        assertThat(chain.get().minecraftToken()).isEqualTo("mc-token");
+        assertThat(chain.get().rotatedRefreshTokenEncrypted()).isEqualTo("enc:refresh-new");
+        verify(accountRepository, never()).save(any());
+    }
 }
