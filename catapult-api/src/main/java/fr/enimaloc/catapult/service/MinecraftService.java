@@ -120,6 +120,14 @@ public class MinecraftService {
                 .body(PresenceList.class);
     }
 
+    /**
+     * Normalise un identifiant de profil pour comparaison : les endpoints Mojang
+     * renvoient l'UUID tantôt avec tirets, tantôt sans, selon l'API.
+     */
+    public static String normalizeProfileId(String profileId) {
+        return profileId == null ? null : profileId.replace("-", "").toLowerCase();
+    }
+
     public Optional<ProfileLookup> lookupProfile(String name) {
         try {
             return Optional.ofNullable(restClient.get()

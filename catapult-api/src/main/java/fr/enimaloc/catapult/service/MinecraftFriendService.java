@@ -129,22 +129,27 @@ public class MinecraftFriendService {
                 continue;
             }
 
+            // matching insensible au format d'UUID (avec/sans tirets selon les endpoints)
             Map<String, MinecraftService.FriendsList.Friend> byProfileId =
                     Arrays.stream(friendsList.friends())
                             .collect(Collectors.toMap(
-                                    MinecraftService.FriendsList.Friend::profileId,
-                                    Function.identity()));
+                                    f -> MinecraftService.normalizeProfileId(f.profileId()),
+                                    Function.identity(),
+                                    (a, b) -> a));
 
             for (MinecraftFriendLink link : links) {
-                MinecraftService.FriendsList.Friend friend = byProfileId.get(link.getMinecraftProfileId());
+                MinecraftService.FriendsList.Friend friend =
+                        byProfileId.get(MinecraftService.normalizeProfileId(link.getMinecraftProfileId()));
                 boolean changed = false;
 
                 if (friend != null && link.getStatus() == MinecraftFriendLink.Status.PENDING) {
                     link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
                     link.setAcceptedAt(Instant.now());
+                    log.info("Lien Minecraft accepté: {} via {}", link.getMinecraftName(), account.getLabel());
                     changed = true;
                 } else if (friend == null && link.getStatus() == MinecraftFriendLink.Status.ACCEPTED) {
                     link.setStatus(MinecraftFriendLink.Status.REMOVED);
+                    log.info("Lien Minecraft retiré côté joueur: {} via {}", link.getMinecraftName(), account.getLabel());
                     changed = true;
                 }
 

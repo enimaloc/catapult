@@ -209,6 +209,20 @@ class MinecraftFriendServiceTest {
         verify(linkRepository, never()).save(any());
     }
 
+    @Test
+    void sync_matchesProfileIdsRegardlessOfDashes() {
+        // lien stocké avec tirets (lookup), friends list sans tirets : doit matcher quand même
+        var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
+        when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
+        when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());
+        when(minecraftService.getFriends("mc-token")).thenReturn(friendsListWith(
+                new MinecraftService.FriendsList.Friend("069a79f444e94726a5befca90e38aaf5", "jeb_")));
+
+        service.syncFriendLinks();
+
+        assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.ACCEPTED);
+    }
+
     private MinecraftFriendLink pendingLink(String profileId, String name) {
         var link = new MinecraftFriendLink();
         link.setUser(user);
