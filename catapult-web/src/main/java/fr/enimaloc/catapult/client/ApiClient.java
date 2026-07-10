@@ -410,6 +410,11 @@ public class ApiClient {
                 .body(Map.of("name", name)));
     }
 
+    /** Force la sync des liens côté api (bouton « Vérifier »). */
+    public void minecraftSyncNow() {
+        post("/api/connect/minecraft/sync", null);
+    }
+
     public boolean minecraftUnenroll() {
         return delete("/api/connect/minecraft");
     }
