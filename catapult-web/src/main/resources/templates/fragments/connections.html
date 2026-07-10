@@ -149,8 +149,11 @@
                 <span th:text="#{connections.minecraft.pending.sent(${minecraftName})}">Demande d'ami envoyée à jeb_ par</span>
                 <b th:text="${minecraftBotUsername}">CatapultBot1</b>
                 <span th:text="#{connections.minecraft.pending.accept}">— accepte-la en jeu (Social → demandes d'amis). Statut rafraîchi sous ~5 minutes.</span>
-                <a th:href="@{/channels/{u}(u=${channelUsername})}" class="btn btn-sm btn-outline-secondary"
-                   th:text="#{connections.minecraft.refresh}">Vérifier</a>
+                <form th:action="@{/channels/{u}/settings/minecraft/check(u=${channelUsername})}" method="post" class="d-inline">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary"
+                            th:text="#{connections.minecraft.refresh}">Vérifier</button>
+                </form>
             </div>
 
             <!-- ACCEPTED : lié -->
