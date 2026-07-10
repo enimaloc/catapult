@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.MinecraftFriendService;
+import fr.enimaloc.catapult.service.MinecraftGateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
@@ -23,10 +24,15 @@ public class ApiMinecraftConnectController {
 
     private final MinecraftFriendService friendService;
     private final UserAccountRepository userAccountRepository;
+    private final MinecraftGateService gateService;
 
     public record LinkStateResponse(String status, String minecraftName, String serviceAccountUsername) {
         static LinkStateResponse none() {
             return new LinkStateResponse("NONE", null, null);
+        }
+
+        static LinkStateResponse unavailable() {
+            return new LinkStateResponse("UNAVAILABLE", null, null);
         }
 
         static LinkStateResponse of(MinecraftFriendLink link) {
@@ -40,13 +46,20 @@ public class ApiMinecraftConnectController {
     /** Vérification immédiate : force la sync des liens puis retourne l'état à jour. */
     @PostMapping("/sync")
     public LinkStateResponse syncNow(@AuthenticationPrincipal Jwt jwt) {
+        UserAccount user = gatedUser(jwt);
         friendService.syncFriendLinks();
-        return status(jwt);
+        return friendService.getLink(user)
+                .map(LinkStateResponse::of)
+                .orElseGet(LinkStateResponse::none);
     }
 
     @GetMapping
     public LinkStateResponse status(@AuthenticationPrincipal Jwt jwt) {
-        return friendService.getLink(currentUser(jwt))
+        UserAccount user = currentUser(jwt);
+        if (!gateService.isAvailableFor(user)) {
+            return LinkStateResponse.unavailable();
+        }
+        return friendService.getLink(user)
                 .map(LinkStateResponse::of)
                 .orElseGet(LinkStateResponse::none);
     }
@@ -59,7 +72,7 @@ public class ApiMinecraftConnectController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pseudo requis");
         }
         try {
-            return LinkStateResponse.of(friendService.enroll(currentUser(jwt), name));
+            return LinkStateResponse.of(friendService.enroll(gatedUser(jwt), name));
         } catch (MinecraftFriendService.MinecraftEnrollmentException e) {
             throw switch (e.getReason()) {
                 case UNKNOWN_PLAYER -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Joueur introuvable");
@@ -72,11 +85,19 @@ public class ApiMinecraftConnectController {
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unenroll(@AuthenticationPrincipal Jwt jwt) {
-        friendService.unenroll(currentUser(jwt));
+        friendService.unenroll(gatedUser(jwt));
     }
 
     private UserAccount currentUser(Jwt jwt) {
         return userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Utilisateur inconnu"));
+    }
+
+    private UserAccount gatedUser(Jwt jwt) {
+        UserAccount user = currentUser(jwt);
+        if (!gateService.isAvailableFor(user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature Minecraft indisponible");
+        }
+        return user;
     }
 }
