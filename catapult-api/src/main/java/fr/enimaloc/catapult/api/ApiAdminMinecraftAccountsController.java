@@ -81,12 +81,18 @@ public class ApiAdminMinecraftAccountsController {
         account.setFillOrder((int) accountRepository.count());
         account.setMinecraftUsername("(en attente)");
 
-        // Déroule la chaîne une fois : valide le compte et récupère son pseudo.
+        // Déroule la chaîne une fois, sans effet de bord (le compte n'est pas encore
+        // persisté) : valide le compte et récupère son pseudo.
         String username;
         try {
-            username = tokenService.getToken(account)
-                    .map(minecraftService::getMinecraftProfileName)
-                    .orElse(null);
+            var chain = tokenService.validateChain(account.getMsaRefreshToken());
+            if (chain.isPresent()) {
+                // la validation a rotaté le refresh MSA : c'est lui qu'il faut stocker
+                account.setMsaRefreshToken(chain.get().rotatedRefreshTokenEncrypted());
+                username = minecraftService.getMinecraftProfileName(chain.get().minecraftToken());
+            } else {
+                username = null;
+            }
         } catch (org.springframework.web.client.RestClientException e) {
             log.warn("Validation du compte de service Minecraft en échec: {}", e.getMessage());
             username = null;

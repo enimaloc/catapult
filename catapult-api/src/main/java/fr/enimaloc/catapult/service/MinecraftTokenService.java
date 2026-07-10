@@ -62,12 +62,38 @@ public class MinecraftTokenService {
     }
 
     public Optional<String> getToken(MinecraftServiceAccount account) {
+        if (account.getId() == null) {
+            // compte transient (validation d'enrôlement) : ni cache, ni verrou, ni persistance
+            return validateChain(account.getMsaRefreshToken()).map(ValidatedChain::minecraftToken);
+        }
         CachedToken cached = cache.get(account.getId());
         if (cached != null && cached.expiry().isAfter(Instant.now().plus(RENEW_BEFORE_EXPIRY))) {
             return Optional.of(cached.token());
         }
         return refreshChain(account);
     }
+
+    /**
+     * Déroule la chaîne complète sans aucun effet de bord (pas de cache, pas de
+     * verrou, pas d'écriture en base) — utilisé pour valider un compte pas encore
+     * persisté à l'enrôlement. Le refresh token rotaté (chiffré) est retourné à
+     * l'appelant, à lui de le stocker.
+     */
+    public Optional<ValidatedChain> validateChain(String encryptedRefreshToken) {
+        try {
+            MsaAuthClient.MsaTokens msa = msaAuthClient.refresh(encryption.decrypt(encryptedRefreshToken));
+            XboxService.Token xbox = xboxService.getXboxToken("d=" + msa.accessToken());
+            XboxService.Token xsts = xboxService.getXstsToken(xbox);
+            MinecraftService.Token mc = minecraftService.getMinecraftToken(xsts);
+            return Optional.of(new ValidatedChain(
+                    mc.accessToken(), encryption.encrypt(msa.refreshToken()), mc.expiresIn()));
+        } catch (Exception e) {
+            log.warn("Chaîne d'auth Minecraft en échec: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    public record ValidatedChain(String minecraftToken, String rotatedRefreshTokenEncrypted, long expiresIn) {}
 
     public void evict(UUID accountId) {
         cache.remove(accountId);
@@ -82,25 +108,22 @@ public class MinecraftTokenService {
             if (cached != null && cached.expiry().isAfter(Instant.now().plus(RENEW_BEFORE_EXPIRY))) {
                 return Optional.of(cached.token());
             }
-            try {
-                MsaAuthClient.MsaTokens msa = msaAuthClient.refresh(encryption.decrypt(account.getMsaRefreshToken()));
-                account.setMsaRefreshToken(encryption.encrypt(msa.refreshToken()));
-                account.setUpdatedAt(Instant.now());
-                accountRepository.save(account);
-
-                XboxService.Token xbox = xboxService.getXboxToken("d=" + msa.accessToken());
-                XboxService.Token xsts = xboxService.getXstsToken(xbox);
-                MinecraftService.Token mc = minecraftService.getMinecraftToken(xsts);
-
-                cache.put(account.getId(),
-                        new CachedToken(mc.accessToken(), Instant.now().plusSeconds(mc.expiresIn())));
-                tokenState.put(account.getId(), 1);
-                return Optional.of(mc.accessToken());
-            } catch (Exception e) {
+            Optional<ValidatedChain> chain = validateChain(account.getMsaRefreshToken());
+            if (chain.isEmpty()) {
                 tokenState.put(account.getId(), 0);
-                log.warn("Chaîne d'auth Minecraft en échec pour le compte {}: {}", account.getLabel(), e.getMessage());
+                log.warn("Chaîne d'auth Minecraft en échec pour le compte {}", account.getLabel());
                 return Optional.empty();
             }
+
+            // rotation persistée après le succès de la chaîne complète
+            account.setMsaRefreshToken(chain.get().rotatedRefreshTokenEncrypted());
+            account.setUpdatedAt(Instant.now());
+            accountRepository.save(account);
+
+            cache.put(account.getId(),
+                    new CachedToken(chain.get().minecraftToken(), Instant.now().plusSeconds(chain.get().expiresIn())));
+            tokenState.put(account.getId(), 1);
+            return Optional.of(chain.get().minecraftToken());
         }
     }
 
