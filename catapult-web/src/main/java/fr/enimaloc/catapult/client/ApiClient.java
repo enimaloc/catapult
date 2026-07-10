@@ -422,7 +422,11 @@ public class ApiClient {
     public Map<String, Object> adminMinecraftDeviceCodeStart() {
         ApiResult result = exchangeForResult(() -> restClient.post()
                 .uri("/api/admin/minecraft-accounts/device-code"));
-        if (result.status() != 200) return null;
+        if (result.status() != 200) {
+            // le 502 de l'api porte le message MSA (ex. app Azure mal configurée)
+            return Map.of("status", "ERROR",
+                    "message", String.valueOf(result.body().getOrDefault("message", "")));
+        }
         Map<String, Object> raw = result.body();
         return Map.of(
                 "deviceCode", String.valueOf(raw.getOrDefault("device_code", "")),

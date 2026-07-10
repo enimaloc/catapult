@@ -58,7 +58,7 @@
         statusEl.textContent = "…";
         post(root.dataset.startUrl).then(function (dc) {
             if (!dc || dc.status === "ERROR" || !dc.deviceCode) {
-                showError();
+                showError(dc && dc.message);
                 return;
             }
             if (typeof dc.verificationUri !== "string" || dc.verificationUri.indexOf("https://") !== 0) {
