@@ -236,6 +236,12 @@ public class ChannelActionsController {
         return "redirect:/channels/" + username;
     }
 
+    @PostMapping("/settings/minecraft/check")
+    public String minecraftCheck(@PathVariable String username) {
+        apiClient.minecraftSyncNow();
+        return "redirect:/channels/" + username;
+    }
+
     @PostMapping("/settings/minecraft/disconnect")
     public String minecraftDisconnect(@PathVariable String username) {
         apiClient.minecraftUnenroll();
