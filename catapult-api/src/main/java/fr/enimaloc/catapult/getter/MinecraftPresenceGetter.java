@@ -10,9 +10,11 @@ import fr.enimaloc.catapult.service.MinecraftService;
 import fr.enimaloc.catapult.service.MinecraftTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -22,7 +24,9 @@ import java.util.concurrent.CompletableFuture;
  * Détecte si un utilisateur joue à Minecraft via la présence de ses amis
  * comptes de service. Un POST /presence par compte et par cycle couvre tous
  * les amis du compte (coût O(comptes), pas O(utilisateurs)).
- * Tout statut sauf OFFLINE compte comme « en jeu ».
+ * Tout statut sauf OFFLINE compte comme « en jeu » — à condition que la
+ * présence soit fraîche : un jeu fermé brutalement ne publie pas OFFLINE et
+ * l'API continue de renvoyer le dernier statut connu (voir lastUpdated).
  */
 @Slf4j
 @Component
@@ -34,6 +38,10 @@ public class MinecraftPresenceGetter implements GameGetter {
     private final MinecraftTokenService tokenService;
     private final MinecraftServiceAccountRepository accountRepository;
     private final MinecraftFriendLinkRepository linkRepository;
+
+    /** Au-delà de cet âge, une présence est considérée périmée (jeu fermé sans OFFLINE). */
+    @Value("${minecraft.presence-max-age-seconds:120}")
+    long presenceMaxAgeSeconds = 120;
 
     private volatile Map<String, MinecraftService.PresenceStatus> cycleCache = Map.of();
 
@@ -53,7 +61,11 @@ public class MinecraftPresenceGetter implements GameGetter {
                     try {
                         MinecraftService.PresenceList presences =
                                 minecraftService.updatePresence(token, MinecraftService.PresenceStatus.ONLINE);
+                        Instant staleBefore = Instant.now().minusSeconds(presenceMaxAgeSeconds);
                         for (MinecraftService.PresenceList.Presence presence : presences.presence()) {
+                            if (presence.lastUpdated() != null && presence.lastUpdated().isBefore(staleBefore)) {
+                                continue; // présence périmée : le jeu ne la rafraîchit plus
+                            }
                             // clé normalisée : le format d'UUID varie selon les endpoints Mojang
                             cache.put(MinecraftService.normalizeProfileId(presence.profileId()), presence.status());
                         }
