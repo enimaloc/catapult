@@ -62,6 +62,12 @@ class MinecraftPresenceGetterTest {
         when(tokenService.getToken(bot1)).thenReturn(Optional.of("mc-token"));
     }
 
+    private MinecraftService.PresenceList presenceAgedOf(String profileId, MinecraftService.PresenceStatus status, Instant lastUpdated) {
+        return new MinecraftService.PresenceList(new MinecraftService.PresenceList.Presence[]{
+                new MinecraftService.PresenceList.Presence(profileId, "pmid", status, null, lastUpdated)
+        });
+    }
+
     private MinecraftService.PresenceList presenceOf(String profileId, MinecraftService.PresenceStatus status) {
         return new MinecraftService.PresenceList(new MinecraftService.PresenceList.Presence[]{
                 new MinecraftService.PresenceList.Presence(profileId, "pmid", status, null, Instant.now())
@@ -142,6 +148,18 @@ class MinecraftPresenceGetterTest {
         getter.prefetchBatch().join();
 
         assertThat(getter.getCurrentGame(user)).isPresent();
+    }
+
+    @Test
+    void stalePresence_isNotDetected() {
+        // jeu fermé sans publier OFFLINE : l'API renvoie l'ancien statut, lastUpdated ne bouge plus
+        when(minecraftService.updatePresence(eq("mc-token"), any(MinecraftService.PresenceStatus.class)))
+                .thenReturn(presenceAgedOf("profile-1", MinecraftService.PresenceStatus.PLAYING_SERVER,
+                        Instant.now().minusSeconds(600)));
+
+        getter.prefetchBatch().join();
+
+        assertThat(getter.getCurrentGame(user)).isEmpty();
     }
 
     @Test
