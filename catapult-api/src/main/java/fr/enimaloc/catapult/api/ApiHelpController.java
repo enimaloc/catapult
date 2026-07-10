@@ -47,9 +47,13 @@ public class ApiHelpController {
 
     private boolean isMinecraftVisible(Jwt jwt) {
         if (jwt == null) return false;
-        return userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
-                .map(gateService::isAvailableFor)
-                .orElse(false);
+        try {
+            return userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
+                    .map(gateService::isAvailableFor)
+                    .orElse(false);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     public record HelpContent(String title, String body) {}

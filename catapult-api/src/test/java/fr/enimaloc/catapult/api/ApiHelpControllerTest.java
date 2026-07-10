@@ -85,4 +85,22 @@ class ApiHelpControllerTest {
         assertThat(content.body()).isEqualTo("<p>status</p>");
         org.mockito.Mockito.verifyNoInteractions(gateService);
     }
+
+    @Test
+    void connections_nonUuidSubject_omitsMinecraftSection() {
+        when(jwt.getSubject()).thenReturn("service-account-client");
+
+        var content = controller.help("connections", locale, jwt);
+
+        assertThat(content.body()).isEqualTo("<p>corps</p>");
+    }
+
+    @Test
+    void connections_unknownUser_omitsMinecraftSection() {
+        when(userAccountRepository.findById(any())).thenReturn(Optional.empty());
+
+        var content = controller.help("connections", locale, jwt);
+
+        assertThat(content.body()).isEqualTo("<p>corps</p>");
+    }
 }
