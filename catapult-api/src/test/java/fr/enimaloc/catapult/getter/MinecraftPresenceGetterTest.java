@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.service.MinecraftGateService;
 import fr.enimaloc.catapult.service.MinecraftService;
 import fr.enimaloc.catapult.service.MinecraftTokenService;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +35,7 @@ class MinecraftPresenceGetterTest {
     @Mock private MinecraftTokenService tokenService;
     @Mock private MinecraftServiceAccountRepository accountRepository;
     @Mock private MinecraftFriendLinkRepository linkRepository;
+    @Mock private MinecraftGateService gateService;
 
     @InjectMocks private MinecraftPresenceGetter getter;
 
@@ -60,6 +62,7 @@ class MinecraftPresenceGetterTest {
                 .thenReturn(true);
         when(linkRepository.findByUser(user)).thenReturn(Optional.of(link));
         when(tokenService.getToken(bot1)).thenReturn(Optional.of("mc-token"));
+        when(gateService.isAvailableReadOnly(user)).thenReturn(true);
     }
 
     private MinecraftService.PresenceList presenceAgedOf(String profileId, MinecraftService.PresenceStatus status, Instant lastUpdated) {
@@ -169,6 +172,17 @@ class MinecraftPresenceGetterTest {
 
         getter.prefetchBatch().join();
         getter.clearCycleCache();
+
+        assertThat(getter.getCurrentGame(user)).isEmpty();
+    }
+
+    @Test
+    void gateClosed_isNotDetected() {
+        when(gateService.isAvailableReadOnly(user)).thenReturn(false);
+        when(minecraftService.updatePresence(eq("mc-token"), any(MinecraftService.PresenceStatus.class)))
+                .thenReturn(presenceOf("profile-1", MinecraftService.PresenceStatus.PLAYING_SERVER));
+
+        getter.prefetchBatch().join();
 
         assertThat(getter.getCurrentGame(user)).isEmpty();
     }
