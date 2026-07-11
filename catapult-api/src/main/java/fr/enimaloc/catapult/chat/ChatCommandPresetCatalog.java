@@ -115,6 +115,9 @@ public class ChatCommandPresetCatalog {
      */
     public void ensureBuiltins(UserAccount user, Locale locale) {
         for (ChatCommand cmd : staticCommands) {
+            // Les commandes owner-only (ex: !debug) restent hors UI streamer :
+            // pas de définition = ni visible, ni désactivable.
+            if (cmd.isOwnerOnly()) continue;
             String name = cmd.getName();
             if (repository.existsByUserAndName(user, name)) continue;
             String template = messageSource.getMessage(builtinTemplateKey(name), null, locale);
