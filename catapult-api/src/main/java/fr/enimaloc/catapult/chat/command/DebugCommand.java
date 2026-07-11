@@ -70,7 +70,7 @@ public class DebugCommand implements ChatCommand {
 
     private TreeSet<String> knownPaths() {
         TreeSet<String> paths = new TreeSet<>(PlaceholderResolver.KNOWN_PATHS);
-        twPlaceholderRegistry.getKnownPaths().forEach(id -> paths.add("tw." + id));
+        twPlaceholderRegistry.getKnownPaths().forEach(id -> paths.add("tw#" + id));
         return paths;
     }
 
