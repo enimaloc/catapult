@@ -17,6 +17,8 @@ import static org.mockito.Mockito.*;
 
 class CommandRegistryTest {
 
+    private static final String OWNER_ID = "owner-123";
+
     private TwitchChatService chat;
     private DynamicCommandResolver dynamicResolver;
     private CommandRegistry registry;
@@ -33,7 +35,7 @@ class CommandRegistryTest {
         when(staticCmd.execute(any(), any())).thenReturn("static result");
 
         registry = new CommandRegistry(List.of(staticCmd), chat, new ObjectMapper(),
-            dynamicResolver, new SimpleMeterRegistry());
+            dynamicResolver, new SimpleMeterRegistry(), OWNER_ID);
 
         user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -87,6 +89,53 @@ class CommandRegistryTest {
         registry.dispatch(ev, true);
 
         verify(chat, never()).sendMessage(any(), any());
+    }
+
+    @Test
+    void owner_only_denied_for_non_owner_sender() {
+        when(staticCmd.isOwnerOnly()).thenReturn(true);
+
+        ChatCommandEvent ev = new ChatCommandEvent(this, user, "!static", List.of(),
+            ChatCommandEvent.SenderRole.BROADCASTER, "someone-else");
+        registry.dispatch(ev, true);
+
+        verify(staticCmd, never()).execute(any(), any());
+        verify(chat, never()).sendMessage(any(), any());
+    }
+
+    @Test
+    void owner_only_denied_without_sender_id() {
+        when(staticCmd.isOwnerOnly()).thenReturn(true);
+
+        ChatCommandEvent ev = new ChatCommandEvent(this, user, "!static", List.of(),
+            ChatCommandEvent.SenderRole.BROADCASTER);
+        registry.dispatch(ev, true);
+
+        verify(staticCmd, never()).execute(any(), any());
+    }
+
+    @Test
+    void owner_only_executes_for_app_owner() {
+        when(staticCmd.isOwnerOnly()).thenReturn(true);
+
+        ChatCommandEvent ev = new ChatCommandEvent(this, user, "!static", List.of(),
+            ChatCommandEvent.SenderRole.EVERYONE, OWNER_ID);
+        registry.dispatch(ev, true);
+
+        verify(chat).sendMessage(eq(user), eq("static result"));
+    }
+
+    @Test
+    void owner_only_denied_when_owner_id_unconfigured() {
+        when(staticCmd.isOwnerOnly()).thenReturn(true);
+        CommandRegistry noOwnerRegistry = new CommandRegistry(List.of(staticCmd), chat,
+            new ObjectMapper(), dynamicResolver, new SimpleMeterRegistry(), "");
+
+        ChatCommandEvent ev = new ChatCommandEvent(this, user, "!static", List.of(),
+            ChatCommandEvent.SenderRole.BROADCASTER, "");
+        noOwnerRegistry.dispatch(ev, true);
+
+        verify(staticCmd, never()).execute(any(), any());
     }
 
     @Test
