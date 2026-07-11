@@ -56,6 +56,19 @@ class IrcTwitchChatServiceTest {
     }
 
     @Test
+    void extractSenderIdFromTags() {
+        var id = IrcTwitchChatService.extractSenderId(
+            "badges=broadcaster/1;color=#FF0000;user-id=123456;user-type=");
+        assertThat(id).isEqualTo("123456");
+    }
+
+    @Test
+    void extractSenderIdNullWhenAbsentOrEmpty() {
+        assertThat(IrcTwitchChatService.extractSenderId("badges=;color=")).isNull();
+        assertThat(IrcTwitchChatService.extractSenderId("user-id=;color=")).isNull();
+    }
+
+    @Test
     void handleLinePongOnPing() {
         ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
         IrcTwitchChatService service = buildService(publisher);
