@@ -51,11 +51,11 @@ class DebugCommandTest {
         String result = (String) command.execute(user, List.of());
 
         assertThat(result)
-            .contains("game.name=Celeste")
-            .contains("game.store.steam=https://store.steampowered.com/app/504230")
-            .contains("game.summary=" + DebugCommand.EMPTY_VALUE)
-            .contains("tw.active=Araignées")
-            .contains("tw.spiders=Araignées");
+            .contains("game#name=Celeste")
+            .contains("game#store#steam=https://store.steampowered.com/app/504230")
+            .contains("game#summary=" + DebugCommand.EMPTY_VALUE)
+            .contains("tw#active=Araignées")
+            .contains("tw#spiders=Araignées");
     }
 
     @Test
@@ -64,7 +64,7 @@ class DebugCommandTest {
 
         String result = (String) command.execute(user, List.of());
 
-        assertThat(result).contains("game.name=" + DebugCommand.EMPTY_VALUE);
+        assertThat(result).contains("game#name=" + DebugCommand.EMPTY_VALUE);
         for (String path : PlaceholderResolver.KNOWN_PATHS) {
             assertThat(result).contains(path + "=");
         }
@@ -74,18 +74,18 @@ class DebugCommandTest {
     void single_arg_resolves_only_that_placeholder() {
         when(gameContextService.get(user)).thenReturn(Optional.of(contextWithGame()));
 
-        String result = (String) command.execute(user, List.of("game.name"));
+        String result = (String) command.execute(user, List.of("game#name"));
 
-        assertThat(result).isEqualTo("game.name=Celeste");
+        assertThat(result).isEqualTo("game#name=Celeste");
     }
 
     @Test
     void unknown_path_reports_error() {
         when(gameContextService.get(user)).thenReturn(Optional.empty());
 
-        String result = (String) command.execute(user, List.of("game.nope"));
+        String result = (String) command.execute(user, List.of("game#nope"));
 
-        assertThat(result).isEqualTo("Placeholder inconnu : game.nope");
+        assertThat(result).isEqualTo("Placeholder inconnu : game#nope");
     }
 
     @Test

@@ -17,18 +17,20 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class PlaceholderResolver {
 
+    // Séparateur '#' (et non '.') pour que Twitch ne détecte pas les
+    // placeholders non résolus comme des liens (ex: "game.name" ≈ domaine).
     public static final Set<String> KNOWN_PATHS = Set.of(
-        "game.name",
-        "game.summary",
-        "game.release_date",
-        "game.store.url",
-        "game.store.steam",
-        "game.store.xbox",
-        "game.store.battlenet",
-        "game.store.official",
-        "game.igdb.url",
-        "game.agerating",
-        "tw.active"
+        "game#name",
+        "game#summary",
+        "game#release_date",
+        "game#store#url",
+        "game#store#steam",
+        "game#store#xbox",
+        "game#store#battlenet",
+        "game#store#official",
+        "game#igdb#url",
+        "game#agerating",
+        "tw#active"
     );
 
     private final MeterRegistry meterRegistry;
@@ -37,7 +39,7 @@ public class PlaceholderResolver {
     /**
      * Resolves a chat command template by substituting {@code {path|fallback}}
      * placeholders. The fallback section itself may contain other placeholders
-     * (e.g. {@code {tw.active|{game.agerating|none}}}) — they are resolved
+     * (e.g. {@code {tw#active|{game#agerating|none}}}) — they are resolved
      * recursively when the outer path has no value.
      *
      * <p>Returns empty when the result is blank, or when a placeholder had no
@@ -85,7 +87,7 @@ public class PlaceholderResolver {
                 continue;
             }
 
-            if (path.startsWith("tw.")) {
+            if (path.startsWith("tw#")) {
                 meterRegistry.counter("catapult.tw.placeholder.usage", "path", path).increment();
             }
 
@@ -114,27 +116,27 @@ public class PlaceholderResolver {
     private String lookup(GameContext ctx, String path, Locale locale) {
         if (ctx == null) return null;
         return switch (path) {
-            case "game.name"          -> ctx.name();
-            case "game.summary"       -> ctx.summary();
-            case "game.release_date"  -> ctx.releaseDate() == null ? null
+            case "game#name"          -> ctx.name();
+            case "game#summary"       -> ctx.summary();
+            case "game#release_date"  -> ctx.releaseDate() == null ? null
                 : ctx.releaseDate().format(DateTimeFormatter.ofPattern(
                     locale.getLanguage().equals("fr") ? "dd/MM/yyyy" : "MM/dd/yyyy"));
-            case "game.store.url"     -> ctx.activeStoreUrl();
-            case "game.store.steam"     -> ctx.stores() == null ? null : ctx.stores().get("steam");
-            case "game.store.xbox"      -> ctx.stores() == null ? null : ctx.stores().get("xbox");
-            case "game.store.battlenet" -> ctx.stores() == null ? null : ctx.stores().get("battlenet");
-            case "game.store.official"  -> ctx.stores() == null ? null : ctx.stores().get("official");
-            case "game.igdb.url"      -> ctx.igdbSlug() == null ? null
+            case "game#store#url"     -> ctx.activeStoreUrl();
+            case "game#store#steam"     -> ctx.stores() == null ? null : ctx.stores().get("steam");
+            case "game#store#xbox"      -> ctx.stores() == null ? null : ctx.stores().get("xbox");
+            case "game#store#battlenet" -> ctx.stores() == null ? null : ctx.stores().get("battlenet");
+            case "game#store#official"  -> ctx.stores() == null ? null : ctx.stores().get("official");
+            case "game#igdb#url"      -> ctx.igdbSlug() == null ? null
                 : "https://www.igdb.com/games/" + ctx.igdbSlug();
-            case "game.agerating"     -> ctx.ageRating();
-            case "tw.active"          -> joinNullIfEmpty(ctx.activeTws() == null ? null
+            case "game#agerating"     -> ctx.ageRating();
+            case "tw#active"          -> joinNullIfEmpty(ctx.activeTws() == null ? null
                 : ctx.activeTws().stream()
                     .map(id -> ctx.twLabels() == null ? null : ctx.twLabels().get(id))
                     .filter(Objects::nonNull)
                     .sorted(Comparator.naturalOrder())
                     .toList());
             default -> {
-                if (path.startsWith("tw.") && ctx.activeTws() != null
+                if (path.startsWith("tw#") && ctx.activeTws() != null
                         && ctx.activeTws().contains(path.substring(3))) {
                     yield ctx.twLabels() == null ? null : ctx.twLabels().get(path.substring(3));
                 }
@@ -166,7 +168,7 @@ public class PlaceholderResolver {
             String path = template.substring(i + 1, bar < 0 ? close : bar);
             if (isValidPath(path)) {
                 if (!KNOWN_PATHS.contains(path)) {
-                    boolean knownTw = path.startsWith("tw.")
+                    boolean knownTw = path.startsWith("tw#")
                             && twPlaceholderRegistry != null
                             && twPlaceholderRegistry.getKnownPaths().contains(path.substring(3));
                     if (!knownTw) unknown.add(path);
@@ -207,7 +209,7 @@ public class PlaceholderResolver {
         if (path.isEmpty()) return false;
         for (int i = 0; i < path.length(); i++) {
             char c = path.charAt(i);
-            if (!((c >= 'a' && c <= 'z') || c == '_' || c == '.')) return false;
+            if (!((c >= 'a' && c <= 'z') || c == '_' || c == '#')) return false;
         }
         return true;
     }
