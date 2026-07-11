@@ -20,13 +20,21 @@ public class ChatCommandEvent extends ApplicationEvent {
     private final String command;
     private final List<String> args;
     private final SenderRole senderRole;
+    /** Twitch ID du chatteur (nullable : rewards, transports legacy). */
+    private final String senderTwitchId;
 
     public ChatCommandEvent(Object source, UserAccount user, String command,
                             List<String> args, SenderRole senderRole) {
+        this(source, user, command, args, senderRole, null);
+    }
+
+    public ChatCommandEvent(Object source, UserAccount user, String command,
+                            List<String> args, SenderRole senderRole, String senderTwitchId) {
         super(source);
         this.user = user;
         this.command = command;
         this.args = args;
         this.senderRole = senderRole;
+        this.senderTwitchId = senderTwitchId;
     }
 }
