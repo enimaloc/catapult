@@ -235,10 +235,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
             String command = "!" + parts[0];
             List<String> args = parts.length > 1 ? List.of(parts[1].split(" ")) : List.of();
             ChatCommandEvent.SenderRole role = extractRole(event);
+            String senderTwitchId = event.path("chatter_user_id").asText(null);
 
             log.info("[EventSub Chat] {} in #{}: {} (sender role={})",
                     command, user.getTwitchUsername(), text, role);
-            eventPublisher.publishEvent(new ChatCommandEvent(this, user, command, args, role));
+            eventPublisher.publishEvent(new ChatCommandEvent(this, user, command, args, role, senderTwitchId));
 
         } else if ("channel.channel_points_custom_reward_redemption.add".equals(subscriptionType)) {
             String rewardTitle = event.path("reward").path("title").asText();

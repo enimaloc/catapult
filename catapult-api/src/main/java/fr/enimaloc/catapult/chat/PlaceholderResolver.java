@@ -106,6 +106,11 @@ public class PlaceholderResolver {
         }
     }
 
+    /** Valeur brute d'un path unique (null si absente) — utilisé par !debug. */
+    public String lookupRaw(GameContext ctx, String path, Locale locale) {
+        return lookup(ctx, path, locale);
+    }
+
     private String lookup(GameContext ctx, String path, Locale locale) {
         if (ctx == null) return null;
         return switch (path) {

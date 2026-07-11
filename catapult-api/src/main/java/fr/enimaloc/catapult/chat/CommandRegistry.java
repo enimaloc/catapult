@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.service.TwitchChatService;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -25,18 +26,21 @@ public class CommandRegistry {
     private final ObjectMapper objectMapper;
     private final DynamicCommandResolver dynamicCommandResolver;
     private final MeterRegistry meterRegistry;
+    private final String appOwnerId;
 
     public CommandRegistry(List<ChatCommand> commandList,
                            TwitchChatService twitchChatService,
                            ObjectMapper objectMapper,
                            DynamicCommandResolver dynamicCommandResolver,
-                           MeterRegistry meterRegistry) {
+                           MeterRegistry meterRegistry,
+                           @Value("${app.owner-id:}") String appOwnerId) {
         this.commands = commandList.stream()
             .collect(Collectors.toMap(ChatCommand::getName, Function.identity()));
         this.twitchChatService = twitchChatService;
         this.objectMapper = objectMapper;
         this.dynamicCommandResolver = dynamicCommandResolver;
         this.meterRegistry = meterRegistry;
+        this.appOwnerId = appOwnerId;
         log.info("Registered {} static chat commands: {}", commands.size(), commands.keySet());
     }
 
@@ -47,6 +51,14 @@ public class CommandRegistry {
         }
         if (command == null) {
             log.debug("Unknown command '{}' for user {}", event.getCommand(), event.getUser().getId());
+            return;
+        }
+
+        if (command.isOwnerOnly() && !isAppOwner(event.getSenderTwitchId())) {
+            log.debug("Owner-only command '{}' denied — sender twitchId: {}",
+                event.getCommand(), event.getSenderTwitchId());
+            meterRegistry.counter("catapult.chat.commands.dispatch",
+                "name", event.getCommand(), "outcome", "forbidden").increment();
             return;
         }
 
@@ -84,6 +96,10 @@ public class CommandRegistry {
             log.warn("Could not serialize command result to JSON, falling back to toString: {}", e.getMessage());
             return result.toString();
         }
+    }
+
+    private boolean isAppOwner(String senderTwitchId) {
+        return appOwnerId != null && !appOwnerId.isBlank() && appOwnerId.equals(senderTwitchId);
     }
 
     private boolean hasPermission(ChatCommandEvent.SenderRole senderRole,
