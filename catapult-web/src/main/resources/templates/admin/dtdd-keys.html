@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'dtdd-keys', ~{::body}, null, 'container', null, null)}">
 <head>
-    <title>Catapult — DoesTheDogDie API Keys</title>
+    <title th:text="${app.name} + ' — DoesTheDogDie API Keys'">Catapult — DoesTheDogDie API Keys</title>
 </head>
 <body>
 <!--/*@thymesvar id="keys" type="java.util.List"*/-->

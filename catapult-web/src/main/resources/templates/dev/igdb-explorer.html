@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, 'igdb', ~{::body}, ~{::style}, '', null, null)}">
 <head>
-    <title>Catapult — IGDB Explorer</title>
+    <title th:text="${app.name} + ' — IGDB Explorer'">Catapult — IGDB Explorer</title>
 </head>
 <body>
 <script th:src="@{/webjars/htmx.org/dist/htmx.min.js}"></script>

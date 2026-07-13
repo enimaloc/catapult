@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, 'broadcast', ~{::body}, ~{::head/script}, 'container', null, null)}">
 <head>
-    <title>Catapult — Admin Broadcast</title>
+    <title th:text="${app.name} + ' — Admin Broadcast'">Catapult — Admin Broadcast</title>
     <script th:src="@{/js/admin-broadcast.js}" defer></script>
 </head>
 <body>

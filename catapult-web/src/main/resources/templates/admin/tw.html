@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'tw', ~{::body}, null, 'container', null, null)}">
 <head>
-    <title>Catapult — Admin Trigger Warnings</title>
+    <title th:text="${app.name} + ' — Admin Trigger Warnings'">Catapult — Admin Trigger Warnings</title>
 </head>
 <body>
 <!--/*@thymesvar id="definitions" type="java.util.List"*/-->

@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, 'notifications', ~{::body}, ~{::head/script}, 'container', null, null)}">
 <head>
-    <title>Catapult — Notifications</title>
+    <title th:text="${app.name} + ' — Notifications'">Catapult — Notifications</title>
     <script th:src="@{/js/admin-notifications.js}" defer></script>
 </head>
 <body>

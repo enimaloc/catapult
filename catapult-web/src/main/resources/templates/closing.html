@@ -3,7 +3,7 @@
       th:replace="~{template::layout(~{::title}, null, ~{::body}, ~{::style}, 'container', null, null)}">
 <head>
     <meta charset="UTF-8">
-    <title>Catapult</title>
+    <title th:text="${app.name}">Catapult</title>
 </head>
 <body>
     <div th:if="${steamError}" class="card" style="text-align:center;padding:32px">
