@@ -6,15 +6,20 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.service.XboxUserTokenService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Détecte le jeu en cours via l'API de présence Xbox Live, avec le token
@@ -27,7 +32,7 @@ import java.util.Optional;
 @ConditionalOnBooleanProperty("xbox.enabled")
 public class XboxGameGetter implements GameGetter {
 
-    private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid({xuid})/presence";
+    private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid({xuid})";
     /** Titre représentant le tableau de bord Xbox lui-même, jamais une partie en cours. */
     private static final String DASHBOARD_TITLE_NAME = "Home";
 
@@ -35,6 +40,19 @@ public class XboxGameGetter implements GameGetter {
     private final OAuthTokenRepository oAuthTokenRepository;
     private final XboxUserTokenService tokenService;
     private final ExternalApiObservations apiObservations;
+
+    @Value("${xbox.title-id-blacklist:1626579248}")
+    private String titleIdBlacklistRaw;
+
+    private Set<String> titleIdBlacklist;
+
+    @PostConstruct
+    void init() {
+        titleIdBlacklist = Arrays.stream(titleIdBlacklistRaw.split(","))
+            .map(String::trim)
+            .filter(id -> !id.isEmpty())
+            .collect(Collectors.toSet());
+    }
 
     @Override
     public String name() {
@@ -82,6 +100,7 @@ public class XboxGameGetter implements GameGetter {
                 if (titleName == null || DASHBOARD_TITLE_NAME.equals(titleName)) continue;
                 if (!"Active".equals(state)) continue;
                 String titleId = String.valueOf(title.get("id"));
+                if (titleIdBlacklist.contains(titleId)) continue;
                 return Optional.of(new DetectedGame(titleId, GameBinding.SourceType.XBOX, titleName));
             }
         }

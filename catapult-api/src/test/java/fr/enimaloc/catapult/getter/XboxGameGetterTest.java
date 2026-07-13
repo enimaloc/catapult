@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -50,6 +51,8 @@ class XboxGameGetterTest {
     @BeforeEach
     void setup() {
         getter = new XboxGameGetter(restClient, oAuthTokenRepository, tokenService, apiObservations);
+        ReflectionTestUtils.setField(getter, "titleIdBlacklistRaw", "1626579248");
+        ReflectionTestUtils.invokeMethod(getter, "init");
 
         user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -85,6 +88,35 @@ class XboxGameGetterTest {
         assertThat(result.get().getSourceId()).isEqualTo("1234");
         assertThat(result.get().getSourceName()).isEqualTo("Halo Infinite");
         assertThat(result.get().getSourceType()).isEqualTo(GameBinding.SourceType.XBOX);
+    }
+
+    @Test
+    void getCurrentGame_blacklistedTitle_skipsAndReturnsNextTitle() {
+        Map<String, Object> response = Map.of("devices", List.of(
+            Map.of("titles", List.of(
+                Map.of("id", "1626579248", "name", "Xbox", "state", "Active"),
+                Map.of("id", "1234", "name", "Halo Infinite", "state", "Active")
+            ))
+        ));
+        doReturn(response).when(responseSpec).body(Map.class);
+
+        Optional<DetectedGame> result = getter.getCurrentGame(user);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getSourceId()).isEqualTo("1234");
+        assertThat(result.get().getSourceName()).isEqualTo("Halo Infinite");
+    }
+
+    @Test
+    void getCurrentGame_onlyBlacklistedTitle_returnsEmpty() {
+        Map<String, Object> response = Map.of("devices", List.of(
+            Map.of("titles", List.of(
+                Map.of("id", "1626579248", "name", "Xbox", "state", "Active")
+            ))
+        ));
+        doReturn(response).when(responseSpec).body(Map.class);
+
+        assertThat(getter.getCurrentGame(user)).isEmpty();
     }
 
     @Test
