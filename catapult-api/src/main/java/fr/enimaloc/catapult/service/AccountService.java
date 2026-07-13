@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service;
 
+import fr.enimaloc.catapult.domain.GetterConfig;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ExperimentAssignmentRepository;
@@ -136,6 +137,11 @@ public class AccountService {
         }
         if (provider == OAuthToken.Provider.XBOX) {
             xboxUserTokenService.ifPresent(service -> service.evict(account.getId()));
+            getterConfigRepository.findByUserAndProvider(account, GetterConfig.Provider.XBOX)
+                .ifPresent(config -> {
+                    config.setEnabled(false);
+                    getterConfigRepository.save(config);
+                });
         }
         log.info("Provider {} disconnected for account {}", provider, account.getId());
     }
