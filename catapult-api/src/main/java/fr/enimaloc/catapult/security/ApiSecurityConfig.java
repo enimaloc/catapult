@@ -16,6 +16,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 
@@ -40,10 +42,6 @@ public class ApiSecurityConfig {
         http
                 .securityMatcher("/api/**")
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health", "/api/config/**", "/api/changelog").permitAll()
-                        .requestMatchers("/api/auth/exchange").permitAll()
-                        .requestMatchers("/api/connect/steam/callback").permitAll()
-                        .requestMatchers("/api/admin/**").permitAll()
                         .anyRequest().permitAll()
                 )
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -52,6 +50,20 @@ public class ApiSecurityConfig {
                 .csrf(csrf -> csrf.disable());
 
         return http.build();
+    }
+
+    @Bean
+    @Profile("dev")
+    BearerTokenResolver bearerTokenResolver() {
+        DefaultBearerTokenResolver resolver = new DefaultBearerTokenResolver();
+
+        return request -> {
+            if (request.getRequestURI().startsWith("/api/config/app")
+                    || request.getRequestURI().startsWith("/api/config/providers")) {
+                return null; // Ignore le header Authorization
+            }
+            return resolver.resolve(request);
+        };
     }
 
     @Bean
