@@ -41,7 +41,7 @@ public class XboxService {
     }
 
     public static final String MINECRAFT_RELYING_PARTY = "rp://api.minecraftservices.com/";
-    public static final String XBOX_LIVE_RELYING_PARTY = "https://xboxlive.com";
+    public static final String XBOX_LIVE_RELYING_PARTY = "http://xboxlive.com";
 
     public Token getXstsToken(Token... xboxTokens) {
         return getXstsToken(Arrays.stream(xboxTokens).map(Token::token).toArray(String[]::new));
