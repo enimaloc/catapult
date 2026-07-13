@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, 'invite', ~{::section}, null, 'container', null, null)}">
 <head>
-    <title>Catapult — Invitations</title>
+    <title th:text="${app.name} + ' — Invitations'">Catapult — Invitations</title>
 </head>
 <body>
 <!--/*@thymesvar id="canInvite" type="java.lang.Boolean"*/-->

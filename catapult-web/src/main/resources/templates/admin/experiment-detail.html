@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'experiments', ~{::body}, ~{::#extra-head}, 'container', null, null)}">
 <head>
-    <title th:text="'Catapult — ' + ${experiment.name}">Catapult — Experiment</title>
+    <title th:text="${app.name} + ' — ' + ${experiment.name}">Catapult — Experiment</title>
     <th:block id="extra-head">
         <script th:src="@{/webjars/chart.js/dist/chart.umd.js}"></script>
         <style>

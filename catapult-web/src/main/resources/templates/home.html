@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, null, ~{::div#home-content}, null, null, null, null)}">
 <head>
-    <title th:text="#{home.hero.tagline}">Catapult</title>
+    <title th:text="${app.name} + ' — ' + #{home.hero.tagline}">Catapult</title>
 </head>
 <body>
 <div id="home-content">
@@ -18,7 +18,7 @@
 
     <!-- Hero -->
     <div class="home-hero">
-        <h1>🚀 Catapult</h1>
+        <h1 th:text="'🚀 ' + ${app.name}">🚀 Catapult</h1>
         <p class="hero-tagline" th:text="#{home.hero.tagline}">Ton stream, toujours dans la bonne catégorie</p>
         <p class="hero-subtitle" th:text="#{home.hero.subtitle(${app.name})}">
             Catapult détecte le jeu que tu lances et met à jour ta catégorie Twitch automatiquement.

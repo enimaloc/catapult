@@ -16,7 +16,7 @@
     <!--/*@thymesVar id="channelUser" type="fr.enimaloc.catapult.web.ChannelPageController$ChannelUserDto"*/-->
     <meta th:if="${channelUser != null}" name="channel-owner-id" th:content="${channelUser.id}"/>
     <meta th:if="${channelUsername != null}" name="channel-username" th:content="${channelUsername}"/>
-    <title th:replace="${title}">Catapult</title>
+    <title th:text="${app.name}" th:replace="${title}">Catapult</title>
     <script>(function () {
         const t = localStorage.getItem('theme');
         if (t) document.documentElement.dataset.theme = t;
@@ -70,7 +70,7 @@
     </form>
 </div>
 <nav class="navbar">
-    <a th:href="@{/}" class="nav-brand">🚀 Catapult</a>
+    <a th:href="@{/}" class="nav-brand" th:text="'🚀 ' + ${app.name}">🚀 Catapult</a>
     <button th:if="${user != null}" class="nav-hamburger" id="nav-hamburger"
             aria-label="Menu" onclick="toggleNavMenu()">
         <span></span><span></span><span></span>

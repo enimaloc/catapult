@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, 'login', ~{::body}, null, null, null, null)}">
 <head>
-    <title>Catapult - Mock Login</title>
+    <title th:text="${app.name} + ' — Mock Login'">Catapult - Mock Login</title>
 </head>
 <body>
 <div class="login-page">

@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'steam-keys', ~{::body}, null, 'container', null, null)}">
 <head>
-    <title>Catapult — Steam API Keys</title>
+    <title th:text="${app.name} + ' — Steam API Keys'">Catapult — Steam API Keys</title>
 </head>
 <body>
 <!--/*@thymesvar id="keys" type="java.util.List"*/-->
