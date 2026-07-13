@@ -64,13 +64,13 @@ public class OAuth2ClientConfig {
             registrations.add(ClientRegistration.withRegistrationId("xbox")
                 .clientId(xboxClientId)
                 .clientSecret(xboxClientSecret)
-                .scope("openid", "XboxLive.signin", "XboxLive.offline_access")
+                .scope("XboxLive.signin", "XboxLive.offline_access")
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri(baseUrl+"/login/oauth2/code/{registrationId}")
                 .authorizationUri("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize")
                 .tokenUri("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
-                .jwkSetUri("https://login.microsoftonline.com/consumers/discovery/v2.0/keys")
-                .userNameAttributeName("sub")
+                .userInfoUri("https://graph.microsoft.com/v1.0/me")
+                .userNameAttributeName("id")
                 .build());
         }
 
