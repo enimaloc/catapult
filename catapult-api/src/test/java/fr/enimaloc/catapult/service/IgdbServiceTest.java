@@ -186,7 +186,7 @@ class IgdbServiceTest {
     @Test
     void getOrRefreshAppToken_expiredToken_fetchesNewToken() {
         when(restClient.post()).thenReturn(postSpec);
-        when(postSpec.uri(anyString())).thenReturn(bodySpec);
+        when(postSpec.uri(anyString(), any(Object[].class))).thenReturn(bodySpec);
         when(bodySpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(Map.class)).thenReturn(Map.of(
             "access_token", "new-token",
@@ -210,7 +210,7 @@ class IgdbServiceTest {
     @Test
     void getOrRefreshAppToken_nullResponse_returnsEmpty() {
         when(restClient.post()).thenReturn(postSpec);
-        when(postSpec.uri(anyString())).thenReturn(bodySpec);
+        when(postSpec.uri(anyString(), any(Object[].class))).thenReturn(bodySpec);
         when(bodySpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(Map.class)).thenReturn(null);
 
