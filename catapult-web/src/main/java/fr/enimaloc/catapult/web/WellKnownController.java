@@ -44,7 +44,7 @@ public class WellKnownController {
     /**
      * Microsoft identity association
      */
-    @GetMapping("/microsoft-identity-association")
+    @GetMapping("/microsoft-identity-association.json")
     public ResponseEntity<String> microsoftWellKnown() {
         return getProperty(
                 "catapult.well-known.microsoft-identity-association.application-id"
