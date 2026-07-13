@@ -60,7 +60,7 @@ class TwitchCategoryServiceTest {
         RestClient.RequestBodyUriSpec postSpec = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec bodySpec    = mock(RestClient.RequestBodySpec.class);
         doReturn(postSpec).when(restClient).post();
-        doReturn(bodySpec).when(postSpec).uri(anyString());
+        doReturn(bodySpec).when(postSpec).uri(anyString(), any(Object[].class));
         doReturn(responseSpec).when(bodySpec).retrieve();
         doReturn(Map.of("access_token", "app-token", "expires_in", 3600))
             .when(responseSpec).body(Map.class);

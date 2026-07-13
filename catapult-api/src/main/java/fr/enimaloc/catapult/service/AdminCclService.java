@@ -132,10 +132,8 @@ public class AdminCclService {
             return null;
         }
         Map<String, Object> response = restClient.post()
-            .uri(TWITCH_TOKEN_URL
-                + "?client_id=" + twitchClientId
-                + "&client_secret=" + twitchClientSecret
-                + "&grant_type=client_credentials")
+            .uri(TWITCH_TOKEN_URL + "?client_id={clientId}&client_secret={clientSecret}&grant_type=client_credentials",
+                twitchClientId, twitchClientSecret)
             .retrieve()
             .body(Map.class);
         return response != null ? (String) response.get("access_token") : null;

@@ -53,7 +53,7 @@ public class RealDtddApiClient implements DtddApiClient {
     public Optional<List<DtddSearchResult>> search(String query, @Nullable String mediaType) {
         return apiObservations.observe("dtdd", "search", () ->
             callWithRetry(key -> client.get()
-                    .uri(uri -> uri.path("/v3/items").queryParam("q", query).build())
+                    .uri("/v3/items?q={q}", query)
                     .header("X-API-KEY", key)
                     .retrieve()
                     .body(String.class), this::parseSearch)
@@ -82,7 +82,7 @@ public class RealDtddApiClient implements DtddApiClient {
     public Optional<DtddItem> item(long dtddId) {
         return apiObservations.observe("dtdd", "item", () ->
             callWithRetry(key -> client.get()
-                    .uri("/v3/items/" + dtddId)
+                    .uri("/v3/items/{id}", dtddId)
                     .header("X-API-KEY", key)
                     .retrieve()
                     .body(String.class), this::parseItem)
