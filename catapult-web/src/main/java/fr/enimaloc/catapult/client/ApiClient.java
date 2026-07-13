@@ -32,6 +32,7 @@ import java.util.function.Supplier;
 public class ApiClient {
 
     public static final String SESSION_JWT_KEY = "jwt";
+    public static final String NOT_STARTED_MESSAGE = "502 Bad Gateway: \"<html><EOL><EOL><head><title>502 Bad Gateway</title></head><EOL><EOL><body><EOL><EOL><center><h1>502 Bad Gateway</h1></center><EOL><EOL><hr><center>openresty</center><EOL><EOL></body><EOL><EOL></html><EOL><EOL>\"";
 
     private final String apiUrl;
     private final RestClient restClient;
@@ -48,7 +49,9 @@ public class ApiClient {
                     return execution.execute(request, body);
                 })
                 .defaultStatusHandler(HttpStatusCode::is4xxClientError, (req, res) -> {
-                    log.warn("catapult-api returned {} for {}", res.getStatusCode(), req.getURI());
+                    if (res.getStatusCode().value() != 401 && !req.getURI().getPath().equals("/api/auth/validate")) { // Investigate why front call that when not logged in
+                        log.warn("catapult-api returned {} for {}", res.getStatusCode(), req.getURI());
+                    }
                 })
                 .build();
     }
@@ -60,7 +63,9 @@ public class ApiClient {
                     .retrieve()
                     .body(responseType);
         } catch (Exception e) {
-            log.warn("GET {} failed: {}", path, e.getMessage());
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("GET {} failed: {}", path, e.getMessage());
+            }
             return null;
         }
     }
@@ -72,7 +77,9 @@ public class ApiClient {
                     .retrieve()
                     .body(responseType);
         } catch (Exception e) {
-            log.warn("GET {} failed: {}", path, e.getMessage());
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("GET {} failed: {}", path, e.getMessage());
+            }
             return null;
         }
     }
@@ -84,7 +91,9 @@ public class ApiClient {
             return (body == null ? spec.retrieve() : spec.body(body).retrieve())
                     .body(responseType);
         } catch (Exception e) {
-            log.warn("POST {} failed: {}", path, e.getMessage());
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("POST {} failed: {}", path, e.getMessage());
+            }
             return null;
         }
     }
@@ -104,7 +113,9 @@ public class ApiClient {
                         .toBodilessEntity();
             }
         } catch (Exception e) {
-            log.warn("POST {} failed: {}", path, e.getMessage());
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("POST {} failed: {}", path, e.getMessage());
+            }
         }
     }
 
@@ -117,7 +128,9 @@ public class ApiClient {
                     .toBodilessEntity();
             return true;
         } catch (Exception e) {
-            log.warn("PUT {} failed: {}", path, e.getMessage());
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("PUT {} failed: {}", path, e.getMessage());
+            }
             return false;
         }
     }
@@ -130,7 +143,9 @@ public class ApiClient {
                     .toBodilessEntity();
             return true;
         } catch (Exception e) {
-            log.warn("DELETE {} failed: {}", path, e.getMessage());
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("DELETE {} failed: {}", path, e.getMessage());
+            }
             return false;
         }
     }
