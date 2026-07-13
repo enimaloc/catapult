@@ -325,9 +325,8 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
         log.debug("getOrRefreshAppToken — fetching new app token");
         try {
             Map<String, Object> resp = restClient.post()
-                    .uri(TWITCH_TOKEN_URL + "?client_id=" + twitchClientId
-                         + "&client_secret=" + twitchClientSecret
-                         + "&grant_type=client_credentials")
+                    .uri(TWITCH_TOKEN_URL + "?client_id={clientId}&client_secret={clientSecret}&grant_type=client_credentials",
+                        twitchClientId, twitchClientSecret)
                     .retrieve()
                     .body(Map.class);
 
