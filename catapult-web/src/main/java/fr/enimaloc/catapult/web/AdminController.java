@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -379,6 +381,58 @@ public class AdminController {
     public String refreshSteamKeys() {
         apiClient.post("/api/admin/steam-keys/refresh", null);
         return "redirect:/admin/steam-keys";
+    }
+
+    // ── Minecraft Service Accounts ───────────────────────────────────────────
+
+    @GetMapping("/minecraft-accounts")
+    public String minecraftAccountsPage(Model model) {
+        List<Map<String, Object>> accounts = apiClient.adminMinecraftAccounts();
+        model.addAttribute("accounts", accounts == null ? List.of() : accounts);
+        return "admin/minecraft-accounts";
+    }
+
+    @PostMapping("/minecraft-accounts/{id}/toggle")
+    public String toggleMinecraftAccount(@PathVariable UUID id, @RequestParam boolean enabled) {
+        apiClient.adminMinecraftPatch(id, Map.of("enabled", enabled));
+        return "redirect:/admin/minecraft-accounts";
+    }
+
+    @PostMapping("/minecraft-accounts/{id}/reset-limit")
+    public String resetMinecraftAccountLimit(@PathVariable UUID id) {
+        apiClient.adminMinecraftPatch(id, Map.of("friendLimitReached", false));
+        return "redirect:/admin/minecraft-accounts";
+    }
+
+    @PostMapping("/minecraft-accounts/{id}/delete")
+    public String deleteMinecraftAccount(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
+        if (apiClient.adminMinecraftDelete(id) == 409) {
+            redirectAttributes.addFlashAttribute("minecraftAccountsError", "links");
+        }
+        return "redirect:/admin/minecraft-accounts";
+    }
+
+    @PostMapping("/minecraft-accounts/device-code/start")
+    @ResponseBody
+    public Map<String, Object> startMinecraftDeviceCode() {
+        Map<String, Object> dc = apiClient.adminMinecraftDeviceCodeStart();
+        return dc == null ? Map.of("status", "ERROR") : dc;
+    }
+
+    @PostMapping("/minecraft-accounts/device-code/complete")
+    @ResponseBody
+    public Map<String, Object> completeMinecraftDeviceCode(@RequestParam String deviceCode,
+                                                           @RequestParam String label) {
+        ApiClient.ApiResult result = apiClient.adminMinecraftCreate(deviceCode, label);
+        if (result.status() == 202) {
+            return Map.of("status", "PENDING");
+        }
+        if (result.status() == 200) {
+            return Map.of("status", "CREATED",
+                    "label", String.valueOf(result.body().getOrDefault("label", label)),
+                    "minecraftUsername", String.valueOf(result.body().getOrDefault("minecraftUsername", "?")));
+        }
+        return Map.of("status", "ERROR", "message", String.valueOf(result.body().getOrDefault("message", "")));
     }
 
     // ── DTDD Keys ────────────────────────────────────────────────────────────
