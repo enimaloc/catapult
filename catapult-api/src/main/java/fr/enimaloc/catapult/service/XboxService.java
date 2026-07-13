@@ -40,14 +40,25 @@ public class XboxService {
                 .body(Token.class);
     }
 
+    public static final String MINECRAFT_RELYING_PARTY = "rp://api.minecraftservices.com/";
+    public static final String XBOX_LIVE_RELYING_PARTY = "https://xboxlive.com";
+
     public Token getXstsToken(Token... xboxTokens) {
         return getXstsToken(Arrays.stream(xboxTokens).map(Token::token).toArray(String[]::new));
     }
 
     public Token getXstsToken(String... tokens) {
+        return getXstsToken(MINECRAFT_RELYING_PARTY, tokens);
+    }
+
+    public Token getXstsToken(String relyingParty, Token... xboxTokens) {
+        return getXstsToken(relyingParty, Arrays.stream(xboxTokens).map(Token::token).toArray(String[]::new));
+    }
+
+    public Token getXstsToken(String relyingParty, String... tokens) {
         return getXstsToken(new PropertiesRequest<>(
                 new XstsAuthXboxServicePayload(tokens),
-                "rp://api.minecraftservices.com/",
+                relyingParty,
                 "JWT"
         ));
     }
@@ -92,8 +103,9 @@ public class XboxService {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record DisplayClaims(Xui[] xui) {
+        // xid absent des réponses scopées Minecraft, présent pour la relying party Xbox Live
         @JsonIgnoreProperties(ignoreUnknown = true)
-        public record Xui(String uhs) {}
+        public record Xui(String uhs, String xid) {}
     }
 
     public record PropertiesRequest<T>(

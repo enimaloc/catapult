@@ -4,6 +4,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2RefreshTokenGrantRequest;
+import org.springframework.security.oauth2.client.endpoint.RestClientRefreshTokenTokenResponseClient;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
@@ -61,9 +64,9 @@ public class OAuth2ClientConfig {
             registrations.add(ClientRegistration.withRegistrationId("xbox")
                 .clientId(xboxClientId)
                 .clientSecret(xboxClientSecret)
-                .scope("openid", "XboxLive.signin", "XboxLive.offline_access")
+                .scope("XboxLive.signin", "XboxLive.offline_access")
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .redirectUri(baseUrl+"/login/oauth2/code/{registrationId}")
                 .authorizationUri("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize")
                 .tokenUri("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
                 .userInfoUri("https://graph.microsoft.com/v1.0/me")
@@ -77,7 +80,7 @@ public class OAuth2ClientConfig {
                 .clientSecret(battleNetClientSecret)
                 .scope("openid")
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .redirectUri(baseUrl+"/login/oauth2/code/{registrationId}")
                 .authorizationUri("https://oauth.battle.net/authorize")
                 .tokenUri("https://oauth.battle.net/token")
                 .userInfoUri("https://oauth.battle.net/userinfo")
@@ -86,5 +89,10 @@ public class OAuth2ClientConfig {
         }
 
         return new InMemoryClientRegistrationRepository(registrations);
+    }
+
+    @Bean
+    public OAuth2AccessTokenResponseClient<OAuth2RefreshTokenGrantRequest> refreshTokenResponseClient() {
+        return new RestClientRefreshTokenTokenResponseClient();
     }
 }

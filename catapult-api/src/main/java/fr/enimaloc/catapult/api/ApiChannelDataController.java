@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.DtddGameCache;
 import fr.enimaloc.catapult.domain.DtddGameMapping;
 import fr.enimaloc.catapult.domain.DtddMappingProposal;
 import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.DetectedGame;
@@ -12,6 +13,7 @@ import fr.enimaloc.catapult.repository.DtddGameCacheRepository;
 import fr.enimaloc.catapult.repository.DtddGameMappingRepository;
 import fr.enimaloc.catapult.repository.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.TwDefinitionRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
@@ -28,6 +30,7 @@ import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -74,6 +77,10 @@ public class ApiChannelDataController {
     private final DtddGameMappingRepository dtddMappingRepo;
     private final DtddGameCacheRepository dtddGameCacheRepo;
     private final DtddMappingProposalRepository dtddProposalRepo;
+    private final OAuthTokenRepository oAuthTokenRepository;
+
+    @Value("${xbox.enabled:false}")
+    private boolean xboxEnabled;
 
     @GetMapping(value = "/logs", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter logs(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
@@ -200,6 +207,10 @@ public class ApiChannelDataController {
             }
         }
 
+        boolean hasXboxProvider = xboxEnabled;
+        boolean hasXbox = hasXboxProvider
+                && oAuthTokenRepository.findByUserAndProvider(channelUser, OAuthToken.Provider.XBOX).isPresent();
+
         ChannelUserDto channelUserDto = new ChannelUserDto(
                 channelUser.getId().toString(),
                 channelUser.getTwitchId(),
@@ -234,7 +245,9 @@ public class ApiChannelDataController {
                 steamProfilePrivate,
                 steamRateLimited,
                 steamOfflineMode,
-                steamProfileCacheTtlMinutes
+                steamProfileCacheTtlMinutes,
+                hasXboxProvider,
+                hasXbox
         );
     }
 
@@ -431,7 +444,9 @@ public class ApiChannelDataController {
             boolean steamProfilePrivate,
             boolean steamRateLimited,
             boolean steamOfflineMode,
-            long steamProfileCacheTtlMinutes
+            long steamProfileCacheTtlMinutes,
+            boolean hasXboxProvider,
+            boolean hasXbox
     ) {}
 
     public record ChannelUserDto(String id, String twitchId, String twitchUsername, String profileImageUrl) {}
