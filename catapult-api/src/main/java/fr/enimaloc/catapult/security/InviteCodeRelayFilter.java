@@ -12,9 +12,8 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.time.Duration;
-
 import java.io.IOException;
+import java.time.Duration;
 
 /**
  * Captures the ?invite=CODE query parameter from /oauth2/authorization/twitch
