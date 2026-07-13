@@ -18,6 +18,7 @@ import java.util.List;
 @RequestMapping("/api/config")
 public class ApiConfigController {
 
+    @Value("${minecraft.enabled:false}")         private boolean minecraftEnabled;
     @Value("${steam.enabled:false}")         private boolean steamEnabled;
     @Value("${steam.api-key:}")              private String steamApiKey;
     @Value("${xbox.enabled:false}")          private boolean xboxEnabled;
@@ -37,7 +38,7 @@ public class ApiConfigController {
     @GetMapping("/providers")
     public ProvidersResponse providers() {
         boolean showSteam = steamEnabled && steamKeyAvailable();
-        return new ProvidersResponse(showSteam, xboxEnabled, battlenetEnabled);
+        return new ProvidersResponse(minecraftEnabled, showSteam, xboxEnabled, battlenetEnabled);
     }
 
     @GetMapping("/app")
@@ -53,8 +54,8 @@ public class ApiConfigController {
         return !steamApiKey.isBlank();
     }
 
-    public record ProvidersResponse(boolean steam, boolean xbox, boolean battlenet) {
-        public boolean hasAny() { return steam || xbox || battlenet; }
+    public record ProvidersResponse(boolean minecraft, boolean steam, boolean xbox, boolean battlenet) {
+        public boolean hasAny() { return minecraft || steam || xbox || battlenet; }
     }
 
     public record AppConfigResponse(String name, int deletionDelayDays, List<String> gettersName) {}
