@@ -82,7 +82,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             return switch (registrationId) {
                 case "twitch" -> handleTwitchLogin(userRequest, fetchTwitchUser(userRequest));
                 case "steam" -> handleSecondaryLink(userRequest, OAuthToken.Provider.STEAM);
-//                case "xbox" -> handleSecondaryLink(userRequest, OAuthToken.Provider.XBOX);
+                case "xbox" -> handleSecondaryLink(userRequest, OAuthToken.Provider.XBOX);
 //                case "battlenet" -> handleSecondaryLink(userRequest, OAuthToken.Provider.BATTLENET);
                 default -> delegate.loadUser(userRequest);
             };
@@ -99,9 +99,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     }
 
     /**
-     * Discord is a secondary provider (game detection), not a login provider.
-     * When a user links Discord, they are already authenticated via Twitch.
-     * We save the Discord token for their account and return their existing principal.
+     * Steam/Xbox/BattleNet are secondary providers (game detection), not login
+     * providers. When a user links one, they are already authenticated via
+     * Twitch. We save the token for their account and return their existing
+     * principal.
      */
     private OAuth2User handleSecondaryLink(OAuth2UserRequest userRequest, OAuthToken.Provider provider) {
         Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();

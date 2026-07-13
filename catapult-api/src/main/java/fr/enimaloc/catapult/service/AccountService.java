@@ -23,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -39,6 +40,7 @@ public class AccountService {
     private final GameBindingRepository gameBindingRepository;
     private final GetterConfigRepository getterConfigRepository;
     private final UserSettingsRepository userSettingsRepository;
+    private final Optional<XboxUserTokenService> xboxUserTokenService;
 
     @Value("${app.account.deletion-delay-days:7}")
     private int deletionDelayDays;
@@ -131,6 +133,9 @@ public class AccountService {
         if (provider == OAuthToken.Provider.STEAM) {
             account.setSteamId(null);
             userAccountRepository.save(account);
+        }
+        if (provider == OAuthToken.Provider.XBOX) {
+            xboxUserTokenService.ifPresent(service -> service.evict(account.getId()));
         }
         log.info("Provider {} disconnected for account {}", provider, account.getId());
     }
