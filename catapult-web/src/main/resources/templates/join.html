@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, null, ~{::div#join-content}, null, null, null, null)}">
 <head>
-    <title th:text="#{join.title}">Rejoindre l'alpha</title>
+    <title th:text="#{join.title(${app.name})}">Rejoindre l'alpha</title>
 </head>
 <body>
 <!--/*@thymesvar id="inviteCode" type="java.lang.String"*/-->

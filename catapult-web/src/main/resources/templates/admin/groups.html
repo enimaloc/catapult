@@ -2,12 +2,12 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'groups', ~{::body}, null, 'container', null, null)}">
 <head>
-    <title th:text="#{admin.groups.title}">Administration — Groupes</title>
+    <title th:text="#{admin.groups.title(${app.name})}">Administration — Groupes</title>
 </head>
 <body>
 <!--/*@thymesvar id="groups" type="java.util.List"*/-->
 
-    <h2 th:text="#{admin.groups.title}" style="margin-bottom:1rem">Administration — Groupes</h2>
+    <h2 th:text="#{admin.groups.title('Administration')}" style="margin-bottom:1rem">Administration — Groupes</h2>
 
     <div class="card" style="margin-bottom:1.5rem">
         <h3 th:text="#{admin.groups.create.title}" style="margin-bottom:0.75rem">Créer un groupe</h3>

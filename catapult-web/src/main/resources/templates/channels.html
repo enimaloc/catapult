@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, 'channels', ~{::div#main-content}, null, 'container', null, null)}">
 <head>
-    <title th:text="#{channels.title}">My Channels</title>
+    <title th:text="#{channels.title(${app.name})}">Catapult — My Channels</title>
 </head>
 <body>
     <div id="main-content">

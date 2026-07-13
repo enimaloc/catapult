@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, 'config', ~{::body}, ~{::head/script}, 'container', null, null)}">
 <head>
-    <title>Catapult — Configuration</title>
+    <title th:text="${app.name} + ' — Configuration'">Catapult — Configuration</title>
     <script th:src="@{/js/admin-config.js}" defer></script>
 </head>
 <body>
