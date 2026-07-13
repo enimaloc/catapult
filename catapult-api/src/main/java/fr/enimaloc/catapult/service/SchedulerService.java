@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.GameGetterChain;
+import fr.enimaloc.catapult.getter.MinecraftPresenceGetter;
 import fr.enimaloc.catapult.getter.SteamGameGetter;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,6 +35,7 @@ public class SchedulerService {
     private final ApplicationEventPublisher eventPublisher;
     private final MeterRegistry meterRegistry;
     private final Optional<SteamGameGetter> steamGameGetter;
+    private final Optional<MinecraftPresenceGetter> minecraftPresenceGetter;
     private final BindingService bindingService;
 
     @Scheduled(fixedRateString = "${app.polling.interval-seconds:60}000")
@@ -59,6 +61,20 @@ public class SchedulerService {
                 }
             });
 
+            minecraftPresenceGetter.ifPresent(getter -> {
+                CompletableFuture<Void> prefetch = getter.prefetchBatch();
+                try {
+                    prefetch.get(5, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (java.util.concurrent.TimeoutException e) {
+                    prefetch.cancel(false);
+                    log.warn("Minecraft prefetch timed out after 5s — proceeding with partial results");
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (java.util.concurrent.ExecutionException e) {
+                    log.warn("Minecraft prefetch failed: {}", e.getCause().getMessage());
+                }
+            });
+
             for (UserAccount user : activeUsers) {
                 try {
                     processUser(user);
@@ -69,6 +85,7 @@ public class SchedulerService {
             }
         } finally {
             steamGameGetter.ifPresent(SteamGameGetter::clearCycleCache);
+            minecraftPresenceGetter.ifPresent(MinecraftPresenceGetter::clearCycleCache);
             sample.stop(Timer.builder("catapult.scheduler.poll.duration").register(meterRegistry));
         }
     }

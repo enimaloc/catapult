@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.net.URI;
 import java.util.Set;
@@ -213,6 +214,38 @@ public class ChannelActionsController {
             @RequestHeader(value = "HX-Request", required = false) String hxRequest) {
         apiClient.post("/api/channels/{username}/settings/cancel-deletion", null, username);
         return ackOrRedirect(hxRequest, username);
+    }
+
+    @PostMapping("/settings/minecraft")
+    public String minecraftEnroll(@PathVariable String username,
+                                  @RequestParam String minecraftName,
+                                  RedirectAttributes redirectAttributes) {
+        String name = minecraftName.trim();
+        if (!name.matches("[A-Za-z0-9_]{3,16}")) {
+            redirectAttributes.addFlashAttribute("minecraftError", "unknown");
+            return "redirect:/channels/" + username;
+        }
+        ApiClient.ApiResult result = apiClient.minecraftEnroll(name);
+        if (result.status() == 404) {
+            redirectAttributes.addFlashAttribute("minecraftError", "unknown");
+        } else if (result.status() == 503) {
+            redirectAttributes.addFlashAttribute("minecraftError", "capacity");
+        } else if (result.status() >= 400) {
+            redirectAttributes.addFlashAttribute("minecraftError", "generic");
+        }
+        return "redirect:/channels/" + username;
+    }
+
+    @PostMapping("/settings/minecraft/check")
+    public String minecraftCheck(@PathVariable String username) {
+        apiClient.minecraftSyncNow();
+        return "redirect:/channels/" + username;
+    }
+
+    @PostMapping("/settings/minecraft/disconnect")
+    public String minecraftDisconnect(@PathVariable String username) {
+        apiClient.minecraftUnenroll();
+        return "redirect:/channels/" + username;
     }
 
     @PostMapping("/settings/disconnect")

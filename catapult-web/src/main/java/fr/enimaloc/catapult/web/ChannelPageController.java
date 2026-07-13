@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -97,6 +98,16 @@ public class ChannelPageController {
         model.addAttribute("steamRateLimited", data.steamRateLimited());
         model.addAttribute("steamOfflineMode", data.steamOfflineMode());
         model.addAttribute("steamProfileCacheTtlMinutes", data.steamProfileCacheTtlMinutes());
+
+        // Liaison Minecraft : uniquement pour le propriétaire (l'API est scoped au JWT courant)
+        if (data.isOwner()) {
+            Map<String, Object> mc = apiClient.minecraftLinkState();
+            model.addAttribute("minecraftStatus", mc == null ? "UNAVAILABLE" : String.valueOf(mc.getOrDefault("status", "NONE")));
+            model.addAttribute("minecraftName", mc == null ? null : mc.get("minecraftName"));
+            model.addAttribute("minecraftBotUsername", mc == null ? null : mc.get("serviceAccountUsername"));
+        } else {
+            model.addAttribute("minecraftStatus", "NONE");
+        }
 
         // Settings — single API call, exposed under four template attribute names
         // because each of the *Settings panels references different fields of the
