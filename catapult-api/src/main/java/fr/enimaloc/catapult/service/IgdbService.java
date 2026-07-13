@@ -562,9 +562,8 @@ public class IgdbService {
         }
         try {
             Map<String, Object> response = restClient.post()
-                .uri(TWITCH_TOKEN_URL + "?client_id=" + clientId
-                     + "&client_secret=" + clientSecret
-                     + "&grant_type=client_credentials")
+                .uri(TWITCH_TOKEN_URL + "?client_id={clientId}&client_secret={clientSecret}&grant_type=client_credentials",
+                    clientId, clientSecret)
                 .retrieve()
                 .body(Map.class);
 

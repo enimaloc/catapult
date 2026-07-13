@@ -10,7 +10,6 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -143,14 +142,11 @@ public class RealSteamApiClient implements SteamApiClient {
                 return result;
             }
 
-            String url = UriComponentsBuilder
-                .fromUriString(PLAYER_SUMMARIES_URL)
-                .queryParam("key", apiKey)
-                .queryParam("steamids", String.join(",", steamIds))
-                .toUriString();
-
             try {
-                Map<String, Object> response = restClient.get().uri(url).retrieve().body(Map.class);
+                Map<String, Object> response = restClient.get()
+                    .uri(PLAYER_SUMMARIES_URL + "?key={key}&steamids={steamids}",
+                        apiKey, String.join(",", steamIds))
+                    .retrieve().body(Map.class);
                 if (response == null) return result;
 
                 Map<String, Object> body = (Map<String, Object>) response.get(RESPONSE_KEY);
@@ -223,15 +219,9 @@ public class RealSteamApiClient implements SteamApiClient {
                 return false;
             }
 
-            String url = UriComponentsBuilder
-                .fromUriString(OWNED_GAMES_URL)
-                .queryParam("key", key)
-                .queryParam("steamid", steamId)
-                .toUriString();
-
             try {
                 Map<String, Object> response = restClient.get()
-                    .uri(url)
+                    .uri(OWNED_GAMES_URL + "?key={key}&steamid={steamid}", key, steamId)
                     .retrieve()
                     .body(Map.class);
                 if (response == null) return false;
@@ -274,15 +264,9 @@ public class RealSteamApiClient implements SteamApiClient {
                 return Optional.empty();
             }
 
-            String url = UriComponentsBuilder
-                .fromUriString(PLAYER_SUMMARIES_URL)
-                .queryParam("key", token)
-                .queryParam("steamids", steamId)
-                .toUriString();
-
             try {
                 Map<String, Object> response = restClient.get()
-                    .uri(url)
+                    .uri(PLAYER_SUMMARIES_URL + "?key={key}&steamids={steamids}", token, steamId)
                     .retrieve()
                     .body(Map.class);
                 if (response == null) return Optional.empty();
@@ -330,15 +314,11 @@ public class RealSteamApiClient implements SteamApiClient {
 
                 if (!rateLimiter.acquireBlocking(key)) return List.of();
 
-                String url = UriComponentsBuilder
-                    .fromUriString(OWNED_GAMES_URL)
-                    .queryParam("key", key)
-                    .queryParam("steamid", steamId)
-                    .queryParam("include_appinfo", 1)
-                    .toUriString();
-
                 try {
-                    Map<String, Object> response = restClient.get().uri(url).retrieve().body(Map.class);
+                    Map<String, Object> response = restClient.get()
+                        .uri(OWNED_GAMES_URL + "?key={key}&steamid={steamid}&include_appinfo={includeAppinfo}",
+                            key, steamId, 1)
+                        .retrieve().body(Map.class);
                     if (response == null) return List.of();
                     Map<String, Object> body = (Map<String, Object>) response.get(RESPONSE_KEY);
                     if (body == null) return List.of();
