@@ -69,6 +69,7 @@ public class OAuth2ClientConfig {
                 .redirectUri(baseUrl+"/login/oauth2/code/{registrationId}")
                 .authorizationUri("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize")
                 .tokenUri("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+                .jwkSetUri("https://login.microsoftonline.com/consumers/discovery/v2.0/keys")
                 .userInfoUri("https://graph.microsoft.com/v1.0/me")
                 .userNameAttributeName("id")
                 .build());
