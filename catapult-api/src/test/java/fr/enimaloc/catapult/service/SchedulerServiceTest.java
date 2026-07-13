@@ -43,7 +43,7 @@ class SchedulerServiceTest {
         registry = new SimpleMeterRegistry();
         schedulerService = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.empty(), bindingService);
+            Optional.empty(), Optional.empty(), bindingService);
     }
 
     @Test
@@ -94,7 +94,7 @@ class SchedulerServiceTest {
 
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.of(steamGetter), bindingService);
+            Optional.of(steamGetter), Optional.empty(), bindingService);
 
         service.poll();
 
