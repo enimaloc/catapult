@@ -21,6 +21,7 @@ public class HomeController {
     @GetMapping("/")
     public String home(@AuthenticationPrincipal CatapultWebUser principal, Model model) {
         if (!apiHealthService.isAvailable()) {
+            model.addAttribute("showMinecraft",     false);
             model.addAttribute("showSteam",     false);
             model.addAttribute("showXbox",      false);
             model.addAttribute("showBattlenet", false);
@@ -33,10 +34,12 @@ public class HomeController {
         }
 
         Map<?, ?> providers = apiClient.get("/api/config/providers", Map.class);
+        boolean showMinecraft = providers != null && Boolean.TRUE.equals(providers.get("minecraft"));
         boolean showSteam     = providers != null && Boolean.TRUE.equals(providers.get("steam"));
         boolean showXbox      = providers != null && Boolean.TRUE.equals(providers.get("xbox"));
         boolean showBattlenet = providers != null && Boolean.TRUE.equals(providers.get("battlenet"));
 
+        model.addAttribute("showMinecraft",  showMinecraft);
         model.addAttribute("showSteam",      showSteam);
         model.addAttribute("showXbox",       showXbox);
         model.addAttribute("showBattlenet",  showBattlenet);
