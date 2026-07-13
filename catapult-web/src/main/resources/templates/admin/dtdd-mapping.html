@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'dtdd-mapping', ~{::body}, null, 'container', null, null)}">
 <head>
-    <title>Catapult — DoesTheDogDie Mapping</title>
+    <title th:text="${app.name} + ' — DoesTheDogDie Mapping'">Catapult — DoesTheDogDie Mapping</title>
 </head>
 <body>
 <!--/*@thymesvar id="proposals" type="java.util.List"*/-->

@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'whitelist', ~{::body}, null, 'container', null, null)}">
 <head>
-    <title>Catapult — Whitelist</title>
+    <title th:text="${app.name} + ' — Whitelist'">Catapult — Whitelist</title>
 </head>
 <body>
 <!--/*@thymesvar id="entries" type="java.util.List"*/-->

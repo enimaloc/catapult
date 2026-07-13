@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, 'minecraft-accounts', ~{::body}, ~{::head/script}, 'container', null, null)}">
 <head>
-    <title>Catapult — Minecraft accounts</title>
+    <title th:text="${app.name} + ' — Minecraft accounts'">Catapult — Minecraft accounts</title>
     <script th:src="@{/js/admin-minecraft-accounts.js}" defer></script>
 </head>
 <body>

@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, null, ~{::body}, null, 'main-content', null, null)}">
 <head>
-    <title th:text="#{privacy.title}">Politique de confidentialité</title>
+    <title th:text="#{privacy.title(${app.name})}">Catapult — Politique de confidentialité</title>
 </head>
 <body>
 <div class="privacy-page">

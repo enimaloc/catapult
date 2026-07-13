@@ -3,7 +3,7 @@
       th:replace="~{template::layout(~{::title}, 'app', ~{::div#main-content}, ~{::style}, 'container', ~{::aside#left-panel}, ~{::aside#right-panel})}"
       xmlns:exp="http://www.w3.org/1999/xhtml">
 <head>
-    <title>Catapult</title>
+    <title th:text="${app.name}">Catapult</title>
 </head>
 <body>
     <div id="main-content">

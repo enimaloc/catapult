@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{template::layout(~{::title}, 'experiments', ~{::body}, null, 'container', null, null)}">
 <head>
-    <title>Catapult — Experiments</title>
+    <title th:text="${app.name} + ' — Experiments'">Catapult — Experiments</title>
 </head>
 <body>
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">

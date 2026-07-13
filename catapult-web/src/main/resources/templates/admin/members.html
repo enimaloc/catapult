@@ -2,7 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws"
       th:replace="~{template::layout(~{::title}, 'members', ~{::body}, null, 'container', null, null)}">
 <head>
-    <title>Catapult — Membres</title>
+    <title th:text="${app.name} + ' — Membres'">Catapult — Membres</title>
 </head>
 <body>
 <!--/*@thymesvar id="members" type="java.util.List"*/-->
