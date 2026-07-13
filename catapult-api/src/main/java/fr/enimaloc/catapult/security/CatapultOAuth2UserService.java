@@ -112,8 +112,29 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         }
 
         saveToken(existingUser.getUserAccount(), provider, userRequest);
+        if (provider == OAuthToken.Provider.XBOX) {
+            enableGetter(existingUser.getUserAccount(), GetterConfig.Provider.XBOX);
+        }
         log.info("{} linked for user {}", provider, existingUser.getUserAccount().getId());
         return existingUser;
+    }
+
+    /**
+     * La chaîne de détection ne consulte que les providers ayant une ligne
+     * GetterConfig activée : la liaison doit créer/activer celle du provider
+     * (les comptes créés avant l'ajout du provider n'en ont pas).
+     */
+    private void enableGetter(UserAccount user, GetterConfig.Provider provider) {
+        GetterConfig config = getterConfigRepository.findByUserAndProvider(user, provider)
+            .orElseGet(() -> {
+                GetterConfig created = new GetterConfig();
+                created.setUser(user);
+                created.setProvider(provider);
+                created.setPriority(getterConfigRepository.findByUserOrderByPriorityAsc(user).size() + 1);
+                return created;
+            });
+        config.setEnabled(true);
+        getterConfigRepository.save(config);
     }
 
     /**
