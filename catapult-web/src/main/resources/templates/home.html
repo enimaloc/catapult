@@ -72,6 +72,7 @@
         <div class="home-section" th:if="${hasAnySources}">
             <div class="home-section-title" th:text="#{home.sources.title}">Plateformes supportées</div>
             <div class="home-sources">
+                <div class="home-source-badge" th:if="${showMinecraft}">🎮 Minecraft</div>
                 <div class="home-source-badge" th:if="${showSteam}">🎮 Steam</div>
                 <div class="home-source-badge" th:if="${showXbox}">🎮 Xbox</div>
                 <div class="home-source-badge" th:if="${showBattlenet}">🎮 Battle.net</div>
