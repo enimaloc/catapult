@@ -25,7 +25,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.io.IOException;
 
 /**
- * Saves the Twitch refresh token after a successful OAuth2 login.
+ * Saves the refresh token after a successful OAuth2 login or secondary link
+ * (Twitch = login, Xbox = secondary link on an already-authenticated user).
  * Spring's OAuth2UserService only exposes the access token; the refresh token
  * is only available via OAuth2AuthorizedClientRepository once the client is saved,
  * which happens before this handler is called.
@@ -60,44 +61,59 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException, ServletException {
         if (authentication instanceof OAuth2AuthenticationToken oauth2Token
-            && "twitch".equals(oauth2Token.getAuthorizedClientRegistrationId())
             && oauth2Token.getPrincipal() instanceof CatapultOAuth2User catUser) {
 
-            eventPublisher.publishEvent(new TwitchLoginEvent(this, catUser.getUserAccount()));
+            String registrationId = oauth2Token.getAuthorizedClientRegistrationId();
+            if ("twitch".equals(registrationId)) {
+                eventPublisher.publishEvent(new TwitchLoginEvent(this, catUser.getUserAccount()));
+                saveRefreshToken(request, authentication, catUser, "twitch", OAuthToken.Provider.TWITCH);
 
-            OAuth2AuthorizedClient client = authorizedClientRepository
-                .loadAuthorizedClient("twitch", authentication, request);
-
-            if (client != null && client.getRefreshToken() != null) {
-                oAuthTokenRepository.findByUserAndProvider(catUser.getUserAccount(), OAuthToken.Provider.TWITCH)
-                    .ifPresent(token -> {
-                        token.setRefreshToken(tokenEncryptionService.encrypt(
-                            client.getRefreshToken().getTokenValue()));
-                        if (client.getAccessToken().getExpiresAt() != null) {
-                            token.setExpiresAt(client.getAccessToken().getExpiresAt());
-                        }
-                        oAuthTokenRepository.save(token);
-                        log.debug("Saved Twitch refresh token for user {}", catUser.getUserAccount().getId());
-                    });
-            } else {
-                log.warn("No refresh token in OAuth2AuthorizedClient for user {} — Twitch may not have issued one",
-                    catUser.getUserAccount().getId());
-            }
-
-            // If catapult-web is configured, redirect there with a one-time code instead of the JWT.
-            // catapult-web exchanges the code server-to-server via POST /api/auth/exchange (30s TTL, single-use).
-            if (webUrl != null && !webUrl.isBlank()) {
-                String jwt = jwtService.generate(catUser);
-                String code = codeStore.issue(jwt);
-                String callbackUrl = UriComponentsBuilder.fromUriString(webUrl)
-                        .path("/auth/callback")
-                        .queryParam("code", code)
-                        .build().toUriString();
-                response.sendRedirect(callbackUrl);
-                return;
+                // If catapult-web is configured, redirect there with a one-time code instead of the JWT.
+                // catapult-web exchanges the code server-to-server via POST /api/auth/exchange (30s TTL, single-use).
+                if (webUrl != null && !webUrl.isBlank()) {
+                    String jwt = jwtService.generate(catUser);
+                    String code = codeStore.issue(jwt);
+                    String callbackUrl = UriComponentsBuilder.fromUriString(webUrl)
+                            .path("/auth/callback")
+                            .queryParam("code", code)
+                            .build().toUriString();
+                    response.sendRedirect(callbackUrl);
+                    return;
+                }
+            } else if ("xbox".equals(registrationId)) {
+                // Xbox is a secondary link: the user is already authenticated via Twitch.
+                // Only the refresh token needs saving — no login event, no JWT re-issuance.
+                saveRefreshToken(request, authentication, catUser, "xbox", OAuthToken.Provider.XBOX);
             }
         }
 
         delegate.onAuthenticationSuccess(request, response, authentication);
+    }
+
+    /**
+     * Spring's OAuth2UserService only exposes the access token; the refresh token
+     * is only available via OAuth2AuthorizedClientRepository once the client is saved,
+     * which happens before this handler is called.
+     */
+    private void saveRefreshToken(HttpServletRequest request, Authentication authentication, CatapultOAuth2User catUser,
+                                   String registrationId, OAuthToken.Provider provider) {
+        OAuth2AuthorizedClient client = authorizedClientRepository
+            .loadAuthorizedClient(registrationId, authentication, request);
+
+        if (client != null && client.getRefreshToken() != null) {
+            oAuthTokenRepository.findByUserAndProvider(catUser.getUserAccount(), provider)
+                .ifPresent(token -> {
+                    token.setRefreshToken(tokenEncryptionService.encrypt(
+                        client.getRefreshToken().getTokenValue()));
+                    if (client.getAccessToken().getExpiresAt() != null) {
+                        token.setExpiresAt(client.getAccessToken().getExpiresAt());
+                    }
+                    oAuthTokenRepository.save(token);
+                    log.debug("Saved {} refresh token for user {}", provider, catUser.getUserAccount().getId());
+                });
+        } else {
+            log.warn("No refresh token in OAuth2AuthorizedClient for user {} — {} may not have issued one",
+                catUser.getUserAccount().getId(), provider);
+        }
     }
 }
