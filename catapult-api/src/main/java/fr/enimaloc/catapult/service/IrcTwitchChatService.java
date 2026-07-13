@@ -190,7 +190,7 @@ public class IrcTwitchChatService implements TwitchChatService {
         List<String> args = parts.length > 1 ? List.of(parts[1].split(" ")) : List.of();
 
         eventPublisher.publishEvent(
-            new ChatCommandEvent(this, user, command, args, extractRole(tags)));
+            new ChatCommandEvent(this, user, command, args, extractRole(tags), extractSenderId(tags)));
     }
 
     static ChatCommandEvent.SenderRole extractRole(String tags) {
@@ -202,6 +202,16 @@ public class IrcTwitchChatService implements TwitchChatService {
             }
         }
         return ChatCommandEvent.SenderRole.EVERYONE;
+    }
+
+    static String extractSenderId(String tags) {
+        for (String tag : tags.split(";")) {
+            if (tag.startsWith("user-id=")) {
+                String id = tag.substring("user-id=".length());
+                return id.isEmpty() ? null : id;
+            }
+        }
+        return null;
     }
 
     @Override

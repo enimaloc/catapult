@@ -123,12 +123,12 @@ class ApiChatCommandsControllerTest {
     void post_with_unknown_placeholder_returns_400() throws Exception {
         mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
-        when(placeholderResolver.findUnknownPaths("Hi {game.unknown}"))
-                .thenReturn(Set.of("game.unknown"));
+        when(placeholderResolver.findUnknownPaths("Hi {game#unknown}"))
+                .thenReturn(Set.of("game#unknown"));
 
         String body = om.writeValueAsString(Map.of(
                 "name", "!foo",
-                "template", "Hi {game.unknown}",
+                "template", "Hi {game#unknown}",
                 "permission", "EVERYONE",
                 "enabled", true));
 
