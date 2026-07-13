@@ -78,7 +78,7 @@ class XboxServiceTest {
                 Instant.parse("2026-07-08T02:00:00Z"),
                 "jwt-token",
                 new XboxService.DisplayClaims(new XboxService.DisplayClaims.Xui[]{
-                        new XboxService.DisplayClaims.Xui("user-hash")
+                        new XboxService.DisplayClaims.Xui("user-hash", "1234567890")
                 })
         );
         doReturn(token).when(responseSpec).body(XboxService.Token.class);
