@@ -45,12 +45,12 @@ class ChatCommandPresetCatalogTest {
         when(messageSource.getMessage(eq("chat.preset.game.name"), any(), eq(Locale.FRANCE)))
             .thenReturn("!game");
         when(messageSource.getMessage(eq("chat.preset.game.template"), any(), eq(Locale.FRANCE)))
-            .thenReturn("Je joue à {game.name}");
+            .thenReturn("Je joue à {game#name}");
 
         ChatCommandDefinition def = catalog.instantiate(user, "game", Locale.FRANCE);
 
         assertThat(def.getName()).isEqualTo("!game");
-        assertThat(def.getTemplate()).isEqualTo("Je joue à {game.name}");
+        assertThat(def.getTemplate()).isEqualTo("Je joue à {game#name}");
         assertThat(def.getPresetKey()).isEqualTo("game");
         assertThat(def.getPermission()).isEqualTo(ChatCommandEvent.SenderRole.EVERYONE);
         assertThat(def.isEnabled()).isTrue();
@@ -69,7 +69,7 @@ class ChatCommandPresetCatalogTest {
         when(messageSource.getMessage(eq("chat.preset.game.name"), any(), eq(Locale.FRANCE)))
             .thenReturn("!game");
         when(messageSource.getMessage(eq("chat.preset.game.template"), any(), eq(Locale.FRANCE)))
-            .thenReturn("Je joue à {game.name}");
+            .thenReturn("Je joue à {game#name}");
 
         assertThatThrownBy(() -> catalog.instantiate(user, "game", Locale.FRANCE))
             .isInstanceOf(IllegalStateException.class);
