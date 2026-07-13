@@ -123,6 +123,36 @@
             </div>
         </div>
 
+        <div th:if="${hasXboxProvider}" class="provider-card" data-provider="XBOX">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+                <strong>Xbox</strong>
+                <span data-conn-block="xbox-connected"
+                      class="badge badge-connected connection-status"
+                      th:attr="hidden=${hasXbox ? null : 'hidden'}"
+                      th:text="#{connections.connected}">Connecté</span>
+                <span data-conn-block="xbox-disconnected"
+                      class="badge badge-disconnected connection-status"
+                      th:attr="hidden=${!hasXbox ? null : 'hidden'}"
+                      th:text="#{connections.not_connected}">Non connecté</span>
+            </div>
+
+            <div th:if="${isOwner}"
+                 data-conn-block="xbox-disconnect-form"
+                 th:attr="hidden=${hasXbox ? null : 'hidden'}">
+                <form th:action="@{/channels/{u}/settings/disconnect(u=${channelUsername})}" method="post" ws:post="@{/channels/{u}/settings/disconnect(u=${channelUsername})}" ws:swap="none"> <!-- nosemgrep -->
+                    <input type="hidden" name="provider" value="XBOX"/>
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-sm btn-danger" th:text="#{connections.disconnect}">Déconnecter</button>
+                </form>
+            </div>
+
+            <div th:if="${isOwner}"
+                 data-conn-block="xbox-connect-link"
+                 th:attr="hidden=${!hasXbox ? null : 'hidden'}">
+                <a th:href="@{/oauth2/authorization/xbox}" hx-boost="false" class="btn btn-primary" th:text="#{connections.connect}">Connecter</a>
+            </div>
+        </div>
+
         <!-- ── Minecraft ─────────────────────────────────────────────── -->
         <div class="provider-card" th:if="${isOwner and minecraftStatus != 'UNAVAILABLE'}" data-provider="MINECRAFT">
             <strong th:text="#{connections.minecraft.title}">Minecraft</strong>

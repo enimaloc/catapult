@@ -20,11 +20,13 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -156,5 +158,60 @@ class TwitchLoginSuccessHandlerTest {
         handler.onAuthenticationSuccess(request, response, token);
 
         verify(oAuthTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void xboxToken_withRefreshToken_savesToken() throws Exception {
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("xbox");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        var refreshToken = mock(OAuth2RefreshToken.class);
+        when(refreshToken.getTokenValue()).thenReturn("raw-xbox-refresh");
+
+        var accessToken = mock(OAuth2AccessToken.class);
+        when(accessToken.getExpiresAt()).thenReturn(Instant.now().plusSeconds(3600));
+
+        var client = mock(OAuth2AuthorizedClient.class);
+        when(client.getRefreshToken()).thenReturn(refreshToken);
+        when(client.getAccessToken()).thenReturn(accessToken);
+        when(authorizedClientRepository.loadAuthorizedClient("xbox", authToken, request)).thenReturn(client);
+
+        OAuthToken oauthToken = new OAuthToken();
+        when(oAuthTokenRepository.findByUserAndProvider(userAccount, OAuthToken.Provider.XBOX))
+            .thenReturn(Optional.of(oauthToken));
+        when(tokenEncryptionService.encrypt("raw-xbox-refresh")).thenReturn("encrypted-token");
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(tokenEncryptionService).encrypt("raw-xbox-refresh");
+        verify(oAuthTokenRepository).save(oauthToken);
+    }
+
+    @Test
+    void xboxToken_noWebUrlConfigured_fallsBackToDefaultTarget() throws Exception {
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("xbox");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("xbox", authToken, request)).thenReturn(null);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("/dashboard");
+    }
+
+    @Test
+    void xboxToken_withWebUrlConfigured_redirectsToChannelSettings() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("xbox");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("xbox", authToken, request)).thenReturn(null);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/channels/jeb_");
     }
 }
