@@ -27,7 +27,7 @@ import java.util.Optional;
 @ConditionalOnBooleanProperty("xbox.enabled")
 public class XboxGameGetter implements GameGetter {
 
-    private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid({xuid})/presence";
+    private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid({xuid})";
     /** Titre représentant le tableau de bord Xbox lui-même, jamais une partie en cours. */
     private static final String DASHBOARD_TITLE_NAME = "Home";
 
