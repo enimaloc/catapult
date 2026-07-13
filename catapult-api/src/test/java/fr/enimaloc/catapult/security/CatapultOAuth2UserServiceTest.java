@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.security;
 
 import fr.enimaloc.catapult.domain.GetterConfig;
+import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.repository.GetterConfigRepository;
@@ -10,12 +11,15 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.InviteService;
 import fr.enimaloc.catapult.service.WhitelistService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -67,6 +71,11 @@ class CatapultOAuth2UserServiceTest {
         ReflectionTestUtils.setField(service, "defaultNoGameId", "");
         ReflectionTestUtils.setField(service, "defaultIncompleteGameName", "");
         ReflectionTestUtils.setField(service, "defaultIncompleteGameId", "");
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     private OAuth2UserRequest buildRequest() {
@@ -177,5 +186,69 @@ class CatapultOAuth2UserServiceTest {
 
         assertThat(pendingDeletion.getStatus()).isEqualTo(UserAccount.Status.ACTIVE);
         assertThat(pendingDeletion.getDeletionRequestedAt()).isNull();
+    }
+
+    @Test
+    void handleSecondaryLink_xbox_createsAndEnablesGetterConfig() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        CatapultOAuth2User principal = new CatapultOAuth2User(null, account, false);
+        SecurityContextHolder.getContext().setAuthentication(
+            new TestingAuthenticationToken(principal, null));
+
+        when(getterConfigRepository.findByUserAndProvider(account, GetterConfig.Provider.XBOX))
+            .thenReturn(Optional.empty());
+        when(getterConfigRepository.findByUserOrderByPriorityAsc(account)).thenReturn(List.of());
+
+        ReflectionTestUtils.invokeMethod(service, "handleSecondaryLink", buildRequest(), OAuthToken.Provider.XBOX);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(GetterConfig.class);
+        verify(getterConfigRepository).save(captor.capture());
+        assertThat(captor.getValue().getProvider()).isEqualTo(GetterConfig.Provider.XBOX);
+        assertThat(captor.getValue().isEnabled()).isTrue();
+    }
+
+    @Test
+    void handleSecondaryLink_xbox_reEnablesExistingDisabledGetterConfig() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        CatapultOAuth2User principal = new CatapultOAuth2User(null, account, false);
+        SecurityContextHolder.getContext().setAuthentication(
+            new TestingAuthenticationToken(principal, null));
+
+        GetterConfig existing = new GetterConfig();
+        existing.setUser(account);
+        existing.setProvider(GetterConfig.Provider.XBOX);
+        existing.setEnabled(false);
+        when(getterConfigRepository.findByUserAndProvider(account, GetterConfig.Provider.XBOX))
+            .thenReturn(Optional.of(existing));
+
+        ReflectionTestUtils.invokeMethod(service, "handleSecondaryLink", buildRequest(), OAuthToken.Provider.XBOX);
+
+        assertThat(existing.isEnabled()).isTrue();
+        verify(getterConfigRepository).save(existing);
+    }
+
+    @Test
+    void handleSecondaryLink_steam_doesNotTouchGetterConfig() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        CatapultOAuth2User principal = new CatapultOAuth2User(null, account, false);
+        SecurityContextHolder.getContext().setAuthentication(
+            new TestingAuthenticationToken(principal, null));
+
+        ReflectionTestUtils.invokeMethod(service, "handleSecondaryLink", buildRequest(), OAuthToken.Provider.STEAM);
+
+        verify(getterConfigRepository, never()).findByUserAndProvider(any(), any());
+        verify(getterConfigRepository, never()).save(any(GetterConfig.class));
+    }
+
+    @Test
+    void handleSecondaryLink_noAuthenticatedTwitchSession_throws() {
+        SecurityContextHolder.clearContext();
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            org.springframework.security.oauth2.core.OAuth2AuthenticationException.class,
+            () -> ReflectionTestUtils.invokeMethod(service, "handleSecondaryLink", buildRequest(), OAuthToken.Provider.XBOX));
     }
 }
