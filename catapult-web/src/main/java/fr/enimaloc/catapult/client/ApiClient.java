@@ -19,6 +19,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -60,6 +61,27 @@ public class ApiClient {
         try {
             return restClient.get()
                     .uri(path, uriVars)
+                    .retrieve()
+                    .body(responseType);
+        } catch (Exception e) {
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("GET {} failed: {}", path, e.getMessage());
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Same as {@link #get(String, Class, Object...)} but forwards {@code locale} as the
+     * {@code Accept-Language} header, so catapult-api's {@code AcceptHeaderLocaleResolver}
+     * resolves the caller's locale instead of the default (this call is server-to-server
+     * and carries no browser {@code Accept-Language} header on its own).
+     */
+    public <T> T get(String path, Class<T> responseType, Locale locale, Object... uriVars) {
+        try {
+            return restClient.get()
+                    .uri(path, uriVars)
+                    .header(HttpHeaders.ACCEPT_LANGUAGE, locale.toLanguageTag())
                     .retrieve()
                     .body(responseType);
         } catch (Exception e) {
