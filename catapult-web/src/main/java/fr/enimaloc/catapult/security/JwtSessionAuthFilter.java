@@ -61,7 +61,7 @@ public class JwtSessionAuthFilter extends OncePerRequestFilter {
             return;
         }
         try {
-            CatapultWebUser user = validateWithApi(jwt);
+            CatapultWebUser user = validateJwt(jwt);
             if (user != null && user.isEnabled()) {
                 var auth = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
                 SecurityContextHolder.getContext().setAuthentication(auth);
@@ -75,8 +75,15 @@ public class JwtSessionAuthFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Validates a JWT against catapult-api and builds the resulting {@link CatapultWebUser}.
+     * Exposed so other entry points that authenticate outside the servlet filter chain — i.e.
+     * {@code HtmxWsDispatcher} bridging WS {@code mvc} actions — can build the same principal
+     * instead of a bare id, which {@code @AuthenticationPrincipal CatapultWebUser} consumers
+     * (e.g. {@code GlobalModelAdvice}) would otherwise silently see as {@code null}.
+     */
     @SuppressWarnings("unchecked")
-    private CatapultWebUser validateWithApi(String jwt) {
+    public CatapultWebUser validateJwt(String jwt) {
         Map<?, ?> body = apiClient.get("/api/auth/validate", Map.class);
         if (body == null) return null;
 
