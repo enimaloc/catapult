@@ -37,6 +37,8 @@
     <script th:if="${user != null}" th:src="@{/js/channel-handlers/settings.js}" defer></script>
     <script th:if="${user != null}" th:src="@{/js/channel-handlers/connections.js}" defer></script>
     <script th:if="${user != null}" th:src="@{/js/channel-page.js}" defer></script>
+    <!-- channel-tabs.js no-ops when there is no #channel-tabs nav (control variant / other pages). -->
+    <script th:if="${user != null}" th:src="@{/js/channel-tabs.js}" defer></script>
     <!-- Admin event-driven scripts: loaded globally for admins (not per active_page)
          so their events.admin subscription survives hx-boost navigation. -->
     <th:block th:if="${user != null and user.admin}">
@@ -75,13 +77,8 @@
             aria-label="Menu" onclick="toggleNavMenu()">
         <span></span><span></span><span></span>
     </button>
-    <div class="nav-links nav-links--main" th:if="${user != null}">
-        <a th:href="@{/channels}" th:classappend="${active_page == 'channels'} ? ' active'" th:text="#{nav.my_channels}">Mes chaînes</a>
-        <a th:if="${invitePlacementVariant == 'nav-default'}"
-           th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
-        <span th:if="${channelUsername != null}" class="nav-separator">›</span>
-        <span th:if="${channelUsername != null}" class="nav-channel-name" th:text="${channelUsername}"></span>
-        <div class="channel-tabs" id="channel-tabs" th:if="${activeTab != null}" th:attr="data-active-tab=${activeTab}">
+    <div class="navbar-center" th:if="${activeTab != null}">
+        <div class="channel-tabs" id="channel-tabs" th:attr="data-active-tab=${activeTab}">
             <button type="button" class="channel-tab" data-tab="dashboard"
                     th:classappend="${activeTab == 'dashboard'} ? ' active'"
                     th:text="#{channel.tabs.dashboard}">Dashboard</button>
@@ -93,6 +90,13 @@
                     th:classappend="${activeTab == 'commands'} ? ' active'"
                     th:text="#{channel.tabs.commands}">Commandes</button>
         </div>
+    </div>
+    <div class="nav-links nav-links--main" th:if="${user != null}">
+        <a th:href="@{/channels}" th:classappend="${active_page == 'channels'} ? ' active'" th:text="#{nav.my_channels}">Mes chaînes</a>
+        <a th:if="${invitePlacementVariant == 'nav-default'}"
+           th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
+        <span th:if="${channelUsername != null}" class="nav-separator">›</span>
+        <span th:if="${channelUsername != null}" class="nav-channel-name" th:text="${channelUsername}"></span>
         <div class="dropdown" sec:authorize="hasRole('ADMIN')">
             <button type="button" class="nav-links-dropdown-toggle"
                     th:classappend="${{'app','ccl','members','experiments','groups','whitelist','steam-keys','minecraft-accounts','dtdd-keys','dtdd-mapping','config','notifications','broadcast','igdb'}.contains(active_page)} ? ' active'"
