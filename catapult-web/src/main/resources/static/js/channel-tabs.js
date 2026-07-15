@@ -57,6 +57,21 @@
       replacement.style.display = document.querySelector(".channel-tab.active")?.dataset.tab === tab ? "" : "none";
       panel.replaceWith(replacement);
       if (window.catapultWsActions) window.catapultWsActions.bind(replacement);
+      executeScripts(replacement);
+    });
+  }
+
+  // <script> tags parsed via DOMParser (or inserted via innerHTML/replaceWith)
+  // never execute — browsers only run scripts encountered during the initial
+  // synchronous HTML parse. Fragments like chat-commands-card.html rely on an
+  // inline <script> to populate themselves (e.g. the commands table), so it
+  // has to be manually re-created to actually run once inserted live.
+  function executeScripts(container) {
+    container.querySelectorAll("script").forEach(function (old) {
+      const fresh = document.createElement("script");
+      for (const attr of old.attributes) fresh.setAttribute(attr.name, attr.value);
+      fresh.textContent = old.textContent;
+      old.replaceWith(fresh);
     });
   }
 
