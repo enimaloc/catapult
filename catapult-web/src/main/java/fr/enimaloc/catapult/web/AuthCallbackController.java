@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -32,8 +33,12 @@ public class AuthCallbackController {
     }
 
     @GetMapping("/login")
-    public String login() {
-        return "redirect:/oauth2/authorization/twitch";
+    public String login(@RequestParam(required = false) String error, Model model) {
+        if (error == null) {
+            return "redirect:/oauth2/authorization/twitch";
+        }
+        model.addAttribute("loginError", error.isBlank() ? "generic" : error);
+        return "login";
     }
 
     @GetMapping("/logout-redirect")
