@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.web.ws.dispatch;
 
+import fr.enimaloc.catapult.security.CatapultWebUser;
+import fr.enimaloc.catapult.security.JwtSessionAuthFilter;
 import fr.enimaloc.catapult.web.ws.WsSession;
 import fr.enimaloc.catapult.web.ws.codec.msg.ResponseMessage;
 import lombok.extern.slf4j.Slf4j;
@@ -67,16 +69,20 @@ public class HtmxWsDispatcher {
     private final DispatcherServlet dispatcherServlet;
     private final ObjectMapper mapper;
     private final ServletContext servletContext;
+    private final JwtSessionAuthFilter jwtSessionAuthFilter;
 
     @Autowired
-    public HtmxWsDispatcher(DispatcherServlet dispatcherServlet, ServletContext servletContext) {
-        this(dispatcherServlet, servletContext, JsonMapper.builder().build());
+    public HtmxWsDispatcher(DispatcherServlet dispatcherServlet, ServletContext servletContext,
+                             JwtSessionAuthFilter jwtSessionAuthFilter) {
+        this(dispatcherServlet, servletContext, JsonMapper.builder().build(), jwtSessionAuthFilter);
     }
 
-    HtmxWsDispatcher(DispatcherServlet dispatcherServlet, ServletContext servletContext, ObjectMapper mapper) {
+    HtmxWsDispatcher(DispatcherServlet dispatcherServlet, ServletContext servletContext, ObjectMapper mapper,
+                      JwtSessionAuthFilter jwtSessionAuthFilter) {
         this.dispatcherServlet = dispatcherServlet;
         this.servletContext = servletContext;
         this.mapper = mapper;
+        this.jwtSessionAuthFilter = jwtSessionAuthFilter;
     }
 
     /**
@@ -274,10 +280,34 @@ public class HtmxWsDispatcher {
         for (String role : session.roles()) {
             authorities.add(new SimpleGrantedAuthority(role));
         }
-        Authentication auth = new UsernamePasswordAuthenticationToken(
-                session.userId().get(), null, authorities);
+
+        // Build the same CatapultWebUser principal a real HTTP request gets via
+        // JwtSessionAuthFilter — without it, @AuthenticationPrincipal CatapultWebUser
+        // consumers (e.g. GlobalModelAdvice) silently see null and every experiment/
+        // feature-flag lookup keyed off the current user resolves to its anonymous
+        // fallback for any controller reached through this WS "mvc" bridge.
+        // Falls back to the bare userId + session roles if validation is unavailable
+        // (mocked ApiClient in tests, transient catapult-api outage, ...).
+        CatapultWebUser user = validateUser(session.jwt());
+        Object principal = session.userId().get();
+        Authentication auth;
+        if (user != null && user.isEnabled()) {
+            auth = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+        } else {
+            auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+        }
         ctx.setAuthentication(auth);
         SecurityContextHolder.setContext(ctx);
+    }
+
+    private CatapultWebUser validateUser(String jwt) {
+        if (jwt == null) return null;
+        try {
+            return jwtSessionAuthFilter.validateJwt(jwt);
+        } catch (Exception e) {
+            log.debug("WS-bridged JWT validation failed: {}", e.getMessage());
+            return null;
+        }
     }
 
     private Map<String, Object> parseTriggers(String headerValue) {
