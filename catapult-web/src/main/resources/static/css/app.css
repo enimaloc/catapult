@@ -1439,6 +1439,13 @@ details summary { cursor: pointer; font-weight: 600; }
 
     .nav-hamburger { display: flex; }
 
+    .navbar-center {
+        flex-basis: 100%;
+        order: 3;
+        justify-content: center;
+        padding-top: 8px;
+    }
+
     /* Logged-in nav: hidden by default, revealed by .open */
     .nav-links--main {
         display: none;
@@ -1780,6 +1787,9 @@ details summary { cursor: pointer; font-weight: 600; }
 .config-tab { background: transparent; border: 0; padding: 0.5rem 1rem; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; }
 .config-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .config-tab:hover { color: var(--text); }
+
+/* Centered section of the navbar (channel-page-tabbed-layout experiment tabs) */
+.navbar-center { flex: 1; display: flex; justify-content: center; min-width: 0; }
 
 /* Channel page tabs (channel-page-tabbed-layout experiment) — inline in the navbar */
 .channel-tabs { display: flex; align-items: center; gap: 4px; }
