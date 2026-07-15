@@ -60,10 +60,19 @@
     });
   }
 
-  // Support browser back/forward across tabs.
-  window.addEventListener("popstate", function (evt) {
-    const tab = evt.state && evt.state.tab;
-    if (tab) activate(tab);
+  // Support browser back/forward across tabs. Derived from the URL rather than
+  // evt.state: the very first history entry (before any tab click) never had
+  // state pushed onto it, so relying on evt.state left the panel stuck on
+  // whatever was last shown when navigating back past that point.
+  function tabFromLocation() {
+    const parts = window.location.pathname.split("/").filter(Boolean);
+    if (parts[0] === "channels" && parts.length >= 3) return parts[2];
+    return "dashboard";
+  }
+
+  window.addEventListener("popstate", function () {
+    if (!document.getElementById("channel-tabs")) return;
+    activate(tabFromLocation());
   });
 
   if (document.readyState === "loading") {
