@@ -7,6 +7,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
+import java.util.Locale;
 import java.util.Map;
 
 @Controller
@@ -16,9 +17,9 @@ public class HelpController {
     private final ApiClient apiClient;
 
     @GetMapping("/help/{cardId}")
-    public String helpPanel(@PathVariable String cardId, Model model) {
+    public String helpPanel(@PathVariable String cardId, Locale locale, Model model) {
         @SuppressWarnings("unchecked")
-        Map<String, String> content = apiClient.get("/api/help/{cardId}", Map.class, cardId);
+        Map<String, String> content = apiClient.get("/api/help/{cardId}", Map.class, locale, cardId);
         if (content != null) {
             model.addAttribute("helpTitle", content.get("title"));
             model.addAttribute("helpBody", content.get("body"));
