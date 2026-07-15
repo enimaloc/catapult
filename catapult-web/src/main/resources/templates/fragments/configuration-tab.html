@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="configuration-tab" id="tab-panel-configuration" data-tab-panel="configuration">
+    <div th:replace="~{fragments/settings-bundle :: settings-bundle}"></div>
+    <div th:replace="~{fragments/dtdd-mapping :: dtdd-mapping}"></div>
+    <div th:replace="~{fragments/danger-zone :: danger-zone}"></div>
+</div>
+</body>
+</html>
