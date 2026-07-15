@@ -39,7 +39,8 @@
       p.style.display = p === panel ? "" : "none";
     });
 
-    const username = (typeof channelUsername !== "undefined") ? channelUsername : "";
+    const meta = document.querySelector('meta[name="channel-username"]');
+    const username = meta ? meta.content : "";
     const path = "/channels/" + encodeURIComponent(username) + "/" + tab;
     if (window.location.pathname !== path) {
       window.history.pushState({ tab: tab }, "", path);
