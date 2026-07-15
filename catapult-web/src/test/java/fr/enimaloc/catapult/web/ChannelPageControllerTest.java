@@ -159,4 +159,44 @@ class ChannelPageControllerTest {
 
         assertThat(view).isEqualTo("fragments/configuration-tab :: configuration-tab");
     }
+
+    @Test
+    void invitationsTabRedirectsWhenVariantIsNotTab() {
+        controller = newController();
+        stubChannelData(ownerData());
+        stubVariant("tabbed");
+        Model model = new ExtendedModelMap();
+        model.addAttribute("invitePlacementVariant", "nav-default");
+
+        String view = controller.channelPage("streamer", "invitations", 0, null, null, model);
+
+        assertThat(view).isEqualTo("redirect:/channels/{username}");
+    }
+
+    @Test
+    void invitationsTabRendersWhenVariantIsTab() {
+        controller = newController();
+        stubChannelData(ownerData());
+        stubVariant("tabbed");
+        Model model = new ExtendedModelMap();
+        model.addAttribute("invitePlacementVariant", "tab");
+        org.mockito.Mockito.lenient().when(apiClient.get(eq("/api/invite"), eq(Map.class))).thenReturn(null);
+
+        String view = controller.channelPage("streamer", "invitations", 0, null, null, model);
+
+        assertThat(view).isEqualTo("app-tabbed");
+        assertThat(model.getAttribute("activeTab")).isEqualTo("invitations");
+    }
+
+    @Test
+    void invitationsTabFragmentForbiddenWhenVariantIsNotTab() {
+        controller = newController();
+        stubChannelData(ownerData());
+        Model model = new ExtendedModelMap();
+        model.addAttribute("invitePlacementVariant", "card");
+
+        assertThatThrownBy(() -> controller.tabFragment("streamer", "invitations", model))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+    }
 }
