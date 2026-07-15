@@ -48,6 +48,8 @@ class ApiHelpControllerTest {
                 .thenReturn("<p>corps</p>");
         when(messageSource.getMessage(eq("help.connections.body.minecraft"), any(), any(), eq(locale)))
                 .thenReturn("<p>minecraft</p>");
+        when(messageSource.getMessage(eq("help.connections.body.xbox"), any(), any(), eq(locale)))
+                .thenReturn("<p>xbox</p>");
     }
 
     @Test
@@ -98,6 +100,26 @@ class ApiHelpControllerTest {
     @Test
     void connections_unknownUser_omitsMinecraftSection() {
         when(userAccountRepository.findById(any())).thenReturn(Optional.empty());
+
+        var content = controller.help("connections", locale, jwt);
+
+        assertThat(content.body()).isEqualTo("<p>corps</p>");
+    }
+
+    @Test
+    void connections_xboxEnabled_appendsXboxSection() {
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "xboxEnabled", true);
+        when(gateService.isAvailableFor(user)).thenReturn(false);
+
+        var content = controller.help("connections", locale, jwt);
+
+        assertThat(content.body()).isEqualTo("<p>corps</p><p>xbox</p>");
+    }
+
+    @Test
+    void connections_xboxDisabled_omitsXboxSection() {
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "xboxEnabled", false);
+        when(gateService.isAvailableFor(user)).thenReturn(false);
 
         var content = controller.help("connections", locale, jwt);
 
