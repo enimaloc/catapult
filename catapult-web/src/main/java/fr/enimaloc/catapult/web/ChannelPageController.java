@@ -47,6 +47,9 @@ public class ChannelPageController {
 
         if (data.isOwner() && TABBED_VARIANT.equals(resolveTabbedLayoutVariant())) {
             String resolvedTab = tab == null ? "dashboard" : tab;
+            if ("invitations".equals(resolvedTab) && !isInviteTabVariant(model)) {
+                return "redirect:/channels/{username}";
+            }
             model.addAttribute("activeTab", resolvedTab);
             if ("invitations".equals(resolvedTab)) {
                 populateInviteModel(model);
@@ -66,11 +69,19 @@ public class ChannelPageController {
         if (data == null || !data.isOwner()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        if ("invitations".equals(tab) && !isInviteTabVariant(model)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
         populateModel(model, data, username);
         if ("invitations".equals(tab)) {
             populateInviteModel(model);
         }
         return "fragments/" + tab + "-tab :: " + tab + "-tab";
+    }
+
+    /** invitePlacementVariant is set globally by GlobalModelAdvice before this controller runs. */
+    private boolean isInviteTabVariant(Model model) {
+        return "tab".equals(model.getAttribute("invitePlacementVariant"));
     }
 
     /** Same data the standalone /invite page shows — the current user's own invite code. */
