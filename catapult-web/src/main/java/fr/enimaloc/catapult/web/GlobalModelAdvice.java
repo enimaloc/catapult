@@ -72,7 +72,13 @@ public class GlobalModelAdvice {
         }
     }
 
-    /** Returns the variant assigned to the user for the invite-button-placement experiment, or "nav-default" as fallback. */
+    /**
+     * Returns the variant assigned to the user for the invite-button-placement
+     * experiment, or "nav-default" as fallback. The "tab" variant relies on the
+     * Invitations tab on the owner's tabbed channel page (see ChannelPageController);
+     * templates fall back to the nav-default link wherever that tab isn't available
+     * (non-owners, control layout variant, or any other page).
+     */
     private String resolveInvitePlacementVariant(CatapultWebUser principal) {
         if (principal == null) return "nav-default";
         try {

@@ -1439,6 +1439,13 @@ details summary { cursor: pointer; font-weight: 600; }
 
     .nav-hamburger { display: flex; }
 
+    .navbar-center {
+        flex-basis: 100%;
+        order: 3;
+        justify-content: center;
+        padding-top: 8px;
+    }
+
     /* Logged-in nav: hidden by default, revealed by .open */
     .nav-links--main {
         display: none;
@@ -1466,6 +1473,29 @@ details summary { cursor: pointer; font-weight: 600; }
         display: block;
         padding: 10px 4px;
         border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav-links--main .channel-tabs {
+        width: 100%;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav-links--main .nav-links-dropdown-toggle {
+        padding: 10px 4px;
+        border-bottom: 1px solid var(--border-subtle);
+        font-size: 14px;
+        text-align: left;
+        width: 100%;
+        display: block;
+    }
+
+    .nav-links--main .dropdown-menu {
+        position: static;
+        box-shadow: none;
+        border: none;
+        border-radius: 0;
+        width: 100%;
+        margin-top: 0;
     }
 
     /* Theme switcher: smaller buttons on mobile */
@@ -1560,6 +1590,7 @@ details summary { cursor: pointer; font-weight: 600; }
 .dropdown-item:hover:not(:disabled) { background: var(--border); }
 .dropdown-item:disabled { opacity: .45; cursor: not-allowed; }
 .dropdown-item--danger { color: var(--danger-text); }
+.dropdown-item.active { color: var(--accent); font-weight: 600; }
 
 .dropdown-divider {
     border: none;
@@ -1756,6 +1787,19 @@ details summary { cursor: pointer; font-weight: 600; }
 .config-tab { background: transparent; border: 0; padding: 0.5rem 1rem; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; }
 .config-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .config-tab:hover { color: var(--text); }
+
+/* Centered section of the navbar (channel-page-tabbed-layout experiment tabs) */
+.navbar-center { flex: 1; display: flex; justify-content: center; min-width: 0; }
+
+/* Channel page tabs (channel-page-tabbed-layout experiment) — inline in the navbar */
+.channel-tabs { display: flex; align-items: center; gap: 4px; }
+.channel-tab { background: transparent; border: 0; padding: 4px 10px; cursor: pointer; color: var(--text-muted); font-size: 14px; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+.channel-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.channel-tab:hover { color: var(--text); }
+
+/* Admin dropdown trigger (navbar) — mirrors .nav-links a */
+.nav-links-dropdown-toggle { background: transparent; border: 0; cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 4px 0; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+.nav-links-dropdown-toggle:hover, .nav-links-dropdown-toggle.active { color: var(--text); border-bottom-color: var(--accent); }
 
 
 
