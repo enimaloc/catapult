@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{template::layout(~{::title}, 'app', ~{::div#main-content}, ~{::style}, 'container', ~{::aside#left-panel}, null)}">
+      th:replace="~{template::layout(~{::title}, 'app', ~{::div#main-content}, ~{::style}, 'container', ~{::aside#left-panel}, ~{::aside#right-panel})}">
 <head>
     <title th:text="${app.name}">Catapult</title>
 </head>
@@ -32,12 +32,14 @@
                      th:attr="data-tab-path=@{/channels/{u}/tabs/commands(u=${channelUsername})}"></div>
             </th:block>
 
-            <th:block th:if="${activeTab == 'invitations'}">
-                <div th:replace="~{fragments/invitations-tab :: invitations-tab}"></div>
+            <th:block th:if="${invitePlacementVariant == 'tab'}">
+                <th:block th:if="${activeTab == 'invitations'}">
+                    <div th:replace="~{fragments/invitations-tab :: invitations-tab}"></div>
+                </th:block>
+                <div id="tab-panel-invitations" data-tab-panel="invitations" style="display:none"
+                     th:unless="${activeTab == 'invitations'}"
+                     th:attr="data-tab-path=@{/channels/{u}/tabs/invitations(u=${channelUsername})}"></div>
             </th:block>
-            <div id="tab-panel-invitations" data-tab-panel="invitations" style="display:none"
-                 th:unless="${activeTab == 'invitations'}"
-                 th:attr="data-tab-path=@{/channels/{u}/tabs/invitations(u=${channelUsername})}"></div>
         </div>
 
         <!-- Modal Steam privacy -->
@@ -143,6 +145,16 @@
     <aside id="left-panel">
         <div th:replace="~{fragments/status :: status}"></div>
         <div th:replace="~{fragments/activity-log :: activity-log}"></div>
+    </aside>
+
+    <aside id="right-panel">
+        <div th:if="${invitePlacementVariant == 'card'}" class="card invite-card"
+             th:classappend="${active_page == 'invite'} ? ' invite-card--active'">
+            <div class="invite-card__icon" aria-hidden="true">✉️</div>
+            <h3 class="invite-card__title" th:text="#{invite.card.title}">Invite des amis</h3>
+            <p class="invite-card__text" th:text="#{invite.card.text}">Partage Catapult avec ton réseau et profite de la communauté.</p>
+            <a th:href="@{/invite}" class="btn btn-primary invite-card__cta" th:text="#{invite.card.cta}">Mes invitations</a>
+        </div>
     </aside>
 
     <script th:inline="javascript">

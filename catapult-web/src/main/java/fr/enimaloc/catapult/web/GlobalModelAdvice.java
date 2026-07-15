@@ -47,6 +47,7 @@ public class GlobalModelAdvice {
         model.addAttribute("user", principal);
         model.addAttribute("isPendingDeletion",
                 principal != null && "PENDING_DELETION".equals(principal.getStatus()));
+        model.addAttribute("invitePlacementVariant", resolveInvitePlacementVariant(principal));
         model.addAttribute("chatCommandsRolledOut", isChatCommandsRolledOut(principal));
 
         try {
@@ -69,6 +70,24 @@ public class GlobalModelAdvice {
             log.warn("Could not fetch app config from catapult-api: {}", e.getMessage());
             model.addAttribute("app", new App("Catapult", 7, List.of()));
         }
+    }
+
+    /**
+     * Returns the variant assigned to the user for the invite-button-placement
+     * experiment, or "nav-default" as fallback. The "tab" variant relies on the
+     * Invitations tab on the owner's tabbed channel page (see ChannelPageController);
+     * templates fall back to the nav-default link wherever that tab isn't available
+     * (non-owners, control layout variant, or any other page).
+     */
+    private String resolveInvitePlacementVariant(CatapultWebUser principal) {
+        if (principal == null) return "nav-default";
+        try {
+            Map<?, ?> raw = apiClient.get("/api/experiments/me/variant/invite-button-placement", Map.class);
+            if (raw != null && raw.get("variant") instanceof String v) return v;
+        } catch (Exception e) {
+            log.debug("Could not fetch invite-button-placement variant: {}", e.getMessage());
+        }
+        return "nav-default";
     }
 
     /**
