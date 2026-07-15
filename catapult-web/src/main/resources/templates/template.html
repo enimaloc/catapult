@@ -89,12 +89,14 @@
                     th:if="${chatCommandsRolledOut}"
                     th:classappend="${activeTab == 'commands'} ? ' active'"
                     th:text="#{channel.tabs.commands}">Commandes</button>
+            <button type="button" class="channel-tab" data-tab="invitations"
+                    th:classappend="${activeTab == 'invitations'} ? ' active'"
+                    th:text="#{channel.tabs.invitations}">Invitations</button>
         </div>
     </div>
     <div class="nav-links nav-links--main" th:if="${user != null}">
         <a th:href="@{/channels}" th:classappend="${active_page == 'channels'} ? ' active'" th:text="#{nav.my_channels}">Mes chaînes</a>
-        <a th:if="${invitePlacementVariant == 'nav-default'}"
-           th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
+        <a th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
         <span th:if="${channelUsername != null}" class="nav-separator">›</span>
         <span th:if="${channelUsername != null}" class="nav-channel-name" th:text="${channelUsername}"></span>
         <div class="dropdown" sec:authorize="hasRole('ADMIN')">
@@ -133,8 +135,6 @@
                    th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
             </div>
         </div>
-        <a th:if="${invitePlacementVariant == 'nav-end'}"
-           th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
         <div id="notif-bell" hidden hx-preserve="true">
             <button id="notif-bell-btn" type="button" aria-label="Notifications">🔔<span id="notif-badge" hidden>0</span></button>
             <div id="notif-dropdown" hidden>

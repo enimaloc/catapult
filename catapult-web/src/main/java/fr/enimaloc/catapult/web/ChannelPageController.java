@@ -30,7 +30,7 @@ public class ChannelPageController {
 
     private final ApiClient apiClient;
 
-    @GetMapping({"", "/{tab:dashboard|configuration|commands}"})
+    @GetMapping({"", "/{tab:dashboard|configuration|commands|invitations}"})
     public String channelPage(
             @PathVariable String username,
             @PathVariable(required = false) String tab,
@@ -46,7 +46,11 @@ public class ChannelPageController {
         populateModel(model, data, username);
 
         if (data.isOwner() && TABBED_VARIANT.equals(resolveTabbedLayoutVariant())) {
-            model.addAttribute("activeTab", tab == null ? "dashboard" : tab);
+            String resolvedTab = tab == null ? "dashboard" : tab;
+            model.addAttribute("activeTab", resolvedTab);
+            if ("invitations".equals(resolvedTab)) {
+                populateInviteModel(model);
+            }
             return "app-tabbed";
         }
         if (tab != null) {
@@ -56,15 +60,39 @@ public class ChannelPageController {
     }
 
     /** Lazy-loaded panel fragment for a tab not rendered at initial page load. */
-    @GetMapping("/tabs/{tab:dashboard|configuration|commands}")
+    @GetMapping("/tabs/{tab:dashboard|configuration|commands|invitations}")
     public String tabFragment(@PathVariable String username, @PathVariable String tab, Model model) {
         ChannelPageData data = fetchChannelPageData(username, 0, null, null);
         if (data == null || !data.isOwner()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         populateModel(model, data, username);
+        if ("invitations".equals(tab)) {
+            populateInviteModel(model);
+        }
         return "fragments/" + tab + "-tab :: " + tab + "-tab";
     }
+
+    /** Same data the standalone /invite page shows — the current user's own invite code. */
+    private void populateInviteModel(Model model) {
+        Map<?, ?> data = apiClient.get("/api/invite", Map.class);
+        if (data == null) return;
+        model.addAttribute("canInvite", Boolean.TRUE.equals(data.get("canInvite")));
+        model.addAttribute("code", data.get("code"));
+        model.addAttribute("inviteUrl", data.get("inviteUrl"));
+        Object rawRedemptions = data.get("redemptions");
+        List<InviteRedemption> redemptions = rawRedemptions instanceof List<?> list
+                ? list.stream()
+                        .filter(Map.class::isInstance)
+                        .map(Map.class::cast)
+                        .map(m -> new InviteRedemption((String) m.get("inviteeTwitchId"),
+                                java.time.Instant.parse((String) m.get("redeemedAt"))))
+                        .toList()
+                : List.of();
+        model.addAttribute("redemptions", redemptions);
+    }
+
+    public record InviteRedemption(String inviteeTwitchId, java.time.Instant redeemedAt) {}
 
     private ChannelPageData fetchChannelPageData(String username, int page, String status, String source) {
         StringBuilder url = new StringBuilder("/api/channels/{username}?page={page}");

@@ -9,7 +9,7 @@
 <!--/*@thymesvar id="code" type="java.lang.String"*/-->
 <!--/*@thymesvar id="inviteUrl" type="java.lang.String"*/-->
 <!--/*@thymesvar id="redemptions" type="java.util.List"*/-->
-<section>
+<section th:fragment="invite-panel">
     <h2 th:text="#{invite.title}" style="margin-bottom:1.5rem;">Invitations</h2>
 
     <div th:unless="${canInvite}" class="card" style="padding:1.5rem;">
@@ -68,14 +68,5 @@
         </div>
     </div>
 </section>
-<script th:inline="javascript">
-function copyInviteLink() {
-    var input = document.getElementById('invite-url-input');
-    navigator.clipboard.writeText(input.value).catch(function() {
-        input.select();
-        document.execCommand('copy');
-    });
-}
-</script>
 </body>
 </html>
