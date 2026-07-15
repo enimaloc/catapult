@@ -6,33 +6,27 @@
 </head>
 <body>
     <!--/*@thymesVar id="activeTab" type="java.lang.String"*/-->
+    <!-- Tab nav buttons (#channel-tabs) live in the navbar (template.html), not here. -->
     <div id="main-content">
-        <nav class="channel-tabs" id="channel-tabs" th:attr="data-active-tab=${activeTab}">
-            <button type="button" class="channel-tab" data-tab="dashboard"
-                    th:classappend="${activeTab == 'dashboard'} ? ' active'"
-                    th:text="#{channel.tabs.dashboard}">Dashboard</button>
-            <button type="button" class="channel-tab" data-tab="configuration"
-                    th:classappend="${activeTab == 'configuration'} ? ' active'"
-                    th:text="#{channel.tabs.configuration}">Configuration</button>
-            <button type="button" class="channel-tab" data-tab="commands"
-                    th:if="${chatCommandsRolledOut}"
-                    th:classappend="${activeTab == 'commands'} ? ' active'"
-                    th:text="#{channel.tabs.commands}">Commandes</button>
-        </nav>
-
         <div id="tab-panels">
-            <div th:replace="~{fragments/dashboard-tab :: dashboard-tab}" th:if="${activeTab == 'dashboard'}"></div>
+            <th:block th:if="${activeTab == 'dashboard'}">
+                <div th:replace="~{fragments/dashboard-tab :: dashboard-tab}"></div>
+            </th:block>
             <div id="tab-panel-dashboard" data-tab-panel="dashboard" style="display:none"
                  th:unless="${activeTab == 'dashboard'}"
                  th:attr="data-tab-path=@{/channels/{u}/tabs/dashboard(u=${channelUsername})}"></div>
 
-            <div th:replace="~{fragments/configuration-tab :: configuration-tab}" th:if="${activeTab == 'configuration'}"></div>
+            <th:block th:if="${activeTab == 'configuration'}">
+                <div th:replace="~{fragments/configuration-tab :: configuration-tab}"></div>
+            </th:block>
             <div id="tab-panel-configuration" data-tab-panel="configuration" style="display:none"
                  th:unless="${activeTab == 'configuration'}"
                  th:attr="data-tab-path=@{/channels/{u}/tabs/configuration(u=${channelUsername})}"></div>
 
             <th:block th:if="${chatCommandsRolledOut}">
-                <div th:replace="~{fragments/commands-tab :: commands-tab}" th:if="${activeTab == 'commands'}"></div>
+                <th:block th:if="${activeTab == 'commands'}">
+                    <div th:replace="~{fragments/commands-tab :: commands-tab}"></div>
+                </th:block>
                 <div id="tab-panel-commands" data-tab-panel="commands" style="display:none"
                      th:unless="${activeTab == 'commands'}"
                      th:attr="data-tab-path=@{/channels/{u}/tabs/commands(u=${channelUsername})}"></div>
