@@ -33,14 +33,22 @@ public class ApiHelpController {
     @Value("${spring.application.name:Catapult}")
     private String appName;
 
+    @Value("${xbox.enabled:false}")
+    private boolean xboxEnabled;
+
     @GetMapping("/{cardId}")
     public HelpContent help(@PathVariable String cardId, Locale locale,
                             @AuthenticationPrincipal Jwt jwt) {
         Object[] args = {accountDeletionDelayDays, defaultNoGameName, appName};
         String title = messageSource.getMessage("help." + cardId + ".title", null, cardId, locale);
         String body = messageSource.getMessage("help." + cardId + ".body", args, "", locale);
-        if ("connections".equals(cardId) && isMinecraftVisible(jwt)) {
-            body += messageSource.getMessage("help.connections.body.minecraft", args, "", locale);
+        if ("connections".equals(cardId)) {
+            if (xboxEnabled) {
+                body += messageSource.getMessage("help.connections.body.xbox", args, "", locale);
+            }
+            if (isMinecraftVisible(jwt)) {
+                body += messageSource.getMessage("help.connections.body.minecraft", args, "", locale);
+            }
         }
         return new HelpContent(title, body);
     }
