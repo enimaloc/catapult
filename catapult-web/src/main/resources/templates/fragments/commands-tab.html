@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="commands-tab" id="tab-panel-commands" data-tab-panel="commands" th:if="${chatCommandsRolledOut}">
+    <div th:replace="~{fragments/chat-commands-card :: chat-commands-card}"></div>
+</div>
+</body>
+</html>

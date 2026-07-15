@@ -37,6 +37,8 @@
     <script th:if="${user != null}" th:src="@{/js/channel-handlers/settings.js}" defer></script>
     <script th:if="${user != null}" th:src="@{/js/channel-handlers/connections.js}" defer></script>
     <script th:if="${user != null}" th:src="@{/js/channel-page.js}" defer></script>
+    <!-- channel-tabs.js no-ops when there is no #channel-tabs nav (control variant / other pages). -->
+    <script th:if="${user != null}" th:src="@{/js/channel-tabs.js}" defer></script>
     <!-- Admin event-driven scripts: loaded globally for admins (not per active_page)
          so their events.admin subscription survives hx-boost navigation. -->
     <th:block th:if="${user != null and user.admin}">
@@ -75,41 +77,69 @@
             aria-label="Menu" onclick="toggleNavMenu()">
         <span></span><span></span><span></span>
     </button>
+    <div class="navbar-center" th:if="${activeTab != null}">
+        <div class="channel-tabs" id="channel-tabs" th:attr="data-active-tab=${activeTab}">
+            <button type="button" class="channel-tab" data-tab="dashboard"
+                    th:classappend="${activeTab == 'dashboard'} ? ' active'"
+                    th:text="#{channel.tabs.dashboard}">Dashboard</button>
+            <button type="button" class="channel-tab" data-tab="configuration"
+                    th:classappend="${activeTab == 'configuration'} ? ' active'"
+                    th:text="#{channel.tabs.configuration}">Configuration</button>
+            <button type="button" class="channel-tab" data-tab="commands"
+                    th:if="${chatCommandsRolledOut}"
+                    th:classappend="${activeTab == 'commands'} ? ' active'"
+                    th:text="#{channel.tabs.commands}">Commandes</button>
+            <button type="button" class="channel-tab" data-tab="invitations"
+                    th:if="${invitePlacementVariant == 'tab'}"
+                    th:classappend="${activeTab == 'invitations'} ? ' active'"
+                    th:text="#{channel.tabs.invitations}">Invitations</button>
+        </div>
+    </div>
     <div class="nav-links nav-links--main" th:if="${user != null}">
         <a th:href="@{/channels}" th:classappend="${active_page == 'channels'} ? ' active'" th:text="#{nav.my_channels}">Mes chaînes</a>
-        <a th:if="${invitePlacementVariant == 'nav-default'}"
+        <!-- "tab" variant: the Invitations tab on the owner's tabbed channel page covers it;
+             everywhere else (other pages, non-owners, control layout variant) fall back to
+             this same nav-default link so nobody assigned "tab" is left without access. -->
+        <a th:if="${invitePlacementVariant == 'nav-default' or (invitePlacementVariant == 'tab' and activeTab == null)}"
            th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
         <span th:if="${channelUsername != null}" class="nav-separator">›</span>
         <span th:if="${channelUsername != null}" class="nav-channel-name" th:text="${channelUsername}"></span>
-        <a th:href="@{/app}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'app'} ? ' active'">App</a>
-        <a th:href="@{/admin/ccl}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'ccl'} ? ' active'" th:text="#{nav.admin_ccl}">Labels de contenu</a>
-        <a th:href="@{/admin/members}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'members'} ? ' active'" th:text="#{nav.members}">Membres</a>
-        <a th:href="@{/admin/experiments}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'experiments'} ? ' active'" th:text="#{nav.admin_experiments}">Tests A/B</a>
-        <a th:href="@{/admin/groups}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'groups'} ? ' active'" th:text="#{nav.admin_groups}">Groups</a>
-        <a th:href="@{/admin/whitelist}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'whitelist'} ? ' active'" th:text="#{nav.admin_whitelist}">Whitelist</a>
-        <a th:href="@{/admin/steam-keys}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'steam-keys'} ? ' active'" th:text="#{nav.admin_steam_keys}">Steam Keys</a>
-        <a th:href="@{/admin/minecraft-accounts}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'minecraft-accounts'} ? ' active'"
-           th:text="#{nav.admin_minecraft_accounts}">Minecraft</a>
-        <a th:href="@{/admin/dtdd-keys}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'dtdd-keys'} ? ' active'" th:text="#{nav.admin_dtdd_keys}">DTDD Keys</a>
-        <a th:href="@{/admin/dtdd-mapping}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'dtdd-mapping'} ? ' active'" th:text="#{nav.admin_dtdd_mapping}">DTDD Mapping</a>
-        <a th:href="@{/admin/config}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'config'} ? ' active'" th:text="#{nav.admin_config}">Configuration</a>
-        <a th:href="@{/admin/notifications}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'notifications'} ? ' active'" th:text="#{nav.admin_notifications}">Notifications</a>
-        <a th:href="@{/admin/broadcast}" sec:authorize="hasRole('ADMIN')"
-           th:classappend="${active_page == 'broadcast'} ? ' active'">Broadcast</a>
-        <a th:href="@{/dev/igdb}" sec:authorize="hasRole('ADMIN')" th:classappend="${active_page == 'igdb'} ? ' active'"
-           th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
+        <div class="dropdown" sec:authorize="hasRole('ADMIN')">
+            <button type="button" class="nav-links-dropdown-toggle"
+                    th:classappend="${{'app','ccl','members','experiments','groups','whitelist','steam-keys','minecraft-accounts','dtdd-keys','dtdd-mapping','config','notifications','broadcast','igdb'}.contains(active_page)} ? ' active'"
+                    onclick="toggleDropdown('admin-menu')" th:text="#{nav.admin_menu}">Admin ▾</button>
+            <div class="dropdown-menu" id="admin-menu">
+                <a th:href="@{/app}" class="dropdown-item"
+                   th:classappend="${active_page == 'app'} ? ' active'">App</a>
+                <a th:href="@{/admin/ccl}" class="dropdown-item"
+                   th:classappend="${active_page == 'ccl'} ? ' active'" th:text="#{nav.admin_ccl}">Labels de contenu</a>
+                <a th:href="@{/admin/members}" class="dropdown-item"
+                   th:classappend="${active_page == 'members'} ? ' active'" th:text="#{nav.members}">Membres</a>
+                <a th:href="@{/admin/experiments}" class="dropdown-item"
+                   th:classappend="${active_page == 'experiments'} ? ' active'" th:text="#{nav.admin_experiments}">Tests A/B</a>
+                <a th:href="@{/admin/groups}" class="dropdown-item"
+                   th:classappend="${active_page == 'groups'} ? ' active'" th:text="#{nav.admin_groups}">Groups</a>
+                <a th:href="@{/admin/whitelist}" class="dropdown-item"
+                   th:classappend="${active_page == 'whitelist'} ? ' active'" th:text="#{nav.admin_whitelist}">Whitelist</a>
+                <a th:href="@{/admin/steam-keys}" class="dropdown-item"
+                   th:classappend="${active_page == 'steam-keys'} ? ' active'" th:text="#{nav.admin_steam_keys}">Steam Keys</a>
+                <a th:href="@{/admin/minecraft-accounts}" class="dropdown-item"
+                   th:classappend="${active_page == 'minecraft-accounts'} ? ' active'"
+                   th:text="#{nav.admin_minecraft_accounts}">Minecraft</a>
+                <a th:href="@{/admin/dtdd-keys}" class="dropdown-item"
+                   th:classappend="${active_page == 'dtdd-keys'} ? ' active'" th:text="#{nav.admin_dtdd_keys}">DTDD Keys</a>
+                <a th:href="@{/admin/dtdd-mapping}" class="dropdown-item"
+                   th:classappend="${active_page == 'dtdd-mapping'} ? ' active'" th:text="#{nav.admin_dtdd_mapping}">DTDD Mapping</a>
+                <a th:href="@{/admin/config}" class="dropdown-item"
+                   th:classappend="${active_page == 'config'} ? ' active'" th:text="#{nav.admin_config}">Configuration</a>
+                <a th:href="@{/admin/notifications}" class="dropdown-item"
+                   th:classappend="${active_page == 'notifications'} ? ' active'" th:text="#{nav.admin_notifications}">Notifications</a>
+                <a th:href="@{/admin/broadcast}" class="dropdown-item"
+                   th:classappend="${active_page == 'broadcast'} ? ' active'">Broadcast</a>
+                <a th:href="@{/dev/igdb}" class="dropdown-item" th:classappend="${active_page == 'igdb'} ? ' active'"
+                   th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
+            </div>
+        </div>
         <a th:if="${invitePlacementVariant == 'nav-end'}"
            th:href="@{/invite}" th:classappend="${active_page == 'invite'} ? ' active'" th:text="#{nav.invite}">Invitations</a>
         <div id="notif-bell" hidden hx-preserve="true">
