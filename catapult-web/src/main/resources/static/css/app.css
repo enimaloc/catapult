@@ -1757,6 +1757,12 @@ details summary { cursor: pointer; font-weight: 600; }
 .config-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .config-tab:hover { color: var(--text); }
 
+/* Channel page tabs (channel-page-tabbed-layout experiment) */
+.channel-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+.channel-tab { background: transparent; border: 0; padding: 0.6rem 1.1rem; cursor: pointer; color: var(--text-muted); font-size: 14px; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+.channel-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.channel-tab:hover { color: var(--text); }
+
 
 
 /* Admin notifications dialog */

@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="dashboard-tab" id="tab-panel-dashboard" data-tab-panel="dashboard">
+    <div th:replace="~{fragments/connections :: connections}"></div>
+    <div th:replace="~{fragments/bindings :: bindings}"></div>
+</div>
+</body>
+</html>

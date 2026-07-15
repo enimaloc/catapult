@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'app', ~{::div#main-content}, ~{::style}, 'container', ~{::aside#left-panel}, ~{::aside#right-panel})}">
+<head>
+    <title th:text="${app.name}">Catapult</title>
+</head>
+<body>
+    <!--/*@thymesVar id="activeTab" type="java.lang.String"*/-->
+    <div id="main-content">
+        <nav class="channel-tabs" id="channel-tabs" th:attr="data-active-tab=${activeTab}">
+            <button type="button" class="channel-tab" data-tab="dashboard"
+                    th:classappend="${activeTab == 'dashboard'} ? ' active'"
+                    th:text="#{channel.tabs.dashboard}">Dashboard</button>
+            <button type="button" class="channel-tab" data-tab="configuration"
+                    th:classappend="${activeTab == 'configuration'} ? ' active'"
+                    th:text="#{channel.tabs.configuration}">Configuration</button>
+            <button type="button" class="channel-tab" data-tab="commands"
+                    th:if="${chatCommandsRolledOut}"
+                    th:classappend="${activeTab == 'commands'} ? ' active'"
+                    th:text="#{channel.tabs.commands}">Commandes</button>
+        </nav>
+
+        <div id="tab-panels">
+            <div th:replace="~{fragments/dashboard-tab :: dashboard-tab}" th:if="${activeTab == 'dashboard'}"></div>
+            <div id="tab-panel-dashboard" data-tab-panel="dashboard" style="display:none"
+                 th:unless="${activeTab == 'dashboard'}"
+                 th:attr="data-tab-path=@{/channels/{u}/tabs/dashboard(u=${channelUsername})}"></div>
+
+            <div th:replace="~{fragments/configuration-tab :: configuration-tab}" th:if="${activeTab == 'configuration'}"></div>
+            <div id="tab-panel-configuration" data-tab-panel="configuration" style="display:none"
+                 th:unless="${activeTab == 'configuration'}"
+                 th:attr="data-tab-path=@{/channels/{u}/tabs/configuration(u=${channelUsername})}"></div>
+
+            <th:block th:if="${chatCommandsRolledOut}">
+                <div th:replace="~{fragments/commands-tab :: commands-tab}" th:if="${activeTab == 'commands'}"></div>
+                <div id="tab-panel-commands" data-tab-panel="commands" style="display:none"
+                     th:unless="${activeTab == 'commands'}"
+                     th:attr="data-tab-path=@{/channels/{u}/tabs/commands(u=${channelUsername})}"></div>
+            </th:block>
+        </div>
+
+        <!-- Modal Steam privacy -->
+        <div id="steamPrivacyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:var(--card-bg, #1e1e2e); border-radius:8px; padding:2rem; max-width:500px; width:90%; position:relative;">
+                <button type="button"
+                        onclick="document.getElementById('steamPrivacyModal').style.display='none'"
+                        style="position:absolute; top:0.75rem; right:0.75rem; background:none; border:none; font-size:1.25rem; cursor:pointer; color:inherit;">&#x2715;</button>
+                <h3 th:text="#{connections.steam.modal.title}">Résoudre le profil privé Steam</h3>
+                <p th:text="#{connections.steam.modal.intro}">Game detection requires access to your Steam game list. Choose one of the options below:</p>
+
+                <div style="margin-top:1.5rem;">
+                    <h4 th:text="#{connections.steam.modal.option1.title}">Option 1 — Rendre le profil public</h4>
+                    <p th:text="#{connections.steam.modal.option1.desc}">Set your Steam profile and game details to public in your privacy settings.</p>
+                    <a href="https://steamcommunity.com/my/edit/settings" target="_blank" rel="noopener noreferrer"
+                       class="btn btn-sm btn-secondary" th:text="#{connections.steam.modal.option1.link}">Ouvrir les paramètres Steam →</a>
+                </div>
+
+                <hr style="margin:1.5rem 0; border-color:var(--border-color, #333);">
+
+                <div>
+                    <h4 th:text="#{connections.steam.modal.option2.title}">Option 2 — Token personnel Steam</h4>
+                    <p th:utext="#{connections.steam.modal.option2.desc}">
+                        Créez une clé API personnelle sur steamcommunity.com/dev/apikey en utilisant le domaine <code>0.0.0.0</code>, puis collez-la ci-dessous.
+                    </p>
+                    <ol>
+                        <li th:utext="#{connections.steam.modal.option2.step1}">Allez sur <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener noreferrer">steamcommunity.com/dev/apikey</a></li>
+                        <li th:utext="#{connections.steam.modal.option2.step2}">Dans le champ "Nom de domaine", saisissez <code>0.0.0.0</code></li>
+                        <li th:utext="#{connections.steam.modal.option2.step3}">Acceptez les conditions et cliquez sur "Enregistrer"</li>
+                        <li th:utext="#{connections.steam.modal.option2.step4}">Copiez la clé générée et collez-la ci-dessous</li>
+                    </ol>
+                    <form th:action="@{/channels/{u}/settings/steam-personal-token(u=${channelUsername})}" method="post"> <!-- nosemgrep -->
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+                            <input type="password" name="token" class="form-control"
+                                   th:placeholder="#{connections.steam.modal.token_placeholder}"
+                                   style="flex:1;" required/>
+                            <button type="submit" class="btn btn-primary" th:text="#{connections.steam.modal.save}">Enregistrer</button>
+                        </div>
+                        <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; margin-top:0.5rem; cursor:pointer;">
+                            <input type="hidden" name="shared" value="false"/>
+                            <input type="checkbox" name="shared" value="true"
+                                   onchange="this.previousElementSibling.disabled=this.checked"/>
+                            <span th:text="#{connections.steam.share_token}">Partager avec les autres profils</span>
+                        </label>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Steam rate limited -->
+        <div id="steamRateLimitModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:var(--card-bg, #1e1e2e); border-radius:8px; padding:2rem; max-width:500px; width:90%; position:relative;">
+                <button type="button"
+                        onclick="document.getElementById('steamRateLimitModal').style.display='none'"
+                        style="position:absolute; top:0.75rem; right:0.75rem; background:none; border:none; font-size:1.25rem; cursor:pointer; color:inherit;">&#x2715;</button>
+                <h3 th:text="#{connections.steam.rate_limited.modal.title}">Steam nous bloque temporairement</h3>
+                <p th:text="#{connections.steam.rate_limited.modal.desc}">Steam a temporairement bloqué nos requêtes. La détection de jeu est indisponible jusqu'à la levée du blocage.</p>
+                <p th:text="#{connections.steam.rate_limited.modal.help}">Vous pouvez contourner cette limitation en fournissant votre propre clé API Steam. Elle sera utilisée uniquement pour votre compte.</p>
+                <ol style="margin-top:0.75rem;">
+                    <li th:utext="#{connections.steam.modal.option2.step1}"></li>
+                    <li th:utext="#{connections.steam.modal.option2.step2}"></li>
+                    <li th:utext="#{connections.steam.modal.option2.step3}"></li>
+                    <li th:utext="#{connections.steam.modal.option2.step4}"></li>
+                </ol>
+                <form th:action="@{/channels/{u}/settings/steam-personal-token(u=${channelUsername})}" method="post"> <!-- nosemgrep -->
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+                        <input type="password" name="token" class="form-control"
+                               th:placeholder="#{connections.steam.modal.token_placeholder}"
+                               style="flex:1;" required/>
+                        <button type="submit" class="btn btn-primary" th:text="#{connections.steam.modal.save}">Enregistrer</button>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; margin-top:0.5rem; cursor:pointer;">
+                        <input type="hidden" name="shared" value="false"/>
+                        <input type="checkbox" name="shared" value="true"
+                               onchange="this.previousElementSibling.disabled=this.checked"/>
+                        <span th:text="#{connections.steam.share_token}">Partager avec les autres profils</span>
+                    </label>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal suppression -->
+        <div id="deleteModal" class="modal" style="display:none">
+            <div class="modal-content">
+                <h3 th:text="#{app.modal.title}">Confirmer la suppression</h3>
+                <p th:text="#{app.modal.prompt}">Saisis ton nom d'utilisateur Twitch pour confirmer :</p>
+                <form th:action="@{/channels/{u}/settings/delete-account(u=${channelUsername})}" method="post"> <!-- nosemgrep -->
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <input type="text" name="confirmUsername" th:placeholder="#{app.modal.username_placeholder}" th:aria-label="#{app.modal.username_placeholder}" required>
+                    <div class="modal-actions">
+                        <button type="button"
+                                onclick="document.getElementById('deleteModal').style.display='none'"
+                                class="btn btn-outline" th:text="#{common.cancel}">Annuler</button>
+                        <button type="submit" class="btn btn-danger" th:text="#{app.modal.confirm_button}">Supprimer définitivement</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <aside id="left-panel">
+        <div th:replace="~{fragments/status :: status}"></div>
+        <div th:replace="~{fragments/activity-log :: activity-log}"></div>
+    </aside>
+
+    <aside id="right-panel">
+        <div th:if="${invitePlacementVariant == 'card'}" class="card invite-card"
+             th:classappend="${active_page == 'invite'} ? ' invite-card--active'">
+            <div class="invite-card__icon" aria-hidden="true">✉️</div>
+            <h3 class="invite-card__title" th:text="#{invite.card.title}">Invite des amis</h3>
+            <p class="invite-card__text" th:text="#{invite.card.text}">Partage Catapult avec ton réseau et profite de la communauté.</p>
+            <a th:href="@{/invite}" class="btn btn-primary invite-card__cta" th:text="#{invite.card.cta}">Mes invitations</a>
+        </div>
+    </aside>
+
+    <script th:inline="javascript">
+        const channelUsername = /*[[${channelUsername}]]*/ '';
+        const channelBlockedCcls = /*[[${blockedCcls}]]*/ [];
+
+        // Connections: reload the page when a new provider is linked. The dedicated
+        // /fragments/connections endpoint has been removed (see event-driven migration);
+        // a connection.changed event will drive partial updates from Phase 4.7 onward.
+        function refreshConnections() { window.location.reload(); }
+        // BroadcastChannel: receives the message from the popup (same browser, same origin)
+        const connectionsBc = new BroadcastChannel('catapult-connections');
+        connectionsBc.onmessage = function (e) {
+            if (e.data === 'steam-linked') refreshConnections();
+        };
+        // SSE: covers multiple browser sessions on the same account
+        (function () {
+            const es = new EventSource('/channels/' + channelUsername + '/connections');
+            es.addEventListener('steam-linked', refreshConnections);
+        })();
+
+        // Activity log SSE
+        (function () {
+            const list = document.getElementById('log-list');
+            const placeholder = document.getElementById('log-placeholder');
+            const MAX_LINES = 50;
+            const es = new EventSource('/channels/' + channelUsername + '/logs');
+            es.onmessage = function (e) {
+                if (placeholder) placeholder.remove();
+                const li = document.createElement('li');
+                li.textContent = e.data;
+                li.style.borderBottom = '1px solid #eee';
+                li.style.padding = '2px 0';
+                list.appendChild(li);
+                while (list.children.length > MAX_LINES) list.removeChild(list.firstChild);
+            };
+            es.onerror = function () { es.close(); };
+        })();
+    </script>
+    <div th:replace="~{fragments/dtdd-mapping :: dtdd-mapping-script}"></div>
+    <script th:src="@{/js/channel-tabs.js}" defer></script>
+</body>
+</html>
