@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.web;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import fr.enimaloc.catapult.client.ApiClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
@@ -17,31 +20,108 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+@Slf4j
 @Controller
 @RequestMapping("/channels/{username}")
 @RequiredArgsConstructor
 public class ChannelPageController {
 
+    private static final String TABBED_VARIANT = "tabbed";
+
     private final ApiClient apiClient;
 
-    @GetMapping
+    @GetMapping({"", "/{tab:dashboard|configuration|commands|invitations}"})
     public String channelPage(
             @PathVariable String username,
+            @PathVariable(required = false) String tab,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String source,
             Model model) {
 
-        StringBuilder url = new StringBuilder("/api/channels/{username}?page={page}");
-        if (status != null && !status.isBlank()) url.append("&status={status}");
-        if (source != null && !source.isBlank()) url.append("&source={source}");
-        Object[] vars = buildVars(username, page, status, source);
-        ChannelPageData data = apiClient.get(url.toString(), ChannelPageData.class, vars);
+        ChannelPageData data = fetchChannelPageData(username, page, status, source);
         if (data == null) {
             return "redirect:/channels";
         }
         populateModel(model, data, username);
+
+        if (data.isOwner() && TABBED_VARIANT.equals(resolveTabbedLayoutVariant())) {
+            String resolvedTab = tab == null ? "dashboard" : tab;
+            if ("invitations".equals(resolvedTab) && !isInviteTabVariant(model)) {
+                return "redirect:/channels/{username}";
+            }
+            model.addAttribute("activeTab", resolvedTab);
+            if ("invitations".equals(resolvedTab)) {
+                populateInviteModel(model);
+            }
+            return "app-tabbed";
+        }
+        if (tab != null) {
+            return "redirect:/channels/{username}";
+        }
         return "app";
+    }
+
+    /** Lazy-loaded panel fragment for a tab not rendered at initial page load. */
+    @GetMapping("/tabs/{tab:dashboard|configuration|commands|invitations}")
+    public String tabFragment(@PathVariable String username, @PathVariable String tab, Model model) {
+        ChannelPageData data = fetchChannelPageData(username, 0, null, null);
+        if (data == null || !data.isOwner()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        if ("invitations".equals(tab) && !isInviteTabVariant(model)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        populateModel(model, data, username);
+        if ("invitations".equals(tab)) {
+            populateInviteModel(model);
+        }
+        return "fragments/" + tab + "-tab :: " + tab + "-tab";
+    }
+
+    /** invitePlacementVariant is set globally by GlobalModelAdvice before this controller runs. */
+    private boolean isInviteTabVariant(Model model) {
+        return "tab".equals(model.getAttribute("invitePlacementVariant"));
+    }
+
+    /** Same data the standalone /invite page shows — the current user's own invite code. */
+    private void populateInviteModel(Model model) {
+        Map<?, ?> data = apiClient.get("/api/invite", Map.class);
+        if (data == null) return;
+        model.addAttribute("canInvite", Boolean.TRUE.equals(data.get("canInvite")));
+        model.addAttribute("code", data.get("code"));
+        model.addAttribute("inviteUrl", data.get("inviteUrl"));
+        Object rawRedemptions = data.get("redemptions");
+        List<InviteRedemption> redemptions = rawRedemptions instanceof List<?> list
+                ? list.stream()
+                        .filter(Map.class::isInstance)
+                        .map(Map.class::cast)
+                        .map(m -> new InviteRedemption((String) m.get("inviteeTwitchId"),
+                                java.time.Instant.parse((String) m.get("redeemedAt"))))
+                        .toList()
+                : List.of();
+        model.addAttribute("redemptions", redemptions);
+    }
+
+    public record InviteRedemption(String inviteeTwitchId, java.time.Instant redeemedAt) {}
+
+    private ChannelPageData fetchChannelPageData(String username, int page, String status, String source) {
+        StringBuilder url = new StringBuilder("/api/channels/{username}?page={page}");
+        if (status != null && !status.isBlank()) url.append("&status={status}");
+        if (source != null && !source.isBlank()) url.append("&source={source}");
+        Object[] vars = buildVars(username, page, status, source);
+        return apiClient.get(url.toString(), ChannelPageData.class, vars);
+    }
+
+    /** Returns the variant assigned for the channel-page-tabbed-layout experiment, or null if unresolved. */
+    private String resolveTabbedLayoutVariant() {
+        try {
+            Map<?, ?> raw = apiClient.get("/api/experiments/me/variant/channel-page-tabbed-layout", Map.class);
+            if (raw != null && raw.get("variant") instanceof String v) return v;
+        } catch (Exception e) {
+            log.debug("Could not fetch channel-page-tabbed-layout variant: {}", e.getMessage());
+        }
+        return null;
     }
 
     // ── SSE proxies ────────────────────────────────────────────────────────────
