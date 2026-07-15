@@ -159,3 +159,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// Used by the invite panel (standalone /invite page and the channel-page Invitations tab).
+function copyInviteLink() {
+    const input = document.getElementById('invite-url-input');
+    if (!input) return;
+    navigator.clipboard.writeText(input.value).catch(function () {
+        input.select();
+        document.execCommand('copy');
+    });
+}
