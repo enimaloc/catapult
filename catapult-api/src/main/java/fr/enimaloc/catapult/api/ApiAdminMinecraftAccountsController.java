@@ -77,36 +77,79 @@ public class ApiAdminMinecraftAccountsController {
     private AccountDto finalizeAccount(MsaAuthClient.MsaTokens tokens, String label) {
         MinecraftServiceAccount account = new MinecraftServiceAccount();
         account.setLabel(label);
-        account.setMsaRefreshToken(encryption.encrypt(tokens.refreshToken()));
         account.setFillOrder((int) accountRepository.count());
         account.setMinecraftUsername("(en attente)");
 
-        // Déroule la chaîne une fois, sans effet de bord (le compte n'est pas encore
-        // persisté) : valide le compte et récupère son pseudo.
-        String username;
+        ValidatedProfile profile = validateAndFetchProfile(encryption.encrypt(tokens.refreshToken()));
+        account.setMsaRefreshToken(profile.rotatedRefreshTokenEncrypted());
+        account.setMinecraftUsername(profile.minecraftUsername());
+        account.setUpdatedAt(Instant.now());
+        MinecraftServiceAccount saved = accountRepository.save(account);
+        log.info("Compte de service Minecraft enrôlé: {} ({})", saved.getLabel(), profile.minecraftUsername());
+        return new AccountDto(saved.getId(), saved.getLabel(), profile.minecraftUsername(), saved.getFillOrder(),
+                saved.isFriendLimitReached(), saved.isEnabled(), 0);
+    }
+
+    /**
+     * Point d'entrée pour un compte existant dont le refresh token MSA a expiré
+     * ({@code invalid_grant}) : redéroule le device-code flow et remplace le
+     * refresh token sans toucher à l'id ni aux liens ({@link #delete} est bloqué
+     * tant qu'un compte a des liens, donc c'est la seule voie de réparation).
+     */
+    @PostMapping("/{id}/reauth")
+    public ResponseEntity<?> reauth(@PathVariable UUID id, @RequestBody Map<String, String> body) {
+        MinecraftServiceAccount account = accountRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compte inconnu"));
+        String deviceCode = body.get("deviceCode");
+        if (deviceCode == null || deviceCode.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deviceCode requis");
+        }
+
+        return msaAuthClient.pollDeviceCode(deviceCode)
+                .<ResponseEntity<?>>map(tokens -> ResponseEntity.ok(reauthenticateAccount(account, tokens)))
+                .orElseGet(() -> ResponseEntity.accepted().body(Map.of("status", "PENDING")));
+    }
+
+    private AccountDto reauthenticateAccount(MinecraftServiceAccount account, MsaAuthClient.MsaTokens tokens) {
+        ValidatedProfile profile = validateAndFetchProfile(encryption.encrypt(tokens.refreshToken()));
+        account.setMsaRefreshToken(profile.rotatedRefreshTokenEncrypted());
+        account.setMinecraftUsername(profile.minecraftUsername());
+        account.setEnabled(true);
+        account.setUpdatedAt(Instant.now());
+        // purge le cache/état d'échec en mémoire : le prochain getToken() doit repartir
+        // sur la nouvelle chaîne plutôt que de retomber sur l'ancien état "en échec"
+        tokenService.evict(account.getId());
+        MinecraftServiceAccount saved = accountRepository.save(account);
+        log.info("Compte de service Minecraft ré-authentifié: {} ({})", saved.getLabel(), profile.minecraftUsername());
+        return new AccountDto(saved.getId(), saved.getLabel(), profile.minecraftUsername(), saved.getFillOrder(),
+                saved.isFriendLimitReached(), saved.isEnabled(),
+                (int) linkRepository.countByServiceAccount(saved));
+    }
+
+    private record ValidatedProfile(String rotatedRefreshTokenEncrypted, String minecraftUsername) {}
+
+    /**
+     * Déroule la chaîne MSA → Xbox → Minecraft pour un refresh token chiffré et
+     * récupère le pseudo Minecraft associé. Lève 502 si la chaîne échoue ou si le
+     * profil Xbox/Minecraft est introuvable.
+     */
+    private ValidatedProfile validateAndFetchProfile(String encryptedRefreshToken) {
+        String username = null;
+        String rotated = null;
         try {
-            var chain = tokenService.validateChain(account.getMsaRefreshToken());
+            var chain = tokenService.validateChain(encryptedRefreshToken);
             if (chain.isPresent()) {
-                // la validation a rotaté le refresh MSA : c'est lui qu'il faut stocker
-                account.setMsaRefreshToken(chain.get().rotatedRefreshTokenEncrypted());
+                rotated = chain.get().rotatedRefreshTokenEncrypted();
                 username = minecraftService.getMinecraftProfileName(chain.get().minecraftToken());
-            } else {
-                username = null;
             }
         } catch (org.springframework.web.client.RestClientException e) {
             log.warn("Validation du compte de service Minecraft en échec: {}", e.getMessage());
-            username = null;
         }
         if (username == null) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Chaîne d'auth Xbox/Minecraft en échec pour ce compte (profil Xbox ou Minecraft manquant ?)");
         }
-        account.setMinecraftUsername(username);
-        account.setUpdatedAt(Instant.now());
-        MinecraftServiceAccount saved = accountRepository.save(account);
-        log.info("Compte de service Minecraft enrôlé: {} ({})", saved.getLabel(), username);
-        return new AccountDto(saved.getId(), saved.getLabel(), username, saved.getFillOrder(),
-                saved.isFriendLimitReached(), saved.isEnabled(), 0);
+        return new ValidatedProfile(rotated, username);
     }
 
     @PatchMapping("/{id}")

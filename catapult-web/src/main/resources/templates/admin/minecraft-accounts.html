@@ -37,6 +37,11 @@
                 <span th:if="${a.friendLimitReached}" class="badge bg-warning" th:text="#{admin.minecraft.state.full}">Plein</span>
             </td>
             <td class="text-end">
+                <button th:if="${!a.enabled}" type="button" class="btn btn-sm btn-outline-primary mc-reauth-btn"
+                        th:attr="data-id=${a.id},
+                                 data-start-url=@{/admin/minecraft-accounts/device-code/start},
+                                 data-complete-url=@{/admin/minecraft-accounts/{id}/reauth/complete(id=${a.id})}"
+                        th:text="#{admin.minecraft.action.reauth}">Ré-authentifier</button>
                 <form th:action="@{/admin/minecraft-accounts/{id}/toggle(id=${a.id})}" method="post" class="d-inline">
                     <input type="hidden" name="enabled" th:value="${!a.enabled}"/>
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -52,6 +57,7 @@
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit" class="btn btn-sm btn-danger" th:text="#{admin.minecraft.action.delete}">Supprimer</button>
                 </form>
+                <div th:if="${!a.enabled}" class="mc-reauth-status mt-1" th:attr="data-for=${a.id}"></div>
             </td>
         </tr>
         <tr th:if="${#lists.isEmpty(accounts)}">

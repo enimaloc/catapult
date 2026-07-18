@@ -435,6 +435,20 @@ public class AdminController {
         return Map.of("status", "ERROR", "message", String.valueOf(result.body().getOrDefault("message", "")));
     }
 
+    @PostMapping("/minecraft-accounts/{id}/reauth/complete")
+    @ResponseBody
+    public Map<String, Object> completeMinecraftReauth(@PathVariable UUID id, @RequestParam String deviceCode) {
+        ApiClient.ApiResult result = apiClient.adminMinecraftReauth(id, deviceCode);
+        if (result.status() == 202) {
+            return Map.of("status", "PENDING");
+        }
+        if (result.status() == 200) {
+            return Map.of("status", "CREATED",
+                    "minecraftUsername", String.valueOf(result.body().getOrDefault("minecraftUsername", "?")));
+        }
+        return Map.of("status", "ERROR", "message", String.valueOf(result.body().getOrDefault("message", "")));
+    }
+
     // ── DTDD Keys ────────────────────────────────────────────────────────────
 
     @GetMapping("/dtdd-keys")
