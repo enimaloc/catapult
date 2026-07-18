@@ -14,7 +14,7 @@ subprojects {
         maven {
             url = uri("https://repo.spring.io/snapshot")
             content {
-                includeGroupByRegex("org\\.springframework\\.cloud(\\..*)?")
+                includeGroupByRegex("org\\.springframework\\.(cloud|boot)(\\..*)?")
             }
         }
     }
