@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.domain.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.MinecraftFriendService;
 import fr.enimaloc.catapult.service.MinecraftGateService;
@@ -32,6 +33,7 @@ class ApiMinecraftConnectControllerTest {
     @Mock private MinecraftFriendService friendService;
     @Mock private MinecraftGateService gateService;
     @Mock private UserAccountRepository userAccountRepository;
+    @Mock private MinecraftServiceAccountRepository accountRepository;
     @Mock private Jwt jwt;
 
     @InjectMocks private ApiMinecraftConnectController controller;
@@ -45,6 +47,8 @@ class ApiMinecraftConnectControllerTest {
         when(jwt.getSubject()).thenReturn(userId.toString());
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
         when(gateService.isAvailableFor(user)).thenReturn(true);
+        when(accountRepository.countByEnabledTrue()).thenReturn(1L);
+        when(accountRepository.countByEnabledTrueAndFriendLimitReachedFalse()).thenReturn(1L);
     }
 
     private MinecraftFriendLink link(MinecraftFriendLink.Status status) {
@@ -132,6 +136,36 @@ class ApiMinecraftConnectControllerTest {
         controller.unenroll(jwt);
 
         org.mockito.Mockito.verify(friendService).unenroll(user);
+    }
+
+    @Test
+    void get_noEnabledAccount_returnsUnavailable_evenWithExistingLink() {
+        when(accountRepository.countByEnabledTrue()).thenReturn(0L);
+        when(friendService.getLink(user)).thenReturn(Optional.of(link(MinecraftFriendLink.Status.ACCEPTED)));
+
+        var response = controller.status(jwt);
+
+        assertThat(response.status()).isEqualTo("UNAVAILABLE");
+    }
+
+    @Test
+    void get_allAccountsFull_noLink_returnsFull() {
+        when(accountRepository.countByEnabledTrueAndFriendLimitReachedFalse()).thenReturn(0L);
+        when(friendService.getLink(user)).thenReturn(Optional.empty());
+
+        var response = controller.status(jwt);
+
+        assertThat(response.status()).isEqualTo("FULL");
+    }
+
+    @Test
+    void get_allAccountsFull_existingLink_keepsRealStatus() {
+        when(accountRepository.countByEnabledTrueAndFriendLimitReachedFalse()).thenReturn(0L);
+        when(friendService.getLink(user)).thenReturn(Optional.of(link(MinecraftFriendLink.Status.ACCEPTED)));
+
+        var response = controller.status(jwt);
+
+        assertThat(response.status()).isEqualTo("ACCEPTED");
     }
 
     @Test
