@@ -29,6 +29,11 @@ public class WebSecurityConfig {
                                 "/ws", "/ws/**", "/.well-known/**").permitAll()
                         .requestMatchers("/admin/impersonate/exit").hasAuthority("ROLE_PREVIOUS_ADMINISTRATOR")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
+                        // ThirdPartiesVerificationController : fichiers de vérification lus par des
+                        // crawlers tiers (Riot, well-known...) sans session. Placé après /admin/** :
+                        // /{file} ne doit jamais court-circuiter la protection ROLE_ADMIN du chemin
+                        // littéral /admin.
+                        .requestMatchers("/riot.txt", "/{file}").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
