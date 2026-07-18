@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.monitoring;
 
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.EventSubTwitchChatService;
@@ -31,6 +32,7 @@ public class CatapultGauges implements MeterBinder {
     private final OAuthTokenRepository oAuthTokenRepository;
     private final ObjectProvider<IgdbService> igdbService;
     private final SystemTwitchAccountService systemTwitchAccountService;
+    private final MinecraftServiceAccountRepository minecraftServiceAccountRepository;
 
     @Override
     public void bindTo(MeterRegistry registry) {
@@ -89,6 +91,11 @@ public class CatapultGauges implements MeterBinder {
                 s -> s.tokenExpiry().map(CatapultGauges::secondsUntil).orElse(Double.NaN))
             .tag("service", "twitch_bot")
             .description("Secondes avant expiration du token du bot système (NaN = bot non lié)")
+            .register(registry);
+
+        Gauge.builder("catapult.minecraft.accounts.total", minecraftServiceAccountRepository,
+                MinecraftServiceAccountRepository::countByEnabledTrue)
+            .description("Nombre de comptes de service Minecraft activés")
             .register(registry);
     }
 
