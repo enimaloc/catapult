@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.monitoring;
 
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.EventSubTwitchChatService;
@@ -36,11 +37,13 @@ class CatapultGaugesTest {
     @Mock ObjectProvider<IgdbService> igdbServiceProvider;
     @Mock SystemTwitchAccountService systemTwitchAccountService;
     @Mock EventSubTwitchChatService eventSubTwitchChatService;
+    @Mock MinecraftServiceAccountRepository minecraftServiceAccountRepository;
 
     private CatapultGauges gauges() {
         return new CatapultGauges(userAccountRepository, streamStateService,
                 eventSubChatProvider, ircChatProvider, chatCommandDefinitionRepository,
-                oAuthTokenRepository, igdbServiceProvider, systemTwitchAccountService);
+                oAuthTokenRepository, igdbServiceProvider, systemTwitchAccountService,
+                minecraftServiceAccountRepository);
     }
 
     @Test
@@ -103,5 +106,15 @@ class CatapultGaugesTest {
         assertThat(registry.get("catapult.token.expiry.seconds").tag("service", "igdb").gauge().value()).isNaN();
         assertThat(registry.get("catapult.token.expiry.seconds").tag("service", "twitch_bot").gauge().value())
                 .isCloseTo(600.0, within(5.0));
+    }
+
+    @Test
+    void minecraft_accounts_gauge_registered() {
+        when(minecraftServiceAccountRepository.countByEnabledTrue()).thenReturn(4L);
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
+        gauges().bindTo(registry);
+
+        assertThat(registry.get("catapult.minecraft.accounts.total").gauge().value()).isEqualTo(4.0);
     }
 }
