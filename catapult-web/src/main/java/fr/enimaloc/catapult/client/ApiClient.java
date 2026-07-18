@@ -483,6 +483,12 @@ public class ApiClient {
                 .body(Map.of("deviceCode", deviceCode, "label", label)));
     }
 
+    public ApiResult adminMinecraftReauth(UUID id, String deviceCode) {
+        return exchangeForResult(() -> restClient.post()
+                .uri("/api/admin/minecraft-accounts/{id}/reauth", id)
+                .body(Map.of("deviceCode", deviceCode)));
+    }
+
     public boolean adminMinecraftPatch(UUID id, Map<String, Object> body) {
         try {
             return restClient.method(HttpMethod.PATCH)
