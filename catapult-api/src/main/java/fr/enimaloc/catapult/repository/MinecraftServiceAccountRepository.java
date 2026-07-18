@@ -10,4 +10,6 @@ public interface MinecraftServiceAccountRepository extends JpaRepository<Minecra
     List<MinecraftServiceAccount> findByEnabledTrueOrderByFillOrderAsc();
 
     long countByEnabledTrue();
+
+    long countByEnabledTrueAndFriendLimitReachedFalse();
 }
