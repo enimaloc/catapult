@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="invitations-tab" id="tab-panel-invitations" data-tab-panel="invitations" th:if="${invitePlacementVariant == 'tab'}">
+    <div th:replace="~{invite :: invite-panel}"></div>
+</div>
+</body>
+</html>
