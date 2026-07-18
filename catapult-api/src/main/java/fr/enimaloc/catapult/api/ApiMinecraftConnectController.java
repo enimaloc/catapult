@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.domain.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.MinecraftFriendService;
 import fr.enimaloc.catapult.service.MinecraftGateService;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -25,6 +27,7 @@ public class ApiMinecraftConnectController {
     private final MinecraftFriendService friendService;
     private final UserAccountRepository userAccountRepository;
     private final MinecraftGateService gateService;
+    private final MinecraftServiceAccountRepository accountRepository;
 
     public record LinkStateResponse(String status, String minecraftName, String serviceAccountUsername) {
         static LinkStateResponse none() {
@@ -33,6 +36,11 @@ public class ApiMinecraftConnectController {
 
         static LinkStateResponse unavailable() {
             return new LinkStateResponse("UNAVAILABLE", null, null);
+        }
+
+        /** Aucun compte de service actif ne peut accepter de nouvel ami — état transitoire, distinct de UNAVAILABLE. */
+        static LinkStateResponse full() {
+            return new LinkStateResponse("FULL", null, null);
         }
 
         static LinkStateResponse of(MinecraftFriendLink link) {
@@ -59,9 +67,21 @@ public class ApiMinecraftConnectController {
         if (!gateService.isAvailableFor(user)) {
             return LinkStateResponse.unavailable();
         }
-        return friendService.getLink(user)
-                .map(LinkStateResponse::of)
-                .orElseGet(LinkStateResponse::none);
+        // Aucun compte de service actif : la feature est indisponible, y compris pour un
+        // utilisateur déjà lié (son lien ne peut plus être géré tant qu'aucun compte ne tourne).
+        if (accountRepository.countByEnabledTrue() == 0) {
+            return LinkStateResponse.unavailable();
+        }
+        Optional<MinecraftFriendLink> link = friendService.getLink(user);
+        if (link.isPresent()) {
+            return LinkStateResponse.of(link.get());
+        }
+        // Comptes actifs mais tous pleins : on cache juste la possibilité de se lier,
+        // un utilisateur déjà lié plus haut garde sa connexion (cas géré ci-dessus).
+        if (accountRepository.countByEnabledTrueAndFriendLimitReachedFalse() == 0) {
+            return LinkStateResponse.full();
+        }
+        return LinkStateResponse.none();
     }
 
     @PostMapping
