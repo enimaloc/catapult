@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.chat.command.ast.ServiceCallNode;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CommandDslParserTest {
 
@@ -43,5 +44,19 @@ class CommandDslParserTest {
         CommandAst ast = parser.parse("{steam#getPrice(game#store#steam)}");
         ServiceCallNode call = (ServiceCallNode) ast.nodes().get(0);
         assertThat(call.args()).containsExactly(new PlaceholderNode("game#store#steam"));
+    }
+
+    @Test
+    void throwsOnUnclosedBrace() {
+        assertThatThrownBy(() -> parser.parse("Hello {world"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void parsesServiceCallWithLiteralArgumentContainingComma() {
+        CommandAst ast = parser.parse("{igdb#getGame(\"Half-Life, part 2\")}");
+        assertThat(ast.nodes()).hasSize(1);
+        ServiceCallNode call = (ServiceCallNode) ast.nodes().get(0);
+        assertThat(call.args()).containsExactly(new LiteralNode("Half-Life, part 2"));
     }
 }
