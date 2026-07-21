@@ -61,14 +61,14 @@ public class JsCompiler {
 
     private String compileCall(ServiceCallNode n, Set<String> bindings) {
         String args = n.args().stream().map(a -> compileValue(a, bindings)).collect(Collectors.joining(", "));
-        return "ctx.call(\"" + n.namespace() + "\", \"" + n.function() + "\""
+        return "ctx.call(\"" + escape(n.namespace()) + "\", \"" + escape(n.function()) + "\""
             + (args.isEmpty() ? "" : ", " + args) + ")";
     }
 
     private String compileValue(CommandNode node, Set<String> bindings) {
         return switch (node) {
             case LiteralNode n -> "\"" + escape(n.text()) + "\"";
-            case PlaceholderNode n -> bindings.contains(n.path()) ? n.path() : "ctx.placeholder(\"" + n.path() + "\")";
+            case PlaceholderNode n -> bindings.contains(n.path()) ? n.path() : "ctx.placeholder(\"" + escape(n.path()) + "\")";
             case ServiceCallNode n -> compileCall(n, bindings);
             default -> throw new IllegalArgumentException("Unsupported value node: " + node.typeName());
         };
