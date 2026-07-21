@@ -53,8 +53,11 @@ public class SandboxExecutor {
                 return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
             } catch (TimeoutException e) {
                 // Force-cancel the guest execution so the worker thread actually
-                // unwinds instead of spinning forever in the background.
-                context.close(true);
+                // unwinds instead of spinning forever in the background. Cleanup
+                // failures here must not mask the timeout as some other kind of
+                // exception, so they're swallowed the same way closeQuietly does
+                // for the normal-path cleanup below.
+                closeQuietly(context);
                 awaitWorkerTermination(future);
                 throw new SandboxExecutionException("Command execution timed out after " + timeout, e);
             }
