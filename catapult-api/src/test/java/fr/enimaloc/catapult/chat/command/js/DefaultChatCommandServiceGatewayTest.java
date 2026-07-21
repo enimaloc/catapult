@@ -2,6 +2,9 @@ package fr.enimaloc.catapult.chat.command.js;
 
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.IgdbClient;
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,7 +41,8 @@ class DefaultChatCommandServiceGatewayTest {
 
     @BeforeEach
     void setUp() {
-        gateway = new DefaultChatCommandServiceGateway(igdbClient, restClient);
+        gateway = new DefaultChatCommandServiceGateway(igdbClient, restClient,
+            new ExternalApiObservations(ObservationRegistry.NOOP, new SimpleMeterRegistry()));
         doReturn(getSpec).when(restClient).get();
         doReturn(headersSpec).when(getSpec).uri(anyString(), any(Object[].class));
         doReturn(responseSpec).when(headersSpec).retrieve();
