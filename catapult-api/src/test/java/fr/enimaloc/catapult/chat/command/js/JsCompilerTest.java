@@ -1,7 +1,11 @@
 package fr.enimaloc.catapult.chat.command.js;
 
+import fr.enimaloc.catapult.chat.command.ast.CommandAst;
+import fr.enimaloc.catapult.chat.command.ast.PlaceholderNode;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,5 +44,12 @@ class JsCompilerTest {
         assertThat(js).contains("for (const f of ctx.list(\"fallbacks\")) {");
         assertThat(js).contains("result += \"-\";");
         assertThat(js).contains("result += f;");
+    }
+
+    @Test
+    void escapesQuotesAndBackslashesInPlaceholderPath() {
+        CommandAst ast = new CommandAst(List.of(new PlaceholderNode("weird\"path\\here")));
+        String js = compiler.compile(ast);
+        assertThat(js).contains("ctx.placeholder(\"weird\\\"path\\\\here\")");
     }
 }
