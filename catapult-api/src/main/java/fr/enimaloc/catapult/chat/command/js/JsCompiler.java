@@ -49,7 +49,7 @@ public class JsCompiler {
             }
             case ForEachNode n -> {
                 js.append("for (const ").append(n.bindingName()).append(" of ctx.list(\"")
-                    .append(n.listSource()).append("\")) {\n");
+                    .append(escape(n.listSource())).append("\")) {\n");
                 Set<String> childBindings = new HashSet<>(bindings);
                 childBindings.add(n.bindingName());
                 for (CommandNode child : n.body()) appendNode(child, js, childBindings);
