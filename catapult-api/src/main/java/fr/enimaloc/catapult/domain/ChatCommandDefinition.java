@@ -54,6 +54,9 @@ public class ChatCommandDefinition {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String template;
 
+    @Column(columnDefinition = "TEXT")
+    private String ast;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private ChatCommandEvent.SenderRole permission;
