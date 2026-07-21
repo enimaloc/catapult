@@ -17,7 +17,8 @@ class NodeJsonCodecTest {
             new PlaceholderNode("game#name"),
             new IfNode(new PlaceholderNode("tw#active"), "==", new LiteralNode("x"),
                 List.of(new LiteralNode("yes")), List.of(new LiteralNode("no"))),
-            new ForEachNode("f", "fallbacks", List.of(new PlaceholderNode("f")))
+            new ForEachNode("f", "fallbacks", List.of(new PlaceholderNode("f"))),
+            new ServiceCallNode("igdb", "getGame", List.of(new PlaceholderNode("game#name")))
         ));
 
         String json = codec.toJson(ast);
