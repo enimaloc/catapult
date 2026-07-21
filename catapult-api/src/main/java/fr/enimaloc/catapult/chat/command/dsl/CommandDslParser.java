@@ -43,6 +43,7 @@ public class CommandDslParser {
     }
 
     private CommandNode parseBraceExpression(DslCursor cursor) {
+        int openPos = cursor.position();
         cursor.next(); // consume '{'
         int start = cursor.position();
         int depth = 1;
@@ -50,6 +51,9 @@ public class CommandDslParser {
             char c = cursor.next();
             if (c == '{') depth++;
             else if (c == '}') depth--;
+        }
+        if (depth > 0) {
+            throw new CommandDslParseException("Unclosed '{' starting at position " + openPos);
         }
         String inner = cursor.substring(start, cursor.position() - 1);
 
@@ -71,7 +75,7 @@ public class CommandDslParser {
     private List<CommandNode> parseArgs(String argsText) {
         List<CommandNode> args = new ArrayList<>();
         if (argsText.isBlank()) return args;
-        for (String rawArg : argsText.split(",")) {
+        for (String rawArg : splitTopLevelArgs(argsText)) {
             String arg = rawArg.trim();
             if (arg.startsWith("\"") && arg.endsWith("\"")) {
                 args.add(new LiteralNode(arg.substring(1, arg.length() - 1)));
@@ -80,5 +84,29 @@ public class CommandDslParser {
             }
         }
         return args;
+    }
+
+    /**
+     * Splits a comma-separated argument list on top-level commas only,
+     * ignoring commas that appear inside a {@code "..."} quoted literal.
+     */
+    private List<String> splitTopLevelArgs(String argsText) {
+        List<String> parts = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+        for (int i = 0; i < argsText.length(); i++) {
+            char c = argsText.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+                current.append(c);
+            } else if (c == ',' && !inQuotes) {
+                parts.add(current.toString());
+                current.setLength(0);
+            } else {
+                current.append(c);
+            }
+        }
+        parts.add(current.toString());
+        return parts;
     }
 }
