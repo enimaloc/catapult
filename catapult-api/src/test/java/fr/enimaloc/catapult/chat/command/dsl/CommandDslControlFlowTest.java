@@ -1,3 +1,4 @@
+
 package fr.enimaloc.catapult.chat.command.dsl;
 
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
@@ -8,6 +9,7 @@ import fr.enimaloc.catapult.chat.command.ast.PlaceholderNode;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CommandDslControlFlowTest {
 
@@ -48,5 +50,35 @@ class CommandDslControlFlowTest {
     void forEachRoundTrips() {
         String source = "{for f in fallbacks}-{f} {/for}";
         assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+    }
+
+    @Test
+    void ifWithoutElseRoundTrips() {
+        String source = "{if a == b}yes{/if}";
+        assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+    }
+
+    @Test
+    void malformedIfConditionThrowsParseException() {
+        assertThatThrownBy(() -> parser.parse("{if broken}x{/if}"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void malformedForHeaderThrowsParseException() {
+        assertThatThrownBy(() -> parser.parse("{for broken}x{/for}"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void unclosedIfThrowsParseException() {
+        assertThatThrownBy(() -> parser.parse("{if a == b}yes"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void unclosedForThrowsParseException() {
+        assertThatThrownBy(() -> parser.parse("{for f in fallbacks}x"))
+            .isInstanceOf(CommandDslParseException.class);
     }
 }

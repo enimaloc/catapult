@@ -20,14 +20,14 @@ public class CommandDslParser {
 
     public CommandAst parse(String text) {
         DslCursor cursor = new DslCursor(text);
-        return new CommandAst(parseSequence(cursor, null));
+        return new CommandAst(parseSequence(cursor));
     }
 
-    private List<CommandNode> parseSequence(DslCursor cursor, String stopTag) {
+    private List<CommandNode> parseSequence(DslCursor cursor, String... stopTags) {
         List<CommandNode> nodes = new ArrayList<>();
         StringBuilder literal = new StringBuilder();
         while (!cursor.atEnd()) {
-            if (stopTag != null && looksAheadAt(cursor, stopTag)) break;
+            if (looksAheadAtAny(cursor, stopTags)) break;
             char c = cursor.peek();
             if (c == '{') {
                 if (!literal.isEmpty()) {
@@ -49,6 +49,13 @@ public class CommandDslParser {
         int start = cursor.position();
         return cursor.length() - start >= tag.length()
             && cursor.substring(start, start + tag.length()).equals(tag);
+    }
+
+    private boolean looksAheadAtAny(DslCursor cursor, String... tags) {
+        for (String tag : tags) {
+            if (looksAheadAt(cursor, tag)) return true;
+        }
+        return false;
     }
 
     private CommandNode parseBraceExpression(DslCursor cursor) {
@@ -90,10 +97,14 @@ public class CommandDslParser {
 
     private CommandNode parseIf(DslCursor cursor, String condition) {
         String[] parts = condition.split("==", 2);
+        if (parts.length != 2) {
+            throw new CommandDslParseException(
+                "Malformed {if} condition, expected 'left == right': " + condition);
+        }
         CommandNode left = parseSingleValue(parts[0].trim());
         CommandNode right = parseSingleValue(parts[1].trim());
 
-        List<CommandNode> thenBranch = parseSequence(cursor, "{else}");
+        List<CommandNode> thenBranch = parseSequence(cursor, "{else}", "{/if}");
         List<CommandNode> elseBranch = List.of();
         if (looksAheadAt(cursor, "{else}")) {
             cursor.position(cursor.position() + "{else}".length());
@@ -108,6 +119,10 @@ public class CommandDslParser {
 
     private CommandNode parseFor(DslCursor cursor, String header) {
         String[] parts = header.split(" in ", 2);
+        if (parts.length != 2) {
+            throw new CommandDslParseException(
+                "Malformed {for} header, expected 'x in list': " + header);
+        }
         String bindingName = parts[0].trim();
         String listSource = parts[1].trim();
         List<CommandNode> body = parseSequence(cursor, "{/for}");
