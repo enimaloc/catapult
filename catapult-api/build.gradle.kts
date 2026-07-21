@@ -60,6 +60,10 @@ dependencies {
     implementation("org.commonmark:commonmark:$commonmarkVersion")
     implementation("org.springframework.cloud:spring-cloud-context:$springCloudContextVersion")
 
+    // GraalJS sandbox for executing compiled chat-command JS
+    implementation("org.graalvm.polyglot:polyglot:24.1.1")
+    implementation("org.graalvm.polyglot:js:24.1.1")
+
     // JWT generation/validation
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:$jjwtVersion")
