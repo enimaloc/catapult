@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.chat.command.js;
 
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
@@ -45,10 +47,22 @@ public class SandboxExecutor {
     }
 
     public String execute(String compiledJs, PlaceholderContext placeholders, ListContext lists, Duration timeout) {
+        return execute(compiledJs, placeholders, lists, null, timeout);
+    }
+
+    /**
+     * Same as {@link #execute(String, PlaceholderContext, ListContext, Duration)}
+     * but also binds {@code ctx.call(namespace, function, ...args)} to the
+     * given registry's whitelisted service functions. A {@code null} registry
+     * is accepted for callers that don't need service calls; {@code ctx.call}
+     * then fails loudly only if the script actually invokes it.
+     */
+    public String execute(String compiledJs, PlaceholderContext placeholders, ListContext lists,
+                           ServiceFunctionRegistry registry, Duration timeout) {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Context context = buildContext();
         try {
-            Future<String> future = executor.submit(() -> runInContext(context, compiledJs, placeholders, lists));
+            Future<String> future = executor.submit(() -> runInContext(context, compiledJs, placeholders, lists, registry));
             try {
                 return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
             } catch (TimeoutException e) {
@@ -103,7 +117,8 @@ public class SandboxExecutor {
             .build();
     }
 
-    private String runInContext(Context context, String compiledJs, PlaceholderContext placeholders, ListContext lists) {
+    private String runInContext(Context context, String compiledJs, PlaceholderContext placeholders, ListContext lists,
+                                 ServiceFunctionRegistry registry) {
         try {
             Value bindings = context.getBindings("js");
             Value ctx = context.eval("js", "({})");
@@ -111,8 +126,29 @@ public class SandboxExecutor {
             ctx.putMember("list", (ProxyExecutable) args ->
                 ProxyArray.fromList(new ArrayList<Object>(lists.resolveList(args[0].asString()))));
             ctx.putMember("call", (ProxyExecutable) args -> {
-                throw new UnsupportedOperationException(
-                    "service-call binding is wired in Task 11 (per-user context)");
+                if (registry == null) {
+                    throw new UnsupportedOperationException(
+                        "No ServiceFunctionRegistry bound for this execution");
+                }
+                if (args.length < 2) {
+                    throw new IllegalArgumentException("ctx.call requires a namespace and a function name");
+                }
+                String namespace = args[0].asString();
+                String function = args[1].asString();
+                Object[] callArgs = new Object[args.length - 2];
+                for (int i = 2; i < args.length; i++) {
+                    callArgs[i - 2] = args[i].as(Object.class);
+                }
+                try {
+                    return registry.lookup(namespace, function)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                            "Unknown service function " + namespace + "#" + function))
+                        .invoke(callArgs);
+                } catch (RuntimeException e) {
+                    throw e;
+                } catch (Exception e) {
+                    throw new RuntimeException("Service function " + namespace + "#" + function + " failed", e);
+                }
             });
             bindings.putMember("ctx", ctx);
 
