@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.chat.command.js;
 
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
+import fr.enimaloc.catapult.chat.command.ast.ForEachNode;
 import fr.enimaloc.catapult.chat.command.ast.PlaceholderNode;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import org.junit.jupiter.api.Test;
@@ -51,5 +52,12 @@ class JsCompilerTest {
         CommandAst ast = new CommandAst(List.of(new PlaceholderNode("weird\"path\\here")));
         String js = compiler.compile(ast);
         assertThat(js).contains("ctx.placeholder(\"weird\\\"path\\\\here\")");
+    }
+
+    @Test
+    void escapesQuotesAndBackslashesInForEachListSource() {
+        CommandAst ast = new CommandAst(List.of(new ForEachNode("f", "weird\"list\\name", List.of())));
+        String js = compiler.compile(ast);
+        assertThat(js).contains("ctx.list(\"weird\\\"list\\\\name\")");
     }
 }
