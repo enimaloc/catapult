@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.chat.command.ast.ServiceCallNode;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -21,6 +22,8 @@ import java.util.stream.Collectors;
  * in a sandboxed engine in a later task).
  */
 public class JsCompiler {
+
+    private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[A-Za-z_$][A-Za-z0-9_$]*$");
 
     public String compile(CommandAst ast) {
         StringBuilder js = new StringBuilder();
@@ -48,6 +51,10 @@ public class JsCompiler {
                 js.append("}\n");
             }
             case ForEachNode n -> {
+                if (!SAFE_IDENTIFIER.matcher(n.bindingName()).matches()) {
+                    throw new JsCompilationException(
+                        "Invalid loop binding name: " + n.bindingName() + " (must be a valid identifier)");
+                }
                 js.append("for (const ").append(n.bindingName()).append(" of ctx.list(\"")
                     .append(escape(n.listSource())).append("\")) {\n");
                 Set<String> childBindings = new HashSet<>(bindings);

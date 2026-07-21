@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JsCompilerTest {
 
@@ -59,5 +60,21 @@ class JsCompilerTest {
         CommandAst ast = new CommandAst(List.of(new ForEachNode("f", "weird\"list\\name", List.of())));
         String js = compiler.compile(ast);
         assertThat(js).contains("ctx.list(\"weird\\\"list\\\\name\")");
+    }
+
+    @Test
+    void rejectsForEachBindingNameContainingASpace() {
+        CommandAst ast = new CommandAst(List.of(new ForEachNode("weird name", "fallbacks", List.of())));
+        assertThatThrownBy(() -> compiler.compile(ast))
+            .isInstanceOf(JsCompilationException.class)
+            .hasMessageContaining("weird name");
+    }
+
+    @Test
+    void rejectsForEachBindingNameStartingWithDigit() {
+        CommandAst ast = new CommandAst(List.of(new ForEachNode("1bad", "fallbacks", List.of())));
+        assertThatThrownBy(() -> compiler.compile(ast))
+            .isInstanceOf(JsCompilationException.class)
+            .hasMessageContaining("1bad");
     }
 }
