@@ -66,7 +66,7 @@ public class ApiChatCommandTestController {
         Map<String, String> overrides = (Map<String, String>) body.getOrDefault("overrides", Map.of());
 
         CommandAst effectiveAst = resolveAst(body, definition);
-        String js = jsCompiler.compile(effectiveAst);
+        String js = jsCompiler.compileWithTrace(effectiveAst);
 
         ExecutionTrace trace = sandboxExecutor.executeWithTrace(js,
             overrides::get, name -> "fallbacks".equals(name) ? List.copyOf(overrides.values()) : List.of(),
