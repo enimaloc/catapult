@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="chat-command-editor-modal" id="chatCommandEditorModal" class="modal" hidden
+     style="display:none;">
+    <div class="modal-content" style="max-width:800px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.75rem;">
+            <input id="ceName" class="form-input" type="text" pattern="^![a-z][a-z0-9_]{0,30}$"
+                   style="font-family:monospace; font-size:1.1em; flex:1;">
+            <button type="button" id="ceClose"
+                    style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:inherit;">&times;</button>
+        </div>
+        <div style="display:flex; gap:.25rem; border-bottom:1px solid var(--border); margin-bottom:.75rem;">
+            <button type="button" class="btn ce-tab-btn active" data-tab="blocks"
+                    th:text="#{chat_commands.tab.blocks}">Blocs</button>
+            <button type="button" class="btn ce-tab-btn" data-tab="text"
+                    th:text="#{chat_commands.tab.text}">Texte</button>
+            <button type="button" class="btn ce-tab-btn" data-tab="js"
+                    th:text="#{chat_commands.tab.js}">JS généré</button>
+        </div>
+        <div>
+            <div id="ceBlocksPane" class="ce-tab-pane" style="min-height:200px;"></div>
+            <div id="ceTextPane" class="ce-tab-pane" hidden>
+                <textarea id="ceTextArea" class="form-input" rows="8" style="width:100%; font-family:monospace;"></textarea>
+            </div>
+            <div id="ceJsPane" class="ce-tab-pane" hidden>
+                <pre id="ceJsOutput" style="white-space:pre-wrap; background:var(--bg-base); padding:.5rem; border-radius:6px;"></pre>
+                <button type="button" id="ceEjectBtn" class="btn" disabled title="Bientôt disponible">Éjecter vers JS</button>
+            </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:.5rem; margin-top:1rem;">
+            <button type="button" id="ceTestBtn" class="btn" th:text="#{chat_commands.action.test}">Tester</button>
+            <button type="button" id="ceSaveBtn" class="btn btn-primary" th:text="#{chat_commands.action.save}">Enregistrer</button>
+        </div>
+        <div id="ceTraceOutput" hidden
+             style="margin-top:.75rem; font-family:monospace; font-size:.85em; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:.5rem; max-height:200px; overflow-y:auto;"></div>
+    </div>
+</div>
+</body>
+</html>
