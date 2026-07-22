@@ -32,7 +32,9 @@ public class NodeJsonCodec {
     public CommandAst fromJson(String json) {
         Map<String, Object> root = mapper.readValue(json, Map.class);
         List<Map<String, Object>> nodes = (List<Map<String, Object>>) root.get("nodes");
-        return new CommandAst(nodes.stream().map(this::fromMap).toList());
+        @SuppressWarnings("unchecked")
+        List<Statement> statements = (List<Statement>) (List<?>) nodes.stream().map(this::fromMap).toList();
+        return new CommandAst(statements);
     }
 
     private Map<String, Object> toMap(CommandNode node) {
