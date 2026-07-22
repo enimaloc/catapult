@@ -109,6 +109,14 @@ class CommandDslParserTest {
     }
 
     @Test
+    void stringLiteralContainingUnbalancedBraceDoesNotDesyncTagScanning() {
+        CommandAst ast = parser.parse("{var msg = \"a}b\"}{print msg}");
+        assertThat(ast.statements()).containsExactly(
+            new VarDeclStatement("msg", ValueType.STRING, new LiteralExpr("a}b", ValueType.STRING)),
+            new PrintStatement(new VarRefExpr("msg")));
+    }
+
+    @Test
     void bareContextPathWithInlineFallbackDropsTheFallbackText() {
         // Matches the pre-existing behavior: the DB-configured ChatCommandFallback is what's
         // actually consulted at runtime, not this inline text — see DynamicChatCommand.
