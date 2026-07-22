@@ -42,6 +42,28 @@ class ChatCommandsDslAstToTextHandlerTest {
     }
 
     @Test
+    void springErrorBodyWithoutATextKeyThrowsInvalidDslWithTheUpstreamMessage() {
+        // ApiClient's non-throwing 4xx status handler means a 400 from catapult-api's
+        // validation comes back here as Spring's default error body, not null and not
+        // a {text:...} map.
+        ApiClient apiClient = mock(ApiClient.class);
+        Map<String, Object> springErrorBody = Map.of(
+                "timestamp", "2026-07-23T00:00:00Z",
+                "status", 400,
+                "error", "Bad Request",
+                "message", "Unclosed '{' starting at position 0",
+                "path", "/api/chat-commands/dsl/ast-to-text");
+        when(apiClient.post(eq("/api/chat-commands/dsl/ast-to-text"), any(), eq(Map.class)))
+                .thenReturn(springErrorBody);
+
+        ChatCommandsDslAstToTextHandler handler = new ChatCommandsDslAstToTextHandler(apiClient);
+
+        assertThatThrownBy(() -> handler.handle(mock(WsSession.class), Map.of("ast", "not json")))
+                .isInstanceOf(WsBusinessException.class)
+                .hasMessageContaining("Unclosed '{' starting at position 0");
+    }
+
+    @Test
     void nullBodyThrowsInvalidParams() {
         ChatCommandsDslAstToTextHandler handler = new ChatCommandsDslAstToTextHandler(mock(ApiClient.class));
 

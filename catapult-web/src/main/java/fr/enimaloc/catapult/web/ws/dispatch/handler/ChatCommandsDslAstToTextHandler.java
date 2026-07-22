@@ -47,8 +47,14 @@ public class ChatCommandsDslAstToTextHandler implements RequestHandler {
         }
         Map<String, Object> body = mapper.convertValue(rawParams, Map.class);
         Map<String, Object> result = apiClient.post("/api/chat-commands/dsl/ast-to-text", body, Map.class);
-        if (result == null) {
-            throw new WsBusinessException("UPSTREAM_UNAVAILABLE", "Conversion failed (check catapult-api logs)");
+        // ApiClient installs a non-throwing 4xx status handler (see ApiClient's constructor),
+        // so a 400 from catapult-api's validation doesn't come back as null here — it comes
+        // back as Spring's default error body ({timestamp,status,error,message,path}), which
+        // has no "text" key. Detect that shape instead of assuming any non-null result is valid.
+        if (result == null || !result.containsKey("text")) {
+            String message = result != null && result.get("message") instanceof String m
+                ? m : "Conversion failed (check catapult-api logs)";
+            throw new WsBusinessException("INVALID_DSL", message);
         }
         return result;
     }
