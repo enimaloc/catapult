@@ -28,4 +28,22 @@ class ChatCommandAstBackfillTest {
         assertThat(needsBackfill.getAst()).contains("\"type\":\"placeholder\"");
         verify(repository).saveAll(List.of(needsBackfill));
     }
+
+    @Test
+    void skipsMalformedTemplateWithoutFailingTheWholeBatch() {
+        ChatCommandDefinitionRepository repository = mock(ChatCommandDefinitionRepository.class);
+        ChatCommandDefinition malformed = new ChatCommandDefinition();
+        malformed.setName("broken");
+        malformed.setTemplate("Hi {game#name");
+        ChatCommandDefinition valid = new ChatCommandDefinition();
+        valid.setName("ok");
+        valid.setTemplate("Hi {game#name}");
+        when(repository.findAll()).thenReturn(List.of(malformed, valid));
+
+        new ChatCommandAstBackfill(repository, new LegacyTemplateConverter()).run();
+
+        assertThat(malformed.getAst()).isNull();
+        assertThat(valid.getAst()).contains("\"type\":\"placeholder\"");
+        verify(repository).saveAll(List.of(valid));
+    }
 }
