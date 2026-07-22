@@ -42,6 +42,28 @@ class ChatCommandsDslTextToAstHandlerTest {
     }
 
     @Test
+    void springErrorBodyWithoutAnAstKeyThrowsInvalidDslWithTheUpstreamMessage() {
+        // ApiClient's non-throwing 4xx status handler means a 400 from catapult-api's
+        // validation (CommandDslParseException -> ResponseStatusException) comes back here
+        // as Spring's default error body, not null and not an {ast:...} map.
+        ApiClient apiClient = mock(ApiClient.class);
+        Map<String, Object> springErrorBody = Map.of(
+                "timestamp", "2026-07-23T00:00:00Z",
+                "status", 400,
+                "error", "Bad Request",
+                "message", "Malformed tag: game.name",
+                "path", "/api/chat-commands/dsl/text-to-ast");
+        when(apiClient.post(eq("/api/chat-commands/dsl/text-to-ast"), any(), eq(Map.class)))
+                .thenReturn(springErrorBody);
+
+        ChatCommandsDslTextToAstHandler handler = new ChatCommandsDslTextToAstHandler(apiClient);
+
+        assertThatThrownBy(() -> handler.handle(mock(WsSession.class), Map.of("text", "{game.name}")))
+                .isInstanceOf(WsBusinessException.class)
+                .hasMessageContaining("Malformed tag: game.name");
+    }
+
+    @Test
     void nullBodyThrowsInvalidParams() {
         ChatCommandsDslTextToAstHandler handler = new ChatCommandsDslTextToAstHandler(mock(ApiClient.class));
 
