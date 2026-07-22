@@ -48,6 +48,16 @@ class CommandDslRoundTripTest {
     }
 
     @Test
+    void stringLiteralContainingUnbalancedBraceRoundTrips() {
+        // The trailing "{print msg}" compacts to the bare "{msg}" shorthand on generation (see
+        // CommandDslGenerator's javadoc), so the AST, not the literal text, is what round-trips
+        // here — same pattern as designSpecExampleProgramRoundTrips below.
+        String source = "{var msg = \"a}b\"}{print msg}";
+        CommandAst ast = parser.parse(source);
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
+    }
+
+    @Test
     void designSpecExampleProgramRoundTrips() {
         // The exact program from docs/specs/2026-07-21-chat-command-block-dsl-design.md
         String source = "{var msg = \"\"}{msg = msg + \"Now playing \"}{msg = msg + get(game#name)}"
