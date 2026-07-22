@@ -32,6 +32,20 @@ public class NodeJsonCodec {
         return new CommandAst(statementsFromMaps(statements));
     }
 
+    /**
+     * Structurally detects whether a persisted {@code ast} JSON blob is still in the pre-rewrite
+     * expression-tree shape (a root {@code "nodes"} array) rather than the current
+     * statement-based shape (a root {@code "statements"} array). Used by
+     * {@code ChatCommandAstBackfill} to find stale rows that need re-deriving from their
+     * template — this deliberately does not deserialize the old shape, it only inspects the
+     * raw JSON structure.
+     */
+    @SuppressWarnings("unchecked")
+    public boolean isOldShape(String json) {
+        Map<String, Object> root = mapper.readValue(json, Map.class);
+        return root.containsKey("nodes") && !root.containsKey("statements");
+    }
+
     // ---- Statements ----
 
     private Map<String, Object> statementToMap(Statement statement) {
