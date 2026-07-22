@@ -271,6 +271,21 @@ public class SandboxExecutor {
             });
             bindings.putMember("ctx", ctx);
 
+            Value traceObj = context.eval("js", "({})");
+            traceObj.putMember("var", (ProxyExecutable) args -> {
+                String name = args[0].asString();
+                Object value = args[1].isNull() ? null : args[1].as(Object.class);
+                trace.record(new TraceEntry("var", name, String.valueOf(value), false));
+                return value;
+            });
+            traceObj.putMember("branch", (ProxyExecutable) args -> {
+                String description = args[0].asString();
+                boolean condition = args[1].asBoolean();
+                trace.record(new TraceEntry("if-branch", description, condition ? "then" : "else", false));
+                return condition;
+            });
+            bindings.putMember("__trace", traceObj);
+
             Value fn = context.eval("js", "(function() {\n" + compiledJs + "\n})");
             Value result = fn.execute();
             return result.isNull() ? "" : result.asString();
