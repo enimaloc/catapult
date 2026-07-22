@@ -55,7 +55,10 @@ class CommandDslRoundTripTest {
             + "{for f in fallbacks}{msg = msg + f}{/for}{print msg}";
         CommandAst ast = parser.parse(source);
         assertThat(ast.statements()).hasSize(6);
-        assertThat(generator.generate(ast)).isEqualTo(source);
+        // The trailing "{print msg}" is the explicit form of a bare var-ref print, which the
+        // generator's canonical output always renders as the compact "{msg}" shorthand (see class
+        // javadoc) — so the AST, not the literal text, is what round-trips here.
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
     }
 
     @Test
