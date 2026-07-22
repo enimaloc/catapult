@@ -20,7 +20,10 @@ public class CommandDslParser {
 
     public CommandAst parse(String text) {
         DslCursor cursor = new DslCursor(text);
-        return new CommandAst(parseSequence(cursor));
+        @SuppressWarnings("unchecked")
+        List<fr.enimaloc.catapult.chat.command.ast.Statement> statements =
+            (List<fr.enimaloc.catapult.chat.command.ast.Statement>) (List<?>) parseSequence(cursor);
+        return new CommandAst(statements);
     }
 
     private List<CommandNode> parseSequence(DslCursor cursor, String... stopTags) {
