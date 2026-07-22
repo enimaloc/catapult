@@ -20,12 +20,12 @@ class ChatCommandAstBackfillTest {
         needsBackfill.setTemplate("Hi {game#name}");
         ChatCommandDefinition alreadyDone = new ChatCommandDefinition();
         alreadyDone.setTemplate("Hi {game#name}");
-        alreadyDone.setAst("{\"nodes\":[]}");
+        alreadyDone.setAst("{\"statements\":[]}");
         when(repository.findAll()).thenReturn(List.of(needsBackfill, alreadyDone));
 
         new ChatCommandAstBackfill(repository, new LegacyTemplateConverter()).run();
 
-        assertThat(needsBackfill.getAst()).contains("\"type\":\"placeholder\"");
+        assertThat(needsBackfill.getAst()).contains("\"type\":\"context-get\"");
         verify(repository).saveAll(List.of(needsBackfill));
     }
 
@@ -43,7 +43,7 @@ class ChatCommandAstBackfillTest {
         new ChatCommandAstBackfill(repository, new LegacyTemplateConverter()).run();
 
         assertThat(malformed.getAst()).isNull();
-        assertThat(valid.getAst()).contains("\"type\":\"placeholder\"");
+        assertThat(valid.getAst()).contains("\"type\":\"context-get\"");
         verify(repository).saveAll(List.of(valid));
     }
 }
