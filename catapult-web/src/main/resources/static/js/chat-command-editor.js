@@ -502,13 +502,19 @@
                     'sauvegarde annulée pour éviter d\'écraser la commande. Vérifie l\'onglet Texte/Blocs.'));
                 return;
             }
+            // This modal has no fallback-editing UI of its own — currentCmd.fallbacks is the
+            // list of {placeholder, fallbackText} the command already had (see CommandDto).
+            // Re-send it as-is; sending {} here would silently wipe every configured fallback
+            // on every Blocks/Text save.
+            const fallbacks = {};
+            (currentCmd.fallbacks || []).forEach(fb => { fallbacks[fb.placeholder] = fb.fallbackText; });
             await window.catapultWs.request('chat-commands.update', {
                 id: currentCmd.id,
                 name: document.getElementById('ceName').value,
                 template: document.getElementById('ceTextArea').value,
                 permission: currentCmd.permission,
                 enabled: currentCmd.enabled,
-                fallbacks: {},
+                fallbacks: fallbacks,
                 ast: JSON.stringify(ast)
             });
             closeEditor();
