@@ -1,66 +1,116 @@
 package fr.enimaloc.catapult.chat.command.dsl;
 
+import fr.enimaloc.catapult.chat.command.ast.AssignStatement;
+import fr.enimaloc.catapult.chat.command.ast.BinaryExpr;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
-import fr.enimaloc.catapult.chat.command.ast.CommandNode;
-import fr.enimaloc.catapult.chat.command.ast.ForEachNode;
-import fr.enimaloc.catapult.chat.command.ast.IfNode;
-import fr.enimaloc.catapult.chat.command.ast.LiteralNode;
-import fr.enimaloc.catapult.chat.command.ast.PlaceholderNode;
-import fr.enimaloc.catapult.chat.command.ast.ServiceCallNode;
+import fr.enimaloc.catapult.chat.command.ast.ConcatStatement;
+import fr.enimaloc.catapult.chat.command.ast.ContextGetExpr;
+import fr.enimaloc.catapult.chat.command.ast.Expression;
+import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
+import fr.enimaloc.catapult.chat.command.ast.IfStatement;
+import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
+import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
+import fr.enimaloc.catapult.chat.command.ast.Statement;
+import fr.enimaloc.catapult.chat.command.ast.ValueType;
+import fr.enimaloc.catapult.chat.command.ast.VarDeclStatement;
+import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Generates DSL text from a {@link CommandAst} — the inverse of {@link CommandDslParser}.
+ * Canonical output: {@code PrintStatement(ContextGetExpr)}/{@code (ServiceCallExpr)}/
+ * {@code (VarRefExpr)}/{@code (LiteralExpr STRING)} use the compact bare-tag shorthand;
+ * anything else uses the explicit {@code {print expr}} form. {@link ContextGetExpr} renders
+ * as {@code get(path)} in {@code var}/assign/concat/explicit-print expression positions, and
+ * as the bare {@code path} in {@code if}-condition operands and service-call arguments — both
+ * spellings parse back to the same node, so {@code parse(generate(ast)) == ast} always holds.
+ */
 public class CommandDslGenerator {
 
     public String generate(CommandAst ast) {
         StringBuilder out = new StringBuilder();
-        for (CommandNode node : ast.nodes()) {
-            out.append(generateNode(node));
+        for (Statement statement : ast.statements()) {
+            out.append(generateStatement(statement));
         }
         return out.toString();
     }
 
-    private String generateNode(CommandNode node) {
-        return switch (node) {
-            case LiteralNode literal -> literal.text();
-            case PlaceholderNode placeholder -> "{" + placeholder.path() + "}";
-            case ServiceCallNode call -> "{" + call.namespace() + "#" + call.function()
-                + "(" + generateArgs(call.args()) + ")}";
-            case IfNode ifNode -> {
-                StringBuilder sb = new StringBuilder();
-                sb.append("{if ").append(generateArg(ifNode.left())).append(" ")
-                    .append(ifNode.operator()).append(" ")
-                    .append(generateArg(ifNode.right())).append("}");
-                for (CommandNode n : ifNode.thenBranch()) sb.append(generateNode(n));
-                if (!ifNode.elseBranch().isEmpty()) {
-                    sb.append("{else}");
-                    for (CommandNode n : ifNode.elseBranch()) sb.append(generateNode(n));
-                }
-                sb.append("{/if}");
-                yield sb.toString();
-            }
-            case ForEachNode forNode -> {
-                StringBuilder sb = new StringBuilder();
-                sb.append("{for ").append(forNode.bindingName()).append(" in ")
-                    .append(forNode.listSource()).append("}");
-                for (CommandNode n : forNode.body()) sb.append(generateNode(n));
-                sb.append("{/for}");
-                yield sb.toString();
-            }
-            default -> throw new IllegalArgumentException("Unhandled node type: " + node.typeName());
+    private String generateStatement(Statement statement) {
+        return switch (statement) {
+            case PrintStatement s -> generatePrint(s);
+            case VarDeclStatement s -> "{var " + s.name() + " = " + generateTopLevelExpr(s.init()) + "}";
+            case AssignStatement s -> "{" + s.name() + " = " + generateTopLevelExpr(s.expr()) + "}";
+            case ConcatStatement s ->
+                "{" + s.name() + " = " + s.name() + " + " + generateTopLevelExpr(s.expr()) + "}";
+            case IfStatement s -> generateIf(s);
+            case ForEachStatement s -> generateForEach(s);
+            default -> throw new IllegalArgumentException("Unhandled statement type: " + statement.typeName());
         };
     }
 
-    private String generateArgs(List<CommandNode> args) {
-        return args.stream().map(this::generateArg).collect(Collectors.joining(", "));
+    private String generatePrint(PrintStatement s) {
+        Expression expr = s.expr();
+        if (expr instanceof LiteralExpr literal && literal.type() == ValueType.STRING) {
+            return literal.value();
+        }
+        if (expr instanceof ContextGetExpr contextGet) {
+            return "{" + contextGet.path() + "}";
+        }
+        if (expr instanceof ServiceCallExpr call) {
+            return "{" + call.namespace() + "#" + call.function() + "(" + generateArgs(call.args()) + ")}";
+        }
+        if (expr instanceof VarRefExpr varRef) {
+            return "{" + varRef.name() + "}";
+        }
+        return "{print " + generateTopLevelExpr(expr) + "}";
     }
 
-    private String generateArg(CommandNode arg) {
-        return switch (arg) {
-            case LiteralNode literal -> "\"" + literal.text() + "\"";
-            case PlaceholderNode placeholder -> placeholder.path();
-            default -> throw new IllegalArgumentException("Unsupported argument node: " + arg.typeName());
+    private String generateIf(IfStatement s) {
+        StringBuilder sb = new StringBuilder();
+        BinaryExpr condition = s.condition();
+        sb.append("{if ").append(generateExpr(condition.left())).append(" ")
+            .append(condition.operator()).append(" ")
+            .append(generateExpr(condition.right())).append("}");
+        for (Statement child : s.thenBranch()) sb.append(generateStatement(child));
+        if (!s.elseBranch().isEmpty()) {
+            sb.append("{else}");
+            for (Statement child : s.elseBranch()) sb.append(generateStatement(child));
+        }
+        sb.append("{/if}");
+        return sb.toString();
+    }
+
+    private String generateForEach(ForEachStatement s) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{for ").append(s.bindingName()).append(" in ").append(s.listSource()).append("}");
+        for (Statement child : s.body()) sb.append(generateStatement(child));
+        sb.append("{/for}");
+        return sb.toString();
+    }
+
+    private String generateArgs(List<Expression> args) {
+        return args.stream().map(this::generateExpr).collect(Collectors.joining(", "));
+    }
+
+    private String generateExpr(Expression expr) {
+        return switch (expr) {
+            case LiteralExpr e when e.type() == ValueType.STRING -> "\"" + e.value() + "\"";
+            case LiteralExpr e -> e.value();
+            case VarRefExpr e -> e.name();
+            case ContextGetExpr e -> e.path();
+            case ServiceCallExpr e -> e.namespace() + "#" + e.function() + "(" + generateArgs(e.args()) + ")";
+            case BinaryExpr e -> generateExpr(e.left()) + " " + e.operator() + " " + generateExpr(e.right());
+            default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
         };
+    }
+
+    private String generateTopLevelExpr(Expression expr) {
+        if (expr instanceof ContextGetExpr contextGet) {
+            return "get(" + contextGet.path() + ")";
+        }
+        return generateExpr(expr);
     }
 }
