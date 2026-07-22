@@ -80,10 +80,20 @@ public class CommandDslParser {
         cursor.next(); // consume '{'
         int start = cursor.position();
         int depth = 1;
+        boolean inQuotes = false;
+        boolean escaped = false;
         while (!cursor.atEnd() && depth > 0) {
             char c = cursor.next();
-            if (c == '{') depth++;
-            else if (c == '}') depth--;
+            if (escaped) {
+                escaped = false;
+            } else if (inQuotes && c == '\\') {
+                escaped = true;
+            } else if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (!inQuotes) {
+                if (c == '{') depth++;
+                else if (c == '}') depth--;
+            }
         }
         if (depth > 0) {
             throw new CommandDslParseException("Unclosed '{' starting at position " + openPos);
