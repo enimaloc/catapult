@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.chat.command.ast.IfNode;
 import fr.enimaloc.catapult.chat.command.ast.LiteralNode;
 import fr.enimaloc.catapult.chat.command.ast.PlaceholderNode;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallNode;
+import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
  * <p>This only produces JS source text; it does not execute anything (execution happens
  * in a sandboxed engine in a later task).
  */
+@Component
 public class JsCompiler {
 
     private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[A-Za-z_$][A-Za-z0-9_$]*$");
