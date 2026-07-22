@@ -11,85 +11,145 @@ import java.util.Map;
 /**
  * Converts a {@link CommandAst} to/from JSON.
  *
- * <p>Deliberately avoids Jackson polymorphic-type annotations ({@code @JsonTypeInfo} etc.):
- * those require a fixed permits-list on a sealed hierarchy, which would defeat the
- * registry-based extensibility goal of the AST (new node types can be registered later
- * without editing annotations here). Instead, each node is serialized as a JSON object
- * tagged by its {@link CommandNode#typeName()} and dispatched manually via the two
- * {@code switch} blocks below — the one place (besides the registries) that knows every
- * built-in type.
+ * <p>Deliberately avoids Jackson polymorphic-type annotations: each node is serialized as a
+ * JSON object tagged by its {@link Node#typeName()} and dispatched manually via the switch
+ * blocks below, keeping the registry-based extensibility goal of the AST intact (new node
+ * types can be added without editing annotations here).
  */
 public class NodeJsonCodec {
 
     private final ObjectMapper mapper = JsonMapper.builder().build();
 
     public String toJson(CommandAst ast) {
-        List<Map<String, Object>> nodes = ast.nodes().stream().map(this::toMap).toList();
-        return mapper.writeValueAsString(Map.of("nodes", nodes));
+        List<Map<String, Object>> statements = ast.statements().stream().map(this::statementToMap).toList();
+        return mapper.writeValueAsString(Map.of("statements", statements));
     }
 
     @SuppressWarnings("unchecked")
     public CommandAst fromJson(String json) {
         Map<String, Object> root = mapper.readValue(json, Map.class);
-        List<Map<String, Object>> nodes = (List<Map<String, Object>>) root.get("nodes");
-        return new CommandAst(nodes.stream().map(this::fromMap).toList());
+        List<Map<String, Object>> statements = (List<Map<String, Object>>) root.get("statements");
+        return new CommandAst(statementsFromMaps(statements));
     }
 
-    private Map<String, Object> toMap(CommandNode node) {
+    // ---- Statements ----
+
+    private Map<String, Object> statementToMap(Statement statement) {
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("type", node.typeName());
-        switch (node) {
-            case LiteralNode n -> map.put("text", n.text());
-            case PlaceholderNode n -> map.put("path", n.path());
-            case ServiceCallNode n -> {
-                map.put("namespace", n.namespace());
-                map.put("function", n.function());
-                map.put("args", n.args().stream().map(this::toMap).toList());
+        map.put("type", statement.typeName());
+        switch (statement) {
+            case VarDeclStatement s -> {
+                map.put("name", s.name());
+                map.put("valueType", s.type().name());
+                map.put("init", expressionToMap(s.init()));
             }
-            case IfNode n -> {
-                map.put("left", toMap(n.left()));
-                map.put("operator", n.operator());
-                map.put("right", toMap(n.right()));
-                map.put("then", n.thenBranch().stream().map(this::toMap).toList());
-                map.put("else", n.elseBranch().stream().map(this::toMap).toList());
+            case AssignStatement s -> {
+                map.put("name", s.name());
+                map.put("expr", expressionToMap(s.expr()));
             }
-            case ForEachNode n -> {
-                map.put("bindingName", n.bindingName());
-                map.put("listSource", n.listSource());
-                map.put("body", n.body().stream().map(this::toMap).toList());
+            case ConcatStatement s -> {
+                map.put("name", s.name());
+                map.put("expr", expressionToMap(s.expr()));
             }
-            default -> throw new IllegalArgumentException("Unhandled node type: " + node.typeName());
+            case PrintStatement s -> map.put("expr", expressionToMap(s.expr()));
+            case IfStatement s -> {
+                map.put("condition", expressionToMap(s.condition()));
+                map.put("then", s.thenBranch().stream().map(this::statementToMap).toList());
+                map.put("else", s.elseBranch().stream().map(this::statementToMap).toList());
+            }
+            case ForEachStatement s -> {
+                map.put("bindingName", s.bindingName());
+                map.put("listSource", s.listSource());
+                map.put("body", s.body().stream().map(this::statementToMap).toList());
+            }
+            default -> throw new IllegalArgumentException("Unhandled statement type: " + statement.typeName());
         }
         return map;
     }
 
     @SuppressWarnings("unchecked")
-    private CommandNode fromMap(Map<String, Object> map) {
+    private Statement statementFromMap(Map<String, Object> map) {
         String type = (String) map.get("type");
         return switch (type) {
-            case "literal" -> new LiteralNode((String) map.get("text"));
-            case "placeholder" -> new PlaceholderNode((String) map.get("path"));
-            case "service-call" -> new ServiceCallNode(
-                (String) map.get("namespace"),
-                (String) map.get("function"),
-                fromMapList((List<Map<String, Object>>) map.get("args")));
-            case "if" -> new IfNode(
-                fromMap((Map<String, Object>) map.get("left")),
-                (String) map.get("operator"),
-                fromMap((Map<String, Object>) map.get("right")),
-                fromMapList((List<Map<String, Object>>) map.get("then")),
-                fromMapList((List<Map<String, Object>>) map.get("else")));
-            case "for-each" -> new ForEachNode(
+            case "var-decl" -> new VarDeclStatement(
+                (String) map.get("name"),
+                ValueType.valueOf((String) map.get("valueType")),
+                expressionFromMap((Map<String, Object>) map.get("init")));
+            case "assign" -> new AssignStatement(
+                (String) map.get("name"),
+                expressionFromMap((Map<String, Object>) map.get("expr")));
+            case "concat" -> new ConcatStatement(
+                (String) map.get("name"),
+                expressionFromMap((Map<String, Object>) map.get("expr")));
+            case "print" -> new PrintStatement(expressionFromMap((Map<String, Object>) map.get("expr")));
+            case "if" -> new IfStatement(
+                (BinaryExpr) expressionFromMap((Map<String, Object>) map.get("condition")),
+                statementsFromMaps((List<Map<String, Object>>) map.get("then")),
+                statementsFromMaps((List<Map<String, Object>>) map.get("else")));
+            case "for-each" -> new ForEachStatement(
                 (String) map.get("bindingName"),
                 (String) map.get("listSource"),
-                fromMapList((List<Map<String, Object>>) map.get("body")));
-            default -> throw new IllegalArgumentException("Unknown node type: " + type);
+                statementsFromMaps((List<Map<String, Object>>) map.get("body")));
+            default -> throw new IllegalArgumentException("Unknown statement type: " + type);
         };
     }
 
-    private List<CommandNode> fromMapList(List<Map<String, Object>> maps) {
-        List<CommandNode> nodes = new ArrayList<>();
-        for (Map<String, Object> m : maps) nodes.add(fromMap(m));
-        return nodes;
+    private List<Statement> statementsFromMaps(List<Map<String, Object>> maps) {
+        List<Statement> statements = new ArrayList<>();
+        for (Map<String, Object> m : maps) statements.add(statementFromMap(m));
+        return statements;
+    }
+
+    // ---- Expressions ----
+
+    private Map<String, Object> expressionToMap(Expression expression) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("type", expression.typeName());
+        switch (expression) {
+            case LiteralExpr e -> {
+                map.put("value", e.value());
+                map.put("valueType", e.type().name());
+            }
+            case VarRefExpr e -> map.put("name", e.name());
+            case ContextGetExpr e -> map.put("path", e.path());
+            case ServiceCallExpr e -> {
+                map.put("namespace", e.namespace());
+                map.put("function", e.function());
+                map.put("args", e.args().stream().map(this::expressionToMap).toList());
+            }
+            case BinaryExpr e -> {
+                map.put("left", expressionToMap(e.left()));
+                map.put("operator", e.operator());
+                map.put("right", expressionToMap(e.right()));
+            }
+            default -> throw new IllegalArgumentException("Unhandled expression type: " + expression.typeName());
+        }
+        return map;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Expression expressionFromMap(Map<String, Object> map) {
+        String type = (String) map.get("type");
+        return switch (type) {
+            case "literal" ->
+                new LiteralExpr((String) map.get("value"), ValueType.valueOf((String) map.get("valueType")));
+            case "var-ref" -> new VarRefExpr((String) map.get("name"));
+            case "context-get" -> new ContextGetExpr((String) map.get("path"));
+            case "service-call" -> new ServiceCallExpr(
+                (String) map.get("namespace"),
+                (String) map.get("function"),
+                expressionsFromMaps((List<Map<String, Object>>) map.get("args")));
+            case "binary" -> new BinaryExpr(
+                expressionFromMap((Map<String, Object>) map.get("left")),
+                (String) map.get("operator"),
+                expressionFromMap((Map<String, Object>) map.get("right")));
+            default -> throw new IllegalArgumentException("Unknown expression type: " + type);
+        };
+    }
+
+    private List<Expression> expressionsFromMaps(List<Map<String, Object>> maps) {
+        List<Expression> expressions = new ArrayList<>();
+        for (Map<String, Object> m : maps) expressions.add(expressionFromMap(m));
+        return expressions;
     }
 }
