@@ -1,11 +1,14 @@
-
 package fr.enimaloc.catapult.chat.command.dsl;
 
+import fr.enimaloc.catapult.chat.command.ast.BinaryExpr;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
-import fr.enimaloc.catapult.chat.command.ast.ForEachNode;
-import fr.enimaloc.catapult.chat.command.ast.IfNode;
-import fr.enimaloc.catapult.chat.command.ast.LiteralNode;
-import fr.enimaloc.catapult.chat.command.ast.PlaceholderNode;
+import fr.enimaloc.catapult.chat.command.ast.ContextGetExpr;
+import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
+import fr.enimaloc.catapult.chat.command.ast.IfStatement;
+import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
+import fr.enimaloc.catapult.chat.command.ast.ValueType;
+import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,31 +22,41 @@ class CommandDslControlFlowTest {
     @Test
     void parsesIfElse() {
         CommandAst ast = parser.parse("{if game#name == \"Valorant\"}yes{else}no{/if}");
-        IfNode ifNode = (IfNode) ast.nodes().get(0);
-        assertThat(ifNode.left()).isEqualTo(new PlaceholderNode("game#name"));
-        assertThat(ifNode.operator()).isEqualTo("==");
-        assertThat(ifNode.right()).isEqualTo(new LiteralNode("Valorant"));
-        assertThat(ifNode.thenBranch()).containsExactly(new LiteralNode("yes"));
-        assertThat(ifNode.elseBranch()).containsExactly(new LiteralNode("no"));
+        IfStatement ifStatement = (IfStatement) ast.statements().get(0);
+        assertThat(ifStatement.condition()).isEqualTo(new BinaryExpr(
+            new ContextGetExpr("game#name"), "==", new LiteralExpr("Valorant", ValueType.STRING)));
+        assertThat(ifStatement.thenBranch()).containsExactly(
+            new PrintStatement(new LiteralExpr("yes", ValueType.STRING)));
+        assertThat(ifStatement.elseBranch()).containsExactly(
+            new PrintStatement(new LiteralExpr("no", ValueType.STRING)));
+    }
+
+    @Test
+    void parsesIfWithAllSixComparisonOperators() {
+        for (String op : new String[]{"==", "!=", "<", ">", "<=", ">="}) {
+            CommandAst ast = parser.parse("{if game#agerating " + op + " \"18\"}x{/if}");
+            IfStatement ifStatement = (IfStatement) ast.statements().get(0);
+            assertThat(ifStatement.condition().operator()).isEqualTo(op);
+        }
+    }
+
+    @Test
+    void parsesForEachOverFallbacksWithVarRefBody() {
+        CommandAst ast = parser.parse("{for f in fallbacks}-{f} {/for}");
+        ForEachStatement forStatement = (ForEachStatement) ast.statements().get(0);
+        assertThat(forStatement.bindingName()).isEqualTo("f");
+        assertThat(forStatement.listSource()).isEqualTo("fallbacks");
+        assertThat(forStatement.body()).containsExactly(
+            new PrintStatement(new LiteralExpr("-", ValueType.STRING)),
+            new PrintStatement(new VarRefExpr("f")),
+            new PrintStatement(new LiteralExpr(" ", ValueType.STRING))
+        );
     }
 
     @Test
     void ifElseRoundTrips() {
         String source = "{if game#name == \"Valorant\"}yes{else}no{/if}";
         assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
-    }
-
-    @Test
-    void parsesForEachOverFallbacks() {
-        CommandAst ast = parser.parse("{for f in fallbacks}-{f} {/for}");
-        ForEachNode forNode = (ForEachNode) ast.nodes().get(0);
-        assertThat(forNode.bindingName()).isEqualTo("f");
-        assertThat(forNode.listSource()).isEqualTo("fallbacks");
-        assertThat(forNode.body()).containsExactly(
-            new LiteralNode("-"),
-            new PlaceholderNode("f"),
-            new LiteralNode(" ")
-        );
     }
 
     @Test
@@ -54,8 +67,19 @@ class CommandDslControlFlowTest {
 
     @Test
     void ifWithoutElseRoundTrips() {
-        String source = "{if a == b}yes{/if}";
+        String source = "{if game#agerating == \"18\"}yes{/if}";
         assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+    }
+
+    @Test
+    void nestedIfInsideForEachRoundTripsAndScopesCorrectly() {
+        String source = "{for f in fallbacks}{if f == \"none\"}skip{else}{f}{/if}{/for}";
+        CommandAst ast = parser.parse(source);
+        assertThat(generator.generate(ast)).isEqualTo(source);
+        ForEachStatement forStatement = (ForEachStatement) ast.statements().get(0);
+        IfStatement nested = (IfStatement) forStatement.body().get(0);
+        // "f" inside the for-each body condition is the loop binding (VarRefExpr), not a context path
+        assertThat(nested.condition().left()).isEqualTo(new VarRefExpr("f"));
     }
 
     @Test
