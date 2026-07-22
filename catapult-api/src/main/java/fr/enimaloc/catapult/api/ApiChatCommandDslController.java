@@ -3,9 +3,11 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -23,11 +25,19 @@ public class ApiChatCommandDslController {
 
     @PostMapping("/api/chat-commands/dsl/text-to-ast")
     public Map<String, String> textToAst(@RequestBody Map<String, String> body) {
-        return Map.of("ast", CODEC.toJson(PARSER.parse(body.get("text"))));
+        try {
+            return Map.of("ast", CODEC.toJson(PARSER.parse(body.get("text"))));
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
     }
 
     @PostMapping("/api/chat-commands/dsl/ast-to-text")
     public Map<String, String> astToText(@RequestBody Map<String, String> body) {
-        return Map.of("text", GENERATOR.generate(CODEC.fromJson(body.get("ast"))));
+        try {
+            return Map.of("text", GENERATOR.generate(CODEC.fromJson(body.get("ast"))));
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
     }
 }
