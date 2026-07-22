@@ -2,6 +2,10 @@ package fr.enimaloc.catapult.chat.command.js;
 
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
@@ -36,6 +40,8 @@ import java.util.concurrent.TimeoutException;
  * safepoint (loop back-edges, method calls, etc.), which reliably unwinds the
  * infinite loop and lets the worker thread terminate.
  */
+@Slf4j
+@Component
 public class SandboxExecutor {
 
     public interface PlaceholderContext {
@@ -44,6 +50,24 @@ public class SandboxExecutor {
 
     public interface ListContext {
         List<String> resolveList(String name);
+    }
+
+    /**
+     * Pays the one-time GraalJS engine/class-loading cold-start cost (which can run into
+     * multiple seconds on a JVM without JVMCI, i.e. the interpreter-only fallback runtime) at
+     * application startup rather than on the first real command execution. Without this, the
+     * first chat command dispatched after boot risks tripping its own {@code timeout} budget on
+     * nothing but JVM warm-up, not actual script work — best-effort: failures are logged and
+     * swallowed since a failed warm-up must not prevent the app from starting.
+     */
+    @PostConstruct
+    void warmUp() {
+        try {
+            execute("return \"\";", path -> "", name -> List.of(), Duration.ofSeconds(30));
+        } catch (RuntimeException e) {
+            log.warn("GraalJS sandbox warm-up failed (first real command may pay the cold-start cost): {}",
+                e.getMessage());
+        }
     }
 
     public String execute(String compiledJs, PlaceholderContext placeholders, ListContext lists, Duration timeout) {
