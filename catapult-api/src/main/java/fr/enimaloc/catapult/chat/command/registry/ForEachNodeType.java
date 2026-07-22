@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.chat.command.registry;
 
-import fr.enimaloc.catapult.chat.command.ast.CommandNode;
-import fr.enimaloc.catapult.chat.command.ast.ForEachNode;
+import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
+import fr.enimaloc.catapult.chat.command.ast.Statement;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,7 +12,7 @@ public class ForEachNodeType implements StructuralNodeType {
     }
 
     @Override
-    public boolean handles(CommandNode node) {
-        return node instanceof ForEachNode;
+    public boolean handles(Statement statement) {
+        return statement instanceof ForEachStatement;
     }
 }
