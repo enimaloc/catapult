@@ -123,7 +123,16 @@
             row.querySelector('.enabled-toggle').checked = cmd.enabled;
 
             const editBtn = row.querySelector('.edit-btn');
-            editBtn.onclick = () => window.chatCommandEditor.openEditor(cmd);
+            editBtn.onclick = () => {
+                // chat-command-editor.js waits for Blockly (a large, separately-loaded
+                // script) before wiring itself up — openEditor may not exist yet if the
+                // user clicks Modifier immediately after the page loads.
+                if (!window.chatCommandEditor || !window.chatCommandEditor.openEditor) {
+                    reportError({ error: { code: 'NOT_READY', message: 'Éditeur en cours de chargement, réessaie dans un instant' } });
+                    return;
+                }
+                window.chatCommandEditor.openEditor(cmd);
+            };
 
             row.querySelector('.enabled-toggle').onchange = async (e) => {
                 try {

@@ -1,4 +1,19 @@
 (function () {
+    // The Commands tab is loaded dynamically and its <script> tags are re-executed by
+    // channel-tabs.js's executeScripts(), which recreates each <script src="..."> without
+    // waiting for the previous one's network fetch to finish — so this file's own <script>
+    // tag can finish loading (it's tiny) and start running before the much larger
+    // blockly_compressed.js has actually loaded, leaving `Blockly` undefined. Poll for it
+    // instead of relying on script tag document order.
+    function whenBlocklyReady(callback) {
+        if (window.Blockly) {
+            callback();
+            return;
+        }
+        setTimeout(function () { whenBlocklyReady(callback); }, 20);
+    }
+
+    whenBlocklyReady(function () {
     let currentCmd = null;
     let currentTab = 'blocks';
     let workspace = null;
@@ -332,4 +347,5 @@
     window.chatCommandEditor.openEditor = openEditor;
     window.chatCommandEditor.blocksToAst = blocksToAst;
     window.chatCommandEditor.astToBlocks = astToBlocks;
+    });
 })();
