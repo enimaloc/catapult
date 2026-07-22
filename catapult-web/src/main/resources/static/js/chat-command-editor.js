@@ -18,53 +18,143 @@
     let currentTab = 'blocks';
     let workspace = null;
 
-    // ---- Blockly custom blocks (mirror the 5 CommandNode types) ----
+    // ---- Blockly custom blocks (mirror the Statement/Expression node types) ----
+
+    // ContextGetExpr: a single generic "get context" block with a dropdown of known
+    // placeholder paths, per docs/specs/2026-07-21-chat-command-block-dsl-design.md#block-editor.
+    var KNOWN_CONTEXT_PATHS = [
+        ["game#name", "game#name"],
+        ["game#summary", "game#summary"],
+        ["game#release_date", "game#release_date"],
+        ["game#store#url", "game#store#url"],
+        ["game#store#steam", "game#store#steam"],
+        ["game#store#xbox", "game#store#xbox"],
+        ["game#store#battlenet", "game#store#battlenet"],
+        ["game#store#official", "game#store#official"],
+        ["game#igdb#url", "game#igdb#url"],
+        ["game#agerating", "game#agerating"],
+        ["tw#active", "tw#active"]
+    ];
 
     Blockly.defineBlocksWithJsonArray([
+        // ---- value blocks (Expression) ----
         {
-            "type": "cmd_literal",
-            "message0": "texte %1",
-            "args0": [{ "type": "field_input", "name": "TEXT", "text": "" }],
-            "previousStatement": null,
-            "nextStatement": null,
+            "type": "cmd_literal_string",
+            "message0": "\" %1 \"",
+            "args0": [{ "type": "field_input", "name": "VALUE", "text": "" }],
+            "output": null,
             "colour": 60
         },
         {
-            "type": "cmd_placeholder",
-            "message0": "placeholder %1",
-            "args0": [{ "type": "field_input", "name": "PATH", "text": "game#name" }],
-            "previousStatement": null,
-            "nextStatement": null,
-            "colour": 200
+            "type": "cmd_literal_number",
+            "message0": "# %1",
+            "args0": [{ "type": "field_number", "name": "VALUE", "value": 0 }],
+            "output": null,
+            "colour": 65
         },
         {
-            "type": "cmd_service_call",
-            "message0": "appel %1 . %2 ( %3 )",
-            "args0": [
-                { "type": "field_input", "name": "NAMESPACE", "text": "igdb" },
-                { "type": "field_input", "name": "FUNCTION", "text": "getGame" },
-                { "type": "field_input", "name": "ARG", "text": "" }
-            ],
-            "previousStatement": null,
-            "nextStatement": null,
+            "type": "cmd_literal_boolean",
+            "message0": "%1",
+            "args0": [{ "type": "field_dropdown", "name": "VALUE", "options": [["true", "true"], ["false", "false"]] }],
+            "output": null,
+            "colour": 70
+        },
+        {
+            "type": "cmd_var_ref",
+            "message0": "var %1",
+            "args0": [{ "type": "field_input", "name": "NAME", "text": "msg" }],
+            "output": null,
+            "colour": 150
+        },
+        {
+            "type": "cmd_context_get",
+            "message0": "get %1",
+            "args0": [{ "type": "field_dropdown", "name": "PATH", "options": KNOWN_CONTEXT_PATHS }],
+            "output": null,
+            "colour": 200
+        },
+        // ServiceCallExpr: one dedicated block per registered function (Phase 1's fixed 3).
+        {
+            "type": "cmd_call_igdb_get_game",
+            "message0": "igdb.getGame( %1 )",
+            "args0": [{ "type": "input_value", "name": "QUERY" }],
+            "output": null,
             "colour": 290
         },
         {
-            "type": "cmd_if",
-            "message0": "si %1 == %2 alors %3 sinon %4",
+            "type": "cmd_call_twitch_get_user",
+            "message0": "twitch.getUser()",
+            "args0": [],
+            "output": null,
+            "colour": 290
+        },
+        {
+            "type": "cmd_call_steam_get_price",
+            "message0": "steam.getPrice( %1 )",
+            "args0": [{ "type": "input_value", "name": "APP_ID" }],
+            "output": null,
+            "colour": 290
+        },
+        // ---- statement blocks ----
+        {
+            "type": "cmd_var_decl",
+            "message0": "var %1 = %2",
             "args0": [
-                { "type": "field_input", "name": "LEFT", "text": "" },
-                { "type": "field_input", "name": "RIGHT", "text": "" },
-                { "type": "input_statement", "name": "THEN" },
-                { "type": "input_statement", "name": "ELSE" }
+                { "type": "field_input", "name": "NAME", "text": "msg" },
+                { "type": "input_value", "name": "INIT" }
             ],
             "previousStatement": null,
             "nextStatement": null,
             "colour": 20
         },
         {
+            "type": "cmd_assign",
+            "message0": "%1 = %2",
+            "args0": [
+                { "type": "field_input", "name": "NAME", "text": "msg" },
+                { "type": "input_value", "name": "EXPR" }
+            ],
+            "previousStatement": null,
+            "nextStatement": null,
+            "colour": 20
+        },
+        {
+            "type": "cmd_concat",
+            "message0": "%1 += %2",
+            "args0": [
+                { "type": "field_input", "name": "NAME", "text": "msg" },
+                { "type": "input_value", "name": "EXPR" }
+            ],
+            "previousStatement": null,
+            "nextStatement": null,
+            "colour": 20
+        },
+        {
+            "type": "cmd_print",
+            "message0": "print %1",
+            "args0": [{ "type": "input_value", "name": "EXPR" }],
+            "previousStatement": null,
+            "nextStatement": null,
+            "colour": 40
+        },
+        {
+            "type": "cmd_if",
+            "message0": "if %1 %2 %3 then %4 else %5",
+            "args0": [
+                { "type": "input_value", "name": "LEFT" },
+                { "type": "field_dropdown", "name": "OPERATOR",
+                    "options": [["==", "=="], ["!=", "!="], ["<", "<"], [">", ">"], ["<=", "<="], [">=", ">="]] },
+                { "type": "input_value", "name": "RIGHT" },
+                { "type": "input_statement", "name": "THEN" },
+                { "type": "input_statement", "name": "ELSE" }
+            ],
+            "previousStatement": null,
+            "nextStatement": null,
+            "colour": 210
+        },
+        {
             "type": "cmd_for_each",
-            "message0": "pour chaque %1 dans %2 %3",
+            "message0": "for each %1 in %2 %3",
             "args0": [
                 { "type": "field_input", "name": "BINDING", "text": "f" },
                 { "type": "field_input", "name": "LIST_SOURCE", "text": "fallbacks" },
@@ -82,11 +172,20 @@
             toolbox: {
                 kind: "flyoutToolbox",
                 contents: [
-                    { kind: "block", type: "cmd_literal" },
-                    { kind: "block", type: "cmd_placeholder" },
-                    { kind: "block", type: "cmd_service_call" },
+                    { kind: "block", type: "cmd_var_decl" },
+                    { kind: "block", type: "cmd_assign" },
+                    { kind: "block", type: "cmd_concat" },
+                    { kind: "block", type: "cmd_print" },
                     { kind: "block", type: "cmd_if" },
-                    { kind: "block", type: "cmd_for_each" }
+                    { kind: "block", type: "cmd_for_each" },
+                    { kind: "block", type: "cmd_literal_string" },
+                    { kind: "block", type: "cmd_literal_number" },
+                    { kind: "block", type: "cmd_literal_boolean" },
+                    { kind: "block", type: "cmd_var_ref" },
+                    { kind: "block", type: "cmd_context_get" },
+                    { kind: "block", type: "cmd_call_igdb_get_game" },
+                    { kind: "block", type: "cmd_call_twitch_get_user" },
+                    { kind: "block", type: "cmd_call_steam_get_price" }
                 ]
             }
         });
@@ -94,25 +193,59 @@
         return workspace;
     }
 
-    function blockToNode(block) {
+    // ---- Blocks -> AST ----
+
+    function exprBlockToNode(block) {
+        if (!block) return { type: 'literal', value: '', valueType: 'STRING' };
         switch (block.type) {
-            case 'cmd_literal':
-                return { type: 'literal', text: block.getFieldValue('TEXT') };
-            case 'cmd_placeholder':
-                return { type: 'placeholder', path: block.getFieldValue('PATH') };
-            case 'cmd_service_call':
+            case 'cmd_literal_string':
+                return { type: 'literal', value: block.getFieldValue('VALUE'), valueType: 'STRING' };
+            case 'cmd_literal_number':
+                return { type: 'literal', value: String(block.getFieldValue('VALUE')), valueType: 'NUMBER' };
+            case 'cmd_literal_boolean':
+                return { type: 'literal', value: block.getFieldValue('VALUE'), valueType: 'BOOLEAN' };
+            case 'cmd_var_ref':
+                return { type: 'var-ref', name: block.getFieldValue('NAME') };
+            case 'cmd_context_get':
+                return { type: 'context-get', path: block.getFieldValue('PATH') };
+            case 'cmd_call_igdb_get_game':
                 return {
-                    type: 'service-call',
-                    namespace: block.getFieldValue('NAMESPACE'),
-                    function: block.getFieldValue('FUNCTION'),
-                    args: [{ type: 'placeholder', path: block.getFieldValue('ARG') }]
+                    type: 'service-call', namespace: 'igdb', function: 'getGame',
+                    args: [exprBlockToNode(block.getInputTargetBlock('QUERY'))]
                 };
+            case 'cmd_call_twitch_get_user':
+                return { type: 'service-call', namespace: 'twitch', function: 'getUser', args: [] };
+            case 'cmd_call_steam_get_price':
+                return {
+                    type: 'service-call', namespace: 'steam', function: 'getPrice',
+                    args: [exprBlockToNode(block.getInputTargetBlock('APP_ID'))]
+                };
+            default:
+                throw new Error('Unknown expression block type: ' + block.type);
+        }
+    }
+
+    function statementBlockToNode(block) {
+        switch (block.type) {
+            case 'cmd_var_decl': {
+                var init = exprBlockToNode(block.getInputTargetBlock('INIT'));
+                return { type: 'var-decl', name: block.getFieldValue('NAME'), valueType: init.valueType || 'STRING', init: init };
+            }
+            case 'cmd_assign':
+                return { type: 'assign', name: block.getFieldValue('NAME'), expr: exprBlockToNode(block.getInputTargetBlock('EXPR')) };
+            case 'cmd_concat':
+                return { type: 'concat', name: block.getFieldValue('NAME'), expr: exprBlockToNode(block.getInputTargetBlock('EXPR')) };
+            case 'cmd_print':
+                return { type: 'print', expr: exprBlockToNode(block.getInputTargetBlock('EXPR')) };
             case 'cmd_if':
                 return {
                     type: 'if',
-                    left: { type: 'placeholder', path: block.getFieldValue('LEFT') },
-                    operator: '==',
-                    right: { type: 'literal', text: block.getFieldValue('RIGHT') },
+                    condition: {
+                        type: 'binary',
+                        left: exprBlockToNode(block.getInputTargetBlock('LEFT')),
+                        operator: block.getFieldValue('OPERATOR'),
+                        right: exprBlockToNode(block.getInputTargetBlock('RIGHT'))
+                    },
                     then: statementsToNodes(block.getInputTargetBlock('THEN')),
                     else: statementsToNodes(block.getInputTargetBlock('ELSE'))
                 };
@@ -124,7 +257,7 @@
                     body: statementsToNodes(block.getInputTargetBlock('BODY'))
                 };
             default:
-                throw new Error('Unknown block type: ' + block.type);
+                throw new Error('Unknown statement block type: ' + block.type);
         }
     }
 
@@ -132,7 +265,7 @@
         const nodes = [];
         let block = firstBlock;
         while (block) {
-            nodes.push(blockToNode(block));
+            nodes.push(statementBlockToNode(block));
             block = block.getNextBlock();
         }
         return nodes;
@@ -140,50 +273,121 @@
 
     function blocksToAst() {
         const top = ensureWorkspace().getTopBlocks(true);
-        return { nodes: top.map(blockToNode) };
+        return { statements: top.map(statementBlockToNode) };
     }
 
-    function nodeToBlock(ws, node) {
+    // ---- AST -> Blocks ----
+
+    function exprNodeToBlock(ws, node) {
         let block;
         switch (node.type) {
             case 'literal':
-                block = ws.newBlock('cmd_literal');
-                block.setFieldValue(node.text, 'TEXT');
+                if (node.valueType === 'NUMBER') { block = ws.newBlock('cmd_literal_number'); block.setFieldValue(Number(node.value), 'VALUE'); }
+                else if (node.valueType === 'BOOLEAN') { block = ws.newBlock('cmd_literal_boolean'); block.setFieldValue(node.value, 'VALUE'); }
+                else { block = ws.newBlock('cmd_literal_string'); block.setFieldValue(node.value, 'VALUE'); }
                 break;
-            case 'placeholder':
-                block = ws.newBlock('cmd_placeholder');
+            case 'var-ref':
+                block = ws.newBlock('cmd_var_ref');
+                block.setFieldValue(node.name, 'NAME');
+                break;
+            case 'context-get':
+                block = ws.newBlock('cmd_context_get');
                 block.setFieldValue(node.path, 'PATH');
                 break;
             case 'service-call':
-                block = ws.newBlock('cmd_service_call');
-                block.setFieldValue(node.namespace, 'NAMESPACE');
-                block.setFieldValue(node.function, 'FUNCTION');
-                block.setFieldValue((node.args[0] && node.args[0].path) || '', 'ARG');
+                if (node.namespace === 'igdb' && node.function === 'getGame') {
+                    block = ws.newBlock('cmd_call_igdb_get_game');
+                    connectValue(ws, block, 'QUERY', node.args[0]);
+                } else if (node.namespace === 'twitch' && node.function === 'getUser') {
+                    block = ws.newBlock('cmd_call_twitch_get_user');
+                } else if (node.namespace === 'steam' && node.function === 'getPrice') {
+                    block = ws.newBlock('cmd_call_steam_get_price');
+                    connectValue(ws, block, 'APP_ID', node.args[0]);
+                } else {
+                    throw new Error('Unsupported service call in Blocks view: ' + node.namespace + '#' + node.function);
+                }
                 break;
             default:
-                // Phase 1: if/for-each round-trip through the Text tab only — reconstructing
-                // their nested statement inputs in the Blocks tab is a follow-up once the
-                // literal/placeholder/service-call round-trip is verified working end-to-end.
-                throw new Error('Unsupported node type for blocks view in Phase 1: ' + node.type);
+                throw new Error('Unknown expression node type for blocks view: ' + node.type);
         }
         block.initSvg();
         block.render();
         return block;
     }
 
+    function connectValue(ws, parentBlock, inputName, node) {
+        if (!node) return;
+        const child = exprNodeToBlock(ws, node);
+        parentBlock.getInput(inputName).connection.connect(child.outputConnection);
+    }
+
+    function statementNodeToBlock(ws, node) {
+        let block;
+        switch (node.type) {
+            case 'var-decl':
+                block = ws.newBlock('cmd_var_decl');
+                block.setFieldValue(node.name, 'NAME');
+                connectValue(ws, block, 'INIT', node.init);
+                break;
+            case 'assign':
+                block = ws.newBlock('cmd_assign');
+                block.setFieldValue(node.name, 'NAME');
+                connectValue(ws, block, 'EXPR', node.expr);
+                break;
+            case 'concat':
+                block = ws.newBlock('cmd_concat');
+                block.setFieldValue(node.name, 'NAME');
+                connectValue(ws, block, 'EXPR', node.expr);
+                break;
+            case 'print':
+                block = ws.newBlock('cmd_print');
+                connectValue(ws, block, 'EXPR', node.expr);
+                break;
+            case 'if':
+                block = ws.newBlock('cmd_if');
+                connectValue(ws, block, 'LEFT', node.condition.left);
+                block.setFieldValue(node.condition.operator, 'OPERATOR');
+                connectValue(ws, block, 'RIGHT', node.condition.right);
+                connectStatements(ws, block, 'THEN', node.then);
+                connectStatements(ws, block, 'ELSE', node.else);
+                break;
+            case 'for-each':
+                block = ws.newBlock('cmd_for_each');
+                block.setFieldValue(node.bindingName, 'BINDING');
+                block.setFieldValue(node.listSource, 'LIST_SOURCE');
+                connectStatements(ws, block, 'BODY', node.body);
+                break;
+            default:
+                throw new Error('Unknown statement node type for blocks view: ' + node.type);
+        }
+        block.initSvg();
+        block.render();
+        return block;
+    }
+
+    function connectStatements(ws, parentBlock, inputName, nodes) {
+        let previous = null;
+        for (const node of (nodes || [])) {
+            const block = statementNodeToBlock(ws, node);
+            if (previous) {
+                previous.nextConnection.connect(block.previousConnection);
+            } else {
+                parentBlock.getInput(inputName).connection.connect(block.previousConnection);
+            }
+            previous = block;
+        }
+    }
+
     function astToBlocks(ast) {
         const ws = ensureWorkspace();
         ws.clear();
         let previous = null;
-        for (const node of (ast.nodes || [])) {
+        for (const node of (ast.statements || [])) {
             let block;
             try {
-                block = nodeToBlock(ws, node);
+                block = statementNodeToBlock(ws, node);
             } catch (err) {
-                // One node the Blocks view can't represent yet (Phase 1: if/for-each)
-                // must not blank out every other node in the same command — skip it
-                // and keep going, rather than aborting the whole conversion.
-                console.warn('chat-command-editor: skipping node in Blocks view', node, err);
+                console.warn('chat-command-editor: skipping statement in Blocks view', node, err);
                 continue;
             }
             if (previous) previous.nextConnection.connect(block.previousConnection);
@@ -291,7 +495,7 @@
             // AST/Blocks node type the current view can't represent, or a broken
             // Blockly workspace) — better to block the save with a clear error than
             // to overwrite a working command with an empty one.
-            if ((!ast.nodes || ast.nodes.length === 0) &&
+            if ((!ast.statements || ast.statements.length === 0) &&
                 document.getElementById('ceTextArea').value.trim() !== '') {
                 reportEditorError(new Error(
                     'La conversion a produit une commande vide alors que du texte existe — ' +
