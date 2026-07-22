@@ -115,7 +115,7 @@ class ApiChatCommandTestControllerTest {
         def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!")));
         def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
         when(repository.findById(id)).thenReturn(Optional.of(def));
-        when(jsCompiler.compile(any())).thenReturn("return \"Now playing Valorant!\";");
+        when(jsCompiler.compileWithTrace(any())).thenReturn("return \"Now playing Valorant!\";");
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
         trace.finish("Now playing Valorant!");
         when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any())).thenReturn(trace);
@@ -125,5 +125,8 @@ class ApiChatCommandTestControllerTest {
                         .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.output").value("Now playing Valorant!"));
+
+        org.mockito.Mockito.verify(jsCompiler).compileWithTrace(any());
+        org.mockito.Mockito.verify(jsCompiler, org.mockito.Mockito.never()).compile(any());
     }
 }
