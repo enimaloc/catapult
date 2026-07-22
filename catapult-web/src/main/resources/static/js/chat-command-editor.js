@@ -170,22 +170,47 @@
         if (workspace) return workspace;
         workspace = Blockly.inject('ceBlocksPane', {
             toolbox: {
-                kind: "flyoutToolbox",
+                kind: "categoryToolbox",
                 contents: [
-                    { kind: "block", type: "cmd_var_decl" },
-                    { kind: "block", type: "cmd_assign" },
-                    { kind: "block", type: "cmd_concat" },
-                    { kind: "block", type: "cmd_print" },
-                    { kind: "block", type: "cmd_if" },
-                    { kind: "block", type: "cmd_for_each" },
-                    { kind: "block", type: "cmd_literal_string" },
-                    { kind: "block", type: "cmd_literal_number" },
-                    { kind: "block", type: "cmd_literal_boolean" },
-                    { kind: "block", type: "cmd_var_ref" },
-                    { kind: "block", type: "cmd_context_get" },
-                    { kind: "block", type: "cmd_call_igdb_get_game" },
-                    { kind: "block", type: "cmd_call_twitch_get_user" },
-                    { kind: "block", type: "cmd_call_steam_get_price" }
+                    {
+                        kind: "category", name: "Variables", colour: "20",
+                        contents: [
+                            { kind: "block", type: "cmd_var_decl" },
+                            { kind: "block", type: "cmd_assign" },
+                            { kind: "block", type: "cmd_concat" },
+                            { kind: "block", type: "cmd_var_ref" }
+                        ]
+                    },
+                    {
+                        kind: "category", name: "Contrôle", colour: "210",
+                        contents: [
+                            { kind: "block", type: "cmd_if" },
+                            { kind: "block", type: "cmd_for_each" }
+                        ]
+                    },
+                    {
+                        kind: "category", name: "Texte", colour: "60",
+                        contents: [
+                            { kind: "block", type: "cmd_print" },
+                            { kind: "block", type: "cmd_literal_string" },
+                            { kind: "block", type: "cmd_literal_number" },
+                            { kind: "block", type: "cmd_literal_boolean" }
+                        ]
+                    },
+                    {
+                        kind: "category", name: "Contexte", colour: "200",
+                        contents: [
+                            { kind: "block", type: "cmd_context_get" }
+                        ]
+                    },
+                    {
+                        kind: "category", name: "Fonctions", colour: "290",
+                        contents: [
+                            { kind: "block", type: "cmd_call_igdb_get_game" },
+                            { kind: "block", type: "cmd_call_twitch_get_user" },
+                            { kind: "block", type: "cmd_call_steam_get_price" }
+                        ]
+                    }
                 ]
             }
         });
