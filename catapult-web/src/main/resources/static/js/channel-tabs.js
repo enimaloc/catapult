@@ -71,6 +71,12 @@
       const fresh = document.createElement("script");
       for (const attr of old.attributes) fresh.setAttribute(attr.name, attr.value);
       fresh.textContent = old.textContent;
+      // Scripts created via document.createElement default to async=true, so
+      // two <script src> tags re-created back to back (e.g. blockly_compressed.js
+      // then msg/en.js) can execute out of order if the first is still fetching
+      // when the second (often smaller) one finishes — async=false restores the
+      // classic in-document-order execution guarantee for external scripts.
+      if (fresh.src) fresh.async = false;
       old.replaceWith(fresh);
     });
   }
