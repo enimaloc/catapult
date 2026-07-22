@@ -1,31 +1,31 @@
 package fr.enimaloc.catapult.chat.command.ast;
 
 import org.junit.jupiter.api.Test;
-
 import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CommandAstTest {
 
-    private record TestStatement(String label) implements Statement {
-        @Override
-        public String typeName() {
-            return "test-statement";
-        }
+    @Test
+    void astExposesItsFlatNodeList() {
+        CommandAst ast = new CommandAst(List.of(
+            new LiteralNode("Hello "),
+            new PlaceholderNode("game#name")
+        ));
+
+        assertThat(ast.nodes()).hasSize(2);
+        assertThat(ast.nodes().get(0).typeName()).isEqualTo("literal");
+        assertThat(ast.nodes().get(1).typeName()).isEqualTo("placeholder");
     }
 
     @Test
-    void astExposesItsStatementList() {
-        CommandAst ast = new CommandAst(List.of(new TestStatement("a"), new TestStatement("b")));
+    void serviceCallNodeCarriesNamespaceFunctionAndArgs() {
+        ServiceCallNode call = new ServiceCallNode("igdb", "getGame",
+            List.of(new PlaceholderNode("game#name")));
 
-        assertThat(ast.statements()).hasSize(2);
-        assertThat(ast.statements().get(0).typeName()).isEqualTo("test-statement");
-    }
-
-    @Test
-    void valueTypeHasFourVariants() {
-        assertThat(ValueType.values()).containsExactly(
-            ValueType.STRING, ValueType.NUMBER, ValueType.BOOLEAN, ValueType.LIST);
+        assertThat(call.typeName()).isEqualTo("service-call");
+        assertThat(call.namespace()).isEqualTo("igdb");
+        assertThat(call.function()).isEqualTo("getGame");
+        assertThat(call.args()).hasSize(1);
     }
 }
