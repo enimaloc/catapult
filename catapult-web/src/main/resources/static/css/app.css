@@ -753,6 +753,39 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
 }
 
 /* ============================================================
+   Chat command editor modal (blocks/text/JS tabs)
+   ============================================================ */
+.ce-tab-btn {
+    border-radius: 6px 6px 0 0;
+    border-bottom: none;
+    background: transparent;
+}
+
+.ce-tab-btn.active {
+    background: var(--bg-base);
+    border-color: var(--border);
+    color: var(--text);
+    font-weight: 600;
+}
+
+.trace-entry {
+    padding: 2px 0;
+    color: var(--text-muted);
+}
+
+.trace-entry.trace-error {
+    color: var(--danger);
+}
+
+.trace-final-output {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* ============================================================
    CCL checkboxes
    ============================================================ */
 .ccl-checkboxes {
