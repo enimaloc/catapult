@@ -35,6 +35,17 @@ public class CommandDslParser {
     private static final Pattern NUMBER = Pattern.compile("^-?\\d+(\\.\\d+)?$");
     private static final List<String> COMPARISON_OPERATORS = List.of("!=", "==", "<=", ">=", "<", ">");
 
+    // Legacy templates (pre-V59__placeholder_hash_separator.sql) used '.' instead of '#' as the
+    // context-path separator (e.g. {game.name} instead of {game#name}). That migration rewrote
+    // stored `template` text once, but isn't guaranteed to have touched every row (fallbacks
+    // entered afterwards, edge cases its regex didn't match) — the parser tolerates both forms
+    // so a still-legacy-shaped command degrades gracefully instead of throwing on every edit/dispatch.
+    private static final Pattern LEGACY_DOT_PATH = Pattern.compile("^[a-z_]+(\\.[a-z_]+)+$");
+
+    private static String normalizeLegacyDotPath(String path) {
+        return LEGACY_DOT_PATH.matcher(path).matches() ? path.replace('.', '#') : path;
+    }
+
     public CommandAst parse(String text) {
         DslCursor cursor = new DslCursor(text);
         return new CommandAst(parseStatements(cursor));
@@ -133,7 +144,7 @@ public class CommandDslParser {
             return new PrintStatement(call);
         }
         int bar = inner.indexOf('|');
-        String path = bar < 0 ? inner : inner.substring(0, bar);
+        String path = normalizeLegacyDotPath(bar < 0 ? inner : inner.substring(0, bar));
         if (path.contains("#")) {
             return new PrintStatement(new ContextGetExpr(path));
         }
@@ -192,7 +203,7 @@ public class CommandDslParser {
     }
 
     private Expression parseExpression(String token) {
-        String text = token.trim();
+        String text = normalizeLegacyDotPath(token.trim());
         if (text.startsWith("\"") && text.endsWith("\"") && text.length() >= 2) {
             return new LiteralExpr(text.substring(1, text.length() - 1), ValueType.STRING);
         }
@@ -203,7 +214,7 @@ public class CommandDslParser {
             return new LiteralExpr(text, ValueType.NUMBER);
         }
         if (text.startsWith("get(") && text.endsWith(")")) {
-            return new ContextGetExpr(text.substring(4, text.length() - 1).trim());
+            return new ContextGetExpr(normalizeLegacyDotPath(text.substring(4, text.length() - 1).trim()));
         }
         ServiceCallExpr call = tryParseServiceCall(text);
         if (call != null) {
