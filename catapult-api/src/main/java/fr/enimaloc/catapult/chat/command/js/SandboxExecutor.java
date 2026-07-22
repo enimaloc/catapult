@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.chat.command.js;
 
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
+import fr.enimaloc.catapult.chat.command.trace.TraceEntry;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -112,6 +114,42 @@ public class SandboxExecutor {
     }
 
     /**
+     * Same as {@link #execute(String, PlaceholderContext, ListContext, ServiceFunctionRegistry, Duration)}
+     * but also records a step-by-step {@link ExecutionTrace} of every placeholder resolution,
+     * list iteration and service call made during the run — used by the command editor's
+     * "Tester" button so authors can see why a command produced (or failed to produce) a
+     * given output.
+     */
+    public ExecutionTrace executeWithTrace(String compiledJs, PlaceholderContext placeholders, ListContext lists,
+                                            ServiceFunctionRegistry registry, Duration timeout) {
+        ExecutionTrace trace = new ExecutionTrace();
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Context context = buildContext();
+        try {
+            Future<String> future = executor.submit(() ->
+                runInContextWithTrace(context, compiledJs, placeholders, lists, registry, trace));
+            try {
+                String output = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+                trace.finish(output);
+                return trace;
+            } catch (TimeoutException e) {
+                closeQuietly(context);
+                awaitWorkerTermination(future);
+                throw new SandboxExecutionException("Command execution timed out after " + timeout, e);
+            }
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            throw new SandboxExecutionException("Command execution failed", cause);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new SandboxExecutionException("Command execution interrupted", e);
+        } finally {
+            executor.shutdownNow();
+            closeQuietly(context);
+        }
+    }
+
+    /**
      * Waits (briefly, bounded) for the worker thread to actually observe the
      * cancellation and unwind, so we don't just fire-and-forget the close
      * call and hope for the best.
@@ -181,6 +219,64 @@ public class SandboxExecutor {
             return result.isNull() ? "" : result.asString();
         } catch (PolyglotException e) {
             throw new SandboxExecutionException("Command script error: " + e.getMessage(), e);
+        }
+    }
+
+    private String runInContextWithTrace(Context context, String compiledJs, PlaceholderContext placeholders,
+                                          ListContext lists, ServiceFunctionRegistry registry,
+                                          ExecutionTrace trace) {
+        try {
+            Value bindings = context.getBindings("js");
+            Value ctx = context.eval("js", "({})");
+            ctx.putMember("placeholder", (ProxyExecutable) args -> {
+                String path = args[0].asString();
+                String value = placeholders.resolve(path);
+                trace.record(new TraceEntry("placeholder", "resolve " + path, value, false));
+                return value;
+            });
+            ctx.putMember("list", (ProxyExecutable) args -> {
+                String name = args[0].asString();
+                List<String> values = lists.resolveList(name);
+                trace.record(new TraceEntry("for-each", "iterate " + name, String.join(", ", values), false));
+                return ProxyArray.fromList(new ArrayList<Object>(values));
+            });
+            ctx.putMember("call", (ProxyExecutable) args -> {
+                if (args.length < 2) {
+                    throw new IllegalArgumentException("ctx.call requires a namespace and a function name");
+                }
+                String namespace = args[0].asString();
+                String function = args[1].asString();
+                Object[] callArgs = new Object[args.length - 2];
+                for (int i = 2; i < args.length; i++) {
+                    callArgs[i - 2] = args[i].as(Object.class);
+                }
+                try {
+                    if (registry == null) {
+                        throw new UnsupportedOperationException("No ServiceFunctionRegistry bound for this execution");
+                    }
+                    Object value = registry.lookup(namespace, function)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                            "Unknown service function " + namespace + "#" + function))
+                        .invoke(callArgs);
+                    trace.record(new TraceEntry("service-call", namespace + "#" + function,
+                        String.valueOf(value), false));
+                    return value;
+                } catch (RuntimeException e) {
+                    trace.record(new TraceEntry("service-call", namespace + "#" + function, e.getMessage(), true));
+                    throw e;
+                } catch (Exception e) {
+                    trace.record(new TraceEntry("service-call", namespace + "#" + function, e.getMessage(), true));
+                    throw new RuntimeException("Service function " + namespace + "#" + function + " failed", e);
+                }
+            });
+            bindings.putMember("ctx", ctx);
+
+            Value fn = context.eval("js", "(function() {\n" + compiledJs + "\n})");
+            Value result = fn.execute();
+            return result.isNull() ? "" : result.asString();
+        } catch (PolyglotException e) {
+            trace.record(new TraceEntry("script", "execution error", e.getMessage(), true));
+            return "";
         }
     }
 }
