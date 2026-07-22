@@ -30,6 +30,28 @@ class ChatCommandAstBackfillTest {
     }
 
     @Test
+    void reBackfillsRowsWhoseAstIsStillTheOldExpressionTreeShape() {
+        ChatCommandDefinitionRepository repository = mock(ChatCommandDefinitionRepository.class);
+        ChatCommandDefinition oldShape = new ChatCommandDefinition();
+        oldShape.setTemplate("Hi {game#name}");
+        oldShape.setAst("{\"nodes\":[{\"type\":\"placeholder\",\"path\":\"game#name\"}]}");
+        ChatCommandDefinition newShape = new ChatCommandDefinition();
+        newShape.setTemplate("Hi {game#name}");
+        newShape.setAst("{\"statements\":[]}");
+        when(repository.findAll()).thenReturn(List.of(oldShape, newShape));
+
+        new ChatCommandAstBackfill(repository, new LegacyTemplateConverter()).run();
+
+        assertThat(oldShape.getAst())
+            .contains("\"statements\"")
+            .contains("\"type\":\"context-get\"")
+            .doesNotContain("\"nodes\"")
+            .doesNotContain("\"placeholder\"");
+        assertThat(newShape.getAst()).isEqualTo("{\"statements\":[]}");
+        verify(repository).saveAll(List.of(oldShape));
+    }
+
+    @Test
     void skipsMalformedTemplateWithoutFailingTheWholeBatch() {
         ChatCommandDefinitionRepository repository = mock(ChatCommandDefinitionRepository.class);
         ChatCommandDefinition malformed = new ChatCommandDefinition();
