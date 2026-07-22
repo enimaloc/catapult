@@ -36,6 +36,32 @@ class CommandDslParserTest {
     }
 
     @Test
+    void legacyDotSeparatedPathIsNormalizedToHashSeparated() {
+        // Pre-V59__placeholder_hash_separator.sql templates used '.' (e.g. {game.name}); the
+        // migration rewrote stored rows once but isn't guaranteed to have caught every one, so
+        // the parser tolerates the old separator instead of throwing "Malformed tag".
+        CommandAst ast = parser.parse("Now playing {game.name}!");
+        assertThat(ast.statements()).containsExactly(
+            new PrintStatement(new LiteralExpr("Now playing ", ValueType.STRING)),
+            new PrintStatement(new ContextGetExpr("game#name")),
+            new PrintStatement(new LiteralExpr("!", ValueType.STRING)));
+    }
+
+    @Test
+    void legacyDotSeparatedPathWithMultipleSegmentsIsNormalized() {
+        CommandAst ast = parser.parse("{game.store.steam}");
+        assertThat(ast.statements()).containsExactly(
+            new PrintStatement(new ContextGetExpr("game#store#steam")));
+    }
+
+    @Test
+    void legacyDotSeparatedPathInIfConditionIsNormalized() {
+        CommandAst ast = parser.parse("{if game.name == \"Valorant\"}yes{/if}");
+        var ifStatement = (fr.enimaloc.catapult.chat.command.ast.IfStatement) ast.statements().get(0);
+        assertThat(ifStatement.condition().left()).isEqualTo(new ContextGetExpr("game#name"));
+    }
+
+    @Test
     void bareTagWithoutHashIsAVarRefNotAContextGet() {
         CommandAst ast = parser.parse("{f}");
         assertThat(ast.statements()).containsExactly(new PrintStatement(new VarRefExpr("f")));

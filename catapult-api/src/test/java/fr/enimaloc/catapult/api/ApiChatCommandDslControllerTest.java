@@ -31,7 +31,7 @@ class ApiChatCommandDslControllerTest {
     void textToAstReturnsBadRequestNotAServerErrorForMalformedDslText() throws Exception {
         mvc.perform(post("/api/chat-commands/dsl/text-to-ast").with(jwt()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(om.writeValueAsString(Map.of("text", "{game.name}"))))
+                        .content(om.writeValueAsString(Map.of("text", "{if x}no operator{/if}"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.trace").doesNotExist());
     }
@@ -43,6 +43,17 @@ class ApiChatCommandDslControllerTest {
                         .content(om.writeValueAsString(Map.of("text", "{game#name}"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ast").value(org.hamcrest.Matchers.containsString("context-get")));
+    }
+
+    @Test
+    void textToAstAcceptsLegacyDotSeparatedContextPathsInsteadOfFailing() throws Exception {
+        // Pre-V59__placeholder_hash_separator.sql templates used '.' (e.g. {game.name});
+        // the parser normalizes it rather than rejecting still-legacy-shaped commands.
+        mvc.perform(post("/api/chat-commands/dsl/text-to-ast").with(jwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("text", "{game.name}"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ast").value(org.hamcrest.Matchers.containsString("game#name")));
     }
 
     @Test
