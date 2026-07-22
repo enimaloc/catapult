@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.chat;
 
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
+import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
@@ -40,6 +43,7 @@ class DynamicCommandResolverTest {
         org.mockito.Mockito.when(twRegistry.getKnownPaths()).thenReturn(java.util.Set.of());
         placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry(), twRegistry);
         resolver = new DynamicCommandResolver(repository, placeholderResolver, gameContextService,
+            new JsCompiler(), new SandboxExecutor(), new ServiceFunctionRegistry(),
             java.util.List.of());
         user = new UserAccount();
         user.setId(UUID.randomUUID());
