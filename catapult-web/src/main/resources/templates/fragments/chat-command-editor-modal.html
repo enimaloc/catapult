@@ -35,14 +35,16 @@
         <div id="ceTraceOutput" hidden
              style="margin-top:.75rem; font-family:monospace; font-size:.85em; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:.5rem; max-height:200px; overflow-y:auto;"></div>
     </div>
-</div>
 
-<!-- Served from the classpath (org.webjars.npm:blockly), not a CDN, matching this
-     project's self-hosted static asset convention. Only the core engine + English
-     message table are needed: the editor never uses Blockly's own JS generators
-     (catapult-api compiles the AST to JS server-side), only defineBlocksWithJsonArray
-     and inject for the Blocks tab's custom node blocks. -->
-<script th:src="@{/webjars/blockly/blockly_compressed.js}"></script>
-<script th:src="@{/webjars/blockly/msg/en.js}"></script>
+    <!-- Served from the classpath (org.webjars.npm:blockly), not a CDN, matching this
+         project's self-hosted static asset convention. Only the core engine + English
+         message table are needed: the editor never uses Blockly's own JS generators
+         (catapult-api compiles the AST to JS server-side), only defineBlocksWithJsonArray
+         and inject for the Blocks tab's custom node blocks.
+         Must live inside this fragment div (not as a body-level sibling) — th:replace
+         only pulls in the th:fragment element's own content, not its siblings. -->
+    <script th:src="@{/webjars/blockly/blockly_compressed.js}"></script>
+    <script th:src="@{/webjars/blockly/msg/en.js}"></script>
+</div>
 </body>
 </html>
