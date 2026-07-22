@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.chat.command.registry;
 
-import fr.enimaloc.catapult.chat.command.ast.CommandNode;
+import fr.enimaloc.catapult.chat.command.ast.Statement;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -23,7 +23,7 @@ public class StructuralNodeTypeRegistry {
         return Optional.ofNullable(byKeyword.get(keyword));
     }
 
-    public Optional<StructuralNodeType> forNode(CommandNode node) {
-        return types.stream().filter(t -> t.handles(node)).findFirst();
+    public Optional<StructuralNodeType> forStatement(Statement statement) {
+        return types.stream().filter(t -> t.handles(statement)).findFirst();
     }
 }

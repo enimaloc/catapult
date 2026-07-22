@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.chat.command.registry;
 
-import fr.enimaloc.catapult.chat.command.ast.CommandNode;
-import fr.enimaloc.catapult.chat.command.ast.IfNode;
+import fr.enimaloc.catapult.chat.command.ast.IfStatement;
+import fr.enimaloc.catapult.chat.command.ast.Statement;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,7 +12,7 @@ public class IfNodeType implements StructuralNodeType {
     }
 
     @Override
-    public boolean handles(CommandNode node) {
-        return node instanceof IfNode;
+    public boolean handles(Statement statement) {
+        return statement instanceof IfStatement;
     }
 }
