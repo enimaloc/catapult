@@ -18,6 +18,35 @@
     let currentTab = 'blocks';
     let workspace = null;
 
+    // ---- Theme: follow the site's current palette (app.js's setTheme sets/removes
+    // [data-theme] on <html> and reads/writes CSS custom properties) ----
+
+    function buildBlocklyTheme() {
+        const style = getComputedStyle(document.documentElement);
+        const cssVar = (name, fallback) => (style.getPropertyValue(name) || '').trim() || fallback;
+        const themeName = 'catapult-' + (document.documentElement.getAttribute('data-theme') || 'dark');
+        return Blockly.Theme.defineTheme(themeName, {
+            base: Blockly.Themes.Classic,
+            componentStyles: {
+                workspaceBackgroundColour: cssVar('--bg-base', '#0f1117'),
+                toolboxBackgroundColour: cssVar('--bg-surface', '#1a1d27'),
+                toolboxForegroundColour: cssVar('--text', '#e2e8f0'),
+                flyoutBackgroundColour: cssVar('--bg-elevated', '#13151f'),
+                flyoutForegroundColour: cssVar('--text', '#e2e8f0'),
+                flyoutOpacity: 1,
+                scrollbarColour: cssVar('--border', '#2d2f3e'),
+                insertionMarkerColour: cssVar('--text-bright', '#f1f5f9'),
+                insertionMarkerOpacity: 0.3,
+                markerColour: cssVar('--text-bright', '#f1f5f9'),
+                cursorColour: cssVar('--text-bright', '#f1f5f9')
+            }
+        });
+    }
+
+    document.addEventListener('catapult:theme-changed', function () {
+        if (workspace) workspace.setTheme(buildBlocklyTheme());
+    });
+
     // ---- Blockly custom blocks (mirror the Statement/Expression node types) ----
 
     // ContextGetExpr: a single generic "get context" block with a dropdown of known
@@ -212,7 +241,8 @@
                         ]
                     }
                 ]
-            }
+            },
+            theme: buildBlocklyTheme()
         });
         workspace.resize();
         return workspace;
