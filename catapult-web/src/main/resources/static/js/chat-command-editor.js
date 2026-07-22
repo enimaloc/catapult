@@ -272,8 +272,16 @@
     }
 
     function blocksToAst() {
+        // getTopBlocks returns only the HEAD of each connected stack — walk each chain
+        // with statementsToNodes (same helper used for nested if/for-each bodies) instead
+        // of converting just the first block, or every statement after the first one in
+        // a stack silently disappears on save.
         const top = ensureWorkspace().getTopBlocks(true);
-        return { statements: top.map(statementBlockToNode) };
+        const statements = [];
+        for (const block of top) {
+            statements.push(...statementsToNodes(block));
+        }
+        return { statements: statements };
     }
 
     // ---- AST -> Blocks ----
