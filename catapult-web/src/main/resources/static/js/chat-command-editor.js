@@ -75,6 +75,7 @@
                 ]
             }
         });
+        workspace.resize();
         return workspace;
     }
 
@@ -160,7 +161,16 @@
         ws.clear();
         let previous = null;
         for (const node of (ast.nodes || [])) {
-            const block = nodeToBlock(ws, node);
+            let block;
+            try {
+                block = nodeToBlock(ws, node);
+            } catch (err) {
+                // One node the Blocks view can't represent yet (Phase 1: if/for-each)
+                // must not blank out every other node in the same command — skip it
+                // and keep going, rather than aborting the whole conversion.
+                console.warn('chat-command-editor: skipping node in Blocks view', node, err);
+                continue;
+            }
             if (previous) previous.nextConnection.connect(block.previousConnection);
             previous = block;
         }
@@ -179,9 +189,12 @@
     }
 
     function reportEditorError(err) {
+        console.error('chat-command-editor:', err);
         const text = err && err.message ? err.message : String(err);
         if (window.catapultOverlay && window.catapultOverlay.showToast) {
             window.catapultOverlay.showToast(text, { kind: 'error', duration: 6000 });
+        } else {
+            alert(text);
         }
     }
 
@@ -259,6 +272,17 @@
         if (!currentCmd) return;
         try {
             const ast = await currentAst();
+            // Refuse to persist a conversion that silently dropped everything (e.g. an
+            // AST/Blocks node type the current view can't represent, or a broken
+            // Blockly workspace) — better to block the save with a clear error than
+            // to overwrite a working command with an empty one.
+            if ((!ast.nodes || ast.nodes.length === 0) &&
+                document.getElementById('ceTextArea').value.trim() !== '') {
+                reportEditorError(new Error(
+                    'La conversion a produit une commande vide alors que du texte existe — ' +
+                    'sauvegarde annulée pour éviter d\'écraser la commande. Vérifie l\'onglet Texte/Blocs.'));
+                return;
+            }
             await window.catapultWs.request('chat-commands.update', {
                 id: currentCmd.id,
                 name: document.getElementById('ceName').value,
