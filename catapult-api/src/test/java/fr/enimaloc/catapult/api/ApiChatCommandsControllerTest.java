@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.chat.ChatCommandPresetCatalog;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
+import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
+import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
@@ -28,6 +30,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import org.mockito.ArgumentCaptor;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -38,6 +43,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -167,6 +173,44 @@ class ApiChatCommandsControllerTest {
                 .andExpect(jsonPath("$.permission").value("EVERYONE"));
 
         verify(repository).save(any(ChatCommandDefinition.class));
+    }
+
+    @Test
+    void put_with_ast_persists_ast_and_regenerates_template_from_it() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition existing = new ChatCommandDefinition();
+        existing.setId(id);
+        existing.setUser(user);
+        existing.setName("!foo");
+        existing.setTemplate("stale text from a previous save");
+        existing.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        String astJson = new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!"));
+
+        String body = om.writeValueAsString(Map.of(
+                "name", "!foo",
+                // Deliberately stale/mismatched: the ast must win, not this text.
+                "template", "ignored client-side text",
+                "permission", "EVERYONE",
+                "enabled", true,
+                "ast", astJson));
+
+        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.template").value("Now playing {game#name}!"));
+
+        ArgumentCaptor<ChatCommandDefinition> captor = ArgumentCaptor.forClass(ChatCommandDefinition.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getAst()).isEqualTo(astJson);
+        assertThat(captor.getValue().getTemplate()).isEqualTo("Now playing {game#name}!");
     }
 
     @Test
