@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.chat.ChatCommandPresetCatalog;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
+import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
+import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.ChatCommandFallback;
 import fr.enimaloc.catapult.domain.UserAccount;
@@ -53,6 +55,8 @@ public class ApiChatCommandsController {
     public static final String EXPERIMENT_KEY = "chat.commands";
 
     private static final Set<String> RESERVED_NAMES = Set.of("!setgame");
+    private static final NodeJsonCodec AST_CODEC = new NodeJsonCodec();
+    private static final CommandDslGenerator DSL_GENERATOR = new CommandDslGenerator();
 
     private final ChatCommandDefinitionRepository repository;
     private final ChatCommandPresetCatalog catalog;
@@ -97,7 +101,13 @@ public class ApiChatCommandsController {
         @NotNull @Size(max = 500) String template,
         @NotNull ChatCommandEvent.SenderRole permission,
         boolean enabled,
-        Map<String, String> fallbacks
+        Map<String, String> fallbacks,
+        // Set by the Blocks/Text editor modal (Task 16-17): the NodeJsonCodec JSON of the
+        // edited CommandAst. Optional so older/simpler callers (e.g. the plain "add custom
+        // command" form) can keep sending template-only bodies. When present it is the
+        // source of truth; `template` is regenerated from it below to keep the read-only
+        // audit column in sync rather than trusting whatever text the client also sent.
+        String ast
     ) {}
 
     @GetMapping
@@ -153,7 +163,7 @@ public class ApiChatCommandsController {
     ) {
         UserAccount user = currentUser(jwt);
         gate(user);
-        validateTemplate(req.template());
+        validateTemplate(effectiveTemplate(req));
         if (isReservedName(req.name())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Reserved command name");
         }
@@ -177,7 +187,7 @@ public class ApiChatCommandsController {
     ) {
         UserAccount user = currentUser(jwt);
         gate(user);
-        validateTemplate(req.template());
+        validateTemplate(effectiveTemplate(req));
         ChatCommandDefinition def = repository.findById(id)
             .filter(d -> d.getUser().getId().equals(user.getId()))
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -255,12 +265,28 @@ public class ApiChatCommandsController {
         }
     }
 
+    /**
+     * The DSL text the command should be validated/persisted with: regenerated from the
+     * client-supplied {@code ast} when present (Blocks/Text editor saves), or the raw
+     * {@code template} for callers that don't send an AST yet (e.g. the plain "add custom
+     * command" form). Keeps validation and persistence looking at the same text.
+     */
+    private String effectiveTemplate(UpsertRequest req) {
+        if (req.ast() == null) return req.template();
+        return DSL_GENERATOR.generate(AST_CODEC.fromJson(req.ast()));
+    }
+
     private void applyRequest(ChatCommandDefinition def, UpsertRequest req) {
         // Renommage autorisé même pour les built-ins : le DynamicCommandResolver
         // route les rows builtin vers le bean Java statique via leur presetKey,
         // donc le nom peut diverger de cmd.getName() sans casser la dispatch.
         def.setName(req.name());
-        def.setTemplate(req.template());
+        if (req.ast() != null) {
+            def.setAst(req.ast());
+            def.setTemplate(DSL_GENERATOR.generate(AST_CODEC.fromJson(req.ast())));
+        } else {
+            def.setTemplate(req.template());
+        }
         def.setPermission(req.permission());
         def.setEnabled(req.enabled());
 
