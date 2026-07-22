@@ -80,7 +80,7 @@ public class JsCompiler {
                 if (trace) js.append("__trace.var(\"__output\", __output);\n");
             }
             case IfStatement s -> {
-                String condJs = compileExpr(s.condition());
+                String condJs = compileCondition(s.condition());
                 if (trace) {
                     condJs = "__trace.branch(\"" + escape(describe(s.condition())) + "\", " + condJs + ")";
                 }
@@ -110,6 +110,12 @@ public class JsCompiler {
     private void appendVarTrace(String name, StringBuilder js, boolean trace) {
         if (!trace) return;
         js.append("__trace.var(\"").append(escape(name)).append("\", ").append(name).append(");\n");
+    }
+
+    /** Renders a top-level {@code if} condition without the redundant outer parens {@link #compileExpr} adds for nested binary expressions. */
+    private String compileCondition(BinaryExpr condition) {
+        return compileExpr(condition.left()) + " " + jsOperator(condition.operator())
+            + " " + compileExpr(condition.right());
     }
 
     private String compileExpr(Expression expr) {
