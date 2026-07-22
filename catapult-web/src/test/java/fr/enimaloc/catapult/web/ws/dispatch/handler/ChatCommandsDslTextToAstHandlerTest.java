@@ -51,16 +51,16 @@ class ChatCommandsDslTextToAstHandlerTest {
                 "timestamp", "2026-07-23T00:00:00Z",
                 "status", 400,
                 "error", "Bad Request",
-                "message", "Malformed tag: game.name",
+                "message", "Malformed {if} condition, no comparison operator found: x",
                 "path", "/api/chat-commands/dsl/text-to-ast");
         when(apiClient.post(eq("/api/chat-commands/dsl/text-to-ast"), any(), eq(Map.class)))
                 .thenReturn(springErrorBody);
 
         ChatCommandsDslTextToAstHandler handler = new ChatCommandsDslTextToAstHandler(apiClient);
 
-        assertThatThrownBy(() -> handler.handle(mock(WsSession.class), Map.of("text", "{game.name}")))
+        assertThatThrownBy(() -> handler.handle(mock(WsSession.class), Map.of("text", "{if x}no operator{/if}")))
                 .isInstanceOf(WsBusinessException.class)
-                .hasMessageContaining("Malformed tag: game.name");
+                .hasMessageContaining("Malformed {if} condition");
     }
 
     @Test
