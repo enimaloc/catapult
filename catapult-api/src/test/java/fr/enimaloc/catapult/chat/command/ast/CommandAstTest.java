@@ -8,19 +8,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CommandAstTest {
 
-    private record TestStatement(String label) implements Statement {
-        @Override
-        public String typeName() {
-            return "test-statement";
-        }
-    }
-
     @Test
     void astExposesItsStatementList() {
-        CommandAst ast = new CommandAst(List.of(new TestStatement("a"), new TestStatement("b")));
+        CommandAst ast = new CommandAst(List.of(
+            new PrintStatement(new LiteralExpr("Hello ", ValueType.STRING)),
+            new PrintStatement(new ContextGetExpr("game#name"))
+        ));
 
         assertThat(ast.statements()).hasSize(2);
-        assertThat(ast.statements().get(0).typeName()).isEqualTo("test-statement");
+        assertThat(ast.statements().get(0).typeName()).isEqualTo("print");
     }
 
     @Test
