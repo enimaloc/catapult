@@ -65,8 +65,7 @@ public class ApiChatCommandTestController {
         @SuppressWarnings("unchecked")
         Map<String, String> overrides = (Map<String, String>) body.getOrDefault("overrides", Map.of());
 
-        CommandAst effectiveAst = resolveAst(body, definition);
-        String js = jsCompiler.compileWithTrace(effectiveAst);
+        String js = resolveJs(body, definition);
 
         // A placeholder the caller didn't supply a test value for must resolve to "" like the
         // real dispatch path (DynamicChatCommand#resolvePlaceholder) does — overrides::get
@@ -103,6 +102,23 @@ public class ApiChatCommandTestController {
             return CODEC.fromJson(definition.getAst());
         }
         return LEGACY_PARSER.parse(definition.getTemplate());
+    }
+
+    /**
+     * "Eject to JS" (Phase 2): an in-progress edit in the JS tab's textarea (unsaved) takes
+     * priority, then the persisted {@code ejectedJs}, then the normal AST-compiled path —
+     * mirroring {@code DynamicChatCommand#execute}'s dispatch-time precedence, so the Tester
+     * button reflects exactly what would actually run.
+     */
+    private String resolveJs(Map<String, Object> body, ChatCommandDefinition definition) {
+        Object ejectedJs = body.get("ejectedJs");
+        if (ejectedJs instanceof String s && !s.isBlank()) {
+            return s;
+        }
+        if (definition.getEjectedJs() != null && !definition.getEjectedJs().isBlank()) {
+            return definition.getEjectedJs();
+        }
+        return jsCompiler.compileWithTrace(resolveAst(body, definition));
     }
 
     private UserAccount currentUser(Jwt jwt) {
