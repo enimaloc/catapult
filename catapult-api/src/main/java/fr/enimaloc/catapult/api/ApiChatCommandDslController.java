@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,7 +21,9 @@ import java.util.Map;
  * can convert text&lt;-&gt;AST without duplicating {@link CommandDslParser}/{@link CommandDslGenerator}
  * in JavaScript, and serves the block/dropdown catalog so the server stays the single source
  * of truth for what a streamer can build — the client never hardcodes known context paths or
- * service functions, it renders whatever this endpoint reports.
+ * service functions, it renders whatever this endpoint reports. Also renders the read-only
+ * "JS généré" tab's content (Phase 1 scope only — see design spec's Block Editor section:
+ * editing the generated JS is explicitly Phase 2, reserved behind the disabled "Éjecter" button).
  */
 @RestController
 public class ApiChatCommandDslController {
@@ -30,9 +33,11 @@ public class ApiChatCommandDslController {
     private static final NodeJsonCodec CODEC = new NodeJsonCodec();
 
     private final ServiceFunctionRegistry serviceFunctionRegistry;
+    private final JsCompiler jsCompiler;
 
-    public ApiChatCommandDslController(ServiceFunctionRegistry serviceFunctionRegistry) {
+    public ApiChatCommandDslController(ServiceFunctionRegistry serviceFunctionRegistry, JsCompiler jsCompiler) {
         this.serviceFunctionRegistry = serviceFunctionRegistry;
+        this.jsCompiler = jsCompiler;
     }
 
     public record ServiceFunctionDto(String namespace, String name, List<String> parameterNames) {}
@@ -60,6 +65,16 @@ public class ApiChatCommandDslController {
     public Map<String, String> astToText(@RequestBody Map<String, String> body) {
         try {
             return Map.of("text", GENERATOR.generate(CODEC.fromJson(body.get("ast"))));
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    /** Backs the read-only "JS généré" tab — same compiler used at actual dispatch time. */
+    @PostMapping("/api/chat-commands/dsl/ast-to-js")
+    public Map<String, String> astToJs(@RequestBody Map<String, String> body) {
+        try {
+            return Map.of("js", jsCompiler.compile(CODEC.fromJson(body.get("ast"))));
         } catch (RuntimeException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
