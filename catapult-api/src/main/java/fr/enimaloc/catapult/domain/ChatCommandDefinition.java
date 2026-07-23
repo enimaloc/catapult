@@ -57,6 +57,15 @@ public class ChatCommandDefinition {
     @Column(columnDefinition = "TEXT")
     private String ast;
 
+    /**
+     * "Eject to JS" escape hatch (Phase 2): when non-null, dispatch runs this JS directly
+     * instead of compiling {@code ast} — same sandboxed GraalJS engine, no elevated trust.
+     * {@code ast}/{@code template} are never touched by an eject, so reverting to Blocks/Text
+     * just means clearing this column.
+     */
+    @Column(name = "ejected_js", columnDefinition = "TEXT")
+    private String ejectedJs;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private ChatCommandEvent.SenderRole permission;

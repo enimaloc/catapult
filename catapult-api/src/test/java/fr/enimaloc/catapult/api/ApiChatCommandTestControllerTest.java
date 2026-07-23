@@ -135,6 +135,66 @@ class ApiChatCommandTestControllerTest {
     }
 
     @Test
+    void test_runs_the_in_progress_unsaved_ejectedJs_from_the_request_body_over_the_ast() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setId(id);
+        def.setUser(user);
+        def.setName("!foo");
+        def.setTemplate("Now playing {game#name}!");
+        def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!")));
+        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(def));
+        var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
+        trace.finish("hand-written output");
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any())).thenReturn(trace);
+
+        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("overrides", Map.of(),
+                                "ejectedJs", "return \"hand-written output\";"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.output").value("hand-written output"));
+
+        org.mockito.Mockito.verify(jsCompiler, org.mockito.Mockito.never()).compileWithTrace(any());
+        org.mockito.Mockito.verify(sandboxExecutor).executeWithTrace(
+                eq("return \"hand-written output\";"), any(), any(), any(), any());
+    }
+
+    @Test
+    void test_runs_the_persisted_ejectedJs_when_no_in_progress_override_is_sent() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setId(id);
+        def.setUser(user);
+        def.setName("!foo");
+        def.setTemplate("this should never compile");
+        def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("this should never compile")));
+        def.setEjectedJs("return \"persisted ejected output\";");
+        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(def));
+        var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
+        trace.finish("persisted ejected output");
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any())).thenReturn(trace);
+
+        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.output").value("persisted ejected output"));
+
+        org.mockito.Mockito.verify(jsCompiler, org.mockito.Mockito.never()).compileWithTrace(any());
+        org.mockito.Mockito.verify(sandboxExecutor).executeWithTrace(
+                eq("return \"persisted ejected output\";"), any(), any(), any(), any());
+    }
+
+    @Test
     void test_resolves_a_placeholder_without_a_test_override_to_empty_string_not_java_null() throws Exception {
         // The real dispatch path (DynamicChatCommand#resolvePlaceholder) always falls back to
         // "" for a placeholder with no value — the Tester endpoint must match that, or GraalJS

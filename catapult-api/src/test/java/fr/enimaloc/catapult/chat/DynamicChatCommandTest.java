@@ -64,6 +64,51 @@ class DynamicChatCommandTest {
     }
 
     @Test
+    void ejectedJsRunsDirectlyInsteadOfCompilingTheAst() {
+        // A non-null ejectedJs (Phase 2's "eject to JS") must run as-is — the ast/template
+        // stay untouched (reversibility), but dispatch bypasses the compiler entirely.
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!custom");
+        definition.setEnabled(true);
+        definition.setTemplate("this should never run");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("this should never run")));
+        definition.setEjectedJs("return \"hand-written output\";");
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
+            newPlaceholderResolver(), Locale.FRENCH);
+
+        Object result = command.execute(null, List.of());
+
+        assertThat(result).isEqualTo("hand-written output");
+    }
+
+    @Test
+    void blankEjectedJsFallsBackToTheAstPipeline() {
+        // A blank (not null) ejectedJs — e.g. after clearing the eject textarea without
+        // reverting explicitly — must not be treated as "ejected".
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!game");
+        definition.setEnabled(true);
+        definition.setTemplate("Now playing {game#name}!");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!")));
+        definition.setEjectedJs("   ");
+
+        GameContext ctx = mock(GameContext.class);
+        when(ctx.name()).thenReturn("Valorant");
+        GameContextService gameContextService = mock(GameContextService.class);
+        when(gameContextService.get(null)).thenReturn(Optional.of(ctx));
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
+            newPlaceholderResolver(), Locale.FRENCH);
+
+        Object result = command.execute(null, List.of());
+
+        assertThat(result).isEqualTo("Now playing Valorant!");
+    }
+
+    @Test
     void nullAstFallsBackToParsingTheLegacyTemplate() {
         // Definitions created before the AST backfill ran (or via a code path
         // that doesn't populate `ast` at creation time, e.g. preset instantiation)
