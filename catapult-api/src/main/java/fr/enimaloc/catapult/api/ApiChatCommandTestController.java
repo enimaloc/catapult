@@ -68,8 +68,12 @@ public class ApiChatCommandTestController {
         CommandAst effectiveAst = resolveAst(body, definition);
         String js = jsCompiler.compileWithTrace(effectiveAst);
 
+        // A placeholder the caller didn't supply a test value for must resolve to "" like the
+        // real dispatch path (DynamicChatCommand#resolvePlaceholder) does — overrides::get
+        // alone would hand GraalJS a Java null, which string-concatenates as the literal "null".
         ExecutionTrace trace = sandboxExecutor.executeWithTrace(js,
-            overrides::get, name -> "fallbacks".equals(name) ? List.copyOf(overrides.values()) : List.of(),
+            path -> overrides.getOrDefault(path, ""),
+            name -> "fallbacks".equals(name) ? List.copyOf(overrides.values()) : List.of(),
             serviceFunctionRegistry, TEST_TIMEOUT);
 
         return Map.of(
