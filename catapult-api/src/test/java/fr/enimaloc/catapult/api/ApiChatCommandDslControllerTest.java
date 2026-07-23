@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ class ApiChatCommandDslControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ServiceFunctionRegistry serviceFunctionRegistry;
+    @MockitoBean JsCompiler jsCompiler;
     final ObjectMapper om = new ObjectMapper();
 
     private static ServiceFunction fn(String namespace, String name, List<String> parameterNames) {
@@ -93,6 +95,27 @@ class ApiChatCommandDslControllerTest {
     @Test
     void astToTextReturnsBadRequestNotAServerErrorForMalformedAstJson() throws Exception {
         mvc.perform(post("/api/chat-commands/dsl/ast-to-text").with(jwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("ast", "not json"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.trace").doesNotExist());
+    }
+
+    @Test
+    void astToJsReturnsTheCompiledJsForTheReadOnlyJsTab() throws Exception {
+        when(jsCompiler.compile(org.mockito.ArgumentMatchers.any()))
+                .thenReturn("let __output = \"\";\n__output += (\"hi\");\nreturn __output;\n");
+
+        mvc.perform(post("/api/chat-commands/dsl/ast-to-js").with(jwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("ast", "{\"statements\":[]}"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.js").value(org.hamcrest.Matchers.containsString("__output")));
+    }
+
+    @Test
+    void astToJsReturnsBadRequestNotAServerErrorForMalformedAstJson() throws Exception {
+        mvc.perform(post("/api/chat-commands/dsl/ast-to-js").with(jwt()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("ast", "not json"))))
                 .andExpect(status().isBadRequest())
