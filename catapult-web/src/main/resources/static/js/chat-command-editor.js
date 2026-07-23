@@ -518,6 +518,27 @@
 
     // ---- Modal wiring ----
 
+    // "Eject to JS" (Phase 2): non-null means the command runs this JS directly at dispatch,
+    // bypassing Blocks/Text/AST entirely. Reversible — ast/template are never derived from
+    // this, "Revenir" just clears it. Kept live in sync with the textarea while editing.
+    let ejectedJs = null;
+
+    function updateEjectUI() {
+        const isEjected = ejectedJs !== null;
+        document.getElementById('ceEjectedBanner').hidden = !isEjected;
+        document.getElementById('ceEjectBtn').hidden = isEjected;
+        document.getElementById('ceRevertBtn').hidden = !isEjected;
+        document.getElementById('ceJsOutput').readOnly = !isEjected;
+        // Editing Blocks/Text while ejected wouldn't affect what actually runs — block it
+        // rather than let the streamer edit a view that's silently ignored.
+        document.querySelectorAll('.ce-tab-btn').forEach(btn => {
+            if (btn.dataset.tab === 'blocks' || btn.dataset.tab === 'text') {
+                btn.disabled = isEjected;
+                btn.title = isEjected ? 'Reviens aux Blocs/Texte pour éditer' : '';
+            }
+        });
+    }
+
     async function openEditor(cmd) {
         currentCmd = cmd;
         const isBuiltin = !!(cmd.presetKey && cmd.presetKey.indexOf('builtin:') === 0);
@@ -527,12 +548,15 @@
         document.getElementById('ceTraceOutput').hidden = true;
         document.getElementById('chatCommandEditorModal').hidden = false;
         document.getElementById('chatCommandEditorModal').style.display = 'flex';
-        currentTab = 'blocks';
-        selectTabUI('blocks');
+        ejectedJs = cmd.ejectedJs || null;
+        if (ejectedJs !== null) document.getElementById('ceJsOutput').value = ejectedJs;
+        updateEjectUI();
+        currentTab = ejectedJs !== null ? 'js' : 'blocks';
+        selectTabUI(currentTab);
         try {
             await ensureCatalog();
             renderTestOverrideFields();
-            astToBlocks(await textToAst(cmd.template || ''));
+            if (ejectedJs === null) astToBlocks(await textToAst(cmd.template || ''));
         } catch (err) {
             reportEditorError(err);
         }
@@ -560,10 +584,10 @@
                 document.getElementById('ceTextArea').value = await astToText(blocksToAst());
             } else if (currentTab === 'text' && tab === 'blocks') {
                 astToBlocks(await textToAst(document.getElementById('ceTextArea').value));
-            } else if (tab === 'js') {
-                // Read-only projection (Phase 1 scope) — computed from whichever of
-                // Blocks/Text is currently authoritative, via currentAst() below.
-                document.getElementById('ceJsOutput').textContent = await astToJs(await currentAst());
+            } else if (tab === 'js' && ejectedJs === null) {
+                // Projection of whichever of Blocks/Text is currently authoritative, via
+                // currentAst() below — read-only until "Éjecter" is clicked.
+                document.getElementById('ceJsOutput').value = await astToJs(await currentAst());
             }
         } catch (err) {
             reportEditorError(err);
@@ -595,39 +619,72 @@
     document.getElementById('ceSaveBtn').onclick = async () => {
         if (!currentCmd) return;
         try {
-            const ast = await currentAst();
-            // Refuse to persist a conversion that silently dropped everything (e.g. an
-            // AST/Blocks node type the current view can't represent, or a broken
-            // Blockly workspace) — better to block the save with a clear error than
-            // to overwrite a working command with an empty one.
-            if ((!ast.statements || ast.statements.length === 0) &&
-                document.getElementById('ceTextArea').value.trim() !== '') {
-                reportEditorError(new Error(
-                    'La conversion a produit une commande vide alors que du texte existe — ' +
-                    'sauvegarde annulée pour éviter d\'écraser la commande. Vérifie l\'onglet Texte/Blocs.'));
-                return;
-            }
             // This modal has no fallback-editing UI of its own — currentCmd.fallbacks is the
             // list of {placeholder, fallbackText} the command already had (see CommandDto).
             // Re-send it as-is; sending {} here would silently wipe every configured fallback
-            // on every Blocks/Text save.
+            // on every save.
             const fallbacks = {};
             (currentCmd.fallbacks || []).forEach(fb => { fallbacks[fb.placeholder] = fb.fallbackText; });
-            await window.catapultWs.request('chat-commands.update', {
+
+            const payload = {
                 id: currentCmd.id,
                 name: document.getElementById('ceName').value,
-                template: document.getElementById('ceTextArea').value,
                 permission: currentCmd.permission,
                 enabled: currentCmd.enabled,
-                fallbacks: fallbacks,
-                ast: JSON.stringify(ast)
-            });
+                fallbacks: fallbacks
+            };
+
+            if (ejectedJs !== null) {
+                // Reversibility: ast/template stay exactly as they already were — only the
+                // hand-written JS changes. "Revenir" later restores editing from that
+                // untouched AST, none of which was ever derived from this JS.
+                payload.template = currentCmd.template;
+                payload.ejectedJs = ejectedJs;
+            } else {
+                const ast = await currentAst();
+                // Refuse to persist a conversion that silently dropped everything (e.g. an
+                // AST/Blocks node type the current view can't represent, or a broken
+                // Blockly workspace) — better to block the save with a clear error than
+                // to overwrite a working command with an empty one.
+                if ((!ast.statements || ast.statements.length === 0) &&
+                    document.getElementById('ceTextArea').value.trim() !== '') {
+                    reportEditorError(new Error(
+                        'La conversion a produit une commande vide alors que du texte existe — ' +
+                        'sauvegarde annulée pour éviter d\'écraser la commande. Vérifie l\'onglet Texte/Blocs.'));
+                    return;
+                }
+                payload.template = document.getElementById('ceTextArea').value;
+                payload.ast = JSON.stringify(ast);
+                // Explicit clear: covers reverting a previously-ejected command.
+                payload.ejectedJs = '';
+            }
+
+            await window.catapultWs.request('chat-commands.update', payload);
             closeEditor();
             if (window.chatCommandEditor.onSaved) window.chatCommandEditor.onSaved();
         } catch (err) {
             reportEditorError(err);
         }
     };
+
+    document.getElementById('ceEjectBtn').onclick = () => {
+        ejectedJs = document.getElementById('ceJsOutput').value;
+        updateEjectUI();
+    };
+
+    document.getElementById('ceRevertBtn').onclick = async () => {
+        ejectedJs = null;
+        updateEjectUI();
+        try {
+            document.getElementById('ceJsOutput').value = await astToJs(await currentAst());
+        } catch (err) {
+            reportEditorError(err);
+        }
+    };
+
+    document.getElementById('ceJsOutput').addEventListener('input', e => {
+        if (ejectedJs !== null) ejectedJs = e.target.value;
+    });
 
     // Kept at module scope (not reset per command) so test values a streamer typed while
     // testing one command are still there when they open a different one — the same
@@ -740,10 +797,17 @@
     document.getElementById('ceTestBtn').onclick = async () => {
         if (!currentCmd) return;
         try {
-            const resp = await window.catapultWs.request('chat-commands.test', {
-                id: currentCmd.id,
-                overrides: collectTestOverrides()
-            });
+            const payload = { id: currentCmd.id, overrides: collectTestOverrides() };
+            // Send whichever in-progress (possibly unsaved) content is authoritative, so
+            // Tester reflects what's currently in the editor, not just the last save —
+            // the server checks these before falling back to the persisted ast/ejectedJs
+            // (see ApiChatCommandTestController#resolveJs/#resolveAst).
+            if (ejectedJs !== null) {
+                payload.ejectedJs = ejectedJs;
+            } else {
+                payload.ast = JSON.stringify(await currentAst());
+            }
+            const resp = await window.catapultWs.request('chat-commands.test', payload);
             renderTrace(resp.result);
         } catch (err) {
             reportEditorError(err);
