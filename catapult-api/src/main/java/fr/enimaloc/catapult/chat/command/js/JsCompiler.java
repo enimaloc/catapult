@@ -9,7 +9,9 @@ import fr.enimaloc.catapult.chat.command.ast.Expression;
 import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.IfStatement;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
+import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
 import fr.enimaloc.catapult.chat.command.ast.Statement;
 import fr.enimaloc.catapult.chat.command.ast.ValueType;
@@ -129,8 +131,17 @@ public class JsCompiler {
             case ServiceCallExpr e -> compileServiceCall(e);
             case BinaryExpr e -> "(" + compileExpr(e.left()) + " " + jsOperator(e.operator())
                 + " " + compileExpr(e.right()) + ")";
+            case ObjectLiteralExpr e -> compileObjectLiteral(e);
+            case PropertyGetExpr e -> compileExpr(e.target()) + "[\"" + escape(e.property()) + "\"]";
             default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
         };
+    }
+
+    private String compileObjectLiteral(ObjectLiteralExpr expr) {
+        String entries = expr.properties().entrySet().stream()
+            .map(entry -> "\"" + escape(entry.getKey()) + "\": " + compileExpr(entry.getValue()))
+            .collect(Collectors.joining(", "));
+        return "{" + entries + "}";
     }
 
     private String compileLiteral(LiteralExpr expr) {
@@ -149,6 +160,8 @@ public class JsCompiler {
                 yield expr.value();
             }
             case LIST -> throw new JsCompilationException("Literal list values are not supported in Phase 1");
+            case OBJECT -> throw new JsCompilationException(
+                "OBJECT is never a LiteralExpr's own type — object values are ObjectLiteralExpr, not a literal variant");
         };
     }
 
