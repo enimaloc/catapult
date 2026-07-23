@@ -168,6 +168,79 @@
         }
     }
 
+    // Groups several related values into one variable, e.g. {name: "Valorant", price: 29.99}.
+    // The PROPERTIES slot holds a chain of CmdObjectPropertyBlock, reusing the exact same
+    // statementsToNodes/connectStatements chaining already used for if/for-each bodies —
+    // 'object-property' isn't a real AST Statement, it's a synthetic shape that only exists
+    // during this Blocks<->AST bridging, converted into the real {properties: {...}} map by
+    // CmdObjectLiteralBlock itself.
+    class CmdObjectPropertyBlock {
+        static type = 'cmd_object_property';
+        static nodeType = 'object-property';
+        static category() { return 'Variables'; }
+        static definition() {
+            return { type: this.type, message0: '%1 : %2',
+                args0: [{ type: 'field_input', name: 'KEY', text: 'key' }, { type: 'input_value', name: 'VALUE' }],
+                previousStatement: null, nextStatement: null, colour: 25 };
+        }
+        static toNode(block) {
+            return { type: 'object-property', key: block.getFieldValue('KEY'), value: blockToNode(block.getInputTargetBlock('VALUE')) };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.key, 'KEY');
+            connectValue(ws, block, 'VALUE', node.value);
+            return block;
+        }
+    }
+
+    class CmdObjectLiteralBlock {
+        static type = 'cmd_object_literal';
+        static nodeType = 'object-literal';
+        static category() { return 'Variables'; }
+        static definition() {
+            return { type: this.type, message0: '{ %1 }',
+                args0: [{ type: 'input_statement', name: 'PROPERTIES' }],
+                output: null, colour: 25 };
+        }
+        static toNode(block) {
+            const propNodes = statementsToNodes(block.getInputTargetBlock('PROPERTIES'));
+            const properties = {};
+            propNodes.forEach(p => { properties[p.key] = p.value; });
+            return { type: 'object-literal', properties: properties };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            const propNodes = Object.entries(node.properties).map(([key, value]) => ({ type: 'object-property', key, value }));
+            connectStatements(ws, block, 'PROPERTIES', propNodes);
+            return block;
+        }
+    }
+
+    // get(obj, "property") — deliberately bracket-style in the label ("[ ]"), not "obj.name":
+    // this app avoids '.' in anything that could reach chat text (Twitch/mod bots flag
+    // dot-paths as links, see V59__placeholder_hash_separator.sql), so the DSL text this
+    // block round-trips through never introduces new '.' syntax either.
+    class CmdPropertyGetBlock {
+        static type = 'cmd_property_get';
+        static nodeType = 'property-get';
+        static category() { return 'Variables'; }
+        static definition() {
+            return { type: this.type, message0: 'get %1 [ %2 ]',
+                args0: [{ type: 'input_value', name: 'TARGET' }, { type: 'field_input', name: 'PROPERTY', text: 'name' }],
+                output: null, colour: 25 };
+        }
+        static toNode(block) {
+            return { type: 'property-get', target: blockToNode(block.getInputTargetBlock('TARGET')), property: block.getFieldValue('PROPERTY') };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            connectValue(ws, block, 'TARGET', node.target);
+            block.setFieldValue(node.property, 'PROPERTY');
+            return block;
+        }
+    }
+
     class CmdVarDeclBlock {
         static type = 'cmd_var_decl';
         static nodeType = 'var-decl';
@@ -179,7 +252,11 @@
         }
         static toNode(block) {
             const init = blockToNode(block.getInputTargetBlock('INIT'));
-            return { type: 'var-decl', name: block.getFieldValue('NAME'), valueType: init.valueType || 'STRING', init: init };
+            // Mirrors CommandDslParser#parseVarDecl's inference: a literal's own type, OBJECT
+            // for an object literal (which carries no valueType of its own), else STRING.
+            const valueType = init.type === 'literal' ? init.valueType
+                : init.type === 'object-literal' ? 'OBJECT' : 'STRING';
+            return { type: 'var-decl', name: block.getFieldValue('NAME'), valueType: valueType, init: init };
         }
         static fromNode(ws, node) {
             const block = ws.newBlock(this.type);
@@ -352,6 +429,7 @@
     const STATIC_BLOCK_CLASSES = [
         CmdLiteralStringBlock, CmdLiteralNumberBlock, CmdLiteralBooleanBlock,
         CmdVarRefBlock, CmdContextGetBlock,
+        CmdObjectLiteralBlock, CmdObjectPropertyBlock, CmdPropertyGetBlock,
         CmdVarDeclBlock, CmdAssignBlock, CmdConcatBlock, CmdPrintBlock, CmdIfBlock, CmdForEachBlock
     ];
     const TOOLBOX_CATEGORY_ORDER = ['Variables', 'Contrôle', 'Texte', 'Contexte', 'Fonctions'];
