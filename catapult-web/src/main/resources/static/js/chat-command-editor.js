@@ -631,26 +631,25 @@
 
     // One labelled input per known context path (catalog.contextPaths), so the streamer
     // can test branches/text that depend on a placeholder without actually being live
-    // with that value (e.g. testing the "no game" wording while off-stream).
+    // with that value (e.g. testing the "no game" wording while off-stream). Stacked
+    // label-above-input per cell of the grid — a side-by-side layout doesn't leave enough
+    // room for paths like "game#store#battlenet" at the grid's ~220px column width.
     function renderTestOverrideFields() {
         const container = document.getElementById('ceTestOverrides');
         container.replaceChildren();
         for (const path of catalog.contextPaths) {
-            const row = document.createElement('div');
-            row.style.display = 'flex';
-            row.style.gap = '.5rem';
-            row.style.alignItems = 'center';
+            const cell = document.createElement('div');
             const label = document.createElement('label');
             label.textContent = path;
-            label.style.cssText = 'font-family:monospace; font-size:.85em; min-width:160px;';
+            label.style.cssText = 'display:block; font-family:monospace; font-size:.75em; color:var(--text-muted); margin-bottom:.15rem;';
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'form-input';
             input.dataset.overridePath = path;
-            input.style.flex = '1';
-            row.appendChild(label);
-            row.appendChild(input);
-            container.appendChild(row);
+            input.style.width = '100%';
+            cell.appendChild(label);
+            cell.appendChild(input);
+            container.appendChild(cell);
         }
     }
 
@@ -662,6 +661,68 @@
         });
         return overrides;
     }
+
+    function applyTestOverrideValues(values) {
+        document.querySelectorAll('#ceTestOverrides [data-override-path]').forEach(input => {
+            const value = values[input.dataset.overridePath];
+            if (value !== undefined) input.value = value;
+        });
+    }
+
+    // "Import a game from IGDB" search box above the test-override fields — picking a
+    // result pre-fills every game#* field this endpoint can resolve (see
+    // ChatCommandsDslIgdbPreviewHandler), instead of typing each one by hand.
+    let igdbSearchTimer = null;
+
+    function setupIgdbSearch() {
+        const input = document.getElementById('ceIgdbSearch');
+        const results = document.getElementById('ceIgdbResults');
+        if (!input || !results) return;
+
+        function renderResults(games) {
+            results.replaceChildren();
+            if (!games.length) { results.style.display = 'none'; return; }
+            games.forEach(game => {
+                const li = document.createElement('li');
+                const span = document.createElement('span');
+                span.textContent = game.name;
+                li.appendChild(span);
+                li.addEventListener('click', async () => {
+                    results.style.display = 'none';
+                    input.value = game.name;
+                    try {
+                        const resp = await window.catapultWs.request('chat-commands.dsl.igdb-preview',
+                            { id: game.id, name: game.name });
+                        applyTestOverrideValues(resp.result || {});
+                    } catch (err) {
+                        reportEditorError(err);
+                    }
+                });
+                results.appendChild(li);
+            });
+            results.style.display = 'block';
+        }
+
+        input.addEventListener('input', () => {
+            clearTimeout(igdbSearchTimer);
+            const q = input.value.trim();
+            if (q.length < 2) { results.style.display = 'none'; return; }
+            igdbSearchTimer = setTimeout(async () => {
+                try {
+                    const resp = await window.catapultWs.request('chat-commands.dsl.igdb-search', { q });
+                    renderResults(resp.result || []);
+                } catch (err) {
+                    results.style.display = 'none';
+                }
+            }, 300);
+        });
+
+        document.addEventListener('click', e => {
+            if (e.target !== input && !results.contains(e.target)) results.style.display = 'none';
+        });
+    }
+
+    setupIgdbSearch();
 
     document.getElementById('ceTestBtn').onclick = async () => {
         if (!currentCmd) return;
