@@ -9,7 +9,9 @@ import fr.enimaloc.catapult.chat.command.ast.Expression;
 import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.IfStatement;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
+import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
 import fr.enimaloc.catapult.chat.command.ast.Statement;
 import fr.enimaloc.catapult.chat.command.ast.ValueType;
@@ -17,7 +19,9 @@ import fr.enimaloc.catapult.chat.command.ast.VarDeclStatement;
 import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -164,7 +168,11 @@ public class CommandDslParser {
             throw new CommandDslParseException("Invalid variable name in {var} declaration: " + name);
         }
         Expression init = parseExpression(rest.substring(eq + 1).trim());
-        ValueType type = init instanceof LiteralExpr literal ? literal.type() : ValueType.STRING;
+        ValueType type = switch (init) {
+            case LiteralExpr literal -> literal.type();
+            case ObjectLiteralExpr ignored -> ValueType.OBJECT;
+            default -> ValueType.STRING;
+        };
         return new VarDeclStatement(name, type, init);
     }
 
@@ -214,7 +222,10 @@ public class CommandDslParser {
             return new LiteralExpr(text, ValueType.NUMBER);
         }
         if (text.startsWith("get(") && text.endsWith(")")) {
-            return new ContextGetExpr(normalizeLegacyDotPath(text.substring(4, text.length() - 1).trim()));
+            return parseGetExpression(text.substring(4, text.length() - 1));
+        }
+        if (text.startsWith("{") && text.endsWith("}")) {
+            return parseObjectLiteral(text.substring(1, text.length() - 1).trim());
         }
         ServiceCallExpr call = tryParseServiceCall(text);
         if (call != null) {
@@ -227,6 +238,43 @@ public class CommandDslParser {
             throw new CommandDslParseException("Malformed expression: " + token);
         }
         return new VarRefExpr(text);
+    }
+
+    /** {@code get(path)} reads a context placeholder; {@code get(obj, "property")} reads an object property. */
+    private Expression parseGetExpression(String argsText) {
+        List<String> args = splitTopLevelArgs(argsText);
+        if (args.size() == 1) {
+            return new ContextGetExpr(normalizeLegacyDotPath(args.get(0).trim()));
+        }
+        if (args.size() == 2) {
+            Expression target = parseExpression(args.get(0));
+            String propertyToken = args.get(1).trim();
+            String property = (propertyToken.startsWith("\"") && propertyToken.endsWith("\"") && propertyToken.length() >= 2)
+                ? propertyToken.substring(1, propertyToken.length() - 1) : propertyToken;
+            return new PropertyGetExpr(target, property);
+        }
+        throw new CommandDslParseException(
+            "Malformed get(...) expression, expected get(path) or get(obj, \"property\"): get(" + argsText + ")");
+    }
+
+    /** {@code { key: expr, key2: expr2, ... }} groups several related values into one variable. */
+    private Expression parseObjectLiteral(String inner) {
+        Map<String, Expression> properties = new LinkedHashMap<>();
+        if (!inner.isBlank()) {
+            for (String rawEntry : splitTopLevelArgs(inner)) {
+                String entry = rawEntry.trim();
+                int colon = entry.indexOf(':');
+                if (colon <= 0) {
+                    throw new CommandDslParseException("Malformed object property, expected 'key: value': " + entry);
+                }
+                String key = entry.substring(0, colon).trim();
+                if (!IDENTIFIER.matcher(key).matches()) {
+                    throw new CommandDslParseException("Invalid object property name: " + key);
+                }
+                properties.put(key, parseExpression(entry.substring(colon + 1)));
+            }
+        }
+        return new ObjectLiteralExpr(properties);
     }
 
     private ServiceCallExpr tryParseServiceCall(String text) {
@@ -251,17 +299,29 @@ public class CommandDslParser {
         return args;
     }
 
-    /** Splits a comma-separated argument list on top-level commas, ignoring commas inside quotes. */
+    /**
+     * Splits a comma-separated argument/property list on top-level commas, ignoring commas
+     * inside quotes or nested {@code {}}/{@code ()} — needed once object literals and
+     * property-get calls can nest inside service-call args or other object literals
+     * (e.g. {@code {a: {b: 1, c: 2}, d: 3}} must split into 2 top-level entries, not 3).
+     */
     private List<String> splitTopLevelArgs(String argsText) {
         List<String> parts = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inQuotes = false;
+        int depth = 0;
         for (int i = 0; i < argsText.length(); i++) {
             char c = argsText.charAt(i);
             if (c == '"') {
                 inQuotes = !inQuotes;
                 current.append(c);
-            } else if (c == ',' && !inQuotes) {
+            } else if (!inQuotes && (c == '{' || c == '(')) {
+                depth++;
+                current.append(c);
+            } else if (!inQuotes && (c == '}' || c == ')')) {
+                depth--;
+                current.append(c);
+            } else if (c == ',' && !inQuotes && depth == 0) {
                 parts.add(current.toString());
                 current.setLength(0);
             } else {
