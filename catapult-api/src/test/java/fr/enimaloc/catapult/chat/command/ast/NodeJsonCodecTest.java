@@ -39,4 +39,24 @@ class NodeJsonCodecTest {
         assertThat(json).contains("\"statements\":[");
         assertThat(json).doesNotContain("\"nodes\":");
     }
+
+    @Test
+    void roundTripsObjectLiteralAndPropertyGet() {
+        java.util.Map<String, Expression> properties = new java.util.LinkedHashMap<>();
+        properties.put("name", new LiteralExpr("Valorant", ValueType.STRING));
+        properties.put("price", new LiteralExpr("29.99", ValueType.NUMBER));
+        properties.put("meta", new ObjectLiteralExpr(java.util.Map.of("free", new LiteralExpr("true", ValueType.BOOLEAN))));
+
+        CommandAst ast = new CommandAst(List.of(
+            new VarDeclStatement("game", ValueType.OBJECT, new ObjectLiteralExpr(properties)),
+            new AssignStatement("msg", new PropertyGetExpr(new VarRefExpr("game"), "name"))
+        ));
+
+        String json = codec.toJson(ast);
+        CommandAst restored = codec.fromJson(json);
+
+        assertThat(restored).isEqualTo(ast);
+        assertThat(json).contains("\"object-literal\"");
+        assertThat(json).contains("\"property-get\"");
+    }
 }
