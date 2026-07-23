@@ -629,12 +629,24 @@
         }
     };
 
+    // Kept at module scope (not reset per command) so test values a streamer typed while
+    // testing one command are still there when they open a different one — the same
+    // {game#name: "Valorant", ...} test rig is usually reused across several commands in
+    // a row, not re-typed for each.
+    let persistedTestOverrides = {};
+
     // One labelled input per known context path (catalog.contextPaths), so the streamer
     // can test branches/text that depend on a placeholder without actually being live
     // with that value (e.g. testing the "no game" wording while off-stream). Stacked
     // label-above-input per cell of the grid — a side-by-side layout doesn't leave enough
     // room for paths like "game#store#battlenet" at the grid's ~220px column width.
     function renderTestOverrideFields() {
+        // Snapshot whatever's currently filled in (from editing the previous command, if
+        // any) into the persisted store before the fields get rebuilt/wiped below.
+        document.querySelectorAll('#ceTestOverrides [data-override-path]').forEach(input => {
+            if (input.value.trim() !== '') persistedTestOverrides[input.dataset.overridePath] = input.value;
+        });
+
         const container = document.getElementById('ceTestOverrides');
         container.replaceChildren();
         for (const path of catalog.contextPaths) {
@@ -647,6 +659,7 @@
             input.className = 'form-input';
             input.dataset.overridePath = path;
             input.style.width = '100%';
+            input.value = persistedTestOverrides[path] || '';
             cell.appendChild(label);
             cell.appendChild(input);
             container.appendChild(cell);
