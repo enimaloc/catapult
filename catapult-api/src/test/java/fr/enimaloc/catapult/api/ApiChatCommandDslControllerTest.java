@@ -1,9 +1,13 @@
 package fr.enimaloc.catapult.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.domain.IgdbGameDetails;
+import fr.enimaloc.catapult.service.IgdbGameDetailsService;
+import fr.enimaloc.catapult.service.IgdbService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -16,7 +20,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -34,6 +41,9 @@ class ApiChatCommandDslControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ServiceFunctionRegistry serviceFunctionRegistry;
     @MockitoBean JsCompiler jsCompiler;
+    @MockitoBean IgdbService igdbService;
+    @MockitoBean IgdbGameDetailsService igdbGameDetailsService;
+    @MockitoBean PlaceholderResolver placeholderResolver;
     final ObjectMapper om = new ObjectMapper();
 
     private static ServiceFunction fn(String namespace, String name, List<String> parameterNames) {
@@ -120,5 +130,48 @@ class ApiChatCommandDslControllerTest {
                         .content(om.writeValueAsString(Map.of("ast", "not json"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.trace").doesNotExist());
+    }
+
+    @Test
+    void igdbSearchReturnsEmptyListForBlankQuery() throws Exception {
+        mvc.perform(get("/api/chat-commands/dsl/igdb-search?q=").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void igdbSearchReturnsResultsFromIgdbService() throws Exception {
+        when(igdbService.searchGames("zelda")).thenReturn(List.of(new IgdbService.IgdbGame("1", "Zelda")));
+
+        mvc.perform(get("/api/chat-commands/dsl/igdb-search?q=zelda").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("1"))
+                .andExpect(jsonPath("$[0].name").value("Zelda"));
+    }
+
+    @Test
+    void igdbPreviewResolvesGamePlaceholdersViaPlaceholderResolverAndOmitsUnresolvedOnes() throws Exception {
+        // Real formatting/URL-construction logic lives in PlaceholderResolver (tested there) —
+        // this only verifies the controller wires a GameContext built from IgdbGameDetails
+        // through it for every game# path and drops the ones that resolve to null
+        // (game#agerating comes from a different subsystem, not plain IGDB details).
+        IgdbGameDetails details = new IgdbGameDetails();
+        details.setIgdbId("123");
+        details.setSummary("A great game");
+        details.setSlug("great-game");
+        details.setWebsites(Map.of("steam", "https://store.steampowered.com/app/123"));
+        when(igdbGameDetailsService.getDetails("123")).thenReturn(Optional.of(details));
+        when(placeholderResolver.lookupRaw(any(), eq("game#name"), any())).thenReturn("Great Game");
+        when(placeholderResolver.lookupRaw(any(), eq("game#summary"), any())).thenReturn("A great game");
+        when(placeholderResolver.lookupRaw(any(), eq("game#store#steam"), any()))
+                .thenReturn("https://store.steampowered.com/app/123");
+
+        mvc.perform(get("/api/chat-commands/dsl/igdb-preview?id=123&name=Great Game").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['game#name']").value("Great Game"))
+                .andExpect(jsonPath("$['game#summary']").value("A great game"))
+                .andExpect(jsonPath("$['game#store#steam']").value("https://store.steampowered.com/app/123"))
+                .andExpect(jsonPath("$['game#agerating']").doesNotExist());
     }
 }
