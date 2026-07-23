@@ -531,6 +531,7 @@
         selectTabUI('blocks');
         try {
             await ensureCatalog();
+            renderTestOverrideFields();
             astToBlocks(await textToAst(cmd.template || ''));
         } catch (err) {
             reportEditorError(err);
@@ -628,12 +629,46 @@
         }
     };
 
+    // One labelled input per known context path (catalog.contextPaths), so the streamer
+    // can test branches/text that depend on a placeholder without actually being live
+    // with that value (e.g. testing the "no game" wording while off-stream).
+    function renderTestOverrideFields() {
+        const container = document.getElementById('ceTestOverrides');
+        container.replaceChildren();
+        for (const path of catalog.contextPaths) {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.gap = '.5rem';
+            row.style.alignItems = 'center';
+            const label = document.createElement('label');
+            label.textContent = path;
+            label.style.cssText = 'font-family:monospace; font-size:.85em; min-width:160px;';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'form-input';
+            input.dataset.overridePath = path;
+            input.style.flex = '1';
+            row.appendChild(label);
+            row.appendChild(input);
+            container.appendChild(row);
+        }
+    }
+
+    function collectTestOverrides() {
+        const overrides = {};
+        document.querySelectorAll('#ceTestOverrides [data-override-path]').forEach(input => {
+            const value = input.value.trim();
+            if (value !== '') overrides[input.dataset.overridePath] = value;
+        });
+        return overrides;
+    }
+
     document.getElementById('ceTestBtn').onclick = async () => {
         if (!currentCmd) return;
         try {
             const resp = await window.catapultWs.request('chat-commands.test', {
                 id: currentCmd.id,
-                overrides: {}
+                overrides: collectTestOverrides()
             });
             renderTrace(resp.result);
         } catch (err) {
