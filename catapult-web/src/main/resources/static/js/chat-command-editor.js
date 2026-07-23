@@ -64,199 +64,329 @@
         return catalog;
     }
 
-    function serviceCallBlockType(fn) {
-        return 'cmd_call_' + fn.namespace + '_' + fn.name;
-    }
-
-    // blockType -> {namespace, name, parameterNames}, populated by defineBlocks() —
-    // lets exprBlockToNode read a service-call block generically instead of one
-    // hardcoded case per function.
-    const serviceFunctionsByBlockType = {};
-
     // ---- Blockly custom blocks (mirror the Statement/Expression node types) ----
+    //
+    // "Interface" (JS has no language-level interface — this is the documented contract
+    // every block class/instance below satisfies, dispatched on duck-typed shape):
+    //   .type                    — the Blockly block type identifier
+    //   .category()              — which toolbox category this block belongs to
+    //   .definition(catalog)      — the Blockly JSON block definition (message0/args0/colour/...)
+    //   .toNode(block)            — reads a Blockly Block instance into its AST node shape
+    //   .fromNode(ws, node)       — builds (but doesn't initSvg/render) a Block from an AST node
+    // Static block classes implement it with static members. ServiceCallBlock (built per
+    // registered function from the server catalog, unknown at author time) implements the
+    // same names as instance members on a per-function instance — `registry[type].toNode(...)`
+    // calls identically either way, so the two "shapes" are interchangeable at every call site.
 
-    function defineBlocks() {
-        // ContextGetExpr: a single generic "get context" block with a dropdown of known
-        // placeholder paths, per docs/specs/2026-07-21-chat-command-block-dsl-design.md#block-editor.
-        const contextPathOptions = catalog.contextPaths.map(p => [p, p]);
-
-        // ServiceCallExpr: one dedicated block per registered function, built from
-        // whatever the server currently reports — one value-input connector per
-        // parameter, labelled with its name.
-        const serviceCallBlocks = catalog.serviceFunctions.map(fn => {
-            const blockType = serviceCallBlockType(fn);
-            serviceFunctionsByBlockType[blockType] = fn;
-            const argRefs = fn.parameterNames.map((name, i) => name + ': %' + (i + 1)).join(', ');
-            return {
-                "type": blockType,
-                "message0": fn.namespace + '.' + fn.name + '(' + argRefs + ')',
-                "args0": fn.parameterNames.map((name, i) => ({ "type": "input_value", "name": "ARG" + i })),
-                "output": null,
-                "colour": 290
-            };
-        });
-
-        Blockly.defineBlocksWithJsonArray([
-        // ---- value blocks (Expression) ----
-        {
-            "type": "cmd_literal_string",
-            "message0": "\" %1 \"",
-            "args0": [{ "type": "field_input", "name": "VALUE", "text": "" }],
-            "output": null,
-            "colour": 60
-        },
-        {
-            "type": "cmd_literal_number",
-            "message0": "# %1",
-            "args0": [{ "type": "field_number", "name": "VALUE", "value": 0 }],
-            "output": null,
-            "colour": 65
-        },
-        {
-            "type": "cmd_literal_boolean",
-            "message0": "%1",
-            "args0": [{ "type": "field_dropdown", "name": "VALUE", "options": [["true", "true"], ["false", "false"]] }],
-            "output": null,
-            "colour": 70
-        },
-        {
-            "type": "cmd_var_ref",
-            "message0": "var %1",
-            "args0": [{ "type": "field_input", "name": "NAME", "text": "msg" }],
-            "output": null,
-            "colour": 150
-        },
-        {
-            "type": "cmd_context_get",
-            "message0": "get %1",
-            "args0": [{ "type": "field_dropdown", "name": "PATH", "options": contextPathOptions }],
-            "output": null,
-            "colour": 200
-        },
-        ...serviceCallBlocks,
-        // ---- statement blocks ----
-        {
-            "type": "cmd_var_decl",
-            "message0": "var %1 = %2",
-            "args0": [
-                { "type": "field_input", "name": "NAME", "text": "msg" },
-                { "type": "input_value", "name": "INIT" }
-            ],
-            "previousStatement": null,
-            "nextStatement": null,
-            "colour": 20
-        },
-        {
-            "type": "cmd_assign",
-            "message0": "%1 = %2",
-            "args0": [
-                { "type": "field_input", "name": "NAME", "text": "msg" },
-                { "type": "input_value", "name": "EXPR" }
-            ],
-            "previousStatement": null,
-            "nextStatement": null,
-            "colour": 20
-        },
-        {
-            "type": "cmd_concat",
-            "message0": "%1 += %2",
-            "args0": [
-                { "type": "field_input", "name": "NAME", "text": "msg" },
-                { "type": "input_value", "name": "EXPR" }
-            ],
-            "previousStatement": null,
-            "nextStatement": null,
-            "colour": 20
-        },
-        {
-            "type": "cmd_print",
-            "message0": "print %1",
-            "args0": [{ "type": "input_value", "name": "EXPR" }],
-            "previousStatement": null,
-            "nextStatement": null,
-            "colour": 40
-        },
-        {
-            "type": "cmd_if",
-            "message0": "if %1 %2 %3 then %4 else %5",
-            "args0": [
-                { "type": "input_value", "name": "LEFT" },
-                { "type": "field_dropdown", "name": "OPERATOR",
-                    "options": [["==", "=="], ["!=", "!="], ["<", "<"], [">", ">"], ["<=", "<="], [">=", ">="]] },
-                { "type": "input_value", "name": "RIGHT" },
-                { "type": "input_statement", "name": "THEN" },
-                { "type": "input_statement", "name": "ELSE" }
-            ],
-            "previousStatement": null,
-            "nextStatement": null,
-            "colour": 210
-        },
-        {
-            "type": "cmd_for_each",
-            "message0": "for each %1 in %2 %3",
-            "args0": [
-                { "type": "field_input", "name": "BINDING", "text": "f" },
-                { "type": "field_input", "name": "LIST_SOURCE", "text": "fallbacks" },
-                { "type": "input_statement", "name": "BODY" }
-            ],
-            "previousStatement": null,
-            "nextStatement": null,
-            "colour": 120
+    class CmdLiteralStringBlock {
+        static type = 'cmd_literal_string';
+        static nodeType = null; // handled specially in nodeToBlock() — 'literal' needs valueType branching
+        static category() { return 'Texte'; }
+        static definition() {
+            return { type: this.type, message0: '" %1 "',
+                args0: [{ type: 'field_input', name: 'VALUE', text: '' }], output: null, colour: 60 };
         }
-        ]);
+        static toNode(block) {
+            return { type: 'literal', value: block.getFieldValue('VALUE'), valueType: 'STRING' };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.value, 'VALUE');
+            return block;
+        }
     }
 
-    let blocksDefined = false;
+    class CmdLiteralNumberBlock {
+        static type = 'cmd_literal_number';
+        static category() { return 'Texte'; }
+        static definition() {
+            return { type: this.type, message0: '# %1',
+                args0: [{ type: 'field_number', name: 'VALUE', value: 0 }], output: null, colour: 65 };
+        }
+        static toNode(block) {
+            return { type: 'literal', value: String(block.getFieldValue('VALUE')), valueType: 'NUMBER' };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(Number(node.value), 'VALUE');
+            return block;
+        }
+    }
+
+    class CmdLiteralBooleanBlock {
+        static type = 'cmd_literal_boolean';
+        static category() { return 'Texte'; }
+        static definition() {
+            return { type: this.type, message0: '%1',
+                args0: [{ type: 'field_dropdown', name: 'VALUE', options: [['true', 'true'], ['false', 'false']] }],
+                output: null, colour: 70 };
+        }
+        static toNode(block) {
+            return { type: 'literal', value: block.getFieldValue('VALUE'), valueType: 'BOOLEAN' };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.value, 'VALUE');
+            return block;
+        }
+    }
+
+    class CmdVarRefBlock {
+        static type = 'cmd_var_ref';
+        static nodeType = 'var-ref';
+        static category() { return 'Variables'; }
+        static definition() {
+            return { type: this.type, message0: 'var %1',
+                args0: [{ type: 'field_input', name: 'NAME', text: 'msg' }], output: null, colour: 150 };
+        }
+        static toNode(block) {
+            return { type: 'var-ref', name: block.getFieldValue('NAME') };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.name, 'NAME');
+            return block;
+        }
+    }
+
+    class CmdContextGetBlock {
+        static type = 'cmd_context_get';
+        static nodeType = 'context-get';
+        static category() { return 'Contexte'; }
+        static definition(catalog) {
+            return { type: this.type, message0: 'get %1',
+                args0: [{ type: 'field_dropdown', name: 'PATH', options: catalog.contextPaths.map(p => [p, p]) }],
+                output: null, colour: 200 };
+        }
+        static toNode(block) {
+            return { type: 'context-get', path: block.getFieldValue('PATH') };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.path, 'PATH');
+            return block;
+        }
+    }
+
+    class CmdVarDeclBlock {
+        static type = 'cmd_var_decl';
+        static nodeType = 'var-decl';
+        static category() { return 'Variables'; }
+        static definition() {
+            return { type: this.type, message0: 'var %1 = %2',
+                args0: [{ type: 'field_input', name: 'NAME', text: 'msg' }, { type: 'input_value', name: 'INIT' }],
+                previousStatement: null, nextStatement: null, colour: 20 };
+        }
+        static toNode(block) {
+            const init = blockToNode(block.getInputTargetBlock('INIT'));
+            return { type: 'var-decl', name: block.getFieldValue('NAME'), valueType: init.valueType || 'STRING', init: init };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.name, 'NAME');
+            connectValue(ws, block, 'INIT', node.init);
+            return block;
+        }
+    }
+
+    class CmdAssignBlock {
+        static type = 'cmd_assign';
+        static nodeType = 'assign';
+        static category() { return 'Variables'; }
+        static definition() {
+            return { type: this.type, message0: '%1 = %2',
+                args0: [{ type: 'field_input', name: 'NAME', text: 'msg' }, { type: 'input_value', name: 'EXPR' }],
+                previousStatement: null, nextStatement: null, colour: 20 };
+        }
+        static toNode(block) {
+            return { type: 'assign', name: block.getFieldValue('NAME'), expr: blockToNode(block.getInputTargetBlock('EXPR')) };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.name, 'NAME');
+            connectValue(ws, block, 'EXPR', node.expr);
+            return block;
+        }
+    }
+
+    class CmdConcatBlock {
+        static type = 'cmd_concat';
+        static nodeType = 'concat';
+        static category() { return 'Variables'; }
+        static definition() {
+            return { type: this.type, message0: '%1 += %2',
+                args0: [{ type: 'field_input', name: 'NAME', text: 'msg' }, { type: 'input_value', name: 'EXPR' }],
+                previousStatement: null, nextStatement: null, colour: 20 };
+        }
+        static toNode(block) {
+            return { type: 'concat', name: block.getFieldValue('NAME'), expr: blockToNode(block.getInputTargetBlock('EXPR')) };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.name, 'NAME');
+            connectValue(ws, block, 'EXPR', node.expr);
+            return block;
+        }
+    }
+
+    class CmdPrintBlock {
+        static type = 'cmd_print';
+        static nodeType = 'print';
+        static category() { return 'Texte'; }
+        static definition() {
+            return { type: this.type, message0: 'print %1',
+                args0: [{ type: 'input_value', name: 'EXPR' }],
+                previousStatement: null, nextStatement: null, colour: 40 };
+        }
+        static toNode(block) {
+            return { type: 'print', expr: blockToNode(block.getInputTargetBlock('EXPR')) };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            connectValue(ws, block, 'EXPR', node.expr);
+            return block;
+        }
+    }
+
+    class CmdIfBlock {
+        static type = 'cmd_if';
+        static nodeType = 'if';
+        static category() { return 'Contrôle'; }
+        static definition() {
+            return { type: this.type, message0: 'if %1 %2 %3 then %4 else %5',
+                args0: [
+                    { type: 'input_value', name: 'LEFT' },
+                    { type: 'field_dropdown', name: 'OPERATOR',
+                        options: [['==', '=='], ['!=', '!='], ['<', '<'], ['>', '>'], ['<=', '<='], ['>=', '>=']] },
+                    { type: 'input_value', name: 'RIGHT' },
+                    { type: 'input_statement', name: 'THEN' },
+                    { type: 'input_statement', name: 'ELSE' }
+                ],
+                previousStatement: null, nextStatement: null, colour: 210 };
+        }
+        static toNode(block) {
+            return {
+                type: 'if',
+                condition: {
+                    type: 'binary',
+                    left: blockToNode(block.getInputTargetBlock('LEFT')),
+                    operator: block.getFieldValue('OPERATOR'),
+                    right: blockToNode(block.getInputTargetBlock('RIGHT'))
+                },
+                then: statementsToNodes(block.getInputTargetBlock('THEN')),
+                else: statementsToNodes(block.getInputTargetBlock('ELSE'))
+            };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            connectValue(ws, block, 'LEFT', node.condition.left);
+            block.setFieldValue(node.condition.operator, 'OPERATOR');
+            connectValue(ws, block, 'RIGHT', node.condition.right);
+            connectStatements(ws, block, 'THEN', node.then);
+            connectStatements(ws, block, 'ELSE', node.else);
+            return block;
+        }
+    }
+
+    class CmdForEachBlock {
+        static type = 'cmd_for_each';
+        static nodeType = 'for-each';
+        static category() { return 'Contrôle'; }
+        static definition() {
+            return { type: this.type, message0: 'for each %1 in %2 %3',
+                args0: [
+                    { type: 'field_input', name: 'BINDING', text: 'f' },
+                    { type: 'field_input', name: 'LIST_SOURCE', text: 'fallbacks' },
+                    { type: 'input_statement', name: 'BODY' }
+                ],
+                previousStatement: null, nextStatement: null, colour: 120 };
+        }
+        static toNode(block) {
+            return {
+                type: 'for-each',
+                bindingName: block.getFieldValue('BINDING'),
+                listSource: block.getFieldValue('LIST_SOURCE'),
+                body: statementsToNodes(block.getInputTargetBlock('BODY'))
+            };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.bindingName, 'BINDING');
+            block.setFieldValue(node.listSource, 'LIST_SOURCE');
+            connectStatements(ws, block, 'BODY', node.body);
+            return block;
+        }
+    }
+
+    // ServiceCallExpr: one instance per registered function, built from whatever the server
+    // currently reports — satisfies the same {type, category, definition, toNode, fromNode}
+    // contract as the static classes above, but as instance members parametrized by `fn`,
+    // since the function catalog isn't known until the catalog loads.
+    class ServiceCallBlock {
+        constructor(fn) {
+            this.fn = fn;
+            this.type = 'cmd_call_' + fn.namespace + '_' + fn.name;
+        }
+        category() { return 'Fonctions'; }
+        definition() {
+            const argRefs = this.fn.parameterNames.map((name, i) => name + ': %' + (i + 1)).join(', ');
+            return {
+                type: this.type,
+                message0: this.fn.namespace + '.' + this.fn.name + '(' + argRefs + ')',
+                args0: this.fn.parameterNames.map((name, i) => ({ type: 'input_value', name: 'ARG' + i })),
+                output: null,
+                colour: 290
+            };
+        }
+        toNode(block) {
+            const args = this.fn.parameterNames.map((name, i) => blockToNode(block.getInputTargetBlock('ARG' + i)));
+            return { type: 'service-call', namespace: this.fn.namespace, function: this.fn.name, args: args };
+        }
+        fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            this.fn.parameterNames.forEach((name, i) => connectValue(ws, block, 'ARG' + i, node.args[i]));
+            return block;
+        }
+    }
+
+    const STATIC_BLOCK_CLASSES = [
+        CmdLiteralStringBlock, CmdLiteralNumberBlock, CmdLiteralBooleanBlock,
+        CmdVarRefBlock, CmdContextGetBlock,
+        CmdVarDeclBlock, CmdAssignBlock, CmdConcatBlock, CmdPrintBlock, CmdIfBlock, CmdForEachBlock
+    ];
+    const TOOLBOX_CATEGORY_ORDER = ['Variables', 'Contrôle', 'Texte', 'Contexte', 'Fonctions'];
+    const TOOLBOX_CATEGORY_COLOURS = { Variables: '20', 'Contrôle': '210', Texte: '60', Contexte: '200', Fonctions: '290' };
+
+    // blockly type -> class/instance implementing the contract above — the single dispatch
+    // table for blockToNode(). AST-node-type -> class/instance for the reverse direction is
+    // built inline in nodeToBlock() below (literal/service-call need special-casing there;
+    // everything else is a 1:1 lookup via each class's static `nodeType`).
+    let blockRegistry = {};
+
+    function ensureBlocksDefined() {
+        if (Object.keys(blockRegistry).length) return;
+        const serviceCallBlocks = catalog.serviceFunctions.map(fn => new ServiceCallBlock(fn));
+        const all = [...STATIC_BLOCK_CLASSES, ...serviceCallBlocks];
+        all.forEach(b => { blockRegistry[b.type] = b; });
+        Blockly.defineBlocksWithJsonArray(all.map(b => b.definition(catalog)));
+    }
 
     // ensureWorkspace() is only ever reached after ensureCatalog() has resolved
     // (openEditor awaits it first), so `catalog` is guaranteed populated here.
     function ensureWorkspace() {
         if (workspace) return workspace;
-        if (!blocksDefined) {
-            defineBlocks();
-            blocksDefined = true;
-        }
+        ensureBlocksDefined();
+        const byCategory = {};
+        Object.values(blockRegistry).forEach(b => {
+            (byCategory[b.category()] = byCategory[b.category()] || []).push(b);
+        });
         workspace = Blockly.inject('ceBlocksPane', {
             toolbox: {
                 kind: "categoryToolbox",
-                contents: [
-                    {
-                        kind: "category", name: "Variables", colour: "20",
-                        contents: [
-                            { kind: "block", type: "cmd_var_decl" },
-                            { kind: "block", type: "cmd_assign" },
-                            { kind: "block", type: "cmd_concat" },
-                            { kind: "block", type: "cmd_var_ref" }
-                        ]
-                    },
-                    {
-                        kind: "category", name: "Contrôle", colour: "210",
-                        contents: [
-                            { kind: "block", type: "cmd_if" },
-                            { kind: "block", type: "cmd_for_each" }
-                        ]
-                    },
-                    {
-                        kind: "category", name: "Texte", colour: "60",
-                        contents: [
-                            { kind: "block", type: "cmd_print" },
-                            { kind: "block", type: "cmd_literal_string" },
-                            { kind: "block", type: "cmd_literal_number" },
-                            { kind: "block", type: "cmd_literal_boolean" }
-                        ]
-                    },
-                    {
-                        kind: "category", name: "Contexte", colour: "200",
-                        contents: [
-                            { kind: "block", type: "cmd_context_get" }
-                        ]
-                    },
-                    {
-                        kind: "category", name: "Fonctions", colour: "290",
-                        contents: catalog.serviceFunctions.map(fn =>
-                            ({ kind: "block", type: serviceCallBlockType(fn) }))
-                    }
-                ]
+                contents: TOOLBOX_CATEGORY_ORDER.filter(name => byCategory[name]).map(name => ({
+                    kind: "category", name: name, colour: TOOLBOX_CATEGORY_COLOURS[name],
+                    contents: byCategory[name].map(b => ({ kind: "block", type: b.type }))
+                }))
             },
             theme: buildBlocklyTheme()
         });
@@ -266,71 +396,18 @@
 
     // ---- Blocks -> AST ----
 
-    function exprBlockToNode(block) {
+    function blockToNode(block) {
         if (!block) return { type: 'literal', value: '', valueType: 'STRING' };
-        const serviceFunction = serviceFunctionsByBlockType[block.type];
-        if (serviceFunction) {
-            const args = serviceFunction.parameterNames.map((name, i) =>
-                exprBlockToNode(block.getInputTargetBlock('ARG' + i)));
-            return { type: 'service-call', namespace: serviceFunction.namespace, function: serviceFunction.name, args: args };
-        }
-        switch (block.type) {
-            case 'cmd_literal_string':
-                return { type: 'literal', value: block.getFieldValue('VALUE'), valueType: 'STRING' };
-            case 'cmd_literal_number':
-                return { type: 'literal', value: String(block.getFieldValue('VALUE')), valueType: 'NUMBER' };
-            case 'cmd_literal_boolean':
-                return { type: 'literal', value: block.getFieldValue('VALUE'), valueType: 'BOOLEAN' };
-            case 'cmd_var_ref':
-                return { type: 'var-ref', name: block.getFieldValue('NAME') };
-            case 'cmd_context_get':
-                return { type: 'context-get', path: block.getFieldValue('PATH') };
-            default:
-                throw new Error('Unknown expression block type: ' + block.type);
-        }
-    }
-
-    function statementBlockToNode(block) {
-        switch (block.type) {
-            case 'cmd_var_decl': {
-                var init = exprBlockToNode(block.getInputTargetBlock('INIT'));
-                return { type: 'var-decl', name: block.getFieldValue('NAME'), valueType: init.valueType || 'STRING', init: init };
-            }
-            case 'cmd_assign':
-                return { type: 'assign', name: block.getFieldValue('NAME'), expr: exprBlockToNode(block.getInputTargetBlock('EXPR')) };
-            case 'cmd_concat':
-                return { type: 'concat', name: block.getFieldValue('NAME'), expr: exprBlockToNode(block.getInputTargetBlock('EXPR')) };
-            case 'cmd_print':
-                return { type: 'print', expr: exprBlockToNode(block.getInputTargetBlock('EXPR')) };
-            case 'cmd_if':
-                return {
-                    type: 'if',
-                    condition: {
-                        type: 'binary',
-                        left: exprBlockToNode(block.getInputTargetBlock('LEFT')),
-                        operator: block.getFieldValue('OPERATOR'),
-                        right: exprBlockToNode(block.getInputTargetBlock('RIGHT'))
-                    },
-                    then: statementsToNodes(block.getInputTargetBlock('THEN')),
-                    else: statementsToNodes(block.getInputTargetBlock('ELSE'))
-                };
-            case 'cmd_for_each':
-                return {
-                    type: 'for-each',
-                    bindingName: block.getFieldValue('BINDING'),
-                    listSource: block.getFieldValue('LIST_SOURCE'),
-                    body: statementsToNodes(block.getInputTargetBlock('BODY'))
-                };
-            default:
-                throw new Error('Unknown statement block type: ' + block.type);
-        }
+        const descriptor = blockRegistry[block.type];
+        if (!descriptor) throw new Error('Unknown block type: ' + block.type);
+        return descriptor.toNode(block);
     }
 
     function statementsToNodes(firstBlock) {
         const nodes = [];
         let block = firstBlock;
         while (block) {
-            nodes.push(statementBlockToNode(block));
+            nodes.push(blockToNode(block));
             block = block.getNextBlock();
         }
         return nodes;
@@ -351,33 +428,23 @@
 
     // ---- AST -> Blocks ----
 
-    function exprNodeToBlock(ws, node) {
+    function nodeToBlock(ws, node) {
         let block;
-        switch (node.type) {
-            case 'literal':
-                if (node.valueType === 'NUMBER') { block = ws.newBlock('cmd_literal_number'); block.setFieldValue(Number(node.value), 'VALUE'); }
-                else if (node.valueType === 'BOOLEAN') { block = ws.newBlock('cmd_literal_boolean'); block.setFieldValue(node.value, 'VALUE'); }
-                else { block = ws.newBlock('cmd_literal_string'); block.setFieldValue(node.value, 'VALUE'); }
-                break;
-            case 'var-ref':
-                block = ws.newBlock('cmd_var_ref');
-                block.setFieldValue(node.name, 'NAME');
-                break;
-            case 'context-get':
-                block = ws.newBlock('cmd_context_get');
-                block.setFieldValue(node.path, 'PATH');
-                break;
-            case 'service-call': {
-                const fn = catalog.serviceFunctions.find(f => f.namespace === node.namespace && f.name === node.function);
-                if (!fn) {
-                    throw new Error('Unsupported service call in Blocks view: ' + node.namespace + '#' + node.function);
-                }
-                block = ws.newBlock(serviceCallBlockType(fn));
-                fn.parameterNames.forEach((name, i) => connectValue(ws, block, 'ARG' + i, node.args[i]));
-                break;
+        if (node.type === 'literal') {
+            const cls = node.valueType === 'NUMBER' ? CmdLiteralNumberBlock
+                : node.valueType === 'BOOLEAN' ? CmdLiteralBooleanBlock
+                : CmdLiteralStringBlock;
+            block = cls.fromNode(ws, node);
+        } else if (node.type === 'service-call') {
+            const fn = catalog.serviceFunctions.find(f => f.namespace === node.namespace && f.name === node.function);
+            if (!fn) {
+                throw new Error('Unsupported service call in Blocks view: ' + node.namespace + '#' + node.function);
             }
-            default:
-                throw new Error('Unknown expression node type for blocks view: ' + node.type);
+            block = new ServiceCallBlock(fn).fromNode(ws, node);
+        } else {
+            const descriptor = Object.values(blockRegistry).find(b => b.nodeType === node.type);
+            if (!descriptor) throw new Error('Unknown node type for blocks view: ' + node.type);
+            block = descriptor.fromNode(ws, node);
         }
         block.initSvg();
         block.render();
@@ -386,58 +453,14 @@
 
     function connectValue(ws, parentBlock, inputName, node) {
         if (!node) return;
-        const child = exprNodeToBlock(ws, node);
+        const child = nodeToBlock(ws, node);
         parentBlock.getInput(inputName).connection.connect(child.outputConnection);
-    }
-
-    function statementNodeToBlock(ws, node) {
-        let block;
-        switch (node.type) {
-            case 'var-decl':
-                block = ws.newBlock('cmd_var_decl');
-                block.setFieldValue(node.name, 'NAME');
-                connectValue(ws, block, 'INIT', node.init);
-                break;
-            case 'assign':
-                block = ws.newBlock('cmd_assign');
-                block.setFieldValue(node.name, 'NAME');
-                connectValue(ws, block, 'EXPR', node.expr);
-                break;
-            case 'concat':
-                block = ws.newBlock('cmd_concat');
-                block.setFieldValue(node.name, 'NAME');
-                connectValue(ws, block, 'EXPR', node.expr);
-                break;
-            case 'print':
-                block = ws.newBlock('cmd_print');
-                connectValue(ws, block, 'EXPR', node.expr);
-                break;
-            case 'if':
-                block = ws.newBlock('cmd_if');
-                connectValue(ws, block, 'LEFT', node.condition.left);
-                block.setFieldValue(node.condition.operator, 'OPERATOR');
-                connectValue(ws, block, 'RIGHT', node.condition.right);
-                connectStatements(ws, block, 'THEN', node.then);
-                connectStatements(ws, block, 'ELSE', node.else);
-                break;
-            case 'for-each':
-                block = ws.newBlock('cmd_for_each');
-                block.setFieldValue(node.bindingName, 'BINDING');
-                block.setFieldValue(node.listSource, 'LIST_SOURCE');
-                connectStatements(ws, block, 'BODY', node.body);
-                break;
-            default:
-                throw new Error('Unknown statement node type for blocks view: ' + node.type);
-        }
-        block.initSvg();
-        block.render();
-        return block;
     }
 
     function connectStatements(ws, parentBlock, inputName, nodes) {
         let previous = null;
         for (const node of (nodes || [])) {
-            const block = statementNodeToBlock(ws, node);
+            const block = nodeToBlock(ws, node);
             if (previous) {
                 previous.nextConnection.connect(block.previousConnection);
             } else {
@@ -454,7 +477,7 @@
         for (const node of (ast.statements || [])) {
             let block;
             try {
-                block = statementNodeToBlock(ws, node);
+                block = nodeToBlock(ws, node);
             } catch (err) {
                 console.warn('chat-command-editor: skipping statement in Blocks view', node, err);
                 continue;
