@@ -499,6 +499,13 @@
         return resp.result.text;
     }
 
+    // Read-only (Phase 1 scope — see design spec's Block Editor section: editing the
+    // generated JS is Phase 2, behind the disabled "Éjecter" button).
+    async function astToJs(ast) {
+        const resp = await window.catapultWs.request('chat-commands.dsl.ast-to-js', { ast: JSON.stringify(ast) });
+        return resp.result.js;
+    }
+
     function reportEditorError(err) {
         console.error('chat-command-editor:', err);
         const text = err && err.message ? err.message : String(err);
@@ -552,6 +559,10 @@
                 document.getElementById('ceTextArea').value = await astToText(blocksToAst());
             } else if (currentTab === 'text' && tab === 'blocks') {
                 astToBlocks(await textToAst(document.getElementById('ceTextArea').value));
+            } else if (tab === 'js') {
+                // Read-only projection (Phase 1 scope) — computed from whichever of
+                // Blocks/Text is currently authoritative, via currentAst() below.
+                document.getElementById('ceJsOutput').textContent = await astToJs(await currentAst());
             }
         } catch (err) {
             reportEditorError(err);
