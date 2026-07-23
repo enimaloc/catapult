@@ -1,20 +1,26 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Map;
 
 /**
  * Bridges the browser's Blocks tab to the (Java-only) text DSL grammar so the editor modal
  * can convert text&lt;-&gt;AST without duplicating {@link CommandDslParser}/{@link CommandDslGenerator}
- * in JavaScript.
+ * in JavaScript, and serves the block/dropdown catalog so the server stays the single source
+ * of truth for what a streamer can build — the client never hardcodes known context paths or
+ * service functions, it renders whatever this endpoint reports.
  */
 @RestController
 public class ApiChatCommandDslController {
@@ -22,6 +28,24 @@ public class ApiChatCommandDslController {
     private static final CommandDslParser PARSER = new CommandDslParser();
     private static final CommandDslGenerator GENERATOR = new CommandDslGenerator();
     private static final NodeJsonCodec CODEC = new NodeJsonCodec();
+
+    private final ServiceFunctionRegistry serviceFunctionRegistry;
+
+    public ApiChatCommandDslController(ServiceFunctionRegistry serviceFunctionRegistry) {
+        this.serviceFunctionRegistry = serviceFunctionRegistry;
+    }
+
+    public record ServiceFunctionDto(String namespace, String name, List<String> parameterNames) {}
+
+    public record CatalogDto(List<String> contextPaths, List<ServiceFunctionDto> serviceFunctions) {}
+
+    @GetMapping("/api/chat-commands/dsl/catalog")
+    public CatalogDto catalog() {
+        List<ServiceFunctionDto> functions = serviceFunctionRegistry.all().stream()
+            .map(f -> new ServiceFunctionDto(f.namespace(), f.name(), f.parameterNames()))
+            .toList();
+        return new CatalogDto(List.copyOf(PlaceholderResolver.KNOWN_PATHS), functions);
+    }
 
     @PostMapping("/api/chat-commands/dsl/text-to-ast")
     public Map<String, String> textToAst(@RequestBody Map<String, String> body) {

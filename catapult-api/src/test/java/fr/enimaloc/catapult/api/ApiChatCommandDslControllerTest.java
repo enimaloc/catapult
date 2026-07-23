@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -8,12 +10,16 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.Map;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -25,7 +31,35 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ApiChatCommandDslControllerTest {
 
     @Autowired MockMvc mvc;
+    @MockitoBean ServiceFunctionRegistry serviceFunctionRegistry;
     final ObjectMapper om = new ObjectMapper();
+
+    private static ServiceFunction fn(String namespace, String name, List<String> parameterNames) {
+        return new ServiceFunction() {
+            @Override public String namespace() { return namespace; }
+            @Override public String name() { return name; }
+            @Override public List<String> parameterNames() { return parameterNames; }
+            @Override public Object invoke(Object[] args) { return null; }
+        };
+    }
+
+    @Test
+    void catalogReturnsKnownContextPathsAndRegisteredServiceFunctions() throws Exception {
+        when(serviceFunctionRegistry.all()).thenReturn(List.of(
+                fn("igdb", "getGame", List.of("query")),
+                fn("twitch", "getUser", List.of())));
+
+        mvc.perform(get("/api/chat-commands/dsl/catalog").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contextPaths").isArray())
+                .andExpect(jsonPath("$.contextPaths", org.hamcrest.Matchers.hasItem("game#name")))
+                .andExpect(jsonPath("$.serviceFunctions", org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$.serviceFunctions[0].namespace").value("igdb"))
+                .andExpect(jsonPath("$.serviceFunctions[0].name").value("getGame"))
+                .andExpect(jsonPath("$.serviceFunctions[0].parameterNames[0]").value("query"))
+                .andExpect(jsonPath("$.serviceFunctions[1].namespace").value("twitch"))
+                .andExpect(jsonPath("$.serviceFunctions[1].parameterNames").isEmpty());
+    }
 
     @Test
     void textToAstReturnsBadRequestNotAServerErrorForMalformedDslText() throws Exception {
