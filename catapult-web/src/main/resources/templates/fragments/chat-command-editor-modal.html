@@ -25,8 +25,16 @@
                 <textarea id="ceTextArea" class="form-input" rows="8" style="width:100%; font-family:monospace;"></textarea>
             </div>
             <div id="ceJsPane" class="ce-tab-pane" hidden>
-                <pre id="ceJsOutput" style="white-space:pre-wrap; background:var(--bg-base); padding:.5rem; border-radius:6px;"></pre>
-                <button type="button" id="ceEjectBtn" class="btn" disabled title="Bientôt disponible">Éjecter vers JS</button>
+                <div id="ceEjectedBanner" hidden style="margin-bottom:.5rem; font-size:.85em; color:var(--text-muted);"
+                     th:text="#{chat_commands.js.ejected_banner}">
+                    Cette commande exécute ce JS directement — les onglets Blocs/Texte sont ignorés tant que tu ne cliques pas « Revenir ».
+                </div>
+                <textarea id="ceJsOutput" class="form-input" rows="10" readonly
+                          style="width:100%; font-family:monospace; white-space:pre;"></textarea>
+                <div style="display:flex; gap:.5rem; margin-top:.5rem;">
+                    <button type="button" id="ceEjectBtn" class="btn" th:text="#{chat_commands.js.eject}">Éjecter vers JS</button>
+                    <button type="button" id="ceRevertBtn" class="btn" hidden th:text="#{chat_commands.js.revert}">Revenir aux Blocs/Texte</button>
+                </div>
             </div>
         </div>
         <details style="margin-top:.75rem;">
