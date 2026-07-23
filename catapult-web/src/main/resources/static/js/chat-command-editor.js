@@ -47,25 +47,56 @@
         if (workspace) workspace.setTheme(buildBlocklyTheme());
     });
 
+    // ---- Server-driven catalog (known context paths + registered service functions) ----
+    //
+    // The server is authoritative for what a streamer can build: known context paths
+    // (PlaceholderResolver#KNOWN_PATHS) and registered service functions
+    // (ServiceFunctionRegistry) both live in catapult-api. This client never hardcodes
+    // its own copy — it fetches the catalog once and renders whatever it reports, so
+    // registering a new ServiceFunction bean picks up a Blockly block automatically.
+
+    let catalog = null;
+
+    async function ensureCatalog() {
+        if (catalog) return catalog;
+        const resp = await window.catapultWs.request('chat-commands.dsl.catalog', {});
+        catalog = resp.result;
+        return catalog;
+    }
+
+    function serviceCallBlockType(fn) {
+        return 'cmd_call_' + fn.namespace + '_' + fn.name;
+    }
+
+    // blockType -> {namespace, name, parameterNames}, populated by defineBlocks() —
+    // lets exprBlockToNode read a service-call block generically instead of one
+    // hardcoded case per function.
+    const serviceFunctionsByBlockType = {};
+
     // ---- Blockly custom blocks (mirror the Statement/Expression node types) ----
 
-    // ContextGetExpr: a single generic "get context" block with a dropdown of known
-    // placeholder paths, per docs/specs/2026-07-21-chat-command-block-dsl-design.md#block-editor.
-    var KNOWN_CONTEXT_PATHS = [
-        ["game#name", "game#name"],
-        ["game#summary", "game#summary"],
-        ["game#release_date", "game#release_date"],
-        ["game#store#url", "game#store#url"],
-        ["game#store#steam", "game#store#steam"],
-        ["game#store#xbox", "game#store#xbox"],
-        ["game#store#battlenet", "game#store#battlenet"],
-        ["game#store#official", "game#store#official"],
-        ["game#igdb#url", "game#igdb#url"],
-        ["game#agerating", "game#agerating"],
-        ["tw#active", "tw#active"]
-    ];
+    function defineBlocks() {
+        // ContextGetExpr: a single generic "get context" block with a dropdown of known
+        // placeholder paths, per docs/specs/2026-07-21-chat-command-block-dsl-design.md#block-editor.
+        const contextPathOptions = catalog.contextPaths.map(p => [p, p]);
 
-    Blockly.defineBlocksWithJsonArray([
+        // ServiceCallExpr: one dedicated block per registered function, built from
+        // whatever the server currently reports — one value-input connector per
+        // parameter, labelled with its name.
+        const serviceCallBlocks = catalog.serviceFunctions.map(fn => {
+            const blockType = serviceCallBlockType(fn);
+            serviceFunctionsByBlockType[blockType] = fn;
+            const argRefs = fn.parameterNames.map((name, i) => name + ': %' + (i + 1)).join(', ');
+            return {
+                "type": blockType,
+                "message0": fn.namespace + '.' + fn.name + '(' + argRefs + ')',
+                "args0": fn.parameterNames.map((name, i) => ({ "type": "input_value", "name": "ARG" + i })),
+                "output": null,
+                "colour": 290
+            };
+        });
+
+        Blockly.defineBlocksWithJsonArray([
         // ---- value blocks (Expression) ----
         {
             "type": "cmd_literal_string",
@@ -98,32 +129,11 @@
         {
             "type": "cmd_context_get",
             "message0": "get %1",
-            "args0": [{ "type": "field_dropdown", "name": "PATH", "options": KNOWN_CONTEXT_PATHS }],
+            "args0": [{ "type": "field_dropdown", "name": "PATH", "options": contextPathOptions }],
             "output": null,
             "colour": 200
         },
-        // ServiceCallExpr: one dedicated block per registered function (Phase 1's fixed 3).
-        {
-            "type": "cmd_call_igdb_get_game",
-            "message0": "igdb.getGame( %1 )",
-            "args0": [{ "type": "input_value", "name": "QUERY" }],
-            "output": null,
-            "colour": 290
-        },
-        {
-            "type": "cmd_call_twitch_get_user",
-            "message0": "twitch.getUser()",
-            "args0": [],
-            "output": null,
-            "colour": 290
-        },
-        {
-            "type": "cmd_call_steam_get_price",
-            "message0": "steam.getPrice( %1 )",
-            "args0": [{ "type": "input_value", "name": "APP_ID" }],
-            "output": null,
-            "colour": 290
-        },
+        ...serviceCallBlocks,
         // ---- statement blocks ----
         {
             "type": "cmd_var_decl",
@@ -193,10 +203,19 @@
             "nextStatement": null,
             "colour": 120
         }
-    ]);
+        ]);
+    }
 
+    let blocksDefined = false;
+
+    // ensureWorkspace() is only ever reached after ensureCatalog() has resolved
+    // (openEditor awaits it first), so `catalog` is guaranteed populated here.
     function ensureWorkspace() {
         if (workspace) return workspace;
+        if (!blocksDefined) {
+            defineBlocks();
+            blocksDefined = true;
+        }
         workspace = Blockly.inject('ceBlocksPane', {
             toolbox: {
                 kind: "categoryToolbox",
@@ -234,11 +253,8 @@
                     },
                     {
                         kind: "category", name: "Fonctions", colour: "290",
-                        contents: [
-                            { kind: "block", type: "cmd_call_igdb_get_game" },
-                            { kind: "block", type: "cmd_call_twitch_get_user" },
-                            { kind: "block", type: "cmd_call_steam_get_price" }
-                        ]
+                        contents: catalog.serviceFunctions.map(fn =>
+                            ({ kind: "block", type: serviceCallBlockType(fn) }))
                     }
                 ]
             },
@@ -252,6 +268,12 @@
 
     function exprBlockToNode(block) {
         if (!block) return { type: 'literal', value: '', valueType: 'STRING' };
+        const serviceFunction = serviceFunctionsByBlockType[block.type];
+        if (serviceFunction) {
+            const args = serviceFunction.parameterNames.map((name, i) =>
+                exprBlockToNode(block.getInputTargetBlock('ARG' + i)));
+            return { type: 'service-call', namespace: serviceFunction.namespace, function: serviceFunction.name, args: args };
+        }
         switch (block.type) {
             case 'cmd_literal_string':
                 return { type: 'literal', value: block.getFieldValue('VALUE'), valueType: 'STRING' };
@@ -263,18 +285,6 @@
                 return { type: 'var-ref', name: block.getFieldValue('NAME') };
             case 'cmd_context_get':
                 return { type: 'context-get', path: block.getFieldValue('PATH') };
-            case 'cmd_call_igdb_get_game':
-                return {
-                    type: 'service-call', namespace: 'igdb', function: 'getGame',
-                    args: [exprBlockToNode(block.getInputTargetBlock('QUERY'))]
-                };
-            case 'cmd_call_twitch_get_user':
-                return { type: 'service-call', namespace: 'twitch', function: 'getUser', args: [] };
-            case 'cmd_call_steam_get_price':
-                return {
-                    type: 'service-call', namespace: 'steam', function: 'getPrice',
-                    args: [exprBlockToNode(block.getInputTargetBlock('APP_ID'))]
-                };
             default:
                 throw new Error('Unknown expression block type: ' + block.type);
         }
@@ -357,19 +367,15 @@
                 block = ws.newBlock('cmd_context_get');
                 block.setFieldValue(node.path, 'PATH');
                 break;
-            case 'service-call':
-                if (node.namespace === 'igdb' && node.function === 'getGame') {
-                    block = ws.newBlock('cmd_call_igdb_get_game');
-                    connectValue(ws, block, 'QUERY', node.args[0]);
-                } else if (node.namespace === 'twitch' && node.function === 'getUser') {
-                    block = ws.newBlock('cmd_call_twitch_get_user');
-                } else if (node.namespace === 'steam' && node.function === 'getPrice') {
-                    block = ws.newBlock('cmd_call_steam_get_price');
-                    connectValue(ws, block, 'APP_ID', node.args[0]);
-                } else {
+            case 'service-call': {
+                const fn = catalog.serviceFunctions.find(f => f.namespace === node.namespace && f.name === node.function);
+                if (!fn) {
                     throw new Error('Unsupported service call in Blocks view: ' + node.namespace + '#' + node.function);
                 }
+                block = ws.newBlock(serviceCallBlockType(fn));
+                fn.parameterNames.forEach((name, i) => connectValue(ws, block, 'ARG' + i, node.args[i]));
                 break;
+            }
             default:
                 throw new Error('Unknown expression node type for blocks view: ' + node.type);
         }
@@ -494,6 +500,7 @@
         currentTab = 'blocks';
         selectTabUI('blocks');
         try {
+            await ensureCatalog();
             astToBlocks(await textToAst(cmd.template || ''));
         } catch (err) {
             reportEditorError(err);
