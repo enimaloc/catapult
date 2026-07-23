@@ -115,4 +115,27 @@ class JsCompilerTest {
             .isInstanceOf(JsCompilationException.class)
             .hasMessageContaining("1bad");
     }
+
+    @Test
+    void compilesObjectLiteralAsAJsObjectAndPropertyGetAsBracketAccess() {
+        String js = compiler.compile(parser.parse(
+            "{var game = {name: \"Valorant\", price: 29.99}}{msg = get(game, \"name\")}"));
+        assertThat(js).contains("let game = {\"name\": \"Valorant\", \"price\": 29.99};");
+        assertThat(js).contains("msg = game[\"name\"];");
+    }
+
+    @Test
+    void executesObjectLiteralAndPropertyGetEndToEndInTheRealSandbox() {
+        // Proves the whole pipeline (parse -> compile -> real GraalJS execution), not just
+        // that the generated JS text looks right.
+        String js = compiler.compile(parser.parse(
+            "{var game = {name: \"Valorant\", price: \"free\"}}"
+            + "{var msg = \"\"}{msg = msg + get(game, \"name\")}{msg = msg + \" - \"}"
+            + "{msg = msg + get(game, \"price\")}{print msg}"));
+
+        String result = new SandboxExecutor().execute(js, path -> null, name -> List.of(),
+            java.time.Duration.ofSeconds(2));
+
+        assertThat(result).isEqualTo("Valorant - free");
+    }
 }

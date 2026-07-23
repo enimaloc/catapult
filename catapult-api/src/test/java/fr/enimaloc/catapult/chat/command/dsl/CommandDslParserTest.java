@@ -3,7 +3,9 @@ package fr.enimaloc.catapult.chat.command.dsl;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
 import fr.enimaloc.catapult.chat.command.ast.ContextGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
+import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
 import fr.enimaloc.catapult.chat.command.ast.ValueType;
 import fr.enimaloc.catapult.chat.command.ast.VarDeclStatement;
@@ -11,6 +13,9 @@ import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
 import fr.enimaloc.catapult.chat.command.ast.AssignStatement;
 import fr.enimaloc.catapult.chat.command.ast.ConcatStatement;
 import org.junit.jupiter.api.Test;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -148,5 +153,59 @@ class CommandDslParserTest {
         // actually consulted at runtime, not this inline text — see DynamicChatCommand.
         CommandAst ast = parser.parse("{game#name|no game}");
         assertThat(ast.statements()).containsExactly(new PrintStatement(new ContextGetExpr("game#name")));
+    }
+
+    @Test
+    void parsesObjectLiteralGroupingSeveralPrimitiveValues() {
+        CommandAst ast = parser.parse("{var game = {name: \"Valorant\", price: 29.99, free: true}}");
+        Map<String, fr.enimaloc.catapult.chat.command.ast.Expression> expected = new LinkedHashMap<>();
+        expected.put("name", new LiteralExpr("Valorant", ValueType.STRING));
+        expected.put("price", new LiteralExpr("29.99", ValueType.NUMBER));
+        expected.put("free", new LiteralExpr("true", ValueType.BOOLEAN));
+        assertThat(ast.statements()).containsExactly(
+            new VarDeclStatement("game", ValueType.OBJECT, new ObjectLiteralExpr(expected)));
+    }
+
+    @Test
+    void parsesEmptyObjectLiteral() {
+        CommandAst ast = parser.parse("{var obj = {}}");
+        assertThat(ast.statements()).containsExactly(
+            new VarDeclStatement("obj", ValueType.OBJECT, new ObjectLiteralExpr(Map.of())));
+    }
+
+    @Test
+    void parsesNestedObjectLiteralWithoutMissplittingTheInnerCommas() {
+        // splitTopLevelArgs must track brace depth, not just quotes — otherwise the inner
+        // object's own comma (between b and c) would be mistaken for a top-level separator.
+        CommandAst ast = parser.parse("{var outer = {a: {b: 1, c: 2}, d: 3}}");
+        VarDeclStatement decl = (VarDeclStatement) ast.statements().get(0);
+        ObjectLiteralExpr outer = (ObjectLiteralExpr) decl.init();
+        assertThat(outer.properties()).containsOnlyKeys("a", "d");
+        ObjectLiteralExpr inner = (ObjectLiteralExpr) outer.properties().get("a");
+        assertThat(inner.properties()).containsOnlyKeys("b", "c");
+        assertThat(inner.properties().get("b")).isEqualTo(new LiteralExpr("1", ValueType.NUMBER));
+        assertThat(inner.properties().get("c")).isEqualTo(new LiteralExpr("2", ValueType.NUMBER));
+    }
+
+    @Test
+    void parsesPropertyGetOnAnObjectVariable() {
+        CommandAst ast = parser.parse("{msg = get(game, \"name\")}");
+        assertThat(ast.statements()).containsExactly(
+            new AssignStatement("msg", new PropertyGetExpr(new VarRefExpr("game"), "name")));
+    }
+
+    @Test
+    void objectPropertyAccessDoesNotCollideWithLegacyDotPathNormalization() {
+        // get(x, "y") is a dedicated 2-arg form, distinct from get(path)'s 1-arg context read —
+        // no '.' syntax is introduced, so there is no ambiguity with legacy dot-paths to resolve.
+        CommandAst ast = parser.parse("{msg = get(game, \"store\")}");
+        AssignStatement assign = (AssignStatement) ast.statements().get(0);
+        assertThat(assign.expr()).isEqualTo(new PropertyGetExpr(new VarRefExpr("game"), "store"));
+    }
+
+    @Test
+    void malformedObjectPropertyThrows() {
+        assertThatThrownBy(() -> parser.parse("{var x = {notAKeyValuePair}}"))
+            .isInstanceOf(CommandDslParseException.class);
     }
 }

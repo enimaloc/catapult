@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -83,6 +84,40 @@ class CommandDslRoundTripTest {
             new ForEachStatement("f", "fallbacks", List.of(new ConcatStatement("msg", new VarRefExpr("f")))),
             new AssignStatement("msg", new VarRefExpr("msg")),
             new PrintStatement(new VarRefExpr("msg"))
+        ));
+
+        String text = generator.generate(ast);
+        assertThat(parser.parse(text)).isEqualTo(ast);
+    }
+
+    @Test
+    void objectLiteralRoundTrips() {
+        String source = "{var game = {name: \"Valorant\", price: 29.99}}";
+        assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+    }
+
+    @Test
+    void nestedObjectLiteralRoundTrips() {
+        String source = "{var outer = {a: {b: 1, c: 2}, d: 3}}";
+        assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+    }
+
+    @Test
+    void propertyGetRoundTrips() {
+        String source = "{msg = get(game, \"name\")}";
+        assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+    }
+
+    @Test
+    void generatedObjectAndPropertyGetAstRoundTripsDirectlyWithoutGoingThroughText() {
+        Map<String, fr.enimaloc.catapult.chat.command.ast.Expression> props = new java.util.LinkedHashMap<>();
+        props.put("name", new LiteralExpr("Valorant", ValueType.STRING));
+        props.put("price", new LiteralExpr("29.99", ValueType.NUMBER));
+        CommandAst ast = new CommandAst(List.of(
+            new VarDeclStatement("game", ValueType.OBJECT,
+                new fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr(props)),
+            new AssignStatement("msg",
+                new fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr(new VarRefExpr("game"), "name"))
         ));
 
         String text = generator.generate(ast);

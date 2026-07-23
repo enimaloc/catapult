@@ -136,6 +136,15 @@ public class NodeJsonCodec {
                 map.put("operator", e.operator());
                 map.put("right", expressionToMap(e.right()));
             }
+            case ObjectLiteralExpr e -> {
+                Map<String, Object> properties = new LinkedHashMap<>();
+                e.properties().forEach((key, value) -> properties.put(key, expressionToMap(value)));
+                map.put("properties", properties);
+            }
+            case PropertyGetExpr e -> {
+                map.put("target", expressionToMap(e.target()));
+                map.put("property", e.property());
+            }
             default -> throw new IllegalArgumentException("Unhandled expression type: " + expression.typeName());
         }
         return map;
@@ -157,6 +166,15 @@ public class NodeJsonCodec {
                 expressionFromMap((Map<String, Object>) map.get("left")),
                 (String) map.get("operator"),
                 expressionFromMap((Map<String, Object>) map.get("right")));
+            case "object-literal" -> {
+                Map<String, Object> rawProperties = (Map<String, Object>) map.get("properties");
+                Map<String, Expression> properties = new LinkedHashMap<>();
+                rawProperties.forEach((key, value) -> properties.put(key, expressionFromMap((Map<String, Object>) value)));
+                yield new ObjectLiteralExpr(properties);
+            }
+            case "property-get" -> new PropertyGetExpr(
+                expressionFromMap((Map<String, Object>) map.get("target")),
+                (String) map.get("property"));
             default -> throw new IllegalArgumentException("Unknown expression type: " + type);
         };
     }

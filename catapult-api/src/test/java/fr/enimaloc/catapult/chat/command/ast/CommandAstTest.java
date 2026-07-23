@@ -20,8 +20,8 @@ class CommandAstTest {
     }
 
     @Test
-    void valueTypeHasFourVariants() {
+    void valueTypeHasFiveVariants() {
         assertThat(ValueType.values()).containsExactly(
-            ValueType.STRING, ValueType.NUMBER, ValueType.BOOLEAN, ValueType.LIST);
+            ValueType.STRING, ValueType.NUMBER, ValueType.BOOLEAN, ValueType.LIST, ValueType.OBJECT);
     }
 }

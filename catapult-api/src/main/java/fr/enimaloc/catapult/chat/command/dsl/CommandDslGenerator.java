@@ -9,7 +9,9 @@ import fr.enimaloc.catapult.chat.command.ast.Expression;
 import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.IfStatement;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
+import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
 import fr.enimaloc.catapult.chat.command.ast.Statement;
 import fr.enimaloc.catapult.chat.command.ast.ValueType;
@@ -103,8 +105,17 @@ public class CommandDslGenerator {
             case ContextGetExpr e -> e.path();
             case ServiceCallExpr e -> e.namespace() + "#" + e.function() + "(" + generateArgs(e.args()) + ")";
             case BinaryExpr e -> generateExpr(e.left()) + " " + e.operator() + " " + generateExpr(e.right());
+            case ObjectLiteralExpr e -> generateObjectLiteral(e);
+            case PropertyGetExpr e -> "get(" + generateExpr(e.target()) + ", \"" + e.property() + "\")";
             default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
         };
+    }
+
+    private String generateObjectLiteral(ObjectLiteralExpr expr) {
+        String entries = expr.properties().entrySet().stream()
+            .map(entry -> entry.getKey() + ": " + generateExpr(entry.getValue()))
+            .collect(Collectors.joining(", "));
+        return "{" + entries + "}";
     }
 
     private String generateTopLevelExpr(Expression expr) {
