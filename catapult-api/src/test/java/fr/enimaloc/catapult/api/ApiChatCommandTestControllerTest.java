@@ -27,8 +27,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.mockito.ArgumentCaptor;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -128,5 +132,41 @@ class ApiChatCommandTestControllerTest {
 
         org.mockito.Mockito.verify(jsCompiler).compileWithTrace(any());
         org.mockito.Mockito.verify(jsCompiler, org.mockito.Mockito.never()).compile(any());
+    }
+
+    @Test
+    void test_resolves_a_placeholder_without_a_test_override_to_empty_string_not_java_null() throws Exception {
+        // The real dispatch path (DynamicChatCommand#resolvePlaceholder) always falls back to
+        // "" for a placeholder with no value — the Tester endpoint must match that, or GraalJS
+        // would concatenate the literal string "null" for any override the caller left blank.
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setId(id);
+        def.setUser(user);
+        def.setName("!foo");
+        def.setTemplate("Now playing {game#name}!");
+        def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!")));
+        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(def));
+        when(jsCompiler.compileWithTrace(any())).thenReturn("return \"irrelevant\";");
+        var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
+        trace.finish("irrelevant");
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any())).thenReturn(trace);
+
+        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        // "tw#active" left out entirely, like a blank test-override field would be
+                        .content(om.writeValueAsString(Map.of("overrides", Map.of("game#name", "Valorant")))))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<SandboxExecutor.PlaceholderContext> placeholderCaptor =
+                ArgumentCaptor.forClass(SandboxExecutor.PlaceholderContext.class);
+        verify(sandboxExecutor).executeWithTrace(any(), placeholderCaptor.capture(), any(), any(), any());
+
+        assertThat(placeholderCaptor.getValue().resolve("game#name")).isEqualTo("Valorant");
+        assertThat(placeholderCaptor.getValue().resolve("tw#active")).isEqualTo("");
     }
 }
