@@ -77,8 +77,10 @@ public class DynamicChatCommand implements ChatCommand {
         Map<String, String> fallbacks = definition.getFallbacks().stream()
             .collect(Collectors.toMap(fb -> fb.getPlaceholder(), fb -> fb.getFallbackText()));
 
-        CommandAst ast = decodeAst();
-        String js = jsCompiler.compile(ast);
+        // "Eject to JS" (Phase 2): a non-null ejectedJs runs directly, bypassing the AST
+        // compiler entirely — same sandbox, same ctx API, just a different JS source.
+        String ejected = definition.getEjectedJs();
+        String js = (ejected != null && !ejected.isBlank()) ? ejected : jsCompiler.compile(decodeAst());
 
         try {
             String output = sandboxExecutor.execute(js,

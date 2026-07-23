@@ -75,14 +75,15 @@ public class ApiChatCommandsController {
         ChatCommandEvent.SenderRole permission,
         boolean enabled,
         String presetKey,
-        List<FallbackDto> fallbacks
+        List<FallbackDto> fallbacks,
+        String ejectedJs
     ) {
         static CommandDto fromEntity(ChatCommandDefinition d) {
             List<FallbackDto> fb = d.getFallbacks().stream()
                 .map(f -> new FallbackDto(f.getPlaceholder(), f.getFallbackText()))
                 .toList();
             return new CommandDto(d.getId(), d.getName(), d.getTemplate(),
-                d.getPermission(), d.isEnabled(), d.getPresetKey(), fb);
+                d.getPermission(), d.isEnabled(), d.getPresetKey(), fb, d.getEjectedJs());
         }
     }
 
@@ -107,7 +108,12 @@ public class ApiChatCommandsController {
         // command" form) can keep sending template-only bodies. When present it is the
         // source of truth; `template` is regenerated from it below to keep the read-only
         // audit column in sync rather than trusting whatever text the client also sent.
-        String ast
+        String ast,
+        // "Eject to JS" (Phase 2): hand-edited JS that runs directly at dispatch time,
+        // bypassing the AST compiler. Reversible by design — ast/template above are never
+        // derived from this, and the client clears it (sends null/omits it) to revert to
+        // Blocks/Text. Null/blank means "not ejected".
+        String ejectedJs
     ) {}
 
     @GetMapping
@@ -289,6 +295,7 @@ public class ApiChatCommandsController {
         }
         def.setPermission(req.permission());
         def.setEnabled(req.enabled());
+        def.setEjectedJs((req.ejectedJs() == null || req.ejectedJs().isBlank()) ? null : req.ejectedJs());
 
         def.getFallbacks().clear();
         if (req.fallbacks() != null) {

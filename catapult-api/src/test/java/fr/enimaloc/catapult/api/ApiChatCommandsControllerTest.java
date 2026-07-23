@@ -214,6 +214,82 @@ class ApiChatCommandsControllerTest {
     }
 
     @Test
+    void put_with_ejectedJs_persists_it_without_touching_ast_or_template() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
+
+        UUID id = UUID.randomUUID();
+        String astJson = new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!"));
+        ChatCommandDefinition existing = new ChatCommandDefinition();
+        existing.setId(id);
+        existing.setUser(user);
+        existing.setName("!foo");
+        existing.setTemplate("Now playing {game#name}!");
+        existing.setAst(astJson);
+        existing.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        String body = om.writeValueAsString(Map.of(
+                "name", "!foo",
+                "template", "Now playing {game#name}!",
+                "permission", "EVERYONE",
+                "enabled", true,
+                "ast", astJson,
+                "ejectedJs", "return \"hand-written\";"));
+
+        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<ChatCommandDefinition> captor = ArgumentCaptor.forClass(ChatCommandDefinition.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getEjectedJs()).isEqualTo("return \"hand-written\";");
+        // Reversibility: the ast/template a Blocks/Text edit would restore stay untouched.
+        assertThat(captor.getValue().getAst()).isEqualTo(astJson);
+        assertThat(captor.getValue().getTemplate()).isEqualTo("Now playing {game#name}!");
+    }
+
+    @Test
+    void put_omitting_ejectedJs_clears_a_previously_ejected_command() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
+
+        UUID id = UUID.randomUUID();
+        String astJson = new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!"));
+        ChatCommandDefinition existing = new ChatCommandDefinition();
+        existing.setId(id);
+        existing.setUser(user);
+        existing.setName("!foo");
+        existing.setTemplate("Now playing {game#name}!");
+        existing.setAst(astJson);
+        existing.setEjectedJs("return \"old hand-written js\";");
+        existing.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // "Revenir aux Blocs/Texte" sends a request without ejectedJs at all.
+        String body = om.writeValueAsString(Map.of(
+                "name", "!foo",
+                "template", "Now playing {game#name}!",
+                "permission", "EVERYONE",
+                "enabled", true,
+                "ast", astJson));
+
+        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<ChatCommandDefinition> captor = ArgumentCaptor.forClass(ChatCommandDefinition.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getEjectedJs()).isNull();
+    }
+
+    @Test
     void delete_returns_404_if_user_does_not_own_command() throws Exception {
         mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
