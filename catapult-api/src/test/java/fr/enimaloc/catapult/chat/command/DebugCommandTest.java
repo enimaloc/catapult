@@ -41,7 +41,8 @@ class DebugCommandTest {
     private GameContext contextWithGame() {
         return new GameContext(null, "42", "Celeste", null, null,
             Map.of("steam", "https://store.steampowered.com/app/504230"),
-            null, null, Set.of("spiders"), Map.of("spiders", "Araignées"), null);
+            null, null, Set.of("spiders"), Map.of("spiders", "Araignées"), null,
+            null, null, List.of(), List.of(), List.of());
     }
 
     @Test
