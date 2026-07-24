@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.IgdbGameDetails;
+import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.IgdbService;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,7 @@ class ApiChatCommandDslControllerTest {
             @Override public String namespace() { return namespace; }
             @Override public String name() { return name; }
             @Override public List<String> parameterNames() { return parameterNames; }
-            @Override public Object invoke(Object[] args) { return null; }
+            @Override public Object invoke(UserAccount user, Object[] args) { return null; }
         };
     }
 
