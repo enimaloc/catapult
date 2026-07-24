@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.chat.command.dsl;
 
+import fr.enimaloc.catapult.chat.command.ast.ArgGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.AssignStatement;
 import fr.enimaloc.catapult.chat.command.ast.BinaryExpr;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
@@ -41,6 +42,7 @@ public class CommandDslParser {
 
     private static final Pattern IDENTIFIER = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
     private static final Pattern NUMBER = Pattern.compile("^-?\\d+(\\.\\d+)?$");
+    private static final Pattern ARG_INDEX = Pattern.compile("^\\d+$");
     private static final List<String> COMPARISON_OPERATORS = List.of("!=", "==", "<=", ">=", "<", ">");
 
     // Legacy templates (pre-V59__placeholder_hash_separator.sql) used '.' instead of '#' as the
@@ -77,6 +79,18 @@ public class CommandDslParser {
             current = new PropertyGetExpr(current, segments[i]);
         }
         return current;
+    }
+
+    /** {@code arg(N)} reads one word of the chat command's own arguments — N must be a literal
+     *  non-negative integer (no signs, no decimals, no variables): {@code arg(-1)}, {@code arg(x)}
+     *  and {@code arg(1.5)} are all rejected here rather than silently misparsed. */
+    private Expression parseArgGet(String text) {
+        String indexText = text.substring(4, text.length() - 1).trim();
+        if (!ARG_INDEX.matcher(indexText).matches()) {
+            throw new CommandDslParseException(
+                "arg(N) requires a literal non-negative integer index: " + text);
+        }
+        return new ArgGetExpr(Integer.parseInt(indexText));
     }
 
     public CommandAst parse(String text) {
@@ -176,6 +190,9 @@ public class CommandDslParser {
         if (call != null) {
             return new PrintStatement(call);
         }
+        if (inner.startsWith("arg(") && inner.endsWith(")")) {
+            return new PrintStatement(parseArgGet(inner));
+        }
         int bar = inner.indexOf('|');
         String rawPath = bar < 0 ? inner : inner.substring(0, bar);
         if (rawPath.startsWith("ctx.") && DOT_CHAIN.matcher(rawPath).matches()) {
@@ -259,6 +276,9 @@ public class CommandDslParser {
         }
         if (text.startsWith("get(") && text.endsWith(")")) {
             return parseGetExpression(text.substring(4, text.length() - 1));
+        }
+        if (text.startsWith("arg(") && text.endsWith(")")) {
+            return parseArgGet(text);
         }
         if (text.startsWith("{") && text.endsWith("}")) {
             return parseObjectLiteral(text.substring(1, text.length() - 1).trim());
