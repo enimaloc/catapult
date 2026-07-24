@@ -30,6 +30,9 @@ public class PlaceholderResolver {
         "game#store#official",
         "game#igdb#url",
         "game#agerating",
+        "game#rating",
+        "game#critic_rating",
+        "game#platforms",
         "tw#active"
     );
 
@@ -129,6 +132,9 @@ public class PlaceholderResolver {
             case "game#igdb#url"      -> ctx.igdbSlug() == null ? null
                 : "https://www.igdb.com/games/" + ctx.igdbSlug();
             case "game#agerating"     -> ctx.ageRating();
+            case "game#rating"        -> roundedOrNull(ctx.rating());
+            case "game#critic_rating" -> roundedOrNull(ctx.criticRating());
+            case "game#platforms"     -> joinNullIfEmpty(ctx.platforms());
             case "tw#active"          -> joinNullIfEmpty(ctx.activeTws() == null ? null
                 : ctx.activeTws().stream()
                     .map(id -> ctx.twLabels() == null ? null : ctx.twLabels().get(id))
@@ -148,6 +154,10 @@ public class PlaceholderResolver {
     private static String joinNullIfEmpty(java.util.List<String> items) {
         if (items == null || items.isEmpty()) return null;
         return String.join(", ", items);
+    }
+
+    private static String roundedOrNull(Double value) {
+        return value == null ? null : String.valueOf(Math.round(value));
     }
 
     /** Paths inconnus présents dans un template (pour validation à l'écriture). */
