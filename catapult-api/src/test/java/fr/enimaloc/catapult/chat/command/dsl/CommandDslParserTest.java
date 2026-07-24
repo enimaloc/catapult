@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.chat.command.dsl;
 
+import fr.enimaloc.catapult.chat.command.ast.ArgGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
 import fr.enimaloc.catapult.chat.command.ast.ContextGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
@@ -284,5 +285,38 @@ class CommandDslParserTest {
             new PrintStatement(new LiteralExpr("Language: ", ValueType.STRING)),
             new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.SettingGetExpr("language")),
             new PrintStatement(new LiteralExpr("!", ValueType.STRING)));
+    }
+
+    @Test
+    void argOpenParenNCloseParenParsesToArgGetExprAsABareTagShorthand() {
+        CommandAst ast = parser.parse("Hi {arg(0)}!");
+        assertThat(ast.statements()).containsExactly(
+            new PrintStatement(new LiteralExpr("Hi ", ValueType.STRING)),
+            new PrintStatement(new ArgGetExpr(0)),
+            new PrintStatement(new LiteralExpr("!", ValueType.STRING)));
+    }
+
+    @Test
+    void argParsesInsideAnExplicitPrintExpression() {
+        CommandAst ast = parser.parse("{print arg(2)}");
+        assertThat(ast.statements()).containsExactly(new PrintStatement(new ArgGetExpr(2)));
+    }
+
+    @Test
+    void argWithANegativeIndexThrows() {
+        assertThatThrownBy(() -> parser.parse("{arg(-1)}"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void argWithANonNumericIndexThrows() {
+        assertThatThrownBy(() -> parser.parse("{arg(x)}"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void argWithADecimalIndexThrows() {
+        assertThatThrownBy(() -> parser.parse("{arg(1.5)}"))
+            .isInstanceOf(CommandDslParseException.class);
     }
 }
