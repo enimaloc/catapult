@@ -192,6 +192,29 @@
         }
     }
 
+    // Reads one of the whitespace-split words typed after the command name (e.g. "!shoutout
+    // myfriend" -> arg(0) === "myfriend"). Index is a fixed, non-negative literal (ArgGetExpr
+    // only supports a literal int today, see docs/specs/2026-07-24-chat-command-args-design.md),
+    // so a number field is enough here — no dropdown, no expression slot for the index.
+    class CmdArgGetBlock {
+        static type = 'cmd_arg_get';
+        static nodeType = 'arg-get';
+        static category() { return 'Contexte'; }
+        static definition() {
+            return { type: this.type, message0: 'arg %1',
+                args0: [{ type: 'field_number', name: 'INDEX', value: 0, min: 0, precision: 1 }],
+                output: null, colour: 200 };
+        }
+        static toNode(block) {
+            return { type: 'arg-get', index: block.getFieldValue('INDEX') };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.index, 'INDEX');
+            return block;
+        }
+    }
+
     // Groups several related values into one variable, e.g. {name: "Valorant", price: 29.99}.
     // The PROPERTIES slot holds a chain of CmdObjectPropertyBlock, reusing the exact same
     // statementsToNodes/connectStatements chaining already used for if/for-each bodies —
@@ -452,7 +475,7 @@
 
     const STATIC_BLOCK_CLASSES = [
         CmdLiteralStringBlock, CmdLiteralNumberBlock, CmdLiteralBooleanBlock,
-        CmdVarRefBlock, CmdContextGetBlock, CmdSettingGetBlock,
+        CmdVarRefBlock, CmdContextGetBlock, CmdSettingGetBlock, CmdArgGetBlock,
         CmdObjectLiteralBlock, CmdObjectPropertyBlock, CmdPropertyGetBlock,
         CmdVarDeclBlock, CmdAssignBlock, CmdConcatBlock, CmdPrintBlock, CmdIfBlock, CmdForEachBlock
     ];
