@@ -71,6 +71,8 @@ public class ApiChatCommandTestController {
         Map<String, String> overrides = (Map<String, String>) body.getOrDefault("overrides", Map.of());
         @SuppressWarnings("unchecked")
         Map<String, String> settingOverrides = (Map<String, String>) body.getOrDefault("settings", Map.of());
+        @SuppressWarnings("unchecked")
+        List<String> args = (List<String>) body.getOrDefault("args", List.of());
 
         // Unlike context placeholders (game#name etc.), which have no real value at all outside
         // a live stream and so always need a manual test override, settings are real persisted
@@ -88,7 +90,11 @@ public class ApiChatCommandTestController {
         // alone would hand GraalJS a Java null, which string-concatenates as the literal "null".
         ExecutionTrace trace = sandboxExecutor.executeWithTrace(js,
             path -> overrides.getOrDefault(path, ""),
-            name -> "fallbacks".equals(name) ? List.copyOf(overrides.values()) : List.of(),
+            name -> {
+                if ("fallbacks".equals(name)) return List.copyOf(overrides.values());
+                if ("args".equals(name)) return args;
+                return List.of();
+            },
             serviceFunctionRegistry, user, key -> settings.getOrDefault(key, ""), TEST_TIMEOUT);
 
         return Map.of(
