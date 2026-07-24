@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -51,16 +50,12 @@ public class ChatCommandsUpdateHandler implements RequestHandler {
         Map<String, Object> body = mapper.convertValue(rawParams, Map.class);
         Object idRaw = body.remove("id");
         UUID id = parseId(idRaw);
-        boolean ok = apiClient.put("/api/chat-commands/{id}", body, id);
-        if (!ok) {
+        Map<String, Object> result = apiClient.put("/api/chat-commands/{id}", body, Map.class, id);
+        if (result == null) {
             throw new WsBusinessException("UPSTREAM_UNAVAILABLE",
                     "Update failed (check catapult-api logs)");
         }
-        // PUT is 204; re-fetch the row so the client can update its UI without
-        // an extra round-trip.
-        Map<String, Object> echoed = new LinkedHashMap<>(body);
-        echoed.put("id", id.toString());
-        return echoed;
+        return result;
     }
 
     private static UUID parseId(Object raw) {
