@@ -671,6 +671,7 @@
         document.getElementById('ceName').disabled = isBuiltin;
         document.getElementById('ceTextArea').value = cmd.template || '';
         document.getElementById('ceTraceOutput').hidden = true;
+        document.getElementById('ceScopeWarning').hidden = true;
         document.getElementById('chatCommandEditorModal').hidden = false;
         document.getElementById('chatCommandEditorModal').style.display = 'flex';
         ejectedJs = cmd.ejectedJs || null;
@@ -784,9 +785,13 @@
                 payload.ejectedJs = '';
             }
 
-            await window.catapultWs.request('chat-commands.update', payload);
-            closeEditor();
+            const result = await window.catapultWs.request('chat-commands.update', payload);
+            const missingScopes = (result && result.missingTwitchScopes) || [];
+            document.getElementById('ceScopeWarning').hidden = missingScopes.length === 0;
             if (window.chatCommandEditor.onSaved) window.chatCommandEditor.onSaved();
+            // Keep the editor open when a scope gap was just detected, so the streamer sees
+            // the warning and the "Reconnecter Twitch" link — otherwise close as before.
+            if (missingScopes.length === 0) closeEditor();
         } catch (err) {
             reportEditorError(err);
         }
