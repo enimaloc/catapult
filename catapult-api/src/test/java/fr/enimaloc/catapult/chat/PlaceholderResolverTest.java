@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -101,7 +102,8 @@ class PlaceholderResolverTest {
             new DetectedGame("1", GameBinding.SourceType.STEAM, "Halo"),
             "100", "Halo", null,
             LocalDate.of(2024, 3, 14),
-            Map.of(), null, null, Set.of(), Map.of(), null);
+            Map.of(), null, null, Set.of(), Map.of(), null,
+            null, null, List.of(), List.of(), List.of());
         Optional<String> result = resolver.resolve(
             "{game#release_date}", ctx, Map.of(), Locale.FRANCE);
         assertThat(result).contains("14/03/2024");
@@ -112,9 +114,57 @@ class PlaceholderResolverTest {
         GameContext ctx = new GameContext(
             new DetectedGame("1", GameBinding.SourceType.STEAM, "Stardew"),
             "100", "Stardew", null, null, Map.of(), null, null,
-            Set.of(), Map.of(), "PEGI 12 — Violence");
+            Set.of(), Map.of(), "PEGI 12 — Violence",
+            null, null, List.of(), List.of(), List.of());
         assertThat(resolver.resolve("Rated: {game#agerating}", ctx, Map.of(), Locale.ENGLISH))
             .contains("Rated: PEGI 12 — Violence");
+    }
+
+    @Test
+    void resolves_gameRating_roundedToNearestInteger() {
+        GameContext ctx = new GameContext(
+            new DetectedGame("1", GameBinding.SourceType.STEAM, "Valorant"),
+            "100", "Valorant", null, null, Map.of(), null, null,
+            Set.of(), Map.of(), null,
+            78.3421, null, List.of(), List.of(), List.of());
+        assertThat(resolver.resolve("Rating: {game#rating}", ctx, Map.of(), Locale.ENGLISH))
+            .contains("Rating: 78");
+    }
+
+    @Test
+    void resolves_gameRating_emptyWhenUnset() {
+        Optional<String> result = resolver.resolve(
+            "x {game#rating|fb} y", contextWithName("Halo"), Map.of(), Locale.FRANCE);
+        assertThat(result).contains("x fb y");
+    }
+
+    @Test
+    void resolves_gameCriticRating_roundedToNearestInteger() {
+        GameContext ctx = new GameContext(
+            new DetectedGame("1", GameBinding.SourceType.STEAM, "Valorant"),
+            "100", "Valorant", null, null, Map.of(), null, null,
+            Set.of(), Map.of(), null,
+            null, 85.9, List.of(), List.of(), List.of());
+        assertThat(resolver.resolve("Critic: {game#critic_rating}", ctx, Map.of(), Locale.ENGLISH))
+            .contains("Critic: 86");
+    }
+
+    @Test
+    void resolves_gamePlatforms_commaJoined() {
+        GameContext ctx = new GameContext(
+            new DetectedGame("1", GameBinding.SourceType.STEAM, "Valorant"),
+            "100", "Valorant", null, null, Map.of(), null, null,
+            Set.of(), Map.of(), null,
+            null, null, List.of("PC", "PlayStation 5", "Xbox Series X"), List.of(), List.of());
+        assertThat(resolver.resolve("{game#platforms}", ctx, Map.of(), Locale.ENGLISH))
+            .contains("PC, PlayStation 5, Xbox Series X");
+    }
+
+    @Test
+    void resolves_gamePlatforms_emptyWhenNoPlatforms() {
+        Optional<String> result = resolver.resolve(
+            "x {game#platforms|fb} y", contextWithName("Halo"), Map.of(), Locale.FRANCE);
+        assertThat(result).contains("x fb y");
     }
 
     @Test
@@ -168,7 +218,8 @@ class PlaceholderResolverTest {
         GameContext ctx = new GameContext(
             new DetectedGame("g1", GameBinding.SourceType.STEAM, "Halo"),
             "igdb-1", "Halo", null, null, Map.of(), null, null,
-            Set.of(), Map.of(), "PEGI 12");
+            Set.of(), Map.of(), "PEGI 12",
+            null, null, List.of(), List.of(), List.of());
         Optional<String> result = resolver.resolve(
             "{tw#active|{game#agerating|aucune information disponible}}",
             ctx, Map.of(), Locale.FRANCE);
@@ -202,13 +253,15 @@ class PlaceholderResolverTest {
         return new GameContext(
             new DetectedGame("1", GameBinding.SourceType.STEAM, name),
             "100", name, null, null, Map.of(), null, null,
-            Set.of(), Map.of(), null);
+            Set.of(), Map.of(), null,
+            null, null, List.of(), List.of(), List.of());
     }
 
     private GameContext ctxWithTws(Set<String> tws, Map<String, String> labels) {
         return new GameContext(
             new DetectedGame("1", GameBinding.SourceType.STEAM, "Stardew"),
             "100", "Stardew", null, null, Map.of(), null, null,
-            tws, labels, null);
+            tws, labels, null,
+            null, null, List.of(), List.of(), List.of());
     }
 }
