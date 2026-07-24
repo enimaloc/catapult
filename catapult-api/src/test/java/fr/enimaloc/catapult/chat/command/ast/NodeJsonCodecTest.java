@@ -73,4 +73,18 @@ class NodeJsonCodecTest {
         assertThat(json).contains("\"setting-get\"");
         assertThat(json).contains("\"language\"");
     }
+
+    @Test
+    void roundTripsArgGetExpr() {
+        CommandAst ast = new CommandAst(List.of(
+            new AssignStatement("msg", new ArgGetExpr(0))
+        ));
+
+        String json = codec.toJson(ast);
+        CommandAst restored = codec.fromJson(json);
+
+        assertThat(restored).isEqualTo(ast);
+        assertThat(json).contains("\"arg-get\"");
+        assertThat(json).contains("\"index\":0");
+    }
 }
