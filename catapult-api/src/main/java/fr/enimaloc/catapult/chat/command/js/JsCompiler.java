@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.chat.command.js;
 
+import fr.enimaloc.catapult.chat.command.ast.ArgGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.AssignStatement;
 import fr.enimaloc.catapult.chat.command.ast.BinaryExpr;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
@@ -156,6 +157,7 @@ public class JsCompiler {
             }
             case PropertyGetExpr e -> collectContextPaths(e.target(), paths);
             case SettingGetExpr ignored -> { }
+            case ArgGetExpr ignored -> { }
             case LiteralExpr ignored -> { }
             case VarRefExpr ignored -> { }
             default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
@@ -211,6 +213,7 @@ public class JsCompiler {
             }
             case PropertyGetExpr e -> collectSettingKeys(e.target(), keys);
             case ContextGetExpr ignored -> { }
+            case ArgGetExpr ignored -> { }
             case LiteralExpr ignored -> { }
             case VarRefExpr ignored -> { }
             default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
@@ -287,6 +290,7 @@ public class JsCompiler {
             }
             case ContextGetExpr e -> ctxPropertyChain(e.path());
             case SettingGetExpr e -> jsPropertyAccess("ctx.settings", e.key());
+            case ArgGetExpr e -> "(ctx.list(\"args\")[" + e.index() + "] || \"\")";
             case ServiceCallExpr e -> compileServiceCall(e);
             case BinaryExpr e -> "(" + compileExpr(e.left()) + " " + jsOperator(e.operator())
                 + " " + compileExpr(e.right()) + ")";

@@ -223,4 +223,21 @@ class JsCompilerTest {
             .isInstanceOf(JsCompilationException.class)
             .hasMessageContaining("__proto__");
     }
+
+    @Test
+    void compilesArgGetToATernaryListLookupWithEmptyStringFallback() {
+        String js = compiler.compile(parser.parse("{msg = arg(2)}"));
+        assertThat(js).contains("msg = (ctx.list(\"args\")[2] || \"\");");
+    }
+
+    @Test
+    void argGetDoesNotTriggerContextOrSettingSetupLines() {
+        // A pure arg(N) reference has nothing to do with ctx.game.* or ctx.settings.* — this
+        // guards against a bug where an unhandled ArgGetExpr case in collectContextPaths or
+        // collectSettingKeys throws IllegalArgumentException for ANY ast containing arg(N),
+        // even one with zero context paths or settings.
+        String js = compiler.compile(parser.parse("{msg = arg(0)}"));
+        assertThat(js).doesNotContain("ctx.game");
+        assertThat(js).doesNotContain("ctx.settings");
+    }
 }
