@@ -31,6 +31,7 @@ class SteamGetProfileFunctionTest {
         assertThat(fn.namespace()).isEqualTo("steam");
         assertThat(fn.name()).isEqualTo("getProfile");
         assertThat(fn.parameterNames()).isEmpty();
+        assertThat(fn.returnKeys()).containsExactly("displayName", "onlineStatus", "currentGame");
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) fn.invoke(user, new Object[0]);

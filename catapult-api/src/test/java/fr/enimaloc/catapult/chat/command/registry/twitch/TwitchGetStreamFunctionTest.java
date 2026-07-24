@@ -28,6 +28,7 @@ class TwitchGetStreamFunctionTest {
         assertThat(fn.namespace()).isEqualTo("twitch");
         assertThat(fn.name()).isEqualTo("getStream");
         assertThat(fn.parameterNames()).isEmpty();
+        assertThat(fn.returnKeys()).containsExactly("title", "category", "viewers", "uptime");
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) fn.invoke(user, new Object[0]);

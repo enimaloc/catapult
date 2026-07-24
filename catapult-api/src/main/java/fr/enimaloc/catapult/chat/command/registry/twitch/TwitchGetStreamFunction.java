@@ -36,6 +36,11 @@ public class TwitchGetStreamFunction implements ServiceFunction {
     }
 
     @Override
+    public List<String> returnKeys() {
+        return List.of("title", "category", "viewers", "uptime");
+    }
+
+    @Override
     public Object invoke(UserAccount user, Object[] args) {
         Map<String, Object> result = new LinkedHashMap<>();
         twitchChatService.getStreamInfo(user).ifPresentOrElse(stream -> {
