@@ -3,11 +3,13 @@ package fr.enimaloc.catapult.chat.command.js;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
 import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
+import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
 import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,6 +49,33 @@ class JsCompilerTest {
     void compilesServiceCall() {
         String js = compiler.compile(parser.parse("{igdb#getGame(\"Valorant\")}"));
         assertThat(js).contains("__output += (ctx.call(\"igdb\", \"getGame\", \"Valorant\"));");
+    }
+
+    @Test
+    void collectServiceCallsFindsATopLevelCall() {
+        CommandAst ast = parser.parse("{twitch#shoutout(arg(0))}");
+        Set<ServiceCallExpr> calls = compiler.collectServiceCalls(ast);
+        assertThat(calls).extracting(ServiceCallExpr::namespace, ServiceCallExpr::function)
+            .containsExactly(org.assertj.core.groups.Tuple.tuple("twitch", "shoutout"));
+    }
+
+    @Test
+    void collectServiceCallsFindsCallsNestedInsideIfAndForEach() {
+        CommandAst ast = parser.parse(
+            "{if igdb#getGame(\"x\") == \"y\"}{twitch#sendMessage(\"hi\")}{/if}"
+            + "{for a in fallbacks}{twitch#ban(a, \"spam\")}{/for}");
+        Set<ServiceCallExpr> calls = compiler.collectServiceCalls(ast);
+        assertThat(calls).extracting(ServiceCallExpr::namespace, ServiceCallExpr::function)
+            .containsExactlyInAnyOrder(
+                org.assertj.core.groups.Tuple.tuple("igdb", "getGame"),
+                org.assertj.core.groups.Tuple.tuple("twitch", "sendMessage"),
+                org.assertj.core.groups.Tuple.tuple("twitch", "ban"));
+    }
+
+    @Test
+    void collectServiceCallsReturnsEmptySetWhenNoneReferenced() {
+        CommandAst ast = parser.parse("Now playing {game#name}!");
+        assertThat(compiler.collectServiceCalls(ast)).isEmpty();
     }
 
     @Test
