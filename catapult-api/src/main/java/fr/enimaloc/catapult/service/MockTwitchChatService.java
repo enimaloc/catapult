@@ -6,7 +6,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -57,6 +59,29 @@ public class MockTwitchChatService implements TwitchChatService {
     @Override
     public void unban(UserAccount user, String targetLogin) {
         log.info("[Mock Chat] unban() for {}: {}", user.getId(), targetLogin);
+    }
+
+    @Override
+    public Optional<TwitchStreamInfo> getStreamInfo(UserAccount user) {
+        log.info("[Mock Chat] getStreamInfo() for {}", user.getId());
+        return Optional.of(new TwitchStreamInfo("Mock Stream Title", "Just Chatting", 42, Instant.now()));
+    }
+
+    @Override
+    public Optional<TwitchUserProfile> getUserProfile(UserAccount user, String login) {
+        log.info("[Mock Chat] getUserProfile() for {}: {}", user.getId(), login);
+        return Optional.of(new TwitchUserProfile(login, Instant.EPOCH));
+    }
+
+    @Override
+    public Optional<Instant> getFollowedAt(UserAccount user, String targetLogin) {
+        log.info("[Mock Chat] getFollowedAt() for {}: {}", user.getId(), targetLogin);
+        return Optional.of(Instant.EPOCH);
+    }
+
+    @Override
+    public void shoutout(UserAccount user, String targetLogin) {
+        log.info("[Mock Chat] shoutout() for {}: {}", user.getId(), targetLogin);
     }
 
 }
