@@ -313,4 +313,48 @@ class DynamicChatCommandTest {
 
         assertThat(result).isEqualTo("[!list][!hello]");
     }
+
+    @Test
+    void forEachOverGameDlcsIteratesTheCurrentGamesDlcNames() {
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!dlcs");
+        definition.setEnabled(true);
+        definition.setTemplate("{for d in gameDlcs}[{d}]{/for}");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{for d in gameDlcs}[{d}]{/for}")));
+
+        GameContext ctx = mock(GameContext.class);
+        when(ctx.dlcNames()).thenReturn(List.of("Expansion 1", "Expansion 2"));
+        GameContextService gameContextService = mock(GameContextService.class);
+        when(gameContextService.get(null)).thenReturn(Optional.of(ctx));
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
+            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class),
+            mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
+
+        Object result = command.execute(null, List.of());
+
+        assertThat(result).isEqualTo("[Expansion 1][Expansion 2]");
+    }
+
+    @Test
+    void forEachOverSimilarGamesIsEmptyWhenNoIgdbData() {
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!similar");
+        definition.setEnabled(true);
+        definition.setTemplate("{for g in similarGames}[{g}]{/for}");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{for g in similarGames}[{g}]{/for}")));
+
+        GameContextService gameContextService = mock(GameContextService.class);
+        when(gameContextService.get(null)).thenReturn(Optional.empty());
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
+            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class),
+            mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
+
+        Object result = command.execute(null, List.of());
+
+        assertThat(result).isNull();
+    }
 }
