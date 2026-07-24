@@ -59,6 +59,33 @@
         </form>
     </details>
 
+    <details style="margin-top:1.25rem;">
+        <summary style="cursor:pointer; font-weight:600;" th:text="#{chat_commands.params.title}">Parameters</summary>
+        <p class="text-muted" th:text="#{chat_commands.params.intro}">Free-form key=value pairs...</p>
+        <table style="width:100%; border-collapse:collapse; max-width:600px;">
+            <tbody id="chatCommandParamsTbody"></tbody>
+        </table>
+        <form id="chatCommandParamsAddForm" style="display:flex; gap:.5rem; margin-top:.5rem; max-width:600px;">
+            <input id="chatCommandParamKeyInput" class="form-input" type="text" name="key"
+                   th:placeholder="#{chat_commands.params.key_placeholder}"
+                   pattern="^[A-Za-z_][A-Za-z0-9_]*$" required style="font-family:monospace;">
+            <input id="chatCommandParamValueInput" class="form-input" type="text" name="value"
+                   th:placeholder="#{chat_commands.params.value_placeholder}" required>
+            <button type="submit" class="btn btn-primary" th:text="#{chat_commands.params.add}">Add</button>
+        </form>
+    </details>
+
+    <template id="chatCommandParamRowTpl">
+        <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.35rem .5rem; font-family:monospace;"><span class="param-key-display"></span></td>
+            <td style="padding:.35rem .5rem;"><input type="text" class="form-input param-value-input"></td>
+            <td style="padding:.35rem .5rem; white-space:nowrap;">
+                <button type="button" class="btn param-save-btn" th:text="#{chat_commands.action.edit}">Save</button>
+                <button type="button" class="btn param-delete-btn" th:text="#{chat_commands.action.delete}">Delete</button>
+            </td>
+        </tr>
+    </template>
+
     <template id="chatCommandsRowTpl">
         <tr style="border-bottom:1px solid var(--border); vertical-align:top;">
             <td style="padding:.5rem .5rem; white-space:nowrap;">
@@ -216,6 +243,76 @@
             loadList();
         } else {
             document.addEventListener('ws:auth.ok', loadList, { once: true });
+        }
+
+        const PARAMS_I18N = {
+            deleteConfirm: /*[[#{chat_commands.params.delete_confirm(' ')}]]*/ 'Delete parameter  ?',
+            invalidKey: /*[[#{chat_commands.params.invalid_key}]]*/ 'Invalid key'
+        };
+
+        function buildParamRow(tpl, param) {
+            const node = tpl.cloneNode(true);
+            const row = node.querySelector('tr');
+            row.dataset.key = param.key;
+            row.querySelector('.param-key-display').textContent = param.key;
+            const valueInput = row.querySelector('.param-value-input');
+            valueInput.value = param.value;
+
+            row.querySelector('.param-save-btn').onclick = async () => {
+                try {
+                    await window.catapultWs.request('chat-commands.params.set', {
+                        key: param.key,
+                        value: valueInput.value
+                    });
+                    reportSuccess(param.key + ' enregistré');
+                } catch (err) { reportError(err); }
+            };
+
+            row.querySelector('.param-delete-btn').onclick = async () => {
+                if (!confirm(PARAMS_I18N.deleteConfirm.replace('  ', ' ' + param.key + ' '))) return;
+                try {
+                    await window.catapultWs.request('chat-commands.params.delete', { key: param.key });
+                    row.remove();
+                    reportSuccess(param.key + ' supprimé');
+                } catch (err) { reportError(err); }
+            };
+
+            return node;
+        }
+
+        async function loadParams() {
+            try {
+                const resp = await window.catapultWs.request('chat-commands.params.list', {});
+                const params = resp.result || [];
+                const tbody = document.getElementById('chatCommandParamsTbody');
+                const tpl = document.getElementById('chatCommandParamRowTpl').content;
+                tbody.replaceChildren();
+                for (const param of params) {
+                    tbody.appendChild(buildParamRow(tpl, param));
+                }
+            } catch (err) { reportError(err); }
+        }
+
+        document.getElementById('chatCommandParamsAddForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            const key = fd.get('key');
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+                reportError({ error: { code: 'INVALID_KEY', message: PARAMS_I18N.invalidKey } });
+                return;
+            }
+            try {
+                await window.catapultWs.request('chat-commands.params.set', { key: key, value: fd.get('value') });
+                e.target.reset();
+                await loadParams();
+                reportSuccess(key + ' ajouté');
+            } catch (err) { reportError(err); }
+        };
+
+        if (window.__wsCsrfToken) {
+            loadParams();
+        } else {
+            document.addEventListener('ws:auth.ok', loadParams, { once: true });
         }
     })();
     </script>
