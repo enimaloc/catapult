@@ -99,6 +99,22 @@ class ApiChatCommandParamsControllerTest {
     }
 
     @Test
+    void put_rejects_reserved_prototype_pollution_keys() throws Exception {
+        // JsCompiler rejects ctx.params.__proto__/.constructor/.prototype (prototype-pollution
+        // guard) — reject them here too so a command referencing such a key fails clearly at
+        // save time instead of compiling fine here and only failing later at dispatch time.
+        mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+
+        for (String reserved : new String[]{"__proto__", "constructor", "prototype"}) {
+            mvc.perform(withAdmin(put("/api/chat-command-params/{key}", reserved))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(Map.of("value", "x"))))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
     void delete_removes_the_param() throws Exception {
         UserAccount user = mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);

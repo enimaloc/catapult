@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -33,6 +34,11 @@ import java.util.regex.Pattern;
 public class ApiChatCommandParamsController {
 
     private static final Pattern VALID_KEY = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
+
+    // JsCompiler rejects these as ctx.params.<key> segments (prototype-pollution guard) — reject
+    // them here too, so a command referencing such a key fails at save time with a clear message
+    // instead of compiling fine here and only failing later when the command actually runs.
+    private static final Set<String> RESERVED_KEYS = Set.of("__proto__", "constructor", "prototype");
 
     private final ChatCommandParamRepository repository;
     private final UserAccountRepository userAccountRepository;
@@ -61,6 +67,9 @@ public class ApiChatCommandParamsController {
         if (!VALID_KEY.matcher(key).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Invalid key (must match ^[A-Za-z_][A-Za-z0-9_]*$): " + key);
+        }
+        if (RESERVED_KEYS.contains(key)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reserved key: " + key);
         }
         ChatCommandParam param = repository.findByUserAndKey(user, key).orElseGet(() -> {
             ChatCommandParam p = new ChatCommandParam();
