@@ -17,15 +17,17 @@ import java.util.UUID;
 
 /**
  * A free-form {@code key=value} pair a streamer defines for their own account, readable from
- * any of their chat commands as {@code ctx.params.<key>} (see {@code ParamGetExpr}). Global per
- * streamer, not scoped to one command — distinct from {@link ChatCommandFallback} (per-command)
- * and from {@link UserFlag} (an admin/experiment-targeting mechanism, not streamer-editable).
+ * any of their chat commands as {@code ctx.settings.<key>} (see {@code SettingGetExpr}). Global
+ * per streamer, not scoped to one command — distinct from {@link ChatCommandFallback}
+ * (per-command), from a chat command's own arguments (the words typed after the command name,
+ * e.g. {@code !test arg1 arg2}), and from {@link UserFlag} (an admin/experiment-targeting
+ * mechanism, not streamer-editable).
  */
 @Entity
-@Table(name = "chat_command_param", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "key"}))
+@Table(name = "chat_command_setting", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "key"}))
 @Getter
 @Setter
-public class ChatCommandParam {
+public class ChatCommandSetting {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

@@ -61,16 +61,16 @@ class NodeJsonCodecTest {
     }
 
     @Test
-    void roundTripsParamGetExpr() {
+    void roundTripsSettingGetExpr() {
         CommandAst ast = new CommandAst(List.of(
-            new AssignStatement("msg", new ParamGetExpr("language"))
+            new AssignStatement("msg", new SettingGetExpr("language"))
         ));
 
         String json = codec.toJson(ast);
         CommandAst restored = codec.fromJson(json);
 
         assertThat(restored).isEqualTo(ast);
-        assertThat(json).contains("\"param-get\"");
+        assertThat(json).contains("\"setting-get\"");
         assertThat(json).contains("\"language\"");
     }
 }

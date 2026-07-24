@@ -60,28 +60,28 @@
     </details>
 
     <details style="margin-top:1.25rem;">
-        <summary style="cursor:pointer; font-weight:600;" th:text="#{chat_commands.params.title}">Parameters</summary>
-        <p class="text-muted" th:text="#{chat_commands.params.intro}">Free-form key=value pairs...</p>
+        <summary style="cursor:pointer; font-weight:600;" th:text="#{chat_commands.settings.title}">Settings</summary>
+        <p class="text-muted" th:text="#{chat_commands.settings.intro}">Free-form key=value pairs...</p>
         <table style="width:100%; border-collapse:collapse; max-width:600px;">
-            <tbody id="chatCommandParamsTbody"></tbody>
+            <tbody id="chatCommandSettingsTbody"></tbody>
         </table>
-        <form id="chatCommandParamsAddForm" style="display:flex; gap:.5rem; margin-top:.5rem; max-width:600px;">
-            <input id="chatCommandParamKeyInput" class="form-input" type="text" name="key"
-                   th:placeholder="#{chat_commands.params.key_placeholder}"
+        <form id="chatCommandSettingsAddForm" style="display:flex; gap:.5rem; margin-top:.5rem; max-width:600px;">
+            <input id="chatCommandSettingKeyInput" class="form-input" type="text" name="key"
+                   th:placeholder="#{chat_commands.settings.key_placeholder}"
                    pattern="^[A-Za-z_][A-Za-z0-9_]*$" required style="font-family:monospace;">
-            <input id="chatCommandParamValueInput" class="form-input" type="text" name="value"
-                   th:placeholder="#{chat_commands.params.value_placeholder}" required>
-            <button type="submit" class="btn btn-primary" th:text="#{chat_commands.params.add}">Add</button>
+            <input id="chatCommandSettingValueInput" class="form-input" type="text" name="value"
+                   th:placeholder="#{chat_commands.settings.value_placeholder}" required>
+            <button type="submit" class="btn btn-primary" th:text="#{chat_commands.settings.add}">Add</button>
         </form>
     </details>
 
-    <template id="chatCommandParamRowTpl">
+    <template id="chatCommandSettingRowTpl">
         <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:.35rem .5rem; font-family:monospace;"><span class="param-key-display"></span></td>
-            <td style="padding:.35rem .5rem;"><input type="text" class="form-input param-value-input"></td>
+            <td style="padding:.35rem .5rem; font-family:monospace;"><span class="setting-key-display"></span></td>
+            <td style="padding:.35rem .5rem;"><input type="text" class="form-input setting-value-input"></td>
             <td style="padding:.35rem .5rem; white-space:nowrap;">
-                <button type="button" class="btn param-save-btn" th:text="#{chat_commands.action.edit}">Save</button>
-                <button type="button" class="btn param-delete-btn" th:text="#{chat_commands.action.delete}">Delete</button>
+                <button type="button" class="btn setting-save-btn" th:text="#{chat_commands.action.edit}">Save</button>
+                <button type="button" class="btn setting-delete-btn" th:text="#{chat_commands.action.delete}">Delete</button>
             </td>
         </tr>
     </template>
@@ -245,74 +245,74 @@
             document.addEventListener('ws:auth.ok', loadList, { once: true });
         }
 
-        const PARAMS_I18N = {
-            deleteConfirm: /*[[#{chat_commands.params.delete_confirm(' ')}]]*/ 'Delete parameter  ?',
-            invalidKey: /*[[#{chat_commands.params.invalid_key}]]*/ 'Invalid key'
+        const SETTINGS_I18N = {
+            deleteConfirm: /*[[#{chat_commands.settings.delete_confirm(' ')}]]*/ 'Delete setting  ?',
+            invalidKey: /*[[#{chat_commands.settings.invalid_key}]]*/ 'Invalid key'
         };
 
-        function buildParamRow(tpl, param) {
+        function buildSettingRow(tpl, setting) {
             const node = tpl.cloneNode(true);
             const row = node.querySelector('tr');
-            row.dataset.key = param.key;
-            row.querySelector('.param-key-display').textContent = param.key;
-            const valueInput = row.querySelector('.param-value-input');
-            valueInput.value = param.value;
+            row.dataset.key = setting.key;
+            row.querySelector('.setting-key-display').textContent = setting.key;
+            const valueInput = row.querySelector('.setting-value-input');
+            valueInput.value = setting.value;
 
-            row.querySelector('.param-save-btn').onclick = async () => {
+            row.querySelector('.setting-save-btn').onclick = async () => {
                 try {
-                    await window.catapultWs.request('chat-commands.params.set', {
-                        key: param.key,
+                    await window.catapultWs.request('chat-commands.settings.set', {
+                        key: setting.key,
                         value: valueInput.value
                     });
-                    reportSuccess(param.key + ' enregistré');
+                    reportSuccess(setting.key + ' enregistré');
                 } catch (err) { reportError(err); }
             };
 
-            row.querySelector('.param-delete-btn').onclick = async () => {
-                if (!confirm(PARAMS_I18N.deleteConfirm.replace('  ', ' ' + param.key + ' '))) return;
+            row.querySelector('.setting-delete-btn').onclick = async () => {
+                if (!confirm(SETTINGS_I18N.deleteConfirm.replace('  ', ' ' + setting.key + ' '))) return;
                 try {
-                    await window.catapultWs.request('chat-commands.params.delete', { key: param.key });
+                    await window.catapultWs.request('chat-commands.settings.delete', { key: setting.key });
                     row.remove();
-                    reportSuccess(param.key + ' supprimé');
+                    reportSuccess(setting.key + ' supprimé');
                 } catch (err) { reportError(err); }
             };
 
             return node;
         }
 
-        async function loadParams() {
+        async function loadSettings() {
             try {
-                const resp = await window.catapultWs.request('chat-commands.params.list', {});
-                const params = resp.result || [];
-                const tbody = document.getElementById('chatCommandParamsTbody');
-                const tpl = document.getElementById('chatCommandParamRowTpl').content;
+                const resp = await window.catapultWs.request('chat-commands.settings.list', {});
+                const settings = resp.result || [];
+                const tbody = document.getElementById('chatCommandSettingsTbody');
+                const tpl = document.getElementById('chatCommandSettingRowTpl').content;
                 tbody.replaceChildren();
-                for (const param of params) {
-                    tbody.appendChild(buildParamRow(tpl, param));
+                for (const setting of settings) {
+                    tbody.appendChild(buildSettingRow(tpl, setting));
                 }
             } catch (err) { reportError(err); }
         }
 
-        document.getElementById('chatCommandParamsAddForm').onsubmit = async (e) => {
+        document.getElementById('chatCommandSettingsAddForm').onsubmit = async (e) => {
             e.preventDefault();
             const fd = new FormData(e.target);
             const key = fd.get('key');
             if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-                reportError({ error: { code: 'INVALID_KEY', message: PARAMS_I18N.invalidKey } });
+                reportError({ error: { code: 'INVALID_KEY', message: SETTINGS_I18N.invalidKey } });
                 return;
             }
             try {
-                await window.catapultWs.request('chat-commands.params.set', { key: key, value: fd.get('value') });
+                await window.catapultWs.request('chat-commands.settings.set', { key: key, value: fd.get('value') });
                 e.target.reset();
-                await loadParams();
+                await loadSettings();
                 reportSuccess(key + ' ajouté');
             } catch (err) { reportError(err); }
         };
 
         if (window.__wsCsrfToken) {
-            loadParams();
+            loadSettings();
         } else {
-            document.addEventListener('ws:auth.ok', loadParams, { once: true });
+            document.addEventListener('ws:auth.ok', loadSettings, { once: true });
         }
     })();
     </script>

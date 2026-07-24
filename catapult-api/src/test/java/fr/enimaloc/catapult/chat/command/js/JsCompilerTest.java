@@ -191,34 +191,34 @@ class JsCompilerTest {
     }
 
     @Test
-    void compilesParamGetWithASetupLineLikeContextGet() {
-        String js = compiler.compile(parser.parse("{msg = ctx.params.language}"));
-        assertThat(js).contains("ctx.params = ctx.params || {};");
-        assertThat(js).contains("ctx.params.language = ctx.param(\"language\");");
-        assertThat(js).contains("msg = ctx.params.language;");
+    void compilesSettingGetWithASetupLineLikeContextGet() {
+        String js = compiler.compile(parser.parse("{msg = ctx.settings.language}"));
+        assertThat(js).contains("ctx.settings = ctx.settings || {};");
+        assertThat(js).contains("ctx.settings.language = ctx.setting(\"language\");");
+        assertThat(js).contains("msg = ctx.settings.language;");
     }
 
     @Test
-    void sharedParamKeyPrefixGetsOnlyOneSetupLine() {
+    void sharedSettingKeyPrefixGetsOnlyOneSetupLine() {
         String js = compiler.compile(parser.parse(
-            "{if ctx.params.language == \"fr\"}{print ctx.params.region}{/if}"));
-        assertThat(js).containsOnlyOnce("ctx.params = ctx.params || {};");
-        assertThat(js).contains("ctx.params.language = ctx.param(\"language\");");
-        assertThat(js).contains("ctx.params.region = ctx.param(\"region\");");
+            "{if ctx.settings.language == \"fr\"}{print ctx.settings.region}{/if}"));
+        assertThat(js).containsOnlyOnce("ctx.settings = ctx.settings || {};");
+        assertThat(js).contains("ctx.settings.language = ctx.setting(\"language\");");
+        assertThat(js).contains("ctx.settings.region = ctx.setting(\"region\");");
     }
 
     @Test
-    void paramKeyResolvesEndToEndInTheRealSandbox() {
-        String js = compiler.compile(parser.parse("Lang: {ctx.params.language}"));
+    void settingKeyResolvesEndToEndInTheRealSandbox() {
+        String js = compiler.compile(parser.parse("Lang: {ctx.settings.language}"));
         String result = new SandboxExecutor().execute(js, path -> null, name -> List.of(), null, null,
             key -> "language".equals(key) ? "fr" : null, java.time.Duration.ofSeconds(2));
         assertThat(result).isEqualTo("Lang: fr");
     }
 
     @Test
-    void rejectsProtoParamKeyAsAPrototypePollutionRisk() {
+    void rejectsProtoSettingKeyAsAPrototypePollutionRisk() {
         CommandAst ast = new CommandAst(List.of(
-            new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.ParamGetExpr("__proto__"))));
+            new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.SettingGetExpr("__proto__"))));
         assertThatThrownBy(() -> compiler.compile(ast))
             .isInstanceOf(JsCompilationException.class)
             .hasMessageContaining("__proto__");
