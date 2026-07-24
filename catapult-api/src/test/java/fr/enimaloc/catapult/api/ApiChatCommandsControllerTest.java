@@ -205,12 +205,12 @@ class ApiChatCommandsControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.template").value("Now playing {game#name}!"));
+                .andExpect(jsonPath("$.template").value("Now playing {ctx.game.name}!"));
 
         ArgumentCaptor<ChatCommandDefinition> captor = ArgumentCaptor.forClass(ChatCommandDefinition.class);
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getAst()).isEqualTo(astJson);
-        assertThat(captor.getValue().getTemplate()).isEqualTo("Now playing {game#name}!");
+        assertThat(captor.getValue().getTemplate()).isEqualTo("Now playing {ctx.game.name}!");
     }
 
     @Test
@@ -249,7 +249,7 @@ class ApiChatCommandsControllerTest {
         assertThat(captor.getValue().getEjectedJs()).isEqualTo("return \"hand-written\";");
         // Reversibility: the ast/template a Blocks/Text edit would restore stay untouched.
         assertThat(captor.getValue().getAst()).isEqualTo(astJson);
-        assertThat(captor.getValue().getTemplate()).isEqualTo("Now playing {game#name}!");
+        assertThat(captor.getValue().getTemplate()).isEqualTo("Now playing {ctx.game.name}!");
     }
 
     @Test
