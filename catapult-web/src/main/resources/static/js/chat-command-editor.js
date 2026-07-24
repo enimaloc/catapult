@@ -201,16 +201,22 @@
         static nodeType = 'arg-get';
         static category() { return 'Contexte'; }
         static definition() {
-            return { type: this.type, message0: 'arg %1',
-                args0: [{ type: 'field_number', name: 'INDEX', value: 0, min: 0, precision: 1 }],
+            return { type: this.type, message0: 'arg %1 défaut "%2"',
+                args0: [
+                    { type: 'field_number', name: 'INDEX', value: 0, min: 0, precision: 1 },
+                    { type: 'field_input', name: 'DEFAULT', text: '' }
+                ],
                 output: null, colour: 200 };
         }
         static toNode(block) {
-            return { type: 'arg-get', index: block.getFieldValue('INDEX') };
+            const defaultValue = block.getFieldValue('DEFAULT');
+            return { type: 'arg-get', index: block.getFieldValue('INDEX'),
+                defaultValue: defaultValue === '' ? null : defaultValue };
         }
         static fromNode(ws, node) {
             const block = ws.newBlock(this.type);
             block.setFieldValue(node.index, 'INDEX');
+            block.setFieldValue(node.defaultValue || '', 'DEFAULT');
             return block;
         }
     }
@@ -509,7 +515,14 @@
         }
         category() { return namespaceCategory(this.fn.namespace); }
         definition() {
-            const argRefs = this.fn.parameterNames.map((name, i) => name + ': %' + (i + 1)).join(', ');
+            // "?" suffix marks a parameter the streamer can safely leave unconnected — it still
+            // compiles to a "" literal like any empty slot, but the label makes clear that's
+            // fine here (see ServiceFunction#optionalParameterNames) instead of looking like a
+            // half-filled-in block.
+            const optional = new Set(this.fn.optionalParameterNames || []);
+            const argRefs = this.fn.parameterNames
+                .map((name, i) => (optional.has(name) ? name + '?' : name) + ': %' + (i + 1))
+                .join(', ');
             return {
                 type: this.type,
                 message0: this.fn.namespace + '.' + this.fn.name + '(' + argRefs + ')',
