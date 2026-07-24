@@ -88,6 +88,7 @@ public class DynamicChatCommand implements ChatCommand {
                 name -> resolveList(name, fallbacks),
                 serviceFunctionRegistry,
                 user,
+                null,
                 EXECUTION_TIMEOUT);
             return output.isBlank() ? null : output;
         } catch (SandboxExecutionException e) {

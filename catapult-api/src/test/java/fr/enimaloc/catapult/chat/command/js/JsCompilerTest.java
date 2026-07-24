@@ -189,4 +189,38 @@ class JsCompilerTest {
 
         assertThat(result).isEqualTo("Valorant - free");
     }
+
+    @Test
+    void compilesParamGetWithASetupLineLikeContextGet() {
+        String js = compiler.compile(parser.parse("{msg = ctx.params.language}"));
+        assertThat(js).contains("ctx.params = ctx.params || {};");
+        assertThat(js).contains("ctx.params.language = ctx.param(\"language\");");
+        assertThat(js).contains("msg = ctx.params.language;");
+    }
+
+    @Test
+    void sharedParamKeyPrefixGetsOnlyOneSetupLine() {
+        String js = compiler.compile(parser.parse(
+            "{if ctx.params.language == \"fr\"}{print ctx.params.region}{/if}"));
+        assertThat(js).containsOnlyOnce("ctx.params = ctx.params || {};");
+        assertThat(js).contains("ctx.params.language = ctx.param(\"language\");");
+        assertThat(js).contains("ctx.params.region = ctx.param(\"region\");");
+    }
+
+    @Test
+    void paramKeyResolvesEndToEndInTheRealSandbox() {
+        String js = compiler.compile(parser.parse("Lang: {ctx.params.language}"));
+        String result = new SandboxExecutor().execute(js, path -> null, name -> List.of(), null, null,
+            key -> "language".equals(key) ? "fr" : null, java.time.Duration.ofSeconds(2));
+        assertThat(result).isEqualTo("Lang: fr");
+    }
+
+    @Test
+    void rejectsProtoParamKeyAsAPrototypePollutionRisk() {
+        CommandAst ast = new CommandAst(List.of(
+            new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.ParamGetExpr("__proto__"))));
+        assertThatThrownBy(() -> compiler.compile(ast))
+            .isInstanceOf(JsCompilationException.class)
+            .hasMessageContaining("__proto__");
+    }
 }
