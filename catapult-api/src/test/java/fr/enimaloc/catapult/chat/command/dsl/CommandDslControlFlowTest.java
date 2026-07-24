@@ -55,8 +55,13 @@ class CommandDslControlFlowTest {
 
     @Test
     void ifElseRoundTrips() {
+        // "#"-style condition operands parse fine, but the generator's canonical output for a
+        // ContextGetExpr is now the "ctx.a.b" dot-chain, so the AST (not the literal text) is
+        // what round-trips here — same pattern as designSpecExampleProgramRoundTrips.
         String source = "{if game#name == \"Valorant\"}yes{else}no{/if}";
-        assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+        CommandAst ast = parser.parse(source);
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
+        assertThat(generator.generate(ast)).isEqualTo("{if ctx.game.name == \"Valorant\"}yes{else}no{/if}");
     }
 
     @Test
@@ -68,7 +73,9 @@ class CommandDslControlFlowTest {
     @Test
     void ifWithoutElseRoundTrips() {
         String source = "{if game#agerating == \"18\"}yes{/if}";
-        assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+        CommandAst ast = parser.parse(source);
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
+        assertThat(generator.generate(ast)).isEqualTo("{if ctx.game.agerating == \"18\"}yes{/if}");
     }
 
     @Test
