@@ -5,8 +5,11 @@ import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.IgdbGameDetails;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.IgdbService;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,8 @@ class ApiChatCommandDslControllerTest {
     @MockitoBean IgdbService igdbService;
     @MockitoBean IgdbGameDetailsService igdbGameDetailsService;
     @MockitoBean PlaceholderResolver placeholderResolver;
+    @MockitoBean ChatCommandSettingRepository settingRepository;
+    @MockitoBean UserAccountRepository userAccountRepository;
     final ObjectMapper om = new ObjectMapper();
 
     private static ServiceFunction fn(String namespace, String name, List<String> parameterNames) {
@@ -72,6 +77,30 @@ class ApiChatCommandDslControllerTest {
                 .andExpect(jsonPath("$.serviceFunctions[0].parameterNames[0]").value("query"))
                 .andExpect(jsonPath("$.serviceFunctions[1].namespace").value("twitch"))
                 .andExpect(jsonPath("$.serviceFunctions[1].parameterNames").isEmpty());
+    }
+
+    @Test
+    void catalogReturnsTheCallersOwnSettingKeysSorted() throws Exception {
+        UserAccount user = new UserAccount();
+        when(userAccountRepository.findByTwitchId("99")).thenReturn(Optional.of(user));
+        ChatCommandSetting region = new ChatCommandSetting();
+        region.setKey("region");
+        ChatCommandSetting language = new ChatCommandSetting();
+        language.setKey("language");
+        when(settingRepository.findByUser(user)).thenReturn(List.of(region, language));
+
+        mvc.perform(get("/api/chat-commands/dsl/catalog")
+                        .with(jwt().jwt(j -> j.claim("twitchId", "99"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.settingKeys[0]").value("language"))
+                .andExpect(jsonPath("$.settingKeys[1]").value("region"));
+    }
+
+    @Test
+    void catalogReturnsEmptySettingKeysWhenTheJwtDoesNotMatchAnAccount() throws Exception {
+        mvc.perform(get("/api/chat-commands/dsl/catalog").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.settingKeys").isEmpty());
     }
 
     @Test
