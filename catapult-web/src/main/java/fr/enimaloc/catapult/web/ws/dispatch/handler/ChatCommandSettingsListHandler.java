@@ -9,22 +9,22 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
-/** Lists the current streamer's chat-command params. No body required. */
+/** Lists the current streamer's chat-command settings. No body required. */
 @Component
-public class ChatCommandParamsListHandler implements RequestHandler {
+public class ChatCommandSettingsListHandler implements RequestHandler {
 
-    private static final ParameterizedTypeReference<List<Map<String, Object>>> PARAMS_TYPE =
+    private static final ParameterizedTypeReference<List<Map<String, Object>>> SETTINGS_TYPE =
         new ParameterizedTypeReference<>() {};
 
     private final ApiClient apiClient;
 
-    public ChatCommandParamsListHandler(ApiClient apiClient) {
+    public ChatCommandSettingsListHandler(ApiClient apiClient) {
         this.apiClient = apiClient;
     }
 
     @Override
     public String action() {
-        return "chat-commands.params.list";
+        return "chat-commands.settings.list";
     }
 
     @Override
@@ -39,6 +39,6 @@ public class ChatCommandParamsListHandler implements RequestHandler {
 
     @Override
     public Object handle(WsSession session, Object rawParams) {
-        return apiClient.get("/api/chat-command-params", PARAMS_TYPE);
+        return apiClient.get("/api/chat-command-settings", SETTINGS_TYPE);
     }
 }

@@ -10,21 +10,21 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.util.Map;
 
-/** Upserts one param. Body: {@code {key, value}}. */
+/** Upserts one setting. Body: {@code {key, value}}. */
 @Component
-public class ChatCommandParamsSetHandler implements RequestHandler {
+public class ChatCommandSettingsSetHandler implements RequestHandler {
 
     private final ApiClient apiClient;
     private final ObjectMapper mapper;
 
-    public ChatCommandParamsSetHandler(ApiClient apiClient) {
+    public ChatCommandSettingsSetHandler(ApiClient apiClient) {
         this.apiClient = apiClient;
         this.mapper = JsonMapper.builder().build();
     }
 
     @Override
     public String action() {
-        return "chat-commands.params.set";
+        return "chat-commands.settings.set";
     }
 
     @Override
@@ -49,7 +49,7 @@ public class ChatCommandParamsSetHandler implements RequestHandler {
         if (!(key instanceof String) || value == null) {
             throw new WsBusinessException("INVALID_PARAMS", "key and value are required");
         }
-        boolean ok = apiClient.put("/api/chat-command-params/{key}", Map.of("value", value), key);
+        boolean ok = apiClient.put("/api/chat-command-settings/{key}", Map.of("value", value), key);
         if (!ok) {
             throw new WsBusinessException("UPSTREAM_UNAVAILABLE",
                 "Save failed (check catapult-api logs — key must match ^[A-Za-z_][A-Za-z0-9_]*$)");

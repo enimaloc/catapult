@@ -8,10 +8,10 @@ import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
-import fr.enimaloc.catapult.domain.ChatCommandParam;
+import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
-import fr.enimaloc.catapult.repository.ChatCommandParamRepository;
+import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +56,7 @@ public class ApiChatCommandTestController {
     private final JsCompiler jsCompiler;
     private final SandboxExecutor sandboxExecutor;
     private final ServiceFunctionRegistry serviceFunctionRegistry;
-    private final ChatCommandParamRepository paramRepository;
+    private final ChatCommandSettingRepository settingRepository;
 
     @PostMapping("/api/chat-commands/{id}/test")
     public Map<String, Object> test(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
@@ -70,16 +70,16 @@ public class ApiChatCommandTestController {
         @SuppressWarnings("unchecked")
         Map<String, String> overrides = (Map<String, String>) body.getOrDefault("overrides", Map.of());
         @SuppressWarnings("unchecked")
-        Map<String, String> paramOverrides = (Map<String, String>) body.getOrDefault("params", Map.of());
+        Map<String, String> settingOverrides = (Map<String, String>) body.getOrDefault("settings", Map.of());
 
         // Unlike context placeholders (game#name etc.), which have no real value at all outside
-        // a live stream and so always need a manual test override, params are real persisted
+        // a live stream and so always need a manual test override, settings are real persisted
         // per-streamer settings — the Tester should reflect what's actually saved by default,
-        // with the "params" request field only overriding specific keys for one-off "what if"
+        // with the "settings" request field only overriding specific keys for one-off "what if"
         // testing (mirrors DynamicChatCommand#execute's real resolution, plus that override layer).
-        Map<String, String> params = new HashMap<>(paramRepository.findByUser(user).stream()
-            .collect(Collectors.toMap(ChatCommandParam::getKey, ChatCommandParam::getValue)));
-        params.putAll(paramOverrides);
+        Map<String, String> settings = new HashMap<>(settingRepository.findByUser(user).stream()
+            .collect(Collectors.toMap(ChatCommandSetting::getKey, ChatCommandSetting::getValue)));
+        settings.putAll(settingOverrides);
 
         String js = resolveJs(body, definition);
 
@@ -89,7 +89,7 @@ public class ApiChatCommandTestController {
         ExecutionTrace trace = sandboxExecutor.executeWithTrace(js,
             path -> overrides.getOrDefault(path, ""),
             name -> "fallbacks".equals(name) ? List.copyOf(overrides.values()) : List.of(),
-            serviceFunctionRegistry, user, key -> params.getOrDefault(key, ""), TEST_TIMEOUT);
+            serviceFunctionRegistry, user, key -> settings.getOrDefault(key, ""), TEST_TIMEOUT);
 
         return Map.of(
             "output", trace.finalOutput(),

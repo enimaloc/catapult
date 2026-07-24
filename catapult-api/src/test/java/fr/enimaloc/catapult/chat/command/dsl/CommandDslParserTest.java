@@ -259,30 +259,30 @@ class CommandDslParserTest {
     }
 
     @Test
-    void ctxParamsDotChainParsesToParamGetExpr() {
-        CommandAst ast = parser.parse("{msg = ctx.params.language}");
+    void ctxSettingsDotChainParsesToSettingGetExpr() {
+        CommandAst ast = parser.parse("{msg = ctx.settings.language}");
         assertThat(ast.statements()).containsExactly(
-            new AssignStatement("msg", new fr.enimaloc.catapult.chat.command.ast.ParamGetExpr("language")));
+            new AssignStatement("msg", new fr.enimaloc.catapult.chat.command.ast.SettingGetExpr("language")));
     }
 
     @Test
-    void ctxParamsAloneWithoutAKeyThrows() {
-        assertThatThrownBy(() -> parser.parse("{msg = ctx.params}"))
+    void ctxSettingsAloneWithoutAKeyThrows() {
+        assertThatThrownBy(() -> parser.parse("{msg = ctx.settings}"))
             .isInstanceOf(CommandDslParseException.class);
     }
 
     @Test
-    void ctxParamsWithTooManySegmentsThrows() {
-        assertThatThrownBy(() -> parser.parse("{msg = ctx.params.a.b}"))
+    void ctxSettingsWithTooManySegmentsThrows() {
+        assertThatThrownBy(() -> parser.parse("{msg = ctx.settings.a.b}"))
             .isInstanceOf(CommandDslParseException.class);
     }
 
     @Test
-    void ctxParamsWorksAsABareTagShorthand() {
-        CommandAst ast = parser.parse("Language: {ctx.params.language}!");
+    void ctxSettingsWorksAsABareTagShorthand() {
+        CommandAst ast = parser.parse("Language: {ctx.settings.language}!");
         assertThat(ast.statements()).containsExactly(
             new PrintStatement(new LiteralExpr("Language: ", ValueType.STRING)),
-            new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.ParamGetExpr("language")),
+            new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.SettingGetExpr("language")),
             new PrintStatement(new LiteralExpr("!", ValueType.STRING)));
     }
 }
