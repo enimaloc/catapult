@@ -1,22 +1,23 @@
 package fr.enimaloc.catapult.chat.command.registry.twitch;
 
-import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
+import fr.enimaloc.catapult.chat.command.registry.DtoMapper;
 import fr.enimaloc.catapult.chat.command.registry.DurationFormatter;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.TwitchChatService;
-import fr.enimaloc.catapult.service.TwitchStreamInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
 public class TwitchGetStreamFunction implements ServiceFunction {
+
+    /** All-{@code ""} fields when offline — same convention as every other missing-data case. */
+    public record Result(String title, String category, String viewers, String uptime) {}
 
     private final TwitchChatService twitchChatService;
 
@@ -37,24 +38,16 @@ public class TwitchGetStreamFunction implements ServiceFunction {
 
     @Override
     public List<String> returnKeys() {
-        return List.of("title", "category", "viewers", "uptime");
+        return DtoMapper.keys(Result.class);
     }
 
     @Override
     public Object invoke(UserAccount user, Object[] args) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        twitchChatService.getStreamInfo(user).ifPresentOrElse(stream -> {
-            result.put("title", stream.title());
-            result.put("category", stream.category());
-            result.put("viewers", stream.viewers());
-            result.put("uptime", formatUptime(stream.startedAt()));
-        }, () -> {
-            result.put("title", "");
-            result.put("category", "");
-            result.put("viewers", "");
-            result.put("uptime", "");
-        });
-        return result;
+        Result result = twitchChatService.getStreamInfo(user)
+            .map(stream -> new Result(stream.title(), stream.category(),
+                String.valueOf(stream.viewers()), formatUptime(stream.startedAt())))
+            .orElse(new Result("", "", "", ""));
+        return DtoMapper.toMap(result);
     }
 
     private static String formatUptime(Instant startedAt) {
