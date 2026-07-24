@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.chat.command.js;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
 import fr.enimaloc.catapult.chat.command.trace.TraceEntry;
+import fr.enimaloc.catapult.domain.UserAccount;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -73,7 +74,7 @@ public class SandboxExecutor {
     }
 
     public String execute(String compiledJs, PlaceholderContext placeholders, ListContext lists, Duration timeout) {
-        return execute(compiledJs, placeholders, lists, null, timeout);
+        return execute(compiledJs, placeholders, lists, null, null, timeout);
     }
 
     /**
@@ -81,22 +82,20 @@ public class SandboxExecutor {
      * but also binds {@code ctx.call(namespace, function, ...args)} to the
      * given registry's whitelisted service functions. A {@code null} registry
      * is accepted for callers that don't need service calls; {@code ctx.call}
-     * then fails loudly only if the script actually invokes it.
+     * then fails loudly only if the script actually invokes it. {@code user} is
+     * the invoking streamer, passed straight through to {@link ServiceFunction#invoke} —
+     * {@code null} is accepted the same way a null registry is, for callers that don't
+     * have one.
      */
     public String execute(String compiledJs, PlaceholderContext placeholders, ListContext lists,
-                           ServiceFunctionRegistry registry, Duration timeout) {
+                           ServiceFunctionRegistry registry, UserAccount user, Duration timeout) {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Context context = buildContext();
         try {
-            Future<String> future = executor.submit(() -> runInContext(context, compiledJs, placeholders, lists, registry));
+            Future<String> future = executor.submit(() -> runInContext(context, compiledJs, placeholders, lists, registry, user));
             try {
                 return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
             } catch (TimeoutException e) {
-                // Force-cancel the guest execution so the worker thread actually
-                // unwinds instead of spinning forever in the background. Cleanup
-                // failures here must not mask the timeout as some other kind of
-                // exception, so they're swallowed the same way closeQuietly does
-                // for the normal-path cleanup below.
                 closeQuietly(context);
                 awaitWorkerTermination(future);
                 throw new SandboxExecutionException("Command execution timed out after " + timeout, e);
@@ -114,20 +113,20 @@ public class SandboxExecutor {
     }
 
     /**
-     * Same as {@link #execute(String, PlaceholderContext, ListContext, ServiceFunctionRegistry, Duration)}
+     * Same as {@link #execute(String, PlaceholderContext, ListContext, ServiceFunctionRegistry, UserAccount, Duration)}
      * but also records a step-by-step {@link ExecutionTrace} of every placeholder resolution,
      * list iteration and service call made during the run — used by the command editor's
      * "Tester" button so authors can see why a command produced (or failed to produce) a
      * given output.
      */
     public ExecutionTrace executeWithTrace(String compiledJs, PlaceholderContext placeholders, ListContext lists,
-                                            ServiceFunctionRegistry registry, Duration timeout) {
+                                            ServiceFunctionRegistry registry, UserAccount user, Duration timeout) {
         ExecutionTrace trace = new ExecutionTrace();
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Context context = buildContext();
         try {
             Future<String> future = executor.submit(() ->
-                runInContextWithTrace(context, compiledJs, placeholders, lists, registry, trace));
+                runInContextWithTrace(context, compiledJs, placeholders, lists, registry, user, trace));
             try {
                 String output = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
                 trace.finish(output);
@@ -180,7 +179,7 @@ public class SandboxExecutor {
     }
 
     private String runInContext(Context context, String compiledJs, PlaceholderContext placeholders, ListContext lists,
-                                 ServiceFunctionRegistry registry) {
+                                 ServiceFunctionRegistry registry, UserAccount user) {
         try {
             Value bindings = context.getBindings("js");
             Value ctx = context.eval("js", "({})");
@@ -205,7 +204,7 @@ public class SandboxExecutor {
                     return registry.lookup(namespace, function)
                         .orElseThrow(() -> new IllegalArgumentException(
                             "Unknown service function " + namespace + "#" + function))
-                        .invoke(callArgs);
+                        .invoke(user, callArgs);
                 } catch (RuntimeException e) {
                     throw e;
                 } catch (Exception e) {
@@ -223,7 +222,7 @@ public class SandboxExecutor {
     }
 
     private String runInContextWithTrace(Context context, String compiledJs, PlaceholderContext placeholders,
-                                          ListContext lists, ServiceFunctionRegistry registry,
+                                          ListContext lists, ServiceFunctionRegistry registry, UserAccount user,
                                           ExecutionTrace trace) {
         try {
             Value bindings = context.getBindings("js");
@@ -257,7 +256,7 @@ public class SandboxExecutor {
                     Object value = registry.lookup(namespace, function)
                         .orElseThrow(() -> new IllegalArgumentException(
                             "Unknown service function " + namespace + "#" + function))
-                        .invoke(callArgs);
+                        .invoke(user, callArgs);
                     trace.record(new TraceEntry("service-call", namespace + "#" + function,
                         String.valueOf(value), false));
                     return value;

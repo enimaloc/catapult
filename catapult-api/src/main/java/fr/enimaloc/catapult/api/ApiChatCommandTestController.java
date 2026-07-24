@@ -73,7 +73,7 @@ public class ApiChatCommandTestController {
         ExecutionTrace trace = sandboxExecutor.executeWithTrace(js,
             path -> overrides.getOrDefault(path, ""),
             name -> "fallbacks".equals(name) ? List.copyOf(overrides.values()) : List.of(),
-            serviceFunctionRegistry, TEST_TIMEOUT);
+            serviceFunctionRegistry, user, TEST_TIMEOUT);
 
         return Map.of(
             "output", trace.finalOutput(),
