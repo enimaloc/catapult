@@ -8,7 +8,9 @@ import fr.enimaloc.catapult.chat.command.js.SandboxExecutionException;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
+import fr.enimaloc.catapult.domain.ChatCommandParam;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.ChatCommandParamRepository;
 import fr.enimaloc.catapult.service.GameContextService;
 import lombok.extern.slf4j.Slf4j;
 
@@ -45,11 +47,12 @@ public class DynamicChatCommand implements ChatCommand {
     private final GameContextService gameContextService;
     private final PlaceholderResolver placeholderResolver;
     private final Locale streamerLocale;
+    private final ChatCommandParamRepository paramRepository;
 
     public DynamicChatCommand(ChatCommandDefinition definition, JsCompiler jsCompiler,
                                SandboxExecutor sandboxExecutor, ServiceFunctionRegistry serviceFunctionRegistry,
                                GameContextService gameContextService, PlaceholderResolver placeholderResolver,
-                               Locale streamerLocale) {
+                               Locale streamerLocale, ChatCommandParamRepository paramRepository) {
         this.definition = definition;
         this.jsCompiler = jsCompiler;
         this.sandboxExecutor = sandboxExecutor;
@@ -57,6 +60,7 @@ public class DynamicChatCommand implements ChatCommand {
         this.gameContextService = gameContextService;
         this.placeholderResolver = placeholderResolver;
         this.streamerLocale = streamerLocale;
+        this.paramRepository = paramRepository;
     }
 
     @Override
@@ -76,6 +80,8 @@ public class DynamicChatCommand implements ChatCommand {
         GameContext ctx = gameContextService.get(user).orElse(GameContext.empty());
         Map<String, String> fallbacks = definition.getFallbacks().stream()
             .collect(Collectors.toMap(fb -> fb.getPlaceholder(), fb -> fb.getFallbackText()));
+        Map<String, String> params = (user == null ? List.<ChatCommandParam>of() : paramRepository.findByUser(user)).stream()
+            .collect(Collectors.toMap(ChatCommandParam::getKey, ChatCommandParam::getValue));
 
         // "Eject to JS" (Phase 2): a non-null ejectedJs runs directly, bypassing the AST
         // compiler entirely — same sandbox, same ctx API, just a different JS source.
@@ -88,7 +94,7 @@ public class DynamicChatCommand implements ChatCommand {
                 name -> resolveList(name, fallbacks),
                 serviceFunctionRegistry,
                 user,
-                null,
+                key -> params.getOrDefault(key, ""),
                 EXECUTION_TIMEOUT);
             return output.isBlank() ? null : output;
         } catch (SandboxExecutionException e) {
