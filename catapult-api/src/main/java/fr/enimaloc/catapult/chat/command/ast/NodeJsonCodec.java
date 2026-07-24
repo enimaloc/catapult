@@ -145,6 +145,7 @@ public class NodeJsonCodec {
                 map.put("target", expressionToMap(e.target()));
                 map.put("property", e.property());
             }
+            case ParamGetExpr e -> map.put("key", e.key());
             default -> throw new IllegalArgumentException("Unhandled expression type: " + expression.typeName());
         }
         return map;
@@ -175,6 +176,7 @@ public class NodeJsonCodec {
             case "property-get" -> new PropertyGetExpr(
                 expressionFromMap((Map<String, Object>) map.get("target")),
                 (String) map.get("property"));
+            case "param-get" -> new ParamGetExpr((String) map.get("key"));
             default -> throw new IllegalArgumentException("Unknown expression type: " + type);
         };
     }

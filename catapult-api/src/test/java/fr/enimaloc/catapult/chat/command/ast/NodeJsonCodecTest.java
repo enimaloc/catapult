@@ -59,4 +59,18 @@ class NodeJsonCodecTest {
         assertThat(json).contains("\"object-literal\"");
         assertThat(json).contains("\"property-get\"");
     }
+
+    @Test
+    void roundTripsParamGetExpr() {
+        CommandAst ast = new CommandAst(List.of(
+            new AssignStatement("msg", new ParamGetExpr("language"))
+        ));
+
+        String json = codec.toJson(ast);
+        CommandAst restored = codec.fromJson(json);
+
+        assertThat(restored).isEqualTo(ast);
+        assertThat(json).contains("\"param-get\"");
+        assertThat(json).contains("\"language\"");
+    }
 }
