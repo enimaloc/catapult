@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.chat.command.dsl;
 
+import fr.enimaloc.catapult.chat.command.ast.ArgGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.AssignStatement;
 import fr.enimaloc.catapult.chat.command.ast.BinaryExpr;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
@@ -105,6 +106,7 @@ public class CommandDslGenerator {
             case VarRefExpr e -> e.name();
             case ContextGetExpr e -> "ctx." + e.path().replace('#', '.');
             case SettingGetExpr e -> "ctx.settings." + e.key();
+            case ArgGetExpr e -> "arg(" + e.index() + ")";
             case ServiceCallExpr e -> e.namespace() + "#" + e.function() + "(" + generateArgs(e.args()) + ")";
             case BinaryExpr e -> generateExpr(e.left()) + " " + e.operator() + " " + generateExpr(e.right());
             case ObjectLiteralExpr e -> generateObjectLiteral(e);
