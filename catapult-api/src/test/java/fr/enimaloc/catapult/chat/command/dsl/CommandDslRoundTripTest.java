@@ -157,4 +157,10 @@ class CommandDslRoundTripTest {
         String source = "{msg = arg(0)}";
         assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
     }
+
+    @Test
+    void argGetWithDefaultRoundTrips() {
+        String source = "{msg = arg(0, \"everyone\")}";
+        assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+    }
 }

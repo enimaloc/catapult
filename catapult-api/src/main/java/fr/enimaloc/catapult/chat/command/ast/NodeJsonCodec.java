@@ -146,7 +146,10 @@ public class NodeJsonCodec {
                 map.put("property", e.property());
             }
             case SettingGetExpr e -> map.put("key", e.key());
-            case ArgGetExpr e -> map.put("index", e.index());
+            case ArgGetExpr e -> {
+                map.put("index", e.index());
+                if (e.defaultValue() != null) map.put("defaultValue", e.defaultValue());
+            }
             default -> throw new IllegalArgumentException("Unhandled expression type: " + expression.typeName());
         }
         return map;
@@ -178,7 +181,7 @@ public class NodeJsonCodec {
                 expressionFromMap((Map<String, Object>) map.get("target")),
                 (String) map.get("property"));
             case "setting-get" -> new SettingGetExpr((String) map.get("key"));
-            case "arg-get" -> new ArgGetExpr(((Number) map.get("index")).intValue());
+            case "arg-get" -> new ArgGetExpr(((Number) map.get("index")).intValue(), (String) map.get("defaultValue"));
             default -> throw new IllegalArgumentException("Unknown expression type: " + type);
         };
     }

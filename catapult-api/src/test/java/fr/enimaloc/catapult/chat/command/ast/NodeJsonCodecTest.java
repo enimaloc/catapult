@@ -77,7 +77,7 @@ class NodeJsonCodecTest {
     @Test
     void roundTripsArgGetExpr() {
         CommandAst ast = new CommandAst(List.of(
-            new AssignStatement("msg", new ArgGetExpr(0))
+            new AssignStatement("msg", new ArgGetExpr(0, null))
         ));
 
         String json = codec.toJson(ast);
@@ -86,5 +86,18 @@ class NodeJsonCodecTest {
         assertThat(restored).isEqualTo(ast);
         assertThat(json).contains("\"arg-get\"");
         assertThat(json).contains("\"index\":0");
+    }
+
+    @Test
+    void roundTripsArgGetExprWithDefaultValue() {
+        CommandAst ast = new CommandAst(List.of(
+            new AssignStatement("msg", new ArgGetExpr(0, "everyone"))
+        ));
+
+        String json = codec.toJson(ast);
+        CommandAst restored = codec.fromJson(json);
+
+        assertThat(restored).isEqualTo(ast);
+        assertThat(json).contains("\"defaultValue\":\"everyone\"");
     }
 }
