@@ -203,7 +203,8 @@ public class IgdbClient {
      */
     public Optional<Game> fetchGameDetails(String igdbId, String token) {
         return apiObservations.observe("igdb", "fetch_game_details", () -> {
-            String fields = "id,name,slug,summary,first_release_date,websites.url,websites.category,external_games.uid,external_games.external_game_source";
+            String fields = "id,name,slug,summary,first_release_date,websites.url,websites.category,external_games.uid,external_games.external_game_source"
+                + ",rating,aggregated_rating,platforms.name,dlcs.name,similar_games.name";
             APICalypse query = new APICalypse().fields(fields).where("id = " + Long.parseLong(igdbId)).limit(1);
             log.debug("[IGDB] /games details id={} — query: {}", igdbId, query.buildQuery());
             try {
