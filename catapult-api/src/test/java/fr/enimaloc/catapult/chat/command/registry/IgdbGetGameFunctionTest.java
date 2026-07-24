@@ -20,7 +20,7 @@ class IgdbGetGameFunctionTest {
         assertThat(fn.namespace()).isEqualTo("igdb");
         assertThat(fn.name()).isEqualTo("getGame");
         assertThat(fn.parameterNames()).containsExactly("query");
-        assertThat(fn.invoke(new Object[]{"Valorant"})).isEqualTo("VALORANT");
+        assertThat(fn.invoke(null, new Object[]{"Valorant"})).isEqualTo("VALORANT");
     }
 
     @Test
@@ -29,6 +29,6 @@ class IgdbGetGameFunctionTest {
         when(gateway.igdbGameName("Unknown")).thenReturn(Optional.empty());
 
         IgdbGetGameFunction fn = new IgdbGetGameFunction(gateway);
-        assertThat(fn.invoke(new Object[]{"Unknown"})).isNull();
+        assertThat(fn.invoke(null, new Object[]{"Unknown"})).isNull();
     }
 }

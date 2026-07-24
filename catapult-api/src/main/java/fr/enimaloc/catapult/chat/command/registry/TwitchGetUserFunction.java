@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.chat.command.registry;
 
 import fr.enimaloc.catapult.chat.command.js.ChatCommandServiceGateway;
+import fr.enimaloc.catapult.domain.UserAccount;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -28,9 +29,7 @@ public class TwitchGetUserFunction implements ServiceFunction {
     }
 
     @Override
-    public Object invoke(Object[] args) {
-        // The invoking UserAccount is bound per-execution by SandboxExecutor
-        // (see Task 6) via a ThreadLocal-free context parameter, not stored here.
-        throw new UnsupportedOperationException("bound per-call by SandboxExecutor#bindContextFunctions");
+    public Object invoke(UserAccount user, Object[] args) {
+        return gateway.twitchOwnDisplayName(user).orElse(null);
     }
 }

@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.chat.command.registry;
 
 import fr.enimaloc.catapult.chat.command.js.ChatCommandServiceGateway;
+import fr.enimaloc.catapult.domain.UserAccount;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -28,7 +29,7 @@ public class IgdbGetGameFunction implements ServiceFunction {
     }
 
     @Override
-    public Object invoke(Object[] args) {
+    public Object invoke(UserAccount user, Object[] args) {
         return gateway.igdbGameName(String.valueOf(args[0])).orElse(null);
     }
 }
