@@ -77,7 +77,8 @@ public class DynamicCommandResolver {
                 }
                 return (ChatCommand) new DynamicChatCommand(
                     def, jsCompiler, sandboxExecutor, serviceFunctionRegistry,
-                    gameContextService, placeholderResolver, resolveLocale(user), settingRepository);
+                    gameContextService, placeholderResolver, resolveLocale(user), settingRepository,
+                    repository);
             });
     }
 
