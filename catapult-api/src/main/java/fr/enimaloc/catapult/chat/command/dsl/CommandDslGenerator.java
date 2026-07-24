@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.IfStatement;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.ParamGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
 import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
@@ -26,9 +27,9 @@ import java.util.stream.Collectors;
  * Canonical output: {@code PrintStatement(ContextGetExpr)}/{@code (ServiceCallExpr)}/
  * {@code (VarRefExpr)}/{@code (LiteralExpr STRING)} use the compact bare-tag shorthand;
  * anything else uses the explicit {@code {print expr}} form. {@link ContextGetExpr} renders
- * as {@code get(path)} in {@code var}/assign/concat/explicit-print expression positions, and
- * as the bare {@code path} in {@code if}-condition operands and service-call arguments — both
- * spellings parse back to the same node, so {@code parse(generate(ast)) == ast} always holds.
+ * as the {@code ctx.a.b} dot-chain (sugar for the "a#b" path) in every expression position, and
+ * {@link PropertyGetExpr} renders as a plain dot-chain ({@code obj.prop}) — both spellings parse
+ * back to the same node, so {@code parse(generate(ast)) == ast} always holds.
  */
 public class CommandDslGenerator {
 
@@ -43,10 +44,10 @@ public class CommandDslGenerator {
     private String generateStatement(Statement statement) {
         return switch (statement) {
             case PrintStatement s -> generatePrint(s);
-            case VarDeclStatement s -> "{var " + s.name() + " = " + generateTopLevelExpr(s.init()) + "}";
-            case AssignStatement s -> "{" + s.name() + " = " + generateTopLevelExpr(s.expr()) + "}";
+            case VarDeclStatement s -> "{var " + s.name() + " = " + generateExpr(s.init()) + "}";
+            case AssignStatement s -> "{" + s.name() + " = " + generateExpr(s.expr()) + "}";
             case ConcatStatement s ->
-                "{" + s.name() + " = " + s.name() + " + " + generateTopLevelExpr(s.expr()) + "}";
+                "{" + s.name() + " = " + s.name() + " + " + generateExpr(s.expr()) + "}";
             case IfStatement s -> generateIf(s);
             case ForEachStatement s -> generateForEach(s);
             default -> throw new IllegalArgumentException("Unhandled statement type: " + statement.typeName());
@@ -59,7 +60,7 @@ public class CommandDslGenerator {
             return literal.value();
         }
         if (expr instanceof ContextGetExpr contextGet) {
-            return "{" + contextGet.path() + "}";
+            return "{ctx." + contextGet.path().replace('#', '.') + "}";
         }
         if (expr instanceof ServiceCallExpr call) {
             return "{" + call.namespace() + "#" + call.function() + "(" + generateArgs(call.args()) + ")}";
@@ -67,7 +68,7 @@ public class CommandDslGenerator {
         if (expr instanceof VarRefExpr varRef) {
             return "{" + varRef.name() + "}";
         }
-        return "{print " + generateTopLevelExpr(expr) + "}";
+        return "{print " + generateExpr(expr) + "}";
     }
 
     private String generateIf(IfStatement s) {
@@ -102,11 +103,12 @@ public class CommandDslGenerator {
             case LiteralExpr e when e.type() == ValueType.STRING -> "\"" + e.value() + "\"";
             case LiteralExpr e -> e.value();
             case VarRefExpr e -> e.name();
-            case ContextGetExpr e -> e.path();
+            case ContextGetExpr e -> "ctx." + e.path().replace('#', '.');
+            case ParamGetExpr e -> "ctx.params." + e.key();
             case ServiceCallExpr e -> e.namespace() + "#" + e.function() + "(" + generateArgs(e.args()) + ")";
             case BinaryExpr e -> generateExpr(e.left()) + " " + e.operator() + " " + generateExpr(e.right());
             case ObjectLiteralExpr e -> generateObjectLiteral(e);
-            case PropertyGetExpr e -> "get(" + generateExpr(e.target()) + ", \"" + e.property() + "\")";
+            case PropertyGetExpr e -> generateExpr(e.target()) + "." + e.property();
             default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
         };
     }
@@ -116,12 +118,5 @@ public class CommandDslGenerator {
             .map(entry -> entry.getKey() + ": " + generateExpr(entry.getValue()))
             .collect(Collectors.joining(", "));
         return "{" + entries + "}";
-    }
-
-    private String generateTopLevelExpr(Expression expr) {
-        if (expr instanceof ContextGetExpr contextGet) {
-            return "get(" + contextGet.path() + ")";
-        }
-        return generateExpr(expr);
     }
 }

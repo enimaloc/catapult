@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.IfStatement;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.ParamGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
 import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
@@ -31,7 +32,9 @@ import java.util.regex.Pattern;
  * {@code {name = name + expr}} (concat), {@code {print expr}}, {@code {if L OP R}...{else}...{/if}},
  * {@code {for x in list}...{/for}}. Backward-compat shorthand: bare {@code {path}} (context path,
  * contains '#'), bare {@code {name}} (variable reference, no '#'), bare {@code {ns#fn(args)}}
- * (service call) all sugar for an implicit print.
+ * (service call) all sugar for an implicit print. {@code ctx.game.name} is sugar for the context
+ * path {@code game#name}; any other dot-chain ({@code myObj.name}, chainable) is property access
+ * on a variable, equivalent to {@code get(myObj, "name")}.
  */
 public class CommandDslParser {
 
@@ -48,6 +51,31 @@ public class CommandDslParser {
 
     private static String normalizeLegacyDotPath(String path) {
         return LEGACY_DOT_PATH.matcher(path).matches() ? path.replace('.', '#') : path;
+    }
+
+    // General dot-chain syntax: {@code ctx.game.name} is sugar for the context path
+    // "game#name"; any other dot-chain ({@code myObj.name}, chainable) is property access on a
+    // variable, equivalent to {@code get(myObj, "name")}. Only reachable outside the bare-tag
+    // shorthand's legacy-dot-path branch, so it never competes with pre-V59 templates.
+    private static final Pattern DOT_CHAIN = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+$");
+
+    private Expression parseDotChain(String text) {
+        String[] segments = text.split("\\.");
+        if (segments[0].equals("ctx") && segments.length > 1 && segments[1].equals("params")) {
+            if (segments.length != 3) {
+                throw new CommandDslParseException(
+                    "ctx.params.<key> takes exactly one key segment (params are flat, not nested): " + text);
+            }
+            return new ParamGetExpr(segments[2]);
+        }
+        if (segments[0].equals("ctx")) {
+            return new ContextGetExpr(String.join("#", java.util.Arrays.copyOfRange(segments, 1, segments.length)));
+        }
+        Expression current = new VarRefExpr(segments[0]);
+        for (int i = 1; i < segments.length; i++) {
+            current = new PropertyGetExpr(current, segments[i]);
+        }
+        return current;
     }
 
     public CommandAst parse(String text) {
@@ -148,12 +176,19 @@ public class CommandDslParser {
             return new PrintStatement(call);
         }
         int bar = inner.indexOf('|');
-        String path = normalizeLegacyDotPath(bar < 0 ? inner : inner.substring(0, bar));
+        String rawPath = bar < 0 ? inner : inner.substring(0, bar);
+        if (rawPath.startsWith("ctx.") && DOT_CHAIN.matcher(rawPath).matches()) {
+            return new PrintStatement(parseDotChain(rawPath));
+        }
+        String path = normalizeLegacyDotPath(rawPath);
         if (path.contains("#")) {
             return new PrintStatement(new ContextGetExpr(path));
         }
         if (IDENTIFIER.matcher(path).matches()) {
             return new PrintStatement(new VarRefExpr(path));
+        }
+        if (DOT_CHAIN.matcher(path).matches()) {
+            return new PrintStatement(parseDotChain(path));
         }
         throw new CommandDslParseException("Malformed tag: " + inner);
     }
@@ -211,7 +246,7 @@ public class CommandDslParser {
     }
 
     private Expression parseExpression(String token) {
-        String text = normalizeLegacyDotPath(token.trim());
+        String text = token.trim();
         if (text.startsWith("\"") && text.endsWith("\"") && text.length() >= 2) {
             return new LiteralExpr(text.substring(1, text.length() - 1), ValueType.STRING);
         }
@@ -231,6 +266,9 @@ public class CommandDslParser {
         if (call != null) {
             return call;
         }
+        if (DOT_CHAIN.matcher(text).matches()) {
+            return parseDotChain(text);
+        }
         if (text.contains("#")) {
             return new ContextGetExpr(text);
         }
@@ -240,11 +278,16 @@ public class CommandDslParser {
         return new VarRefExpr(text);
     }
 
-    /** {@code get(path)} reads a context placeholder; {@code get(obj, "property")} reads an object property. */
+    /** {@code get(path)} reads a context placeholder (also accepts {@code ctx.a.b} sugar);
+     *  {@code get(obj, "property")} reads an object property. */
     private Expression parseGetExpression(String argsText) {
         List<String> args = splitTopLevelArgs(argsText);
         if (args.size() == 1) {
-            return new ContextGetExpr(normalizeLegacyDotPath(args.get(0).trim()));
+            String arg = args.get(0).trim();
+            if (arg.startsWith("ctx.") && DOT_CHAIN.matcher(arg).matches()) {
+                return parseDotChain(arg);
+            }
+            return new ContextGetExpr(arg);
         }
         if (args.size() == 2) {
             Expression target = parseExpression(args.get(0));
