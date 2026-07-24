@@ -6,18 +6,24 @@ import fr.enimaloc.catapult.chat.ChatCommandPresetCatalog;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.chat.command.registry.TwitchShoutoutFunction;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.SystemTwitchAccountService;
+import fr.enimaloc.catapult.service.TwitchChatService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -51,6 +57,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiChatCommandsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
+@Import({JsCompiler.class, ServiceFunctionRegistry.class, TwitchShoutoutFunction.class})
 class ApiChatCommandsControllerTest {
 
     @Autowired MockMvc mvc;
@@ -61,6 +68,8 @@ class ApiChatCommandsControllerTest {
     @MockitoBean ExperimentService experimentService;
     @MockitoBean SystemTwitchAccountService systemAccount;
     @MockitoBean UserAccountRepository userRepo;
+    @MockitoBean OAuthTokenRepository oAuthTokenRepository;
+    @MockitoBean TwitchChatService twitchChatService;
 
     private UserAccount mockUser() {
         UserAccount user = new UserAccount();
@@ -211,6 +220,73 @@ class ApiChatCommandsControllerTest {
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getAst()).isEqualTo(astJson);
         assertThat(captor.getValue().getTemplate()).isEqualTo("Now playing {ctx.game.name}!");
+    }
+
+    @Test
+    void put_with_ast_referencing_a_scope_gated_function_reports_missing_scopes() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
+        when(oAuthTokenRepository.findByUserAndProvider(any(), any())).thenReturn(Optional.empty());
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition existing = new ChatCommandDefinition();
+        existing.setId(id);
+        existing.setUser(user);
+        existing.setName("!so");
+        existing.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        String astJson = new NodeJsonCodec().toJson(new CommandDslParser().parse("{twitch#shoutout(arg(0))}"));
+        String body = om.writeValueAsString(Map.of(
+                "name", "!so",
+                "template", "ignored",
+                "permission", "EVERYONE",
+                "enabled", true,
+                "ast", astJson));
+
+        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.missingTwitchScopes[0]").value("moderator:manage:shoutouts"));
+
+        // Best-effort: the command still saves despite the missing scope.
+        verify(repository).save(any(ChatCommandDefinition.class));
+    }
+
+    @Test
+    void put_with_ast_referencing_a_call_with_an_already_granted_scope_reports_no_gap() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
+        fr.enimaloc.catapult.domain.OAuthToken token = new fr.enimaloc.catapult.domain.OAuthToken();
+        token.setGrantedScopes("moderator:manage:shoutouts channel:moderate");
+        when(oAuthTokenRepository.findByUserAndProvider(any(), any())).thenReturn(Optional.of(token));
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition existing = new ChatCommandDefinition();
+        existing.setId(id);
+        existing.setUser(user);
+        existing.setName("!so");
+        existing.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        String astJson = new NodeJsonCodec().toJson(new CommandDslParser().parse("{twitch#shoutout(arg(0))}"));
+        String body = om.writeValueAsString(Map.of(
+                "name", "!so",
+                "template", "ignored",
+                "permission", "EVERYONE",
+                "enabled", true,
+                "ast", astJson));
+
+        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.missingTwitchScopes").isEmpty());
     }
 
     @Test
