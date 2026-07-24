@@ -164,6 +164,56 @@ public class JsCompiler {
         }
     }
 
+    /** Every {@link ServiceCallExpr} referenced anywhere in {@code ast}, for save-time scope-gap checks. */
+    public Set<ServiceCallExpr> collectServiceCalls(CommandAst ast) {
+        Set<ServiceCallExpr> calls = new LinkedHashSet<>();
+        for (Statement statement : ast.statements()) {
+            collectServiceCalls(statement, calls);
+        }
+        return calls;
+    }
+
+    private void collectServiceCalls(Statement statement, Set<ServiceCallExpr> calls) {
+        switch (statement) {
+            case VarDeclStatement s -> collectServiceCalls(s.init(), calls);
+            case AssignStatement s -> collectServiceCalls(s.expr(), calls);
+            case ConcatStatement s -> collectServiceCalls(s.expr(), calls);
+            case PrintStatement s -> collectServiceCalls(s.expr(), calls);
+            case IfStatement s -> {
+                collectServiceCalls(s.condition(), calls);
+                for (Statement child : s.thenBranch()) collectServiceCalls(child, calls);
+                for (Statement child : s.elseBranch()) collectServiceCalls(child, calls);
+            }
+            case ForEachStatement s -> {
+                for (Statement child : s.body()) collectServiceCalls(child, calls);
+            }
+            default -> throw new IllegalArgumentException("Unhandled statement type: " + statement.typeName());
+        }
+    }
+
+    private void collectServiceCalls(Expression expr, Set<ServiceCallExpr> calls) {
+        switch (expr) {
+            case ServiceCallExpr e -> {
+                calls.add(e);
+                for (Expression arg : e.args()) collectServiceCalls(arg, calls);
+            }
+            case BinaryExpr e -> {
+                collectServiceCalls(e.left(), calls);
+                collectServiceCalls(e.right(), calls);
+            }
+            case ObjectLiteralExpr e -> {
+                for (Expression value : e.properties().values()) collectServiceCalls(value, calls);
+            }
+            case PropertyGetExpr e -> collectServiceCalls(e.target(), calls);
+            case ContextGetExpr ignored -> { }
+            case SettingGetExpr ignored -> { }
+            case ArgGetExpr ignored -> { }
+            case LiteralExpr ignored -> { }
+            case VarRefExpr ignored -> { }
+            default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
+        }
+    }
+
     private String buildSettingSetup(CommandAst ast) {
         Set<String> keys = new LinkedHashSet<>();
         for (Statement statement : ast.statements()) {
