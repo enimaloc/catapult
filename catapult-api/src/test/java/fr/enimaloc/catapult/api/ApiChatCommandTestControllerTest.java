@@ -122,7 +122,7 @@ class ApiChatCommandTestControllerTest {
         when(jsCompiler.compileWithTrace(any())).thenReturn("return \"Now playing Valorant!\";");
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
         trace.finish("Now playing Valorant!");
-        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any())).thenReturn(trace);
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
         mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -150,7 +150,7 @@ class ApiChatCommandTestControllerTest {
         when(repository.findById(id)).thenReturn(Optional.of(def));
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
         trace.finish("hand-written output");
-        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any())).thenReturn(trace);
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
         mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -161,7 +161,7 @@ class ApiChatCommandTestControllerTest {
 
         org.mockito.Mockito.verify(jsCompiler, org.mockito.Mockito.never()).compileWithTrace(any());
         org.mockito.Mockito.verify(sandboxExecutor).executeWithTrace(
-                eq("return \"hand-written output\";"), any(), any(), any(), any(), any());
+                eq("return \"hand-written output\";"), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -181,7 +181,7 @@ class ApiChatCommandTestControllerTest {
         when(repository.findById(id)).thenReturn(Optional.of(def));
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
         trace.finish("persisted ejected output");
-        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any())).thenReturn(trace);
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
         mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -191,7 +191,7 @@ class ApiChatCommandTestControllerTest {
 
         org.mockito.Mockito.verify(jsCompiler, org.mockito.Mockito.never()).compileWithTrace(any());
         org.mockito.Mockito.verify(sandboxExecutor).executeWithTrace(
-                eq("return \"persisted ejected output\";"), any(), any(), any(), any(), any());
+                eq("return \"persisted ejected output\";"), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -214,7 +214,7 @@ class ApiChatCommandTestControllerTest {
         when(jsCompiler.compileWithTrace(any())).thenReturn("return \"irrelevant\";");
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
         trace.finish("irrelevant");
-        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any())).thenReturn(trace);
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
         mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -224,7 +224,7 @@ class ApiChatCommandTestControllerTest {
 
         ArgumentCaptor<SandboxExecutor.PlaceholderContext> placeholderCaptor =
                 ArgumentCaptor.forClass(SandboxExecutor.PlaceholderContext.class);
-        verify(sandboxExecutor).executeWithTrace(any(), placeholderCaptor.capture(), any(), any(), any(), any());
+        verify(sandboxExecutor).executeWithTrace(any(), placeholderCaptor.capture(), any(), any(), any(), any(), any());
 
         assertThat(placeholderCaptor.getValue().resolve("game#name")).isEqualTo("Valorant");
         assertThat(placeholderCaptor.getValue().resolve("tw#active")).isEqualTo("");
