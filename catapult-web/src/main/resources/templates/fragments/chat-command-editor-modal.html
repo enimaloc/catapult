@@ -10,6 +10,13 @@
             <button type="button" id="ceClose"
                     style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:inherit;">&times;</button>
         </div>
+        <div id="ceScopeWarning" hidden class="banner banner-warning" style="margin-bottom:.75rem;">
+            <span th:text="#{chat_commands.scope_warning.text}">
+                Cette commande utilise une fonctionnalité qui nécessite de reconnecter Twitch avec des permissions supplémentaires.
+            </span>
+            <a href="/oauth2/authorization/twitch" hx-boost="false" class="btn btn-primary"
+               th:text="#{chat_commands.scope_warning.reconnect}">Reconnecter Twitch</a>
+        </div>
         <div style="display:flex; gap:.25rem; border-bottom:1px solid var(--border); margin-bottom:.75rem;">
             <button type="button" class="btn ce-tab-btn active" data-tab="blocks"
                     th:text="#{chat_commands.tab.blocks}">Blocs</button>
