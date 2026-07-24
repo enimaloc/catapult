@@ -10,10 +10,10 @@ import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.IfStatement;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
-import fr.enimaloc.catapult.chat.command.ast.ParamGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
 import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
+import fr.enimaloc.catapult.chat.command.ast.SettingGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.Statement;
 import fr.enimaloc.catapult.chat.command.ast.ValueType;
 import fr.enimaloc.catapult.chat.command.ast.VarDeclStatement;
@@ -71,7 +71,7 @@ public class JsCompiler {
         StringBuilder js = new StringBuilder();
         js.append("let __output = \"\";\n");
         js.append(buildContextSetup(ast));
-        js.append(buildParamSetup(ast));
+        js.append(buildSettingSetup(ast));
         for (Statement statement : ast.statements()) {
             appendStatement(statement, js, trace);
         }
@@ -155,61 +155,61 @@ public class JsCompiler {
                 for (Expression value : e.properties().values()) collectContextPaths(value, paths);
             }
             case PropertyGetExpr e -> collectContextPaths(e.target(), paths);
-            case ParamGetExpr ignored -> { }
+            case SettingGetExpr ignored -> { }
             case LiteralExpr ignored -> { }
             case VarRefExpr ignored -> { }
             default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
         }
     }
 
-    private String buildParamSetup(CommandAst ast) {
+    private String buildSettingSetup(CommandAst ast) {
         Set<String> keys = new LinkedHashSet<>();
         for (Statement statement : ast.statements()) {
-            collectParamKeys(statement, keys);
+            collectSettingKeys(statement, keys);
         }
         if (keys.isEmpty()) return "";
 
         StringBuilder setup = new StringBuilder();
-        setup.append("ctx.params = ctx.params || {};\n");
+        setup.append("ctx.settings = ctx.settings || {};\n");
         for (String key : keys) {
-            setup.append(jsPropertyAccess("ctx.params", key))
-                .append(" = ctx.param(\"").append(escape(key)).append("\");\n");
+            setup.append(jsPropertyAccess("ctx.settings", key))
+                .append(" = ctx.setting(\"").append(escape(key)).append("\");\n");
         }
         return setup.toString();
     }
 
-    private void collectParamKeys(Statement statement, Set<String> keys) {
+    private void collectSettingKeys(Statement statement, Set<String> keys) {
         switch (statement) {
-            case VarDeclStatement s -> collectParamKeys(s.init(), keys);
-            case AssignStatement s -> collectParamKeys(s.expr(), keys);
-            case ConcatStatement s -> collectParamKeys(s.expr(), keys);
-            case PrintStatement s -> collectParamKeys(s.expr(), keys);
+            case VarDeclStatement s -> collectSettingKeys(s.init(), keys);
+            case AssignStatement s -> collectSettingKeys(s.expr(), keys);
+            case ConcatStatement s -> collectSettingKeys(s.expr(), keys);
+            case PrintStatement s -> collectSettingKeys(s.expr(), keys);
             case IfStatement s -> {
-                collectParamKeys(s.condition(), keys);
-                for (Statement child : s.thenBranch()) collectParamKeys(child, keys);
-                for (Statement child : s.elseBranch()) collectParamKeys(child, keys);
+                collectSettingKeys(s.condition(), keys);
+                for (Statement child : s.thenBranch()) collectSettingKeys(child, keys);
+                for (Statement child : s.elseBranch()) collectSettingKeys(child, keys);
             }
             case ForEachStatement s -> {
-                for (Statement child : s.body()) collectParamKeys(child, keys);
+                for (Statement child : s.body()) collectSettingKeys(child, keys);
             }
             default -> throw new IllegalArgumentException("Unhandled statement type: " + statement.typeName());
         }
     }
 
-    private void collectParamKeys(Expression expr, Set<String> keys) {
+    private void collectSettingKeys(Expression expr, Set<String> keys) {
         switch (expr) {
-            case ParamGetExpr e -> keys.add(e.key());
+            case SettingGetExpr e -> keys.add(e.key());
             case ServiceCallExpr e -> {
-                for (Expression arg : e.args()) collectParamKeys(arg, keys);
+                for (Expression arg : e.args()) collectSettingKeys(arg, keys);
             }
             case BinaryExpr e -> {
-                collectParamKeys(e.left(), keys);
-                collectParamKeys(e.right(), keys);
+                collectSettingKeys(e.left(), keys);
+                collectSettingKeys(e.right(), keys);
             }
             case ObjectLiteralExpr e -> {
-                for (Expression value : e.properties().values()) collectParamKeys(value, keys);
+                for (Expression value : e.properties().values()) collectSettingKeys(value, keys);
             }
-            case PropertyGetExpr e -> collectParamKeys(e.target(), keys);
+            case PropertyGetExpr e -> collectSettingKeys(e.target(), keys);
             case ContextGetExpr ignored -> { }
             case LiteralExpr ignored -> { }
             case VarRefExpr ignored -> { }
@@ -286,7 +286,7 @@ public class JsCompiler {
                 yield e.name();
             }
             case ContextGetExpr e -> ctxPropertyChain(e.path());
-            case ParamGetExpr e -> jsPropertyAccess("ctx.params", e.key());
+            case SettingGetExpr e -> jsPropertyAccess("ctx.settings", e.key());
             case ServiceCallExpr e -> compileServiceCall(e);
             case BinaryExpr e -> "(" + compileExpr(e.left()) + " " + jsOperator(e.operator())
                 + " " + compileExpr(e.right()) + ")";

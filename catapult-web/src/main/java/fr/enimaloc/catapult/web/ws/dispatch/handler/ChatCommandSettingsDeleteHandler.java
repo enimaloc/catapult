@@ -10,21 +10,21 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.util.Map;
 
-/** Deletes one param. Body: {@code {key}}. */
+/** Deletes one setting. Body: {@code {key}}. */
 @Component
-public class ChatCommandParamsDeleteHandler implements RequestHandler {
+public class ChatCommandSettingsDeleteHandler implements RequestHandler {
 
     private final ApiClient apiClient;
     private final ObjectMapper mapper;
 
-    public ChatCommandParamsDeleteHandler(ApiClient apiClient) {
+    public ChatCommandSettingsDeleteHandler(ApiClient apiClient) {
         this.apiClient = apiClient;
         this.mapper = JsonMapper.builder().build();
     }
 
     @Override
     public String action() {
-        return "chat-commands.params.delete";
+        return "chat-commands.settings.delete";
     }
 
     @Override
@@ -48,7 +48,7 @@ public class ChatCommandParamsDeleteHandler implements RequestHandler {
         if (!(key instanceof String)) {
             throw new WsBusinessException("INVALID_PARAMS", "key is required");
         }
-        boolean ok = apiClient.delete("/api/chat-command-params/{key}", key);
+        boolean ok = apiClient.delete("/api/chat-command-settings/{key}", key);
         if (!ok) {
             throw new WsBusinessException("UPSTREAM_UNAVAILABLE", "Delete failed (check catapult-api logs)");
         }

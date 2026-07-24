@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.ChatCommandParam;
+import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandParamRepository;
+import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import lombok.RequiredArgsConstructor;
@@ -24,39 +24,39 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * REST endpoints for a streamer's own free-form {@code key=value} chat-command params
- * (see {@code ChatCommandParam}, {@code ParamGetExpr}) — global to the user, not per-command.
+ * REST endpoints for a streamer's own free-form {@code key=value} chat-command settings
+ * (see {@code ChatCommandSetting}, {@code SettingGetExpr}) — global to the user, not per-command.
  * Gated by the same {@code chat.commands} experiment as the rest of the chat-command API.
  */
 @RestController
-@RequestMapping("/api/chat-command-params")
+@RequestMapping("/api/chat-command-settings")
 @RequiredArgsConstructor
-public class ApiChatCommandParamsController {
+public class ApiChatCommandSettingsController {
 
     private static final Pattern VALID_KEY = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
 
-    // JsCompiler rejects these as ctx.params.<key> segments (prototype-pollution guard) — reject
+    // JsCompiler rejects these as ctx.settings.<key> segments (prototype-pollution guard) — reject
     // them here too, so a command referencing such a key fails at save time with a clear message
     // instead of compiling fine here and only failing later when the command actually runs.
     private static final Set<String> RESERVED_KEYS = Set.of("__proto__", "constructor", "prototype");
 
-    private final ChatCommandParamRepository repository;
+    private final ChatCommandSettingRepository repository;
     private final UserAccountRepository userAccountRepository;
     private final ExperimentService experimentService;
 
-    public record ParamDto(String key, String value) {
-        static ParamDto fromEntity(ChatCommandParam p) {
-            return new ParamDto(p.getKey(), p.getValue());
+    public record SettingDto(String key, String value) {
+        static SettingDto fromEntity(ChatCommandSetting s) {
+            return new SettingDto(s.getKey(), s.getValue());
         }
     }
 
     public record UpsertRequest(String value) {}
 
     @GetMapping
-    public List<ParamDto> list(@AuthenticationPrincipal Jwt jwt) {
+    public List<SettingDto> list(@AuthenticationPrincipal Jwt jwt) {
         UserAccount user = currentUser(jwt);
         gate(user);
-        return repository.findByUser(user).stream().map(ParamDto::fromEntity).toList();
+        return repository.findByUser(user).stream().map(SettingDto::fromEntity).toList();
     }
 
     @PutMapping("/{key}")
@@ -71,14 +71,14 @@ public class ApiChatCommandParamsController {
         if (RESERVED_KEYS.contains(key)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reserved key: " + key);
         }
-        ChatCommandParam param = repository.findByUserAndKey(user, key).orElseGet(() -> {
-            ChatCommandParam p = new ChatCommandParam();
-            p.setUser(user);
-            p.setKey(key);
-            return p;
+        ChatCommandSetting setting = repository.findByUserAndKey(user, key).orElseGet(() -> {
+            ChatCommandSetting s = new ChatCommandSetting();
+            s.setUser(user);
+            s.setKey(key);
+            return s;
         });
-        param.setValue(body.value());
-        repository.save(param);
+        setting.setValue(body.value());
+        repository.save(setting);
         return ResponseEntity.noContent().build();
     }
 

@@ -147,8 +147,8 @@ class CommandDslRoundTripTest {
     }
 
     @Test
-    void paramGetRoundTrips() {
-        String source = "{msg = ctx.params.language}";
+    void settingGetRoundTrips() {
+        String source = "{msg = ctx.settings.language}";
         assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
     }
 }
