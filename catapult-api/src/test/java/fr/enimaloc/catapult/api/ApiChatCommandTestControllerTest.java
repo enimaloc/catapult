@@ -307,4 +307,66 @@ class ApiChatCommandTestControllerTest {
         verify(sandboxExecutor).executeWithTrace(any(), any(), any(), any(), any(), settingCaptor.capture(), any());
         assertThat(settingCaptor.getValue().resolve("language")).isEqualTo("en");
     }
+
+    @Test
+    void test_args_request_field_resolves_arg_n_and_for_each_args() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setId(id);
+        def.setUser(user);
+        def.setName("!shoutout");
+        def.setTemplate("Go check out {arg(0)}!");
+        def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("Go check out {arg(0)}!")));
+        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(def));
+        when(jsCompiler.compileWithTrace(any())).thenReturn("return \"Go check out myfriend!\";");
+        var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
+        trace.finish("Go check out myfriend!");
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
+
+        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("overrides", Map.of(),
+                                "args", java.util.List.of("myfriend")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.output").value("Go check out myfriend!"));
+
+        ArgumentCaptor<SandboxExecutor.ListContext> listCaptor =
+                ArgumentCaptor.forClass(SandboxExecutor.ListContext.class);
+        verify(sandboxExecutor).executeWithTrace(any(), any(), listCaptor.capture(), any(), any(), any(), any());
+        assertThat(listCaptor.getValue().resolveList("args")).containsExactly("myfriend");
+    }
+
+    @Test
+    void test_defaults_args_to_an_empty_list_when_the_request_body_omits_it() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setId(id);
+        def.setUser(user);
+        def.setName("!shoutout");
+        def.setTemplate("[{arg(0)}]");
+        def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("[{arg(0)}]")));
+        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(def));
+        when(jsCompiler.compileWithTrace(any())).thenReturn("return \"[]\";");
+        var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
+        trace.finish("[]");
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
+
+        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<SandboxExecutor.ListContext> listCaptor =
+                ArgumentCaptor.forClass(SandboxExecutor.ListContext.class);
+        verify(sandboxExecutor).executeWithTrace(any(), any(), listCaptor.capture(), any(), any(), any(), any());
+        assertThat(listCaptor.getValue().resolveList("args")).isEmpty();
+    }
 }
