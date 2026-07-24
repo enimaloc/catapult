@@ -71,7 +71,8 @@ class ChatCommandsHandlersTest {
     void update_strips_id_from_body_and_uses_it_in_path() throws Exception {
         ApiClient api = mock(ApiClient.class);
         UUID id = UUID.randomUUID();
-        when(api.put(eq("/api/chat-commands/{id}"), any(), eq(id))).thenReturn(true);
+        when(api.put(eq("/api/chat-commands/{id}"), any(), eq(Map.class), eq(id)))
+                .thenReturn(Map.of("id", id.toString(), "name", "!hi"));
         var handler = new ChatCommandsUpdateHandler(api);
 
         Object out = handler.handle((WsSession) null, Map.of(
@@ -85,7 +86,7 @@ class ChatCommandsHandlersTest {
         // in the URL only.
         verify(api).put(eq("/api/chat-commands/{id}"),
                 org.mockito.ArgumentMatchers.argThat(b -> !((Map<?, ?>) b).containsKey("id")),
-                eq(id));
+                eq(Map.class), eq(id));
     }
 
     @Test
