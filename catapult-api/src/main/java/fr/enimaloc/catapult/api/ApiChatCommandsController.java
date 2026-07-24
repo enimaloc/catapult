@@ -3,13 +3,20 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.chat.ChatCommandPresetCatalog;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
+import fr.enimaloc.catapult.chat.command.ast.CommandAst;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
+import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.ChatCommandFallback;
+import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.SystemTwitchAccountService;
@@ -65,6 +72,9 @@ public class ApiChatCommandsController {
     private final SystemTwitchAccountService systemAccount;
     private final UserAccountRepository userRepo;
     private final ApplicationEventPublisher eventPublisher;
+    private final JsCompiler jsCompiler;
+    private final ServiceFunctionRegistry serviceFunctionRegistry;
+    private final OAuthTokenRepository oAuthTokenRepository;
 
     public record FallbackDto(String placeholder, String fallbackText) {}
 
@@ -76,14 +86,15 @@ public class ApiChatCommandsController {
         boolean enabled,
         String presetKey,
         List<FallbackDto> fallbacks,
-        String ejectedJs
+        String ejectedJs,
+        List<String> missingTwitchScopes
     ) {
         static CommandDto fromEntity(ChatCommandDefinition d) {
             List<FallbackDto> fb = d.getFallbacks().stream()
                 .map(f -> new FallbackDto(f.getPlaceholder(), f.getFallbackText()))
                 .toList();
             return new CommandDto(d.getId(), d.getName(), d.getTemplate(),
-                d.getPermission(), d.isEnabled(), d.getPresetKey(), fb, d.getEjectedJs());
+                d.getPermission(), d.isEnabled(), d.getPresetKey(), fb, d.getEjectedJs(), List.of());
         }
     }
 
@@ -181,7 +192,7 @@ public class ApiChatCommandsController {
         applyRequest(def, req);
         repository.save(def);
         publishChanged(user);
-        return ResponseEntity.status(HttpStatus.CREATED).body(CommandDto.fromEntity(def));
+        return ResponseEntity.status(HttpStatus.CREATED).body(withMissingScopes(def, user));
     }
 
     @PutMapping("/{id}")
@@ -200,7 +211,7 @@ public class ApiChatCommandsController {
         applyRequest(def, req);
         repository.save(def);
         publishChanged(user);
-        return CommandDto.fromEntity(def);
+        return withMissingScopes(def, user);
     }
 
     @DeleteMapping("/{id}")
@@ -309,6 +320,40 @@ public class ApiChatCommandsController {
                 }
             });
         }
+    }
+
+    /**
+     * Builds the response DTO with {@code missingTwitchScopes} computed from the just-saved
+     * AST against the user's currently granted Twitch OAuth scopes. Best-effort: a command
+     * still saves successfully even when a referenced function needs a scope the user hasn't
+     * granted yet — it just fails gracefully at dispatch time, same as any other best-effort
+     * chat command failure. Non-Twitch functions (no requiredScopes()) never contribute here.
+     */
+    private CommandDto withMissingScopes(ChatCommandDefinition def, UserAccount user) {
+        List<String> missing = missingTwitchScopes(def, user);
+        CommandDto base = CommandDto.fromEntity(def);
+        return new CommandDto(base.id(), base.name(), base.template(), base.permission(), base.enabled(),
+            base.presetKey(), base.fallbacks(), base.ejectedJs(), missing);
+    }
+
+    private List<String> missingTwitchScopes(ChatCommandDefinition def, UserAccount user) {
+        if (def.getAst() == null) return List.of();
+        CommandAst ast = AST_CODEC.fromJson(def.getAst());
+        Set<ServiceCallExpr> calls = jsCompiler.collectServiceCalls(ast);
+        if (calls.isEmpty()) return List.of();
+
+        Set<String> granted = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+            .map(OAuthToken::getGrantedScopes)
+            .map(s -> Set.of(s.split(" ")))
+            .orElse(Set.of());
+
+        Set<String> missing = new java.util.LinkedHashSet<>();
+        for (ServiceCallExpr call : calls) {
+            serviceFunctionRegistry.lookup(call.namespace(), call.function())
+                .map(ServiceFunction::requiredScopes)
+                .ifPresent(required -> required.stream().filter(s -> !granted.contains(s)).forEach(missing::add));
+        }
+        return List.copyOf(missing);
     }
 
     private void publishChanged(UserAccount user) {
