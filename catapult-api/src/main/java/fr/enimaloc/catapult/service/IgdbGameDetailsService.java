@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import proto.ExternalGame;
 import proto.Game;
+import proto.Platform;
 import proto.Website;
 
 import java.time.Duration;
@@ -103,6 +104,13 @@ public class IgdbGameDetailsService {
             entity.setFirstReleaseDate(Instant.ofEpochSecond(game.getFirstReleaseDate().getSeconds()));
         }
         entity.setWebsites(extractWebsites(game));
+        // proto3 scalar doubles have no presence tracking (no hasRating()/hasAggregatedRating()) —
+        // 0 is indistinguishable from "IGDB omitted the field", so treat <= 0 as unset.
+        entity.setRating(game.getRating() > 0 ? game.getRating() : null);
+        entity.setAggregatedRating(game.getAggregatedRating() > 0 ? game.getAggregatedRating() : null);
+        entity.setPlatforms(game.getPlatformsList().stream().map(Platform::getName).toList());
+        entity.setDlcNames(game.getDlcsList().stream().map(Game::getName).toList());
+        entity.setSimilarGameNames(game.getSimilarGamesList().stream().map(Game::getName).toList());
         entity.setFetchedAt(Instant.now());
         return repository.save(entity);
     }
