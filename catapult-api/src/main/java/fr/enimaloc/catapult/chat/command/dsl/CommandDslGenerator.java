@@ -106,7 +106,9 @@ public class CommandDslGenerator {
             case VarRefExpr e -> e.name();
             case ContextGetExpr e -> "ctx." + e.path().replace('#', '.');
             case SettingGetExpr e -> "ctx.settings." + e.key();
-            case ArgGetExpr e -> "arg(" + e.index() + ")";
+            case ArgGetExpr e -> e.defaultValue() == null
+                ? "arg(" + e.index() + ")"
+                : "arg(" + e.index() + ", \"" + e.defaultValue() + "\")";
             case ServiceCallExpr e -> e.namespace() + "#" + e.function() + "(" + generateArgs(e.args()) + ")";
             case BinaryExpr e -> generateExpr(e.left()) + " " + e.operator() + " " + generateExpr(e.right());
             case ObjectLiteralExpr e -> generateObjectLiteral(e);

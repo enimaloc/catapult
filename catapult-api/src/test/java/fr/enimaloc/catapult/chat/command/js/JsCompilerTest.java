@@ -278,4 +278,19 @@ class JsCompilerTest {
             java.time.Duration.ofSeconds(2));
         assertThat(result).isEqualTo("[myfriend] []");
     }
+
+    @Test
+    void compilesArgGetWithADefaultToAFallbackOfThatDefaultInsteadOfEmptyString() {
+        String js = compiler.compile(parser.parse("{msg = arg(2, \"everyone\")}"));
+        assertThat(js).contains("msg = (ctx.list(\"args\")[2] || \"everyone\");");
+    }
+
+    @Test
+    void argGetWithDefaultResolvesEndToEndInTheRealSandboxWhenOutOfRange() {
+        String js = compiler.compile(parser.parse("[{arg(0, \"everyone\")}] [{arg(5, \"everyone\")}]"));
+        String result = new SandboxExecutor().execute(js,
+            path -> null, name -> "args".equals(name) ? List.of("myfriend") : List.of(),
+            java.time.Duration.ofSeconds(2));
+        assertThat(result).isEqualTo("[myfriend] [everyone]");
+    }
 }

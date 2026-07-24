@@ -292,14 +292,14 @@ class CommandDslParserTest {
         CommandAst ast = parser.parse("Hi {arg(0)}!");
         assertThat(ast.statements()).containsExactly(
             new PrintStatement(new LiteralExpr("Hi ", ValueType.STRING)),
-            new PrintStatement(new ArgGetExpr(0)),
+            new PrintStatement(new ArgGetExpr(0, null)),
             new PrintStatement(new LiteralExpr("!", ValueType.STRING)));
     }
 
     @Test
     void argParsesInsideAnExplicitPrintExpression() {
         CommandAst ast = parser.parse("{print arg(2)}");
-        assertThat(ast.statements()).containsExactly(new PrintStatement(new ArgGetExpr(2)));
+        assertThat(ast.statements()).containsExactly(new PrintStatement(new ArgGetExpr(2, null)));
     }
 
     @Test
@@ -317,6 +317,24 @@ class CommandDslParserTest {
     @Test
     void argWithADecimalIndexThrows() {
         assertThatThrownBy(() -> parser.parse("{arg(1.5)}"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void argWithALiteralStringDefaultParsesToArgGetExprWithDefaultValue() {
+        CommandAst ast = parser.parse("{print arg(0, \"everyone\")}");
+        assertThat(ast.statements()).containsExactly(new PrintStatement(new ArgGetExpr(0, "everyone")));
+    }
+
+    @Test
+    void argWithAVariableDefaultThrows() {
+        assertThatThrownBy(() -> parser.parse("{arg(0, msg)}"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void argWithTooManyArgumentsThrows() {
+        assertThatThrownBy(() -> parser.parse("{arg(0, \"a\", \"b\")}"))
             .isInstanceOf(CommandDslParseException.class);
     }
 }
