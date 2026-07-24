@@ -24,7 +24,7 @@ class SandboxExecutorTraceTest {
             + "__output += \"!\"; return __output;";
 
         ExecutionTrace trace = executor.executeWithTrace(js,
-            path -> "Valorant", name -> List.of(), null, null, Duration.ofSeconds(2));
+            path -> "Valorant", name -> List.of(), null, null, null, Duration.ofSeconds(2));
 
         assertThat(trace.finalOutput()).isEqualTo("Valorant!");
         assertThat(trace.entries()).anySatisfy(entry -> {
@@ -40,7 +40,7 @@ class SandboxExecutorTraceTest {
         ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
 
         ExecutionTrace trace = executor.executeWithTrace(js, path -> null, name -> List.of(),
-            registry, null, Duration.ofSeconds(2));
+            registry, null, null, Duration.ofSeconds(2));
 
         assertThat(trace.entries()).anySatisfy(entry -> assertThat(entry.error()).isTrue());
     }
@@ -51,7 +51,7 @@ class SandboxExecutorTraceTest {
         String js = compiler.compileWithTrace(ast);
 
         ExecutionTrace trace = executor.executeWithTrace(js,
-            path -> "Valorant", name -> List.of(), null, null, Duration.ofSeconds(2));
+            path -> "Valorant", name -> List.of(), null, null, null, Duration.ofSeconds(2));
 
         assertThat(trace.finalOutput()).isEqualTo("Now playing Valorant");
         List<String> varValues = trace.entries().stream()
@@ -68,7 +68,7 @@ class SandboxExecutorTraceTest {
         String js = compiler.compileWithTrace(ast);
 
         ExecutionTrace trace = executor.executeWithTrace(js,
-            path -> "Valorant", name -> List.of(), null, null, Duration.ofSeconds(2));
+            path -> "Valorant", name -> List.of(), null, null, null, Duration.ofSeconds(2));
 
         assertThat(trace.finalOutput()).isEqualTo("ranked");
         assertThat(trace.entries()).anySatisfy(entry -> {
