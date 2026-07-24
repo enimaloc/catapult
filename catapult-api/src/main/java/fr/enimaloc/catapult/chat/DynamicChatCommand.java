@@ -95,7 +95,7 @@ public class DynamicChatCommand implements ChatCommand {
         try {
             String output = sandboxExecutor.execute(js,
                 path -> resolvePlaceholder(path, ctx, fallbacks),
-                name -> resolveList(name, fallbacks, args, user),
+                name -> resolveList(name, fallbacks, args, user, ctx),
                 serviceFunctionRegistry,
                 user,
                 key -> settings.getOrDefault(key, ""),
@@ -129,7 +129,8 @@ public class DynamicChatCommand implements ChatCommand {
         return fallbacks.getOrDefault(path, "");
     }
 
-    private List<String> resolveList(String name, Map<String, String> fallbacks, List<String> args, UserAccount user) {
+    private List<String> resolveList(String name, Map<String, String> fallbacks, List<String> args,
+                                      UserAccount user, GameContext ctx) {
         if ("fallbacks".equals(name)) return List.copyOf(fallbacks.values());
         if ("args".equals(name)) return args;
         if ("ownCommands".equals(name)) {
@@ -140,6 +141,8 @@ public class DynamicChatCommand implements ChatCommand {
                 .map(ChatCommandDefinition::getName)
                 .toList();
         }
+        if ("gameDlcs".equals(name)) return ctx.dlcNames();
+        if ("similarGames".equals(name)) return ctx.similarGameNames();
         return List.of();
     }
 }
