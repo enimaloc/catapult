@@ -168,6 +168,30 @@
         }
     }
 
+    // Reads one of the streamer's own free-form key=value settings (ChatCommandSetting,
+    // ctx.settings.<key> — distinct from ContextGetExpr/ctx.a.b, which is a fixed known-path
+    // catalog). Settings are per-streamer and open-ended, so KEY is a free-text field rather
+    // than a dropdown (which would break with zero saved settings) — pre-filled from the
+    // streamer's first saved key as a hint when one exists.
+    class CmdSettingGetBlock {
+        static type = 'cmd_setting_get';
+        static nodeType = 'setting-get';
+        static category() { return 'Contexte'; }
+        static definition(catalog) {
+            return { type: this.type, message0: 'setting %1',
+                args0: [{ type: 'field_input', name: 'KEY', text: (catalog.settingKeys[0] || 'key') }],
+                output: null, colour: 200 };
+        }
+        static toNode(block) {
+            return { type: 'setting-get', key: block.getFieldValue('KEY') };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.key, 'KEY');
+            return block;
+        }
+    }
+
     // Groups several related values into one variable, e.g. {name: "Valorant", price: 29.99}.
     // The PROPERTIES slot holds a chain of CmdObjectPropertyBlock, reusing the exact same
     // statementsToNodes/connectStatements chaining already used for if/for-each bodies —
@@ -428,7 +452,7 @@
 
     const STATIC_BLOCK_CLASSES = [
         CmdLiteralStringBlock, CmdLiteralNumberBlock, CmdLiteralBooleanBlock,
-        CmdVarRefBlock, CmdContextGetBlock,
+        CmdVarRefBlock, CmdContextGetBlock, CmdSettingGetBlock,
         CmdObjectLiteralBlock, CmdObjectPropertyBlock, CmdPropertyGetBlock,
         CmdVarDeclBlock, CmdAssignBlock, CmdConcatBlock, CmdPrintBlock, CmdIfBlock, CmdForEachBlock
     ];
