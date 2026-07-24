@@ -51,9 +51,6 @@ public class TwitchGetStreamFunction implements ServiceFunction {
     }
 
     private static String formatUptime(Instant startedAt) {
-        Duration uptime = Duration.between(startedAt, Instant.now());
-        long hours = uptime.toHours();
-        long minutes = uptime.toMinutesPart();
-        return hours + "h" + minutes + "m";
+        return DurationFormatter.format(Duration.between(startedAt, Instant.now()));
     }
 }
