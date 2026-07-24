@@ -119,6 +119,7 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                     if (client.getAccessToken().getExpiresAt() != null) {
                         token.setExpiresAt(client.getAccessToken().getExpiresAt());
                     }
+                    token.setGrantedScopes(String.join(" ", client.getAccessToken().getScopes()));
                     oAuthTokenRepository.save(token);
                     log.debug("Saved {} refresh token for user {}", provider, catUser.getUserAccount().getId());
                 });
