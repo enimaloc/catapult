@@ -141,6 +141,21 @@ public class ApiClient {
         }
     }
 
+    public <T> T put(String path, Object body, Class<T> responseType, Object... uriVars) {
+        try {
+            return restClient.put()
+                    .uri(path, uriVars)
+                    .body(body)
+                    .retrieve()
+                    .body(responseType);
+        } catch (Exception e) {
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("PUT {} failed: {}", path, e.getMessage());
+            }
+            return null;
+        }
+    }
+
     public boolean put(String path, Object body, Object... uriVars) {
         try {
             restClient.put()
