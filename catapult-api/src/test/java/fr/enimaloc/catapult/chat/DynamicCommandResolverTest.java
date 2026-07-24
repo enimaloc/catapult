@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.ChatCommandParamRepository;
 import fr.enimaloc.catapult.service.GameContextService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +45,7 @@ class DynamicCommandResolverTest {
         placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry(), twRegistry);
         resolver = new DynamicCommandResolver(repository, placeholderResolver, gameContextService,
             new JsCompiler(), new SandboxExecutor(), new ServiceFunctionRegistry(),
+            org.mockito.Mockito.mock(ChatCommandParamRepository.class),
             java.util.List.of());
         user = new UserAccount();
         user.setId(UUID.randomUUID());
