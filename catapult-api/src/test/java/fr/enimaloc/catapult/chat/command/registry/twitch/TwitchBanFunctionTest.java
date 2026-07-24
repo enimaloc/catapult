@@ -17,7 +17,18 @@ class TwitchBanFunctionTest {
 
         TwitchBanFunction fn = new TwitchBanFunction(service);
         assertThat(fn.parameterNames()).containsExactly("login", "reason");
+        assertThat(fn.optionalParameterNames()).containsExactly("reason");
         assertThat(fn.invoke(user, new Object[]{"troll", "spam"})).isEqualTo("");
         verify(service).ban(user, "troll", "spam");
+    }
+
+    @Test
+    void invokeDefaultsReasonToEmptyStringWhenOmitted() throws Exception {
+        TwitchChatService service = mock(TwitchChatService.class);
+        UserAccount user = new UserAccount();
+
+        TwitchBanFunction fn = new TwitchBanFunction(service);
+        assertThat(fn.invoke(user, new Object[]{"troll"})).isEqualTo("");
+        verify(service).ban(user, "troll", "");
     }
 }
