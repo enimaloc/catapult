@@ -340,7 +340,8 @@ public class JsCompiler {
             }
             case ContextGetExpr e -> ctxPropertyChain(e.path());
             case SettingGetExpr e -> jsPropertyAccess("ctx.settings", e.key());
-            case ArgGetExpr e -> "(ctx.list(\"args\")[" + e.index() + "] || \"\")";
+            case ArgGetExpr e -> "(ctx.list(\"args\")[" + e.index() + "] || \""
+                + escape(e.defaultValue() == null ? "" : e.defaultValue()) + "\")";
             case ServiceCallExpr e -> compileServiceCall(e);
             case BinaryExpr e -> "(" + compileExpr(e.left()) + " " + jsOperator(e.operator())
                 + " " + compileExpr(e.right()) + ")";

@@ -81,16 +81,33 @@ public class CommandDslParser {
         return current;
     }
 
-    /** {@code arg(N)} reads one word of the chat command's own arguments — N must be a literal
-     *  non-negative integer (no signs, no decimals, no variables): {@code arg(-1)}, {@code arg(x)}
-     *  and {@code arg(1.5)} are all rejected here rather than silently misparsed. */
+    /** {@code arg(N)} or {@code arg(N, "default")} reads one word of the chat command's own
+     *  arguments — N must be a literal non-negative integer (no signs, no decimals, no
+     *  variables): {@code arg(-1)}, {@code arg(x)} and {@code arg(1.5)} are all rejected here
+     *  rather than silently misparsed. The optional default must likewise be a literal string
+     *  (no variables, no nested expressions) — {@code arg(0, "everyone")}. */
     private Expression parseArgGet(String text) {
-        String indexText = text.substring(4, text.length() - 1).trim();
+        String inner = text.substring(4, text.length() - 1).trim();
+        List<String> parts = splitTopLevelArgs(inner);
+        if (parts.isEmpty() || parts.size() > 2) {
+            throw new CommandDslParseException(
+                "arg(N) or arg(N, \"default\") expected: " + text);
+        }
+        String indexText = parts.get(0).trim();
         if (!ARG_INDEX.matcher(indexText).matches()) {
             throw new CommandDslParseException(
                 "arg(N) requires a literal non-negative integer index: " + text);
         }
-        return new ArgGetExpr(Integer.parseInt(indexText));
+        int index = Integer.parseInt(indexText);
+        if (parts.size() == 1) {
+            return new ArgGetExpr(index, null);
+        }
+        String defaultText = parts.get(1).trim();
+        if (!(defaultText.startsWith("\"") && defaultText.endsWith("\"") && defaultText.length() >= 2)) {
+            throw new CommandDslParseException(
+                "arg(N, default) requires a literal string default: " + text);
+        }
+        return new ArgGetExpr(index, defaultText.substring(1, defaultText.length() - 1));
     }
 
     public CommandAst parse(String text) {
