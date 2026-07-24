@@ -91,7 +91,7 @@ public class DynamicChatCommand implements ChatCommand {
         try {
             String output = sandboxExecutor.execute(js,
                 path -> resolvePlaceholder(path, ctx, fallbacks),
-                name -> resolveList(name, fallbacks),
+                name -> resolveList(name, fallbacks, args),
                 serviceFunctionRegistry,
                 user,
                 key -> settings.getOrDefault(key, ""),
@@ -125,8 +125,9 @@ public class DynamicChatCommand implements ChatCommand {
         return fallbacks.getOrDefault(path, "");
     }
 
-    private List<String> resolveList(String name, Map<String, String> fallbacks) {
+    private List<String> resolveList(String name, Map<String, String> fallbacks, List<String> args) {
         if ("fallbacks".equals(name)) return List.copyOf(fallbacks.values());
+        if ("args".equals(name)) return args;
         return List.of();
     }
 }

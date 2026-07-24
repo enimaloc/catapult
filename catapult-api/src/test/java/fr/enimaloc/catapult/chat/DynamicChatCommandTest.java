@@ -231,4 +231,55 @@ class DynamicChatCommandTest {
 
         assertThat(result).isEqualTo("[]");
     }
+
+    @Test
+    void argResolvesTheRealInvocationArgument() {
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!shoutout");
+        definition.setEnabled(true);
+        definition.setTemplate("Go check out {arg(0)}!");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("Go check out {arg(0)}!")));
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
+            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class));
+
+        Object result = command.execute(null, List.of("myfriend"));
+
+        assertThat(result).isEqualTo("Go check out myfriend!");
+    }
+
+    @Test
+    void argResolvesToEmptyStringWhenTheIndexWasNotSupplied() {
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!shoutout");
+        definition.setEnabled(true);
+        definition.setTemplate("[{arg(0)}]");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("[{arg(0)}]")));
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
+            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class));
+
+        Object result = command.execute(null, List.of());
+
+        assertThat(result).isEqualTo("[]");
+    }
+
+    @Test
+    void forEachOverArgsIteratesAllSuppliedArguments() {
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!listargs");
+        definition.setEnabled(true);
+        definition.setTemplate("{for a in args}[{a}]{/for}");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{for a in args}[{a}]{/for}")));
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
+            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class));
+
+        Object result = command.execute(null, List.of("one", "two"));
+
+        assertThat(result).isEqualTo("[one][two]");
+    }
 }
