@@ -20,4 +20,9 @@ public interface ServiceFunction {
     String name();
     List<String> parameterNames();
     Object invoke(UserAccount user, Object[] args) throws Exception;
+
+    /** OAuth scopes (beyond what's already granted) this function needs to work. */
+    default List<String> requiredScopes() {
+        return List.of();
+    }
 }
