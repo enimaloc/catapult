@@ -40,7 +40,7 @@ public class MockSteamApiClient implements SteamApiClient {
     }
 
     public void setGameForUser(String steamId, String gameId, String gameName) {
-        gameByUser.put(steamId, new PlayerSummary(gameId, gameName));
+        gameByUser.put(steamId, new PlayerSummary(gameId, gameName, "MockPlayer", "online"));
         log.info("[Mock Steam] Game for {} → {} ({})", steamId, gameName, gameId);
     }
 

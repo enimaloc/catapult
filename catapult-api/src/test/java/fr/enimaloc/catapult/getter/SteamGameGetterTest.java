@@ -40,7 +40,7 @@ class SteamGameGetterTest {
 
         when(steamApiClient.getPlayerSummaries(List.of("123")))
             .thenReturn(CompletableFuture.completedFuture(
-                Map.of("123", Optional.of(new SteamApiClient.PlayerSummary("456", "Game")))
+                Map.of("123", Optional.of(new SteamApiClient.PlayerSummary("456", "Game", "Streamer", "online")))
             ));
 
         getter.prefetchBatch(List.of(user)).get();
@@ -72,7 +72,7 @@ class SteamGameGetterTest {
         when(tokenEncryptionService.decrypt("encrypted")).thenReturn("raw-token");
         when(steamApiClient.getPlayerSummary("123", "raw-token"))
             .thenReturn(CompletableFuture.completedFuture(
-                Optional.of(new SteamApiClient.PlayerSummary("789", "AnotherGame"))
+                Optional.of(new SteamApiClient.PlayerSummary("789", "AnotherGame", "Streamer", "online"))
             ));
 
         Optional<DetectedGame> result = getter.getCurrentGame(user);
