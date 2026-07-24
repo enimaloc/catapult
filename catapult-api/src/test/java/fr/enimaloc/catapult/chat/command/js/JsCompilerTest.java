@@ -19,10 +19,15 @@ class JsCompilerTest {
 
     @Test
     void compilesLiteralAndBareContextGet() {
+        // Every context path the ast references gets a one-time setup line building the real
+        // ctx.a.b dot-chain via ctx.placeholder(...); the rest of the body then reads ctx.game.name
+        // directly instead of calling ctx.placeholder(...) inline (see JsCompiler's class javadoc).
         String js = compiler.compile(parser.parse("Now playing {game#name}!"));
         assertThat(js).contains("let __output = \"\";");
+        assertThat(js).contains("ctx.game = ctx.game || {};");
+        assertThat(js).contains("ctx.game.name = ctx.placeholder(\"game#name\");");
         assertThat(js).contains("__output += (\"Now playing \");");
-        assertThat(js).contains("__output += (ctx.placeholder(\"game#name\"));");
+        assertThat(js).contains("__output += (ctx.game.name);");
         assertThat(js).contains("__output += (\"!\");");
         assertThat(js).contains("return __output;");
     }
@@ -31,9 +36,10 @@ class JsCompilerTest {
     void compilesVarDeclAssignAndConcat() {
         String js = compiler.compile(parser.parse(
             "{var msg = \"\"}{msg = msg + \"Now playing \"}{msg = msg + get(game#name)}{print msg}"));
+        assertThat(js).contains("ctx.game.name = ctx.placeholder(\"game#name\");");
         assertThat(js).contains("let msg = \"\";");
         assertThat(js).contains("msg = msg + (\"Now playing \");");
-        assertThat(js).contains("msg = msg + (ctx.placeholder(\"game#name\"));");
+        assertThat(js).contains("msg = msg + (ctx.game.name);");
         assertThat(js).contains("__output += (msg);");
     }
 
@@ -46,7 +52,8 @@ class JsCompilerTest {
     @Test
     void compilesIfElseWithStrictEquality() {
         String js = compiler.compile(parser.parse("{if game#name == \"Valorant\"}yes{else}no{/if}"));
-        assertThat(js).contains("if (ctx.placeholder(\"game#name\") === \"Valorant\") {");
+        assertThat(js).contains("ctx.game.name = ctx.placeholder(\"game#name\");");
+        assertThat(js).contains("if (ctx.game.name === \"Valorant\") {");
         assertThat(js).contains("__output += (\"yes\");");
         assertThat(js).contains("} else {");
         assertThat(js).contains("__output += (\"no\");");
@@ -94,10 +101,54 @@ class JsCompilerTest {
 
     @Test
     void escapesQuotesAndBackslashesInContextPath() {
+        // A single-segment path (no '#') isn't a safe JS identifier, so the dot-chain setup
+        // falls back to bracket notation instead of throwing.
         CommandAst ast = new CommandAst(List.of(
             new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.ContextGetExpr("weird\"path\\here"))));
         String js = compiler.compile(ast);
         assertThat(js).contains("ctx.placeholder(\"weird\\\"path\\\\here\")");
+        assertThat(js).contains("ctx[\"weird\\\"path\\\\here\"]");
+    }
+
+    @Test
+    void sharedPathPrefixGetsOnlyOneSetupLine() {
+        String js = compiler.compile(parser.parse(
+            "{if game#store#steam == \"\"}{print game#store#xbox}{/if}"));
+        assertThat(js).containsOnlyOnce("ctx.game = ctx.game || {};");
+        assertThat(js).containsOnlyOnce("ctx.game.store = ctx.game.store || {};");
+        assertThat(js).contains("ctx.game.store.steam = ctx.placeholder(\"game#store#steam\");");
+        assertThat(js).contains("ctx.game.store.xbox = ctx.placeholder(\"game#store#xbox\");");
+    }
+
+    @Test
+    void ctxDotChainResolvesTheRealPlaceholderValueEndToEndInTheSandbox() {
+        // Proves the compile-time-lowering (ctx.game.name reading a value the setup preamble
+        // resolved via ctx.placeholder) actually works at runtime, not just in the JS text.
+        String js = compiler.compile(parser.parse("Now playing {ctx.game.name}!"));
+        String result = new SandboxExecutor().execute(js,
+            path -> path.equals("game#name") ? "Valorant" : null, name -> List.of(),
+            java.time.Duration.ofSeconds(2));
+        assertThat(result).isEqualTo("Now playing Valorant!");
+    }
+
+    @Test
+    void rejectsProtoPathSegmentAsAPrototypePollutionRisk() {
+        CommandAst ast = new CommandAst(List.of(
+            new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.ContextGetExpr("__proto__#name"))));
+        assertThatThrownBy(() -> compiler.compile(ast))
+            .isInstanceOf(JsCompilationException.class)
+            .hasMessageContaining("__proto__");
+    }
+
+    @Test
+    void rejectsConstructorAndPrototypePathSegments() {
+        for (String unsafe : new String[]{"constructor", "prototype"}) {
+            CommandAst ast = new CommandAst(List.of(
+                new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.ContextGetExpr("game#" + unsafe))));
+            assertThatThrownBy(() -> compiler.compile(ast))
+                .isInstanceOf(JsCompilationException.class)
+                .hasMessageContaining(unsafe);
+        }
     }
 
     @Test

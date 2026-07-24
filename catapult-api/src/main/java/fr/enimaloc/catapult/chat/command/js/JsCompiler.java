@@ -19,6 +19,8 @@ import fr.enimaloc.catapult.chat.command.ast.VarDeclStatement;
 import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -29,6 +31,14 @@ import java.util.stream.Collectors;
  * {@code ctx.list(name)}. Statements execute in order; {@code if}/{@code for-each} bodies
  * compile to native JS {@code { }} blocks, so variables declared inside them are naturally
  * block-scoped by plain JS {@code let}/{@code const} semantics — no extra bookkeeping needed.
+ *
+ * <p>Every context path the ast actually references (e.g. {@code "game#name"}) gets a one-time
+ * setup line at the top of the script — {@code ctx.game = ctx.game || {}; ctx.game.name =
+ * ctx.placeholder("game#name");} — so the rest of the compiled body can read {@code ctx.game.name}
+ * as a plain dot-chain instead of calling {@code ctx.placeholder(...)} inline. This is a pure
+ * compile-time lowering: {@link SandboxExecutor}'s actual {@code ctx.placeholder}/{@code ctx.call}/
+ * {@code ctx.list} contract is untouched, so hand-edited "ejected" JS written against the old
+ * {@code ctx.placeholder(path)} form keeps working unchanged.
  *
  * <p>{@link #compileWithTrace(CommandAst)} additionally emits {@code __trace.var(name, value)}
  * calls after every var-decl/assign/concat/print and a {@code __trace.branch(desc, cond)} call
@@ -41,6 +51,13 @@ public class JsCompiler {
     private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[A-Za-z_$][A-Za-z0-9_$]*$");
     private static final Pattern NUMBER_LITERAL = Pattern.compile("^-?\\d+(\\.\\d+)?$");
 
+    // Prototype-pollution guard: a context path segment named "__proto__" (or "constructor"/
+    // "prototype", which reach the same object via ctx.game.constructor.prototype) must never be
+    // emitted as a dot-chain assignment target — bracket notation does NOT neutralize "__proto__"
+    // (obj["__proto__"] = x still sets the prototype), so these segments are rejected outright
+    // rather than merely re-escaped.
+    private static final Set<String> UNSAFE_PROPERTY_NAMES = Set.of("__proto__", "constructor", "prototype");
+
     public String compile(CommandAst ast) {
         return compile(ast, false);
     }
@@ -52,11 +69,94 @@ public class JsCompiler {
     private String compile(CommandAst ast, boolean trace) {
         StringBuilder js = new StringBuilder();
         js.append("let __output = \"\";\n");
+        js.append(buildContextSetup(ast));
         for (Statement statement : ast.statements()) {
             appendStatement(statement, js, trace);
         }
         js.append("return __output;\n");
         return js.toString();
+    }
+
+    private String buildContextSetup(CommandAst ast) {
+        Set<String> paths = new LinkedHashSet<>();
+        for (Statement statement : ast.statements()) {
+            collectContextPaths(statement, paths);
+        }
+        if (paths.isEmpty()) return "";
+
+        StringBuilder setup = new StringBuilder();
+        Set<String> declaredPrefixes = new LinkedHashSet<>();
+        for (String path : paths) {
+            String[] segments = path.split("#");
+            String prefix = "ctx";
+            for (int i = 0; i < segments.length - 1; i++) {
+                prefix = jsPropertyAccess(prefix, segments[i]);
+                if (declaredPrefixes.add(prefix)) {
+                    setup.append(prefix).append(" = ").append(prefix).append(" || {};\n");
+                }
+            }
+            setup.append(ctxPropertyChain(path))
+                .append(" = ctx.placeholder(\"").append(escape(path)).append("\");\n");
+        }
+        return setup.toString();
+    }
+
+    /** {@code "game#store#steam"} -> {@code ctx.game.store.steam}, falling back to bracket
+     *  notation ({@code ctx["a b"]}) for any segment that isn't a safe JS identifier. */
+    private String ctxPropertyChain(String path) {
+        String chain = "ctx";
+        for (String segment : path.split("#")) {
+            chain = jsPropertyAccess(chain, segment);
+        }
+        return chain;
+    }
+
+    private String jsPropertyAccess(String base, String segment) {
+        if (UNSAFE_PROPERTY_NAMES.contains(segment)) {
+            throw new JsCompilationException(
+                "Context path segment is not allowed (prototype pollution risk): " + segment);
+        }
+        return SAFE_IDENTIFIER.matcher(segment).matches()
+            ? base + "." + segment
+            : base + "[\"" + escape(segment) + "\"]";
+    }
+
+    private void collectContextPaths(Statement statement, Set<String> paths) {
+        switch (statement) {
+            case VarDeclStatement s -> collectContextPaths(s.init(), paths);
+            case AssignStatement s -> collectContextPaths(s.expr(), paths);
+            case ConcatStatement s -> collectContextPaths(s.expr(), paths);
+            case PrintStatement s -> collectContextPaths(s.expr(), paths);
+            case IfStatement s -> {
+                collectContextPaths(s.condition(), paths);
+                for (Statement child : s.thenBranch()) collectContextPaths(child, paths);
+                for (Statement child : s.elseBranch()) collectContextPaths(child, paths);
+            }
+            case ForEachStatement s -> {
+                for (Statement child : s.body()) collectContextPaths(child, paths);
+            }
+            default -> throw new IllegalArgumentException("Unhandled statement type: " + statement.typeName());
+        }
+    }
+
+    private void collectContextPaths(Expression expr, Set<String> paths) {
+        switch (expr) {
+            case ContextGetExpr e -> paths.add(e.path());
+            case ServiceCallExpr e -> {
+                for (Expression arg : e.args()) collectContextPaths(arg, paths);
+            }
+            case BinaryExpr e -> {
+                collectContextPaths(e.left(), paths);
+                collectContextPaths(e.right(), paths);
+            }
+            case ObjectLiteralExpr e -> {
+                for (Expression value : e.properties().values()) collectContextPaths(value, paths);
+            }
+            case PropertyGetExpr e -> collectContextPaths(e.target(), paths);
+            case LiteralExpr ignored -> { }
+            case VarRefExpr ignored -> { }
+            default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
+        }
     }
 
     private void appendStatement(Statement statement, StringBuilder js, boolean trace) {
@@ -127,7 +227,7 @@ public class JsCompiler {
                 validateIdentifier(e.name());
                 yield e.name();
             }
-            case ContextGetExpr e -> "ctx.placeholder(\"" + escape(e.path()) + "\")";
+            case ContextGetExpr e -> ctxPropertyChain(e.path());
             case ServiceCallExpr e -> compileServiceCall(e);
             case BinaryExpr e -> "(" + compileExpr(e.left()) + " " + jsOperator(e.operator())
                 + " " + compileExpr(e.right()) + ")";
