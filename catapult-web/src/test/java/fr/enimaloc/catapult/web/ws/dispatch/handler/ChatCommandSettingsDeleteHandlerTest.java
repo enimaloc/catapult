@@ -12,24 +12,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class ChatCommandParamsDeleteHandlerTest {
+class ChatCommandSettingsDeleteHandlerTest {
 
     @Test
     void deletesAndEchoesKey() {
         ApiClient apiClient = mock(ApiClient.class);
-        when(apiClient.delete("/api/chat-command-params/{key}", "language")).thenReturn(true);
+        when(apiClient.delete("/api/chat-command-settings/{key}", "language")).thenReturn(true);
 
-        ChatCommandParamsDeleteHandler handler = new ChatCommandParamsDeleteHandler(apiClient);
+        ChatCommandSettingsDeleteHandler handler = new ChatCommandSettingsDeleteHandler(apiClient);
         Object result = handler.handle(mock(WsSession.class), Map.of("key", "language"));
 
         assertThat(result).isEqualTo(Map.of("key", "language"));
-        assertThat(handler.action()).isEqualTo("chat-commands.params.delete");
+        assertThat(handler.action()).isEqualTo("chat-commands.settings.delete");
     }
 
     @Test
     void missingKeyThrowsInvalidParams() {
         ApiClient apiClient = mock(ApiClient.class);
-        ChatCommandParamsDeleteHandler handler = new ChatCommandParamsDeleteHandler(apiClient);
+        ChatCommandSettingsDeleteHandler handler = new ChatCommandSettingsDeleteHandler(apiClient);
 
         assertThatThrownBy(() -> handler.handle(mock(WsSession.class), Map.of()))
             .isInstanceOf(WsBusinessException.class);

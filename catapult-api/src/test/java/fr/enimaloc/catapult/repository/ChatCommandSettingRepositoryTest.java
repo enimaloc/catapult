@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.repository;
 
-import fr.enimaloc.catapult.domain.ChatCommandParam;
+import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.UserAccount;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,9 +19,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "logging.level.org.hibernate.tool.schema=ERROR"
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class ChatCommandParamRepositoryTest {
+class ChatCommandSettingRepositoryTest {
 
-    @Autowired ChatCommandParamRepository repository;
+    @Autowired ChatCommandSettingRepository repository;
     @Autowired TestEntityManager em;
 
     private UserAccount persistUser(String twitchUsername) {
@@ -35,57 +35,57 @@ class ChatCommandParamRepositoryTest {
     void savesAndFindsByUserAndKey() {
         UserAccount user = persistUser("streamer1");
 
-        ChatCommandParam param = new ChatCommandParam();
-        param.setUser(user);
-        param.setKey("language");
-        param.setValue("fr");
-        repository.save(param);
+        ChatCommandSetting setting = new ChatCommandSetting();
+        setting.setUser(user);
+        setting.setKey("language");
+        setting.setValue("fr");
+        repository.save(setting);
         em.flush();
         em.clear();
 
-        ChatCommandParam found = repository.findByUserAndKey(user, "language").orElseThrow();
+        ChatCommandSetting found = repository.findByUserAndKey(user, "language").orElseThrow();
         assertThat(found.getValue()).isEqualTo("fr");
     }
 
     @Test
-    void findByUserReturnsOnlyThatUsersParams() {
+    void findByUserReturnsOnlyThatUsersSettings() {
         UserAccount user1 = persistUser("streamer1");
         UserAccount user2 = persistUser("streamer2");
 
-        ChatCommandParam p1 = new ChatCommandParam();
-        p1.setUser(user1);
-        p1.setKey("language");
-        p1.setValue("fr");
-        repository.save(p1);
+        ChatCommandSetting s1 = new ChatCommandSetting();
+        s1.setUser(user1);
+        s1.setKey("language");
+        s1.setValue("fr");
+        repository.save(s1);
 
-        ChatCommandParam p2 = new ChatCommandParam();
-        p2.setUser(user2);
-        p2.setKey("language");
-        p2.setValue("en");
-        repository.save(p2);
+        ChatCommandSetting s2 = new ChatCommandSetting();
+        s2.setUser(user2);
+        s2.setKey("language");
+        s2.setValue("en");
+        repository.save(s2);
         em.flush();
         em.clear();
 
-        assertThat(repository.findByUser(user1)).extracting(ChatCommandParam::getValue).containsExactly("fr");
-        assertThat(repository.findByUser(user2)).extracting(ChatCommandParam::getValue).containsExactly("en");
+        assertThat(repository.findByUser(user1)).extracting(ChatCommandSetting::getValue).containsExactly("fr");
+        assertThat(repository.findByUser(user2)).extracting(ChatCommandSetting::getValue).containsExactly("en");
     }
 
     @Test
     void uniqueConstraintRejectsDuplicateKeyForSameUser() {
         UserAccount user = persistUser("streamer1");
 
-        ChatCommandParam p1 = new ChatCommandParam();
-        p1.setUser(user);
-        p1.setKey("language");
-        p1.setValue("fr");
-        repository.saveAndFlush(p1);
+        ChatCommandSetting s1 = new ChatCommandSetting();
+        s1.setUser(user);
+        s1.setKey("language");
+        s1.setValue("fr");
+        repository.saveAndFlush(s1);
 
-        ChatCommandParam p2 = new ChatCommandParam();
-        p2.setUser(user);
-        p2.setKey("language");
-        p2.setValue("en");
+        ChatCommandSetting s2 = new ChatCommandSetting();
+        s2.setUser(user);
+        s2.setKey("language");
+        s2.setValue("en");
 
-        assertThatThrownBy(() -> repository.saveAndFlush(p2))
+        assertThatThrownBy(() -> repository.saveAndFlush(s2))
             .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -93,17 +93,17 @@ class ChatCommandParamRepositoryTest {
     void deleteByUserAndKeyRemovesOnlyThatRow() {
         UserAccount user = persistUser("streamer1");
 
-        ChatCommandParam p1 = new ChatCommandParam();
-        p1.setUser(user);
-        p1.setKey("language");
-        p1.setValue("fr");
-        repository.save(p1);
+        ChatCommandSetting s1 = new ChatCommandSetting();
+        s1.setUser(user);
+        s1.setKey("language");
+        s1.setValue("fr");
+        repository.save(s1);
 
-        ChatCommandParam p2 = new ChatCommandParam();
-        p2.setUser(user);
-        p2.setKey("region");
-        p2.setValue("eu");
-        repository.save(p2);
+        ChatCommandSetting s2 = new ChatCommandSetting();
+        s2.setUser(user);
+        s2.setKey("region");
+        s2.setValue("eu");
+        repository.save(s2);
         em.flush();
         em.clear();
 

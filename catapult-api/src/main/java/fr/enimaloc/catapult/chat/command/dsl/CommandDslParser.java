@@ -10,10 +10,10 @@ import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.IfStatement;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
-import fr.enimaloc.catapult.chat.command.ast.ParamGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
 import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
+import fr.enimaloc.catapult.chat.command.ast.SettingGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.Statement;
 import fr.enimaloc.catapult.chat.command.ast.ValueType;
 import fr.enimaloc.catapult.chat.command.ast.VarDeclStatement;
@@ -33,8 +33,9 @@ import java.util.regex.Pattern;
  * {@code {for x in list}...{/for}}. Backward-compat shorthand: bare {@code {path}} (context path,
  * contains '#'), bare {@code {name}} (variable reference, no '#'), bare {@code {ns#fn(args)}}
  * (service call) all sugar for an implicit print. {@code ctx.game.name} is sugar for the context
- * path {@code game#name}; any other dot-chain ({@code myObj.name}, chainable) is property access
- * on a variable, equivalent to {@code get(myObj, "name")}.
+ * path {@code game#name}; {@code ctx.settings.<key>} reads a streamer-defined setting (see
+ * {@code ChatCommandSetting}); any other dot-chain ({@code myObj.name}, chainable) is property
+ * access on a variable, equivalent to {@code get(myObj, "name")}.
  */
 public class CommandDslParser {
 
@@ -61,12 +62,12 @@ public class CommandDslParser {
 
     private Expression parseDotChain(String text) {
         String[] segments = text.split("\\.");
-        if (segments[0].equals("ctx") && segments.length > 1 && segments[1].equals("params")) {
+        if (segments[0].equals("ctx") && segments.length > 1 && segments[1].equals("settings")) {
             if (segments.length != 3) {
                 throw new CommandDslParseException(
-                    "ctx.params.<key> takes exactly one key segment (params are flat, not nested): " + text);
+                    "ctx.settings.<key> takes exactly one key segment (settings are flat, not nested): " + text);
             }
-            return new ParamGetExpr(segments[2]);
+            return new SettingGetExpr(segments[2]);
         }
         if (segments[0].equals("ctx")) {
             return new ContextGetExpr(String.join("#", java.util.Arrays.copyOfRange(segments, 1, segments.length)));

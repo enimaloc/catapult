@@ -14,19 +14,19 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class ChatCommandParamsListHandlerTest {
+class ChatCommandSettingsListHandlerTest {
 
     @Test
-    void returnsTheParamListFromCatapultApi() {
+    void returnsTheSettingListFromCatapultApi() {
         ApiClient apiClient = mock(ApiClient.class);
-        List<Map<String, Object>> params = List.of(Map.of("key", "language", "value", "fr"));
-        when(apiClient.get(eq("/api/chat-command-params"), any(ParameterizedTypeReference.class)))
-            .thenReturn(params);
+        List<Map<String, Object>> settings = List.of(Map.of("key", "language", "value", "fr"));
+        when(apiClient.get(eq("/api/chat-command-settings"), any(ParameterizedTypeReference.class)))
+            .thenReturn(settings);
 
-        ChatCommandParamsListHandler handler = new ChatCommandParamsListHandler(apiClient);
+        ChatCommandSettingsListHandler handler = new ChatCommandSettingsListHandler(apiClient);
         Object result = handler.handle(mock(WsSession.class), null);
 
-        assertThat(result).isEqualTo(params);
-        assertThat(handler.action()).isEqualTo("chat-commands.params.list");
+        assertThat(result).isEqualTo(settings);
+        assertThat(handler.action()).isEqualTo("chat-commands.settings.list");
     }
 }

@@ -11,7 +11,7 @@ import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandParamRepository;
+import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.GameContextService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -48,7 +48,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandParamRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
 
         Object result = command.execute(null, List.of());
 
@@ -64,7 +64,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandParamRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
 
         assertThat(command.execute(null, List.of())).isNull();
     }
@@ -82,7 +82,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandParamRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
 
         Object result = command.execute(null, List.of());
 
@@ -107,7 +107,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandParamRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
 
         Object result = command.execute(null, List.of());
 
@@ -132,7 +132,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandParamRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
 
         Object result = command.execute(null, List.of());
 
@@ -170,7 +170,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), registry, gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandParamRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
 
         Object result = command.execute(user, List.of());
 
@@ -178,28 +178,28 @@ class DynamicChatCommandTest {
     }
 
     @Test
-    void resolvesCtxParamsFromTheRealRepositoryForTheInvokingUser() {
+    void resolvesCtxSettingsFromTheRealRepositoryForTheInvokingUser() {
         UserAccount user = new UserAccount();
 
         ChatCommandDefinition definition = new ChatCommandDefinition();
         definition.setName("!lang");
         definition.setEnabled(true);
-        definition.setTemplate("{ctx.params.language}");
-        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{ctx.params.language}")));
+        definition.setTemplate("{ctx.settings.language}");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{ctx.settings.language}")));
 
-        fr.enimaloc.catapult.repository.ChatCommandParamRepository paramRepository =
-            mock(fr.enimaloc.catapult.repository.ChatCommandParamRepository.class);
-        fr.enimaloc.catapult.domain.ChatCommandParam param = new fr.enimaloc.catapult.domain.ChatCommandParam();
-        param.setKey("language");
-        param.setValue("fr");
-        when(paramRepository.findByUser(user)).thenReturn(List.of(param));
+        fr.enimaloc.catapult.repository.ChatCommandSettingRepository settingRepository =
+            mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class);
+        fr.enimaloc.catapult.domain.ChatCommandSetting setting = new fr.enimaloc.catapult.domain.ChatCommandSetting();
+        setting.setKey("language");
+        setting.setValue("fr");
+        when(settingRepository.findByUser(user)).thenReturn(List.of(setting));
 
         GameContextService gameContextService = mock(GameContextService.class);
         when(gameContextService.get(user)).thenReturn(Optional.empty());
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, paramRepository);
+            newPlaceholderResolver(), Locale.FRENCH, settingRepository);
 
         Object result = command.execute(user, List.of());
 
@@ -207,25 +207,25 @@ class DynamicChatCommandTest {
     }
 
     @Test
-    void ctxParamsResolvesToEmptyStringWhenKeyIsNotSet() {
+    void ctxSettingsResolvesToEmptyStringWhenKeyIsNotSet() {
         UserAccount user = new UserAccount();
 
         ChatCommandDefinition definition = new ChatCommandDefinition();
         definition.setName("!lang");
         definition.setEnabled(true);
-        definition.setTemplate("[{ctx.params.language}]");
-        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("[{ctx.params.language}]")));
+        definition.setTemplate("[{ctx.settings.language}]");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("[{ctx.settings.language}]")));
 
-        fr.enimaloc.catapult.repository.ChatCommandParamRepository paramRepository =
-            mock(fr.enimaloc.catapult.repository.ChatCommandParamRepository.class);
-        when(paramRepository.findByUser(user)).thenReturn(List.of());
+        fr.enimaloc.catapult.repository.ChatCommandSettingRepository settingRepository =
+            mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class);
+        when(settingRepository.findByUser(user)).thenReturn(List.of());
 
         GameContextService gameContextService = mock(GameContextService.class);
         when(gameContextService.get(user)).thenReturn(Optional.empty());
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, paramRepository);
+            newPlaceholderResolver(), Locale.FRENCH, settingRepository);
 
         Object result = command.execute(user, List.of());
 

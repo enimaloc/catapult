@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.ChatCommandParam;
+import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandParamRepository;
+import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,12 +31,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ApiChatCommandParamsController.class)
-class ApiChatCommandParamsControllerTest {
+@WebMvcTest(ApiChatCommandSettingsController.class)
+class ApiChatCommandSettingsControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean UserAccountRepository userAccountRepository;
-    @MockitoBean ChatCommandParamRepository repository;
+    @MockitoBean ChatCommandSettingRepository repository;
     @MockitoBean ExperimentService experimentService;
     final ObjectMapper om = new ObjectMapper();
 
@@ -58,28 +58,28 @@ class ApiChatCommandParamsControllerTest {
     }
 
     @Test
-    void get_returns_the_current_users_params() throws Exception {
+    void get_returns_the_current_users_settings() throws Exception {
         UserAccount user = mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
-        ChatCommandParam param = new ChatCommandParam();
-        param.setKey("language");
-        param.setValue("fr");
-        when(repository.findByUser(user)).thenReturn(List.of(param));
+        ChatCommandSetting setting = new ChatCommandSetting();
+        setting.setKey("language");
+        setting.setValue("fr");
+        when(repository.findByUser(user)).thenReturn(List.of(setting));
 
-        mvc.perform(withAdmin(get("/api/chat-command-params")))
+        mvc.perform(withAdmin(get("/api/chat-command-settings")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].key").value("language"))
                 .andExpect(jsonPath("$[0].value").value("fr"));
     }
 
     @Test
-    void put_upserts_a_param_value() throws Exception {
+    void put_upserts_a_setting_value() throws Exception {
         UserAccount user = mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
         when(repository.findByUserAndKey(user, "language")).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        mvc.perform(withAdmin(put("/api/chat-command-params/{key}", "language"))
+        mvc.perform(withAdmin(put("/api/chat-command-settings/{key}", "language"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("value", "fr"))))
                 .andExpect(status().isNoContent());
@@ -92,7 +92,7 @@ class ApiChatCommandParamsControllerTest {
         mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
-        mvc.perform(withAdmin(put("/api/chat-command-params/{key}", "not a valid key"))
+        mvc.perform(withAdmin(put("/api/chat-command-settings/{key}", "not a valid key"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("value", "fr"))))
                 .andExpect(status().isBadRequest());
@@ -100,14 +100,14 @@ class ApiChatCommandParamsControllerTest {
 
     @Test
     void put_rejects_reserved_prototype_pollution_keys() throws Exception {
-        // JsCompiler rejects ctx.params.__proto__/.constructor/.prototype (prototype-pollution
+        // JsCompiler rejects ctx.settings.__proto__/.constructor/.prototype (prototype-pollution
         // guard) — reject them here too so a command referencing such a key fails clearly at
         // save time instead of compiling fine here and only failing later at dispatch time.
         mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
         for (String reserved : new String[]{"__proto__", "constructor", "prototype"}) {
-            mvc.perform(withAdmin(put("/api/chat-command-params/{key}", reserved))
+            mvc.perform(withAdmin(put("/api/chat-command-settings/{key}", reserved))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(Map.of("value", "x"))))
                     .andExpect(status().isBadRequest());
@@ -115,11 +115,11 @@ class ApiChatCommandParamsControllerTest {
     }
 
     @Test
-    void delete_removes_the_param() throws Exception {
+    void delete_removes_the_setting() throws Exception {
         UserAccount user = mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
-        mvc.perform(withAdmin(delete("/api/chat-command-params/{key}", "language")))
+        mvc.perform(withAdmin(delete("/api/chat-command-settings/{key}", "language")))
                 .andExpect(status().isNoContent());
 
         verify(repository).deleteByUserAndKey(user, "language");
