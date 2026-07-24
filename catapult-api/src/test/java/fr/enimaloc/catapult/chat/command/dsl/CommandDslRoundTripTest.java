@@ -26,7 +26,16 @@ class CommandDslRoundTripTest {
 
     @Test
     void bareContextPathRoundTrips() {
+        // The generator's canonical output for a bare context tag is now "ctx.a.b", not "a#b".
         String source = "Now playing {game#name}!";
+        CommandAst ast = parser.parse(source);
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
+        assertThat(generator.generate(ast)).isEqualTo("Now playing {ctx.game.name}!");
+    }
+
+    @Test
+    void ctxDotChainBareTagRoundTrips() {
+        String source = "Now playing {ctx.game.name}!";
         assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
     }
 
@@ -38,8 +47,11 @@ class CommandDslRoundTripTest {
 
     @Test
     void serviceCallWithBarePathArgRoundTrips() {
+        // Canonical output for the ContextGetExpr arg is now the "ctx.a.b" dot-chain.
         String source = "{steam#getPrice(game#store#steam)}";
-        assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+        CommandAst ast = parser.parse(source);
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
+        assertThat(generator.generate(ast)).isEqualTo("{steam#getPrice(ctx.game.store.steam)}");
     }
 
     @Test
@@ -103,8 +115,18 @@ class CommandDslRoundTripTest {
     }
 
     @Test
-    void propertyGetRoundTrips() {
+    void propertyGetViaGetCallParsesAndGeneratesAsDotChain() {
+        // The generator's canonical output for PropertyGetExpr is now a plain dot-chain, not
+        // get(obj, "prop") — get(...) with 2 args still parses (never breaks existing commands).
         String source = "{msg = get(game, \"name\")}";
+        CommandAst ast = parser.parse(source);
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
+        assertThat(generator.generate(ast)).isEqualTo("{msg = game.name}");
+    }
+
+    @Test
+    void propertyGetDotChainRoundTrips() {
+        String source = "{msg = game.name}";
         assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
     }
 
@@ -122,5 +144,11 @@ class CommandDslRoundTripTest {
 
         String text = generator.generate(ast);
         assertThat(parser.parse(text)).isEqualTo(ast);
+    }
+
+    @Test
+    void paramGetRoundTrips() {
+        String source = "{msg = ctx.params.language}";
+        assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
     }
 }

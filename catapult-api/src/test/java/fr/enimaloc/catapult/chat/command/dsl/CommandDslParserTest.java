@@ -60,10 +60,15 @@ class CommandDslParserTest {
     }
 
     @Test
-    void legacyDotSeparatedPathInIfConditionIsNormalized() {
+    void dotChainInAnIfConditionIsPropertyAccessNotLegacyPathNormalization() {
+        // Legacy dot-paths (pre-V59) only ever appeared as bare top-level tags in flat templates —
+        // if/for didn't exist yet, so a dot-chain reaching a nested expression position (like an
+        // if-condition operand) is always the new '.' property-access operator. Context paths here
+        // are spelled either "game#name" or the "ctx.game.name" sugar (see ctxDotChainWorksInAnIfCondition).
         CommandAst ast = parser.parse("{if game.name == \"Valorant\"}yes{/if}");
         var ifStatement = (fr.enimaloc.catapult.chat.command.ast.IfStatement) ast.statements().get(0);
-        assertThat(ifStatement.condition().left()).isEqualTo(new ContextGetExpr("game#name"));
+        assertThat(ifStatement.condition().left())
+            .isEqualTo(new PropertyGetExpr(new VarRefExpr("game"), "name"));
     }
 
     @Test
@@ -196,8 +201,7 @@ class CommandDslParserTest {
 
     @Test
     void objectPropertyAccessDoesNotCollideWithLegacyDotPathNormalization() {
-        // get(x, "y") is a dedicated 2-arg form, distinct from get(path)'s 1-arg context read —
-        // no '.' syntax is introduced, so there is no ambiguity with legacy dot-paths to resolve.
+        // get(x, "y") is a dedicated 2-arg form, distinct from get(path)'s 1-arg context read.
         CommandAst ast = parser.parse("{msg = get(game, \"store\")}");
         AssignStatement assign = (AssignStatement) ast.statements().get(0);
         assertThat(assign.expr()).isEqualTo(new PropertyGetExpr(new VarRefExpr("game"), "store"));
@@ -207,5 +211,78 @@ class CommandDslParserTest {
     void malformedObjectPropertyThrows() {
         assertThatThrownBy(() -> parser.parse("{var x = {notAKeyValuePair}}"))
             .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void dotOperatorAccessesPropertyOnAVariable() {
+        CommandAst ast = parser.parse("{msg = game.name}");
+        assertThat(ast.statements()).containsExactly(
+            new AssignStatement("msg", new PropertyGetExpr(new VarRefExpr("game"), "name")));
+    }
+
+    @Test
+    void dotOperatorChainsThroughMultipleProperties() {
+        CommandAst ast = parser.parse("{msg = game.store.steam}");
+        assertThat(ast.statements()).containsExactly(new AssignStatement("msg",
+            new PropertyGetExpr(new PropertyGetExpr(new VarRefExpr("game"), "store"), "steam")));
+    }
+
+    @Test
+    void ctxDotChainIsSugarForAContextPath() {
+        CommandAst ast = parser.parse("{msg = ctx.game.name}");
+        assertThat(ast.statements()).containsExactly(
+            new AssignStatement("msg", new ContextGetExpr("game#name")));
+    }
+
+    @Test
+    void ctxDotChainWorksAsABareTagShorthand() {
+        CommandAst ast = parser.parse("Now playing {ctx.game.name}!");
+        assertThat(ast.statements()).containsExactly(
+            new PrintStatement(new LiteralExpr("Now playing ", ValueType.STRING)),
+            new PrintStatement(new ContextGetExpr("game#name")),
+            new PrintStatement(new LiteralExpr("!", ValueType.STRING)));
+    }
+
+    @Test
+    void ctxDotChainWorksInAnIfCondition() {
+        CommandAst ast = parser.parse("{if ctx.game.name == \"Valorant\"}yes{/if}");
+        var ifStatement = (fr.enimaloc.catapult.chat.command.ast.IfStatement) ast.statements().get(0);
+        assertThat(ifStatement.condition().left()).isEqualTo(new ContextGetExpr("game#name"));
+    }
+
+    @Test
+    void dotOperatorWorksInsideAServiceCallArgument() {
+        CommandAst ast = parser.parse("{igdb#getGame(game.name)}");
+        PrintStatement print = (PrintStatement) ast.statements().get(0);
+        ServiceCallExpr call = (ServiceCallExpr) print.expr();
+        assertThat(call.args()).containsExactly(new PropertyGetExpr(new VarRefExpr("game"), "name"));
+    }
+
+    @Test
+    void ctxParamsDotChainParsesToParamGetExpr() {
+        CommandAst ast = parser.parse("{msg = ctx.params.language}");
+        assertThat(ast.statements()).containsExactly(
+            new AssignStatement("msg", new fr.enimaloc.catapult.chat.command.ast.ParamGetExpr("language")));
+    }
+
+    @Test
+    void ctxParamsAloneWithoutAKeyThrows() {
+        assertThatThrownBy(() -> parser.parse("{msg = ctx.params}"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void ctxParamsWithTooManySegmentsThrows() {
+        assertThatThrownBy(() -> parser.parse("{msg = ctx.params.a.b}"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
+
+    @Test
+    void ctxParamsWorksAsABareTagShorthand() {
+        CommandAst ast = parser.parse("Language: {ctx.params.language}!");
+        assertThat(ast.statements()).containsExactly(
+            new PrintStatement(new LiteralExpr("Language: ", ValueType.STRING)),
+            new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.ParamGetExpr("language")),
+            new PrintStatement(new LiteralExpr("!", ValueType.STRING)));
     }
 }
