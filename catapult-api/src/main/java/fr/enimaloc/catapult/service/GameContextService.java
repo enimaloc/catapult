@@ -17,6 +17,7 @@ import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -103,6 +104,14 @@ public class GameContextService {
             : Map.of();
         String activeStoreUrl = stores.get(GameContext.storeKey(detected.getSourceType()));
         String slug = details != null ? details.getSlug() : null;
+        Double rating = details != null ? details.getRating() : null;
+        Double criticRating = details != null ? details.getAggregatedRating() : null;
+        List<String> platforms = details != null && details.getPlatforms() != null
+            ? details.getPlatforms() : List.of();
+        List<String> dlcNames = details != null && details.getDlcNames() != null
+            ? details.getDlcNames() : List.of();
+        List<String> similarGameNames = details != null && details.getSimilarGameNames() != null
+            ? details.getSimilarGameNames() : List.of();
 
         String ageRating = igdbId == null ? null
             : igdbGameCclRepository.findById(igdbId)
@@ -139,7 +148,8 @@ public class GameContextService {
         return new GameContext(
             detected, igdbId, detected.getSourceName(),
             summary, releaseDate, stores, activeStoreUrl, slug,
-            activeTws, twLabels, ageRating
+            activeTws, twLabels, ageRating,
+            rating, criticRating, platforms, dlcNames, similarGameNames
         );
     }
 
@@ -147,7 +157,8 @@ public class GameContextService {
         return new GameContext(
             detected, null, detected.getSourceName(),
             null, null, Map.of(), null, null,
-            Collections.emptySet(), Collections.emptyMap(), null
+            Collections.emptySet(), Collections.emptyMap(), null,
+            null, null, List.of(), List.of(), List.of()
         );
     }
 
