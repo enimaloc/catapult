@@ -25,4 +25,14 @@ public interface ServiceFunction {
     default List<String> requiredScopes() {
         return List.of();
     }
+
+    /**
+     * Field names of the object this function returns, empty for scalar-returning functions.
+     * Purely descriptive (the sandbox doesn't enforce it) — lets the Blocks editor pre-fill a
+     * property-access dropdown instead of the streamer having to type a field name from memory
+     * and risk a silent {@code undefined} on a typo.
+     */
+    default List<String> returnKeys() {
+        return List.of();
+    }
 }
