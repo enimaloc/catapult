@@ -8,8 +8,10 @@ import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
+import fr.enimaloc.catapult.domain.ChatCommandParam;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.ChatCommandParamRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import org.junit.jupiter.api.Test;
@@ -54,6 +56,7 @@ class ApiChatCommandTestControllerTest {
     @MockitoBean JsCompiler jsCompiler;
     @MockitoBean SandboxExecutor sandboxExecutor;
     @MockitoBean ServiceFunctionRegistry serviceFunctionRegistry;
+    @MockitoBean ChatCommandParamRepository paramRepository;
 
     private UserAccount mockUser() {
         UserAccount user = new UserAccount();
@@ -231,7 +234,11 @@ class ApiChatCommandTestControllerTest {
     }
 
     @Test
-    void test_resolves_ctx_params_from_the_params_request_field() throws Exception {
+    void test_resolves_ctx_params_from_the_real_saved_param_by_default() throws Exception {
+        // Unlike context placeholders (no live game during a test), params are real persisted
+        // per-streamer settings, so the Tester must reflect what's actually saved without the
+        // caller needing to pass a "params" override for every key — this was a real bug: the
+        // Tester used to ONLY look at a request-body "params" map, ignoring saved values entirely.
         UserAccount user = mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
@@ -244,15 +251,60 @@ class ApiChatCommandTestControllerTest {
         def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{ctx.params.language}")));
         def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
         when(repository.findById(id)).thenReturn(Optional.of(def));
+        ChatCommandParam savedParam = new ChatCommandParam();
+        savedParam.setKey("language");
+        savedParam.setValue("fr");
+        when(paramRepository.findByUser(user)).thenReturn(java.util.List.of(savedParam));
         when(jsCompiler.compileWithTrace(any())).thenReturn("return ctx.params.language;");
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
         trace.finish("fr");
         when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
+        // No "params" field sent at all — must still resolve from the real saved value.
         mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(om.writeValueAsString(Map.of("overrides", Map.of(), "params", Map.of("language", "fr")))))
+                        .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.output").value("fr"));
+
+        ArgumentCaptor<SandboxExecutor.ParamContext> paramCaptor =
+                ArgumentCaptor.forClass(SandboxExecutor.ParamContext.class);
+        verify(sandboxExecutor).executeWithTrace(any(), any(), any(), any(), any(), paramCaptor.capture(), any());
+        assertThat(paramCaptor.getValue().resolve("language")).isEqualTo("fr");
+    }
+
+    @Test
+    void test_params_request_field_overrides_the_real_saved_value() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setId(id);
+        def.setUser(user);
+        def.setName("!lang");
+        def.setTemplate("{ctx.params.language}");
+        def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{ctx.params.language}")));
+        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(def));
+        ChatCommandParam savedParam = new ChatCommandParam();
+        savedParam.setKey("language");
+        savedParam.setValue("fr");
+        when(paramRepository.findByUser(user)).thenReturn(java.util.List.of(savedParam));
+        when(jsCompiler.compileWithTrace(any())).thenReturn("return ctx.params.language;");
+        var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
+        trace.finish("en");
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
+
+        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("overrides", Map.of(), "params", Map.of("language", "en")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.output").value("en"));
+
+        ArgumentCaptor<SandboxExecutor.ParamContext> paramCaptor =
+                ArgumentCaptor.forClass(SandboxExecutor.ParamContext.class);
+        verify(sandboxExecutor).executeWithTrace(any(), any(), any(), any(), any(), paramCaptor.capture(), any());
+        assertThat(paramCaptor.getValue().resolve("language")).isEqualTo("en");
     }
 }

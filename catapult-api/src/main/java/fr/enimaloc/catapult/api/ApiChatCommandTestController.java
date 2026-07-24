@@ -8,8 +8,10 @@ import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
+import fr.enimaloc.catapult.domain.ChatCommandParam;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.ChatCommandParamRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +25,11 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Backs the "Tester" button in the command editor modal: compiles and runs a command's AST
@@ -52,6 +56,7 @@ public class ApiChatCommandTestController {
     private final JsCompiler jsCompiler;
     private final SandboxExecutor sandboxExecutor;
     private final ServiceFunctionRegistry serviceFunctionRegistry;
+    private final ChatCommandParamRepository paramRepository;
 
     @PostMapping("/api/chat-commands/{id}/test")
     public Map<String, Object> test(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
@@ -67,6 +72,15 @@ public class ApiChatCommandTestController {
         @SuppressWarnings("unchecked")
         Map<String, String> paramOverrides = (Map<String, String>) body.getOrDefault("params", Map.of());
 
+        // Unlike context placeholders (game#name etc.), which have no real value at all outside
+        // a live stream and so always need a manual test override, params are real persisted
+        // per-streamer settings — the Tester should reflect what's actually saved by default,
+        // with the "params" request field only overriding specific keys for one-off "what if"
+        // testing (mirrors DynamicChatCommand#execute's real resolution, plus that override layer).
+        Map<String, String> params = new HashMap<>(paramRepository.findByUser(user).stream()
+            .collect(Collectors.toMap(ChatCommandParam::getKey, ChatCommandParam::getValue)));
+        params.putAll(paramOverrides);
+
         String js = resolveJs(body, definition);
 
         // A placeholder the caller didn't supply a test value for must resolve to "" like the
@@ -75,7 +89,7 @@ public class ApiChatCommandTestController {
         ExecutionTrace trace = sandboxExecutor.executeWithTrace(js,
             path -> overrides.getOrDefault(path, ""),
             name -> "fallbacks".equals(name) ? List.copyOf(overrides.values()) : List.of(),
-            serviceFunctionRegistry, user, key -> paramOverrides.getOrDefault(key, ""), TEST_TIMEOUT);
+            serviceFunctionRegistry, user, key -> params.getOrDefault(key, ""), TEST_TIMEOUT);
 
         return Map.of(
             "output", trace.finalOutput(),
