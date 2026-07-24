@@ -7,10 +7,16 @@ import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.IgdbGameDetails;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.IgdbService;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -47,27 +54,50 @@ public class ApiChatCommandDslController {
     private final IgdbService igdbService;
     private final IgdbGameDetailsService igdbGameDetailsService;
     private final PlaceholderResolver placeholderResolver;
+    private final ChatCommandSettingRepository settingRepository;
+    private final UserAccountRepository userAccountRepository;
 
     public ApiChatCommandDslController(ServiceFunctionRegistry serviceFunctionRegistry, JsCompiler jsCompiler,
                                         IgdbService igdbService, IgdbGameDetailsService igdbGameDetailsService,
-                                        PlaceholderResolver placeholderResolver) {
+                                        PlaceholderResolver placeholderResolver,
+                                        ChatCommandSettingRepository settingRepository,
+                                        UserAccountRepository userAccountRepository) {
         this.serviceFunctionRegistry = serviceFunctionRegistry;
         this.jsCompiler = jsCompiler;
         this.igdbService = igdbService;
         this.igdbGameDetailsService = igdbGameDetailsService;
         this.placeholderResolver = placeholderResolver;
+        this.settingRepository = settingRepository;
+        this.userAccountRepository = userAccountRepository;
     }
 
     public record ServiceFunctionDto(String namespace, String name, List<String> parameterNames) {}
 
-    public record CatalogDto(List<String> contextPaths, List<ServiceFunctionDto> serviceFunctions) {}
+    public record CatalogDto(List<String> contextPaths, List<ServiceFunctionDto> serviceFunctions,
+                              List<String> settingKeys) {}
 
+    /**
+     * The settings block's dropdown needs the streamer's own saved keys (unlike context paths,
+     * which are a fixed known catalog) — resolved best-effort so the rest of the catalog (context
+     * paths, service functions) still renders even for a caller the JWT can't be matched to a
+     * {@link UserAccount} for (e.g. an incomplete test JWT).
+     */
     @GetMapping("/api/chat-commands/dsl/catalog")
-    public CatalogDto catalog() {
+    public CatalogDto catalog(@AuthenticationPrincipal Jwt jwt) {
         List<ServiceFunctionDto> functions = serviceFunctionRegistry.all().stream()
             .map(f -> new ServiceFunctionDto(f.namespace(), f.name(), f.parameterNames()))
             .toList();
-        return new CatalogDto(List.copyOf(PlaceholderResolver.KNOWN_PATHS), functions);
+        List<String> settingKeys = currentUser(jwt)
+            .map(user -> settingRepository.findByUser(user).stream()
+                .map(ChatCommandSetting::getKey).sorted().toList())
+            .orElse(List.of());
+        return new CatalogDto(List.copyOf(PlaceholderResolver.KNOWN_PATHS), functions, settingKeys);
+    }
+
+    private Optional<UserAccount> currentUser(Jwt jwt) {
+        if (jwt == null) return Optional.empty();
+        String twitchId = jwt.getClaimAsString("twitchId");
+        return userAccountRepository.findByTwitchId(twitchId);
     }
 
     @PostMapping("/api/chat-commands/dsl/text-to-ast")
