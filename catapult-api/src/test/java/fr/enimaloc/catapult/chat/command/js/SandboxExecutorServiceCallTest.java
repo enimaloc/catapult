@@ -51,6 +51,24 @@ class SandboxExecutorServiceCallTest {
     }
 
     @Test
+    void diagnosticMapPropertyAccessOnServiceCallResult() {
+        ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
+        registry.register(new ServiceFunction() {
+            @Override public String namespace() { return "test"; }
+            @Override public String name() { return "getMap"; }
+            @Override public List<String> parameterNames() { return List.of(); }
+            @Override public Object invoke(UserAccount user, Object[] args) {
+                return java.util.Map.of("title", "Hello");
+            }
+        });
+
+        String js = "let s = ctx.call(\"test\", \"getMap\"); return s[\"title\"];";
+        String output = executor.execute(js, path -> null, name -> List.of(), registry, null, null, Duration.ofSeconds(2));
+
+        assertThat(output).isEqualTo("Hello");
+    }
+
+    @Test
     void serviceCallOnUnknownFunctionFailsClearly() {
         ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
 
