@@ -34,7 +34,7 @@ class TwitchGetStreamFunctionTest {
         Map<String, Object> result = (Map<String, Object>) fn.invoke(user, new Object[0]);
         assertThat(result.get("title")).isEqualTo("My Title");
         assertThat(result.get("category")).isEqualTo("Just Chatting");
-        assertThat(result.get("viewers")).isEqualTo(42);
+        assertThat(result.get("viewers")).isEqualTo("42");
         assertThat(result.get("uptime")).isEqualTo("2h34m");
     }
 
