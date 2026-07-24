@@ -156,9 +156,17 @@ public class ApiChatCommandDslController {
         Map<String, String> stores = (details != null && details.getWebsites() != null)
             ? details.getWebsites() : Map.of();
         String slug = details != null ? details.getSlug() : null;
+        Double rating = details != null ? details.getRating() : null;
+        Double criticRating = details != null ? details.getAggregatedRating() : null;
+        List<String> platforms = (details != null && details.getPlatforms() != null)
+            ? details.getPlatforms() : List.of();
+        List<String> dlcNames = (details != null && details.getDlcNames() != null)
+            ? details.getDlcNames() : List.of();
+        List<String> similarGameNames = (details != null && details.getSimilarGameNames() != null)
+            ? details.getSimilarGameNames() : List.of();
 
         GameContext ctx = new GameContext(null, id, name, summary, releaseDate, stores, null, slug,
-            Set.of(), Map.of(), null);
+            Set.of(), Map.of(), null, rating, criticRating, platforms, dlcNames, similarGameNames);
 
         Map<String, String> result = new LinkedHashMap<>();
         for (String path : PlaceholderResolver.KNOWN_PATHS) {

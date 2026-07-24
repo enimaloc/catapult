@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.getter.DetectedGame;
 
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -23,11 +24,17 @@ public record GameContext(
     String igdbSlug,
     Set<String> activeTws,
     Map<String, String> twLabels,
-    String ageRating
+    String ageRating,
+    Double rating,
+    Double criticRating,
+    List<String> platforms,
+    List<String> dlcNames,
+    List<String> similarGameNames
 ) {
     public static GameContext empty() {
         return new GameContext(null, null, null, null, null, Collections.emptyMap(), null, null,
-            Collections.emptySet(), Collections.emptyMap(), null);
+            Collections.emptySet(), Collections.emptyMap(), null,
+            null, null, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     public static String storeKey(GameBinding.SourceType sourceType) {
