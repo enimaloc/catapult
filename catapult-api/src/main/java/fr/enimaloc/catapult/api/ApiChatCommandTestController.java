@@ -64,6 +64,8 @@ public class ApiChatCommandTestController {
 
         @SuppressWarnings("unchecked")
         Map<String, String> overrides = (Map<String, String>) body.getOrDefault("overrides", Map.of());
+        @SuppressWarnings("unchecked")
+        Map<String, String> paramOverrides = (Map<String, String>) body.getOrDefault("params", Map.of());
 
         String js = resolveJs(body, definition);
 
@@ -73,7 +75,7 @@ public class ApiChatCommandTestController {
         ExecutionTrace trace = sandboxExecutor.executeWithTrace(js,
             path -> overrides.getOrDefault(path, ""),
             name -> "fallbacks".equals(name) ? List.copyOf(overrides.values()) : List.of(),
-            serviceFunctionRegistry, user, null, TEST_TIMEOUT);
+            serviceFunctionRegistry, user, key -> paramOverrides.getOrDefault(key, ""), TEST_TIMEOUT);
 
         return Map.of(
             "output", trace.finalOutput(),

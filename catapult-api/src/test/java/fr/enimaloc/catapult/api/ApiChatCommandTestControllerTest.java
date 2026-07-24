@@ -229,4 +229,30 @@ class ApiChatCommandTestControllerTest {
         assertThat(placeholderCaptor.getValue().resolve("game#name")).isEqualTo("Valorant");
         assertThat(placeholderCaptor.getValue().resolve("tw#active")).isEqualTo("");
     }
+
+    @Test
+    void test_resolves_ctx_params_from_the_params_request_field() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setId(id);
+        def.setUser(user);
+        def.setName("!lang");
+        def.setTemplate("{ctx.params.language}");
+        def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{ctx.params.language}")));
+        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        when(repository.findById(id)).thenReturn(Optional.of(def));
+        when(jsCompiler.compileWithTrace(any())).thenReturn("return ctx.params.language;");
+        var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
+        trace.finish("fr");
+        when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
+
+        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("overrides", Map.of(), "params", Map.of("language", "fr")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.output").value("fr"));
+    }
 }
