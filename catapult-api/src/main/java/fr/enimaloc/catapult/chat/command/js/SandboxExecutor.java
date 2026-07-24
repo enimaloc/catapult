@@ -183,6 +183,51 @@ public class SandboxExecutor {
             .build();
     }
 
+    /**
+     * Wraps a list as a {@link ProxyArray} whose {@code get}/{@code set} bounds-check against the
+     * list's actual size and throw {@link ArrayIndexOutOfBoundsException} for out-of-range indices —
+     * unlike {@link ProxyArray#fromList}, whose {@code checkIndex} only rejects negative/overflow
+     * indices and otherwise lets {@code List#get} raise a plain {@link IndexOutOfBoundsException}.
+     * GraalJS's array-element-read interop only recognizes the former as "index unreadable" (and
+     * degrades a compiled {@code arr[i]} read to {@code undefined} accordingly); the latter escapes
+     * as an uncaught guest script error instead. This matters for compiled {@code arg(N)} lookups
+     * (emitted as {@code ctx.list("args")[N] || ""}), which rely on out-of-range access resolving to
+     * {@code undefined} rather than throwing.
+     */
+    private static ProxyArray boundedListProxyArray(List<Object> values) {
+        return new ProxyArray() {
+            @Override
+            public Object get(long index) {
+                checkIndex(index);
+                return values.get((int) index);
+            }
+
+            @Override
+            public void set(long index, Value value) {
+                checkIndex(index);
+                values.set((int) index, value.isHostObject() ? value.asHostObject() : value);
+            }
+
+            @Override
+            public boolean remove(long index) {
+                checkIndex(index);
+                values.remove((int) index);
+                return true;
+            }
+
+            @Override
+            public long getSize() {
+                return values.size();
+            }
+
+            private void checkIndex(long index) {
+                if (index < 0 || index >= values.size()) {
+                    throw new ArrayIndexOutOfBoundsException("invalid index: " + index);
+                }
+            }
+        };
+    }
+
     private String runInContext(Context context, String compiledJs, PlaceholderContext placeholders, ListContext lists,
                                  ServiceFunctionRegistry registry, UserAccount user, SettingContext settings) {
         try {
@@ -190,7 +235,7 @@ public class SandboxExecutor {
             Value ctx = context.eval("js", "({})");
             ctx.putMember("placeholder", (ProxyExecutable) args -> placeholders.resolve(args[0].asString()));
             ctx.putMember("list", (ProxyExecutable) args ->
-                ProxyArray.fromList(new ArrayList<Object>(lists.resolveList(args[0].asString()))));
+                boundedListProxyArray(new ArrayList<Object>(lists.resolveList(args[0].asString()))));
             ctx.putMember("setting", (ProxyExecutable) args -> settings == null ? null : settings.resolve(args[0].asString()));
             ctx.putMember("call", (ProxyExecutable) args -> {
                 if (registry == null) {
@@ -243,7 +288,7 @@ public class SandboxExecutor {
                 String name = args[0].asString();
                 List<String> values = lists.resolveList(name);
                 trace.record(new TraceEntry("for-each", "iterate " + name, String.join(", ", values), false));
-                return ProxyArray.fromList(new ArrayList<Object>(values));
+                return boundedListProxyArray(new ArrayList<Object>(values));
             });
             ctx.putMember("setting", (ProxyExecutable) args -> {
                 String key = args[0].asString();

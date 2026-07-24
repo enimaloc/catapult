@@ -240,4 +240,13 @@ class JsCompilerTest {
         assertThat(js).doesNotContain("ctx.game");
         assertThat(js).doesNotContain("ctx.settings");
     }
+
+    @Test
+    void argGetResolvesEndToEndInTheRealSandboxIncludingOutOfRangeAsEmptyString() {
+        String js = compiler.compile(parser.parse("[{arg(0)}] [{arg(5)}]"));
+        String result = new SandboxExecutor().execute(js,
+            path -> null, name -> "args".equals(name) ? List.of("myfriend") : List.of(),
+            java.time.Duration.ofSeconds(2));
+        assertThat(result).isEqualTo("[myfriend] []");
+    }
 }
