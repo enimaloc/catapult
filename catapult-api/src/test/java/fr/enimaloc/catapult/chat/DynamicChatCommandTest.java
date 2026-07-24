@@ -1,11 +1,16 @@
 package fr.enimaloc.catapult.chat;
 
+import fr.enimaloc.catapult.chat.command.ast.CommandAst;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
+import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
+import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
+import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.GameContextService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -131,5 +136,43 @@ class DynamicChatCommandTest {
         Object result = command.execute(null, List.of());
 
         assertThat(result).isEqualTo("Now playing Dota 2!");
+    }
+
+    @Test
+    void invokingUserReachesServiceFunctionCalls() {
+        // A command whose AST calls a service function (e.g. a future "twitch#getUser"-style
+        // lookup scoped to "the current streamer") must have the invoking UserAccount threaded
+        // all the way from ChatCommand.execute(user, args) through DynamicChatCommand,
+        // SandboxExecutor's ctx.call, down to ServiceFunction#invoke.
+        UserAccount user = new UserAccount();
+
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!whoami");
+        definition.setEnabled(true);
+        definition.setTemplate("");
+        CommandAst ast = new CommandAst(List.of(
+            new PrintStatement(new ServiceCallExpr("test", "whoAmI", List.of()))));
+        definition.setAst(new NodeJsonCodec().toJson(ast));
+
+        GameContextService gameContextService = mock(GameContextService.class);
+        when(gameContextService.get(user)).thenReturn(Optional.of(GameContext.empty()));
+
+        ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
+        registry.register(new ServiceFunction() {
+            @Override public String namespace() { return "test"; }
+            @Override public String name() { return "whoAmI"; }
+            @Override public List<String> parameterNames() { return List.of(); }
+            @Override public Object invoke(UserAccount boundUser, Object[] args) {
+                return boundUser == user ? "same-user" : "different-user";
+            }
+        });
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), registry, gameContextService,
+            newPlaceholderResolver(), Locale.FRENCH);
+
+        Object result = command.execute(user, List.of());
+
+        assertThat(result).isEqualTo("same-user");
     }
 }
