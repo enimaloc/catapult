@@ -451,7 +451,7 @@
             this.fn = fn;
             this.type = 'cmd_call_' + fn.namespace + '_' + fn.name;
         }
-        category() { return 'Fonctions'; }
+        category() { return namespaceCategory(this.fn.namespace); }
         definition() {
             const argRefs = this.fn.parameterNames.map((name, i) => name + ': %' + (i + 1)).join(', ');
             return {
@@ -479,8 +479,16 @@
         CmdObjectLiteralBlock, CmdObjectPropertyBlock, CmdPropertyGetBlock,
         CmdVarDeclBlock, CmdAssignBlock, CmdConcatBlock, CmdPrintBlock, CmdIfBlock, CmdForEachBlock
     ];
-    const TOOLBOX_CATEGORY_ORDER = ['Variables', 'Contrôle', 'Texte', 'Contexte', 'Fonctions'];
-    const TOOLBOX_CATEGORY_COLOURS = { Variables: '20', 'Contrôle': '210', Texte: '60', Contexte: '200', Fonctions: '290' };
+    const TOOLBOX_CATEGORY_ORDER = ['Variables', 'Contrôle', 'Texte', 'Contexte'];
+    const TOOLBOX_CATEGORY_COLOURS = { Variables: '20', 'Contrôle': '210', Texte: '60', Contexte: '200' };
+    // Registered functions get their own toolbox category per namespace instead of one shared
+    // "Fonctions" bucket, so a growing function catalog stays browsable (Twitch/Steam/Catapult/
+    // IGDB, one tab each) instead of piling every service into a single flat list.
+    const SERVICE_CATEGORY_DISPLAY_NAMES = { igdb: 'IGDB' };
+    function namespaceCategory(namespace) {
+        return SERVICE_CATEGORY_DISPLAY_NAMES[namespace]
+            || (namespace.charAt(0).toUpperCase() + namespace.slice(1));
+    }
 
     // blockly type -> class/instance implementing the contract above — the single dispatch
     // table for blockToNode(). AST-node-type -> class/instance for the reverse direction is
@@ -505,11 +513,17 @@
         Object.values(blockRegistry).forEach(b => {
             (byCategory[b.category()] = byCategory[b.category()] || []).push(b);
         });
+        // Static categories first in their fixed order, then one category per service
+        // namespace (sorted alphabetically) for whatever the catalog currently reports.
+        const serviceCategoryNames = Object.keys(byCategory)
+            .filter(name => !TOOLBOX_CATEGORY_ORDER.includes(name))
+            .sort();
+        const categoryOrder = [...TOOLBOX_CATEGORY_ORDER, ...serviceCategoryNames];
         workspace = Blockly.inject('ceBlocksPane', {
             toolbox: {
                 kind: "categoryToolbox",
-                contents: TOOLBOX_CATEGORY_ORDER.filter(name => byCategory[name]).map(name => ({
-                    kind: "category", name: name, colour: TOOLBOX_CATEGORY_COLOURS[name],
+                contents: categoryOrder.filter(name => byCategory[name]).map(name => ({
+                    kind: "category", name: name, colour: TOOLBOX_CATEGORY_COLOURS[name] || '290',
                     contents: byCategory[name].map(b => ({ kind: "block", type: b.type }))
                 }))
             },
