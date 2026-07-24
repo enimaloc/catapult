@@ -30,10 +30,15 @@ public class TwitchTimeoutFunction implements ServiceFunction {
     }
 
     @Override
+    public List<String> optionalParameterNames() {
+        return List.of("reason");
+    }
+
+    @Override
     public Object invoke(UserAccount user, Object[] args) {
         String login = String.valueOf(args[0]);
         int durationSeconds = ((Number) args[1]).intValue();
-        String reason = String.valueOf(args[2]);
+        String reason = ServiceFunction.optionalArg(args, 2);
         twitchChatService.timeout(user, login, durationSeconds, reason);
         return "";
     }

@@ -35,4 +35,22 @@ public interface ServiceFunction {
     default List<String> returnKeys() {
         return List.of();
     }
+
+    /**
+     * Subset of {@link #parameterNames()} that may be omitted by the caller — a trailing
+     * argument the streamer left unconnected in the Blocks editor already compiles to a
+     * {@code ""} literal, but the text DSL and any hand-edited "ejected" JS can call {@code
+     * ctx.call(...)} with fewer arguments than {@link #parameterNames()} declares, so {@code
+     * invoke(...)} must read optional trailing arguments via {@link #optionalArg(Object[], int)}
+     * rather than indexing {@code args} directly. Purely descriptive otherwise (not enforced by
+     * the sandbox) — lets the Blocks editor mark the corresponding slot's label as optional.
+     */
+    default List<String> optionalParameterNames() {
+        return List.of();
+    }
+
+    /** {@code ""} (the DSL's universal "missing" value) when {@code index} wasn't supplied. */
+    static String optionalArg(Object[] args, int index) {
+        return index < args.length ? String.valueOf(args[index]) : "";
+    }
 }
