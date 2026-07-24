@@ -48,7 +48,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class), mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         Object result = command.execute(null, List.of());
 
@@ -64,7 +64,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class), mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         assertThat(command.execute(null, List.of())).isNull();
     }
@@ -82,7 +82,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class), mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         Object result = command.execute(null, List.of());
 
@@ -107,7 +107,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class), mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         Object result = command.execute(null, List.of());
 
@@ -132,7 +132,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class), mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         Object result = command.execute(null, List.of());
 
@@ -170,7 +170,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), registry, gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(ChatCommandSettingRepository.class), mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         Object result = command.execute(user, List.of());
 
@@ -199,7 +199,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, settingRepository);
+            newPlaceholderResolver(), Locale.FRENCH, settingRepository, mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         Object result = command.execute(user, List.of());
 
@@ -225,7 +225,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
-            newPlaceholderResolver(), Locale.FRENCH, settingRepository);
+            newPlaceholderResolver(), Locale.FRENCH, settingRepository, mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         Object result = command.execute(user, List.of());
 
@@ -242,7 +242,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
-            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class), mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         Object result = command.execute(null, List.of("myfriend"));
 
@@ -259,7 +259,7 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
-            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class), mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         Object result = command.execute(null, List.of());
 
@@ -276,10 +276,41 @@ class DynamicChatCommandTest {
 
         DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
             new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
-            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class));
+            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class), mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
 
         Object result = command.execute(null, List.of("one", "two"));
 
         assertThat(result).isEqualTo("[one][two]");
+    }
+
+    @Test
+    void forEachOverOwnCommandsListsOnlyTheStreamersOwnEnabledCommandNames() {
+        UserAccount user = new UserAccount();
+
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!list");
+        definition.setEnabled(true);
+        definition.setTemplate("{for c in ownCommands}[{c}]{/for}");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{for c in ownCommands}[{c}]{/for}")));
+
+        ChatCommandDefinition enabledOther = new ChatCommandDefinition();
+        enabledOther.setName("!hello");
+        enabledOther.setEnabled(true);
+        ChatCommandDefinition disabledOther = new ChatCommandDefinition();
+        disabledOther.setName("!disabled");
+        disabledOther.setEnabled(false);
+
+        fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository definitionRepository =
+            mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class);
+        when(definitionRepository.findByUser(user)).thenReturn(List.of(definition, enabledOther, disabledOther));
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
+            newPlaceholderResolver(), Locale.FRENCH,
+            mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class), definitionRepository);
+
+        Object result = command.execute(user, List.of());
+
+        assertThat(result).isEqualTo("[!list][!hello]");
     }
 }
