@@ -71,7 +71,8 @@ public class ApiChatCommandDslController {
         this.userAccountRepository = userAccountRepository;
     }
 
-    public record ServiceFunctionDto(String namespace, String name, List<String> parameterNames) {}
+    public record ServiceFunctionDto(String namespace, String name, List<String> parameterNames,
+                                      List<String> returnKeys) {}
 
     public record CatalogDto(List<String> contextPaths, List<ServiceFunctionDto> serviceFunctions,
                               List<String> settingKeys) {}
@@ -85,7 +86,7 @@ public class ApiChatCommandDslController {
     @GetMapping("/api/chat-commands/dsl/catalog")
     public CatalogDto catalog(@AuthenticationPrincipal Jwt jwt) {
         List<ServiceFunctionDto> functions = serviceFunctionRegistry.all().stream()
-            .map(f -> new ServiceFunctionDto(f.namespace(), f.name(), f.parameterNames()))
+            .map(f -> new ServiceFunctionDto(f.namespace(), f.name(), f.parameterNames(), f.returnKeys()))
             .toList();
         List<String> settingKeys = currentUser(jwt)
             .map(user -> settingRepository.findByUser(user).stream()

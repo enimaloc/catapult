@@ -34,6 +34,11 @@ public class SteamGetProfileFunction implements ServiceFunction {
     }
 
     @Override
+    public List<String> returnKeys() {
+        return List.of("displayName", "onlineStatus", "currentGame");
+    }
+
+    @Override
     public Object invoke(UserAccount user, Object[] args) {
         Map<String, Object> result = new LinkedHashMap<>();
         if (user.getSteamId() == null) {
