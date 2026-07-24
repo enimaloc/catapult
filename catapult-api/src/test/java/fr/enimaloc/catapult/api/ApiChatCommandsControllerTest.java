@@ -8,7 +8,7 @@ import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
-import fr.enimaloc.catapult.chat.command.registry.TwitchShoutoutFunction;
+import fr.enimaloc.catapult.chat.command.registry.twitch.TwitchShoutoutFunction;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
