@@ -26,7 +26,7 @@ class SandboxExecutorServiceCallTest {
         });
 
         String js = "let result = \"\"; result += ctx.call(\"igdb\", \"getGame\", \"Valorant\"); return result;";
-        String output = executor.execute(js, path -> null, name -> List.of(), registry, null, Duration.ofSeconds(2));
+        String output = executor.execute(js, path -> null, name -> List.of(), registry, null, null, Duration.ofSeconds(2));
 
         assertThat(output).isEqualTo("resolved:Valorant");
     }
@@ -45,7 +45,7 @@ class SandboxExecutorServiceCallTest {
         });
 
         String js = "return ctx.call(\"test\", \"whoAmI\");";
-        String output = executor.execute(js, path -> null, name -> List.of(), registry, user, Duration.ofSeconds(2));
+        String output = executor.execute(js, path -> null, name -> List.of(), registry, user, null, Duration.ofSeconds(2));
 
         assertThat(output).isEqualTo("same-user");
     }
@@ -55,7 +55,7 @@ class SandboxExecutorServiceCallTest {
         ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
 
         String js = "return ctx.call(\"igdb\", \"getGame\", \"Valorant\");";
-        assertThatThrownBy(() -> executor.execute(js, path -> null, name -> List.of(), registry, null, Duration.ofSeconds(2)))
+        assertThatThrownBy(() -> executor.execute(js, path -> null, name -> List.of(), registry, null, null, Duration.ofSeconds(2)))
             .isInstanceOf(SandboxExecutionException.class)
             .satisfies(t -> assertThat(fullMessageChain(t)).contains("igdb#getGame"));
     }

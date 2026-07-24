@@ -55,6 +55,10 @@ public class SandboxExecutor {
         List<String> resolveList(String name);
     }
 
+    public interface ParamContext {
+        String resolve(String key);
+    }
+
     /**
      * Pays the one-time GraalJS engine/class-loading cold-start cost (which can run into
      * multiple seconds on a JVM without JVMCI, i.e. the interpreter-only fallback runtime) at
@@ -74,7 +78,7 @@ public class SandboxExecutor {
     }
 
     public String execute(String compiledJs, PlaceholderContext placeholders, ListContext lists, Duration timeout) {
-        return execute(compiledJs, placeholders, lists, null, null, timeout);
+        return execute(compiledJs, placeholders, lists, null, null, null, timeout);
     }
 
     /**
@@ -88,11 +92,11 @@ public class SandboxExecutor {
      * have one.
      */
     public String execute(String compiledJs, PlaceholderContext placeholders, ListContext lists,
-                           ServiceFunctionRegistry registry, UserAccount user, Duration timeout) {
+                           ServiceFunctionRegistry registry, UserAccount user, ParamContext params, Duration timeout) {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Context context = buildContext();
         try {
-            Future<String> future = executor.submit(() -> runInContext(context, compiledJs, placeholders, lists, registry, user));
+            Future<String> future = executor.submit(() -> runInContext(context, compiledJs, placeholders, lists, registry, user, params));
             try {
                 return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
             } catch (TimeoutException e) {
@@ -120,13 +124,14 @@ public class SandboxExecutor {
      * given output.
      */
     public ExecutionTrace executeWithTrace(String compiledJs, PlaceholderContext placeholders, ListContext lists,
-                                            ServiceFunctionRegistry registry, UserAccount user, Duration timeout) {
+                                            ServiceFunctionRegistry registry, UserAccount user, ParamContext params,
+                                            Duration timeout) {
         ExecutionTrace trace = new ExecutionTrace();
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Context context = buildContext();
         try {
             Future<String> future = executor.submit(() ->
-                runInContextWithTrace(context, compiledJs, placeholders, lists, registry, user, trace));
+                runInContextWithTrace(context, compiledJs, placeholders, lists, registry, user, params, trace));
             try {
                 String output = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
                 trace.finish(output);
@@ -179,13 +184,14 @@ public class SandboxExecutor {
     }
 
     private String runInContext(Context context, String compiledJs, PlaceholderContext placeholders, ListContext lists,
-                                 ServiceFunctionRegistry registry, UserAccount user) {
+                                 ServiceFunctionRegistry registry, UserAccount user, ParamContext params) {
         try {
             Value bindings = context.getBindings("js");
             Value ctx = context.eval("js", "({})");
             ctx.putMember("placeholder", (ProxyExecutable) args -> placeholders.resolve(args[0].asString()));
             ctx.putMember("list", (ProxyExecutable) args ->
                 ProxyArray.fromList(new ArrayList<Object>(lists.resolveList(args[0].asString()))));
+            ctx.putMember("param", (ProxyExecutable) args -> params == null ? null : params.resolve(args[0].asString()));
             ctx.putMember("call", (ProxyExecutable) args -> {
                 if (registry == null) {
                     throw new UnsupportedOperationException(
@@ -223,7 +229,7 @@ public class SandboxExecutor {
 
     private String runInContextWithTrace(Context context, String compiledJs, PlaceholderContext placeholders,
                                           ListContext lists, ServiceFunctionRegistry registry, UserAccount user,
-                                          ExecutionTrace trace) {
+                                          ParamContext params, ExecutionTrace trace) {
         try {
             Value bindings = context.getBindings("js");
             Value ctx = context.eval("js", "({})");
@@ -238,6 +244,12 @@ public class SandboxExecutor {
                 List<String> values = lists.resolveList(name);
                 trace.record(new TraceEntry("for-each", "iterate " + name, String.join(", ", values), false));
                 return ProxyArray.fromList(new ArrayList<Object>(values));
+            });
+            ctx.putMember("param", (ProxyExecutable) args -> {
+                String key = args[0].asString();
+                String value = params == null ? null : params.resolve(key);
+                trace.record(new TraceEntry("param", "resolve " + key, value, false));
+                return value;
             });
             ctx.putMember("call", (ProxyExecutable) args -> {
                 if (args.length < 2) {
