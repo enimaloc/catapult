@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.GameContextService;
 import lombok.extern.slf4j.Slf4j;
@@ -48,11 +49,13 @@ public class DynamicChatCommand implements ChatCommand {
     private final PlaceholderResolver placeholderResolver;
     private final Locale streamerLocale;
     private final ChatCommandSettingRepository settingRepository;
+    private final ChatCommandDefinitionRepository definitionRepository;
 
     public DynamicChatCommand(ChatCommandDefinition definition, JsCompiler jsCompiler,
                                SandboxExecutor sandboxExecutor, ServiceFunctionRegistry serviceFunctionRegistry,
                                GameContextService gameContextService, PlaceholderResolver placeholderResolver,
-                               Locale streamerLocale, ChatCommandSettingRepository settingRepository) {
+                               Locale streamerLocale, ChatCommandSettingRepository settingRepository,
+                               ChatCommandDefinitionRepository definitionRepository) {
         this.definition = definition;
         this.jsCompiler = jsCompiler;
         this.sandboxExecutor = sandboxExecutor;
@@ -61,6 +64,7 @@ public class DynamicChatCommand implements ChatCommand {
         this.placeholderResolver = placeholderResolver;
         this.streamerLocale = streamerLocale;
         this.settingRepository = settingRepository;
+        this.definitionRepository = definitionRepository;
     }
 
     @Override
@@ -91,7 +95,7 @@ public class DynamicChatCommand implements ChatCommand {
         try {
             String output = sandboxExecutor.execute(js,
                 path -> resolvePlaceholder(path, ctx, fallbacks),
-                name -> resolveList(name, fallbacks, args),
+                name -> resolveList(name, fallbacks, args, user),
                 serviceFunctionRegistry,
                 user,
                 key -> settings.getOrDefault(key, ""),
@@ -125,9 +129,17 @@ public class DynamicChatCommand implements ChatCommand {
         return fallbacks.getOrDefault(path, "");
     }
 
-    private List<String> resolveList(String name, Map<String, String> fallbacks, List<String> args) {
+    private List<String> resolveList(String name, Map<String, String> fallbacks, List<String> args, UserAccount user) {
         if ("fallbacks".equals(name)) return List.copyOf(fallbacks.values());
         if ("args".equals(name)) return args;
+        if ("ownCommands".equals(name)) {
+            // The currently-executing command isn't specially excluded — a streamer listing
+            // their own commands from within one of them is a plausible, harmless self-reference.
+            return definitionRepository.findByUser(user).stream()
+                .filter(ChatCommandDefinition::isEnabled)
+                .map(ChatCommandDefinition::getName)
+                .toList();
+        }
         return List.of();
     }
 }
