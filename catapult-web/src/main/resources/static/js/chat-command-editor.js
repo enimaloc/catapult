@@ -841,6 +841,7 @@
     function closeEditor() {
         document.getElementById('chatCommandEditorModal').hidden = true;
         document.getElementById('chatCommandEditorModal').style.display = 'none';
+        document.getElementById('ceModalContent').classList.remove('ce-fullscreen');
         currentCmd = null;
     }
 
@@ -878,6 +879,11 @@
     });
 
     document.getElementById('ceClose').onclick = closeEditor;
+
+    document.getElementById('ceFullscreenBtn').onclick = () => {
+        document.getElementById('ceModalContent').classList.toggle('ce-fullscreen');
+        if (workspace) workspace.resize();
+    };
 
     /**
      * The Blocks/Text tabs are kept in sync on every switch (see selectTab), so whichever
