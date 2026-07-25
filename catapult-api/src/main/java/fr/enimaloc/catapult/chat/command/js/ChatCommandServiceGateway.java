@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.chat.command.js;
 
 import fr.enimaloc.catapult.domain.UserAccount;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -12,4 +13,6 @@ public interface ChatCommandServiceGateway {
     Optional<String> igdbGameName(String query);
     Optional<String> twitchOwnDisplayName(UserAccount user);
     Optional<String> steamPrice(String appId);
+
+    Optional<Object> steamGame(String appId, @Nullable String locale);
 }
