@@ -77,7 +77,17 @@
       // when the second (often smaller) one finishes — async=false restores the
       // classic in-document-order execution guarantee for external scripts.
       if (fresh.src) fresh.async = false;
-      old.replaceWith(fresh);
+      try {
+        // Inline scripts run synchronously right here, inside replaceWith() — an
+        // uncaught exception in one fragment's script would otherwise propagate out
+        // of this forEach callback and silently abort it, so every OTHER script still
+        // queued in the same tab fragment (e.g. a sibling card's own bootstrap) would
+        // simply never run, with no obviously-attributable error in the console.
+        old.replaceWith(fresh);
+      } catch (err) {
+        console.error("[channel-tabs] a tab fragment's <script> threw during init — " +
+          "other scripts in this tab still ran, but this one didn't:", err, old);
+      }
     });
   }
 
