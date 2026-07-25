@@ -573,7 +573,7 @@
     // Registered functions get their own toolbox category per namespace instead of one shared
     // "Fonctions" bucket, so a growing function catalog stays browsable (Twitch/Steam/Catapult/
     // IGDB, one tab each) instead of piling every service into a single flat list.
-    const SERVICE_CATEGORY_DISPLAY_NAMES = { igdb: 'IGDB' };
+    const SERVICE_CATEGORY_DISPLAY_NAMES = { igdb: 'IGDB', tw: 'TW' };
     function namespaceCategory(namespace) {
         return SERVICE_CATEGORY_DISPLAY_NAMES[namespace]
             || (namespace.charAt(0).toUpperCase() + namespace.slice(1));
