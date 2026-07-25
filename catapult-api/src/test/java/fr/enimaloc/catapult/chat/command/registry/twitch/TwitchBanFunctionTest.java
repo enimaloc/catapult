@@ -18,6 +18,7 @@ class TwitchBanFunctionTest {
         TwitchBanFunction fn = new TwitchBanFunction(service);
         assertThat(fn.parameterNames()).containsExactly("login", "reason");
         assertThat(fn.optionalParameterNames()).containsExactly("reason");
+        assertThat(fn.isAction()).isTrue();
         assertThat(fn.invoke(user, new Object[]{"troll", "spam"})).isEqualTo("");
         verify(service).ban(user, "troll", "spam");
     }
