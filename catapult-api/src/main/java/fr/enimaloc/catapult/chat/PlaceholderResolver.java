@@ -215,8 +215,17 @@ public class PlaceholderResolver {
         return -1;
     }
 
+    // {else} in particular is indistinguishable from a legit simple placeholder by character
+    // shape alone (4 lowercase letters, no '#') — {if ...}/{for ...}/{var ...}/{print ...} all
+    // naturally fail the char-class check below because their condition/header always has a
+    // space plus non-path characters (quotes, '#', operators, ...), but a bare {else} has
+    // nothing else in it. Without this, findUnknownPaths flags "else" as an unknown placeholder
+    // for ANY {if}...{else}...{/if} template, rejecting the save with a 400 — reproduced and
+    // fixed after a save on an if/else command failed with "Unknown placeholders: else".
+    private static final Set<String> STRUCTURAL_KEYWORDS = Set.of("if", "else", "for", "var", "print");
+
     private static boolean isValidPath(String path) {
-        if (path.isEmpty()) return false;
+        if (path.isEmpty() || STRUCTURAL_KEYWORDS.contains(path)) return false;
         for (int i = 0; i < path.length(); i++) {
             char c = path.charAt(i);
             if (!((c >= 'a' && c <= 'z') || c == '_' || c == '#')) return false;
