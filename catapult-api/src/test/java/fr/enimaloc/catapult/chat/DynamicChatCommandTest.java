@@ -357,4 +357,29 @@ class DynamicChatCommandTest {
 
         assertThat(result).isNull();
     }
+
+    @Test
+    void forEachOverActiveTwsIteratesSortedLabels() {
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!tws");
+        definition.setEnabled(true);
+        definition.setTemplate("{for t in activeTws}[{t}]{/for}");
+        definition.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{for t in activeTws}[{t}]{/for}")));
+
+        GameContext ctx = mock(GameContext.class);
+        when(ctx.activeTws()).thenReturn(java.util.Set.of("violence_graphic", "death_of_animal"));
+        when(ctx.twLabels()).thenReturn(java.util.Map.of(
+            "violence_graphic", "Violence (graphic)", "death_of_animal", "Death of animal"));
+        GameContextService gameContextService = mock(GameContextService.class);
+        when(gameContextService.get(null)).thenReturn(Optional.of(ctx));
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), new ServiceFunctionRegistry(), gameContextService,
+            newPlaceholderResolver(), Locale.FRENCH, mock(fr.enimaloc.catapult.repository.ChatCommandSettingRepository.class),
+            mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
+
+        Object result = command.execute(null, List.of());
+
+        assertThat(result).isEqualTo("[Death of animal][Violence (graphic)]");
+    }
 }
