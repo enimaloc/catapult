@@ -585,12 +585,43 @@
     // everything else is a 1:1 lookup via each class's static `nodeType`).
     let blockRegistry = {};
 
+    // The single, fixed entry point of a command's script — not part of the toolbox (there's
+    // only ever one per workspace, auto-placed rather than dragged in) and never appears in the
+    // AST itself: blocksToAst() reads only what's connected below it, so stray blocks dropped
+    // elsewhere in the canvas (experiments, copy-pasted fragments) are silently excluded from
+    // what gets saved instead of being concatenated in alongside the real script by accident.
+    const CMD_START_TYPE = 'cmd_start';
+
+    function ensureStartBlockTypeDefined() {
+        if (Blockly.Blocks[CMD_START_TYPE]) return;
+        Blockly.defineBlocksWithJsonArray([{
+            type: CMD_START_TYPE,
+            message0: 'Début',
+            nextStatement: null,
+            colour: 0,
+            tooltip: 'Point de départ de la commande — connecte les blocs de ta commande ici en dessous.'
+        }]);
+    }
+
+    /** Finds the workspace's entry block, creating it (undeletable) if this is a fresh workspace. */
+    function ensureEntryBlock(ws) {
+        let entry = ws.getTopBlocks(false).find(b => b.type === CMD_START_TYPE);
+        if (entry) return entry;
+        entry = ws.newBlock(CMD_START_TYPE);
+        entry.setDeletable(false);
+        entry.initSvg();
+        entry.render();
+        entry.moveBy(20, 20);
+        return entry;
+    }
+
     function ensureBlocksDefined() {
         if (Object.keys(blockRegistry).length) return;
         const serviceCallBlocks = catalog.serviceFunctions.map(fn => new ServiceCallBlock(fn));
         const all = [...STATIC_BLOCK_CLASSES, ...serviceCallBlocks];
         all.forEach(b => { blockRegistry[b.type] = b; });
         Blockly.defineBlocksWithJsonArray(all.map(b => b.definition(catalog)));
+        ensureStartBlockTypeDefined();
     }
 
     // ensureWorkspace() is only ever reached after ensureCatalog() has resolved
@@ -619,6 +650,7 @@
             theme: buildBlocklyTheme()
         });
         workspace.resize();
+        ensureEntryBlock(workspace);
         return workspace;
     }
 
@@ -642,15 +674,12 @@
     }
 
     function blocksToAst() {
-        // getTopBlocks returns only the HEAD of each connected stack — walk each chain
-        // with statementsToNodes (same helper used for nested if/for-each bodies) instead
-        // of converting just the first block, or every statement after the first one in
-        // a stack silently disappears on save.
-        const top = ensureWorkspace().getTopBlocks(true);
-        const statements = [];
-        for (const block of top) {
-            statements.push(...statementsToNodes(block));
-        }
+        // Only what's connected below the fixed entry block is part of the saved script —
+        // anything else floating in the canvas (stray experiments, copy-pasted fragments not
+        // reattached) is deliberately ignored rather than silently concatenated in.
+        const ws = ensureWorkspace();
+        const entry = ensureEntryBlock(ws);
+        const statements = statementsToNodes(entry.getNextBlock());
         return { statements: statements };
     }
 
@@ -710,7 +739,7 @@
     function astToBlocks(ast) {
         const ws = ensureWorkspace();
         ws.clear();
-        let previous = null;
+        let previous = ensureEntryBlock(ws);
         for (const node of (ast.statements || [])) {
             let block;
             try {
@@ -719,7 +748,7 @@
                 console.warn('chat-command-editor: skipping statement in Blocks view', node, err);
                 continue;
             }
-            if (previous) previous.nextConnection.connect(block.previousConnection);
+            previous.nextConnection.connect(block.previousConnection);
             previous = block;
         }
     }
