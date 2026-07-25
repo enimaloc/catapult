@@ -131,6 +131,31 @@ class CommandDslRoundTripTest {
     }
 
     @Test
+    void propertyGetOnAServiceCallResultRoundTrips() {
+        // Previously mis-parsed the whole expression into a garbage ContextGetExpr (silently,
+        // since "text contains '#'" was the last-resort fallback) because tryParseServiceCall
+        // only recognized a call when the entire text ended at its own closing paren — a
+        // trailing ".property" made it fall straight past the service-call branch.
+        String source = "{print steam#getGame(\"730\", ctx.settings.lang).short_description}";
+        CommandAst ast = parser.parse(source);
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
+    }
+
+    @Test
+    void chainedPropertyGetOnAServiceCallResultRoundTrips() {
+        String source = "{print steam#getGame(\"730\").pc_requirements.minimum}";
+        CommandAst ast = parser.parse(source);
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
+    }
+
+    @Test
+    void propertyGetOnAGetCallResultRoundTrips() {
+        String source = "{msg = get(game, \"details\").summary}";
+        CommandAst ast = parser.parse(source);
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
+    }
+
+    @Test
     void generatedObjectAndPropertyGetAstRoundTripsDirectlyWithoutGoingThroughText() {
         Map<String, fr.enimaloc.catapult.chat.command.ast.Expression> props = new java.util.LinkedHashMap<>();
         props.put("name", new LiteralExpr("Valorant", ValueType.STRING));
