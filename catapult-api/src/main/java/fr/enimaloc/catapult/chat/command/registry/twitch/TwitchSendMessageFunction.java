@@ -30,6 +30,11 @@ public class TwitchSendMessageFunction implements ServiceFunction {
     }
 
     @Override
+    public boolean isAction() {
+        return true;
+    }
+
+    @Override
     public Object invoke(UserAccount user, Object[] args) {
         twitchChatService.sendMessage(user, String.valueOf(args[0]));
         return "";

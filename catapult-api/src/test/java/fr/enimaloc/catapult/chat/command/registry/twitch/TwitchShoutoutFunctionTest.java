@@ -24,6 +24,7 @@ class TwitchShoutoutFunctionTest {
 
         TwitchShoutoutFunction fn = new TwitchShoutoutFunction(service);
         assertThat(fn.parameterNames()).containsExactly("login");
+        assertThat(fn.isAction()).isTrue();
         assertThat(fn.invoke(user, new Object[]{"myfriend"})).isEqualTo("");
         verify(service).shoutout(user, "myfriend");
     }

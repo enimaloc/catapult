@@ -35,6 +35,11 @@ public class TwitchTimeoutFunction implements ServiceFunction {
     }
 
     @Override
+    public boolean isAction() {
+        return true;
+    }
+
+    @Override
     public Object invoke(UserAccount user, Object[] args) {
         String login = String.valueOf(args[0]);
         int durationSeconds = ((Number) args[1]).intValue();

@@ -72,7 +72,8 @@ public class ApiChatCommandDslController {
     }
 
     public record ServiceFunctionDto(String namespace, String name, List<String> parameterNames,
-                                      List<String> returnKeys, List<String> optionalParameterNames) {}
+                                      List<String> returnKeys, List<String> optionalParameterNames,
+                                      boolean isAction) {}
 
     public record CatalogDto(List<String> contextPaths, List<ServiceFunctionDto> serviceFunctions,
                               List<String> settingKeys) {}
@@ -87,7 +88,7 @@ public class ApiChatCommandDslController {
     public CatalogDto catalog(@AuthenticationPrincipal Jwt jwt) {
         List<ServiceFunctionDto> functions = serviceFunctionRegistry.all().stream()
             .map(f -> new ServiceFunctionDto(f.namespace(), f.name(), f.parameterNames(), f.returnKeys(),
-                f.optionalParameterNames()))
+                f.optionalParameterNames(), f.isAction()))
             .toList();
         List<String> settingKeys = currentUser(jwt)
             .map(user -> settingRepository.findByUser(user).stream()
