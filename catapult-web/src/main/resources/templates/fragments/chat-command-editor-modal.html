@@ -3,10 +3,12 @@
 <body>
 <div th:fragment="chat-command-editor-modal" id="chatCommandEditorModal" class="modal" hidden
      style="display:none;">
-    <div class="modal-content" style="max-width:800px; max-height:90vh; overflow-y:auto;">
+    <div id="ceModalContent" class="modal-content" style="max-width:1200px; width:95vw; max-height:92vh; overflow-y:auto;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.75rem;">
             <input id="ceName" class="form-input" type="text" pattern="^![a-z][a-z0-9_]{0,30}$"
                    style="font-family:monospace; font-size:1.1em; flex:1;">
+            <button type="button" id="ceFullscreenBtn" title="Plein écran"
+                    style="background:none; border:none; font-size:1.1rem; cursor:pointer; color:inherit;">&#x26F6;</button>
             <button type="button" id="ceClose"
                     style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:inherit;">&times;</button>
         </div>
@@ -27,7 +29,7 @@
         </div>
         <div>
             <div id="ceBlocksPane" class="ce-tab-pane"
-                 style="height:300px; width:100%; position:relative;"></div>
+                 style="height:450px; width:100%; position:relative;"></div>
             <div id="ceTextPane" class="ce-tab-pane" hidden>
                 <textarea id="ceTextArea" class="form-input" rows="8" style="width:100%; font-family:monospace;"></textarea>
             </div>
