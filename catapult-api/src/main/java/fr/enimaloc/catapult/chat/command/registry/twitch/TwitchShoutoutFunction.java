@@ -35,6 +35,11 @@ public class TwitchShoutoutFunction implements ServiceFunction {
     }
 
     @Override
+    public boolean isAction() {
+        return true;
+    }
+
+    @Override
     public Object invoke(UserAccount user, Object[] args) {
         twitchChatService.shoutout(user, String.valueOf(args[0]));
         return "";

@@ -49,6 +49,20 @@ public interface ServiceFunction {
         return List.of();
     }
 
+    /**
+     * True for a function whose return value is never meaningful (always {@code ""}) because
+     * it exists purely for its side effect — {@code twitch#ban}, {@code twitch#timeout},
+     * {@code twitch#shoutout}, {@code twitch#sendMessage}, {@code catapult#setParam}. Purely
+     * descriptive (the sandbox doesn't enforce it — the AST/compiler shape, an implicit {@code
+     * PrintStatement} wrapping a {@code ServiceCallExpr} whose result is thrown away, is
+     * identical to any value-returning call): lets the Blocks editor render this function as its
+     * own directly stackable statement block instead of a value block that has to be plugged
+     * into some other block's socket (typically a {@code print}) to do anything at all.
+     */
+    default boolean isAction() {
+        return false;
+    }
+
     /** {@code ""} (the DSL's universal "missing" value) when {@code index} wasn't supplied. */
     static String optionalArg(Object[] args, int index) {
         return optionalArg(args, index, "");
