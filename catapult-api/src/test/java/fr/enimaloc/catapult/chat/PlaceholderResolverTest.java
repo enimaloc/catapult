@@ -242,6 +242,27 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void findUnknownPaths_doesNotFlagBareElseAsAnUnknownPlaceholder() {
+        // {else} is 4 lowercase letters with no '#' — indistinguishable from a legit simple
+        // placeholder by character shape alone, unlike {if ...}/{for ...} whose condition/header
+        // always contains a space plus non-path characters. Without excluding structural
+        // keywords, this rejected the save of ANY {if}...{else}...{/if} command with a 400
+        // "Unknown placeholders: else".
+        Set<String> unknown = resolver.findUnknownPaths(
+            "{if game#name == \"Halo\"}a{else}b{/if}");
+        assertThat(unknown).isEmpty();
+    }
+
+    @Test
+    void findUnknownPaths_doesNotFlagBareElseInsideNestedServiceCallExpressions() {
+        Set<String> unknown = resolver.findUnknownPaths(
+            "{if catapult#getGame().sourceType == \"STEAM\"}"
+            + "{print steam#getGame(catapult#getGame().sourceId, ctx.settings.lang).short_description}"
+            + "{else}{igdb#getGame(catapult#getGame().sourceName)}{/if}");
+        assertThat(unknown).isEmpty();
+    }
+
+    @Test
     void findUnknownPaths_acceptsTwActiveAndKnownSlugs_rejectsUnknown() {
         when(twRegistry.getKnownPaths()).thenReturn(Set.of("violence_graphic"));
         Set<String> unknown = resolver.findUnknownPaths(
