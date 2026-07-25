@@ -6,6 +6,9 @@ import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
 import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.domain.UserAccount;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -48,6 +51,74 @@ class JsCompilerTest {
     @Test
     void compilesServiceCall() {
         String js = compiler.compile(parser.parse("{igdb#getGame(\"Valorant\")}"));
+        assertThat(js).contains("__output += (ctx.call(\"igdb\", \"getGame\", \"Valorant\"));");
+    }
+
+    @Test
+    void printedActionCallSkipsOutputConcatenationWhenRegistryIsBound() {
+        ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
+        registry.register(new ServiceFunction() {
+            @Override public String namespace() { return "twitch"; }
+            @Override public String name() { return "ban"; }
+            @Override public List<String> parameterNames() { return List.of("login", "reason"); }
+            @Override public boolean isAction() { return true; }
+            @Override public Object invoke(UserAccount user, Object[] args) { return ""; }
+        });
+        JsCompiler compilerWithRegistry = new JsCompiler(registry);
+
+        String js = compilerWithRegistry.compile(parser.parse("{twitch#ban(\"troll\", \"spam\")}"));
+
+        assertThat(js).contains("ctx.call(\"twitch\", \"ban\", \"troll\", \"spam\");");
+        assertThat(js).doesNotContain("__output += (ctx.call(\"twitch\", \"ban\"");
+    }
+
+    @Test
+    void printedActionCallStillConcatenatesWhenNoRegistryIsBound() {
+        // The no-arg constructor (used by every other test in this class, and by every test
+        // that builds a JsCompiler directly without a Spring context) has no way to know which
+        // functions are actions, so it must fall back to the always-correct, if slightly
+        // wasteful, __output += (...) form rather than silently dropping a call's output.
+        String js = compiler.compile(parser.parse("{twitch#ban(\"troll\", \"spam\")}"));
+        assertThat(js).contains("__output += (ctx.call(\"twitch\", \"ban\", \"troll\", \"spam\"));");
+    }
+
+    @Test
+    void discardedActionCallStillRunsAndProducesNoOutputEndToEndInTheRealSandbox() {
+        java.util.concurrent.atomic.AtomicBoolean invoked = new java.util.concurrent.atomic.AtomicBoolean(false);
+        ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
+        registry.register(new ServiceFunction() {
+            @Override public String namespace() { return "twitch"; }
+            @Override public String name() { return "ban"; }
+            @Override public List<String> parameterNames() { return List.of("login", "reason"); }
+            @Override public boolean isAction() { return true; }
+            @Override public Object invoke(UserAccount user, Object[] args) {
+                invoked.set(true);
+                return "";
+            }
+        });
+        JsCompiler compilerWithRegistry = new JsCompiler(registry);
+        String js = compilerWithRegistry.compile(parser.parse("{twitch#ban(\"troll\", \"spam\")}"));
+
+        String result = new SandboxExecutor().execute(js, path -> null, name -> List.of(),
+            registry, null, null, java.time.Duration.ofSeconds(2));
+
+        assertThat(invoked).isTrue();
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void nonActionServiceCallStillConcatenatesWhenRegistryIsBound() {
+        ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
+        registry.register(new ServiceFunction() {
+            @Override public String namespace() { return "igdb"; }
+            @Override public String name() { return "getGame"; }
+            @Override public List<String> parameterNames() { return List.of("query"); }
+            @Override public Object invoke(UserAccount user, Object[] args) { return "resolved"; }
+        });
+        JsCompiler compilerWithRegistry = new JsCompiler(registry);
+
+        String js = compilerWithRegistry.compile(parser.parse("{igdb#getGame(\"Valorant\")}"));
+
         assertThat(js).contains("__output += (ctx.call(\"igdb\", \"getGame\", \"Valorant\"));");
     }
 
