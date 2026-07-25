@@ -270,29 +270,81 @@
         }
     }
 
+    // Field names available on whatever is connected to a cmd_property_get block's TARGET —
+    // either an object-literal's own (user-typed) keys, or a service function's declared
+    // returnKeys() (catalog-driven, e.g. twitch#getStream() -> title/category/viewers/uptime).
+    // Feeds the PROPERTY_PICKER helper dropdown below, not PROPERTY itself.
+    function computeTargetKeys(targetBlock) {
+        if (!targetBlock) return [];
+        if (targetBlock.type === 'cmd_object_literal') {
+            const keys = [];
+            let propBlock = targetBlock.getInputTargetBlock('PROPERTIES');
+            while (propBlock) {
+                const key = propBlock.getFieldValue('KEY');
+                if (key) keys.push(key);
+                propBlock = propBlock.getNextBlock();
+            }
+            return keys;
+        }
+        const descriptor = blockRegistry[targetBlock.type];
+        if (descriptor && descriptor.fn && Array.isArray(descriptor.fn.returnKeys)) {
+            return descriptor.fn.returnKeys;
+        }
+        return [];
+    }
+
+    // Blockly calls a FieldDropdown's function-form menuGenerator with `this` bound to the
+    // field, re-invoking it fresh every time the dropdown opens — always reflects whatever is
+    // currently wired into TARGET. Only ever offers keys that are actually known right now, so
+    // whatever the user picks is guaranteed to be a valid option — unlike the reverted approach,
+    // this dropdown's OWN value is never what's persisted (see the extension below), so there's
+    // nothing for Blockly's option-membership validation to ever have to reject.
+    function propertyPickerOptions() {
+        const block = this.getSourceBlock();
+        const keys = block ? computeTargetKeys(block.getInputTargetBlock('TARGET')) : [];
+        return keys.length ? keys.map(k => [k, k]) : [['(aucune suggestion)', '']];
+    }
+
+    // JSON block definitions can't reference a JS function for a dropdown's options (JSON is
+    // data-only), so PROPERTY_PICKER is defined with a static placeholder and this extension
+    // swaps it for a real function-generated FieldDropdown, then wires a validator that COPIES
+    // whatever gets picked into the real PROPERTY field — PROPERTY_PICKER's own value is never
+    // read by toNode()/fromNode() and is not part of the saved AST at all, it's a pure UI
+    // trigger. This is what makes a dropdown safe here: PROPERTY (a plain field_input) always
+    // accepts and persists any value exactly like before, so an unknown-shaped TARGET (a plain
+    // variable, the common case) just means the picker has nothing to suggest — it never blocks
+    // typing or loses a previously-saved property name the way a validated PROPERTY dropdown did.
+    Blockly.Extensions.register('cmd_property_get_picker', function () {
+        const block = this;
+        const input = block.inputList.find(i => i.fieldRow.some(f => f.name === 'PROPERTY_PICKER'));
+        const index = input.fieldRow.findIndex(f => f.name === 'PROPERTY_PICKER');
+        input.removeField('PROPERTY_PICKER');
+        const picker = new Blockly.FieldDropdown(propertyPickerOptions);
+        input.insertFieldAt(index, picker, 'PROPERTY_PICKER');
+        picker.setValidator(function (newValue) {
+            if (newValue) block.setFieldValue(newValue, 'PROPERTY');
+            return newValue;
+        });
+    });
+
     // get(obj, "property") — deliberately bracket-style in the label ("[ ]"), not "obj.name":
     // this app avoids '.' in anything that could reach chat text (Twitch/mod bots flag
     // dot-paths as links, see V59__placeholder_hash_separator.sql), so the DSL text this
     // block round-trips through never introduces new '.' syntax either.
-    //
-    // PROPERTY is a free-text field, not a dropdown — a dropdown was tried and reverted (see
-    // git history): Blockly's FieldDropdown validates every setValue() against its CURRENT
-    // options list and silently rejects/resets anything not in it. The set of valid property
-    // names is only known for a literal-object or known-service-call TARGET; for the common
-    // case (a plain variable, anything else) there's no way to enumerate valid options at all —
-    // meaning every real property name would fail validation and get silently wiped out on
-    // every load/save (the bug this reverts). Free text always accepts whatever was saved.
     class CmdPropertyGetBlock {
         static type = 'cmd_property_get';
         static nodeType = 'property-get';
         static category() { return 'Variables'; }
         static definition() {
-            return { type: this.type, message0: 'get %1 [ %2 ]',
+            return { type: this.type, message0: 'get %1 [ %2 ] %3',
                 args0: [
                     { type: 'input_value', name: 'TARGET' },
-                    { type: 'field_input', name: 'PROPERTY', text: 'name' }
+                    { type: 'field_input', name: 'PROPERTY', text: 'name' },
+                    { type: 'field_dropdown', name: 'PROPERTY_PICKER', options: [['▾', '']] }
                 ],
-                output: null, colour: 25 };
+                output: null, colour: 25,
+                extensions: ['cmd_property_get_picker']
+            };
         }
         static toNode(block) {
             return { type: 'property-get', target: blockToNode(block.getInputTargetBlock('TARGET')), property: block.getFieldValue('PROPERTY') };
