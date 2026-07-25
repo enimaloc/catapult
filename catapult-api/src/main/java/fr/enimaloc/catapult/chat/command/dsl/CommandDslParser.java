@@ -300,6 +300,24 @@ public class CommandDslParser {
         if (text.startsWith("{") && text.endsWith("}")) {
             return parseObjectLiteral(text.substring(1, text.length() - 1).trim());
         }
+        // A trailing ".identifier" at paren/quote depth 0 is property access on WHATEVER comes
+        // before it — not just a plain identifier chain (that's DOT_CHAIN below, which a bare
+        // "game.name" already matches whole and doesn't need peeling for). This is what makes
+        // e.g. steam#getGame(id, ctx.settings.lang).short_description parse at all: without it,
+        // tryParseServiceCall below only recognizes a call when the ENTIRE text is "ns#fn(args)"
+        // (must end with ")"), so a trailing .property made it fall through to the "text contains
+        // '#' -> ContextGetExpr" catch-all, silently building a garbage context path instead of
+        // throwing — the previous, unparseable text this method now generates for such AST nodes.
+        if (!DOT_CHAIN.matcher(text).matches()) {
+            int trailingDot = findTopLevelTrailingDot(text);
+            if (trailingDot > 0) {
+                String property = text.substring(trailingDot + 1).trim();
+                if (IDENTIFIER.matcher(property).matches()) {
+                    Expression target = parseExpression(text.substring(0, trailingDot).trim());
+                    return new PropertyGetExpr(target, property);
+                }
+            }
+        }
         ServiceCallExpr call = tryParseServiceCall(text);
         if (call != null) {
             return call;
@@ -314,6 +332,27 @@ public class CommandDslParser {
             throw new CommandDslParseException("Malformed expression: " + token);
         }
         return new VarRefExpr(text);
+    }
+
+    /** Index of the last {@code '.'} at paren/quote depth 0, or -1 if none — used to peel a
+     *  trailing {@code .property} off of an arbitrary expression head (see {@link #parseExpression}). */
+    private int findTopLevelTrailingDot(String text) {
+        boolean inQuotes = false;
+        int depth = 0;
+        int lastDot = -1;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (!inQuotes && (c == '(' || c == '{')) {
+                depth++;
+            } else if (!inQuotes && (c == ')' || c == '}')) {
+                depth--;
+            } else if (!inQuotes && depth == 0 && c == '.') {
+                lastDot = i;
+            }
+        }
+        return lastDot;
     }
 
     /** {@code get(path)} reads a context placeholder (also accepts {@code ctx.a.b} sugar);
