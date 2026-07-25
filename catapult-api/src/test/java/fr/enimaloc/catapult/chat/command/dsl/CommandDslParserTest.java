@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.chat.command.ast.ConcatStatement;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -226,6 +227,18 @@ class CommandDslParserTest {
         CommandAst ast = parser.parse("{msg = game.store.steam}");
         assertThat(ast.statements()).containsExactly(new AssignStatement("msg",
             new PropertyGetExpr(new PropertyGetExpr(new VarRefExpr("game"), "store"), "steam")));
+    }
+
+    @Test
+    void dotOperatorAccessesPropertyOnAServiceCallResult() {
+        CommandAst ast = parser.parse(
+            "{msg = steam#getGame(\"730\", ctx.settings.lang).short_description}");
+        assertThat(ast.statements()).containsExactly(new AssignStatement("msg",
+            new PropertyGetExpr(
+                new ServiceCallExpr("steam", "getGame", List.of(
+                    new LiteralExpr("730", ValueType.STRING),
+                    new fr.enimaloc.catapult.chat.command.ast.SettingGetExpr("lang"))),
+                "short_description")));
     }
 
     @Test
