@@ -17,6 +17,7 @@ class TwitchSendMessageFunctionTest {
 
         TwitchSendMessageFunction fn = new TwitchSendMessageFunction(service);
         assertThat(fn.parameterNames()).containsExactly("text");
+        assertThat(fn.isAction()).isTrue();
         assertThat(fn.invoke(user, new Object[]{"hello chat"})).isEqualTo("");
         verify(service).sendMessage(user, "hello chat");
     }

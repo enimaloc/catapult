@@ -44,6 +44,11 @@ public class CatapultSetParamFunction implements ServiceFunction {
     }
 
     @Override
+    public boolean isAction() {
+        return true;
+    }
+
+    @Override
     public Object invoke(UserAccount user, Object[] args) {
         String key = String.valueOf(args[0]);
         String value = String.valueOf(args[1]);

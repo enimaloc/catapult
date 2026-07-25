@@ -18,6 +18,7 @@ class TwitchTimeoutFunctionTest {
         TwitchTimeoutFunction fn = new TwitchTimeoutFunction(service);
         assertThat(fn.parameterNames()).containsExactly("login", "durationSeconds", "reason");
         assertThat(fn.optionalParameterNames()).containsExactly("reason");
+        assertThat(fn.isAction()).isTrue();
         assertThat(fn.invoke(user, new Object[]{"troll", 60.0, "spam"})).isEqualTo("");
         verify(service).timeout(user, "troll", 60, "spam");
     }

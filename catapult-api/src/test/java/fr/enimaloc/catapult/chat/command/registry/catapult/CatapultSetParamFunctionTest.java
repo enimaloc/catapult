@@ -25,6 +25,7 @@ class CatapultSetParamFunctionTest {
         assertThat(fn.namespace()).isEqualTo("catapult");
         assertThat(fn.name()).isEqualTo("setParam");
         assertThat(fn.parameterNames()).containsExactly("key", "value");
+        assertThat(fn.isAction()).isTrue();
         assertThat(fn.invoke(user, new Object[]{"language", "fr"})).isEqualTo("");
 
         org.mockito.ArgumentCaptor<ChatCommandSetting> captor = org.mockito.ArgumentCaptor.forClass(ChatCommandSetting.class);
