@@ -648,6 +648,11 @@
                 }))
             },
             theme: buildBlocklyTheme(),
+            // Blockly defaults to loading zoom control icons from './media/' relative to the
+            // current page URL, which never resolves correctly here since the editor is
+            // injected on arbitrary app pages, not on a page served from the webjar itself —
+            // without this, the zoom in/out/reset buttons render broken and don't work.
+            media: '/webjars/blockly/media/',
             zoom: {
                 controls: true,
                 wheel: true,
