@@ -19,6 +19,9 @@ import fr.enimaloc.catapult.chat.command.ast.Statement;
 import fr.enimaloc.catapult.chat.command.ast.ValueType;
 import fr.enimaloc.catapult.chat.command.ast.VarDeclStatement;
 import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashSet;
@@ -59,6 +62,23 @@ public class JsCompiler {
     // (obj["__proto__"] = x still sets the prototype), so these segments are rejected outright
     // rather than merely re-escaped.
     private static final Set<String> UNSAFE_PROPERTY_NAMES = Set.of("__proto__", "constructor", "prototype");
+
+    // Nullable, and deliberately kept optional: this is a pure compile-time optimization (skip
+    // wrapping an action call's guaranteed-"" result in __output += (...) since it can never
+    // contribute anything to the rendered message — see isDiscardableActionCall), not something
+    // the compiler's correctness depends on. A null registry (the no-arg constructor, used by
+    // every existing test that builds a JsCompiler directly) just means every service call still
+    // gets concatenated as before — functionally identical output, only skips the optimization.
+    private final ServiceFunctionRegistry registry;
+
+    public JsCompiler() {
+        this(null);
+    }
+
+    @Autowired
+    public JsCompiler(ServiceFunctionRegistry registry) {
+        this.registry = registry;
+    }
 
     public String compile(CommandAst ast) {
         return compile(ast, false);
@@ -289,8 +309,14 @@ public class JsCompiler {
                 appendVarTrace(s.name(), js, trace);
             }
             case PrintStatement s -> {
-                js.append("__output += (").append(compileExpr(s.expr())).append(");\n");
-                if (trace) js.append("__trace.var(\"__output\", __output);\n");
+                if (isDiscardableActionCall(s.expr())) {
+                    // ban/timeout/shoutout/sendMessage/setParam always return "" — concatenating
+                    // that into __output is a guaranteed no-op, so just run it for its side effect.
+                    js.append(compileExpr(s.expr())).append(";\n");
+                } else {
+                    js.append("__output += (").append(compileExpr(s.expr())).append(");\n");
+                    if (trace) js.append("__trace.var(\"__output\", __output);\n");
+                }
             }
             case IfStatement s -> {
                 String condJs = compileCondition(s.condition());
@@ -377,6 +403,19 @@ public class JsCompiler {
             case OBJECT -> throw new JsCompilationException(
                 "OBJECT is never a LiteralExpr's own type — object values are ObjectLiteralExpr, not a literal variant");
         };
+    }
+
+    /** True for a {@code print}ed {@link ServiceCallExpr} whose function is declared {@link
+     *  ServiceFunction#isAction()} — its return value is always {@code ""}, so wrapping it in
+     *  {@code __output += (...)} is a guaranteed no-op. {@code registry == null} (no-arg
+     *  constructor) always answers false — see the field's own javadoc. */
+    private boolean isDiscardableActionCall(Expression expr) {
+        if (registry == null || !(expr instanceof ServiceCallExpr call)) {
+            return false;
+        }
+        return registry.lookup(call.namespace(), call.function())
+            .map(ServiceFunction::isAction)
+            .orElse(false);
     }
 
     private String compileServiceCall(ServiceCallExpr expr) {
