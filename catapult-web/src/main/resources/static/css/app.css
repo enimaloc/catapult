@@ -782,7 +782,11 @@ h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-s
     border-radius: 0;
 }
 
-.modal-content.ce-fullscreen #ceBlocksPane {
+.ce-blocks-pane {
+    height: 55vh;
+}
+
+.ce-modal-content.ce-fullscreen .ce-blocks-pane {
     height: calc(100vh - 320px);
 }
 
