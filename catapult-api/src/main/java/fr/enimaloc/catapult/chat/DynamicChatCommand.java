@@ -143,6 +143,17 @@ public class DynamicChatCommand implements ChatCommand {
         }
         if ("gameDlcs".equals(name)) return ctx.dlcNames();
         if ("similarGames".equals(name)) return ctx.similarGameNames();
+        if ("activeTws".equals(name)) return activeTwLabels(ctx);
         return List.of();
+    }
+
+    /** Same content/ordering as {@code tw#active}/{@code TwActiveFunction} — sorted labels. */
+    private static List<String> activeTwLabels(GameContext ctx) {
+        if (ctx.activeTws() == null) return List.of();
+        return ctx.activeTws().stream()
+            .map(id -> ctx.twLabels() == null ? null : ctx.twLabels().get(id))
+            .filter(java.util.Objects::nonNull)
+            .sorted()
+            .toList();
     }
 }
