@@ -110,4 +110,54 @@ class DefaultChatCommandServiceGatewayTest {
 
         assertThat(gateway.steamPrice("1091500")).isEmpty();
     }
+
+    @Test
+    void steamGameReturnsTheDataObjectWhenFound() {
+        Map<String, Object> body = Map.of("1091500", Map.of(
+            "success", true,
+            "data", Map.of("name", "Cyberpunk 2077", "type", "game")
+        ));
+        doReturn(body).when(responseSpec).body(Map.class);
+
+        Optional<Object> result = gateway.steamGame("1091500", null);
+
+        assertThat(result).isPresent();
+        assertThat(((Map<?, ?>) result.get()).get("name")).isEqualTo("Cyberpunk 2077");
+    }
+
+    @Test
+    void steamGameDefaultsToEnglishWhenNoLocaleGiven() {
+        Map<String, Object> body = Map.of("1091500", Map.of("success", true, "data", Map.of("name", "Game")));
+        doReturn(body).when(responseSpec).body(Map.class);
+
+        gateway.steamGame("1091500", null);
+
+        org.mockito.Mockito.verify(getSpec).uri(anyString(), org.mockito.ArgumentMatchers.eq("1091500"), org.mockito.ArgumentMatchers.eq("english"));
+    }
+
+    @Test
+    void steamGamePassesThroughAnExplicitLocale() {
+        Map<String, Object> body = Map.of("1091500", Map.of("success", true, "data", Map.of("name", "Jeu")));
+        doReturn(body).when(responseSpec).body(Map.class);
+
+        gateway.steamGame("1091500", "french");
+
+        org.mockito.Mockito.verify(getSpec).uri(anyString(), org.mockito.ArgumentMatchers.eq("1091500"), org.mockito.ArgumentMatchers.eq("french"));
+    }
+
+    @Test
+    void steamGameReturnsEmptyWhenSuccessFalse() {
+        Map<String, Object> body = Map.of("1091500", Map.of("success", false));
+        doReturn(body).when(responseSpec).body(Map.class);
+
+        assertThat(gateway.steamGame("1091500", null)).isEmpty();
+    }
+
+    @Test
+    void steamGameReturnsEmptyWhenRestClientThrows() {
+        doReturn(getSpec).when(restClient).get();
+        when(getSpec.uri(anyString(), any(Object[].class))).thenThrow(new RuntimeException("network down"));
+
+        assertThat(gateway.steamGame("1091500", null)).isEmpty();
+    }
 }

@@ -51,6 +51,11 @@ public interface ServiceFunction {
 
     /** {@code ""} (the DSL's universal "missing" value) when {@code index} wasn't supplied. */
     static String optionalArg(Object[] args, int index) {
-        return index < args.length ? String.valueOf(args[index]) : "";
+        return optionalArg(args, index, "");
+    }
+
+    /** {@code def} (the DSL's universal "missing" value) when {@code index} wasn't supplied. */
+    static String optionalArg(Object[] args, int index, String def) {
+        return index < args.length ? String.valueOf(args[index]) : def;
     }
 }
