@@ -515,6 +515,14 @@
     // currently reports — satisfies the same {type, category, definition, toNode, fromNode}
     // contract as the static classes above, but as instance members parametrized by `fn`,
     // since the function catalog isn't known until the catalog loads.
+    //
+    // fn.isAction (ban/timeout/shoutout/sendMessage/setParam — always return "", exist only for
+    // their side effect) renders as its own directly stackable STATEMENT block instead of a
+    // value block that has to be plugged into some other block's socket (typically print) to do
+    // anything — there's no new AST shape involved: it's still exactly the {type:"print",
+    // expr:{type:"service-call",...}} the compiler already knows how to run (the compiled
+    // __output += (...) picks up the guaranteed-"" result and appends nothing), only how it's
+    // presented and reconstructed in the Blocks tab changes (see nodeToBlock's 'print' branch).
     class ServiceCallBlock {
         constructor(fn) {
             this.fn = fn;
@@ -534,13 +542,18 @@
                 type: this.type,
                 message0: this.fn.namespace + '.' + this.fn.name + '(' + argRefs + ')',
                 args0: this.fn.parameterNames.map((name, i) => ({ type: 'input_value', name: 'ARG' + i })),
-                output: null,
-                colour: 290
+                colour: 290,
+                ...(this.fn.isAction ? { previousStatement: null, nextStatement: null } : { output: null })
             };
         }
         toNode(block) {
             const args = this.fn.parameterNames.map((name, i) => blockToNode(block.getInputTargetBlock('ARG' + i)));
-            return { type: 'service-call', namespace: this.fn.namespace, function: this.fn.name, args: args };
+            const call = { type: 'service-call', namespace: this.fn.namespace, function: this.fn.name, args: args };
+            // An action's return value is never used — this is exactly the AST shape a bare
+            // {ns#fn(args)} tag already produces in the text DSL (an implicit print whose result,
+            // always "", contributes nothing to the output), just built directly here instead of
+            // via a separate cmd_print block wrapping this one.
+            return this.fn.isAction ? { type: 'print', expr: call } : call;
         }
         fromNode(ws, node) {
             const block = ws.newBlock(this.type);
@@ -656,6 +669,15 @@
                 throw new Error('Unsupported service call in Blocks view: ' + node.namespace + '#' + node.function);
             }
             block = new ServiceCallBlock(fn).fromNode(ws, node);
+        } else if (node.type === 'print' && node.expr && node.expr.type === 'service-call'
+                && catalog.serviceFunctions.some(f => f.namespace === node.expr.namespace
+                    && f.name === node.expr.function && f.isAction)) {
+            // Collapse the implicit print-wrapper an action call compiles through (see
+            // ServiceCallBlock) back into that action's own statement block, rather than
+            // rendering it as a separate cmd_print block with the call nested in its EXPR socket.
+            const fn = catalog.serviceFunctions.find(f => f.namespace === node.expr.namespace
+                && f.name === node.expr.function);
+            block = new ServiceCallBlock(fn).fromNode(ws, node.expr);
         } else {
             const descriptor = Object.values(blockRegistry).find(b => b.nodeType === node.type);
             if (!descriptor) throw new Error('Unknown node type for blocks view: ' + node.type);
