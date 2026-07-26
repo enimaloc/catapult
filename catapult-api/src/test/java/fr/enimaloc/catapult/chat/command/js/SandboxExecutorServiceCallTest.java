@@ -32,6 +32,44 @@ class SandboxExecutorServiceCallTest {
     }
 
     @Test
+    void namespaceObjectMethodDelegatesToRegisteredFunctionLikeCtxCallDoes() {
+        ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
+        registry.register(new ServiceFunction() {
+            @Override public String namespace() { return "igdb"; }
+            @Override public String name() { return "getGame"; }
+            @Override public List<String> parameterNames() { return List.of("query"); }
+            @Override public Object invoke(UserAccount user, Object[] args) { return "resolved:" + args[0]; }
+        });
+
+        String js = "return igdb.getGame(\"Valorant\");";
+        String output = executor.execute(js, path -> null, name -> List.of(), registry, null, null, Duration.ofSeconds(2));
+
+        assertThat(output).isEqualTo("resolved:Valorant");
+    }
+
+    @Test
+    void distinctNamespacesGetDistinctObjectsWithOnlyTheirOwnFunctions() {
+        ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
+        registry.register(new ServiceFunction() {
+            @Override public String namespace() { return "igdb"; }
+            @Override public String name() { return "getGame"; }
+            @Override public List<String> parameterNames() { return List.of(); }
+            @Override public Object invoke(UserAccount user, Object[] args) { return "igdb-result"; }
+        });
+        registry.register(new ServiceFunction() {
+            @Override public String namespace() { return "steam"; }
+            @Override public String name() { return "getGame"; }
+            @Override public List<String> parameterNames() { return List.of(); }
+            @Override public Object invoke(UserAccount user, Object[] args) { return "steam-result"; }
+        });
+
+        String js = "return igdb.getGame() + \"/\" + steam.getGame();";
+        String output = executor.execute(js, path -> null, name -> List.of(), registry, null, null, Duration.ofSeconds(2));
+
+        assertThat(output).isEqualTo("igdb-result/steam-result");
+    }
+
+    @Test
     void serviceCallReceivesTheBoundUser() {
         UserAccount user = new UserAccount();
         ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
