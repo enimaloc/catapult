@@ -268,6 +268,18 @@ class JsCompilerTest {
     }
 
     @Test
+    void rejectsAServiceCallWithANonIdentifierNamespaceOrFunctionInsteadOfSplicingItIntoTheScript() {
+        // Since namespace.function(args) compiles to bare JS (not a JSON-escaped string literal
+        // the way ctx.call("namespace", "function", ...) did), an attacker-crafted AST — the
+        // client can submit one directly via the save/test endpoints' "ast" field, bypassing the
+        // text-DSL parser's own identifier regex — must not be able to inject arbitrary JS here.
+        CommandAst ast = new CommandAst(List.of(new PrintStatement(
+            new ServiceCallExpr("igdb; maliciousCode(); void 0", "getGame", List.of()))));
+        assertThatThrownBy(() -> compiler.compile(ast))
+            .isInstanceOf(JsCompilationException.class);
+    }
+
+    @Test
     void compilesObjectLiteralAsAJsObjectAndPropertyGetAsBracketAccess() {
         String js = compiler.compile(parser.parse(
             "{var game = {name: \"Valorant\", price: 29.99}}{msg = get(game, \"name\")}"));
