@@ -13,10 +13,12 @@ import java.util.UUID;
 
 /**
  * Backs the "Tester" button in the command editor modal.
- * Body: {@code {id, overrides, ast?, ejectedJs?}} — {@code overrides} is a map of placeholder
- * path -> test value used instead of the live GameContext; {@code ast}/{@code ejectedJs} are
- * the editor's in-progress (possibly unsaved) content, forwarded as-is to
- * {@code ApiChatCommandTestController}, which prefers them over the persisted row.
+ * Body: {@code {id, overrides, serviceMocks?, ast?, ejectedJs?}} — {@code overrides} is a map of
+ * placeholder path -> test value used instead of the live GameContext; {@code serviceMocks} is a
+ * map of {@code namespace#function} -> fake return value used instead of actually invoking that
+ * service call; {@code ast}/{@code ejectedJs} are the editor's in-progress (possibly unsaved)
+ * content, forwarded as-is to {@code ApiChatCommandTestController}, which prefers them over the
+ * persisted row.
  */
 @Component
 public class ChatCommandsTestHandler implements RequestHandler {

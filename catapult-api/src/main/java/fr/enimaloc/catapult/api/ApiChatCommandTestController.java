@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
+import fr.enimaloc.catapult.chat.command.registry.MockingServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
@@ -23,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -49,6 +52,7 @@ public class ApiChatCommandTestController {
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(3);
     private static final NodeJsonCodec CODEC = new NodeJsonCodec();
     private static final CommandDslParser LEGACY_PARSER = new CommandDslParser();
+    private static final ObjectMapper MOCK_MAPPER = JsonMapper.builder().build();
 
     private final ChatCommandDefinitionRepository repository;
     private final UserAccountRepository userAccountRepository;
@@ -73,6 +77,10 @@ public class ApiChatCommandTestController {
         Map<String, String> settingOverrides = (Map<String, String>) body.getOrDefault("settings", Map.of());
         @SuppressWarnings("unchecked")
         List<String> args = (List<String>) body.getOrDefault("args", List.of());
+        @SuppressWarnings("unchecked")
+        Map<String, String> rawServiceMocks = (Map<String, String>) body.getOrDefault("serviceMocks", Map.of());
+        ServiceFunctionRegistry registry = rawServiceMocks.isEmpty() ? serviceFunctionRegistry
+            : new MockingServiceFunctionRegistry(serviceFunctionRegistry, parseServiceMocks(rawServiceMocks));
 
         // Unlike context placeholders (game#name etc.), which have no real value at all outside
         // a live stream and so always need a manual test override, settings are real persisted
@@ -95,7 +103,7 @@ public class ApiChatCommandTestController {
                 if ("args".equals(name)) return args;
                 return List.of();
             },
-            serviceFunctionRegistry, user, key -> settings.getOrDefault(key, ""), TEST_TIMEOUT);
+            registry, user, key -> settings.getOrDefault(key, ""), TEST_TIMEOUT);
 
         return Map.of(
             "output", trace.finalOutput(),
@@ -141,6 +149,25 @@ public class ApiChatCommandTestController {
             return definition.getEjectedJs();
         }
         return jsCompiler.compileWithTrace(resolveAst(body, definition));
+    }
+
+    /**
+     * A mocked service call's test value is free-form text in the editor — parsed as JSON when
+     * possible, so a map/DTO-returning function (e.g. {@code steam#getGame}) can be mocked with
+     * {@code {"short_description":"..."}}, or a scalar one (e.g. {@code tw#has}) with just {@code
+     * true} — falling back to the raw string otherwise (plain text isn't valid JSON, so this is
+     * also what a bare string mock value like {@code Cyberpunk 2077} ends up as).
+     */
+    private Map<String, Object> parseServiceMocks(Map<String, String> rawServiceMocks) {
+        Map<String, Object> parsed = new HashMap<>();
+        rawServiceMocks.forEach((key, value) -> {
+            try {
+                parsed.put(key, MOCK_MAPPER.readValue(value, Object.class));
+            } catch (RuntimeException e) {
+                parsed.put(key, value);
+            }
+        });
+        return parsed;
     }
 
     private UserAccount currentUser(Jwt jwt) {

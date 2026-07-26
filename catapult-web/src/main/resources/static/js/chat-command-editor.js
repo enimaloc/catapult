@@ -481,18 +481,46 @@
         }
     }
 
+    // Fixed, known list sources DynamicChatCommand#resolveList actually recognizes — anything
+    // else silently resolves to an empty list at runtime, so these are the only values worth
+    // offering. Static (not catalog-derived), so the dropdown's own options never change.
+    const KNOWN_LIST_SOURCES = ['fallbacks', 'args', 'ownCommands', 'gameDlcs', 'similarGames', 'activeTws'];
+
+    function listSourcePickerOptions() {
+        return KNOWN_LIST_SOURCES.map(name => [name, name]);
+    }
+
+    // Same rationale as cmd_property_get_picker below: LIST_SOURCE stays a plain field_input so
+    // any previously-saved value (including one typed before this picker existed) always loads
+    // and saves correctly, and LIST_SOURCE_PICKER is a pure suggestion whose own value is never
+    // read by toNode() — picking one just copies it into LIST_SOURCE via this validator.
+    Blockly.Extensions.register('cmd_for_each_list_source_picker', function () {
+        const block = this;
+        const input = block.inputList.find(i => i.fieldRow.some(f => f.name === 'LIST_SOURCE_PICKER'));
+        const index = input.fieldRow.findIndex(f => f.name === 'LIST_SOURCE_PICKER');
+        input.removeField('LIST_SOURCE_PICKER');
+        const picker = new Blockly.FieldDropdown(listSourcePickerOptions);
+        input.insertFieldAt(index, picker, 'LIST_SOURCE_PICKER');
+        picker.setValidator(function (newValue) {
+            if (newValue) block.setFieldValue(newValue, 'LIST_SOURCE');
+            return newValue;
+        });
+    });
+
     class CmdForEachBlock {
         static type = 'cmd_for_each';
         static nodeType = 'for-each';
         static category() { return 'Contrôle'; }
         static definition() {
-            return { type: this.type, message0: 'for each %1 in %2 %3',
+            return { type: this.type, message0: 'for each %1 in %2 %3 %4',
                 args0: [
                     { type: 'field_input', name: 'BINDING', text: 'f' },
                     { type: 'field_input', name: 'LIST_SOURCE', text: 'fallbacks' },
+                    { type: 'field_dropdown', name: 'LIST_SOURCE_PICKER', options: [['▾', '']] },
                     { type: 'input_statement', name: 'BODY' }
                 ],
-                previousStatement: null, nextStatement: null, colour: 120 };
+                previousStatement: null, nextStatement: null, colour: 120,
+                extensions: ['cmd_for_each_list_source_picker'] };
         }
         static toNode(block) {
             return {
@@ -983,6 +1011,10 @@
     // a row, not re-typed for each.
     let persistedTestOverrides = {};
 
+    // Same persistence rationale as persistedTestOverrides above, but keyed by
+    // "namespace#function" (e.g. "steam#getGame") instead of a legacy placeholder path.
+    let persistedServiceMocks = {};
+
     // One labelled input per known context path (catalog.contextPaths), so the streamer
     // can test branches/text that depend on a placeholder without actually being live
     // with that value (e.g. testing the "no game" wording while off-stream). Stacked
@@ -1012,6 +1044,37 @@
             cell.appendChild(input);
             container.appendChild(cell);
         }
+        renderServiceMockFields();
+    }
+
+    // One labelled input per non-action service function (steam#getGame, catapult#getCurrentGame,
+    // tw#has, ...) — actions (ban/timeout/...) always return "" so mocking them wouldn't do
+    // anything. Without this, "Tester" always hit the real gateway/DB for these calls with no way
+    // to fake a value the way legacy placeholders already could.
+    function renderServiceMockFields() {
+        document.querySelectorAll('#ceServiceMocks [data-mock-function]').forEach(input => {
+            if (input.value.trim() !== '') persistedServiceMocks[input.dataset.mockFunction] = input.value;
+        });
+
+        const container = document.getElementById('ceServiceMocks');
+        container.replaceChildren();
+        for (const fn of catalog.serviceFunctions) {
+            if (fn.isAction) continue;
+            const key = fn.namespace + '#' + fn.name;
+            const cell = document.createElement('div');
+            const label = document.createElement('label');
+            label.textContent = key;
+            label.style.cssText = 'display:block; font-family:monospace; font-size:.75em; color:var(--text-muted); margin-bottom:.15rem;';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'form-input';
+            input.dataset.mockFunction = key;
+            input.style.width = '100%';
+            input.value = persistedServiceMocks[key] || '';
+            cell.appendChild(label);
+            cell.appendChild(input);
+            container.appendChild(cell);
+        }
     }
 
     function collectTestOverrides() {
@@ -1021,6 +1084,18 @@
             if (value !== '') overrides[input.dataset.overridePath] = value;
         });
         return overrides;
+    }
+
+    // Values are sent as plain strings — the server parses each as JSON when possible (so a
+    // map/DTO-returning function can be mocked with e.g. {"short_description":"..."}, and a
+    // boolean-returning one like tw#has with just "true"), falling back to the raw string.
+    function collectServiceMocks() {
+        const mocks = {};
+        document.querySelectorAll('#ceServiceMocks [data-mock-function]').forEach(input => {
+            const value = input.value.trim();
+            if (value !== '') mocks[input.dataset.mockFunction] = value;
+        });
+        return mocks;
     }
 
     function applyTestOverrideValues(values) {
@@ -1088,7 +1163,7 @@
     document.getElementById('ceTestBtn').onclick = async () => {
         if (!currentCmd) return;
         try {
-            const payload = { id: currentCmd.id, overrides: collectTestOverrides() };
+            const payload = { id: currentCmd.id, overrides: collectTestOverrides(), serviceMocks: collectServiceMocks() };
             // Send whichever in-progress (possibly unsaved) content is authoritative, so
             // Tester reflects what's currently in the editor, not just the last save —
             // the server checks these before falling back to the persisted ast/ejectedJs
