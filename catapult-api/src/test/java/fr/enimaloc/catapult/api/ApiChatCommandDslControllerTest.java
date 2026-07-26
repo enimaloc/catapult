@@ -6,12 +6,10 @@ import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandSetting;
-import fr.enimaloc.catapult.domain.IgdbGameDetails;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.repository.TwDefinitionRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.service.IgdbGameDetailsService;
-import fr.enimaloc.catapult.service.IgdbService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -26,8 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -45,11 +41,10 @@ class ApiChatCommandDslControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ServiceFunctionRegistry serviceFunctionRegistry;
     @MockitoBean JsCompiler jsCompiler;
-    @MockitoBean IgdbService igdbService;
-    @MockitoBean IgdbGameDetailsService igdbGameDetailsService;
     @MockitoBean PlaceholderResolver placeholderResolver;
     @MockitoBean ChatCommandSettingRepository settingRepository;
     @MockitoBean UserAccountRepository userAccountRepository;
+    @MockitoBean TwDefinitionRepository twDefinitionRepository;
     final ObjectMapper om = new ObjectMapper();
 
     private static ServiceFunction fn(String namespace, String name, List<String> parameterNames) {
@@ -66,6 +61,7 @@ class ApiChatCommandDslControllerTest {
         when(serviceFunctionRegistry.all()).thenReturn(List.of(
                 fn("igdb", "getGame", List.of("query")),
                 fn("twitch", "getUser", List.of())));
+        when(twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc()).thenReturn(List.of());
 
         mvc.perform(get("/api/chat-commands/dsl/catalog").with(jwt()))
                 .andExpect(status().isOk())
@@ -88,6 +84,7 @@ class ApiChatCommandDslControllerTest {
         ChatCommandSetting language = new ChatCommandSetting();
         language.setKey("language");
         when(settingRepository.findByUser(user)).thenReturn(List.of(region, language));
+        when(twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc()).thenReturn(List.of());
 
         mvc.perform(get("/api/chat-commands/dsl/catalog")
                         .with(jwt().jwt(j -> j.claim("twitchId", "99"))))
@@ -98,9 +95,24 @@ class ApiChatCommandDslControllerTest {
 
     @Test
     void catalogReturnsEmptySettingKeysWhenTheJwtDoesNotMatchAnAccount() throws Exception {
+        when(twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc()).thenReturn(List.of());
+
         mvc.perform(get("/api/chat-commands/dsl/catalog").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.settingKeys").isEmpty());
+    }
+
+    @Test
+    void catalogReturnsKnownTwsFromTheEnabledDefinitions() throws Exception {
+        fr.enimaloc.catapult.domain.TwDefinition def = new fr.enimaloc.catapult.domain.TwDefinition();
+        def.setId("violence_graphic");
+        def.setLabel("Violence (graphic)");
+        when(twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc()).thenReturn(List.of(def));
+
+        mvc.perform(get("/api/chat-commands/dsl/catalog").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.knownTws[0].id").value("violence_graphic"))
+                .andExpect(jsonPath("$.knownTws[0].label").value("Violence (graphic)"));
     }
 
     @Test
@@ -160,48 +172,5 @@ class ApiChatCommandDslControllerTest {
                         .content(om.writeValueAsString(Map.of("ast", "not json"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.trace").doesNotExist());
-    }
-
-    @Test
-    void igdbSearchReturnsEmptyListForBlankQuery() throws Exception {
-        mvc.perform(get("/api/chat-commands/dsl/igdb-search?q=").with(jwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$").isEmpty());
-    }
-
-    @Test
-    void igdbSearchReturnsResultsFromIgdbService() throws Exception {
-        when(igdbService.searchGames("zelda")).thenReturn(List.of(new IgdbService.IgdbGame("1", "Zelda")));
-
-        mvc.perform(get("/api/chat-commands/dsl/igdb-search?q=zelda").with(jwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value("1"))
-                .andExpect(jsonPath("$[0].name").value("Zelda"));
-    }
-
-    @Test
-    void igdbPreviewResolvesGamePlaceholdersViaPlaceholderResolverAndOmitsUnresolvedOnes() throws Exception {
-        // Real formatting/URL-construction logic lives in PlaceholderResolver (tested there) —
-        // this only verifies the controller wires a GameContext built from IgdbGameDetails
-        // through it for every game# path and drops the ones that resolve to null
-        // (game#agerating comes from a different subsystem, not plain IGDB details).
-        IgdbGameDetails details = new IgdbGameDetails();
-        details.setIgdbId("123");
-        details.setSummary("A great game");
-        details.setSlug("great-game");
-        details.setWebsites(Map.of("steam", "https://store.steampowered.com/app/123"));
-        when(igdbGameDetailsService.getDetails("123")).thenReturn(Optional.of(details));
-        when(placeholderResolver.lookupRaw(any(), eq("game#name"), any())).thenReturn("Great Game");
-        when(placeholderResolver.lookupRaw(any(), eq("game#summary"), any())).thenReturn("A great game");
-        when(placeholderResolver.lookupRaw(any(), eq("game#store#steam"), any()))
-                .thenReturn("https://store.steampowered.com/app/123");
-
-        mvc.perform(get("/api/chat-commands/dsl/igdb-preview?id=123&name=Great Game").with(jwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$['game#name']").value("Great Game"))
-                .andExpect(jsonPath("$['game#summary']").value("A great game"))
-                .andExpect(jsonPath("$['game#store#steam']").value("https://store.steampowered.com/app/123"))
-                .andExpect(jsonPath("$['game#agerating']").doesNotExist());
     }
 }
