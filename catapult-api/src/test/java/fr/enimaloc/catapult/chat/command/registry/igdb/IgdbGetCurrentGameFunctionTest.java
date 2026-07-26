@@ -23,7 +23,7 @@ class IgdbGetCurrentGameFunctionTest {
         GameContextService gameContextService = mock(GameContextService.class);
         UserAccount user = new UserAccount();
         GameContext ctx = new GameContext(null, "1877", "Valorant", "A tactical shooter",
-            LocalDate.of(2020, 6, 2), Map.of("steam", "https://store/730"),
+            LocalDate.of(2020, 6, 2), Map.of("steam", "https://store/730", "official", "https://valorant.com"),
             "https://store/730", "valorant", Set.of(), Map.of(), "PEGI 12",
             85.0, 90.0, List.of("PC"), List.of(), List.of());
         when(gameContextService.get(user)).thenReturn(Optional.of(ctx));
@@ -33,6 +33,7 @@ class IgdbGetCurrentGameFunctionTest {
         assertThat(fn.name()).isEqualTo("getCurrentGame");
         assertThat(fn.parameterNames()).isEmpty();
         assertThat(fn.returnKeys()).containsExactly("name", "summary", "releaseDate", "storeUrl",
+            "storeSteamUrl", "storeXboxUrl", "storeBattlenetUrl", "storeOfficialUrl",
             "igdbUrl", "ageRating", "rating", "criticRating", "platforms");
 
         @SuppressWarnings("unchecked")
@@ -41,6 +42,10 @@ class IgdbGetCurrentGameFunctionTest {
         assertThat(result.get("summary")).isEqualTo("A tactical shooter");
         assertThat(result.get("releaseDate")).isEqualTo("2020-06-02");
         assertThat(result.get("storeUrl")).isEqualTo("https://store/730");
+        assertThat(result.get("storeSteamUrl")).isEqualTo("https://store/730");
+        assertThat(result.get("storeXboxUrl")).isEqualTo("");
+        assertThat(result.get("storeBattlenetUrl")).isEqualTo("");
+        assertThat(result.get("storeOfficialUrl")).isEqualTo("https://valorant.com");
         assertThat(result.get("igdbUrl")).isEqualTo("https://www.igdb.com/games/valorant");
         assertThat(result.get("ageRating")).isEqualTo("PEGI 12");
         assertThat(result.get("rating")).isEqualTo("85");
