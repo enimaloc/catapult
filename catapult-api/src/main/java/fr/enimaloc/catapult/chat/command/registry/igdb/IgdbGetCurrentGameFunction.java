@@ -22,10 +22,12 @@ public class IgdbGetCurrentGameFunction implements ServiceFunction {
 
     /** All-{@code ""} fields when no game is currently detected or IGDB has no data for it. */
     public record Result(String name, String summary, String releaseDate, String storeUrl,
-                          String igdbUrl, String ageRating, String rating, String criticRating,
-                          String platforms) {}
+                          String storeSteamUrl, String storeXboxUrl, String storeBattlenetUrl,
+                          String storeOfficialUrl, String igdbUrl, String ageRating, String rating,
+                          String criticRating, String platforms) {}
 
-    private static final Result EMPTY = new Result("", "", "", "", "", "", "", "", "");
+    private static final Result EMPTY =
+        new Result("", "", "", "", "", "", "", "", "", "", "", "", "");
 
     private final GameContextService gameContextService;
 
@@ -61,11 +63,19 @@ public class IgdbGetCurrentGameFunction implements ServiceFunction {
             orEmpty(ctx.summary()),
             ctx.releaseDate() == null ? "" : DateTimeFormatter.ISO_LOCAL_DATE.format(ctx.releaseDate()),
             orEmpty(ctx.activeStoreUrl()),
+            storeUrl(ctx, "steam"),
+            storeUrl(ctx, "xbox"),
+            storeUrl(ctx, "battlenet"),
+            storeUrl(ctx, "official"),
             ctx.igdbSlug() == null ? "" : "https://www.igdb.com/games/" + ctx.igdbSlug(),
             orEmpty(ctx.ageRating()),
             ctx.rating() == null ? "" : String.valueOf(Math.round(ctx.rating())),
             ctx.criticRating() == null ? "" : String.valueOf(Math.round(ctx.criticRating())),
             ctx.platforms() == null || ctx.platforms().isEmpty() ? "" : String.join(", ", ctx.platforms()));
+    }
+
+    private static String storeUrl(GameContext ctx, String key) {
+        return ctx.stores() == null ? "" : orEmpty(ctx.stores().get(key));
     }
 
     private static String orEmpty(String value) {
