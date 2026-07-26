@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.chat.command.js;
 
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
 import fr.enimaloc.catapult.chat.command.trace.TraceEntry;
@@ -19,7 +20,9 @@ import org.graalvm.polyglot.proxy.ProxyExecutable;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -236,6 +239,70 @@ public class SandboxExecutor {
         };
     }
 
+    /**
+     * Invokes {@code namespace#function} against {@code registry} with the given already-Java
+     * args, recording a trace entry when {@code trace} is non-null — the single dispatch path
+     * shared by {@code ctx.call} (kept only for backward compatibility with hand-edited "ejected"
+     * JS predating the {@code namespace.function()} syntax) and the per-namespace object methods
+     * {@link JsCompiler} now compiles a {@link fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr}
+     * into directly.
+     */
+    private Object invokeServiceFunction(ServiceFunctionRegistry registry, UserAccount user,
+                                          String namespace, String function, Object[] callArgs, ExecutionTrace trace) {
+        if (registry == null) {
+            throw new UnsupportedOperationException("No ServiceFunctionRegistry bound for this execution");
+        }
+        try {
+            Object value = registry.lookup(namespace, function)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown service function " + namespace + "#" + function))
+                .invoke(user, callArgs);
+            if (trace != null) {
+                trace.record(new TraceEntry("service-call", namespace + "#" + function, String.valueOf(value), false));
+            }
+            return value;
+        } catch (RuntimeException e) {
+            if (trace != null) {
+                trace.record(new TraceEntry("service-call", namespace + "#" + function, e.getMessage(), true));
+            }
+            throw e;
+        } catch (Exception e) {
+            if (trace != null) {
+                trace.record(new TraceEntry("service-call", namespace + "#" + function, e.getMessage(), true));
+            }
+            throw new RuntimeException("Service function " + namespace + "#" + function + " failed", e);
+        }
+    }
+
+    private static Object[] toJavaArgs(Value[] args, int from) {
+        Object[] callArgs = new Object[args.length - from];
+        for (int i = from; i < args.length; i++) {
+            callArgs[i - from] = args[i].as(Object.class);
+        }
+        return callArgs;
+    }
+
+    /**
+     * Binds one global object per service namespace ({@code catapult}, {@code igdb}, ...), each
+     * exposing its registered functions as methods — {@code igdb.getCurrentGame()} instead of
+     * {@code ctx.call("igdb", "getCurrentGame")}. No-op when {@code registry} is null (callers
+     * that don't need service calls never see these globals at all).
+     */
+    private void bindNamespaceObjects(Context context, Value bindings, ServiceFunctionRegistry registry,
+                                       UserAccount user, ExecutionTrace trace) {
+        if (registry == null) {
+            return;
+        }
+        Map<String, Value> namespaces = new HashMap<>();
+        for (ServiceFunction fn : registry.all()) {
+            String namespace = fn.namespace();
+            String function = fn.name();
+            Value nsObj = namespaces.computeIfAbsent(namespace, ns -> context.eval("js", "({})"));
+            nsObj.putMember(function, (ProxyExecutable) args ->
+                invokeServiceFunction(registry, user, namespace, function, toJavaArgs(args, 0), trace));
+        }
+        namespaces.forEach(bindings::putMember);
+    }
+
     private String runInContext(Context context, String compiledJs, PlaceholderContext placeholders, ListContext lists,
                                  ServiceFunctionRegistry registry, UserAccount user, SettingContext settings) {
         try {
@@ -246,31 +313,14 @@ public class SandboxExecutor {
                 boundedListProxyArray(new ArrayList<Object>(lists.resolveList(args[0].asString()))));
             ctx.putMember("setting", (ProxyExecutable) args -> settings == null ? null : settings.resolve(args[0].asString()));
             ctx.putMember("call", (ProxyExecutable) args -> {
-                if (registry == null) {
-                    throw new UnsupportedOperationException(
-                        "No ServiceFunctionRegistry bound for this execution");
-                }
                 if (args.length < 2) {
                     throw new IllegalArgumentException("ctx.call requires a namespace and a function name");
                 }
-                String namespace = args[0].asString();
-                String function = args[1].asString();
-                Object[] callArgs = new Object[args.length - 2];
-                for (int i = 2; i < args.length; i++) {
-                    callArgs[i - 2] = args[i].as(Object.class);
-                }
-                try {
-                    return registry.lookup(namespace, function)
-                        .orElseThrow(() -> new IllegalArgumentException(
-                            "Unknown service function " + namespace + "#" + function))
-                        .invoke(user, callArgs);
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (Exception e) {
-                    throw new RuntimeException("Service function " + namespace + "#" + function + " failed", e);
-                }
+                return invokeServiceFunction(registry, user, args[0].asString(), args[1].asString(),
+                    toJavaArgs(args, 2), null);
             });
             bindings.putMember("ctx", ctx);
+            bindNamespaceObjects(context, bindings, registry, user, null);
 
             Value fn = context.eval("js", "(function() {\n" + compiledJs + "\n})");
             Value result = fn.execute();
@@ -308,32 +358,11 @@ public class SandboxExecutor {
                 if (args.length < 2) {
                     throw new IllegalArgumentException("ctx.call requires a namespace and a function name");
                 }
-                String namespace = args[0].asString();
-                String function = args[1].asString();
-                Object[] callArgs = new Object[args.length - 2];
-                for (int i = 2; i < args.length; i++) {
-                    callArgs[i - 2] = args[i].as(Object.class);
-                }
-                try {
-                    if (registry == null) {
-                        throw new UnsupportedOperationException("No ServiceFunctionRegistry bound for this execution");
-                    }
-                    Object value = registry.lookup(namespace, function)
-                        .orElseThrow(() -> new IllegalArgumentException(
-                            "Unknown service function " + namespace + "#" + function))
-                        .invoke(user, callArgs);
-                    trace.record(new TraceEntry("service-call", namespace + "#" + function,
-                        String.valueOf(value), false));
-                    return value;
-                } catch (RuntimeException e) {
-                    trace.record(new TraceEntry("service-call", namespace + "#" + function, e.getMessage(), true));
-                    throw e;
-                } catch (Exception e) {
-                    trace.record(new TraceEntry("service-call", namespace + "#" + function, e.getMessage(), true));
-                    throw new RuntimeException("Service function " + namespace + "#" + function + " failed", e);
-                }
+                return invokeServiceFunction(registry, user, args[0].asString(), args[1].asString(),
+                    toJavaArgs(args, 2), trace);
             });
             bindings.putMember("ctx", ctx);
+            bindNamespaceObjects(context, bindings, registry, user, trace);
 
             Value traceObj = context.eval("js", "({})");
             traceObj.putMember("var", (ProxyExecutable) args -> {

@@ -51,7 +51,7 @@ class JsCompilerTest {
     @Test
     void compilesServiceCall() {
         String js = compiler.compile(parser.parse("{igdb#getGame(\"Valorant\")}"));
-        assertThat(js).contains("__output += (ctx.call(\"igdb\", \"getGame\", \"Valorant\"));");
+        assertThat(js).contains("__output += (igdb.getGame(\"Valorant\"));");
     }
 
     @Test
@@ -68,8 +68,8 @@ class JsCompilerTest {
 
         String js = compilerWithRegistry.compile(parser.parse("{twitch#ban(\"troll\", \"spam\")}"));
 
-        assertThat(js).contains("ctx.call(\"twitch\", \"ban\", \"troll\", \"spam\");");
-        assertThat(js).doesNotContain("__output += (ctx.call(\"twitch\", \"ban\"");
+        assertThat(js).contains("twitch.ban(\"troll\", \"spam\");");
+        assertThat(js).doesNotContain("__output += (twitch.ban(\"troll\"");
     }
 
     @Test
@@ -79,7 +79,7 @@ class JsCompilerTest {
         // functions are actions, so it must fall back to the always-correct, if slightly
         // wasteful, __output += (...) form rather than silently dropping a call's output.
         String js = compiler.compile(parser.parse("{twitch#ban(\"troll\", \"spam\")}"));
-        assertThat(js).contains("__output += (ctx.call(\"twitch\", \"ban\", \"troll\", \"spam\"));");
+        assertThat(js).contains("__output += (twitch.ban(\"troll\", \"spam\"));");
     }
 
     @Test
@@ -119,7 +119,7 @@ class JsCompilerTest {
 
         String js = compilerWithRegistry.compile(parser.parse("{igdb#getGame(\"Valorant\")}"));
 
-        assertThat(js).contains("__output += (ctx.call(\"igdb\", \"getGame\", \"Valorant\"));");
+        assertThat(js).contains("__output += (igdb.getGame(\"Valorant\"));");
     }
 
     @Test
