@@ -423,7 +423,17 @@ public class JsCompiler {
             .orElse(false);
     }
 
+    /**
+     * Unlike the old {@code ctx.call("namespace", "function", ...)} form (namespace/function were
+     * always safe as JSON-escaped string literals), splicing them in directly as bare JS
+     * identifiers means an attacker-crafted AST — the client can submit one directly via the
+     * save/test endpoints' {@code ast} field, bypassing the text-DSL parser's own identifier
+     * regex entirely — could inject arbitrary JS if these strings were used unvalidated. Reject
+     * anything that isn't a plain identifier before it ever reaches the compiled script.
+     */
     private String compileServiceCall(ServiceCallExpr expr) {
+        validateIdentifier(expr.namespace());
+        validateIdentifier(expr.function());
         String args = expr.args().stream().map(this::compileExpr).collect(Collectors.joining(", "));
         return expr.namespace() + "." + expr.function() + "(" + args + ")";
     }
