@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.chat.GameContext;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
@@ -8,30 +7,23 @@ import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandSetting;
-import fr.enimaloc.catapult.domain.IgdbGameDetails;
+import fr.enimaloc.catapult.domain.TwDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.repository.TwDefinitionRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.service.IgdbGameDetailsService;
-import fr.enimaloc.catapult.service.IgdbService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Bridges the browser's Blocks tab to the (Java-only) text DSL grammar so the editor modal
@@ -51,32 +43,32 @@ public class ApiChatCommandDslController {
 
     private final ServiceFunctionRegistry serviceFunctionRegistry;
     private final JsCompiler jsCompiler;
-    private final IgdbService igdbService;
-    private final IgdbGameDetailsService igdbGameDetailsService;
     private final PlaceholderResolver placeholderResolver;
     private final ChatCommandSettingRepository settingRepository;
     private final UserAccountRepository userAccountRepository;
+    private final TwDefinitionRepository twDefinitionRepository;
 
     public ApiChatCommandDslController(ServiceFunctionRegistry serviceFunctionRegistry, JsCompiler jsCompiler,
-                                        IgdbService igdbService, IgdbGameDetailsService igdbGameDetailsService,
                                         PlaceholderResolver placeholderResolver,
                                         ChatCommandSettingRepository settingRepository,
-                                        UserAccountRepository userAccountRepository) {
+                                        UserAccountRepository userAccountRepository,
+                                        TwDefinitionRepository twDefinitionRepository) {
         this.serviceFunctionRegistry = serviceFunctionRegistry;
         this.jsCompiler = jsCompiler;
-        this.igdbService = igdbService;
-        this.igdbGameDetailsService = igdbGameDetailsService;
         this.placeholderResolver = placeholderResolver;
         this.settingRepository = settingRepository;
         this.userAccountRepository = userAccountRepository;
+        this.twDefinitionRepository = twDefinitionRepository;
     }
 
     public record ServiceFunctionDto(String namespace, String name, List<String> parameterNames,
                                       List<String> returnKeys, List<String> optionalParameterNames,
                                       boolean isAction) {}
 
+    public record TwOptionDto(String id, String label) {}
+
     public record CatalogDto(List<String> contextPaths, List<ServiceFunctionDto> serviceFunctions,
-                              List<String> settingKeys) {}
+                              List<String> settingKeys, List<TwOptionDto> knownTws) {}
 
     /**
      * The settings block's dropdown needs the streamer's own saved keys (unlike context paths,
@@ -94,7 +86,10 @@ public class ApiChatCommandDslController {
             .map(user -> settingRepository.findByUser(user).stream()
                 .map(ChatCommandSetting::getKey).sorted().toList())
             .orElse(List.of());
-        return new CatalogDto(List.copyOf(PlaceholderResolver.KNOWN_PATHS), functions, settingKeys);
+        List<TwOptionDto> knownTws = twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc().stream()
+            .map(d -> new TwOptionDto(d.getId(), d.getLabel()))
+            .toList();
+        return new CatalogDto(List.copyOf(PlaceholderResolver.KNOWN_PATHS), functions, settingKeys, knownTws);
     }
 
     private Optional<UserAccount> currentUser(Jwt jwt) {
@@ -131,52 +126,4 @@ public class ApiChatCommandDslController {
         }
     }
 
-    /**
-     * Backs the Tester panel's "import a game from IGDB" search — a non-admin-gated
-     * equivalent of {@link ApiAdminIgdbController#search}, since regular streamers (not just
-     * admins) use the chat-command editor.
-     */
-    @GetMapping("/api/chat-commands/dsl/igdb-search")
-    public List<IgdbService.IgdbGame> igdbSearch(@RequestParam(defaultValue = "") String q) {
-        if (q.isBlank()) return List.of();
-        return igdbService.searchGames(q);
-    }
-
-    /**
-     * Resolves every {@code game#*} placeholder for the given IGDB game exactly as
-     * {@link PlaceholderResolver} would at real dispatch time, so the "Valeurs de test" fields
-     * can be pre-filled from a picked game instead of typed by hand. {@code game#agerating}
-     * comes from a separate content-labels subsystem (not plain IGDB details) and {@code
-     * game#store#url} depends on which store the streamer is actually live on — both are left
-     * for manual entry.
-     */
-    @GetMapping("/api/chat-commands/dsl/igdb-preview")
-    public Map<String, String> igdbPreview(@RequestParam String id, @RequestParam String name, Locale locale) {
-        IgdbGameDetails details = igdbGameDetailsService.getDetails(id).orElse(null);
-        String summary = details != null ? details.getSummary() : null;
-        LocalDate releaseDate = (details != null && details.getFirstReleaseDate() != null)
-            ? details.getFirstReleaseDate().atZone(ZoneOffset.UTC).toLocalDate() : null;
-        Map<String, String> stores = (details != null && details.getWebsites() != null)
-            ? details.getWebsites() : Map.of();
-        String slug = details != null ? details.getSlug() : null;
-        Double rating = details != null ? details.getRating() : null;
-        Double criticRating = details != null ? details.getAggregatedRating() : null;
-        List<String> platforms = (details != null && details.getPlatforms() != null)
-            ? details.getPlatforms() : List.of();
-        List<String> dlcNames = (details != null && details.getDlcNames() != null)
-            ? details.getDlcNames() : List.of();
-        List<String> similarGameNames = (details != null && details.getSimilarGameNames() != null)
-            ? details.getSimilarGameNames() : List.of();
-
-        GameContext ctx = new GameContext(null, id, name, summary, releaseDate, stores, null, slug,
-            Set.of(), Map.of(), null, rating, criticRating, platforms, dlcNames, similarGameNames);
-
-        Map<String, String> result = new LinkedHashMap<>();
-        for (String path : PlaceholderResolver.KNOWN_PATHS) {
-            if (!path.startsWith("game#")) continue;
-            String value = placeholderResolver.lookupRaw(ctx, path, locale);
-            if (value != null) result.put(path, value);
-        }
-        return result;
-    }
 }

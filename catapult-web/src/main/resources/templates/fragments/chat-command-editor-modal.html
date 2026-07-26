@@ -47,19 +47,8 @@
             </div>
         </div>
         <details style="margin-top:.75rem;">
-            <summary th:text="#{chat_commands.test.overrides_label}" style="cursor:pointer; color:var(--text-muted);">Valeurs de test (optionnel)</summary>
-            <div class="search-wrapper" style="margin-top:.5rem;">
-                <input id="ceIgdbSearch" class="form-input" type="text" autocomplete="off"
-                       th:placeholder="#{chat_commands.test.igdb_search_placeholder}"
-                       placeholder="Importer un jeu depuis IGDB…" style="width:100%;">
-                <ul id="ceIgdbResults" class="game-results"></ul>
-            </div>
-            <div id="ceTestOverrides"
-                 style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:.35rem .75rem; margin-top:.5rem; max-height:220px; overflow-y:auto;"></div>
-            <div style="margin-top:.75rem; font-size:.85em; color:var(--text-muted);"
-                 th:text="#{chat_commands.test.service_mocks_label}">Valeurs simulées pour les appels de service (optionnel)</div>
-            <div id="ceServiceMocks"
-                 style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:.35rem .75rem; margin-top:.5rem; max-height:220px; overflow-y:auto;"></div>
+            <summary th:text="#{chat_commands.test.service_mocks_label}" style="cursor:pointer; color:var(--text-muted);">Valeurs simulées pour les appels de service (optionnel)</summary>
+            <div id="ceServiceMocks" style="margin-top:.5rem; max-height:320px; overflow-y:auto;"></div>
         </details>
         <div style="display:flex; justify-content:flex-end; gap:.5rem; margin-top:1rem;">
             <button type="button" id="ceTestBtn" class="btn" th:text="#{chat_commands.action.test}">Tester</button>

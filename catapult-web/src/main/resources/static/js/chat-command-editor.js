@@ -131,6 +131,59 @@
         }
     }
 
+    // Options function bound with `this` as the field itself (Blockly's dropdown menuGenerator
+    // contract) so it always includes whatever's currently selected, even a TW id the catalog no
+    // longer reports (disabled/removed after this block was built) — never a value the field
+    // can't accept, unlike a plain static option list.
+    function knownTwOptions() {
+        const current = this.getValue ? this.getValue() : null;
+        const options = (catalog.knownTws || []).map(tw => [tw.label + ' (' + tw.id + ')', tw.id]);
+        if (current && !options.some(([, value]) => value === current)) {
+            options.push([current + ' (TW inconnu ou désactivé)', current]);
+        }
+        return options.length ? options : [['(aucun TW connu)', '']];
+    }
+
+    // JSON block definitions can't reference a JS function for a dropdown's options (JSON is
+    // data-only — see the identical rationale on cmd_property_get_picker below), so ID starts as
+    // a static placeholder and this extension swaps in a real function-generated FieldDropdown.
+    Blockly.Extensions.register('cmd_tw_picker_options', function () {
+        const block = this;
+        const input = block.inputList.find(i => i.fieldRow.some(f => f.name === 'ID'));
+        const index = input.fieldRow.findIndex(f => f.name === 'ID');
+        input.removeField('ID');
+        input.insertFieldAt(index, new Blockly.FieldDropdown(knownTwOptions), 'ID');
+    });
+
+    // Convenience for filling in tw#has(name)'s argument (or any other spot a TW id string is
+    // needed) without having to know/type the raw internal id by hand. Deliberately produces the
+    // exact same AST shape as cmd_literal_string ({type:'literal', valueType:'STRING'}) — this is
+    // a smarter way to CREATE that literal, not a new node type, so it needs no parser/generator/
+    // compiler changes and a saved command always parses back fine even without this block
+    // existing. It also means this block is never reconstructed from a saved AST (nodeType is
+    // null, and 'literal' nodes already resolve to cmd_literal_string in nodeToBlock) — reloading
+    // a command that used this picker shows a plain text block with the chosen id already typed
+    // in, which is what keeps this dropdown safe: it never has to round-trip a stale value.
+    class CmdTwPickerBlock {
+        static type = 'cmd_tw_picker';
+        static nodeType = null;
+        static category() { return 'TW'; }
+        static definition() {
+            return { type: this.type, message0: '%1',
+                args0: [{ type: 'field_dropdown', name: 'ID', options: [['▾', '']] }],
+                output: null, colour: 200, tooltip: 'Choisir un trigger warning connu',
+                extensions: ['cmd_tw_picker_options'] };
+        }
+        static toNode(block) {
+            return { type: 'literal', value: block.getFieldValue('ID'), valueType: 'STRING' };
+        }
+        static fromNode(ws, node) {
+            const block = ws.newBlock(this.type);
+            block.setFieldValue(node.value, 'ID');
+            return block;
+        }
+    }
+
     class CmdVarRefBlock {
         static type = 'cmd_var_ref';
         static nodeType = 'var-ref';
@@ -591,7 +644,7 @@
     }
 
     const STATIC_BLOCK_CLASSES = [
-        CmdLiteralStringBlock, CmdLiteralNumberBlock, CmdLiteralBooleanBlock,
+        CmdLiteralStringBlock, CmdLiteralNumberBlock, CmdLiteralBooleanBlock, CmdTwPickerBlock,
         CmdVarRefBlock, CmdContextGetBlock, CmdSettingGetBlock, CmdArgGetBlock,
         CmdObjectLiteralBlock, CmdObjectPropertyBlock, CmdPropertyGetBlock,
         CmdVarDeclBlock, CmdAssignBlock, CmdConcatBlock, CmdPrintBlock, CmdIfBlock, CmdForEachBlock
@@ -864,7 +917,7 @@
         selectTabUI(currentTab);
         try {
             await ensureCatalog();
-            renderTestOverrideFields();
+            renderServiceMockFields();
             if (ejectedJs === null) astToBlocks(await textToAst(cmd.template || ''));
         } catch (err) {
             reportEditorError(err);
@@ -1006,164 +1059,91 @@
     });
 
     // Kept at module scope (not reset per command) so test values a streamer typed while
-    // testing one command are still there when they open a different one — the same
-    // {game#name: "Valorant", ...} test rig is usually reused across several commands in
-    // a row, not re-typed for each.
-    let persistedTestOverrides = {};
-
-    // Same persistence rationale as persistedTestOverrides above, but keyed by
-    // "namespace#function" (e.g. "steam#getGame") instead of a legacy placeholder path.
+    // testing one command are still there when they open a different one — the same mock rig is
+    // usually reused across several commands in a row, not re-typed for each. Keyed by
+    // "namespace#function" for a scalar-returning function, or "namespace#function::field" for
+    // one return-key of a DTO-returning function.
     let persistedServiceMocks = {};
-
-    // One labelled input per known context path (catalog.contextPaths), so the streamer
-    // can test branches/text that depend on a placeholder without actually being live
-    // with that value (e.g. testing the "no game" wording while off-stream). Stacked
-    // label-above-input per cell of the grid — a side-by-side layout doesn't leave enough
-    // room for paths like "game#store#battlenet" at the grid's ~220px column width.
-    function renderTestOverrideFields() {
-        // Snapshot whatever's currently filled in (from editing the previous command, if
-        // any) into the persisted store before the fields get rebuilt/wiped below.
-        document.querySelectorAll('#ceTestOverrides [data-override-path]').forEach(input => {
-            if (input.value.trim() !== '') persistedTestOverrides[input.dataset.overridePath] = input.value;
-        });
-
-        const container = document.getElementById('ceTestOverrides');
-        container.replaceChildren();
-        for (const path of catalog.contextPaths) {
-            const cell = document.createElement('div');
-            const label = document.createElement('label');
-            label.textContent = path;
-            label.style.cssText = 'display:block; font-family:monospace; font-size:.75em; color:var(--text-muted); margin-bottom:.15rem;';
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'form-input';
-            input.dataset.overridePath = path;
-            input.style.width = '100%';
-            input.value = persistedTestOverrides[path] || '';
-            cell.appendChild(label);
-            cell.appendChild(input);
-            container.appendChild(cell);
-        }
-        renderServiceMockFields();
-    }
 
     // One labelled input per non-action service function (steam#getGame, catapult#getCurrentGame,
     // tw#has, ...) — actions (ban/timeout/...) always return "" so mocking them wouldn't do
-    // anything. Without this, "Tester" always hit the real gateway/DB for these calls with no way
-    // to fake a value the way legacy placeholders already could.
+    // anything. A DTO-returning function (fn.returnKeys non-empty) gets one input per field
+    // instead of a single JSON blob, so a streamer edits e.g. steam#getGame's short_description
+    // directly rather than hand-writing {"short_description":"..."}.
     function renderServiceMockFields() {
-        document.querySelectorAll('#ceServiceMocks [data-mock-function]').forEach(input => {
-            if (input.value.trim() !== '') persistedServiceMocks[input.dataset.mockFunction] = input.value;
+        document.querySelectorAll('#ceServiceMocks [data-mock-key]').forEach(input => {
+            if (input.value.trim() !== '') persistedServiceMocks[input.dataset.mockKey] = input.value;
         });
 
         const container = document.getElementById('ceServiceMocks');
         container.replaceChildren();
         for (const fn of catalog.serviceFunctions) {
             if (fn.isAction) continue;
-            const key = fn.namespace + '#' + fn.name;
-            const cell = document.createElement('div');
-            const label = document.createElement('label');
-            label.textContent = key;
-            label.style.cssText = 'display:block; font-family:monospace; font-size:.75em; color:var(--text-muted); margin-bottom:.15rem;';
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'form-input';
-            input.dataset.mockFunction = key;
-            input.style.width = '100%';
-            input.value = persistedServiceMocks[key] || '';
-            cell.appendChild(label);
-            cell.appendChild(input);
-            container.appendChild(cell);
+            const fnKey = fn.namespace + '#' + fn.name;
+            const group = document.createElement('div');
+            group.style.cssText = 'margin-bottom:.75rem;';
+            const heading = document.createElement('div');
+            heading.textContent = fnKey;
+            heading.style.cssText = 'font-family:monospace; font-size:.8em; color:var(--text); margin-bottom:.25rem;';
+            group.appendChild(heading);
+
+            const grid = document.createElement('div');
+            grid.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:.35rem .75rem;';
+            const fields = fn.returnKeys && fn.returnKeys.length ? fn.returnKeys : [null];
+            for (const field of fields) {
+                const mockKey = field === null ? fnKey : fnKey + '::' + field;
+                const cell = document.createElement('div');
+                const label = document.createElement('label');
+                label.textContent = field === null ? '(valeur retournée)' : field;
+                label.style.cssText = 'display:block; font-family:monospace; font-size:.75em; color:var(--text-muted); margin-bottom:.15rem;';
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'form-input';
+                input.dataset.mockKey = mockKey;
+                input.dataset.mockFunction = fnKey;
+                if (field !== null) input.dataset.mockField = field;
+                input.style.width = '100%';
+                input.value = persistedServiceMocks[mockKey] || '';
+                cell.appendChild(label);
+                cell.appendChild(input);
+                grid.appendChild(cell);
+            }
+            group.appendChild(grid);
+            container.appendChild(group);
         }
     }
 
-    function collectTestOverrides() {
-        const overrides = {};
-        document.querySelectorAll('#ceTestOverrides [data-override-path]').forEach(input => {
-            const value = input.value.trim();
-            if (value !== '') overrides[input.dataset.overridePath] = value;
-        });
-        return overrides;
-    }
-
-    // Values are sent as plain strings — the server parses each as JSON when possible (so a
-    // map/DTO-returning function can be mocked with e.g. {"short_description":"..."}, and a
-    // boolean-returning one like tw#has with just "true"), falling back to the raw string.
+    // Groups per-field inputs back into one mock value per function: a DTO-returning function's
+    // fields are combined into a JSON object string (server parses it back into a map via
+    // MockingServiceFunctionRegistry), a scalar one sends its single field's raw text as-is.
     function collectServiceMocks() {
         const mocks = {};
-        document.querySelectorAll('#ceServiceMocks [data-mock-function]').forEach(input => {
-            const value = input.value.trim();
-            if (value !== '') mocks[input.dataset.mockFunction] = value;
+        const byFunction = {};
+        document.querySelectorAll('#ceServiceMocks [data-mock-key]').forEach(input => {
+            const fnKey = input.dataset.mockFunction;
+            (byFunction[fnKey] = byFunction[fnKey] || []).push(input);
         });
+        for (const [fnKey, inputs] of Object.entries(byFunction)) {
+            if (inputs.length === 1 && inputs[0].dataset.mockField === undefined) {
+                const value = inputs[0].value.trim();
+                if (value !== '') mocks[fnKey] = value;
+                continue;
+            }
+            const obj = {};
+            let any = false;
+            inputs.forEach(input => {
+                const value = input.value.trim();
+                if (value !== '') { obj[input.dataset.mockField] = value; any = true; }
+            });
+            if (any) mocks[fnKey] = JSON.stringify(obj);
+        }
         return mocks;
     }
-
-    function applyTestOverrideValues(values) {
-        document.querySelectorAll('#ceTestOverrides [data-override-path]').forEach(input => {
-            const value = values[input.dataset.overridePath];
-            if (value !== undefined) input.value = value;
-        });
-    }
-
-    // "Import a game from IGDB" search box above the test-override fields — picking a
-    // result pre-fills every game#* field this endpoint can resolve (see
-    // ChatCommandsDslIgdbPreviewHandler), instead of typing each one by hand.
-    let igdbSearchTimer = null;
-
-    function setupIgdbSearch() {
-        const input = document.getElementById('ceIgdbSearch');
-        const results = document.getElementById('ceIgdbResults');
-        if (!input || !results) return;
-
-        function renderResults(games) {
-            results.replaceChildren();
-            if (!games.length) { results.style.display = 'none'; return; }
-            games.forEach(game => {
-                const li = document.createElement('li');
-                const span = document.createElement('span');
-                span.textContent = game.name;
-                li.appendChild(span);
-                li.addEventListener('click', async () => {
-                    results.style.display = 'none';
-                    input.value = game.name;
-                    try {
-                        const resp = await window.catapultWs.request('chat-commands.dsl.igdb-preview',
-                            { id: game.id, name: game.name });
-                        applyTestOverrideValues(resp.result || {});
-                    } catch (err) {
-                        reportEditorError(err);
-                    }
-                });
-                results.appendChild(li);
-            });
-            results.style.display = 'block';
-        }
-
-        input.addEventListener('input', () => {
-            clearTimeout(igdbSearchTimer);
-            const q = input.value.trim();
-            if (q.length < 2) { results.style.display = 'none'; return; }
-            igdbSearchTimer = setTimeout(async () => {
-                try {
-                    const resp = await window.catapultWs.request('chat-commands.dsl.igdb-search', { q });
-                    renderResults(resp.result || []);
-                } catch (err) {
-                    results.style.display = 'none';
-                }
-            }, 300);
-        });
-
-        document.addEventListener('click', e => {
-            if (e.target !== input && !results.contains(e.target)) results.style.display = 'none';
-        });
-    }
-
-    setupIgdbSearch();
 
     document.getElementById('ceTestBtn').onclick = async () => {
         if (!currentCmd) return;
         try {
-            const payload = { id: currentCmd.id, overrides: collectTestOverrides(), serviceMocks: collectServiceMocks() };
+            const payload = { id: currentCmd.id, overrides: {}, serviceMocks: collectServiceMocks() };
             // Send whichever in-progress (possibly unsaved) content is authoritative, so
             // Tester reflects what's currently in the editor, not just the last save —
             // the server checks these before falling back to the persisted ast/ejectedJs
