@@ -32,17 +32,22 @@ import java.util.stream.Collectors;
 /**
  * Compiles a {@link CommandAst} into a JavaScript program string that accumulates into
  * {@code let __output = "";} (returned at the end) via a {@code ctx} object exposing
- * {@code ctx.placeholder(path)}, {@code ctx.call(namespace, function, ...args)} and
- * {@code ctx.list(name)}. Statements execute in order; {@code if}/{@code for-each} bodies
- * compile to native JS {@code { }} blocks, so variables declared inside them are naturally
- * block-scoped by plain JS {@code let}/{@code const} semantics — no extra bookkeeping needed.
+ * {@code ctx.placeholder(path)} and {@code ctx.list(name)}, plus one global object per service
+ * namespace ({@code catapult}, {@code igdb}, {@code steam}, {@code twitch}, {@code tw}, ...)
+ * whose methods mirror the registered functions — a {@link ServiceCallExpr} compiles to {@code
+ * namespace.function(args)} (e.g. {@code igdb.getCurrentGame().name}) rather than the older
+ * {@code ctx.call(namespace, function, ...args)} form. {@link SandboxExecutor} still binds {@code
+ * ctx.call} too, purely for backward compatibility with hand-edited "ejected" JS written before
+ * this syntax existed. Statements execute in order; {@code if}/{@code for-each} bodies compile to
+ * native JS {@code { }} blocks, so variables declared inside them are naturally block-scoped by
+ * plain JS {@code let}/{@code const} semantics — no extra bookkeeping needed.
  *
  * <p>Every context path the ast actually references (e.g. {@code "game#name"}) gets a one-time
  * setup line at the top of the script — {@code ctx.game = ctx.game || {}; ctx.game.name =
  * ctx.placeholder("game#name");} — so the rest of the compiled body can read {@code ctx.game.name}
  * as a plain dot-chain instead of calling {@code ctx.placeholder(...)} inline. This is a pure
- * compile-time lowering: {@link SandboxExecutor}'s actual {@code ctx.placeholder}/{@code ctx.call}/
- * {@code ctx.list} contract is untouched, so hand-edited "ejected" JS written against the old
+ * compile-time lowering: {@link SandboxExecutor}'s actual {@code ctx.placeholder}/{@code ctx.list}
+ * contract is untouched, so hand-edited "ejected" JS written against the old
  * {@code ctx.placeholder(path)} form keeps working unchanged.
  *
  * <p>{@link #compileWithTrace(CommandAst)} additionally emits {@code __trace.var(name, value)}
@@ -420,8 +425,7 @@ public class JsCompiler {
 
     private String compileServiceCall(ServiceCallExpr expr) {
         String args = expr.args().stream().map(this::compileExpr).collect(Collectors.joining(", "));
-        return "ctx.call(\"" + escape(expr.namespace()) + "\", \"" + escape(expr.function()) + "\""
-            + (args.isEmpty() ? "" : ", " + args) + ")";
+        return expr.namespace() + "." + expr.function() + "(" + args + ")";
     }
 
     private String jsOperator(String operator) {
