@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.IgdbGameDetails;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
@@ -21,6 +22,7 @@ public class BindingService {
 
     private final GameBindingRepository gameBindingRepository;
     private final IgdbService igdbService;
+    private final IgdbGameDetailsService igdbGameDetailsService;
     private final TwitchService twitchService;
     private final TwResolverService twResolverService;
 
@@ -73,7 +75,11 @@ public class BindingService {
         if (igdbGame.isPresent()) {
             String igdbId = igdbGame.get().id();
             String gameName = igdbGame.get().name();
-            String twitchId = igdbService.findTwitchGameId(igdbId)
+            String twitchId = igdbGameDetailsService.getDetails(igdbId)
+                    .map(IgdbGameDetails::getWebsites)
+                    .map(websites -> websites.get("twitch"))
+                    .filter(id -> id != null && !id.isBlank())
+                    .or(() -> igdbService.findTwitchGameId(igdbId))
                     .or(() -> twitchService.findCategoryIdByName(user, gameName))
                     .orElse(null);
             binding.setTwitchGameId(twitchId);
