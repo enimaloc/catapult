@@ -1,6 +1,9 @@
 package fr.enimaloc.catapult.chat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.domain.ChatCommandDefinition;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.service.TwitchChatService;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +28,7 @@ public class CommandRegistry {
     private final TwitchChatService twitchChatService;
     private final ObjectMapper objectMapper;
     private final DynamicCommandResolver dynamicCommandResolver;
+    private final ChatCommandDefinitionRepository definitionRepository;
     private final MeterRegistry meterRegistry;
     private final String appOwnerId;
 
@@ -32,6 +36,7 @@ public class CommandRegistry {
                            TwitchChatService twitchChatService,
                            ObjectMapper objectMapper,
                            DynamicCommandResolver dynamicCommandResolver,
+                           ChatCommandDefinitionRepository definitionRepository,
                            MeterRegistry meterRegistry,
                            @Value("${app.owner-id:}") String appOwnerId) {
         this.commands = commandList.stream()
@@ -39,6 +44,7 @@ public class CommandRegistry {
         this.twitchChatService = twitchChatService;
         this.objectMapper = objectMapper;
         this.dynamicCommandResolver = dynamicCommandResolver;
+        this.definitionRepository = definitionRepository;
         this.meterRegistry = meterRegistry;
         this.appOwnerId = appOwnerId;
         log.info("Registered {} static chat commands: {}", commands.size(), commands.keySet());
@@ -62,7 +68,8 @@ public class CommandRegistry {
             return;
         }
 
-        if (!hasPermission(event.getSenderRole(), command.getRequiredPermission())) {
+        ChatCommandEvent.SenderRole required = requiredPermission(event.getUser(), command);
+        if (!hasPermission(event, required)) {
             log.debug("Permission denied for command '{}' — sender role: {}",
                 event.getCommand(), event.getSenderRole());
             meterRegistry.counter("catapult.chat.commands.dispatch",
@@ -102,13 +109,45 @@ public class CommandRegistry {
         return appOwnerId != null && !appOwnerId.isBlank() && appOwnerId.equals(senderTwitchId);
     }
 
-    private boolean hasPermission(ChatCommandEvent.SenderRole senderRole,
-                                  ChatCommandEvent.SenderRole required) {
-        return switch (required) {
-            case EVERYONE -> true;
-            case MODERATOR -> senderRole == ChatCommandEvent.SenderRole.MODERATOR
-                || senderRole == ChatCommandEvent.SenderRole.BROADCASTER;
-            case BROADCASTER -> senderRole == ChatCommandEvent.SenderRole.BROADCASTER;
-        };
+    /**
+     * A {@link fr.enimaloc.catapult.chat.command.SetGameCommand}-style static/builtin command
+     * always reports its own hardcoded default — {@link ChatCommandPresetCatalog} seeds an
+     * editable {@link ChatCommandDefinition} row per one specifically so the streamer can
+     * override that default from the command editor, so that row's permission (once present)
+     * must win here. A data-driven ({@link DynamicChatCommand}) command already reads its own
+     * definition's permission directly in {@code getRequiredPermission()} — looking it up again
+     * by presetKey here would just waste a query per dispatch for no benefit, so it's skipped
+     * for anything that isn't one of the static beans this registry was built from.
+     */
+    private ChatCommandEvent.SenderRole requiredPermission(UserAccount user, ChatCommand command) {
+        if (!commands.containsValue(command)) {
+            return command.getRequiredPermission();
+        }
+        String presetKey = ChatCommandPresetCatalog.BUILTIN_PRESET_KEY_PREFIX
+            + command.getName().replaceFirst("^!", "");
+        return definitionRepository.findByUserAndPresetKey(user, presetKey)
+            .map(ChatCommandDefinition::getPermission)
+            .orElseGet(command::getRequiredPermission);
+    }
+
+    /**
+     * A higher tier always satisfies a lower requirement ({@link ChatCommandEvent.SenderRole} is
+     * ordered least to most privileged), except FOLLOWERS: Twitch chat badges have no "is a
+     * follower" signal the way broadcaster/moderator/vip/subscriber do, so a sender whose
+     * badge-derived role is the baseline VIEWERS needs a live Helix lookup before FOLLOWERS-gated
+     * commands can be denied outright — done only for that one borderline case, not on every
+     * message, to avoid an extra API call per dispatch.
+     */
+    private boolean hasPermission(ChatCommandEvent event, ChatCommandEvent.SenderRole required) {
+        ChatCommandEvent.SenderRole senderRole = event.getSenderRole();
+        if (senderRole.ordinal() >= required.ordinal()) {
+            return true;
+        }
+        if (required == ChatCommandEvent.SenderRole.FOLLOWERS
+                && senderRole == ChatCommandEvent.SenderRole.VIEWERS
+                && event.getSenderTwitchId() != null && !event.getSenderTwitchId().isBlank()) {
+            return twitchChatService.getFollowedAtById(event.getUser(), event.getSenderTwitchId()).isPresent();
+        }
+        return false;
     }
 }

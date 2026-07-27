@@ -123,7 +123,7 @@ class ApiChatCommandsControllerTest {
         String body = om.writeValueAsString(Map.of(
                 "name", "noBang",
                 "template", "Hi",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true));
 
         mvc.perform(withAdmin(post("/api/chat-commands"))
@@ -144,7 +144,7 @@ class ApiChatCommandsControllerTest {
         String body = om.writeValueAsString(Map.of(
                 "name", "!foo",
                 "template", "Hi {game#unknown}",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true));
 
         mvc.perform(withAdmin(post("/api/chat-commands"))
@@ -170,7 +170,7 @@ class ApiChatCommandsControllerTest {
         String body = om.writeValueAsString(Map.of(
                 "name", "!foo",
                 "template", "Hi",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true));
 
         mvc.perform(withAdmin(post("/api/chat-commands"))
@@ -179,7 +179,7 @@ class ApiChatCommandsControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("!foo"))
                 .andExpect(jsonPath("$.template").value("Hi"))
-                .andExpect(jsonPath("$.permission").value("EVERYONE"));
+                .andExpect(jsonPath("$.permission").value("VIEWERS"));
 
         verify(repository).save(any(ChatCommandDefinition.class));
     }
@@ -196,7 +196,7 @@ class ApiChatCommandsControllerTest {
         existing.setUser(user);
         existing.setName("!foo");
         existing.setTemplate("stale text from a previous save");
-        existing.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        existing.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -206,7 +206,7 @@ class ApiChatCommandsControllerTest {
                 "name", "!foo",
                 // Deliberately stale/mismatched: the ast must win, not this text.
                 "template", "ignored client-side text",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true,
                 "ast", astJson));
 
@@ -234,7 +234,7 @@ class ApiChatCommandsControllerTest {
         existing.setId(id);
         existing.setUser(user);
         existing.setName("!so");
-        existing.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        existing.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -242,7 +242,7 @@ class ApiChatCommandsControllerTest {
         String body = om.writeValueAsString(Map.of(
                 "name", "!so",
                 "template", "ignored",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true,
                 "ast", astJson));
 
@@ -270,7 +270,7 @@ class ApiChatCommandsControllerTest {
         existing.setId(id);
         existing.setUser(user);
         existing.setName("!so");
-        existing.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        existing.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -278,7 +278,7 @@ class ApiChatCommandsControllerTest {
         String body = om.writeValueAsString(Map.of(
                 "name", "!so",
                 "template", "ignored",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true,
                 "ast", astJson));
 
@@ -303,14 +303,14 @@ class ApiChatCommandsControllerTest {
         existing.setName("!foo");
         existing.setTemplate("Now playing {game#name}!");
         existing.setAst(astJson);
-        existing.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        existing.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         String body = om.writeValueAsString(Map.of(
                 "name", "!foo",
                 "template", "Now playing {game#name}!",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true,
                 "ast", astJson,
                 "ejectedJs", "return \"hand-written\";"));
@@ -343,7 +343,7 @@ class ApiChatCommandsControllerTest {
         existing.setTemplate("Now playing {game#name}!");
         existing.setAst(astJson);
         existing.setEjectedJs("return \"old hand-written js\";");
-        existing.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        existing.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -351,7 +351,7 @@ class ApiChatCommandsControllerTest {
         String body = om.writeValueAsString(Map.of(
                 "name", "!foo",
                 "template", "Now playing {game#name}!",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true,
                 "ast", astJson));
 
@@ -379,7 +379,7 @@ class ApiChatCommandsControllerTest {
         def.setUser(otherOwner);
         def.setName("!foo");
         def.setTemplate("Hi");
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(otherId)).thenReturn(Optional.of(def));
 
         mvc.perform(withAdmin(delete("/api/chat-commands/{id}", otherId)))

@@ -197,15 +197,21 @@ public class IrcTwitchChatService implements TwitchChatService {
             new ChatCommandEvent(this, user, command, args, extractRole(tags), extractSenderId(tags)));
     }
 
+    /** FOLLOWERS is never returned here — Twitch chat badges have no "is a follower" signal,
+     *  unlike broadcaster/moderator/vip/subscriber, which are all present on every message
+     *  a badge-holder sends. {@link fr.enimaloc.catapult.chat.CommandRegistry} checks that tier
+     *  separately (a live Helix lookup) only for the borderline case this can't decide. */
     static ChatCommandEvent.SenderRole extractRole(String tags) {
         for (String tag : tags.split(";")) {
             if (tag.startsWith("badges=")) {
                 String badges = tag.substring("badges=".length());
                 if (badges.contains("broadcaster/")) return ChatCommandEvent.SenderRole.BROADCASTER;
                 if (badges.contains("moderator/")) return ChatCommandEvent.SenderRole.MODERATOR;
+                if (badges.contains("vip/")) return ChatCommandEvent.SenderRole.VIP;
+                if (badges.contains("subscriber/")) return ChatCommandEvent.SenderRole.SUBS;
             }
         }
-        return ChatCommandEvent.SenderRole.EVERYONE;
+        return ChatCommandEvent.SenderRole.VIEWERS;
     }
 
     static String extractSenderId(String tags) {
@@ -362,30 +368,42 @@ public class IrcTwitchChatService implements TwitchChatService {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Optional<Instant> getFollowedAt(UserAccount user, String targetLogin) {
         return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
             String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
             String targetId = resolveUserId(accessToken, targetLogin);
             if (targetId == null) return Optional.empty();
-            try {
-                Map<String, Object> response = restClient.get()
-                    .uri(HELIX_FOLLOWERS_URL + "?broadcaster_id=" + user.getTwitchId()
-                        + "&moderator_id=" + user.getTwitchId() + "&user_id=" + targetId)
-                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                    .header(CLIENT_ID, twitchClientId)
-                    .retrieve()
-                    .body(Map.class);
-                if (response == null) return Optional.empty();
-                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                if (data == null || data.isEmpty()) return Optional.empty();
-                return Optional.of(Instant.parse((String) data.get(0).get("followed_at")));
-            } catch (Exception e) {
-                log.warn("[IRC] Failed to fetch follow date for '{}' on user {}: {}",
-                    targetLogin, user.getId(), e.getMessage());
-                return Optional.empty();
-            }
+            return fetchFollowedAt(user, accessToken, targetId, targetLogin);
         });
+    }
+
+    @Override
+    public Optional<Instant> getFollowedAtById(UserAccount user, String targetTwitchId) {
+        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
+            String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+            return fetchFollowedAt(user, accessToken, targetTwitchId, targetTwitchId);
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<Instant> fetchFollowedAt(UserAccount user, String accessToken, String targetId, String logLabel) {
+        try {
+            Map<String, Object> response = restClient.get()
+                .uri(HELIX_FOLLOWERS_URL + "?broadcaster_id=" + user.getTwitchId()
+                    + "&moderator_id=" + user.getTwitchId() + "&user_id=" + targetId)
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
+                .retrieve()
+                .body(Map.class);
+            if (response == null) return Optional.empty();
+            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+            if (data == null || data.isEmpty()) return Optional.empty();
+            return Optional.of(Instant.parse((String) data.get(0).get("followed_at")));
+        } catch (Exception e) {
+            log.warn("[IRC] Failed to fetch follow date for '{}' on user {}: {}",
+                logLabel, user.getId(), e.getMessage());
+            return Optional.empty();
+        }
     }
 
     @Override

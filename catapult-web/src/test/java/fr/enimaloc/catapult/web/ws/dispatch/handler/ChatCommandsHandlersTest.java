@@ -54,7 +54,7 @@ class ChatCommandsHandlersTest {
         var handler = new ChatCommandsCreateHandler(api);
 
         Object out = handler.handle((WsSession) null, Map.of(
-                "name", "!hi", "template", "hello", "permission", "EVERYONE",
+                "name", "!hi", "template", "hello", "permission", "VIEWERS",
                 "enabled", true, "fallbacks", Map.of()));
 
         assertThat(out).isEqualTo(created);
@@ -77,7 +77,7 @@ class ChatCommandsHandlersTest {
 
         Object out = handler.handle((WsSession) null, Map.of(
                 "id", id.toString(),
-                "name", "!hi", "template", "hello", "permission", "EVERYONE",
+                "name", "!hi", "template", "hello", "permission", "VIEWERS",
                 "enabled", true, "fallbacks", Map.of()));
 
         assertThat(out).isInstanceOf(Map.class);

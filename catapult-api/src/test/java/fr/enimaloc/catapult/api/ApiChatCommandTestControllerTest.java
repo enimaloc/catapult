@@ -99,7 +99,7 @@ class ApiChatCommandTestControllerTest {
         def.setUser(otherOwner);
         def.setName("!foo");
         def.setTemplate("Hi");
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(otherId)).thenReturn(Optional.of(def));
 
         mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", otherId))
@@ -120,7 +120,7 @@ class ApiChatCommandTestControllerTest {
         def.setName("!foo");
         def.setTemplate("Now playing {game#name}!");
         def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!")));
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(def));
         when(jsCompiler.compileWithTrace(any())).thenReturn("return \"Now playing Valorant!\";");
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
@@ -149,7 +149,7 @@ class ApiChatCommandTestControllerTest {
         def.setName("!foo");
         def.setTemplate("Now playing {game#name}!");
         def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!")));
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(def));
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
         trace.finish("hand-written output");
@@ -180,7 +180,7 @@ class ApiChatCommandTestControllerTest {
         def.setTemplate("this should never compile");
         def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("this should never compile")));
         def.setEjectedJs("return \"persisted ejected output\";");
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(def));
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
         trace.finish("persisted ejected output");
@@ -212,7 +212,7 @@ class ApiChatCommandTestControllerTest {
         def.setName("!foo");
         def.setTemplate("Now playing {game#name}!");
         def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!")));
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(def));
         when(jsCompiler.compileWithTrace(any())).thenReturn("return \"irrelevant\";");
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
@@ -249,7 +249,7 @@ class ApiChatCommandTestControllerTest {
         def.setName("!lang");
         def.setTemplate("{ctx.settings.language}");
         def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{ctx.settings.language}")));
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(def));
         ChatCommandSetting savedSetting = new ChatCommandSetting();
         savedSetting.setKey("language");
@@ -285,7 +285,7 @@ class ApiChatCommandTestControllerTest {
         def.setName("!lang");
         def.setTemplate("{ctx.settings.language}");
         def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("{ctx.settings.language}")));
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(def));
         ChatCommandSetting savedSetting = new ChatCommandSetting();
         savedSetting.setKey("language");
@@ -320,7 +320,7 @@ class ApiChatCommandTestControllerTest {
         def.setName("!shoutout");
         def.setTemplate("Go check out {arg(0)}!");
         def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("Go check out {arg(0)}!")));
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(def));
         when(jsCompiler.compileWithTrace(any())).thenReturn("return \"Go check out myfriend!\";");
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();
@@ -352,7 +352,7 @@ class ApiChatCommandTestControllerTest {
         def.setName("!shoutout");
         def.setTemplate("[{arg(0)}]");
         def.setAst(new NodeJsonCodec().toJson(new CommandDslParser().parse("[{arg(0)}]")));
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(id)).thenReturn(Optional.of(def));
         when(jsCompiler.compileWithTrace(any())).thenReturn("return \"[]\";");
         var trace = new fr.enimaloc.catapult.chat.command.trace.ExecutionTrace();

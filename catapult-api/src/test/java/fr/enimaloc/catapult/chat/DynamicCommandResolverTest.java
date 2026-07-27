@@ -57,7 +57,7 @@ class DynamicCommandResolverTest {
         def.setName("!game");
         def.setTemplate("...");
         def.setEnabled(true);
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findByUserAndName(user, "!game")).thenReturn(Optional.of(def));
 
         Optional<ChatCommand> result = resolver.resolve(user, "!game");
@@ -88,7 +88,7 @@ class DynamicCommandResolverTest {
         def.setName("!game");
         def.setTemplate("...");
         def.setEnabled(true);
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findByUserAndName(user, "!game")).thenReturn(Optional.of(def));
 
         resolver.resolve(user, "!game"); // populate cache

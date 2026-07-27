@@ -248,22 +248,27 @@ public class EventSubTwitchChatService implements TwitchChatService {
         } else if ("channel.channel_points_custom_reward_redemption.add".equals(subscriptionType)) {
             String rewardTitle = event.path("reward").path("title").asText();
             eventPublisher.publishEvent(new ChatCommandEvent(this, user, "reward:" + rewardTitle,
-                List.of(), ChatCommandEvent.SenderRole.EVERYONE));
+                List.of(), ChatCommandEvent.SenderRole.VIEWERS));
             log.info("[EventSub Chat] Reward redeemed: '{}' for user {}", rewardTitle, user.getId());
         }
     }
 
+    /**
+     * Checks for the highest-priority badge across the WHOLE collection rather than returning on
+     * the first match found while iterating — Twitch doesn't guarantee badge array order, so a
+     * subscriber badge listed before a broadcaster/mod one must not shadow it. FOLLOWERS is never
+     * returned here — see {@link IrcTwitchChatService#extractRole} for why.
+     */
     private ChatCommandEvent.SenderRole extractRole(JsonNode event) {
-        ArrayNode badges = event.withArray("badges");
-        for (JsonNode badge : badges) {
-            String setId = badge.path("set_id").asText("");
-            if (setId.equals("broadcaster")) {
-                return ChatCommandEvent.SenderRole.BROADCASTER;
-            } else if (setId.equals("mod")) {
-                return ChatCommandEvent.SenderRole.MODERATOR;
-            }
+        java.util.Set<String> setIds = new java.util.HashSet<>();
+        for (JsonNode badge : event.withArray("badges")) {
+            setIds.add(badge.path("set_id").asText(""));
         }
-        return ChatCommandEvent.SenderRole.EVERYONE;
+        if (setIds.contains("broadcaster")) return ChatCommandEvent.SenderRole.BROADCASTER;
+        if (setIds.contains("mod")) return ChatCommandEvent.SenderRole.MODERATOR;
+        if (setIds.contains("vip")) return ChatCommandEvent.SenderRole.VIP;
+        if (setIds.contains("subscriber")) return ChatCommandEvent.SenderRole.SUBS;
+        return ChatCommandEvent.SenderRole.VIEWERS;
     }
 
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
@@ -510,30 +515,42 @@ public class EventSubTwitchChatService implements TwitchChatService {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Optional<Instant> getFollowedAt(UserAccount user, String targetLogin) {
         return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
             String accessToken = twitchTokenService.resolveAccessToken(token, user);
             String targetId = resolveUserId(accessToken, targetLogin);
             if (targetId == null) return Optional.empty();
-            try {
-                Map<String, Object> response = restClient.get()
-                    .uri(HELIX_FOLLOWERS_URL + "?broadcaster_id=" + user.getTwitchId()
-                        + "&moderator_id=" + user.getTwitchId() + "&user_id=" + targetId)
-                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                    .header(CLIENT_ID, twitchClientId)
-                    .retrieve()
-                    .body(Map.class);
-                if (response == null) return Optional.empty();
-                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                if (data == null || data.isEmpty()) return Optional.empty();
-                return Optional.of(Instant.parse((String) data.get(0).get("followed_at")));
-            } catch (Exception e) {
-                log.warn("[EventSub Chat] Failed to fetch follow date for '{}' on user {}: {}",
-                    targetLogin, user.getId(), e.getMessage());
-                return Optional.empty();
-            }
+            return fetchFollowedAt(user, accessToken, targetId, targetLogin);
         });
+    }
+
+    @Override
+    public Optional<Instant> getFollowedAtById(UserAccount user, String targetTwitchId) {
+        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
+            String accessToken = twitchTokenService.resolveAccessToken(token, user);
+            return fetchFollowedAt(user, accessToken, targetTwitchId, targetTwitchId);
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<Instant> fetchFollowedAt(UserAccount user, String accessToken, String targetId, String logLabel) {
+        try {
+            Map<String, Object> response = restClient.get()
+                .uri(HELIX_FOLLOWERS_URL + "?broadcaster_id=" + user.getTwitchId()
+                    + "&moderator_id=" + user.getTwitchId() + "&user_id=" + targetId)
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
+                .retrieve()
+                .body(Map.class);
+            if (response == null) return Optional.empty();
+            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+            if (data == null || data.isEmpty()) return Optional.empty();
+            return Optional.of(Instant.parse((String) data.get(0).get("followed_at")));
+        } catch (Exception e) {
+            log.warn("[EventSub Chat] Failed to fetch follow date for '{}' on user {}: {}",
+                logLabel, user.getId(), e.getMessage());
+            return Optional.empty();
+        }
     }
 
     @Override

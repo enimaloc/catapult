@@ -82,7 +82,7 @@ class ChatCommandsIntegrationTest {
 
         // 3. Chat command received from a viewer
         publisher.publishEvent(new ChatCommandEvent(this, user, "!game",
-            List.of(), ChatCommandEvent.SenderRole.EVERYONE));
+            List.of(), ChatCommandEvent.SenderRole.VIEWERS));
 
         // 4. The mock chat service captured the rendered response.
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
