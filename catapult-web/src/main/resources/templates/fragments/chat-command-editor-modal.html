@@ -7,6 +7,14 @@
         <div style="display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.75rem;">
             <input id="ceName" class="form-input" type="text" pattern="^![a-z][a-z0-9_]{0,30}$"
                    style="font-family:monospace; font-size:1.1em; flex:1;">
+            <select id="cePermission" class="form-input" style="width:auto;">
+                <option value="VIEWERS" th:text="#{chat_commands.permission.viewers}">Everyone</option>
+                <option value="FOLLOWERS" th:text="#{chat_commands.permission.followers}">Followers</option>
+                <option value="SUBS" th:text="#{chat_commands.permission.subs}">Subscribers</option>
+                <option value="VIP" th:text="#{chat_commands.permission.vip}">VIPs</option>
+                <option value="MODERATOR" th:text="#{chat_commands.permission.moderator}">Moderator</option>
+                <option value="BROADCASTER" th:text="#{chat_commands.permission.broadcaster}">Broadcaster</option>
+            </select>
             <button type="button" id="ceFullscreenBtn" title="Plein écran"
                     style="background:none; border:none; font-size:1.1rem; cursor:pointer; color:inherit;">&#x26F6;</button>
             <button type="button" id="ceClose"
