@@ -96,6 +96,35 @@ class EventSubTwitchChatServiceTest {
     }
 
     @Test
+    void extractRole_broadcasterBadgeWinsOverEverything() throws Exception {
+        var event = new ObjectMapper().readTree(
+            "{\"badges\":[{\"set_id\":\"subscriber\",\"info\":\"3\"},{\"set_id\":\"broadcaster\",\"info\":\"1\"}]}");
+        var role = ReflectionTestUtils.invokeMethod(service, "extractRole", event);
+        assertThat(role).isEqualTo(fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole.BROADCASTER);
+    }
+
+    @Test
+    void extractRole_subsBadgeMapsToSubsTier() throws Exception {
+        var event = new ObjectMapper().readTree("{\"badges\":[{\"set_id\":\"subscriber\",\"info\":\"3\"}]}");
+        var role = ReflectionTestUtils.invokeMethod(service, "extractRole", event);
+        assertThat(role).isEqualTo(fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole.SUBS);
+    }
+
+    @Test
+    void extractRole_vipBadgeMapsToVipTier() throws Exception {
+        var event = new ObjectMapper().readTree("{\"badges\":[{\"set_id\":\"vip\",\"info\":\"1\"}]}");
+        var role = ReflectionTestUtils.invokeMethod(service, "extractRole", event);
+        assertThat(role).isEqualTo(fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole.VIP);
+    }
+
+    @Test
+    void extractRole_noRecognizedBadgeFallsBackToViewers() throws Exception {
+        var event = new ObjectMapper().readTree("{\"badges\":[]}");
+        var role = ReflectionTestUtils.invokeMethod(service, "extractRole", event);
+        assertThat(role).isEqualTo(fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole.VIEWERS);
+    }
+
+    @Test
     void handleMessage_sessionWelcome_resolvesTokenThroughTokenService() {
         service.handleMessage(user, token, WELCOME_MESSAGE, false);
 

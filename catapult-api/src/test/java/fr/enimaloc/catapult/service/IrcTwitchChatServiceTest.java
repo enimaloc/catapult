@@ -43,16 +43,30 @@ class IrcTwitchChatServiceTest {
     }
 
     @Test
-    void extractRoleEveryoneWhenSubscriberOnly() {
+    void extractRoleSubsWhenSubscriberBadgePresent() {
         var role = IrcTwitchChatService.extractRole(
             "badge-info=subscriber/3;badges=subscriber/3;color=");
-        assertThat(role).isEqualTo(ChatCommandEvent.SenderRole.EVERYONE);
+        assertThat(role).isEqualTo(ChatCommandEvent.SenderRole.SUBS);
+    }
+
+    @Test
+    void extractRoleVipWhenVipBadgePresent() {
+        var role = IrcTwitchChatService.extractRole(
+            "badge-info=;badges=vip/1;color=");
+        assertThat(role).isEqualTo(ChatCommandEvent.SenderRole.VIP);
+    }
+
+    @Test
+    void extractRoleModeratorOutranksSubscriberBadge() {
+        var role = IrcTwitchChatService.extractRole(
+            "badge-info=subscriber/3;badges=moderator/1,subscriber/3;color=");
+        assertThat(role).isEqualTo(ChatCommandEvent.SenderRole.MODERATOR);
     }
 
     @Test
     void extractRoleEveryoneWhenEmptyTags() {
         var role = IrcTwitchChatService.extractRole("");
-        assertThat(role).isEqualTo(ChatCommandEvent.SenderRole.EVERYONE);
+        assertThat(role).isEqualTo(ChatCommandEvent.SenderRole.VIEWERS);
     }
 
     @Test
