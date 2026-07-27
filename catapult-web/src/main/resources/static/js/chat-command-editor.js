@@ -905,6 +905,10 @@
         const isBuiltin = !!(cmd.presetKey && cmd.presetKey.indexOf('builtin:') === 0);
         document.getElementById('ceName').value = cmd.name;
         document.getElementById('ceName').disabled = isBuiltin;
+        // Builtin commands (their Java-implemented action, e.g. !setgame's actual game-setting
+        // side effect) aren't renamable/deletable, but their required permission is a genuine
+        // per-streamer setting CommandRegistry now reads from this row — never disable this one.
+        document.getElementById('cePermission').value = cmd.permission || 'VIEWERS';
         document.getElementById('ceTextArea').value = cmd.template || '';
         document.getElementById('ceTraceOutput').hidden = true;
         document.getElementById('ceScopeWarning').hidden = true;
@@ -997,7 +1001,7 @@
             const payload = {
                 id: currentCmd.id,
                 name: document.getElementById('ceName').value,
-                permission: currentCmd.permission,
+                permission: document.getElementById('cePermission').value,
                 enabled: currentCmd.enabled,
                 fallbacks: fallbacks
             };

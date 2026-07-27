@@ -50,7 +50,10 @@
             <div class="form-field">
                 <label for="customChatCmdPermission" th:text="#{chat_commands.column.permission}">Permission</label>
                 <select id="customChatCmdPermission" class="form-input" name="permission" style="width:auto;">
-                    <option value="EVERYONE" th:text="#{chat_commands.permission.everyone}">Everyone</option>
+                    <option value="VIEWERS" th:text="#{chat_commands.permission.viewers}">Everyone</option>
+                    <option value="FOLLOWERS" th:text="#{chat_commands.permission.followers}">Followers</option>
+                    <option value="SUBS" th:text="#{chat_commands.permission.subs}">Subscribers</option>
+                    <option value="VIP" th:text="#{chat_commands.permission.vip}">VIPs</option>
                     <option value="MODERATOR" th:text="#{chat_commands.permission.moderator}">Moderator</option>
                     <option value="BROADCASTER" th:text="#{chat_commands.permission.broadcaster}">Broadcaster</option>
                 </select>
@@ -118,7 +121,10 @@
         };
 
         const PERMISSION_LABELS = {
-            EVERYONE: /*[[#{chat_commands.permission.everyone}]]*/ 'Everyone',
+            VIEWERS: /*[[#{chat_commands.permission.viewers}]]*/ 'Everyone',
+            FOLLOWERS: /*[[#{chat_commands.permission.followers}]]*/ 'Followers',
+            SUBS: /*[[#{chat_commands.permission.subs}]]*/ 'Subscribers',
+            VIP: /*[[#{chat_commands.permission.vip}]]*/ 'VIPs',
             MODERATOR: /*[[#{chat_commands.permission.moderator}]]*/ 'Moderator',
             BROADCASTER: /*[[#{chat_commands.permission.broadcaster}]]*/ 'Broadcaster'
         };
