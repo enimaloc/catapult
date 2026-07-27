@@ -52,7 +52,7 @@ class ChatCommandPresetCatalogTest {
         assertThat(def.getName()).isEqualTo("!game");
         assertThat(def.getTemplate()).isEqualTo("Je joue à {game#name}");
         assertThat(def.getPresetKey()).isEqualTo("game");
-        assertThat(def.getPermission()).isEqualTo(ChatCommandEvent.SenderRole.EVERYONE);
+        assertThat(def.getPermission()).isEqualTo(ChatCommandEvent.SenderRole.VIEWERS);
         assertThat(def.isEnabled()).isTrue();
         assertThat(def.getUser()).isSameAs(user);
     }

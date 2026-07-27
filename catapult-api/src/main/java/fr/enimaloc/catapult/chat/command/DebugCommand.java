@@ -41,7 +41,7 @@ public class DebugCommand implements ChatCommand {
 
     @Override
     public ChatCommandEvent.SenderRole getRequiredPermission() {
-        return ChatCommandEvent.SenderRole.EVERYONE;
+        return ChatCommandEvent.SenderRole.VIEWERS;
     }
 
     @Override
