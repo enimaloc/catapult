@@ -80,6 +80,12 @@ public class MockTwitchChatService implements TwitchChatService {
     }
 
     @Override
+    public Optional<Instant> getFollowedAtById(UserAccount user, String targetTwitchId) {
+        log.info("[Mock Chat] getFollowedAtById() for {}: {}", user.getId(), targetTwitchId);
+        return Optional.of(Instant.EPOCH);
+    }
+
+    @Override
     public void shoutout(UserAccount user, String targetLogin) {
         log.info("[Mock Chat] shoutout() for {}: {}", user.getId(), targetLogin);
     }

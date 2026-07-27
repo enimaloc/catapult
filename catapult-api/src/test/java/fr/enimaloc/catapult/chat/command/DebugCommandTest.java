@@ -93,6 +93,6 @@ class DebugCommandTest {
     void is_owner_only_and_hidden_permission_everyone() {
         assertThat(command.isOwnerOnly()).isTrue();
         assertThat(command.getRequiredPermission())
-            .isEqualTo(fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole.EVERYONE);
+            .isEqualTo(fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole.VIEWERS);
     }
 }
