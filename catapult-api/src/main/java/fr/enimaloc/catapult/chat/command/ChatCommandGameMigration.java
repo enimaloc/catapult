@@ -20,6 +20,13 @@ import java.util.Map;
  * {@code ctx.settings.language} so the description text matches the streamer's own language. Only
  * rows whose stored template still exactly matches one of the old hardcoded defaults are
  * rewritten — a genuine customization is left untouched.
+ *
+ * <p>Also recognizes the intermediate form {@link ChatCommandContextGetMigration} (Order 3,
+ * pre-existing) already produced on production before this migration existed — it rewrites
+ * {@code game#name}/{@code game#summary} into {@code {print igdb#getCurrentGame().name}}/
+ * {@code {print igdb#getCurrentGame().summary}} in place, leaving the surrounding literal text
+ * (and therefore the language marker) untouched, so both language variants are still
+ * distinguishable here — unlike {@link ChatCommandDescriptionMigration}'s equivalent case.
  */
 @Slf4j
 @Component
@@ -46,7 +53,11 @@ public class ChatCommandGameMigration implements CommandLineRunner {
     // messages.properties — see git history), mapped to their language-matched replacement.
     private static final Map<String, String> OLD_TO_NEW_TEMPLATE = Map.of(
         "Currently playing {game#name} — {game#summary|}", NEW_DEFAULT_TEMPLATE_ENGLISH,
-        "Je joue à {game#name} — {game#summary|}", NEW_DEFAULT_TEMPLATE_FRENCH
+        "Je joue à {game#name} — {game#summary|}", NEW_DEFAULT_TEMPLATE_FRENCH,
+        "Currently playing {print igdb#getCurrentGame().name} — {print igdb#getCurrentGame().summary}",
+        NEW_DEFAULT_TEMPLATE_ENGLISH,
+        "Je joue à {print igdb#getCurrentGame().name} — {print igdb#getCurrentGame().summary}",
+        NEW_DEFAULT_TEMPLATE_FRENCH
     );
 
     private final ChatCommandDefinitionRepository repository;

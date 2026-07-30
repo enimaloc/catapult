@@ -56,6 +56,20 @@ class ChatCommandDescriptionMigrationTest {
     }
 
     @Test
+    void replacesTheIntermediateContextGetMigrationForm() {
+        ChatCommandDefinitionRepository repository = mock(ChatCommandDefinitionRepository.class);
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setPresetKey("description");
+        def.setTemplate("{print igdb#getCurrentGame().summary}");
+        when(repository.findAll()).thenReturn(List.of(def));
+
+        new ChatCommandDescriptionMigration(repository).run();
+
+        assertThat(def.getTemplate()).isEqualTo(NEW_FRENCH_TEMPLATE);
+        assertThat(def.getAst()).isNotNull();
+    }
+
+    @Test
     void clearsAnyEjectedJsOnRowsWhoseTemplateGetsReplaced() {
         ChatCommandDefinitionRepository repository = mock(ChatCommandDefinitionRepository.class);
         ChatCommandDefinition def = new ChatCommandDefinition();
