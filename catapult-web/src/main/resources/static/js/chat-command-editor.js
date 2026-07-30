@@ -90,7 +90,7 @@
             return { type: 'literal', value: block.getFieldValue('VALUE'), valueType: 'STRING' };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.value, 'VALUE');
             return block;
         }
@@ -107,7 +107,7 @@
             return { type: 'literal', value: String(block.getFieldValue('VALUE')), valueType: 'NUMBER' };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(Number(node.value), 'VALUE');
             return block;
         }
@@ -125,7 +125,7 @@
             return { type: 'literal', value: block.getFieldValue('VALUE'), valueType: 'BOOLEAN' };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.value, 'VALUE');
             return block;
         }
@@ -146,13 +146,15 @@
 
     // JSON block definitions can't reference a JS function for a dropdown's options (JSON is
     // data-only — see the identical rationale on cmd_property_get_picker below), so ID starts as
-    // a static placeholder and this extension swaps in a real function-generated FieldDropdown.
+    // a static placeholder and this extension swaps its options source for a real function —
+    // reassigning the field's own menuGenerator_ rather than removing/reinserting the field
+    // object, for the same reason installDynamicPropertyPicker does (see its comment): swapping
+    // the field itself only works once the block has already been rendered once, which isn't
+    // true here since this extension runs during construction — this block currently never gets
+    // rebuilt from a saved AST (see the class doc below), so that particular crash couldn't have
+    // hit it in practice, but there's no reason to leave the same landmine lying around.
     Blockly.Extensions.register('cmd_tw_picker_options', function () {
-        const block = this;
-        const input = block.inputList.find(i => i.fieldRow.some(f => f.name === 'ID'));
-        const index = input.fieldRow.findIndex(f => f.name === 'ID');
-        input.removeField('ID');
-        input.insertFieldAt(index, new Blockly.FieldDropdown(knownTwOptions), 'ID');
+        this.getField('ID').menuGenerator_ = knownTwOptions;
     });
 
     // Convenience for filling in tw#has(name)'s argument (or any other spot a TW id string is
@@ -178,25 +180,43 @@
             return { type: 'literal', value: block.getFieldValue('ID'), valueType: 'STRING' };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.value, 'ID');
             return block;
         }
     }
 
+    // The optional PROPERTY/PROPERTY_PICKER pair is the inline shortcut for "just get one field
+    // off this variable" — the same convenience cmd_property_get offers via a separate wrapping
+    // block, added directly here so a command doesn't need two nested blocks for the common case
+    // of reading one field of an object-valued variable. The picker is computed at runtime (see
+    // cmd_var_ref_picker/computeTargetKeys): it traces this variable's NAME back to its
+    // cmd_var_decl in the workspace and reuses whatever that declaration's own value block
+    // reports (a service call's returnKeys, an object-literal's own keys, ...) — falling back to
+    // "(aucune suggestion)" only when no declaration can be found (forward reference, var
+    // declared in an unreachable branch, etc.); typing a property name directly always works
+    // regardless of what the picker could infer.
     class CmdVarRefBlock {
         static type = 'cmd_var_ref';
         static nodeType = 'var-ref';
         static category() { return 'Variables'; }
         static definition() {
-            return { type: this.type, message0: 'var %1',
-                args0: [{ type: 'field_input', name: 'NAME', text: 'msg' }], output: null, colour: 150 };
+            return { type: this.type, message0: 'var %1 [ %2 ] %3',
+                args0: [
+                    { type: 'field_input', name: 'NAME', text: 'msg' },
+                    { type: 'field_input', name: 'PROPERTY', text: '' },
+                    { type: 'field_dropdown', name: 'PROPERTY_PICKER', options: [['▾', '']] }
+                ],
+                output: null, colour: 150,
+                extensions: ['cmd_var_ref_picker'] };
         }
         static toNode(block) {
-            return { type: 'var-ref', name: block.getFieldValue('NAME') };
+            const varNode = { type: 'var-ref', name: block.getFieldValue('NAME') };
+            const property = block.getFieldValue('PROPERTY');
+            return property ? { type: 'property-get', target: varNode, property: property } : varNode;
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.name, 'NAME');
             return block;
         }
@@ -215,8 +235,33 @@
             return { type: 'context-get', path: block.getFieldValue('PATH') };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.path, 'PATH');
+            return block;
+        }
+    }
+
+    // Reads one of DynamicChatCommand's known named lists (KNOWN_LIST_SOURCES below, the same
+    // ones cmd_for_each already iterates) as a VALUE instead of only being able to loop over it —
+    // e.g. {var allArgs = list(args)} then {arr#join(allArgs, ", ")}. KNOWN_LIST_SOURCES is
+    // declared further down this file, not above — safe to reference here anyway, since this
+    // definition() only actually runs later (from ensureBlocksDefined()), by which point every
+    // top-level const in this IIFE has already been initialized in file order.
+    class CmdListGetBlock {
+        static type = 'cmd_list_get';
+        static nodeType = 'list-get';
+        static category() { return 'Contexte'; }
+        static definition() {
+            return { type: this.type, message0: 'list %1',
+                args0: [{ type: 'field_dropdown', name: 'NAME', options: KNOWN_LIST_SOURCES.map(n => [n, n]) }],
+                output: null, colour: 200 };
+        }
+        static toNode(block) {
+            return { type: 'list-get', name: block.getFieldValue('NAME') };
+        }
+        static fromNode(ws, node) {
+            const block = newBlock(ws, this.type);
+            block.setFieldValue(node.name, 'NAME');
             return block;
         }
     }
@@ -239,7 +284,7 @@
             return { type: 'setting-get', key: block.getFieldValue('KEY') };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.key, 'KEY');
             return block;
         }
@@ -267,7 +312,7 @@
                 defaultValue: defaultValue === '' ? null : defaultValue };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.index, 'INDEX');
             block.setFieldValue(node.defaultValue || '', 'DEFAULT');
             return block;
@@ -279,7 +324,12 @@
     // statementsToNodes/connectStatements chaining already used for if/for-each bodies —
     // 'object-property' isn't a real AST Statement, it's a synthetic shape that only exists
     // during this Blocks<->AST bridging, converted into the real {properties: {...}} map by
-    // CmdObjectLiteralBlock itself.
+    // CmdObjectLiteralBlock itself. The 'ObjectProperty' connection check on both ends is load-
+    // bearing, not decorative: without it Blockly lets this block snap into ANY statement socket
+    // (the main command body, an if/else branch, a for-each body), and statementsToNodes() would
+    // then happily serialize it as a top-level {"type":"object-property",...} node — a shape
+    // NodeJsonCodec.statementFromMap correctly has no case for, so it 500s instead of the
+    // frontend ever having let the user create that shape in the first place.
     class CmdObjectPropertyBlock {
         static type = 'cmd_object_property';
         static nodeType = 'object-property';
@@ -287,13 +337,13 @@
         static definition() {
             return { type: this.type, message0: '%1 : %2',
                 args0: [{ type: 'field_input', name: 'KEY', text: 'key' }, { type: 'input_value', name: 'VALUE' }],
-                previousStatement: null, nextStatement: null, colour: 25 };
+                previousStatement: 'ObjectProperty', nextStatement: 'ObjectProperty', colour: 25 };
         }
         static toNode(block) {
             return { type: 'object-property', key: block.getFieldValue('KEY'), value: blockToNode(block.getInputTargetBlock('VALUE')) };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.key, 'KEY');
             connectValue(ws, block, 'VALUE', node.value);
             return block;
@@ -306,7 +356,7 @@
         static category() { return 'Variables'; }
         static definition() {
             return { type: this.type, message0: '{ %1 }',
-                args0: [{ type: 'input_statement', name: 'PROPERTIES' }],
+                args0: [{ type: 'input_statement', name: 'PROPERTIES', check: 'ObjectProperty' }],
                 output: null, colour: 25 };
         }
         static toNode(block) {
@@ -316,18 +366,31 @@
             return { type: 'object-literal', properties: properties };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             const propNodes = Object.entries(node.properties).map(([key, value]) => ({ type: 'object-property', key, value }));
             connectStatements(ws, block, 'PROPERTIES', propNodes);
             return block;
         }
     }
 
-    // Field names available on whatever is connected to a cmd_property_get block's TARGET —
-    // either an object-literal's own (user-typed) keys, or a service function's declared
-    // returnKeys() (catalog-driven, e.g. twitch#getStream() -> title/category/viewers/uptime).
-    // Feeds the PROPERTY_PICKER helper dropdown below, not PROPERTY itself.
-    function computeTargetKeys(targetBlock) {
+    // Finds the (first, in workspace block order — redeclarations/shadowing aren't resolved
+    // precisely, this is a suggestion source, not a type checker) cmd_var_decl whose NAME
+    // matches, searching the whole workspace via getAllBlocks so it's found regardless of
+    // nesting (inside an if/for-each body, etc.), not just the top-level statement chain.
+    function findVarDecl(workspace, name) {
+        if (!workspace || !name) return null;
+        return workspace.getAllBlocks(false)
+            .find(b => b.type === 'cmd_var_decl' && b.getFieldValue('NAME') === name) || null;
+    }
+
+    // Field names available on a given block's VALUE — either an object-literal's own
+    // (user-typed) keys, a service function's declared returnKeys() (catalog-driven, e.g.
+    // twitch#getStream() -> title/category/viewers/uptime), or — computed at runtime by tracing
+    // back through the workspace rather than hardcoded — whatever a variable was declared with,
+    // recursively (var x = igdb.getGame(...) means computeTargetKeys(the var-ref to x) resolves
+    // through the var-decl to igdb.getGame's own returnKeys). Feeds PROPERTY_PICKER dropdowns,
+    // never PROPERTY itself.
+    function computeTargetKeys(targetBlock, visitedNames) {
         if (!targetBlock) return [];
         if (targetBlock.type === 'cmd_object_literal') {
             const keys = [];
@@ -339,6 +402,17 @@
             }
             return keys;
         }
+        if (targetBlock.type === 'cmd_var_ref') {
+            const name = targetBlock.getFieldValue('NAME');
+            // A user-constructable cycle (var a = var-ref(b); var b = var-ref(a)) would otherwise
+            // recurse forever every time this picker opens — bail once a name reappears instead
+            // of hanging the tab; this is only a suggestion source, an empty result is harmless.
+            const seen = visitedNames || new Set();
+            if (seen.has(name)) return [];
+            seen.add(name);
+            const decl = findVarDecl(targetBlock.workspace, name);
+            return decl ? computeTargetKeys(decl.getInputTargetBlock('INIT'), seen) : [];
+        }
         const descriptor = blockRegistry[targetBlock.type];
         if (descriptor && descriptor.fn && Array.isArray(descriptor.fn.returnKeys)) {
             return descriptor.fn.returnKeys;
@@ -347,34 +421,75 @@
     }
 
     // Blockly calls a FieldDropdown's function-form menuGenerator with `this` bound to the
-    // field, re-invoking it fresh every time the dropdown opens — always reflects whatever is
-    // currently wired into TARGET. Only ever offers keys that are actually known right now, so
-    // whatever the user picks is guaranteed to be a valid option — unlike the reverted approach,
-    // this dropdown's OWN value is never what's persisted (see the extension below), so there's
-    // nothing for Blockly's option-membership validation to ever have to reject.
-    function propertyPickerOptions() {
-        const block = this.getSourceBlock();
-        const keys = block ? computeTargetKeys(block.getInputTargetBlock('TARGET')) : [];
+    // field, re-invoking it fresh every time the dropdown opens — so any picker built from this
+    // always reflects whatever the workspace currently looks like (a re-wired TARGET, a variable
+    // whose declaration just changed, ...). Whatever the user picks is guaranteed to be a valid
+    // option — the dropdown's OWN value is never what's persisted (see installDynamicPicker
+    // below), so there's nothing for Blockly's option-membership validation to ever have to
+    // reject; when nothing can be inferred it just falls back to "(aucune suggestion)", which
+    // never blocks typing a property name directly.
+    function keysToOptions(keys) {
         return keys.length ? keys.map(k => [k, k]) : [['(aucune suggestion)', '']];
     }
 
     // JSON block definitions can't reference a JS function for a dropdown's options (JSON is
-    // data-only), so PROPERTY_PICKER is defined with a static placeholder and this extension
-    // swaps it for a real function-generated FieldDropdown, then wires a validator that COPIES
-    // whatever gets picked into the real PROPERTY field — PROPERTY_PICKER's own value is never
-    // read by toNode()/fromNode() and is not part of the saved AST at all, it's a pure UI
-    // trigger. This is what makes a dropdown safe here: PROPERTY (a plain field_input) always
-    // accepts and persists any value exactly like before, so an unknown-shaped TARGET (a plain
-    // variable, the common case) just means the picker has nothing to suggest — it never blocks
-    // typing or loses a previously-saved property name the way a validated PROPERTY dropdown did.
+    // data-only), so PROPERTY_PICKER is defined with a static placeholder and this swaps its
+    // *options source* (FieldDropdown's own settable menuGenerator_) for a real function —
+    // deliberately NOT by removing and reinserting a whole new field. An earlier version did
+    // exactly that (input.removeField + insertFieldAt(new FieldDropdown(...))), which crashed
+    // with Blockly's own "The text content is null." — Input.prototype.insertFieldAt only calls
+    // a newly-added field's own init() (the call that creates its SVG text node) when the block
+    // is ALREADY rendered at that moment, and this extension runs during block construction
+    // (before the block has ever been rendered) whenever a saved command is loaded into the
+    // Blocks tab — so the swapped-in field's DOM was simply never created, and rendering it
+    // moments later threw. Reassigning menuGenerator_ on the field the JSON definition already
+    // created sidesteps the whole issue: that field went through Blockly's normal init lifecycle
+    // like any other, so its DOM already exists — only where it reads its options from changes.
+    // Then wires a validator that COPIES whatever gets picked into the real PROPERTY field —
+    // PROPERTY_PICKER's own value is never read by toNode()/fromNode() and is not part of the
+    // saved AST at all, it's a pure UI trigger. This is what makes a dropdown safe here: PROPERTY
+    // (a plain field_input) always accepts and persists any value exactly like before, so nothing
+    // to suggest just means the picker is empty — it never blocks typing or loses a
+    // previously-saved property name the way a validated PROPERTY dropdown did. Shared by every
+    // block below that embeds this shortcut.
+    function installDynamicPropertyPicker(block, optionsFn) {
+        const picker = block.getField('PROPERTY_PICKER');
+        picker.menuGenerator_ = optionsFn;
+        picker.setValidator(function (newValue) {
+            if (newValue) block.setFieldValue(newValue, 'PROPERTY');
+            return newValue;
+        });
+    }
+
     Blockly.Extensions.register('cmd_property_get_picker', function () {
         const block = this;
-        const input = block.inputList.find(i => i.fieldRow.some(f => f.name === 'PROPERTY_PICKER'));
-        const index = input.fieldRow.findIndex(f => f.name === 'PROPERTY_PICKER');
-        input.removeField('PROPERTY_PICKER');
-        const picker = new Blockly.FieldDropdown(propertyPickerOptions);
-        input.insertFieldAt(index, picker, 'PROPERTY_PICKER');
-        picker.setValidator(function (newValue) {
+        installDynamicPropertyPicker(block, function () {
+            return keysToOptions(computeTargetKeys(block.getInputTargetBlock('TARGET')));
+        });
+    });
+
+    // Same idea as cmd_property_get_picker, but the block IS the value whose keys we want
+    // (there's no separate TARGET input) — computeTargetKeys' cmd_var_ref branch does the actual
+    // runtime lookup (tracing this block's own NAME back to its declaration).
+    Blockly.Extensions.register('cmd_var_ref_picker', function () {
+        const block = this;
+        installDynamicPropertyPicker(block, function () {
+            return keysToOptions(computeTargetKeys(block));
+        });
+    });
+
+    // The inline counterpart of cmd_property_get_picker: for a block that embeds its OWN
+    // optional "just get one field" shortcut (an object-returning service call, a variable
+    // reference) instead of requiring a separate wrapping cmd_property_get block. Unlike
+    // cmd_property_get's picker, the option list here is fixed at block-definition time (a
+    // service call's returnKeys are already known from the catalog; a plain variable reference
+    // has no statically-known shape so it's always "(aucune suggestion)", matching
+    // cmd_property_get's own behaviour for an unknown-shaped TARGET) — so PROPERTY_PICKER is
+    // already a real FieldDropdown from the JSON definition and this only needs to wire the
+    // copy-into-PROPERTY validator, not swap the field like cmd_property_get_picker does.
+    Blockly.Extensions.register('cmd_inline_property_picker', function () {
+        const block = this;
+        block.getField('PROPERTY_PICKER').setValidator(function (newValue) {
             if (newValue) block.setFieldValue(newValue, 'PROPERTY');
             return newValue;
         });
@@ -403,7 +518,7 @@
             return { type: 'property-get', target: blockToNode(block.getInputTargetBlock('TARGET')), property: block.getFieldValue('PROPERTY') };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             connectValue(ws, block, 'TARGET', node.target);
             block.setFieldValue(node.property, 'PROPERTY');
             return block;
@@ -428,7 +543,7 @@
             return { type: 'var-decl', name: block.getFieldValue('NAME'), valueType: valueType, init: init };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.name, 'NAME');
             connectValue(ws, block, 'INIT', node.init);
             return block;
@@ -448,7 +563,7 @@
             return { type: 'assign', name: block.getFieldValue('NAME'), expr: blockToNode(block.getInputTargetBlock('EXPR')) };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.name, 'NAME');
             connectValue(ws, block, 'EXPR', node.expr);
             return block;
@@ -468,7 +583,7 @@
             return { type: 'concat', name: block.getFieldValue('NAME'), expr: blockToNode(block.getInputTargetBlock('EXPR')) };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.name, 'NAME');
             connectValue(ws, block, 'EXPR', node.expr);
             return block;
@@ -488,7 +603,7 @@
             return { type: 'print', expr: blockToNode(block.getInputTargetBlock('EXPR')) };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             connectValue(ws, block, 'EXPR', node.expr);
             return block;
         }
@@ -524,7 +639,7 @@
             };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             connectValue(ws, block, 'LEFT', node.condition.left);
             block.setFieldValue(node.condition.operator, 'OPERATOR');
             connectValue(ws, block, 'RIGHT', node.condition.right);
@@ -536,25 +651,21 @@
 
     // Fixed, known list sources DynamicChatCommand#resolveList actually recognizes — anything
     // else silently resolves to an empty list at runtime, so these are the only values worth
-    // offering. Static (not catalog-derived), so the dropdown's own options never change.
+    // offering. Static (not catalog-derived), so the dropdown's own options never change — unlike
+    // cmd_property_get_picker/cmd_tw_picker_options, this one needs no runtime computation at
+    // all, so it's just a plain array right in the JSON definition below (no removeField/
+    // insertFieldAt swap, no menuGenerator_ reassignment, nothing that depends on the block
+    // already having been rendered once — see installDynamicPropertyPicker's comment for why
+    // that matters: this exact field IS reconstructed from a saved AST, unlike cmd_tw_picker's).
     const KNOWN_LIST_SOURCES = ['fallbacks', 'args', 'ownCommands', 'gameDlcs', 'similarGames', 'activeTws'];
 
-    function listSourcePickerOptions() {
-        return KNOWN_LIST_SOURCES.map(name => [name, name]);
-    }
-
-    // Same rationale as cmd_property_get_picker below: LIST_SOURCE stays a plain field_input so
-    // any previously-saved value (including one typed before this picker existed) always loads
-    // and saves correctly, and LIST_SOURCE_PICKER is a pure suggestion whose own value is never
-    // read by toNode() — picking one just copies it into LIST_SOURCE via this validator.
+    // LIST_SOURCE stays a plain field_input so any previously-saved value (including one typed
+    // before this picker existed) always loads and saves correctly, and LIST_SOURCE_PICKER is a
+    // pure suggestion whose own value is never read by toNode() — picking one just copies it into
+    // LIST_SOURCE via this validator.
     Blockly.Extensions.register('cmd_for_each_list_source_picker', function () {
         const block = this;
-        const input = block.inputList.find(i => i.fieldRow.some(f => f.name === 'LIST_SOURCE_PICKER'));
-        const index = input.fieldRow.findIndex(f => f.name === 'LIST_SOURCE_PICKER');
-        input.removeField('LIST_SOURCE_PICKER');
-        const picker = new Blockly.FieldDropdown(listSourcePickerOptions);
-        input.insertFieldAt(index, picker, 'LIST_SOURCE_PICKER');
-        picker.setValidator(function (newValue) {
+        block.getField('LIST_SOURCE_PICKER').setValidator(function (newValue) {
             if (newValue) block.setFieldValue(newValue, 'LIST_SOURCE');
             return newValue;
         });
@@ -569,7 +680,7 @@
                 args0: [
                     { type: 'field_input', name: 'BINDING', text: 'f' },
                     { type: 'field_input', name: 'LIST_SOURCE', text: 'fallbacks' },
-                    { type: 'field_dropdown', name: 'LIST_SOURCE_PICKER', options: [['▾', '']] },
+                    { type: 'field_dropdown', name: 'LIST_SOURCE_PICKER', options: KNOWN_LIST_SOURCES.map(name => [name, name]) },
                     { type: 'input_statement', name: 'BODY' }
                 ],
                 previousStatement: null, nextStatement: null, colour: 120,
@@ -584,7 +695,7 @@
             };
         }
         static fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             block.setFieldValue(node.bindingName, 'BINDING');
             block.setFieldValue(node.listSource, 'LIST_SOURCE');
             connectStatements(ws, block, 'BODY', node.body);
@@ -610,6 +721,14 @@
             this.type = 'cmd_call_' + fn.namespace + '_' + fn.name;
         }
         category() { return namespaceCategory(this.fn.namespace); }
+        // Whether this call's result is an object worth offering the inline "just get one
+        // field" shortcut on — an action always returns "" (nothing to extract a field from)
+        // and a function with no declared returnKeys is either scalar or a bare List (Lists
+        // aren't Map-shaped, so "field" doesn't apply — see igdb#getGenres et al., which moved
+        // to returning List<String> and correspondingly report no returnKeys).
+        get canExtractField() {
+            return !this.fn.isAction && Array.isArray(this.fn.returnKeys) && this.fn.returnKeys.length > 0;
+        }
         definition() {
             // "?" suffix marks a parameter the streamer can safely leave unconnected — it still
             // compiles to a "" literal like any empty slot, but the label makes clear that's
@@ -619,12 +738,25 @@
             const argRefs = this.fn.parameterNames
                 .map((name, i) => (optional.has(name) ? name + '?' : name) + ': %' + (i + 1))
                 .join(', ');
+            const argCount = this.fn.parameterNames.length;
+            // Same inline PROPERTY/PROPERTY_PICKER shortcut as cmd_var_ref, but here the picker's
+            // options are known upfront from this function's own returnKeys() instead of always
+            // falling back to "(aucune suggestion)".
+            const propertyArgs = this.canExtractField ? [
+                { type: 'field_input', name: 'PROPERTY', text: '' },
+                { type: 'field_dropdown', name: 'PROPERTY_PICKER', options: this.fn.returnKeys.map(k => [k, k]) }
+            ] : [];
             return {
                 type: this.type,
-                message0: this.fn.namespace + '.' + this.fn.name + '(' + argRefs + ')',
-                args0: this.fn.parameterNames.map((name, i) => ({ type: 'input_value', name: 'ARG' + i })),
+                message0: this.fn.namespace + '.' + this.fn.name + '(' + argRefs + ')'
+                    + (this.canExtractField ? ' [ %' + (argCount + 1) + ' ] %' + (argCount + 2) : ''),
+                args0: [
+                    ...this.fn.parameterNames.map((name, i) => ({ type: 'input_value', name: 'ARG' + i })),
+                    ...propertyArgs
+                ],
                 colour: 290,
-                ...(this.fn.isAction ? { previousStatement: null, nextStatement: null } : { output: null })
+                ...(this.fn.isAction ? { previousStatement: null, nextStatement: null } : { output: null }),
+                ...(this.canExtractField ? { extensions: ['cmd_inline_property_picker'] } : {})
             };
         }
         toNode(block) {
@@ -634,10 +766,12 @@
             // {ns#fn(args)} tag already produces in the text DSL (an implicit print whose result,
             // always "", contributes nothing to the output), just built directly here instead of
             // via a separate cmd_print block wrapping this one.
-            return this.fn.isAction ? { type: 'print', expr: call } : call;
+            if (this.fn.isAction) return { type: 'print', expr: call };
+            const property = this.canExtractField ? block.getFieldValue('PROPERTY') : '';
+            return property ? { type: 'property-get', target: call, property: property } : call;
         }
         fromNode(ws, node) {
-            const block = ws.newBlock(this.type);
+            const block = newBlock(ws, this.type);
             this.fn.parameterNames.forEach((name, i) => connectValue(ws, block, 'ARG' + i, node.args[i]));
             return block;
         }
@@ -645,7 +779,7 @@
 
     const STATIC_BLOCK_CLASSES = [
         CmdLiteralStringBlock, CmdLiteralNumberBlock, CmdLiteralBooleanBlock, CmdTwPickerBlock,
-        CmdVarRefBlock, CmdContextGetBlock, CmdSettingGetBlock, CmdArgGetBlock,
+        CmdVarRefBlock, CmdContextGetBlock, CmdListGetBlock, CmdSettingGetBlock, CmdArgGetBlock,
         CmdObjectLiteralBlock, CmdObjectPropertyBlock, CmdPropertyGetBlock,
         CmdVarDeclBlock, CmdAssignBlock, CmdConcatBlock, CmdPrintBlock, CmdIfBlock, CmdForEachBlock
     ];
@@ -779,6 +913,27 @@
     }
 
     // ---- AST -> Blocks ----
+
+    // Every fromNode() below calls this instead of raw ws.newBlock(type) — initSvg() must run
+    // BEFORE this block gets any children connected to it, not after. Blockly's own connection
+    // logic (Connection.prototype.connect_, Input.prototype.insertFieldAt, ...) queues a render
+    // of a block's NEIGHBOURS whenever a connection changes, and that queued render can get
+    // flushed (Blockly 10's batched render_management pipeline: renderEfficiently/
+    // triggerQueuedRenders) before nodeToBlock() gets around to calling THIS block's own
+    // initSvg()+render() at the very end, once every recursive connectValue()/connectStatements()
+    // call inside its fromNode() has already finished attaching children. A block rendered before
+    // its own initSvg() has run has fields with no SVG DOM at all yet — every one of them throws
+    // Blockly's own "The text content is null." the moment anything tries to measure it, even a
+    // plain static field_dropdown with no custom logic (confirmed on cmd_if's OPERATOR field,
+    // which has neither an extension nor a dynamic menuGenerator — ruling out every field-picker
+    // theory this bug was chased down through first). initSvg() is safe to call this early and
+    // again later (every Field.prototype.init() no-ops once its fieldGroup_ already exists), so
+    // simply front-loading it here removes the ordering hazard without touching anything else.
+    function newBlock(ws, type) {
+        const block = ws.newBlock(type);
+        block.initSvg();
+        return block;
+    }
 
     function nodeToBlock(ws, node) {
         let block;
