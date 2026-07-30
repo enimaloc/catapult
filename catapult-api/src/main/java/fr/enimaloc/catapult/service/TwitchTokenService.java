@@ -74,10 +74,15 @@ public class TwitchTokenService {
             if (newAccess == null) return null;
             String newRefresh = (String) response.get("refresh_token");
             Number expiresIn = (Number) response.get("expires_in");
+            Object scope = response.get("scope");
 
             token.setAccessToken(tokenEncryptionService.encrypt(newAccess));
             if (newRefresh != null) token.setRefreshToken(tokenEncryptionService.encrypt(newRefresh));
             if (expiresIn != null) token.setExpiresAt(Instant.now().plusSeconds(expiresIn.longValue()));
+            if (scope instanceof java.util.List<?> scopes) {
+                token.setGrantedScopes(scopes.stream().map(String::valueOf)
+                    .collect(java.util.stream.Collectors.joining(" ")));
+            }
             oAuthTokenRepository.save(token);
             refreshWarnedUsers.remove(user.getId());
             log.debug("Refreshed Twitch token for user {}", user.getId());

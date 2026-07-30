@@ -1,9 +1,13 @@
 package fr.enimaloc.catapult.chat;
 
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
+import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.GameContextService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +44,8 @@ class DynamicCommandResolverTest {
         org.mockito.Mockito.when(twRegistry.getKnownPaths()).thenReturn(java.util.Set.of());
         placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry(), twRegistry);
         resolver = new DynamicCommandResolver(repository, placeholderResolver, gameContextService,
+            new JsCompiler(), new SandboxExecutor(), new ServiceFunctionRegistry(),
+            org.mockito.Mockito.mock(ChatCommandSettingRepository.class),
             java.util.List.of());
         user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -51,7 +57,7 @@ class DynamicCommandResolverTest {
         def.setName("!game");
         def.setTemplate("...");
         def.setEnabled(true);
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findByUserAndName(user, "!game")).thenReturn(Optional.of(def));
 
         Optional<ChatCommand> result = resolver.resolve(user, "!game");
@@ -82,7 +88,7 @@ class DynamicCommandResolverTest {
         def.setName("!game");
         def.setTemplate("...");
         def.setEnabled(true);
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findByUserAndName(user, "!game")).thenReturn(Optional.of(def));
 
         resolver.resolve(user, "!game"); // populate cache

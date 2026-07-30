@@ -178,4 +178,53 @@ class IgdbGameDetailsServiceTest {
         assertThat(result.get().getWebsites()).containsEntry("steam", "440");
         assertThat(result.get().getFirstReleaseDate()).isEqualTo(Instant.ofEpochSecond(1234567890L));
     }
+
+    @Test
+    void cache_miss_extracts_ratings_platforms_dlcs_and_similar_games() {
+        when(repository.findById(IGDB_ID)).thenReturn(Optional.empty());
+        proto.Platform pc = proto.Platform.newBuilder().setName("PC").build();
+        proto.Platform ps5 = proto.Platform.newBuilder().setName("PlayStation 5").build();
+        Game dlc = Game.newBuilder().setName("Some DLC").build();
+        Game similar = Game.newBuilder().setName("Some Similar Game").build();
+        Game game = Game.newBuilder()
+            .setId(Long.parseLong(IGDB_ID))
+            .setSlug("valorant")
+            .setRating(78.3421)
+            .setAggregatedRating(85.9)
+            .addPlatforms(pc).addPlatforms(ps5)
+            .addDlcs(dlc)
+            .addSimilarGames(similar)
+            .build();
+        when(igdbClient.fetchGameDetails(IGDB_ID, TOKEN)).thenReturn(Optional.of(game));
+        when(repository.save(any(IgdbGameDetails.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Optional<IgdbGameDetails> result = service.getDetails(IGDB_ID);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getRating()).isEqualTo(78.3421);
+        assertThat(result.get().getAggregatedRating()).isEqualTo(85.9);
+        assertThat(result.get().getPlatforms()).containsExactly("PC", "PlayStation 5");
+        assertThat(result.get().getDlcNames()).containsExactly("Some DLC");
+        assertThat(result.get().getSimilarGameNames()).containsExactly("Some Similar Game");
+    }
+
+    @Test
+    void cache_miss_with_no_rating_or_platform_data_maps_to_null_and_empty_lists() {
+        when(repository.findById(IGDB_ID)).thenReturn(Optional.empty());
+        Game game = Game.newBuilder()
+            .setId(Long.parseLong(IGDB_ID))
+            .setSlug("mystery-game")
+            .build();
+        when(igdbClient.fetchGameDetails(IGDB_ID, TOKEN)).thenReturn(Optional.of(game));
+        when(repository.save(any(IgdbGameDetails.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Optional<IgdbGameDetails> result = service.getDetails(IGDB_ID);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getRating()).isNull();
+        assertThat(result.get().getAggregatedRating()).isNull();
+        assertThat(result.get().getPlatforms()).isEmpty();
+        assertThat(result.get().getDlcNames()).isEmpty();
+        assertThat(result.get().getSimilarGameNames()).isEmpty();
+    }
 }

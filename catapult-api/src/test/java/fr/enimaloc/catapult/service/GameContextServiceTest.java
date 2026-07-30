@@ -81,6 +81,11 @@ class GameContextServiceTest {
         details.setSummary("MOBA");
         details.setWebsites(Map.of("steam", "https://steam/570"));
         details.setFirstReleaseDate(Instant.parse("2013-07-09T00:00:00Z"));
+        details.setRating(85.0);
+        details.setAggregatedRating(90.0);
+        details.setPlatforms(java.util.List.of("PC"));
+        details.setDlcNames(java.util.List.of("Some DLC"));
+        details.setSimilarGameNames(java.util.List.of("Some Similar Game"));
         when(igdbGameDetailsService.getDetails("8173")).thenReturn(Optional.of(details));
 
         Optional<GameContext> ctxOpt = service.get(user);
@@ -96,6 +101,11 @@ class GameContextServiceTest {
         assertThat(ctx.detected()).isSameAs(detected);
         assertThat(ctx.activeTws()).isEmpty();
         assertThat(ctx.twLabels()).isEmpty();
+        assertThat(ctx.rating()).isEqualTo(85.0);
+        assertThat(ctx.criticRating()).isEqualTo(90.0);
+        assertThat(ctx.platforms()).containsExactly("PC");
+        assertThat(ctx.dlcNames()).containsExactly("Some DLC");
+        assertThat(ctx.similarGameNames()).containsExactly("Some Similar Game");
     }
 
     @Test

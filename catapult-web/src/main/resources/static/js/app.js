@@ -92,6 +92,10 @@ function setTheme(name) {
     document.querySelectorAll('.theme-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.theme === name);
     });
+    // Lets anything embedding a themed widget outside plain CSS (e.g. the Blockly
+    // editor's canvas, which paints its own chrome rather than using stylesheet
+    // rules) react to a theme switch without this file knowing those widgets exist.
+    document.dispatchEvent(new CustomEvent('catapult:theme-changed', { detail: { theme: name } }));
 }
 
 function initThemeUI() {
