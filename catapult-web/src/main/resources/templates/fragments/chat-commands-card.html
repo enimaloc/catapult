@@ -23,7 +23,6 @@
         <thead>
             <tr style="text-align:left; border-bottom:1px solid var(--border); color:var(--text-muted);">
                 <th style="padding:.5rem .5rem;" th:text="#{chat_commands.column.name}">Name</th>
-                <th style="padding:.5rem .5rem;" th:text="#{chat_commands.column.response}">Response</th>
                 <th style="padding:.5rem .5rem;" th:text="#{chat_commands.column.permission}">Permission</th>
                 <th style="padding:.5rem .5rem; text-align:center;" th:text="#{chat_commands.column.enabled}">Enabled</th>
                 <th style="padding:.5rem .5rem;" th:text="#{chat_commands.column.actions}">Actions</th>
@@ -51,7 +50,10 @@
             <div class="form-field">
                 <label for="customChatCmdPermission" th:text="#{chat_commands.column.permission}">Permission</label>
                 <select id="customChatCmdPermission" class="form-input" name="permission" style="width:auto;">
-                    <option value="EVERYONE" th:text="#{chat_commands.permission.everyone}">Everyone</option>
+                    <option value="VIEWERS" th:text="#{chat_commands.permission.viewers}">Everyone</option>
+                    <option value="FOLLOWERS" th:text="#{chat_commands.permission.followers}">Followers</option>
+                    <option value="SUBS" th:text="#{chat_commands.permission.subs}">Subscribers</option>
+                    <option value="VIP" th:text="#{chat_commands.permission.vip}">VIPs</option>
                     <option value="MODERATOR" th:text="#{chat_commands.permission.moderator}">Moderator</option>
                     <option value="BROADCASTER" th:text="#{chat_commands.permission.broadcaster}">Broadcaster</option>
                 </select>
@@ -60,25 +62,43 @@
         </form>
     </details>
 
+    <details style="margin-top:1.25rem;">
+        <summary style="cursor:pointer; font-weight:600;" th:text="#{chat_commands.settings.title}">Settings</summary>
+        <p class="text-muted" th:text="#{chat_commands.settings.intro}">Free-form key=value pairs...</p>
+        <table style="width:100%; border-collapse:collapse; max-width:600px;">
+            <tbody id="chatCommandSettingsTbody"></tbody>
+        </table>
+        <form id="chatCommandSettingsAddForm" style="display:flex; gap:.5rem; margin-top:.5rem; max-width:600px;">
+            <input id="chatCommandSettingKeyInput" class="form-input" type="text" name="key"
+                   th:placeholder="#{chat_commands.settings.key_placeholder}"
+                   pattern="^[A-Za-z_][A-Za-z0-9_]*$" required style="font-family:monospace;">
+            <input id="chatCommandSettingValueInput" class="form-input" type="text" name="value"
+                   th:placeholder="#{chat_commands.settings.value_placeholder}" required>
+            <button type="submit" class="btn btn-primary" th:text="#{chat_commands.settings.add}">Add</button>
+        </form>
+    </details>
+
+    <template id="chatCommandSettingRowTpl">
+        <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.35rem .5rem; font-family:monospace;"><span class="setting-key-display"></span></td>
+            <td style="padding:.35rem .5rem;"><input type="text" class="form-input setting-value-input"></td>
+            <td style="padding:.35rem .5rem; white-space:nowrap;">
+                <button type="button" class="btn setting-save-btn" th:text="#{chat_commands.action.edit}">Save</button>
+                <button type="button" class="btn setting-delete-btn" th:text="#{chat_commands.action.delete}">Delete</button>
+            </td>
+        </tr>
+    </template>
+
     <template id="chatCommandsRowTpl">
         <tr style="border-bottom:1px solid var(--border); vertical-align:top;">
             <td style="padding:.5rem .5rem; white-space:nowrap;">
-                <input type="text" class="cmd-name form-input" pattern="^![a-z][a-z0-9_]{0,30}$"
-                       required style="font-family:monospace; width:9em;">
+                <span class="cmd-name-display" style="font-family:monospace;"></span>
                 <span class="builtin-badge" hidden
                       th:text="#{chat_commands.badge.builtin}"
                       style="display:inline-block; font-size:.7em; margin-left:.25em; padding:.1em .35em; border:1px solid var(--border); border-radius:.25em; color:var(--text-muted);">built-in</span>
             </td>
             <td style="padding:.5rem .5rem;">
-                <textarea class="cmd-template form-input" rows="2" maxlength="500"
-                          style="min-width:18em;"></textarea>
-            </td>
-            <td style="padding:.5rem .5rem;">
-                <select class="permission-select form-input" style="width:auto;">
-                    <option value="EVERYONE" th:text="#{chat_commands.permission.everyone}">Everyone</option>
-                    <option value="MODERATOR" th:text="#{chat_commands.permission.moderator}">Moderator</option>
-                    <option value="BROADCASTER" th:text="#{chat_commands.permission.broadcaster}">Broadcaster</option>
-                </select>
+                <span class="cmd-permission-display"></span>
             </td>
             <td style="padding:.5rem .5rem; text-align:center;">
                 <label class="toggle-label" style="display:inline-flex; margin:0;">
@@ -87,7 +107,7 @@
                 </label>
             </td>
             <td style="padding:.5rem .5rem; white-space:nowrap;">
-                <button type="button" class="btn save-btn" th:text="#{chat_commands.action.save}">Save</button>
+                <button type="button" class="btn edit-btn" th:text="#{chat_commands.action.edit}">Modifier</button>
                 <button type="button" class="btn delete-btn" th:text="#{chat_commands.action.delete}">Delete</button>
             </td>
         </tr>
@@ -98,6 +118,15 @@
         const I18N = {
             deleteConfirm: /*[[#{chat_commands.action.delete_confirm(' ')}]]*/ 'Supprimer  ?',
             builtinTooltip: /*[[#{chat_commands.badge.builtin.tooltip}]]*/ 'Java command — name not editable'
+        };
+
+        const PERMISSION_LABELS = {
+            VIEWERS: /*[[#{chat_commands.permission.viewers}]]*/ 'Everyone',
+            FOLLOWERS: /*[[#{chat_commands.permission.followers}]]*/ 'Followers',
+            SUBS: /*[[#{chat_commands.permission.subs}]]*/ 'Subscribers',
+            VIP: /*[[#{chat_commands.permission.vip}]]*/ 'VIPs',
+            MODERATOR: /*[[#{chat_commands.permission.moderator}]]*/ 'Moderator',
+            BROADCASTER: /*[[#{chat_commands.permission.broadcaster}]]*/ 'Broadcaster'
         };
 
         function reportError(err) {
@@ -121,30 +150,35 @@
             const node = tpl.cloneNode(true);
             const row = node.querySelector('tr');
             row.dataset.id = cmd.id;
-            row.querySelector('.cmd-name').value = cmd.name;
-            row.querySelector('.cmd-template').value = cmd.template;
-            row.querySelector('.permission-select').value = cmd.permission;
+            row.querySelector('.cmd-name-display').textContent = cmd.name;
+            row.querySelector('.cmd-permission-display').textContent =
+                PERMISSION_LABELS[cmd.permission] || cmd.permission;
             row.querySelector('.enabled-toggle').checked = cmd.enabled;
 
-            const saveBtn = row.querySelector('.save-btn');
-            saveBtn.onclick = async () => {
-                if (saveBtn.disabled) return;
-                saveBtn.disabled = true;
+            const editBtn = row.querySelector('.edit-btn');
+            editBtn.onclick = () => {
+                // chat-command-editor.js waits for Blockly (a large, separately-loaded
+                // script) before wiring itself up — openEditor may not exist yet if the
+                // user clicks Modifier immediately after the page loads.
+                if (!window.chatCommandEditor || !window.chatCommandEditor.openEditor) {
+                    reportError({ error: { code: 'NOT_READY', message: 'Éditeur en cours de chargement, réessaie dans un instant' } });
+                    return;
+                }
+                window.chatCommandEditor.openEditor(cmd);
+            };
+
+            row.querySelector('.enabled-toggle').onchange = async (e) => {
                 try {
                     const resp = await window.catapultWs.request('chat-commands.update', {
                         id: cmd.id,
-                        name: row.querySelector('.cmd-name').value,
-                        template: row.querySelector('.cmd-template').value,
-                        permission: row.querySelector('.permission-select').value,
-                        enabled: row.querySelector('.enabled-toggle').checked,
-                        fallbacks: {}
+                        enabled: e.target.checked
                     });
-                    // Keep the in-memory cmd snapshot in sync so subsequent
-                    // saves diff against the latest server state.
                     Object.assign(cmd, resp.result);
                     reportSuccess(cmd.name + ' enregistrée');
-                } catch (err) { reportError(err); }
-                finally { saveBtn.disabled = false; }
+                } catch (err) {
+                    reportError(err);
+                    e.target.checked = !e.target.checked;
+                }
             };
 
             const deleteBtn = row.querySelector('.delete-btn');
@@ -167,7 +201,6 @@
                 const badge = row.querySelector('.builtin-badge');
                 badge.hidden = false;
                 badge.title = I18N.builtinTooltip;
-                row.querySelector('.cmd-name').disabled = true;
                 deleteBtn.remove();
             }
             return node;
@@ -205,6 +238,11 @@
             } catch (err) { reportError(err); }
         };
 
+        // Re-list after the editor modal saves, so the row's name/permission
+        // display and the in-memory cmd snapshot reflect the edit.
+        window.chatCommandEditor = window.chatCommandEditor || {};
+        window.chatCommandEditor.onSaved = loadList;
+
         // Wait for the WS session to be authenticated before the first list
         // call — chat-commands.list requires an auth-ok session.
         if (window.__wsCsrfToken) {
@@ -212,8 +250,81 @@
         } else {
             document.addEventListener('ws:auth.ok', loadList, { once: true });
         }
+
+        const SETTINGS_I18N = {
+            deleteConfirm: /*[[#{chat_commands.settings.delete_confirm(' ')}]]*/ 'Delete setting  ?',
+            invalidKey: /*[[#{chat_commands.settings.invalid_key}]]*/ 'Invalid key'
+        };
+
+        function buildSettingRow(tpl, setting) {
+            const node = tpl.cloneNode(true);
+            const row = node.querySelector('tr');
+            row.dataset.key = setting.key;
+            row.querySelector('.setting-key-display').textContent = setting.key;
+            const valueInput = row.querySelector('.setting-value-input');
+            valueInput.value = setting.value;
+
+            row.querySelector('.setting-save-btn').onclick = async () => {
+                try {
+                    await window.catapultWs.request('chat-commands.settings.set', {
+                        key: setting.key,
+                        value: valueInput.value
+                    });
+                    reportSuccess(setting.key + ' enregistré');
+                } catch (err) { reportError(err); }
+            };
+
+            row.querySelector('.setting-delete-btn').onclick = async () => {
+                if (!confirm(SETTINGS_I18N.deleteConfirm.replace('  ', ' ' + setting.key + ' '))) return;
+                try {
+                    await window.catapultWs.request('chat-commands.settings.delete', { key: setting.key });
+                    row.remove();
+                    reportSuccess(setting.key + ' supprimé');
+                } catch (err) { reportError(err); }
+            };
+
+            return node;
+        }
+
+        async function loadSettings() {
+            try {
+                const resp = await window.catapultWs.request('chat-commands.settings.list', {});
+                const settings = resp.result || [];
+                const tbody = document.getElementById('chatCommandSettingsTbody');
+                const tpl = document.getElementById('chatCommandSettingRowTpl').content;
+                tbody.replaceChildren();
+                for (const setting of settings) {
+                    tbody.appendChild(buildSettingRow(tpl, setting));
+                }
+            } catch (err) { reportError(err); }
+        }
+
+        document.getElementById('chatCommandSettingsAddForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            const key = fd.get('key');
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+                reportError({ error: { code: 'INVALID_KEY', message: SETTINGS_I18N.invalidKey } });
+                return;
+            }
+            try {
+                await window.catapultWs.request('chat-commands.settings.set', { key: key, value: fd.get('value') });
+                e.target.reset();
+                await loadSettings();
+                reportSuccess(key + ' ajouté');
+            } catch (err) { reportError(err); }
+        };
+
+        if (window.__wsCsrfToken) {
+            loadSettings();
+        } else {
+            document.addEventListener('ws:auth.ok', loadSettings, { once: true });
+        }
     })();
     </script>
+
+    <div th:replace="~{fragments/chat-command-editor-modal :: chat-command-editor-modal}"></div>
+    <script th:src="@{/js/chat-command-editor.js}"></script>
 </section>
 </body>
 </html>

@@ -40,4 +40,8 @@ public class OAuthToken {
 
     @Column(name = "expires_at")
     private Instant expiresAt;
+
+    /** Space-separated, mirroring how Twitch/OAuth2 report scopes (OAuth2AccessToken#getScopes()). */
+    @Column(name = "granted_scopes", columnDefinition = "TEXT")
+    private String grantedScopes;
 }

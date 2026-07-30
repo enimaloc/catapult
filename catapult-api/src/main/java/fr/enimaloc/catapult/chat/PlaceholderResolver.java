@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
@@ -30,6 +31,9 @@ public class PlaceholderResolver {
         "game#store#official",
         "game#igdb#url",
         "game#agerating",
+        "game#rating",
+        "game#critic_rating",
+        "game#platforms",
         "tw#active"
     );
 
@@ -129,6 +133,9 @@ public class PlaceholderResolver {
             case "game#igdb#url"      -> ctx.igdbSlug() == null ? null
                 : "https://www.igdb.com/games/" + ctx.igdbSlug();
             case "game#agerating"     -> ctx.ageRating();
+            case "game#rating"        -> roundedOrNull(ctx.rating());
+            case "game#critic_rating" -> roundedOrNull(ctx.criticRating());
+            case "game#platforms"     -> joinNullIfEmpty(ctx.platforms());
             case "tw#active"          -> joinNullIfEmpty(ctx.activeTws() == null ? null
                 : ctx.activeTws().stream()
                     .map(id -> ctx.twLabels() == null ? null : ctx.twLabels().get(id))
@@ -150,14 +157,61 @@ public class PlaceholderResolver {
         return String.join(", ", items);
     }
 
+    private static String roundedOrNull(Double value) {
+        return value == null ? null : String.valueOf(Math.round(value));
+    }
+
     /** Paths inconnus présents dans un template (pour validation à l'écriture). */
     public Set<String> findUnknownPaths(String template) {
+        Set<String> declaredNames = new HashSet<>();
+        collectDeclaredNames(template, 0, template.length(), declaredNames);
         Set<String> unknown = new HashSet<>();
-        collectUnknown(template, 0, template.length(), unknown);
+        collectUnknown(template, 0, template.length(), unknown, declaredNames);
         return unknown;
     }
 
-    private void collectUnknown(String template, int from, int to, Set<String> unknown) {
+    // {var game = ...} / {for game in ...} declare "game" as a valid bare {game} tag later in
+    // the same template (a VarRefExpr, per CommandDslParser#bareTagWithoutHashIsAVarRefNotAContextGet)
+    // — collectUnknown must know about these or every {if}/{for} command that ever prints one of
+    // its own variables fails to save with "Unknown placeholders: <name>", indistinguishable by
+    // character shape alone from a genuinely unknown context path (both are bare lowercase words).
+    // This is a purely syntactic pre-pass (no scoping/ordering checks, same spirit as
+    // STRUCTURAL_KEYWORDS below) — a name declared anywhere in the template, including inside an
+    // {if}/{for} body, counts as known everywhere, which is looser than real scoping but never
+    // wrong in the direction that matters here (rejecting a save that would actually work).
+    private void collectDeclaredNames(String template, int from, int to, Set<String> names) {
+        int i = from;
+        while (i < to) {
+            char c = template.charAt(i);
+            if (c != '{') { i++; continue; }
+            int close = findMatchingClose(template, i, to);
+            if (close < 0) return;
+            String inner = template.substring(i + 1, close).trim();
+            if (inner.startsWith("var ")) {
+                addDeclaredName(names, inner.substring(4), '=');
+            } else if (inner.startsWith("for ")) {
+                addDeclaredName(names, inner.substring(4), " in ");
+            }
+            collectDeclaredNames(template, i + 1, close, names);
+            i = close + 1;
+        }
+    }
+
+    private void addDeclaredName(Set<String> names, String rest, char delimiter) {
+        int idx = rest.indexOf(delimiter);
+        if (idx <= 0) return;
+        String name = rest.substring(0, idx).trim();
+        if (IDENTIFIER.matcher(name).matches()) names.add(name);
+    }
+
+    private void addDeclaredName(Set<String> names, String rest, String delimiter) {
+        int idx = rest.indexOf(delimiter);
+        if (idx <= 0) return;
+        String name = rest.substring(0, idx).trim();
+        if (IDENTIFIER.matcher(name).matches()) names.add(name);
+    }
+
+    private void collectUnknown(String template, int from, int to, Set<String> unknown, Set<String> declaredNames) {
         int i = from;
         while (i < to) {
             char c = template.charAt(i);
@@ -167,13 +221,13 @@ public class PlaceholderResolver {
             int bar = indexOfTopLevelBar(template, i + 1, close);
             String path = template.substring(i + 1, bar < 0 ? close : bar);
             if (isValidPath(path)) {
-                if (!KNOWN_PATHS.contains(path)) {
+                if (!KNOWN_PATHS.contains(path) && !declaredNames.contains(path)) {
                     boolean knownTw = path.startsWith("tw#")
                             && twPlaceholderRegistry != null
                             && twPlaceholderRegistry.getKnownPaths().contains(path.substring(3));
                     if (!knownTw) unknown.add(path);
                 }
-                if (bar >= 0) collectUnknown(template, bar + 1, close, unknown);
+                if (bar >= 0) collectUnknown(template, bar + 1, close, unknown, declaredNames);
             }
             i = close + 1;
         }
@@ -205,8 +259,21 @@ public class PlaceholderResolver {
         return -1;
     }
 
+    // {else} in particular is indistinguishable from a legit simple placeholder by character
+    // shape alone (4 lowercase letters, no '#') — {if ...}/{for ...}/{var ...}/{print ...} all
+    // naturally fail the char-class check below because their condition/header always has a
+    // space plus non-path characters (quotes, '#', operators, ...), but a bare {else} has
+    // nothing else in it. Without this, findUnknownPaths flags "else" as an unknown placeholder
+    // for ANY {if}...{else}...{/if} template, rejecting the save with a 400 — reproduced and
+    // fixed after a save on an if/else command failed with "Unknown placeholders: else".
+    private static final Set<String> STRUCTURAL_KEYWORDS = Set.of("if", "else", "for", "var", "print");
+
+    // Mirrors CommandDslParser's own IDENTIFIER pattern — a declared name here must be something
+    // the parser itself would actually accept as a {var}/{for} binding name.
+    private static final Pattern IDENTIFIER = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
+
     private static boolean isValidPath(String path) {
-        if (path.isEmpty()) return false;
+        if (path.isEmpty() || STRUCTURAL_KEYWORDS.contains(path)) return false;
         for (int i = 0; i < path.length(); i++) {
             char c = path.charAt(i);
             if (!((c >= 'a' && c <= 'z') || c == '_' || c == '#')) return false;

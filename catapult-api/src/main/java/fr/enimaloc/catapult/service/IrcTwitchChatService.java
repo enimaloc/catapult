@@ -24,6 +24,7 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import java.io.*;
 import java.net.Socket;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -37,6 +38,9 @@ public class IrcTwitchChatService implements TwitchChatService {
     private static final int IRC_PORT = 6697;
     private static final String HELIX_BANS_URL = "https://api.twitch.tv/helix/moderation/bans";
     private static final String HELIX_USERS_URL = "https://api.twitch.tv/helix/users";
+    private static final String HELIX_STREAMS_URL = "https://api.twitch.tv/helix/streams";
+    private static final String HELIX_FOLLOWERS_URL = "https://api.twitch.tv/helix/channels/followers";
+    private static final String HELIX_SHOUTOUTS_URL = "https://api.twitch.tv/helix/chat/shoutouts";
     private static final long MAX_RETRY_SECONDS = 60L;
 
     public static final String CLIENT_ID = "Client-Id";
@@ -193,15 +197,21 @@ public class IrcTwitchChatService implements TwitchChatService {
             new ChatCommandEvent(this, user, command, args, extractRole(tags), extractSenderId(tags)));
     }
 
+    /** FOLLOWERS is never returned here — Twitch chat badges have no "is a follower" signal,
+     *  unlike broadcaster/moderator/vip/subscriber, which are all present on every message
+     *  a badge-holder sends. {@link fr.enimaloc.catapult.chat.CommandRegistry} checks that tier
+     *  separately (a live Helix lookup) only for the borderline case this can't decide. */
     static ChatCommandEvent.SenderRole extractRole(String tags) {
         for (String tag : tags.split(";")) {
             if (tag.startsWith("badges=")) {
                 String badges = tag.substring("badges=".length());
                 if (badges.contains("broadcaster/")) return ChatCommandEvent.SenderRole.BROADCASTER;
                 if (badges.contains("moderator/")) return ChatCommandEvent.SenderRole.MODERATOR;
+                if (badges.contains("vip/")) return ChatCommandEvent.SenderRole.VIP;
+                if (badges.contains("subscriber/")) return ChatCommandEvent.SenderRole.SUBS;
             }
         }
-        return ChatCommandEvent.SenderRole.EVERYONE;
+        return ChatCommandEvent.SenderRole.VIEWERS;
     }
 
     static String extractSenderId(String tags) {
@@ -295,6 +305,12 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     @SuppressWarnings("unchecked")
     private String resolveUserId(String accessToken, String login) {
+        Map<String, Object> user = resolveUserJson(accessToken, login);
+        return user == null ? null : (String) user.get("id");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> resolveUserJson(String accessToken, String login) {
         try {
             Map<String, Object> response = restClient.get()
                 .uri(HELIX_USERS_URL + "?login=" + java.net.URLEncoder.encode(login, java.nio.charset.StandardCharsets.UTF_8))
@@ -305,10 +321,111 @@ public class IrcTwitchChatService implements TwitchChatService {
             if (response == null) return null;
             List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
             if (data == null || data.isEmpty()) return null;
-            return (String) data.get(0).get("id");
+            return data.get(0);
         } catch (Exception e) {
-            log.warn("[IRC] Failed to resolve user ID for '{}': {}", login, e.getMessage());
+            log.warn("[IRC] Failed to resolve user for '{}': {}", login, e.getMessage());
             return null;
         }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Optional<TwitchStreamInfo> getStreamInfo(UserAccount user) {
+        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
+            String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+            try {
+                Map<String, Object> response = restClient.get()
+                    .uri(HELIX_STREAMS_URL + "?user_id=" + user.getTwitchId())
+                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                    .header(CLIENT_ID, twitchClientId)
+                    .retrieve()
+                    .body(Map.class);
+                if (response == null) return Optional.empty();
+                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                if (data == null || data.isEmpty()) return Optional.empty();
+                Map<String, Object> stream = data.get(0);
+                Instant startedAt = Instant.parse((String) stream.get("started_at"));
+                return Optional.of(new TwitchStreamInfo(
+                    (String) stream.get("title"), (String) stream.get("game_name"),
+                    ((Number) stream.get("viewer_count")).intValue(), startedAt));
+            } catch (Exception e) {
+                log.warn("[IRC] Failed to fetch stream info for user {}: {}", user.getId(), e.getMessage());
+                return Optional.empty();
+            }
+        });
+    }
+
+    @Override
+    public Optional<TwitchUserProfile> getUserProfile(UserAccount user, String login) {
+        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
+            String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+            Map<String, Object> profile = resolveUserJson(accessToken, login);
+            if (profile == null) return Optional.empty();
+            String createdAtRaw = (String) profile.get("created_at");
+            Instant createdAt = createdAtRaw == null ? null : Instant.parse(createdAtRaw);
+            return Optional.of(new TwitchUserProfile((String) profile.get("display_name"), createdAt));
+        });
+    }
+
+    @Override
+    public Optional<Instant> getFollowedAt(UserAccount user, String targetLogin) {
+        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
+            String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+            String targetId = resolveUserId(accessToken, targetLogin);
+            if (targetId == null) return Optional.empty();
+            return fetchFollowedAt(user, accessToken, targetId, targetLogin);
+        });
+    }
+
+    @Override
+    public Optional<Instant> getFollowedAtById(UserAccount user, String targetTwitchId) {
+        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
+            String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+            return fetchFollowedAt(user, accessToken, targetTwitchId, targetTwitchId);
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<Instant> fetchFollowedAt(UserAccount user, String accessToken, String targetId, String logLabel) {
+        try {
+            Map<String, Object> response = restClient.get()
+                .uri(HELIX_FOLLOWERS_URL + "?broadcaster_id=" + user.getTwitchId()
+                    + "&moderator_id=" + user.getTwitchId() + "&user_id=" + targetId)
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
+                .retrieve()
+                .body(Map.class);
+            if (response == null) return Optional.empty();
+            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+            if (data == null || data.isEmpty()) return Optional.empty();
+            return Optional.of(Instant.parse((String) data.get(0).get("followed_at")));
+        } catch (Exception e) {
+            log.warn("[IRC] Failed to fetch follow date for '{}' on user {}: {}",
+                logLabel, user.getId(), e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public void shoutout(UserAccount user, String targetLogin) {
+        oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+            .ifPresent(token -> {
+                String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
+                String targetId = resolveUserId(accessToken, targetLogin);
+                if (targetId == null) return;
+                try {
+                    restClient.post()
+                        .uri(HELIX_SHOUTOUTS_URL + "?from_broadcaster_id=" + user.getTwitchId()
+                            + "&to_broadcaster_id=" + targetId + "&moderator_id=" + user.getTwitchId())
+                        .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                        .header(CLIENT_ID, twitchClientId)
+                        .retrieve()
+                        .toBodilessEntity();
+                    log.info("[IRC] Shouted out {} for user {}", targetLogin, user.getId());
+                } catch (Exception e) {
+                    log.warn("[IRC] Shoutout failed for {} on user {}: {}",
+                        targetLogin, user.getId(), e.getMessage());
+                }
+            });
     }
 }
