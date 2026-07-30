@@ -104,6 +104,20 @@ class ChatCommandLegacyPresetMigrationTest {
     }
 
     @Test
+    void ignoresACustomCommandWithNoPresetKeyWithoutThrowing() {
+        ChatCommandDefinitionRepository repository = mock(ChatCommandDefinitionRepository.class);
+        ChatCommandDefinition custom = new ChatCommandDefinition();
+        custom.setPresetKey(null);
+        custom.setTemplate("Some fully custom command");
+        when(repository.findAll()).thenReturn(List.of(custom));
+
+        new ChatCommandLegacyPresetMigration(repository).run();
+
+        assertThat(custom.getTemplate()).isEqualTo("Some fully custom command");
+        verify(repository).saveAll(List.of());
+    }
+
+    @Test
     void ignoresRowsWithAnUnrelatedPresetKey() {
         ChatCommandDefinitionRepository repository = mock(ChatCommandDefinitionRepository.class);
         ChatCommandDefinition other = new ChatCommandDefinition();

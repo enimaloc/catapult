@@ -74,6 +74,7 @@ public class ChatCommandLegacyPresetMigration implements CommandLineRunner {
     public void run(String... args) {
         List<ChatCommandDefinition> changed = new ArrayList<>();
         for (ChatCommandDefinition def : repository.findAll()) {
+            if (def.getPresetKey() == null) continue;
             Map<String, String> oldToNew = OLD_TO_NEW_TEMPLATE_BY_PRESET.get(def.getPresetKey());
             if (oldToNew == null) {
                 continue;
