@@ -1,7 +1,9 @@
 package fr.enimaloc.catapult.chat.command.js;
 
+import com.google.protobuf.Timestamp;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.IgdbClient;
+import fr.enimaloc.catapult.service.IgdbService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
@@ -13,7 +15,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.web.client.RestClient;
+import proto.ExternalGame;
+import proto.ExternalGameSource;
 import proto.Game;
+import proto.Genre;
+import proto.Platform;
+import proto.Website;
+import proto.WebsiteCategoryEnum;
 
 import java.util.List;
 import java.util.Map;
@@ -32,6 +40,7 @@ import static org.mockito.Mockito.when;
 class DefaultChatCommandServiceGatewayTest {
 
     @Mock private IgdbClient igdbClient;
+    @Mock private IgdbService igdbService;
     @Mock private RestClient restClient;
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
@@ -41,34 +50,290 @@ class DefaultChatCommandServiceGatewayTest {
 
     @BeforeEach
     void setUp() {
-        gateway = new DefaultChatCommandServiceGateway(igdbClient, restClient,
+        gateway = new DefaultChatCommandServiceGateway(igdbClient, igdbService, restClient,
             new ExternalApiObservations(ObservationRegistry.NOOP, new SimpleMeterRegistry()));
         doReturn(getSpec).when(restClient).get();
         doReturn(headersSpec).when(getSpec).uri(anyString(), any(Object[].class));
         doReturn(responseSpec).when(headersSpec).retrieve();
+        when(igdbService.getAppToken()).thenReturn("app-token");
     }
 
     @Test
-    void igdbGameNameReturnsFirstResultName() {
-        Game game = mock(Game.class);
-        when(game.getName()).thenReturn("VALORANT");
-        when(igdbClient.searchByName("Valorant", "")).thenReturn(List.of(game));
+    void igdbGameReturnsTheEnrichedGameObject() {
+        Game searchResult = Game.newBuilder().setId(1234L).setName("VALORANT").build();
+        when(igdbClient.searchByName("Valorant", "app-token")).thenReturn(List.of(searchResult));
 
-        assertThat(gateway.igdbGameName("Valorant")).contains("VALORANT");
+        Platform pc = Platform.newBuilder().setName("PC").build();
+        Platform ps5 = Platform.newBuilder().setName("PlayStation 5").build();
+        Game details = Game.newBuilder()
+            .setId(1234L)
+            .setName("VALORANT")
+            .setSlug("valorant")
+            .setSummary("A tactical shooter.")
+            .setFirstReleaseDate(Timestamp.newBuilder().setSeconds(1591056000L).build())
+            .setRating(85.4)
+            .setAggregatedRating(79.6)
+            .addPlatforms(pc)
+            .addPlatforms(ps5)
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        var result = gateway.igdbGame("Valorant");
+
+        assertThat(result).isPresent();
+        var game = result.get();
+        assertThat(game.id()).isEqualTo("1234");
+        assertThat(game.name()).isEqualTo("VALORANT");
+        assertThat(game.summary()).isEqualTo("A tactical shooter.");
+        assertThat(game.releaseDate()).isEqualTo("2020-06-02");
+        assertThat(game.rating()).isEqualTo("85");
+        assertThat(game.criticRating()).isEqualTo("80");
+        assertThat(game.platforms()).isEqualTo("PC, PlayStation 5");
+        assertThat(game.igdbUrl()).isEqualTo("https://www.igdb.com/games/valorant");
     }
 
     @Test
-    void igdbGameNameReturnsEmptyWhenNoResults() {
-        when(igdbClient.searchByName("Unknown", "")).thenReturn(List.of());
+    void igdbGameFallsBackToTheBareSearchResultWhenDetailsFetchReturnsEmpty() {
+        Game searchResult = Game.newBuilder().setId(1234L).setName("VALORANT").build();
+        when(igdbClient.searchByName("Valorant", "app-token")).thenReturn(List.of(searchResult));
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.empty());
 
-        assertThat(gateway.igdbGameName("Unknown")).isEmpty();
+        var result = gateway.igdbGame("Valorant");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().id()).isEqualTo("1234");
+        assertThat(result.get().name()).isEqualTo("VALORANT");
+        assertThat(result.get().summary()).isEmpty();
+        assertThat(result.get().releaseDate()).isEmpty();
     }
 
     @Test
-    void igdbGameNameReturnsEmptyWhenClientThrows() {
-        when(igdbClient.searchByName("Boom", "")).thenThrow(new RuntimeException("igdb down"));
+    void igdbExternalPlatformsMergesWebsitesAndExternalGames() {
+        Website official = Website.newBuilder()
+            .setCategory(WebsiteCategoryEnum.WEBSITE_OFFICIAL)
+            .setUrl("https://playvalorant.com")
+            .build();
+        ExternalGameSource steamSource = ExternalGameSource.newBuilder().setName("Steam").build();
+        ExternalGame steamLink = ExternalGame.newBuilder()
+            .setUid("1234560")
+            .setExternalGameSource(steamSource)
+            .build();
+        Game details = Game.newBuilder()
+            .setId(1234L)
+            .addWebsites(official)
+            .addExternalGames(steamLink)
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
 
-        assertThat(gateway.igdbGameName("Boom")).isEmpty();
+        var result = gateway.igdbExternalPlatforms("1234");
+
+        assertThat(result).isPresent();
+        assertThat(result.get())
+            .containsEntry("official", "https://playvalorant.com")
+            .containsEntry("steam", "1234560");
+    }
+
+    @Test
+    void igdbExternalPlatformsReturnsEmptyWhenDetailsFetchReturnsEmpty() {
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.empty());
+
+        assertThat(gateway.igdbExternalPlatforms("1234")).isEmpty();
+    }
+
+    @Test
+    void igdbExternalPlatformsReturnsEmptyWhenAppTokenIsBlank() {
+        when(igdbService.getAppToken()).thenReturn("");
+
+        assertThat(gateway.igdbExternalPlatforms("1234")).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(igdbClient);
+    }
+
+    @Test
+    void igdbGenresReturnsGenreNameList() {
+        Genre shooter = Genre.newBuilder().setName("Shooter").build();
+        Genre tactical = Genre.newBuilder().setName("Tactical").build();
+        Game details = Game.newBuilder().setId(1234L).addGenres(shooter).addGenres(tactical).build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbGenres("1234")).contains(List.of("Shooter", "Tactical"));
+    }
+
+    @Test
+    void igdbGenresReturnsEmptyWhenDetailsFetchReturnsEmpty() {
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.empty());
+
+        assertThat(gateway.igdbGenres("1234")).isEmpty();
+    }
+
+    @Test
+    void igdbCoverReturnsTheCoverObject() {
+        Game details = Game.newBuilder().setId(1234L)
+            .setCover(proto.Cover.newBuilder().setUrl("//images.igdb.com/cover.jpg").setWidth(264).setHeight(352).build())
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbCover("1234")).contains(
+            Map.of("url", "//images.igdb.com/cover.jpg", "width", 264, "height", 352));
+    }
+
+    @Test
+    void igdbCoverReturnsEmptyMapWhenGameHasNoCover() {
+        Game details = Game.newBuilder().setId(1234L).build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbCover("1234")).contains(Map.of());
+    }
+
+    @Test
+    void igdbScreenshotsReturnsUrlList() {
+        Game details = Game.newBuilder().setId(1234L)
+            .addScreenshots(proto.Screenshot.newBuilder().setUrl("//images.igdb.com/s1.jpg").build())
+            .addScreenshots(proto.Screenshot.newBuilder().setUrl("//images.igdb.com/s2.jpg").build())
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbScreenshots("1234"))
+            .contains(List.of("//images.igdb.com/s1.jpg", "//images.igdb.com/s2.jpg"));
+    }
+
+    @Test
+    void igdbVideosReturnsNameAndYoutubeUrlObjects() {
+        Game details = Game.newBuilder().setId(1234L)
+            .addVideos(proto.GameVideo.newBuilder().setName("Trailer").setVideoId("abc123").build())
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbVideos("1234")).contains(
+            List.of(Map.of("name", "Trailer", "url", "https://www.youtube.com/watch?v=abc123")));
+    }
+
+    @Test
+    void igdbGameModesReturnsNameList() {
+        Game details = Game.newBuilder().setId(1234L)
+            .addGameModes(proto.GameMode.newBuilder().setName("Single player").build())
+            .addGameModes(proto.GameMode.newBuilder().setName("Co-operative").build())
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbGameModes("1234")).contains(List.of("Single player", "Co-operative"));
+    }
+
+    @Test
+    void igdbThemesReturnsNameList() {
+        Game details = Game.newBuilder().setId(1234L)
+            .addThemes(proto.Theme.newBuilder().setName("Action").build())
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbThemes("1234")).contains(List.of("Action"));
+    }
+
+    @Test
+    void igdbPlayerPerspectivesReturnsNameList() {
+        Game details = Game.newBuilder().setId(1234L)
+            .addPlayerPerspectives(proto.PlayerPerspective.newBuilder().setName("First person").build())
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbPlayerPerspectives("1234")).contains(List.of("First person"));
+    }
+
+    @Test
+    void igdbInvolvedCompaniesReturnsObjectsWithRoleFlags() {
+        proto.Company company = proto.Company.newBuilder().setName("Riot Games").build();
+        proto.InvolvedCompany involved = proto.InvolvedCompany.newBuilder()
+            .setCompany(company)
+            .setDeveloper(true)
+            .setPublisher(true)
+            .build();
+        Game details = Game.newBuilder().setId(1234L).addInvolvedCompanies(involved).build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        var result = gateway.igdbInvolvedCompanies("1234");
+        assertThat(result).isPresent();
+        assertThat(result.get()).hasSize(1);
+        assertThat(result.get().get(0))
+            .containsEntry("name", "Riot Games")
+            .containsEntry("developer", true)
+            .containsEntry("publisher", true)
+            .containsEntry("supporting", false)
+            .containsEntry("porting", false);
+    }
+
+    @Test
+    void igdbAgeRatingsReturnsOrganizationAndRatingObjects() {
+        proto.AgeRatingOrganization esrb = proto.AgeRatingOrganization.newBuilder().setName("ESRB").build();
+        proto.AgeRating ageRating = proto.AgeRating.newBuilder()
+            .setOrganization(esrb)
+            .setRating(proto.AgeRatingRatingEnum.M)
+            .build();
+        Game details = Game.newBuilder().setId(1234L).addAgeRatings(ageRating).build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbAgeRatings("1234")).contains(
+            List.of(Map.of("organization", "ESRB", "rating", "M")));
+    }
+
+    @Test
+    void igdbFranchisesReturnsNameList() {
+        Game details = Game.newBuilder().setId(1234L)
+            .addFranchises(proto.Franchise.newBuilder().setName("Half-Life").build())
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbFranchises("1234")).contains(List.of("Half-Life"));
+    }
+
+    @Test
+    void igdbKeywordsReturnsNameList() {
+        Game details = Game.newBuilder().setId(1234L)
+            .addKeywords(proto.Keyword.newBuilder().setName("post-apocalyptic").build())
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbKeywords("1234")).contains(List.of("post-apocalyptic"));
+    }
+
+    @Test
+    void igdbSimilarGamesReturnsNameList() {
+        Game details = Game.newBuilder().setId(1234L)
+            .addSimilarGames(Game.newBuilder().setName("Counter-Strike 2").build())
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbSimilarGames("1234")).contains(List.of("Counter-Strike 2"));
+    }
+
+    @Test
+    void igdbDlcsReturnsNameList() {
+        Game details = Game.newBuilder().setId(1234L)
+            .addDlcs(Game.newBuilder().setName("Some DLC").build())
+            .build();
+        when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));
+
+        assertThat(gateway.igdbDlcs("1234")).contains(List.of("Some DLC"));
+    }
+
+    @Test
+    void igdbGameReturnsEmptyWhenNoSearchResults() {
+        when(igdbClient.searchByName("Unknown", "app-token")).thenReturn(List.of());
+
+        assertThat(gateway.igdbGame("Unknown")).isEmpty();
+    }
+
+    @Test
+    void igdbGameReturnsEmptyWhenClientThrows() {
+        when(igdbClient.searchByName("Boom", "app-token")).thenThrow(new RuntimeException("igdb down"));
+
+        assertThat(gateway.igdbGame("Boom")).isEmpty();
+    }
+
+    @Test
+    void igdbGameReturnsEmptyWhenAppTokenIsBlank() {
+        when(igdbService.getAppToken()).thenReturn("");
+
+        assertThat(gateway.igdbGame("Valorant")).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(igdbClient);
     }
 
     @Test
