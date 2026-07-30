@@ -263,6 +263,36 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void findUnknownPaths_doesNotFlagABareVarRefToAVarDeclaredEarlierInTheTemplate() {
+        // {var game = arg(0, "")} declares "game" as a VarRefExpr, per
+        // CommandDslParser#bareTagWithoutHashIsAVarRefNotAContextGet — a later bare {game} tag
+        // reads that variable, not a "game" context path (which doesn't exist; only "game#name"
+        // etc. do). Reproduced from a save that failed with "Unknown placeholders: game" for
+        // {var game = arg(0, "")}{if igdb#getGame(game).id != ""}{catapult#setGame(game,
+        // igdb#getGame(game).id)}Jeu mis à jour: {game}{else}{game} non trouvé{/if}.
+        Set<String> unknown = resolver.findUnknownPaths(
+            "{var game = arg(0, \"\")}"
+            + "{if igdb#getGame(game).id != \"\"}"
+            + "{catapult#setGame(game, igdb#getGame(game).id)}Jeu mis à jour: {game}"
+            + "{else}{game} non trouvé{/if}");
+        assertThat(unknown).isEmpty();
+    }
+
+    @Test
+    void findUnknownPaths_recognizesAForEachBindingNameAsKnownInsideTheLoopBody() {
+        Set<String> unknown = resolver.findUnknownPaths(
+            "{for f in fallbacks}{f} {/for}");
+        assertThat(unknown).isEmpty();
+    }
+
+    @Test
+    void findUnknownPaths_stillFlagsABareTagThatMatchesNoDeclaredVarOrKnownPath() {
+        Set<String> unknown = resolver.findUnknownPaths(
+            "{var game = arg(0, \"\")}{totallyunrelated}");
+        assertThat(unknown).containsExactly("totallyunrelated");
+    }
+
+    @Test
     void findUnknownPaths_acceptsTwActiveAndKnownSlugs_rejectsUnknown() {
         when(twRegistry.getKnownPaths()).thenReturn(Set.of("violence_graphic"));
         Set<String> unknown = resolver.findUnknownPaths(
