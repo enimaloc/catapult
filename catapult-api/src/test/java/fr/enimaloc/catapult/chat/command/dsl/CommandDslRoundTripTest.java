@@ -61,6 +61,19 @@ class CommandDslRoundTripTest {
     }
 
     @Test
+    void listGetBareTagRoundTrips() {
+        String source = "{list(args)}";
+        assertThat(generator.generate(parser.parse(source))).isEqualTo(source);
+    }
+
+    @Test
+    void listGetInAVarDeclThenUsedInAnArrFunctionRoundTrips() {
+        String source = "{var allArgs = list(args)}Args: {arr#join(allArgs, \", \")}";
+        CommandAst ast = parser.parse(source);
+        assertThat(parser.parse(generator.generate(ast))).isEqualTo(ast);
+    }
+
+    @Test
     void stringLiteralContainingUnbalancedBraceRoundTrips() {
         // The trailing "{print msg}" compacts to the bare "{msg}" shorthand on generation (see
         // CommandDslGenerator's javadoc), so the AST, not the literal text, is what round-trips

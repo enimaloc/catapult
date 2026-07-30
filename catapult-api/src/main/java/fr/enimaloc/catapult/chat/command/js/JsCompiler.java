@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.chat.command.ast.Expression;
 import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.IfStatement;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.ListGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
 import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
@@ -183,6 +184,7 @@ public class JsCompiler {
             case PropertyGetExpr e -> collectContextPaths(e.target(), paths);
             case SettingGetExpr ignored -> { }
             case ArgGetExpr ignored -> { }
+            case ListGetExpr ignored -> { }
             case LiteralExpr ignored -> { }
             case VarRefExpr ignored -> { }
             default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
@@ -233,6 +235,7 @@ public class JsCompiler {
             case ContextGetExpr ignored -> { }
             case SettingGetExpr ignored -> { }
             case ArgGetExpr ignored -> { }
+            case ListGetExpr ignored -> { }
             case LiteralExpr ignored -> { }
             case VarRefExpr ignored -> { }
             default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
@@ -289,6 +292,7 @@ public class JsCompiler {
             case PropertyGetExpr e -> collectSettingKeys(e.target(), keys);
             case ContextGetExpr ignored -> { }
             case ArgGetExpr ignored -> { }
+            case ListGetExpr ignored -> { }
             case LiteralExpr ignored -> { }
             case VarRefExpr ignored -> { }
             default -> throw new IllegalArgumentException("Unsupported expression: " + expr.typeName());
@@ -373,6 +377,7 @@ public class JsCompiler {
             case SettingGetExpr e -> jsPropertyAccess("ctx.settings", e.key());
             case ArgGetExpr e -> "(ctx.list(\"args\")[" + e.index() + "] || \""
                 + escape(e.defaultValue() == null ? "" : e.defaultValue()) + "\")";
+            case ListGetExpr e -> "ctx.list(\"" + escape(e.name()) + "\")";
             case ServiceCallExpr e -> compileServiceCall(e);
             case BinaryExpr e -> "(" + compileExpr(e.left()) + " " + jsOperator(e.operator())
                 + " " + compileExpr(e.right()) + ")";
@@ -458,6 +463,7 @@ public class JsCompiler {
             case LiteralExpr e -> e.value();
             case VarRefExpr e -> e.name();
             case ContextGetExpr e -> e.path();
+            case ListGetExpr e -> "list(" + e.name() + ")";
             case ServiceCallExpr e -> e.namespace() + "#" + e.function() + "(...)";
             case BinaryExpr e -> describe(e.left()) + " " + e.operator() + " " + describe(e.right());
             default -> expr.typeName();
