@@ -27,6 +27,9 @@ public class ChatCommandPresetCatalog {
         PRESETS.put("release",     new Preset("release",     ChatCommandEvent.SenderRole.VIEWERS));
         PRESETS.put("igdb",        new Preset("igdb",        ChatCommandEvent.SenderRole.VIEWERS));
         PRESETS.put("triggers",    new Preset("triggers",    ChatCommandEvent.SenderRole.VIEWERS));
+        // Data-driven since the migration that removed SetGameCommand (the last Java-backed
+        // command with an editable template) — matches its old hardcoded default permission.
+        PRESETS.put("setgame",     new Preset("setgame",     ChatCommandEvent.SenderRole.MODERATOR));
     }
 
     public static final String BUILTIN_PRESET_KEY_PREFIX = "builtin:";

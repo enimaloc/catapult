@@ -110,14 +110,18 @@ public class CommandRegistry {
     }
 
     /**
-     * A {@link fr.enimaloc.catapult.chat.command.SetGameCommand}-style static/builtin command
-     * always reports its own hardcoded default — {@link ChatCommandPresetCatalog} seeds an
-     * editable {@link ChatCommandDefinition} row per one specifically so the streamer can
-     * override that default from the command editor, so that row's permission (once present)
-     * must win here. A data-driven ({@link DynamicChatCommand}) command already reads its own
-     * definition's permission directly in {@code getRequiredPermission()} — looking it up again
-     * by presetKey here would just waste a query per dispatch for no benefit, so it's skipped
-     * for anything that isn't one of the static beans this registry was built from.
+     * A static/builtin {@link ChatCommand} bean always reports its own hardcoded default — {@link
+     * ChatCommandPresetCatalog} seeds an editable {@link ChatCommandDefinition} row per
+     * non-owner-only one specifically so the streamer can override that default from the command
+     * editor, so that row's permission (once present) must win here. {@code !debug} is currently
+     * the only static bean left (owner-only, so it never gets such a row and always falls
+     * through to its hardcoded default) — {@code !setgame} moved to being a fully data-driven
+     * preset ({@link ChatCommandPresetCatalog}'s {@code setgame} entry), so this override lookup
+     * is dormant rather than removed, ready for whichever future static command needs it next. A
+     * data-driven ({@link DynamicChatCommand}) command already reads its own definition's
+     * permission directly in {@code getRequiredPermission()} — looking it up again by presetKey
+     * here would just waste a query per dispatch for no benefit, so it's skipped for anything
+     * that isn't one of the static beans this registry was built from.
      */
     private ChatCommandEvent.SenderRole requiredPermission(UserAccount user, ChatCommand command) {
         if (!commands.containsValue(command)) {
