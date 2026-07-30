@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="chat-command-editor-modal" id="chatCommandEditorModal" class="modal" hidden
+     style="display:none;">
+    <div id="ceModalContent" class="modal-content ce-modal-content" style="overflow-y:auto;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.75rem;">
+            <input id="ceName" class="form-input" type="text" pattern="^![a-z][a-z0-9_]{0,30}$"
+                   style="font-family:monospace; font-size:1.1em; flex:1;">
+            <select id="cePermission" class="form-input" style="width:auto;">
+                <option value="VIEWERS" th:text="#{chat_commands.permission.viewers}">Everyone</option>
+                <option value="FOLLOWERS" th:text="#{chat_commands.permission.followers}">Followers</option>
+                <option value="SUBS" th:text="#{chat_commands.permission.subs}">Subscribers</option>
+                <option value="VIP" th:text="#{chat_commands.permission.vip}">VIPs</option>
+                <option value="MODERATOR" th:text="#{chat_commands.permission.moderator}">Moderator</option>
+                <option value="BROADCASTER" th:text="#{chat_commands.permission.broadcaster}">Broadcaster</option>
+            </select>
+            <button type="button" id="ceFullscreenBtn" title="Plein écran"
+                    style="background:none; border:none; font-size:1.1rem; cursor:pointer; color:inherit;">&#x26F6;</button>
+            <button type="button" id="ceClose"
+                    style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:inherit;">&times;</button>
+        </div>
+        <div id="ceScopeWarning" hidden class="banner banner-warning" style="margin-bottom:.75rem;">
+            <span th:text="#{chat_commands.scope_warning.text}">
+                Cette commande utilise une fonctionnalité qui nécessite de reconnecter Twitch avec des permissions supplémentaires.
+            </span>
+            <a href="/oauth2/authorization/twitch" hx-boost="false" class="btn btn-primary"
+               th:text="#{chat_commands.scope_warning.reconnect}">Reconnecter Twitch</a>
+        </div>
+        <div style="display:flex; gap:.25rem; border-bottom:1px solid var(--border); margin-bottom:.75rem;">
+            <button type="button" class="btn ce-tab-btn active" data-tab="blocks"
+                    th:text="#{chat_commands.tab.blocks}">Blocs</button>
+            <button type="button" class="btn ce-tab-btn" data-tab="text"
+                    th:text="#{chat_commands.tab.text}">Texte</button>
+            <button type="button" class="btn ce-tab-btn" data-tab="js"
+                    th:text="#{chat_commands.tab.js}">JS généré</button>
+        </div>
+        <div>
+            <div id="ceBlocksPane" class="ce-tab-pane ce-blocks-pane"
+                 style="width:100%; position:relative;"></div>
+            <div id="ceTextPane" class="ce-tab-pane" hidden>
+                <textarea id="ceTextArea" class="form-input" rows="8" style="width:100%; font-family:monospace;"></textarea>
+            </div>
+            <div id="ceJsPane" class="ce-tab-pane" hidden>
+                <div id="ceEjectedBanner" hidden style="margin-bottom:.5rem; font-size:.85em; color:var(--text-muted);"
+                     th:text="#{chat_commands.js.ejected_banner}">
+                    Cette commande exécute ce JS directement — les onglets Blocs/Texte sont ignorés tant que tu ne cliques pas « Revenir ».
+                </div>
+                <textarea id="ceJsOutput" class="form-input" rows="10" readonly
+                          style="width:100%; font-family:monospace; white-space:pre;"></textarea>
+                <div style="display:flex; gap:.5rem; margin-top:.5rem;">
+                    <button type="button" id="ceEjectBtn" class="btn" th:text="#{chat_commands.js.eject}">Éjecter vers JS</button>
+                    <button type="button" id="ceRevertBtn" class="btn" hidden th:text="#{chat_commands.js.revert}">Revenir aux Blocs/Texte</button>
+                </div>
+            </div>
+        </div>
+        <details style="margin-top:.75rem;">
+            <summary th:text="#{chat_commands.test.service_mocks_label}" style="cursor:pointer; color:var(--text-muted);">Valeurs simulées pour les appels de service (optionnel)</summary>
+            <div id="ceServiceMocks" style="margin-top:.5rem; max-height:320px; overflow-y:auto;"></div>
+        </details>
+        <div style="display:flex; justify-content:flex-end; gap:.5rem; margin-top:1rem;">
+            <button type="button" id="ceTestBtn" class="btn" th:text="#{chat_commands.action.test}">Tester</button>
+            <button type="button" id="ceSaveBtn" class="btn btn-primary" th:text="#{chat_commands.action.save}">Enregistrer</button>
+        </div>
+        <div id="ceTraceOutput" hidden
+             style="margin-top:.75rem; font-family:monospace; font-size:.85em; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:.5rem; max-height:200px; overflow-y:auto;"></div>
+    </div>
+
+    <!-- Served from the classpath (org.webjars.npm:blockly), not a CDN, matching this
+         project's self-hosted static asset convention. Only the core engine + English
+         message table are needed: the editor never uses Blockly's own JS generators
+         (catapult-api compiles the AST to JS server-side), only defineBlocksWithJsonArray
+         and inject for the Blocks tab's custom node blocks.
+         Must live inside this fragment div (not as a body-level sibling) — th:replace
+         only pulls in the th:fragment element's own content, not its siblings. -->
+    <script th:src="@{/webjars/blockly/blockly_compressed.js}"></script>
+    <script th:src="@{/webjars/blockly/msg/en.js}"></script>
+</div>
+</body>
+</html>

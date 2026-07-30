@@ -4,18 +4,26 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.chat.ChatCommandPresetCatalog;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
+import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
+import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.chat.command.registry.twitch.TwitchShoutoutFunction;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.SystemTwitchAccountService;
+import fr.enimaloc.catapult.service.TwitchChatService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -28,6 +36,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import org.mockito.ArgumentCaptor;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -38,6 +49,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,6 +57,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiChatCommandsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
+@Import({JsCompiler.class, ServiceFunctionRegistry.class, TwitchShoutoutFunction.class})
 class ApiChatCommandsControllerTest {
 
     @Autowired MockMvc mvc;
@@ -55,6 +68,8 @@ class ApiChatCommandsControllerTest {
     @MockitoBean ExperimentService experimentService;
     @MockitoBean SystemTwitchAccountService systemAccount;
     @MockitoBean UserAccountRepository userRepo;
+    @MockitoBean OAuthTokenRepository oAuthTokenRepository;
+    @MockitoBean TwitchChatService twitchChatService;
 
     private UserAccount mockUser() {
         UserAccount user = new UserAccount();
@@ -108,7 +123,7 @@ class ApiChatCommandsControllerTest {
         String body = om.writeValueAsString(Map.of(
                 "name", "noBang",
                 "template", "Hi",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true));
 
         mvc.perform(withAdmin(post("/api/chat-commands"))
@@ -129,7 +144,7 @@ class ApiChatCommandsControllerTest {
         String body = om.writeValueAsString(Map.of(
                 "name", "!foo",
                 "template", "Hi {game#unknown}",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true));
 
         mvc.perform(withAdmin(post("/api/chat-commands"))
@@ -155,7 +170,7 @@ class ApiChatCommandsControllerTest {
         String body = om.writeValueAsString(Map.of(
                 "name", "!foo",
                 "template", "Hi",
-                "permission", "EVERYONE",
+                "permission", "VIEWERS",
                 "enabled", true));
 
         mvc.perform(withAdmin(post("/api/chat-commands"))
@@ -164,9 +179,190 @@ class ApiChatCommandsControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("!foo"))
                 .andExpect(jsonPath("$.template").value("Hi"))
-                .andExpect(jsonPath("$.permission").value("EVERYONE"));
+                .andExpect(jsonPath("$.permission").value("VIEWERS"));
 
         verify(repository).save(any(ChatCommandDefinition.class));
+    }
+
+    @Test
+    void put_with_ast_persists_ast_and_regenerates_template_from_it() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition existing = new ChatCommandDefinition();
+        existing.setId(id);
+        existing.setUser(user);
+        existing.setName("!foo");
+        existing.setTemplate("stale text from a previous save");
+        existing.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
+        when(repository.findById(id)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        String astJson = new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!"));
+
+        String body = om.writeValueAsString(Map.of(
+                "name", "!foo",
+                // Deliberately stale/mismatched: the ast must win, not this text.
+                "template", "ignored client-side text",
+                "permission", "VIEWERS",
+                "enabled", true,
+                "ast", astJson));
+
+        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.template").value("Now playing {ctx.game.name}!"));
+
+        ArgumentCaptor<ChatCommandDefinition> captor = ArgumentCaptor.forClass(ChatCommandDefinition.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getAst()).isEqualTo(astJson);
+        assertThat(captor.getValue().getTemplate()).isEqualTo("Now playing {ctx.game.name}!");
+    }
+
+    @Test
+    void put_with_ast_referencing_a_scope_gated_function_reports_missing_scopes() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
+        when(oAuthTokenRepository.findByUserAndProvider(any(), any())).thenReturn(Optional.empty());
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition existing = new ChatCommandDefinition();
+        existing.setId(id);
+        existing.setUser(user);
+        existing.setName("!so");
+        existing.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
+        when(repository.findById(id)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        String astJson = new NodeJsonCodec().toJson(new CommandDslParser().parse("{twitch#shoutout(arg(0))}"));
+        String body = om.writeValueAsString(Map.of(
+                "name", "!so",
+                "template", "ignored",
+                "permission", "VIEWERS",
+                "enabled", true,
+                "ast", astJson));
+
+        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.missingTwitchScopes[0]").value("moderator:manage:shoutouts"));
+
+        // Best-effort: the command still saves despite the missing scope.
+        verify(repository).save(any(ChatCommandDefinition.class));
+    }
+
+    @Test
+    void put_with_ast_referencing_a_call_with_an_already_granted_scope_reports_no_gap() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
+        fr.enimaloc.catapult.domain.OAuthToken token = new fr.enimaloc.catapult.domain.OAuthToken();
+        token.setGrantedScopes("moderator:manage:shoutouts channel:moderate");
+        when(oAuthTokenRepository.findByUserAndProvider(any(), any())).thenReturn(Optional.of(token));
+
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition existing = new ChatCommandDefinition();
+        existing.setId(id);
+        existing.setUser(user);
+        existing.setName("!so");
+        existing.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
+        when(repository.findById(id)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        String astJson = new NodeJsonCodec().toJson(new CommandDslParser().parse("{twitch#shoutout(arg(0))}"));
+        String body = om.writeValueAsString(Map.of(
+                "name", "!so",
+                "template", "ignored",
+                "permission", "VIEWERS",
+                "enabled", true,
+                "ast", astJson));
+
+        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.missingTwitchScopes").isEmpty());
+    }
+
+    @Test
+    void put_with_ejectedJs_persists_it_without_touching_ast_or_template() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
+
+        UUID id = UUID.randomUUID();
+        String astJson = new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!"));
+        ChatCommandDefinition existing = new ChatCommandDefinition();
+        existing.setId(id);
+        existing.setUser(user);
+        existing.setName("!foo");
+        existing.setTemplate("Now playing {game#name}!");
+        existing.setAst(astJson);
+        existing.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
+        when(repository.findById(id)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        String body = om.writeValueAsString(Map.of(
+                "name", "!foo",
+                "template", "Now playing {game#name}!",
+                "permission", "VIEWERS",
+                "enabled", true,
+                "ast", astJson,
+                "ejectedJs", "return \"hand-written\";"));
+
+        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<ChatCommandDefinition> captor = ArgumentCaptor.forClass(ChatCommandDefinition.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getEjectedJs()).isEqualTo("return \"hand-written\";");
+        // Reversibility: the ast/template a Blocks/Text edit would restore stay untouched.
+        assertThat(captor.getValue().getAst()).isEqualTo(astJson);
+        assertThat(captor.getValue().getTemplate()).isEqualTo("Now playing {ctx.game.name}!");
+    }
+
+    @Test
+    void put_omitting_ejectedJs_clears_a_previously_ejected_command() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(placeholderResolver.findUnknownPaths(any())).thenReturn(Set.of());
+
+        UUID id = UUID.randomUUID();
+        String astJson = new NodeJsonCodec().toJson(new CommandDslParser().parse("Now playing {game#name}!"));
+        ChatCommandDefinition existing = new ChatCommandDefinition();
+        existing.setId(id);
+        existing.setUser(user);
+        existing.setName("!foo");
+        existing.setTemplate("Now playing {game#name}!");
+        existing.setAst(astJson);
+        existing.setEjectedJs("return \"old hand-written js\";");
+        existing.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
+        when(repository.findById(id)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // "Revenir aux Blocs/Texte" sends a request without ejectedJs at all.
+        String body = om.writeValueAsString(Map.of(
+                "name", "!foo",
+                "template", "Now playing {game#name}!",
+                "permission", "VIEWERS",
+                "enabled", true,
+                "ast", astJson));
+
+        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<ChatCommandDefinition> captor = ArgumentCaptor.forClass(ChatCommandDefinition.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getEjectedJs()).isNull();
     }
 
     @Test
@@ -183,7 +379,7 @@ class ApiChatCommandsControllerTest {
         def.setUser(otherOwner);
         def.setName("!foo");
         def.setTemplate("Hi");
-        def.setPermission(ChatCommandEvent.SenderRole.EVERYONE);
+        def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(otherId)).thenReturn(Optional.of(def));
 
         mvc.perform(withAdmin(delete("/api/chat-commands/{id}", otherId)))

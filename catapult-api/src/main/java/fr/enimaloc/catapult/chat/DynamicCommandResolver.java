@@ -1,9 +1,13 @@
 package fr.enimaloc.catapult.chat;
 
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
+import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.GameContextService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
@@ -23,6 +27,10 @@ public class DynamicCommandResolver {
     private final ChatCommandDefinitionRepository repository;
     private final PlaceholderResolver placeholderResolver;
     private final GameContextService gameContextService;
+    private final JsCompiler jsCompiler;
+    private final SandboxExecutor sandboxExecutor;
+    private final ServiceFunctionRegistry serviceFunctionRegistry;
+    private final ChatCommandSettingRepository settingRepository;
     private final Map<String, ChatCommand> staticByPresetKey;
 
     private final Map<UUID, Map<String, Optional<ChatCommand>>> userCache = new ConcurrentHashMap<>();
@@ -31,10 +39,18 @@ public class DynamicCommandResolver {
     public DynamicCommandResolver(ChatCommandDefinitionRepository repository,
                                   PlaceholderResolver placeholderResolver,
                                   GameContextService gameContextService,
+                                  JsCompiler jsCompiler,
+                                  SandboxExecutor sandboxExecutor,
+                                  ServiceFunctionRegistry serviceFunctionRegistry,
+                                  ChatCommandSettingRepository settingRepository,
                                   List<ChatCommand> staticCommands) {
         this.repository = repository;
         this.placeholderResolver = placeholderResolver;
         this.gameContextService = gameContextService;
+        this.jsCompiler = jsCompiler;
+        this.sandboxExecutor = sandboxExecutor;
+        this.serviceFunctionRegistry = serviceFunctionRegistry;
+        this.settingRepository = settingRepository;
         this.staticByPresetKey = staticCommands.stream()
             .collect(Collectors.toMap(
                 c -> ChatCommandPresetCatalog.BUILTIN_PRESET_KEY_PREFIX
@@ -60,7 +76,9 @@ public class DynamicCommandResolver {
                     if (bean != null) return bean;
                 }
                 return (ChatCommand) new DynamicChatCommand(
-                    def, placeholderResolver, gameContextService, resolveLocale(user));
+                    def, jsCompiler, sandboxExecutor, serviceFunctionRegistry,
+                    gameContextService, placeholderResolver, resolveLocale(user), settingRepository,
+                    repository);
             });
     }
 
