@@ -25,6 +25,13 @@ import java.util.Map;
  * directly in the preset's default template text so a freshly-instantiated row never touches
  * the legacy placeholder syntax at all. Only rows whose stored template still exactly matches
  * one of the old hardcoded defaults are rewritten — a genuine customization is left untouched.
+ *
+ * <p>Also recognizes the intermediate form {@link ChatCommandContextGetMigration} (Order 3,
+ * pre-existing) already produced on production before this migration existed — e.g.
+ * {@code Get it here: {game#store#url}} became {@code Get it here: {print igdb#getCurrentGame().storeUrl}}
+ * in place, and {@code tw#active} became the bare {@code {tw#active()}} service-call tag. The
+ * surrounding literal text (and language marker) survives that rewrite untouched, so every
+ * variant below is still distinguishable per language, same as {@link ChatCommandGameMigration}.
  */
 @Slf4j
 @Component
@@ -36,29 +43,49 @@ public class ChatCommandLegacyPresetMigration implements CommandLineRunner {
             "Get it here: {game#store#url}",
             "{if igdb#getCurrentGame().storeUrl != \"\"}Get it here: {print igdb#getCurrentGame().storeUrl}{/if}",
             "Disponible ici : {game#store#url}",
+            "{if igdb#getCurrentGame().storeUrl != \"\"}Disponible ici : {print igdb#getCurrentGame().storeUrl}{/if}",
+            "Get it here: {print igdb#getCurrentGame().storeUrl}",
+            "{if igdb#getCurrentGame().storeUrl != \"\"}Get it here: {print igdb#getCurrentGame().storeUrl}{/if}",
+            "Disponible ici : {print igdb#getCurrentGame().storeUrl}",
             "{if igdb#getCurrentGame().storeUrl != \"\"}Disponible ici : {print igdb#getCurrentGame().storeUrl}{/if}"
         ),
         "release", Map.of(
             "Released on {game#release_date}",
             "{if igdb#getCurrentGame().releaseDate != \"\"}Released on {print igdb#getCurrentGame().releaseDate}{/if}",
             "Sortie le {game#release_date}",
+            "{if igdb#getCurrentGame().releaseDate != \"\"}Sortie le {print igdb#getCurrentGame().releaseDate}{/if}",
+            "Released on {print igdb#getCurrentGame().releaseDate}",
+            "{if igdb#getCurrentGame().releaseDate != \"\"}Released on {print igdb#getCurrentGame().releaseDate}{/if}",
+            "Sortie le {print igdb#getCurrentGame().releaseDate}",
             "{if igdb#getCurrentGame().releaseDate != \"\"}Sortie le {print igdb#getCurrentGame().releaseDate}{/if}"
         ),
         "igdb", Map.of(
             "IGDB page: {game#igdb#url}",
             "{if igdb#getCurrentGame().igdbUrl != \"\"}IGDB page: {print igdb#getCurrentGame().igdbUrl}{/if}",
             "Fiche IGDB : {game#igdb#url}",
+            "{if igdb#getCurrentGame().igdbUrl != \"\"}Fiche IGDB : {print igdb#getCurrentGame().igdbUrl}{/if}",
+            "IGDB page: {print igdb#getCurrentGame().igdbUrl}",
+            "{if igdb#getCurrentGame().igdbUrl != \"\"}IGDB page: {print igdb#getCurrentGame().igdbUrl}{/if}",
+            "Fiche IGDB : {print igdb#getCurrentGame().igdbUrl}",
             "{if igdb#getCurrentGame().igdbUrl != \"\"}Fiche IGDB : {print igdb#getCurrentGame().igdbUrl}{/if}"
         ),
-        "triggers", Map.of(
-            "⚠ Known triggers for {game#name|this game}: {tw#active|{game#agerating|no information available}}",
-            "⚠ Known triggers for {if igdb#getCurrentGame().name != \"\"}{print igdb#getCurrentGame().name}{else}this game{/if}: "
-                + "{if tw#active() != \"\"}{print tw#active()}{else}{if igdb#getCurrentGame().ageRating != \"\"}"
-                + "{print igdb#getCurrentGame().ageRating}{else}no information available{/if}{/if}",
-            "⚠ Triggers connus pour {game#name|ce jeu} : {tw#active|{game#agerating|aucune information disponible}}",
-            "⚠ Triggers connus pour {if igdb#getCurrentGame().name != \"\"}{print igdb#getCurrentGame().name}{else}ce jeu{/if} : "
-                + "{if tw#active() != \"\"}{print tw#active()}{else}{if igdb#getCurrentGame().ageRating != \"\"}"
-                + "{print igdb#getCurrentGame().ageRating}{else}aucune information disponible{/if}{/if}"
+        "triggers", Map.ofEntries(
+            Map.entry("⚠ Known triggers for {game#name|this game}: {tw#active|{game#agerating|no information available}}",
+                "⚠ Known triggers for {if igdb#getCurrentGame().name != \"\"}{print igdb#getCurrentGame().name}{else}this game{/if}: "
+                    + "{if tw#active() != \"\"}{print tw#active()}{else}{if igdb#getCurrentGame().ageRating != \"\"}"
+                    + "{print igdb#getCurrentGame().ageRating}{else}no information available{/if}{/if}"),
+            Map.entry("⚠ Triggers connus pour {game#name|ce jeu} : {tw#active|{game#agerating|aucune information disponible}}",
+                "⚠ Triggers connus pour {if igdb#getCurrentGame().name != \"\"}{print igdb#getCurrentGame().name}{else}ce jeu{/if} : "
+                    + "{if tw#active() != \"\"}{print tw#active()}{else}{if igdb#getCurrentGame().ageRating != \"\"}"
+                    + "{print igdb#getCurrentGame().ageRating}{else}aucune information disponible{/if}{/if}"),
+            Map.entry("⚠ Known triggers for {print igdb#getCurrentGame().name}: {tw#active()}",
+                "⚠ Known triggers for {if igdb#getCurrentGame().name != \"\"}{print igdb#getCurrentGame().name}{else}this game{/if}: "
+                    + "{if tw#active() != \"\"}{print tw#active()}{else}{if igdb#getCurrentGame().ageRating != \"\"}"
+                    + "{print igdb#getCurrentGame().ageRating}{else}no information available{/if}{/if}"),
+            Map.entry("⚠ Triggers connus pour {print igdb#getCurrentGame().name} : {tw#active()}",
+                "⚠ Triggers connus pour {if igdb#getCurrentGame().name != \"\"}{print igdb#getCurrentGame().name}{else}ce jeu{/if} : "
+                    + "{if tw#active() != \"\"}{print tw#active()}{else}{if igdb#getCurrentGame().ageRating != \"\"}"
+                    + "{print igdb#getCurrentGame().ageRating}{else}aucune information disponible{/if}{/if}")
         )
     );
 
