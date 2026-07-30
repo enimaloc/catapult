@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -40,6 +41,12 @@ public class ApiChatCommandSettingsController {
     // instead of compiling fine here and only failing later when the command actually runs.
     private static final Set<String> RESERVED_KEYS = Set.of("__proto__", "constructor", "prototype");
 
+    // Presets (e.g. chat.preset.description.template) read ctx.settings.language to pick the
+    // locale IGDB/Steam lookups respond in. Nothing in UserAccount/UserSettings/the JWT stores a
+    // streamer's language, so the request's own resolved Locale (Accept-Language, the same signal
+    // ApiClient already forwards browser-side) is the only thing to seed a sensible default from.
+    private static final String LANGUAGE_KEY = "language";
+
     private final ChatCommandSettingRepository repository;
     private final UserAccountRepository userAccountRepository;
     private final ExperimentService experimentService;
@@ -53,10 +60,25 @@ public class ApiChatCommandSettingsController {
     public record UpsertRequest(String value) {}
 
     @GetMapping
-    public List<SettingDto> list(@AuthenticationPrincipal Jwt jwt) {
+    public List<SettingDto> list(@AuthenticationPrincipal Jwt jwt, Locale locale) {
         UserAccount user = currentUser(jwt);
         gate(user);
+        ensureDefaultLanguage(user, locale);
         return repository.findByUser(user).stream().map(SettingDto::fromEntity).toList();
+    }
+
+    /** Seeds a default {@code language} setting on first visit from the caller's resolved locale
+     *  — idempotent, like {@code ChatCommandPresetCatalog#ensureBuiltins}, so a manually
+     *  deleted/edited row stays that way. */
+    private void ensureDefaultLanguage(UserAccount user, Locale locale) {
+        if (repository.findByUserAndKey(user, LANGUAGE_KEY).isPresent()) {
+            return;
+        }
+        ChatCommandSetting setting = new ChatCommandSetting();
+        setting.setUser(user);
+        setting.setKey(LANGUAGE_KEY);
+        setting.setValue(locale.getLanguage());
+        repository.save(setting);
     }
 
     @PutMapping("/{key}")
