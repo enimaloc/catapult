@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.chat.command.ast.Expression;
 import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.IfStatement;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.ListGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
 import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
@@ -69,6 +70,9 @@ public class CommandDslGenerator {
         if (expr instanceof VarRefExpr varRef) {
             return "{" + varRef.name() + "}";
         }
+        if (expr instanceof ListGetExpr listGet) {
+            return "{list(" + listGet.name() + ")}";
+        }
         return "{print " + generateExpr(expr) + "}";
     }
 
@@ -109,6 +113,7 @@ public class CommandDslGenerator {
             case ArgGetExpr e -> e.defaultValue() == null
                 ? "arg(" + e.index() + ")"
                 : "arg(" + e.index() + ", \"" + e.defaultValue() + "\")";
+            case ListGetExpr e -> "list(" + e.name() + ")";
             case ServiceCallExpr e -> e.namespace() + "#" + e.function() + "(" + generateArgs(e.args()) + ")";
             case BinaryExpr e -> generateExpr(e.left()) + " " + e.operator() + " " + generateExpr(e.right());
             case ObjectLiteralExpr e -> generateObjectLiteral(e);
