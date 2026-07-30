@@ -20,6 +20,19 @@ import java.util.Map;
  * language. Only rows whose stored template still exactly matches one of the old hardcoded
  * defaults (English/French) are rewritten — a genuine customization is left untouched, same as
  * {@link ChatCommandSetGameMigration}.
+ *
+ * <p>{@link ChatCommandContextGetMigration} (Order 3, pre-existing) already ran on production
+ * before this migration existed, rewriting the original {@code {game#summary|...}} default into
+ * {@code {print igdb#getCurrentGame().summary}} — the inline fallback text is silently dropped by
+ * {@link CommandDslParser}'s bare-tag handling (only the path before the first {@code '|'} is
+ * ever parsed), so both languages' old defaults collapse to this SAME language-neutral
+ * intermediate string. Without also recognizing it here, every row a streamer actually has in
+ * production looks "customized" (an exact-match miss) and never gets upgraded to the new
+ * default — this was caught only because a real production {@code !description} row still showed
+ * this intermediate form after deploy. There's no language marker left in it to know which of the
+ * two new defaults to apply, so it maps to the French one, matching every other locale-dependent
+ * default in this codebase ({@code Locale.FRANCE} hardcoded in {@code ApiChatCommandsController},
+ * {@code GameContextService}, {@code DebugCommand}, ...).
  */
 @Slf4j
 @Component
@@ -46,7 +59,10 @@ public class ChatCommandDescriptionMigration implements CommandLineRunner {
     // messages.properties — see git history), mapped to their language-matched replacement.
     private static final Map<String, String> OLD_TO_NEW_TEMPLATE = Map.of(
         "{game#summary|no description available}", NEW_DEFAULT_TEMPLATE_ENGLISH,
-        "{game#summary|aucune description disponible}", NEW_DEFAULT_TEMPLATE_FRENCH
+        "{game#summary|aucune description disponible}", NEW_DEFAULT_TEMPLATE_FRENCH,
+        // ChatCommandContextGetMigration's already-deployed rewrite of either default above —
+        // language-neutral, so it maps to the French default (see class javadoc).
+        "{print igdb#getCurrentGame().summary}", NEW_DEFAULT_TEMPLATE_FRENCH
     );
 
     private final ChatCommandDefinitionRepository repository;

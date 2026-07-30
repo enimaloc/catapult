@@ -76,6 +76,37 @@ class ChatCommandLegacyPresetMigrationTest {
     }
 
     @Test
+    void replacesTheIntermediateContextGetMigrationFormForStore() {
+        ChatCommandDefinitionRepository repository = mock(ChatCommandDefinitionRepository.class);
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setPresetKey("store");
+        def.setTemplate("Get it here: {print igdb#getCurrentGame().storeUrl}");
+        when(repository.findAll()).thenReturn(List.of(def));
+
+        new ChatCommandLegacyPresetMigration(repository).run();
+
+        assertThat(def.getTemplate()).isEqualTo(
+            "{if igdb#getCurrentGame().storeUrl != \"\"}Get it here: {print igdb#getCurrentGame().storeUrl}{/if}");
+    }
+
+    @Test
+    void replacesTheIntermediateContextGetMigrationFormForTriggers() {
+        ChatCommandDefinitionRepository repository = mock(ChatCommandDefinitionRepository.class);
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setPresetKey("triggers");
+        def.setTemplate("⚠ Triggers connus pour {print igdb#getCurrentGame().name} : {tw#active()}");
+        when(repository.findAll()).thenReturn(List.of(def));
+
+        new ChatCommandLegacyPresetMigration(repository).run();
+
+        assertThat(def.getTemplate()).isEqualTo(
+            "⚠ Triggers connus pour {if igdb#getCurrentGame().name != \"\"}{print igdb#getCurrentGame().name}{else}ce jeu{/if} : "
+                + "{if tw#active() != \"\"}{print tw#active()}{else}{if igdb#getCurrentGame().ageRating != \"\"}"
+                + "{print igdb#getCurrentGame().ageRating}{else}aucune information disponible{/if}{/if}");
+        assertThat(def.getAst()).isNotNull();
+    }
+
+    @Test
     void clearsAnyEjectedJsOnRowsWhoseTemplateGetsReplaced() {
         ChatCommandDefinitionRepository repository = mock(ChatCommandDefinitionRepository.class);
         ChatCommandDefinition def = new ChatCommandDefinition();
