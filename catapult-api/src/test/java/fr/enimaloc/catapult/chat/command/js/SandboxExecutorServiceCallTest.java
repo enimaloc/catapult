@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -130,5 +131,36 @@ class SandboxExecutorServiceCallTest {
         String js = "return ctx.call(\"igdb\", \"getGame\", \"Valorant\");";
         assertThatThrownBy(() -> executor.execute(js, path -> null, name -> List.of(), Duration.ofSeconds(2)))
             .isInstanceOf(SandboxExecutionException.class);
+    }
+
+    // Regression coverage for the bug fixed on IgdbGetGameFunction: a bare empty Map (Map.of())
+    // makes every field read back as JS `undefined` through the sandbox's Map interop, and
+    // `undefined == ""` is false — exactly like a real populated value would also be false — so
+    // an `== ""` not-found check is indistinguishable from a found result. A function that
+    // instead returns an object with every field present but blank (as IgdbGetGameFunction now
+    // does) makes that check actually work; this proves it end-to-end through the real sandbox,
+    // not just at the function-unit level, since the bug only manifests through GraalJS's Map
+    // interop, not in plain Java.
+    @Test
+    void objectFieldEqualsEmptyStringDistinguishesFoundFromNotFoundOnlyWhenEveryFieldIsPresent() {
+        ServiceFunctionRegistry registry = new ServiceFunctionRegistry();
+        registry.register(new ServiceFunction() {
+            @Override public String namespace() { return "igdb"; }
+            @Override public String name() { return "getGame"; }
+            @Override public List<String> parameterNames() { return List.of("query"); }
+            @Override public Object invoke(UserAccount user, Object[] args) {
+                return "found".equals(args[0]) ? Map.of("name", "VALORANT") : Map.of("name", "");
+            }
+        });
+        // ctx.list("args")[0], not arg(0) — this test feeds pre-compiled JS straight to the
+        // sandbox, and arg(...) is text-DSL sugar JsCompiler expands, not real JS.
+        String js = "let r = igdb.getGame(ctx.list(\"args\")[0]); "
+            + "return (r.name == \"\") ? \"NOT_FOUND\" : \"FOUND:\" + r.name;";
+
+        String foundOutput = executor.execute(js, path -> null, name -> List.of("found"), registry, null, null, Duration.ofSeconds(2));
+        String notFoundOutput = executor.execute(js, path -> null, name -> List.of("missing"), registry, null, null, Duration.ofSeconds(2));
+
+        assertThat(foundOutput).isEqualTo("FOUND:VALORANT");
+        assertThat(notFoundOutput).isEqualTo("NOT_FOUND");
     }
 }
