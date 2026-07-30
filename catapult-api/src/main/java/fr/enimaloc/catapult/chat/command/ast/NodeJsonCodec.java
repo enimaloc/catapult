@@ -126,6 +126,7 @@ public class NodeJsonCodec {
             }
             case VarRefExpr e -> map.put("name", e.name());
             case ContextGetExpr e -> map.put("path", e.path());
+            case ListGetExpr e -> map.put("name", e.name());
             case ServiceCallExpr e -> {
                 map.put("namespace", e.namespace());
                 map.put("function", e.function());
@@ -163,6 +164,7 @@ public class NodeJsonCodec {
                 new LiteralExpr((String) map.get("value"), ValueType.valueOf((String) map.get("valueType")));
             case "var-ref" -> new VarRefExpr((String) map.get("name"));
             case "context-get" -> new ContextGetExpr((String) map.get("path"));
+            case "list-get" -> new ListGetExpr((String) map.get("name"));
             case "service-call" -> new ServiceCallExpr(
                 (String) map.get("namespace"),
                 (String) map.get("function"),

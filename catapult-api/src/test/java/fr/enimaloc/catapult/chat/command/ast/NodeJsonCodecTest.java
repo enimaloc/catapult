@@ -100,4 +100,18 @@ class NodeJsonCodecTest {
         assertThat(restored).isEqualTo(ast);
         assertThat(json).contains("\"defaultValue\":\"everyone\"");
     }
+
+    @Test
+    void roundTripsListGetExpr() {
+        CommandAst ast = new CommandAst(List.of(
+            new AssignStatement("allArgs", new fr.enimaloc.catapult.chat.command.ast.ListGetExpr("args"))
+        ));
+
+        String json = codec.toJson(ast);
+        CommandAst restored = codec.fromJson(json);
+
+        assertThat(restored).isEqualTo(ast);
+        assertThat(json).contains("\"list-get\"");
+        assertThat(json).contains("\"name\":\"args\"");
+    }
 }
