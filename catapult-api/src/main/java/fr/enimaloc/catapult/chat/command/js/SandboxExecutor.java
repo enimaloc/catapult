@@ -182,8 +182,11 @@ public class SandboxExecutor {
     // resolve to undefined instead of throwing, so the gap went unnoticed until a real command
     // hit it. allowMapAccess(true) turns on GraalJS's built-in Map<->object interop (member
     // read/write routed through Map#get/put) without loosening anything else EXPLICIT already locks down.
+    // allowListAccess(true) does the same for java.util.List (length/index/iteration), needed
+    // once igdb#get* functions started returning List<String>/List<Map<>> instead of a single
+    // comma-joined string.
     private static final HostAccess SANDBOX_HOST_ACCESS =
-        HostAccess.newBuilder(HostAccess.EXPLICIT).allowMapAccess(true).build();
+        HostAccess.newBuilder(HostAccess.EXPLICIT).allowMapAccess(true).allowListAccess(true).build();
 
     private Context buildContext() {
         return Context.newBuilder("js")
