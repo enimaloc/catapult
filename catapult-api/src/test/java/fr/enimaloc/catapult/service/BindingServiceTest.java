@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.IgdbGameDetails;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
@@ -13,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -28,6 +30,7 @@ class BindingServiceTest {
 
     @Mock private GameBindingRepository gameBindingRepository;
     @Mock private IgdbService igdbService;
+    @Mock private IgdbGameDetailsService igdbGameDetailsService;
     @Mock private TwitchService twitchService;
     @Mock private TwResolverService twResolverService;
 
@@ -39,7 +42,7 @@ class BindingServiceTest {
 
     @BeforeEach
     void setup() {
-        bindingService = new BindingService(gameBindingRepository, igdbService, twitchService, twResolverService);
+        bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService);
 
         user = new UserAccount();
         bindingId = UUID.randomUUID();
@@ -150,6 +153,33 @@ class BindingServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(GameBinding.Status.AUTO);
         assertThat(result.getTwitchGameId()).isEqualTo("twitch-123");
+    }
+
+    @Test
+    void resolveOrCreate_usesIgdbExternalGamesTwitchId_beforeNameMatching() {
+        // Regression test: IGDB names "Red Dead Redemption 2" with an arabic numeral while
+        // Twitch's category is "Red Dead Redemption II" (roman numeral), so name-based matching
+        // fails. The Twitch category id should instead come from IGDB's external_games mapping,
+        // which IgdbGameDetailsService already caches.
+        DetectedGame game = new DetectedGame("steam-123", GameBinding.SourceType.STEAM, "Red Dead Redemption 2");
+        when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "steam-123", GameBinding.SourceType.STEAM))
+            .thenReturn(Optional.empty());
+        IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("25076", "Red Dead Redemption 2");
+        when(igdbService.findBySteamAppId("steam-123")).thenReturn(Optional.of(igdbGame));
+
+        IgdbGameDetails details = new IgdbGameDetails();
+        details.setIgdbId("25076");
+        details.setWebsites(Map.of("twitch", "493959"));
+        when(igdbGameDetailsService.getDetails("25076")).thenReturn(Optional.of(details));
+
+        when(igdbService.suggestCcls("25076")).thenReturn(Set.of());
+        when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        GameBinding result = bindingService.resolveOrCreate(user, game);
+
+        assertThat(result.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        assertThat(result.getTwitchGameId()).isEqualTo("493959");
+        verifyNoInteractions(twitchService);
     }
 
     @Test

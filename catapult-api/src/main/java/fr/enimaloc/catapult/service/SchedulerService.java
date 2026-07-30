@@ -99,7 +99,9 @@ public class SchedulerService {
         }
     }
 
-    @Scheduled(fixedRateString = "${app.retry.incomplete-interval-ms:21600000}")
+    @Scheduled(
+        initialDelayString = "${app.retry.incomplete-interval-ms:21600000}",
+        fixedRateString = "${app.retry.incomplete-interval-ms:21600000}")
     public void retryIncompleteBindings() {
         try {
             bindingService.refreshIncompleteBindings();
