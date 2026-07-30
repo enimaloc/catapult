@@ -74,10 +74,45 @@ public class RealSteamApiClient implements SteamApiClient {
                 Object gameId   = player.get("gameid");
                 Object gameName = player.get("gameextrainfo");
                 if (gameId == null || gameName == null) return Optional.empty();
-                return Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName)));
+                return Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName),
+                    displayName(player), onlineStatus(player.get("personastate"))));
             }),
             steamExecutor
         );
+    }
+
+    @Override
+    public CompletableFuture<Optional<PlayerSummary>> getPlayerProfile(String steamId, String personalToken) {
+        return CompletableFuture.supplyAsync(
+            () -> fetchPlayer(steamId, personalToken).map(player -> {
+                Object gameId   = player.get("gameid");
+                Object gameName = player.get("gameextrainfo");
+                return new PlayerSummary(
+                    gameId != null ? String.valueOf(gameId) : null,
+                    gameName != null ? String.valueOf(gameName) : null,
+                    displayName(player), onlineStatus(player.get("personastate")));
+            }),
+            steamExecutor
+        );
+    }
+
+    private static String displayName(Map<String, Object> player) {
+        Object name = player.get("personaname");
+        return name != null ? String.valueOf(name) : null;
+    }
+
+    /** Maps Steam's numeric personastate to the small fixed vocabulary chat commands read. */
+    private static String onlineStatus(Object personaState) {
+        int state = personaState instanceof Number n ? n.intValue() : 0;
+        return switch (state) {
+            case 1 -> "online";
+            case 2 -> "busy";
+            case 3 -> "away";
+            case 4 -> "snooze";
+            case 5 -> "looking to trade";
+            case 6 -> "looking to play";
+            default -> "offline";
+        };
     }
 
     @Override
@@ -118,6 +153,11 @@ public class RealSteamApiClient implements SteamApiClient {
     @Override
     public CompletableFuture<List<String>> getOwnedGameIds(String steamId, String personalToken) {
         return CompletableFuture.supplyAsync(() -> fetchOwnedGameIds(steamId, personalToken), steamExecutor);
+    }
+
+    @Override
+    public CompletableFuture<Optional<Duration>> getPlaytime(String steamId, String appId, String personalToken) {
+        return CompletableFuture.supplyAsync(() -> fetchPlaytime(steamId, appId, personalToken), steamExecutor);
     }
 
     // -------------------------------------------------------------------------
@@ -161,7 +201,8 @@ public class RealSteamApiClient implements SteamApiClient {
                     Object gameName = player.get("gameextrainfo");
                     result.put(id,
                         (gameId != null && gameName != null)
-                            ? Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName)))
+                            ? Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName),
+                                displayName(player), onlineStatus(player.get("personastate"))))
                             : Optional.empty());
                 }
             } catch (HttpClientErrorException.TooManyRequests e) {
@@ -340,6 +381,62 @@ public class RealSteamApiClient implements SteamApiClient {
                 } catch (Exception e) {
                     log.warn("Failed to fetch owned Steam games for {}: {}", steamId, e.getMessage());
                     return List.of();
+                }
+            }
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<Duration> fetchPlaytime(String steamId, String appId, String personalToken) {
+        return apiObservations.observe("steam", "get_playtime", () -> {
+            boolean usePersonalToken = personalToken != null && !personalToken.isBlank();
+
+            while (true) {
+                String key;
+                boolean usedRotator;
+                if (usePersonalToken) {
+                    key = personalToken;
+                    usedRotator = false;
+                } else {
+                    Optional<String> keyOpt = rotator.nextKey();
+                    if (keyOpt.isEmpty()) {
+                        log.warn("No Steam API key available for playtime fetch {}", steamId);
+                        return Optional.empty();
+                    }
+                    key = keyOpt.get();
+                    usedRotator = true;
+                }
+
+                if (!rateLimiter.acquireBlocking(key)) return Optional.empty();
+
+                try {
+                    Map<String, Object> response = restClient.get()
+                        .uri(OWNED_GAMES_URL + "?key={key}&steamid={steamid}&include_appinfo={includeAppinfo}"
+                                + "&include_played_free_games={includePlayedFree}",
+                            key, steamId, 1, 1)
+                        .retrieve().body(Map.class);
+                    if (response == null) return Optional.empty();
+                    Map<String, Object> body = (Map<String, Object>) response.get(RESPONSE_KEY);
+                    if (body == null) return Optional.empty();
+                    List<Map<String, Object>> games = (List<Map<String, Object>>) body.get("games");
+                    if (games == null) return Optional.empty();
+                    return games.stream()
+                        .filter(g -> appId.equals(String.valueOf(g.get("appid"))))
+                        .findFirst()
+                        .map(g -> g.get("playtime_forever"))
+                        .filter(Objects::nonNull)
+                        .map(minutes -> Duration.ofMinutes(((Number) minutes).longValue()));
+                } catch (HttpClientErrorException.TooManyRequests e) {
+                    int retryAfter = parseRetryAfter(e);
+                    if (usedRotator) rotator.onKeyRateLimited(key, retryAfter);
+                    else rateLimiter.onRateLimitResponse(key, retryAfter);
+                    log.warn("Steam API 429 fetching playtime for {}: retry after {}s", steamId, retryAfter);
+                    if (usePersonalToken || rotator.isAllKeysBlocked()) {
+                        return Optional.empty();
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to fetch Steam playtime for {} ({}): {}", steamId, appId, e.getMessage());
+                    return Optional.empty();
                 }
             }
         });

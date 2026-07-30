@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 
 public interface SteamApiClient {
 
-    record PlayerSummary(String gameId, String gameName) {}
+    record PlayerSummary(String gameId, String gameName, String displayName, String onlineStatus) {}
 
     record SteamProfileStatus(boolean profilePublic, boolean offlineMode) {}
 
@@ -19,6 +19,16 @@ public interface SteamApiClient {
 
     default CompletableFuture<Optional<PlayerSummary>> getPlayerSummary(String steamId) {
         return getPlayerSummary(steamId, null);
+    }
+
+    /**
+     * Unlike {@link #getPlayerSummary}, always resolves (never empty) as long as the player
+     * is found at all — {@code steam#getProfile()} needs displayName/onlineStatus regardless
+     * of whether a game is currently being played, whereas getPlayerSummary's "empty means not
+     * currently playing anything" contract is load-bearing for game detection elsewhere.
+     */
+    default CompletableFuture<Optional<PlayerSummary>> getPlayerProfile(String steamId, String personalToken) {
+        return CompletableFuture.completedFuture(Optional.empty());
     }
 
     /**
@@ -67,4 +77,9 @@ public interface SteamApiClient {
     }
 
     default void invalidateProfileCache(String steamId, String personalToken) {}
+
+    /** Total playtime on {@code appId}, empty when never played or the account/game isn't found. */
+    default CompletableFuture<Optional<Duration>> getPlaytime(String steamId, String appId, String personalToken) {
+        return CompletableFuture.completedFuture(Optional.empty());
+    }
 }

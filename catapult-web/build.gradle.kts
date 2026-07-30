@@ -22,6 +22,7 @@ configurations {
 
 val chartjsVersion = "4.4.9"
 val htmxVersion = "2.0.4"
+val blocklyVersion = "10.4.1" // latest version published on the webjars.npm mirror at time of writing
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -38,6 +39,9 @@ dependencies {
     implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
     implementation("org.webjars.npm:chart.js:$chartjsVersion")
     implementation("org.webjars.npm:htmx.org:$htmxVersion")
+    // Served from the classpath (not a CDN) to match this project's self-hosted static asset
+    // convention; used by the chat command editor's Blocks tab (Task 17).
+    implementation("org.webjars.npm:blockly:$blocklyVersion")
     implementation("org.webjars:webjars-locator-lite")
     implementation("io.micrometer:micrometer-registry-prometheus")
 

@@ -12,8 +12,10 @@ import java.util.List;
 @Getter
 public class ChatCommandEvent extends ApplicationEvent {
 
+    /** Ordered least to most privileged — {@link CommandRegistry} relies on {@code ordinal()}
+     *  for its hierarchy check (a higher tier always satisfies a lower requirement). */
     public enum SenderRole {
-        BROADCASTER, MODERATOR, EVERYONE
+        VIEWERS, FOLLOWERS, SUBS, VIP, MODERATOR, BROADCASTER
     }
 
     private final transient UserAccount user;

@@ -11,7 +11,9 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -47,4 +49,24 @@ public class IgdbGameDetails {
 
     @Column(name = "fetched_at", nullable = false)
     private Instant fetchedAt;
+
+    /** IGDB's own user-rating aggregate (0-100), null when IGDB has no rating for this game. */
+    @Column
+    private Double rating;
+
+    /** IGDB's aggregated critic rating (0-100), same null-means-unset convention as {@link #rating}. */
+    @Column(name = "aggregated_rating")
+    private Double aggregatedRating;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "platforms_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> platforms = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "dlc_names_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> dlcNames = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "similar_game_names_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> similarGameNames = new ArrayList<>();
 }

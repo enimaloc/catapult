@@ -3,11 +3,20 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.chat.ChatCommandPresetCatalog;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
+import fr.enimaloc.catapult.chat.command.ast.CommandAst;
+import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
+import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
+import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.ChatCommandFallback;
+import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.SystemTwitchAccountService;
@@ -53,6 +62,8 @@ public class ApiChatCommandsController {
     public static final String EXPERIMENT_KEY = "chat.commands";
 
     private static final Set<String> RESERVED_NAMES = Set.of("!setgame");
+    private static final NodeJsonCodec AST_CODEC = new NodeJsonCodec();
+    private static final CommandDslGenerator DSL_GENERATOR = new CommandDslGenerator();
 
     private final ChatCommandDefinitionRepository repository;
     private final ChatCommandPresetCatalog catalog;
@@ -61,6 +72,9 @@ public class ApiChatCommandsController {
     private final SystemTwitchAccountService systemAccount;
     private final UserAccountRepository userRepo;
     private final ApplicationEventPublisher eventPublisher;
+    private final JsCompiler jsCompiler;
+    private final ServiceFunctionRegistry serviceFunctionRegistry;
+    private final OAuthTokenRepository oAuthTokenRepository;
 
     public record FallbackDto(String placeholder, String fallbackText) {}
 
@@ -71,14 +85,16 @@ public class ApiChatCommandsController {
         ChatCommandEvent.SenderRole permission,
         boolean enabled,
         String presetKey,
-        List<FallbackDto> fallbacks
+        List<FallbackDto> fallbacks,
+        String ejectedJs,
+        List<String> missingTwitchScopes
     ) {
         static CommandDto fromEntity(ChatCommandDefinition d) {
             List<FallbackDto> fb = d.getFallbacks().stream()
                 .map(f -> new FallbackDto(f.getPlaceholder(), f.getFallbackText()))
                 .toList();
             return new CommandDto(d.getId(), d.getName(), d.getTemplate(),
-                d.getPermission(), d.isEnabled(), d.getPresetKey(), fb);
+                d.getPermission(), d.isEnabled(), d.getPresetKey(), fb, d.getEjectedJs(), List.of());
         }
     }
 
@@ -97,7 +113,18 @@ public class ApiChatCommandsController {
         @NotNull @Size(max = 500) String template,
         @NotNull ChatCommandEvent.SenderRole permission,
         boolean enabled,
-        Map<String, String> fallbacks
+        Map<String, String> fallbacks,
+        // Set by the Blocks/Text editor modal (Task 16-17): the NodeJsonCodec JSON of the
+        // edited CommandAst. Optional so older/simpler callers (e.g. the plain "add custom
+        // command" form) can keep sending template-only bodies. When present it is the
+        // source of truth; `template` is regenerated from it below to keep the read-only
+        // audit column in sync rather than trusting whatever text the client also sent.
+        String ast,
+        // "Eject to JS" (Phase 2): hand-edited JS that runs directly at dispatch time,
+        // bypassing the AST compiler. Reversible by design — ast/template above are never
+        // derived from this, and the client clears it (sends null/omits it) to revert to
+        // Blocks/Text. Null/blank means "not ejected".
+        String ejectedJs
     ) {}
 
     @GetMapping
@@ -153,7 +180,7 @@ public class ApiChatCommandsController {
     ) {
         UserAccount user = currentUser(jwt);
         gate(user);
-        validateTemplate(req.template());
+        validateTemplate(effectiveTemplate(req));
         if (isReservedName(req.name())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Reserved command name");
         }
@@ -165,7 +192,7 @@ public class ApiChatCommandsController {
         applyRequest(def, req);
         repository.save(def);
         publishChanged(user);
-        return ResponseEntity.status(HttpStatus.CREATED).body(CommandDto.fromEntity(def));
+        return ResponseEntity.status(HttpStatus.CREATED).body(withMissingScopes(def, user));
     }
 
     @PutMapping("/{id}")
@@ -177,14 +204,14 @@ public class ApiChatCommandsController {
     ) {
         UserAccount user = currentUser(jwt);
         gate(user);
-        validateTemplate(req.template());
+        validateTemplate(effectiveTemplate(req));
         ChatCommandDefinition def = repository.findById(id)
             .filter(d -> d.getUser().getId().equals(user.getId()))
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         applyRequest(def, req);
         repository.save(def);
         publishChanged(user);
-        return CommandDto.fromEntity(def);
+        return withMissingScopes(def, user);
     }
 
     @DeleteMapping("/{id}")
@@ -255,14 +282,31 @@ public class ApiChatCommandsController {
         }
     }
 
+    /**
+     * The DSL text the command should be validated/persisted with: regenerated from the
+     * client-supplied {@code ast} when present (Blocks/Text editor saves), or the raw
+     * {@code template} for callers that don't send an AST yet (e.g. the plain "add custom
+     * command" form). Keeps validation and persistence looking at the same text.
+     */
+    private String effectiveTemplate(UpsertRequest req) {
+        if (req.ast() == null) return req.template();
+        return DSL_GENERATOR.generate(AST_CODEC.fromJson(req.ast()));
+    }
+
     private void applyRequest(ChatCommandDefinition def, UpsertRequest req) {
         // Renommage autorisé même pour les built-ins : le DynamicCommandResolver
         // route les rows builtin vers le bean Java statique via leur presetKey,
         // donc le nom peut diverger de cmd.getName() sans casser la dispatch.
         def.setName(req.name());
-        def.setTemplate(req.template());
+        if (req.ast() != null) {
+            def.setAst(req.ast());
+            def.setTemplate(DSL_GENERATOR.generate(AST_CODEC.fromJson(req.ast())));
+        } else {
+            def.setTemplate(req.template());
+        }
         def.setPermission(req.permission());
         def.setEnabled(req.enabled());
+        def.setEjectedJs((req.ejectedJs() == null || req.ejectedJs().isBlank()) ? null : req.ejectedJs());
 
         def.getFallbacks().clear();
         if (req.fallbacks() != null) {
@@ -276,6 +320,40 @@ public class ApiChatCommandsController {
                 }
             });
         }
+    }
+
+    /**
+     * Builds the response DTO with {@code missingTwitchScopes} computed from the just-saved
+     * AST against the user's currently granted Twitch OAuth scopes. Best-effort: a command
+     * still saves successfully even when a referenced function needs a scope the user hasn't
+     * granted yet — it just fails gracefully at dispatch time, same as any other best-effort
+     * chat command failure. Non-Twitch functions (no requiredScopes()) never contribute here.
+     */
+    private CommandDto withMissingScopes(ChatCommandDefinition def, UserAccount user) {
+        List<String> missing = missingTwitchScopes(def, user);
+        CommandDto base = CommandDto.fromEntity(def);
+        return new CommandDto(base.id(), base.name(), base.template(), base.permission(), base.enabled(),
+            base.presetKey(), base.fallbacks(), base.ejectedJs(), missing);
+    }
+
+    private List<String> missingTwitchScopes(ChatCommandDefinition def, UserAccount user) {
+        if (def.getAst() == null) return List.of();
+        CommandAst ast = AST_CODEC.fromJson(def.getAst());
+        Set<ServiceCallExpr> calls = jsCompiler.collectServiceCalls(ast);
+        if (calls.isEmpty()) return List.of();
+
+        Set<String> granted = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+            .map(OAuthToken::getGrantedScopes)
+            .map(s -> Set.of(s.split(" ")))
+            .orElse(Set.of());
+
+        Set<String> missing = new java.util.LinkedHashSet<>();
+        for (ServiceCallExpr call : calls) {
+            serviceFunctionRegistry.lookup(call.namespace(), call.function())
+                .map(ServiceFunction::requiredScopes)
+                .ifPresent(required -> required.stream().filter(s -> !granted.contains(s)).forEach(missing::add));
+        }
+        return List.copyOf(missing);
     }
 
     private void publishChanged(UserAccount user) {
