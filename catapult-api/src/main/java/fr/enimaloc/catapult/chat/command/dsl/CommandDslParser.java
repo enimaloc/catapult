@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.chat.command.ast.Expression;
 import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
 import fr.enimaloc.catapult.chat.command.ast.IfStatement;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
+import fr.enimaloc.catapult.chat.command.ast.ListGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
 import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
@@ -108,6 +109,18 @@ public class CommandDslParser {
                 "arg(N, default) requires a literal string default: " + text);
         }
         return new ArgGetExpr(index, defaultText.substring(1, defaultText.length() - 1));
+    }
+
+    /** {@code list(args)} reads one of {@code DynamicChatCommand}'s known named lists as a value
+     *  — the same names {@code {for x in NAME}} already accepts as its list source, whose own
+     *  parsing ({@link #parseFor}) likewise doesn't validate the name's shape (an unknown name
+     *  just resolves to an empty list at runtime, never a parse-time error). */
+    private Expression parseListGet(String text) {
+        String name = text.substring(5, text.length() - 1).trim();
+        if (name.isEmpty()) {
+            throw new CommandDslParseException("list(name) requires a list source name: " + text);
+        }
+        return new ListGetExpr(name);
     }
 
     public CommandAst parse(String text) {
@@ -210,6 +223,9 @@ public class CommandDslParser {
         if (inner.startsWith("arg(") && inner.endsWith(")")) {
             return new PrintStatement(parseArgGet(inner));
         }
+        if (inner.startsWith("list(") && inner.endsWith(")")) {
+            return new PrintStatement(parseListGet(inner));
+        }
         int bar = inner.indexOf('|');
         String rawPath = bar < 0 ? inner : inner.substring(0, bar);
         if (rawPath.startsWith("ctx.") && DOT_CHAIN.matcher(rawPath).matches()) {
@@ -296,6 +312,9 @@ public class CommandDslParser {
         }
         if (text.startsWith("arg(") && text.endsWith(")")) {
             return parseArgGet(text);
+        }
+        if (text.startsWith("list(") && text.endsWith(")")) {
+            return parseListGet(text);
         }
         if (text.startsWith("{") && text.endsWith("}")) {
             return parseObjectLiteral(text.substring(1, text.length() - 1).trim());

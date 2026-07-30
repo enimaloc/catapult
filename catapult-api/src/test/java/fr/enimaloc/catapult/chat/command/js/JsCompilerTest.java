@@ -376,4 +376,32 @@ class JsCompilerTest {
             java.time.Duration.ofSeconds(2));
         assertThat(result).isEqualTo("[myfriend] [everyone]");
     }
+
+    @Test
+    void compilesListGetToACtxListCall() {
+        String js = compiler.compile(parser.parse("{var allArgs = list(args)}"));
+        assertThat(js).contains("let allArgs = ctx.list(\"args\");");
+    }
+
+    @Test
+    void listGetDoesNotTriggerContextOrSettingSetupLines() {
+        String js = compiler.compile(parser.parse("{var allArgs = list(args)}"));
+        assertThat(js).doesNotContain("ctx.game");
+        assertThat(js).doesNotContain("ctx.settings");
+    }
+
+    @Test
+    void listGetResolvesEndToEndInTheRealSandboxAndIsUsableWithArrJoin() {
+        fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry registry =
+            new fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry();
+        registry.register(new fr.enimaloc.catapult.chat.command.registry.arr.ArrJoinFunction());
+        String js = compiler.compile(parser.parse(
+            "{var allArgs = list(args)}{arr#join(allArgs, \", \")}"));
+
+        String result = new SandboxExecutor().execute(js,
+            path -> null, name -> "args".equals(name) ? List.of("a", "b", "c") : List.of(),
+            registry, null, null, java.time.Duration.ofSeconds(2));
+
+        assertThat(result).isEqualTo("a, b, c");
+    }
 }

@@ -350,4 +350,25 @@ class CommandDslParserTest {
         assertThatThrownBy(() -> parser.parse("{arg(0, \"a\", \"b\")}"))
             .isInstanceOf(CommandDslParseException.class);
     }
+
+    @Test
+    void listOpenParenNCloseParenParsesToListGetExprAsABareTagShorthand() {
+        CommandAst ast = parser.parse("{list(args)}");
+        assertThat(ast.statements()).containsExactly(
+            new PrintStatement(new fr.enimaloc.catapult.chat.command.ast.ListGetExpr("args")));
+    }
+
+    @Test
+    void listParsesInsideAVarDeclInit() {
+        CommandAst ast = parser.parse("{var allArgs = list(args)}");
+        assertThat(ast.statements()).containsExactly(
+            new VarDeclStatement("allArgs", ValueType.STRING,
+                new fr.enimaloc.catapult.chat.command.ast.ListGetExpr("args")));
+    }
+
+    @Test
+    void listWithAnEmptyNameThrows() {
+        assertThatThrownBy(() -> parser.parse("{list()}"))
+            .isInstanceOf(CommandDslParseException.class);
+    }
 }
