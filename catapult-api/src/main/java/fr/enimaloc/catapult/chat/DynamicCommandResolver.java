@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.GameContextService;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class DynamicCommandResolver {
     private final SandboxExecutor sandboxExecutor;
     private final ServiceFunctionRegistry serviceFunctionRegistry;
     private final ChatCommandSettingRepository settingRepository;
+    private final MeterRegistry meterRegistry;
     private final Map<String, ChatCommand> staticByPresetKey;
 
     private final Map<UUID, Map<String, Optional<ChatCommand>>> userCache = new ConcurrentHashMap<>();
@@ -43,6 +45,7 @@ public class DynamicCommandResolver {
                                   SandboxExecutor sandboxExecutor,
                                   ServiceFunctionRegistry serviceFunctionRegistry,
                                   ChatCommandSettingRepository settingRepository,
+                                  MeterRegistry meterRegistry,
                                   List<ChatCommand> staticCommands) {
         this.repository = repository;
         this.placeholderResolver = placeholderResolver;
@@ -51,6 +54,7 @@ public class DynamicCommandResolver {
         this.sandboxExecutor = sandboxExecutor;
         this.serviceFunctionRegistry = serviceFunctionRegistry;
         this.settingRepository = settingRepository;
+        this.meterRegistry = meterRegistry;
         this.staticByPresetKey = staticCommands.stream()
             .collect(Collectors.toMap(
                 c -> ChatCommandPresetCatalog.BUILTIN_PRESET_KEY_PREFIX
@@ -78,7 +82,7 @@ public class DynamicCommandResolver {
                 return (ChatCommand) new DynamicChatCommand(
                     def, jsCompiler, sandboxExecutor, serviceFunctionRegistry,
                     gameContextService, placeholderResolver, resolveLocale(user), settingRepository,
-                    repository);
+                    repository, meterRegistry);
             });
     }
 
