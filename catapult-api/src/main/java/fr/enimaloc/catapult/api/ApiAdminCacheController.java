@@ -50,7 +50,16 @@ public class ApiAdminCacheController {
     }
 
     @GetMapping("/{name}")
-    public List<CacheEntryDto> entries(@PathVariable String name) {
+    public org.springframework.data.domain.Page<CacheEntryDto> entries(
+            @PathVariable String name,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        List<CacheEntryDto> filtered = filter(allEntries(name), q);
+        return paginate(filtered, page, size);
+    }
+
+    private List<CacheEntryDto> allEntries(String name) {
         return switch (name) {
             case "igdb-game-cache" -> igdbService.getGameCache().entrySet().stream()
                 .map(e -> new CacheEntryDto(e.getKey(), e.getValue())).toList();
@@ -68,6 +77,26 @@ public class ApiAdminCacheController {
                 .map(o -> new CacheEntryDto(o.get("id"), o.get("label"))).toList();
             default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown cache " + name);
         };
+    }
+
+    private static List<CacheEntryDto> filter(List<CacheEntryDto> entries, String q) {
+        if (q == null || q.isBlank()) {
+            return entries;
+        }
+        String needle = q.toLowerCase(java.util.Locale.ROOT);
+        return entries.stream()
+            .filter(e -> e.key().toLowerCase(java.util.Locale.ROOT).contains(needle)
+                      || e.value().toLowerCase(java.util.Locale.ROOT).contains(needle))
+            .toList();
+    }
+
+    private static org.springframework.data.domain.Page<CacheEntryDto> paginate(List<CacheEntryDto> entries, int page, int size) {
+        int fromIndex = Math.min(page * size, entries.size());
+        int toIndex = Math.min(fromIndex + size, entries.size());
+        return new org.springframework.data.domain.PageImpl<>(
+            entries.subList(fromIndex, toIndex),
+            org.springframework.data.domain.PageRequest.of(page, size),
+            entries.size());
     }
 
     @DeleteMapping("/{name}")
