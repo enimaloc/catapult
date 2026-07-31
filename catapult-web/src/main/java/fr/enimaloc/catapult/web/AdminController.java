@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.web;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import fr.enimaloc.catapult.client.ApiClient;
 import fr.enimaloc.catapult.security.CatapultWebUser;
 import lombok.RequiredArgsConstructor;
@@ -99,23 +100,43 @@ public class AdminController {
     }
 
     @GetMapping("/caches/{name}")
-    public String cacheEntriesPage(@PathVariable String name, Model model) {
-        List<?> entries = apiClient.get("/api/admin/caches/{name}",
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {}, name);
+    public String cacheEntriesPage(@PathVariable String name,
+                                    @RequestParam(required = false, defaultValue = "") String q,
+                                    @RequestParam(defaultValue = "0") int page,
+                                    Model model) {
+        CacheEntriesPage entries = apiClient.get("/api/admin/caches/{name}?q={q}&page={page}&size=25",
+                new ParameterizedTypeReference<CacheEntriesPage>() {}, name, q, page);
         List<Map<String, Object>> caches = apiClient.get("/api/admin/caches",
                 new ParameterizedTypeReference<List<Map<String, Object>>>() {});
         boolean deletable = caches != null && caches.stream()
                 .anyMatch(c -> name.equals(c.get("name")) && Boolean.TRUE.equals(c.get("deletable")));
         model.addAttribute("cacheName", name);
-        model.addAttribute("entries", entries != null ? entries : List.of());
+        model.addAttribute("entries", entries != null ? entries : new CacheEntriesPage(0, 0, 0, List.of()));
         model.addAttribute("deletable", deletable);
+        model.addAttribute("q", q);
         return "admin/cache-entries";
+    }
+
+    @GetMapping("/caches/{name}/entry")
+    public String cacheEntryDetailPage(@PathVariable String name, @RequestParam String key, Model model) {
+        Map<String, Object> detail = apiClient.get("/api/admin/caches/{name}/entry?key={key}",
+                new ParameterizedTypeReference<Map<String, Object>>() {}, name, key);
+        model.addAttribute("cacheName", name);
+        model.addAttribute("entryKey", key);
+        model.addAttribute("detail", detail);
+        return "admin/cache-entry-detail";
     }
 
     @PostMapping("/caches/{name}/delete")
     public String deleteCacheEntry(@PathVariable String name, @RequestParam String key) {
         apiClient.delete("/api/admin/caches/{name}?key={key}", name, key);
         return "redirect:/admin/caches/" + name;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record CacheEntriesPage(int number, int totalPages, long totalElements, List<Map<String, Object>> content) {
+        public boolean first() { return number == 0; }
+        public boolean last() { return number >= totalPages - 1; }
     }
 
     // ── Members ──────────────────────────────────────────────────────────────
