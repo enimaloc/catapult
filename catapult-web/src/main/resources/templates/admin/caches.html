@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'caches', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title th:text="#{admin.caches.page_title(${app.name})}">Catapult — Admin Caches</title>
+</head>
+<body>
+<!--/*@thymesvar id="caches" type="java.util.List"*/-->
+    <h2 th:text="#{admin.caches.title}" style="margin-bottom:1rem">Administration — Caches</h2>
+
+    <div th:if="${#lists.isEmpty(caches)}" class="text-muted">
+        <p th:text="#{admin.caches.empty}">No cache found.</p>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(caches)}" class="card">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.caches.column.name}">Name</th>
+                        <th th:text="#{admin.caches.column.size}">Entries</th>
+                        <th th:text="#{admin.caches.column.actions}">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="c : ${caches}">
+                        <td><span class="badge" th:text="${c.name}"></span></td>
+                        <td th:text="${c.size}"></td>
+                        <td>
+                            <a th:href="@{/admin/caches/{name}(name=${c.name})}" class="btn btn-sm"
+                               th:text="#{admin.caches.action.view}">View</a>
+                            <span th:unless="${c.deletable}" class="text-muted" style="font-size:0.8rem; margin-left:0.5rem;"
+                                  th:text="#{admin.caches.readonly}">read-only</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

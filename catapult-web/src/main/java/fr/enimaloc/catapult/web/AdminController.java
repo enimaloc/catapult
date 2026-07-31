@@ -88,6 +88,36 @@ public class AdminController {
         return "redirect:/admin/tw";
     }
 
+    // ── Caches ───────────────────────────────────────────────────────────────
+
+    @GetMapping("/caches")
+    public String cachesPage(Model model) {
+        List<?> caches = apiClient.get("/api/admin/caches",
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        model.addAttribute("caches", caches != null ? caches : List.of());
+        return "admin/caches";
+    }
+
+    @GetMapping("/caches/{name}")
+    public String cacheEntriesPage(@PathVariable String name, Model model) {
+        List<?> entries = apiClient.get("/api/admin/caches/{name}",
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {}, name);
+        List<Map<String, Object>> caches = apiClient.get("/api/admin/caches",
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        boolean deletable = caches != null && caches.stream()
+                .anyMatch(c -> name.equals(c.get("name")) && Boolean.TRUE.equals(c.get("deletable")));
+        model.addAttribute("cacheName", name);
+        model.addAttribute("entries", entries != null ? entries : List.of());
+        model.addAttribute("deletable", deletable);
+        return "admin/cache-entries";
+    }
+
+    @PostMapping("/caches/{name}/delete")
+    public String deleteCacheEntry(@PathVariable String name, @RequestParam String key) {
+        apiClient.delete("/api/admin/caches/{name}?key={key}", name, key);
+        return "redirect:/admin/caches/" + name;
+    }
+
     // ── Members ──────────────────────────────────────────────────────────────
 
     @GetMapping("/members")
