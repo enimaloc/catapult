@@ -108,6 +108,27 @@ public class IgdbService {
         return Collections.unmodifiableMap(igdbGameCache);
     }
 
+    public Map<String, IgdbGame> getNameIndex() {
+        return Collections.unmodifiableMap(igdbNameIndex);
+    }
+
+    public Map<String, IgdbGame> getExeIndex() {
+        return Collections.unmodifiableMap(exeNameIndex);
+    }
+
+    public Map<String, Set<String>> getCclCache() {
+        return Collections.unmodifiableMap(cclCache);
+    }
+
+    /** Evicts one in-memory entry — the underlying DB-backed L2 cache is untouched, so a fresh IGDB lookup only happens once that entry's own TTL has also expired. */
+    public boolean evictGameCache(String key) { return igdbGameCache.remove(key) != null; }
+
+    public boolean evictNameIndex(String key) { return igdbNameIndex.remove(key) != null; }
+
+    public boolean evictExeIndex(String key) { return exeNameIndex.remove(key) != null; }
+
+    public boolean evictCclCache(String key) { return cclCache.remove(key) != null; }
+
     public Optional<IgdbGame> findBySteamAppId(String appId) {
         if (clientId.isBlank()) return Optional.empty();
 

@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -95,5 +96,16 @@ public class DynamicCommandResolver {
     @EventListener
     public void onDefinitionChanged(ChatCommandDefinitionChangedEvent event) {
         userCache.remove(event.getUserId());
+    }
+
+    /** Resolved command names cached per user — for the admin cache viewer. */
+    public Map<UUID, Set<String>> cacheSnapshot() {
+        return userCache.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().keySet()));
+    }
+
+    /** Same effect as {@link #onDefinitionChanged}, triggered manually from the admin cache viewer. */
+    public boolean evictUser(UUID userId) {
+        return userCache.remove(userId) != null;
     }
 }
