@@ -31,6 +31,16 @@ class SandboxExecutorTest {
     }
 
     @Test
+    void executesListIterationOverStructuredElements() {
+        // "allTws"-style list: elements are Map<String,String> (id/label), not plain strings —
+        // ctx.list() must hand GraalJS host maps whose members are readable via bracket access.
+        String js = "let result = \"\"; for (const tw of ctx.list(\"allTws\")) { result += tw[\"id\"] + \":\" + tw[\"label\"] + \";\"; } return result;";
+        String output = executor.execute(js, path -> null,
+            name -> List.of(Map.of("id", "violence", "label", "Violence")), Duration.ofSeconds(2));
+        assertThat(output).isEqualTo("violence:Violence;");
+    }
+
+    @Test
     void hasNoFileSystemAccess() {
         String js = "let result = \"\"; "
             + "try { require('fs'); } catch (e) { result = 'blocked'; } return result;";
