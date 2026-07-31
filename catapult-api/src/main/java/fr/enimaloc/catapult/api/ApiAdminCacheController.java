@@ -2,8 +2,14 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.chat.DynamicCommandResolver;
 import fr.enimaloc.catapult.chat.TwPlaceholderRegistry;
+import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
+import fr.enimaloc.catapult.repository.IgdbGameDetailsRepository;
+import fr.enimaloc.catapult.repository.TwDefinitionRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.IgdbService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,7 +21,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -32,9 +42,21 @@ public class ApiAdminCacheController {
     private final IgdbService igdbService;
     private final DynamicCommandResolver dynamicCommandResolver;
     private final TwPlaceholderRegistry twPlaceholderRegistry;
+    private final IgdbGameDetailsRepository igdbGameDetailsRepository;
+    private final IgdbGameCclRepository igdbGameCclRepository;
+    private final TwDefinitionRepository twDefinitionRepository;
+    private final ChatCommandDefinitionRepository chatCommandDefinitionRepository;
+    private final UserAccountRepository userAccountRepository;
+
+    @Value("${app.igdb.details-cache-ttl-hours:168}")
+    private int detailsCacheTtlHours;
+
+    private static final Set<String> IGDB_DETAILS_TTL_CACHES =
+        Set.of("igdb-game-cache", "igdb-name-index", "igdb-exe-index");
 
     public record CacheSummaryDto(String name, int size, boolean deletable) {}
     public record CacheEntryDto(String key, String value) {}
+    public record CacheEntryDetailDto(String key, Object detail, Long expiresInSeconds) {}
 
     @GetMapping
     public List<CacheSummaryDto> list() {
@@ -57,6 +79,47 @@ public class ApiAdminCacheController {
             @RequestParam(defaultValue = "25") int size) {
         List<CacheEntryDto> filtered = filter(allEntries(name), q);
         return paginate(filtered, page, size);
+    }
+
+    @GetMapping("/{name}/entry")
+    public CacheEntryDetailDto entryDetail(@PathVariable String name, @RequestParam String key) {
+        Object detail = resolveDetail(name, key);
+        return new CacheEntryDetailDto(key, detail, expiresInSeconds(name, detail));
+    }
+
+    private Object resolveDetail(String name, String key) {
+        return switch (name) {
+            case "igdb-game-cache" -> igdbGameDetailsRepository.findById(key).orElse(null);
+            case "igdb-name-index" -> igdbGameDetailsRepository.findById(igdbIdFromIndex(igdbService.getNameIndex(), key)).orElse(null);
+            case "igdb-exe-index" -> igdbGameDetailsRepository.findById(igdbIdFromIndex(igdbService.getExeIndex(), key)).orElse(null);
+            case "igdb-ccl-cache" -> igdbGameCclRepository.findById(key).orElse(null);
+            case "chat-command-user-cache" -> chatCommandDefinitionRepository.findByUser(requireUser(key));
+            case "tw-known-paths", "tw-all-options" -> twDefinitionRepository.findById(key).orElse(null);
+            default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown cache " + name);
+        };
+    }
+
+    private static String igdbIdFromIndex(Map<String, IgdbService.IgdbGame> index, String key) {
+        IgdbService.IgdbGame game = index.get(key);
+        if (game == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown entry " + key);
+        }
+        return game.id();
+    }
+
+    private fr.enimaloc.catapult.domain.UserAccount requireUser(String key) {
+        return userAccountRepository.findById(parseUserId(key))
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown user " + key));
+    }
+
+    private Long expiresInSeconds(String name, Object detail) {
+        if (!IGDB_DETAILS_TTL_CACHES.contains(name)
+                || !(detail instanceof fr.enimaloc.catapult.domain.IgdbGameDetails d)
+                || d.getFetchedAt() == null) {
+            return null;
+        }
+        Instant expiresAt = d.getFetchedAt().plus(Duration.ofHours(detailsCacheTtlHours));
+        return Duration.between(Instant.now(), expiresAt).getSeconds();
     }
 
     private List<CacheEntryDto> allEntries(String name) {
