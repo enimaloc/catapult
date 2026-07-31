@@ -6,8 +6,12 @@ import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
 import fr.enimaloc.catapult.chat.command.trace.TraceEntry;
 import fr.enimaloc.catapult.domain.UserAccount;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import org.graalvm.polyglot.Context;
@@ -49,6 +53,17 @@ import java.util.concurrent.TimeoutException;
 @Slf4j
 @Component
 public class SandboxExecutor {
+
+    private final MeterRegistry meterRegistry;
+
+    public SandboxExecutor() {
+        this(new SimpleMeterRegistry());
+    }
+
+    @Autowired
+    public SandboxExecutor(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     public interface PlaceholderContext {
         String resolve(String path);
@@ -96,15 +111,20 @@ public class SandboxExecutor {
      */
     public String execute(String compiledJs, PlaceholderContext placeholders, ListContext lists,
                            ServiceFunctionRegistry registry, UserAccount user, SettingContext settings, Duration timeout) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "error";
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Context context = buildContext();
         try {
             Future<String> future = executor.submit(() -> runInContext(context, compiledJs, placeholders, lists, registry, user, settings));
             try {
-                return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+                String result = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+                outcome = "success";
+                return result;
             } catch (TimeoutException e) {
                 closeQuietly(context);
                 awaitWorkerTermination(future);
+                outcome = "timeout";
                 throw new SandboxExecutionException("Command execution timed out after " + timeout, e);
             }
         } catch (ExecutionException e) {
@@ -116,6 +136,7 @@ public class SandboxExecutor {
         } finally {
             executor.shutdownNow();
             closeQuietly(context);
+            sample.stop(meterRegistry.timer("catapult.chat.commands.dsl.execute", "outcome", outcome));
         }
     }
 
@@ -262,16 +283,22 @@ public class SandboxExecutor {
             if (trace != null) {
                 trace.record(new TraceEntry("service-call", namespace + "#" + function, String.valueOf(value), false));
             }
+            meterRegistry.counter("catapult.chat.commands.dsl.service_call",
+                "namespace", namespace, "function", function, "outcome", "success").increment();
             return value;
         } catch (RuntimeException e) {
             if (trace != null) {
                 trace.record(new TraceEntry("service-call", namespace + "#" + function, e.getMessage(), true));
             }
+            meterRegistry.counter("catapult.chat.commands.dsl.service_call",
+                "namespace", namespace, "function", function, "outcome", "error").increment();
             throw e;
         } catch (Exception e) {
             if (trace != null) {
                 trace.record(new TraceEntry("service-call", namespace + "#" + function, e.getMessage(), true));
             }
+            meterRegistry.counter("catapult.chat.commands.dsl.service_call",
+                "namespace", namespace, "function", function, "outcome", "error").increment();
             throw new RuntimeException("Service function " + namespace + "#" + function + " failed", e);
         }
     }

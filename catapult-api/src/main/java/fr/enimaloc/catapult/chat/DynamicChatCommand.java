@@ -13,6 +13,8 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.GameContextService;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
@@ -50,12 +52,22 @@ public class DynamicChatCommand implements ChatCommand {
     private final Locale streamerLocale;
     private final ChatCommandSettingRepository settingRepository;
     private final ChatCommandDefinitionRepository definitionRepository;
+    private final MeterRegistry meterRegistry;
 
     public DynamicChatCommand(ChatCommandDefinition definition, JsCompiler jsCompiler,
                                SandboxExecutor sandboxExecutor, ServiceFunctionRegistry serviceFunctionRegistry,
                                GameContextService gameContextService, PlaceholderResolver placeholderResolver,
                                Locale streamerLocale, ChatCommandSettingRepository settingRepository,
                                ChatCommandDefinitionRepository definitionRepository) {
+        this(definition, jsCompiler, sandboxExecutor, serviceFunctionRegistry, gameContextService,
+            placeholderResolver, streamerLocale, settingRepository, definitionRepository, new SimpleMeterRegistry());
+    }
+
+    public DynamicChatCommand(ChatCommandDefinition definition, JsCompiler jsCompiler,
+                               SandboxExecutor sandboxExecutor, ServiceFunctionRegistry serviceFunctionRegistry,
+                               GameContextService gameContextService, PlaceholderResolver placeholderResolver,
+                               Locale streamerLocale, ChatCommandSettingRepository settingRepository,
+                               ChatCommandDefinitionRepository definitionRepository, MeterRegistry meterRegistry) {
         this.definition = definition;
         this.jsCompiler = jsCompiler;
         this.sandboxExecutor = sandboxExecutor;
@@ -65,6 +77,7 @@ public class DynamicChatCommand implements ChatCommand {
         this.streamerLocale = streamerLocale;
         this.settingRepository = settingRepository;
         this.definitionRepository = definitionRepository;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -90,7 +103,21 @@ public class DynamicChatCommand implements ChatCommand {
         // "Eject to JS" (Phase 2): a non-null ejectedJs runs directly, bypassing the AST
         // compiler entirely — same sandbox, same ctx API, just a different JS source.
         String ejected = definition.getEjectedJs();
-        String js = (ejected != null && !ejected.isBlank()) ? ejected : jsCompiler.compile(decodeAst());
+        boolean isEjected = ejected != null && !ejected.isBlank();
+        meterRegistry.counter("catapult.chat.commands.dsl.source",
+            "type", isEjected ? "ejected" : "compiled").increment();
+        String js;
+        if (isEjected) {
+            js = ejected;
+        } else {
+            try {
+                js = jsCompiler.compile(decodeAst());
+                meterRegistry.counter("catapult.chat.commands.dsl.compile", "outcome", "success").increment();
+            } catch (RuntimeException e) {
+                meterRegistry.counter("catapult.chat.commands.dsl.compile", "outcome", "error").increment();
+                throw e;
+            }
+        }
 
         try {
             String output = sandboxExecutor.execute(js,
