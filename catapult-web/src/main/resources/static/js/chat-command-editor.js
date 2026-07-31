@@ -18,6 +18,10 @@
     let currentTab = 'blocks';
     let workspace = null;
 
+    // Server-rendered strings from chat-command-editor-modal.html's data-i18n-tw-* attributes
+    // (the file this whenBlocklyReady body lives in has no i18n mechanism of its own).
+    const twI18n = document.getElementById('chatCommandEditorModal').dataset;
+
     // ---- Theme: follow the site's current palette (app.js's setTheme sets/removes
     // [data-theme] on <html> and reads/writes CSS custom properties) ----
 
@@ -139,9 +143,9 @@
         const current = this.getValue ? this.getValue() : null;
         const options = (catalog.knownTws || []).map(tw => [tw.label + ' (' + tw.id + ')', tw.id]);
         if (current && !options.some(([, value]) => value === current)) {
-            options.push([current + ' (TW inconnu ou désactivé)', current]);
+            options.push([current + ' ' + twI18n.i18nTwUnknown, current]);
         }
-        return options.length ? options : [['(aucun TW connu)', '']];
+        return options.length ? options : [[twI18n.i18nTwNone, '']];
     }
 
     // JSON block definitions can't reference a JS function for a dropdown's options (JSON is
@@ -173,7 +177,7 @@
         static definition() {
             return { type: this.type, message0: '%1',
                 args0: [{ type: 'field_dropdown', name: 'ID', options: [['▾', '']] }],
-                output: null, colour: 200, tooltip: 'Choisir un trigger warning connu',
+                output: null, colour: 200, tooltip: twI18n.i18nTwTooltip,
                 extensions: ['cmd_tw_picker_options'] };
         }
         static toNode(block) {
