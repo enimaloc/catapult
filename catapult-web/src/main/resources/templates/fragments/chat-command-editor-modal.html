@@ -2,6 +2,9 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="chat-command-editor-modal" id="chatCommandEditorModal" class="modal" hidden
+     th:attr="data-i18n-tw-unknown=#{chat_commands.tw_picker.unknown},
+              data-i18n-tw-none=#{chat_commands.tw_picker.none},
+              data-i18n-tw-tooltip=#{chat_commands.tw_picker.tooltip}"
      style="display:none;">
     <div id="ceModalContent" class="modal-content ce-modal-content" style="overflow-y:auto;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.75rem;">
