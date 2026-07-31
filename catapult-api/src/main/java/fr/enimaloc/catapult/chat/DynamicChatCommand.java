@@ -156,21 +156,24 @@ public class DynamicChatCommand implements ChatCommand {
         return fallbacks.getOrDefault(path, "");
     }
 
-    private List<String> resolveList(String name, Map<String, String> fallbacks, List<String> args,
+    private List<Object> resolveList(String name, Map<String, String> fallbacks, List<String> args,
                                       UserAccount user, GameContext ctx) {
         if ("fallbacks".equals(name)) return List.copyOf(fallbacks.values());
-        if ("args".equals(name)) return args;
+        if ("args".equals(name)) return List.copyOf(args);
         if ("ownCommands".equals(name)) {
             // The currently-executing command isn't specially excluded — a streamer listing
             // their own commands from within one of them is a plausible, harmless self-reference.
-            return definitionRepository.findByUser(user).stream()
+            return List.copyOf(definitionRepository.findByUser(user).stream()
                 .filter(ChatCommandDefinition::isEnabled)
                 .map(ChatCommandDefinition::getName)
-                .toList();
+                .toList());
         }
-        if ("gameDlcs".equals(name)) return ctx.dlcNames();
-        if ("similarGames".equals(name)) return ctx.similarGameNames();
-        if ("activeTws".equals(name)) return activeTwLabels(ctx);
+        if ("gameDlcs".equals(name)) return List.copyOf(ctx.dlcNames());
+        if ("similarGames".equals(name)) return List.copyOf(ctx.similarGameNames());
+        if ("activeTws".equals(name)) return List.copyOf(activeTwLabels(ctx));
+        // Every registered TW ({id, label} maps), enabled or not — unlike activeTws, not scoped
+        // to the current game, so authors can build their own TW pickers/listings.
+        if ("allTws".equals(name)) return List.copyOf(placeholderResolver.allTwOptions());
         return List.of();
     }
 

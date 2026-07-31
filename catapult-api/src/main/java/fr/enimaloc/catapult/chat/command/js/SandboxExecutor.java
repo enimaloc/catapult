@@ -33,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 /**
  * Runs compiled command JS in a GraalJS sandbox with no filesystem/network/
@@ -70,7 +71,7 @@ public class SandboxExecutor {
     }
 
     public interface ListContext {
-        List<String> resolveList(String name);
+        List<Object> resolveList(String name);
     }
 
     public interface SettingContext {
@@ -374,8 +375,9 @@ public class SandboxExecutor {
             });
             ctx.putMember("list", (ProxyExecutable) args -> {
                 String name = args[0].asString();
-                List<String> values = lists.resolveList(name);
-                trace.record(new TraceEntry("for-each", "iterate " + name, String.join(", ", values), false));
+                List<Object> values = lists.resolveList(name);
+                String preview = values.stream().map(String::valueOf).collect(Collectors.joining(", "));
+                trace.record(new TraceEntry("for-each", "iterate " + name, preview, false));
                 return boundedListProxyArray(new ArrayList<Object>(values));
             });
             ctx.putMember("setting", (ProxyExecutable) args -> {

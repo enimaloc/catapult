@@ -1,9 +1,14 @@
 package fr.enimaloc.catapult.chat;
 
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
+import fr.enimaloc.catapult.chat.command.ast.ForEachStatement;
+import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.ast.PrintStatement;
+import fr.enimaloc.catapult.chat.command.ast.PropertyGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
+import fr.enimaloc.catapult.chat.command.ast.ValueType;
+import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
@@ -18,6 +23,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -53,6 +59,33 @@ class DynamicChatCommandTest {
         Object result = command.execute(null, List.of());
 
         assertThat(result).isEqualTo("Now playing Valorant!");
+    }
+
+    @Test
+    void allTwsListsEveryRegisteredTwRegardlessOfEnabled() {
+        TwPlaceholderRegistry twRegistry = mock(TwPlaceholderRegistry.class);
+        when(twRegistry.getKnownPaths()).thenReturn(Set.of());
+        when(twRegistry.getAllOptions()).thenReturn(List.of(Map.of("id", "violence", "label", "Violence")));
+        PlaceholderResolver placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry(), twRegistry);
+
+        CommandAst ast = new CommandAst(List.of(new ForEachStatement("tw", "allTws", List.of(
+            new PrintStatement(new PropertyGetExpr(new VarRefExpr("tw"), "id")),
+            new PrintStatement(new LiteralExpr(":", ValueType.STRING)),
+            new PrintStatement(new PropertyGetExpr(new VarRefExpr("tw"), "label")),
+            new PrintStatement(new LiteralExpr(";", ValueType.STRING))
+        ))));
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setName("!alltws");
+        definition.setEnabled(true);
+        definition.setAst(new NodeJsonCodec().toJson(ast));
+
+        DynamicChatCommand command = new DynamicChatCommand(definition, new JsCompiler(),
+            new SandboxExecutor(), new ServiceFunctionRegistry(), mock(GameContextService.class),
+            placeholderResolver, Locale.FRENCH, mock(ChatCommandSettingRepository.class), mock(fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository.class));
+
+        Object result = command.execute(null, List.of());
+
+        assertThat(result).isEqualTo("violence:Violence;");
     }
 
     @Test

@@ -387,10 +387,24 @@
             .find(b => b.type === 'cmd_var_decl' && b.getFieldValue('NAME') === name) || null;
     }
 
+    // Same idea as findVarDecl, but for a cmd_for_each's loop-binding name (the other place a
+    // NAME can be bound besides cmd_var_decl) — lets computeTargetKeys' cmd_var_ref branch also
+    // resolve a for-each loop variable back to its list source.
+    function findForEachBinding(workspace, name) {
+        if (!workspace || !name) return null;
+        return workspace.getAllBlocks(false)
+            .find(b => b.type === 'cmd_for_each' && b.getFieldValue('BINDING') === name) || null;
+    }
+
+    // Element shape for the handful of named lists (KNOWN_LIST_SOURCES) whose elements are
+    // structured (id+label pairs) rather than plain strings — everything else has no known keys.
+    const LIST_ELEMENT_KEYS = { allTws: ['id', 'label'] };
+
     // Field names available on a given block's VALUE — either an object-literal's own
     // (user-typed) keys, a service function's declared returnKeys() (catalog-driven, e.g.
-    // twitch#getStream() -> title/category/viewers/uptime), or — computed at runtime by tracing
-    // back through the workspace rather than hardcoded — whatever a variable was declared with,
+    // twitch#getStream() -> title/category/viewers/uptime), a for-each loop variable bound from a
+    // structured list source (LIST_ELEMENT_KEYS), or — computed at runtime by tracing back
+    // through the workspace rather than hardcoded — whatever a variable was declared with,
     // recursively (var x = igdb.getGame(...) means computeTargetKeys(the var-ref to x) resolves
     // through the var-decl to igdb.getGame's own returnKeys). Feeds PROPERTY_PICKER dropdowns,
     // never PROPERTY itself.
@@ -415,7 +429,10 @@
             if (seen.has(name)) return [];
             seen.add(name);
             const decl = findVarDecl(targetBlock.workspace, name);
-            return decl ? computeTargetKeys(decl.getInputTargetBlock('INIT'), seen) : [];
+            if (decl) return computeTargetKeys(decl.getInputTargetBlock('INIT'), seen);
+            const forEach = findForEachBinding(targetBlock.workspace, name);
+            if (forEach) return LIST_ELEMENT_KEYS[forEach.getFieldValue('LIST_SOURCE')] || [];
+            return [];
         }
         const descriptor = blockRegistry[targetBlock.type];
         if (descriptor && descriptor.fn && Array.isArray(descriptor.fn.returnKeys)) {
@@ -661,7 +678,7 @@
     // insertFieldAt swap, no menuGenerator_ reassignment, nothing that depends on the block
     // already having been rendered once — see installDynamicPropertyPicker's comment for why
     // that matters: this exact field IS reconstructed from a saved AST, unlike cmd_tw_picker's).
-    const KNOWN_LIST_SOURCES = ['fallbacks', 'args', 'ownCommands', 'gameDlcs', 'similarGames', 'activeTws'];
+    const KNOWN_LIST_SOURCES = ['fallbacks', 'args', 'ownCommands', 'gameDlcs', 'similarGames', 'activeTws', 'allTws'];
 
     // LIST_SOURCE stays a plain field_input so any previously-saved value (including one typed
     // before this picker existed) always loads and saves correctly, and LIST_SOURCE_PICKER is a
