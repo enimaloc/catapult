@@ -46,6 +46,7 @@ class DynamicCommandResolverTest {
         resolver = new DynamicCommandResolver(repository, placeholderResolver, gameContextService,
             new JsCompiler(), new SandboxExecutor(), new ServiceFunctionRegistry(),
             org.mockito.Mockito.mock(ChatCommandSettingRepository.class),
+            new SimpleMeterRegistry(),
             java.util.List.of());
         user = new UserAccount();
         user.setId(UUID.randomUUID());
