@@ -63,6 +63,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private final SystemTwitchAccountService systemTwitchAccountService;
     private final MeterRegistry meterRegistry;
     private final ExternalApiObservations apiObservations;
+    private final TwitchChatRateLimiter chatRateLimiter;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -364,6 +365,13 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     private boolean trySend(UserAccount user, String message, String accessToken,
                             String senderId, String senderLabel) {
+        if (!chatRateLimiter.acquire(senderId)) {
+            meterRegistry.counter("catapult.chat.commands.send",
+                "sender", senderLabel, "outcome", "rate_limited").increment();
+            log.warn("[EventSub Chat] sendMessage skipped ({}) for user {}: rate limiter is pausing sender {}",
+                senderLabel, user.getId(), senderId);
+            return false;
+        }
         try {
             restClient.post()
                 .uri(HELIX_CHAT_URL)
@@ -376,6 +384,13 @@ public class EventSubTwitchChatService implements TwitchChatService {
             meterRegistry.counter("catapult.chat.commands.send",
                 "sender", senderLabel, "outcome", "success").increment();
             return true;
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            chatRateLimiter.onRateLimitResponse(senderId, retryAfterSeconds(e));
+            meterRegistry.counter("catapult.chat.commands.send",
+                "sender", senderLabel, "outcome", "failed").increment();
+            log.warn("[EventSub Chat] sendMessage failed ({}) for user {}: {}",
+                senderLabel, user.getId(), e.getMessage());
+            return false;
         } catch (Exception e) {
             meterRegistry.counter("catapult.chat.commands.send",
                 "sender", senderLabel, "outcome", "failed").increment();
@@ -383,6 +398,29 @@ public class EventSubTwitchChatService implements TwitchChatService {
                 senderLabel, user.getId(), e.getMessage());
             return false;
         }
+    }
+
+    // Twitch reports the reset deadline as a Unix timestamp in seconds (Ratelimit-Reset),
+    // not a delta — fall back to a plain Retry-After delta, then a conservative default
+    // if Helix returned neither.
+    private static long retryAfterSeconds(HttpClientErrorException.TooManyRequests e) {
+        String reset = e.getResponseHeaders() != null ? e.getResponseHeaders().getFirst("Ratelimit-Reset") : null;
+        if (reset != null) {
+            try {
+                return Math.max(1, Long.parseLong(reset) - Instant.now().getEpochSecond());
+            } catch (NumberFormatException ignored) {
+                // fall through to Retry-After
+            }
+        }
+        String retryAfter = e.getResponseHeaders() != null ? e.getResponseHeaders().getFirst("Retry-After") : null;
+        if (retryAfter != null) {
+            try {
+                return Math.max(1, Long.parseLong(retryAfter));
+            } catch (NumberFormatException ignored) {
+                // fall through to default
+            }
+        }
+        return 30L;
     }
 
     @Override
