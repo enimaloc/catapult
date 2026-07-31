@@ -86,7 +86,7 @@ public class ApiChatCommandDslController {
             .map(user -> settingRepository.findByUser(user).stream()
                 .map(ChatCommandSetting::getKey).sorted().toList())
             .orElse(List.of());
-        List<TwOptionDto> knownTws = twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc().stream()
+        List<TwOptionDto> knownTws = twDefinitionRepository.findAllByOrderBySortOrderAscIdAsc().stream()
             .map(d -> new TwOptionDto(d.getId(), d.getLabel()))
             .toList();
         return new CatalogDto(List.copyOf(PlaceholderResolver.KNOWN_PATHS), functions, settingKeys, knownTws);
