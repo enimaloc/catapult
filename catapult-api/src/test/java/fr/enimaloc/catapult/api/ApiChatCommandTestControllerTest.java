@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
+import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
@@ -57,6 +58,7 @@ class ApiChatCommandTestControllerTest {
     @MockitoBean SandboxExecutor sandboxExecutor;
     @MockitoBean ServiceFunctionRegistry serviceFunctionRegistry;
     @MockitoBean ChatCommandSettingRepository settingRepository;
+    @MockitoBean PlaceholderResolver placeholderResolver;
 
     private UserAccount mockUser() {
         UserAccount user = new UserAccount();
