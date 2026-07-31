@@ -103,11 +103,12 @@ class ApiChatCommandDslControllerTest {
     }
 
     @Test
-    void catalogReturnsKnownTwsFromTheEnabledDefinitions() throws Exception {
+    void catalogReturnsKnownTwsFromAllDefinitionsRegardlessOfEnabled() throws Exception {
         fr.enimaloc.catapult.domain.TwDefinition def = new fr.enimaloc.catapult.domain.TwDefinition();
         def.setId("violence_graphic");
         def.setLabel("Violence (graphic)");
-        when(twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc()).thenReturn(List.of(def));
+        def.setEnabled(false);
+        when(twDefinitionRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of(def));
 
         mvc.perform(get("/api/chat-commands/dsl/catalog").with(jwt()))
                 .andExpect(status().isOk())
