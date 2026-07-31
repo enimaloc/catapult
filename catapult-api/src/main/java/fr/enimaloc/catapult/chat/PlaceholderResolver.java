@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -159,6 +160,11 @@ public class PlaceholderResolver {
 
     private static String roundedOrNull(Double value) {
         return value == null ? null : String.valueOf(Math.round(value));
+    }
+
+    /** Every registered TW definition, enabled or not, as {@code {id, label}} pairs — backs the DSL's {@code allTws} named list. */
+    public List<Map<String, String>> allTwOptions() {
+        return twPlaceholderRegistry.getAllOptions();
     }
 
     /** Paths inconnus présents dans un template (pour validation à l'écriture). */
