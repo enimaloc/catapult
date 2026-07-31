@@ -100,7 +100,7 @@ public class ApiChatCommandTestController {
             path -> overrides.getOrDefault(path, ""),
             name -> {
                 if ("fallbacks".equals(name)) return List.copyOf(overrides.values());
-                if ("args".equals(name)) return args;
+                if ("args".equals(name)) return List.copyOf(args);
                 return List.of();
             },
             registry, user, key -> settings.getOrDefault(key, ""), TEST_TIMEOUT);
