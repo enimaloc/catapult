@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
@@ -61,6 +62,7 @@ public class ApiChatCommandTestController {
     private final SandboxExecutor sandboxExecutor;
     private final ServiceFunctionRegistry serviceFunctionRegistry;
     private final ChatCommandSettingRepository settingRepository;
+    private final PlaceholderResolver placeholderResolver;
 
     @PostMapping("/api/chat-commands/{id}/test")
     public Map<String, Object> test(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
@@ -101,6 +103,9 @@ public class ApiChatCommandTestController {
             name -> {
                 if ("fallbacks".equals(name)) return List.copyOf(overrides.values());
                 if ("args".equals(name)) return List.copyOf(args);
+                // Unlike activeTws/ownCommands/gameDlcs/similarGames, allTws doesn't depend on a
+                // live game context — safe to resolve for real in the Tester too.
+                if ("allTws".equals(name)) return List.copyOf(placeholderResolver.allTwOptions());
                 return List.of();
             },
             registry, user, key -> settings.getOrDefault(key, ""), TEST_TIMEOUT);
