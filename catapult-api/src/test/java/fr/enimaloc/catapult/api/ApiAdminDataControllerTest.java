@@ -1,7 +1,14 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.chat.ChatCommandEvent;
+import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.TwDefinition;
+import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.UserGroup;
+import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.TwDefinitionRepository;
+import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.repository.UserGroupRepository;
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +40,9 @@ class ApiAdminDataControllerTest {
 
     @Autowired WebApplicationContext wac;
     @Autowired TwDefinitionRepository twDefinitionRepository;
+    @Autowired UserGroupRepository userGroupRepository;
+    @Autowired UserAccountRepository userAccountRepository;
+    @Autowired ChatCommandDefinitionRepository chatCommandDefinitionRepository;
 
     @Test
     void listRepositories_includesKnownRepos() throws Exception {
@@ -152,6 +162,53 @@ class ApiAdminDataControllerTest {
         mvc.perform(put("/api/admin/data/tw-definition/bad-update").with(csrf())
                         .contentType("application/json")
                         .content("{\"sortOrder\":\"not-a-number\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void entityDetail_rendersLazyCollectionRelation() throws Exception {
+        userGroupRepository.deleteAll();
+
+        UserAccount member = new UserAccount();
+        member.setTwitchUsername("member-user-" + java.util.UUID.randomUUID());
+        member = userAccountRepository.save(member);
+
+        UserGroup group = new UserGroup();
+        group.setKey("lazy-collection-group");
+        group.setName("Lazy collection group");
+        group.getMembers().add(member);
+        group = userGroupRepository.save(group);
+
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(get("/api/admin/data/user-group/" + group.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members.length()").value(1))
+                .andExpect(jsonPath("$.members[0].id").exists())
+                .andExpect(jsonPath("$.members[0].label").value(
+                        org.hamcrest.Matchers.containsString("member-user")));
+    }
+
+    @Test
+    void update_unresolvedRelationTarget_returns400() throws Exception {
+        chatCommandDefinitionRepository.deleteAll();
+
+        UserAccount owner = new UserAccount();
+        owner.setTwitchUsername("cmd-owner-" + java.util.UUID.randomUUID());
+        owner = userAccountRepository.save(owner);
+
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setUser(owner);
+        definition.setName("greet");
+        definition.setTemplate("Hello!");
+        definition.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
+        definition = chatCommandDefinitionRepository.save(definition);
+
+        String nonexistentUserId = java.util.UUID.randomUUID().toString();
+
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(put("/api/admin/data/chat-command-definition/" + definition.getId()).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"user\":\"" + nonexistentUserId + "\"}"))
                 .andExpect(status().isBadRequest());
     }
 }
