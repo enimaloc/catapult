@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'data', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title th:text="#{admin.data.title}">Catapult — Admin Data</title>
+</head>
+<body>
+<!--/*@thymesvar id="repos" type="java.util.List"*/-->
+    <h2 th:text="#{admin.data.title}" style="margin-bottom:1rem">Administration — Data</h2>
+
+    <div th:if="${#lists.isEmpty(repos)}" class="text-muted">
+        <p th:text="#{admin.data.entities.empty}">No repository found.</p>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(repos)}" class="card">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.data.column.repository}">Repository</th>
+                        <th th:text="#{admin.data.column.rows}">Rows</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="r : ${repos}">
+                        <td><span class="badge" th:text="${r.name}"></span></td>
+                        <td th:text="${r.size}"></td>
+                        <td>
+                            <a th:href="@{/admin/data/{name}(name=${r.name})}" class="btn btn-sm"
+                               th:text="#{admin.data.action.view}">Browse</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
