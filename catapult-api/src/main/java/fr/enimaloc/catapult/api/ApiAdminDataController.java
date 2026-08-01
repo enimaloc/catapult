@@ -57,6 +57,7 @@ public class ApiAdminDataController {
     }
 
     @GetMapping("/{repo}")
+    @Transactional(readOnly = true)
     public Page<Map<String, Object>> entityList(
             @PathVariable String repo,
             @RequestParam(required = false) String q,
@@ -223,10 +224,11 @@ public class ApiAdminDataController {
             return List.of();
         }
         return collection.stream().map(item -> {
-            EntityType<?> itemType = entityManager.getMetamodel().entity(item.getClass());
+            Object real = org.hibernate.Hibernate.unproxy(item);
+            EntityType<?> itemType = entityManager.getMetamodel().entity(real.getClass());
             Map<String, String> link = new LinkedHashMap<>();
-            link.put("id", IdCodec.encode(readId(item, itemType), itemType));
-            link.put("label", AttributeClassifier.label(item, itemType));
+            link.put("id", IdCodec.encode(readId(real, itemType), itemType));
+            link.put("label", AttributeClassifier.label(real, itemType));
             return link;
         }).toList();
     }
@@ -240,14 +242,41 @@ public class ApiAdminDataController {
                 continue; // not shown in list rows — only in detail (Task 6)
             }
             Object value = readField(entity, attribute.getName());
-            if (kind == AttributeKind.SINGULAR_RELATION) {
-                row.put(attribute.getName(), value == null ? null
-                    : AttributeClassifier.label(value, entityManager.getMetamodel().entity(value.getClass())));
-            } else {
-                row.put(attribute.getName(), ValueCoercion.toString(value));
+            switch (kind) {
+                case SINGULAR_RELATION -> {
+                    if (value == null) {
+                        row.put(attribute.getName(), null);
+                    } else {
+                        // `value` may be an uninitialized Hibernate proxy: its runtime getClass()
+                        // is a dynamically generated proxy subclass (rejected by
+                        // getMetamodel().entity(...)) and direct reflective field reads on the
+                        // proxy itself (bypassing Hibernate's getters) would return default/unset
+                        // values rather than the real data. Unproxy first to get the real,
+                        // initialized target instance (safe here: entityList/entityDetail are
+                        // @Transactional, so the session is still open).
+                        Object real = org.hibernate.Hibernate.unproxy(value);
+                        EntityType<?> targetType = entityManager.getMetamodel().entity(real.getClass());
+                        // Emit the encoded target id as the field's round-trippable value (what a
+                        // submitted edit form actually sends back to PUT/applyFields), and the
+                        // human-readable label under a sibling "<field>_label" key purely for
+                        // display — the label is not valid input for resolveRelation/IdCodec.decode.
+                        row.put(attribute.getName(), IdCodec.encode(readId(real, targetType), targetType));
+                        row.put(attribute.getName() + "_label", AttributeClassifier.label(real, targetType));
+                    }
+                }
+                case CONVERTED -> row.put(attribute.getName(), toJson(value));
+                default -> row.put(attribute.getName(), ValueCoercion.toString(value));
             }
         }
         return row;
+    }
+
+    private String toJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Cannot serialize value " + value, e);
+        }
     }
 
     private Object readId(Object entity, EntityType<?> entityType) {
