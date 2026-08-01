@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'data', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title th:text="#{admin.data.entities.title} + ' — ' + ${repo}">Catapult — Data</title>
+</head>
+<body>
+<!--/*@thymesvar id="repo" type="java.lang.String"*/-->
+<!--/*@thymesvar id="entityId" type="java.lang.String"*/-->
+<!--/*@thymesvar id="entity" type="java.util.Map"*/-->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 style="margin:0" th:text="${entityId} != null ? #{admin.data.form.title.edit} : #{admin.data.form.title.new}">Entry</h2>
+        <a th:href="@{/admin/data/{repo}(repo=${repo})}" class="btn btn-sm" th:text="#{admin.caches.back}">&larr; Back</a>
+    </div>
+
+    <form method="post" class="card" style="padding:1rem; display:flex; flex-direction:column; gap:0.75rem;"
+          th:action="${entityId} != null ? @{/admin/data/{repo}/{id}(repo=${repo},id=${entityId})} : @{/admin/data/{repo}/new(repo=${repo})}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+        <!--
+            The "id" field is only rendered on the CREATE form (entityId == null).
+            On EDIT, the id is already fixed and showing it as an editable text
+            input would be confusing/risky, so it stays excluded there — same as
+            the brief originally intended. On CREATE, natural-key entities (e.g.
+            TwDefinition, whose @Id has no @GeneratedValue) need to be able to
+            supply an id manually, so it must appear in the loop; the controller
+            seeds an empty "id" entry into the (otherwise empty) `entity` map on
+            newEntityPage so this loop has something to iterate for it.
+        -->
+        <label class="label" th:each="field : ${entity.keySet()}" th:if="${field != 'id' or entityId == null}">
+            <span th:text="${field}"></span>
+            <input type="text" th:name="${field}" th:value="${entity.get(field)}">
+        </label>
+
+        <menu style="display:flex; gap:0.5rem; justify-content:flex-end; margin:0; padding:0;">
+            <button type="submit" class="btn btn-primary" th:text="#{admin.data.form.action.save}">Save</button>
+        </menu>
+    </form>
+
+    <form th:if="${entityId} != null" method="post" style="margin-top:1rem;"
+          th:action="@{/admin/data/{repo}/{id}/delete(repo=${repo},id=${entityId})}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <button type="submit" class="btn btn-sm" th:text="#{admin.data.form.action.delete}">Delete</button>
+    </form>
+</body>
+</html>
