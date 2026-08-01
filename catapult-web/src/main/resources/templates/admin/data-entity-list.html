@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'data', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title th:text="#{admin.data.entities.title} + ' — ' + ${repo}">Catapult — Data</title>
+</head>
+<body>
+<!--/*@thymesvar id="repo" type="java.lang.String"*/-->
+<!--/*@thymesvar id="entities" type="fr.enimaloc.catapult.web.AdminDataController$EntityPage"*/-->
+<!--/*@thymesvar id="q" type="java.lang.String"*/-->
+<!--/*@thymesvar id="pickFor" type="java.lang.String"*/-->
+<!--/*@thymesvar id="returnTo" type="java.lang.String"*/-->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 style="margin:0"><span th:text="#{admin.data.entities.title}">Data</span> — <span th:text="${repo}"></span></h2>
+        <div style="display:flex; gap:0.5rem;">
+            <a th:href="@{/admin/data}" class="btn btn-sm" th:text="#{admin.caches.back}">&larr; Back</a>
+            <a th:unless="${pickFor}" th:href="@{/admin/data/{repo}/new(repo=${repo})}" class="btn btn-sm btn-primary"
+               th:text="#{admin.data.action.new}">+ New</a>
+        </div>
+    </div>
+
+    <div th:if="${error}" class="card" style="padding:0.75rem 1rem; margin-bottom:1rem; border-color:var(--danger,#c0392b); color:var(--danger,#c0392b);"
+         th:text="#{admin.data.list.error}">Delete failed — the row is likely still referenced by other data.</div>
+
+    <form method="get" th:action="@{/admin/data/{repo}(repo=${repo})}" style="margin-bottom:1rem;">
+        <input type="hidden" name="pickFor" th:if="${pickFor}" th:value="${pickFor}">
+        <input type="hidden" name="returnTo" th:if="${returnTo}" th:value="${returnTo}">
+        <input type="search" name="q" th:value="${q}" th:placeholder="#{admin.data.search.placeholder}" autocomplete="off">
+    </form>
+
+    <div th:if="${#lists.isEmpty(entities.content)} and ${#strings.isEmpty(q)}" class="text-muted">
+        <p th:text="#{admin.data.entities.empty}">No rows.</p>
+    </div>
+    <div th:if="${#lists.isEmpty(entities.content)} and ${!#strings.isEmpty(q)}" class="text-muted">
+        <p th:text="#{admin.data.entities.no_match}">No row matches this search.</p>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(entities.content)}" class="card">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:each="col : ${entities.content[0].keySet()}" th:text="${col}"></th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="row : ${entities.content}">
+                        <td th:each="col : ${row.keySet()}" th:text="${row.get(col)}"></td>
+                        <td>
+                            <a th:unless="${pickFor}" th:href="@{/admin/data/{repo}/{id}(repo=${repo},id=${row.id})}"
+                               class="btn btn-sm" th:text="#{admin.data.action.detail}">View</a>
+                            <a th:if="${pickFor}" th:href="@{${returnTo}(pickedField=${pickFor},pickedId=${row.id})}"
+                               class="btn btn-sm" th:text="#{admin.data.action.select}">Select</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div th:if="${entities.totalPages > 1}" class="pagination">
+            <a th:if="${!entities.first}"
+               th:href="@{/admin/data/{repo}(repo=${repo},q=${q},page=${entities.number - 1},pickFor=${pickFor},returnTo=${returnTo})}"
+               class="btn btn-sm" th:text="#{admin.data.pagination.previous}">&larr; Previous</a>
+            <span th:text="${entities.number + 1} + ' / ' + ${entities.totalPages}"></span>
+            <a th:if="${!entities.last}"
+               th:href="@{/admin/data/{repo}(repo=${repo},q=${q},page=${entities.number + 1},pickFor=${pickFor},returnTo=${returnTo})}"
+               class="btn btn-sm" th:text="#{admin.data.pagination.next}">Next &rarr;</a>
+        </div>
+    </div>
+</body>
+</html>
