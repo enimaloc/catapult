@@ -14,8 +14,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
+import java.util.Map;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -80,5 +84,74 @@ class ApiAdminDataControllerTest {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         mvc.perform(get("/api/admin/data/does-not-exist"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void entityDetail_returnsFullRow() throws Exception {
+        twDefinitionRepository.deleteAll();
+        TwDefinition d = new TwDefinition();
+        d.setId("detail-row");
+        d.setLabel("Detail row");
+        d.setDescription("A description");
+        twDefinitionRepository.save(d);
+
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(get("/api/admin/data/tw-definition/detail-row"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("detail-row"))
+                .andExpect(jsonPath("$.description").value("A description"));
+    }
+
+    @Test
+    void entityDetail_unknownId_returns404() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(get("/api/admin/data/tw-definition/does-not-exist"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void create_savesNewRow() throws Exception {
+        twDefinitionRepository.deleteAll();
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(post("/api/admin/data/tw-definition").with(csrf())
+                        .contentType("application/json")
+                        .content("{\"id\":\"new-row\",\"label\":\"New row\",\"enabled\":\"true\",\"sortOrder\":\"1\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("new-row"));
+
+        mvc.perform(get("/api/admin/data/tw-definition/new-row"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.label").value("New row"));
+    }
+
+    @Test
+    void update_savesChangesToExistingRow() throws Exception {
+        twDefinitionRepository.deleteAll();
+        TwDefinition d = new TwDefinition();
+        d.setId("update-row");
+        d.setLabel("Old label");
+        twDefinitionRepository.save(d);
+
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(put("/api/admin/data/tw-definition/update-row").with(csrf())
+                        .contentType("application/json")
+                        .content("{\"label\":\"New label\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.label").value("New label"));
+    }
+
+    @Test
+    void update_invalidScalarValue_returns400() throws Exception {
+        twDefinitionRepository.deleteAll();
+        TwDefinition d = new TwDefinition();
+        d.setId("bad-update");
+        d.setLabel("Label");
+        twDefinitionRepository.save(d);
+
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(put("/api/admin/data/tw-definition/bad-update").with(csrf())
+                        .contentType("application/json")
+                        .content("{\"sortOrder\":\"not-a-number\"}"))
+                .andExpect(status().isBadRequest());
     }
 }
