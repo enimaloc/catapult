@@ -19,6 +19,9 @@
         </div>
     </div>
 
+    <div th:if="${error}" class="card" style="padding:0.75rem 1rem; margin-bottom:1rem; border-color:var(--danger,#c0392b); color:var(--danger,#c0392b);"
+         th:text="#{admin.data.list.error}">Delete failed — the row is likely still referenced by other data.</div>
+
     <form method="get" th:action="@{/admin/data/{repo}(repo=${repo})}" style="margin-bottom:1rem;">
         <input type="hidden" name="pickFor" th:if="${pickFor}" th:value="${pickFor}">
         <input type="hidden" name="returnTo" th:if="${returnTo}" th:value="${returnTo}">
