@@ -6,33 +6,44 @@
 </head>
 <body>
 <!--/*@thymesvar id="cacheName" type="java.lang.String"*/-->
-<!--/*@thymesvar id="entries" type="java.util.List"*/-->
+<!--/*@thymesvar id="entries" type="fr.enimaloc.catapult.web.AdminController$CacheEntriesPage"*/-->
+<!--/*@thymesvar id="q" type="java.lang.String"*/-->
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
         <h2 style="margin:0"><span th:text="#{admin.caches.title}">Caches</span> — <span th:text="${cacheName}"></span></h2>
         <a th:href="@{/admin/caches}" class="btn btn-sm" th:text="#{admin.caches.back}">&larr; Back</a>
     </div>
 
-    <div th:if="${#lists.isEmpty(entries)}" class="text-muted">
+    <form method="get" th:action="@{/admin/caches/{name}(name=${cacheName})}" style="margin-bottom:1rem;">
+        <input type="search" name="q" th:value="${q}" th:placeholder="#{admin.caches.search.placeholder}" autocomplete="off">
+    </form>
+
+    <div th:if="${#lists.isEmpty(entries.content)} and ${#strings.isEmpty(q)}" class="text-muted">
         <p th:text="#{admin.caches.entries.empty}">This cache is empty.</p>
     </div>
 
-    <div th:unless="${#lists.isEmpty(entries)}" class="card">
+    <div th:if="${#lists.isEmpty(entries.content)} and ${!#strings.isEmpty(q)}" class="text-muted">
+        <p th:text="#{admin.caches.entries.no_match}">No entry matches this search.</p>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(entries.content)}" class="card">
         <div class="table-container">
             <table class="table">
                 <thead>
                     <tr>
                         <th th:text="#{admin.caches.column.key}">Key</th>
                         <th th:text="#{admin.caches.column.value}">Value</th>
-                        <th th:if="${deletable}" th:text="#{admin.caches.column.actions}">Actions</th>
+                        <th th:text="#{admin.caches.column.actions}">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="e : ${entries}">
+                    <tr th:each="e : ${entries.content}">
                         <td><span class="badge" th:text="${e.key}"></span></td>
                         <td th:text="${e.value}"></td>
-                        <td th:if="${deletable}">
-                            <form th:action="@{/admin/caches/{name}/delete(name=${cacheName})}" method="post"
-                                  ws:post="@{/admin/caches/{name}/delete(name=${cacheName})}"> <!-- nosemgrep -->
+                        <td>
+                            <a th:href="@{/admin/caches/{name}/entry(name=${cacheName},key=${e.key})}" class="btn btn-sm"
+                               th:text="#{admin.caches.action.detail}">View detail</a>
+                            <form th:if="${deletable}" th:action="@{/admin/caches/{name}/delete(name=${cacheName})}" method="post"
+                                  ws:post="@{/admin/caches/{name}/delete(name=${cacheName})}" style="display:inline"> <!-- nosemgrep -->
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <input type="hidden" name="key" th:value="${e.key}"/>
                                 <button type="submit" class="btn btn-sm"
@@ -42,6 +53,16 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <div th:if="${entries.totalPages > 1}" class="pagination">
+            <a th:if="${!entries.first}"
+               th:href="@{/admin/caches/{name}(name=${cacheName},q=${q},page=${entries.number - 1})}"
+               class="btn btn-sm" th:text="#{admin.caches.pagination.previous}">&larr; Previous</a>
+            <span th:text="${entries.number + 1} + ' / ' + ${entries.totalPages}"></span>
+            <a th:if="${!entries.last}"
+               th:href="@{/admin/caches/{name}(name=${cacheName},q=${q},page=${entries.number + 1})}"
+               class="btn btn-sm" th:text="#{admin.caches.pagination.next}">Next &rarr;</a>
         </div>
     </div>
 </body>
