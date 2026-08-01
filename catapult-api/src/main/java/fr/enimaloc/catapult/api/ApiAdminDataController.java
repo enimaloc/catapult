@@ -15,13 +15,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
@@ -37,6 +42,7 @@ public class ApiAdminDataController {
 
     private final DataRegistry registry;
     private final EntityManager entityManager;
+    private final ObjectMapper objectMapper;
 
     public record RepoSummaryDto(String name, long size) {}
 
@@ -96,6 +102,108 @@ public class ApiAdminDataController {
             .filter(a -> a instanceof SingularAttribute<?, ?> s && s.getJavaType() == String.class)
             .map(Attribute::getName)
             .toList();
+    }
+
+    @GetMapping("/{repo}/{id}")
+    public Map<String, Object> entityDetail(@PathVariable String repo, @PathVariable String id) {
+        DataRegistry.Entry entry = requireEntry(repo);
+        Object entity = findEntity(entry, id);
+        Map<String, Object> row = toRowMap(entity, entry.entityType());
+        for (Attribute<?, ?> attribute : entry.entityType().getAttributes()) {
+            if (AttributeClassifier.classify(attribute) != AttributeKind.COLLECTION_RELATION) {
+                continue;
+            }
+            Object rawCollection = readField(entity, attribute.getName());
+            row.put(attribute.getName(), toCollectionLinks(rawCollection));
+        }
+        return row;
+    }
+
+    @PostMapping("/{repo}")
+    public ResponseEntity<Map<String, Object>> create(
+            @PathVariable String repo, @RequestBody Map<String, String> body) {
+        DataRegistry.Entry entry = requireEntry(repo);
+        Object entity = instantiate(entry.entityClass());
+        applyFields(entity, entry.entityType(), body);
+        Object saved = entry.repository().save(entity);
+        return ResponseEntity.status(HttpStatus.CREATED).body(toRowMap(saved, entry.entityType()));
+    }
+
+    @PutMapping("/{repo}/{id}")
+    public Map<String, Object> update(@PathVariable String repo, @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        DataRegistry.Entry entry = requireEntry(repo);
+        Object entity = findEntity(entry, id);
+        applyFields(entity, entry.entityType(), body);
+        Object saved = entry.repository().save(entity);
+        return toRowMap(saved, entry.entityType());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object findEntity(DataRegistry.Entry entry, String encodedId) {
+        Object id = IdCodec.decode(encodedId, entry.entityType());
+        java.util.Optional<Object> found = entry.repository().findById(id);
+        return found.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown id " + encodedId));
+    }
+
+    private static Object instantiate(Class<?> entityClass) {
+        try {
+            var ctor = entityClass.getDeclaredConstructor();
+            ctor.setAccessible(true);
+            return ctor.newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot instantiate " + entityClass, e);
+        }
+    }
+
+    private void applyFields(Object entity, EntityType<?> entityType, Map<String, String> body) {
+        for (Map.Entry<String, String> field : body.entrySet()) {
+            Attribute<?, ?> attribute;
+            try {
+                attribute = entityType.getAttribute(field.getKey());
+            } catch (IllegalArgumentException e) {
+                continue; // unknown field name in the submitted form — ignore rather than fail
+            }
+            AttributeKind kind = AttributeClassifier.classify(attribute);
+            try {
+                Object value = switch (kind) {
+                    case BASIC -> ValueCoercion.fromString(field.getValue(), attribute.getJavaType());
+                    case CONVERTED -> objectMapper.readValue(field.getValue(), attribute.getJavaType());
+                    case SINGULAR_RELATION -> resolveRelation(attribute, field.getValue());
+                    case COLLECTION_RELATION -> null; // read-only, per spec — never written here
+                };
+                if (value != null || kind != AttributeKind.COLLECTION_RELATION) {
+                    Field f = findField(entity.getClass(), attribute.getName());
+                    f.setAccessible(true);
+                    f.set(entity, value);
+                }
+            } catch (Exception e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid value for field '" + field.getKey() + "': " + e.getMessage());
+            }
+        }
+    }
+
+    private Object resolveRelation(Attribute<?, ?> attribute, String encodedTargetId) {
+        if (encodedTargetId == null || encodedTargetId.isBlank()) {
+            return null;
+        }
+        EntityType<?> targetType = entityManager.getMetamodel().entity(attribute.getJavaType());
+        Object targetId = IdCodec.decode(encodedTargetId, targetType);
+        return entityManager.find(attribute.getJavaType(), targetId);
+    }
+
+    private List<Map<String, String>> toCollectionLinks(Object rawCollection) {
+        if (!(rawCollection instanceof java.util.Collection<?> collection)) {
+            return List.of();
+        }
+        return collection.stream().map(item -> {
+            EntityType<?> itemType = entityManager.getMetamodel().entity(item.getClass());
+            Map<String, String> link = new LinkedHashMap<>();
+            link.put("id", IdCodec.encode(readId(item, itemType), itemType));
+            link.put("label", AttributeClassifier.label(item, itemType));
+            return link;
+        }).toList();
     }
 
     private Map<String, Object> toRowMap(Object entity, EntityType<?> entityType) {
