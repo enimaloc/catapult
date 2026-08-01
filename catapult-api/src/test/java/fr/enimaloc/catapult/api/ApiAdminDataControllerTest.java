@@ -91,6 +91,35 @@ class ApiAdminDataControllerTest {
     }
 
     @Test
+    void entityList_rowWithLazySingularRelation_returns200WithRenderedLabel() throws Exception {
+        chatCommandDefinitionRepository.deleteAll();
+
+        UserAccount owner = new UserAccount();
+        owner.setTwitchUsername("list-owner-" + java.util.UUID.randomUUID());
+        owner = userAccountRepository.save(owner);
+
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setUser(owner);
+        definition.setName("greet");
+        definition.setTemplate("Hello!");
+        definition.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
+        chatCommandDefinitionRepository.save(definition);
+
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        // entityList reads TwDefinition/ChatCommandDefinition rows outside any repository-level
+        // transaction; ChatCommandDefinition.user is a FetchType.LAZY @ManyToOne, so the row it
+        // returns here is fetched by a fresh JPQL query — its "user" relation is an uninitialized
+        // Hibernate proxy at read time. Without @Transactional(readOnly = true) on entityList and
+        // proxy-safe label resolution, this used to throw LazyInitializationException /
+        // IllegalArgumentException instead of returning 200.
+        mvc.perform(get("/api/admin/data/chat-command-definition"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].user").exists())
+                .andExpect(jsonPath("$.content[0].user_label").value(
+                        org.hamcrest.Matchers.containsString("list-owner")));
+    }
+
+    @Test
     void unknownRepo_returns404() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         mvc.perform(get("/api/admin/data/does-not-exist"))
