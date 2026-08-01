@@ -44,8 +44,17 @@ public class AdminDataController {
         model.addAttribute("entities", entities != null ? entities : new EntityPage(0, 0, 0, List.of()));
         model.addAttribute("q", q);
         model.addAttribute("pickFor", pickFor);
-        model.addAttribute("returnTo", returnTo);
+        // Open-redirect guard: returnTo is attacker-controllable (plain request
+        // param) and is used as the base of a link target in
+        // data-entity-list.html. Only accept it when it points at an internal
+        // /admin/ path; otherwise drop it so the "Select" / pagination links
+        // fall back to not carrying a (potentially off-site) return target.
+        model.addAttribute("returnTo", isSafeReturnTo(returnTo) ? returnTo : null);
         return "admin/data-entity-list";
+    }
+
+    private static boolean isSafeReturnTo(String returnTo) {
+        return returnTo != null && returnTo.startsWith("/admin/");
     }
 
     @GetMapping("/{repo}/new")
@@ -62,7 +71,7 @@ public class AdminDataController {
 
     @PostMapping("/{repo}/new")
     public String createEntity(@PathVariable String repo, @RequestParam Map<String, String> form) {
-        apiClient.post("/api/admin/data/{repo}", stripCsrf(form), repo);
+        apiClient.post("/api/admin/data/{repo}", stripBlankId(stripCsrf(form)), repo);
         return "redirect:/admin/data/" + repo;
     }
 
@@ -92,5 +101,26 @@ public class AdminDataController {
         Map<String, String> copy = new java.util.LinkedHashMap<>(form);
         copy.remove("_csrf");
         return copy;
+    }
+
+    /**
+     * The create form always renders an "id" input (needed for natural-key
+     * entities with no {@code @GeneratedValue}), but for the more common
+     * generated-id entities the user is expected to leave it blank. If we
+     * forwarded {@code id=""} as-is, the API's {@code applyFields} would try
+     * to coerce the empty string into the id type (UUID/Long/...) and fail
+     * with a 400 that {@link ApiClient} silently swallows — the row would
+     * never be created but the controller would still redirect as if it had
+     * been. Dropping a blank id here means it's simply never submitted, so
+     * the server assigns one normally, exactly as if the field didn't exist.
+     */
+    private static Map<String, String> stripBlankId(Map<String, String> form) {
+        String id = form.get("id");
+        if (id != null && id.isBlank()) {
+            Map<String, String> copy = new java.util.LinkedHashMap<>(form);
+            copy.remove("id");
+            return copy;
+        }
+        return form;
     }
 }
