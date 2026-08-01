@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.admindata;
 import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.metamodel.EntityType;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,7 @@ import java.util.TreeMap;
  * Discovers every {@link JpaRepository} bean in the application context and resolves the JPA
  * entity type it manages, so the admin data viewer needs zero per-repository registration.
  */
+@Slf4j
 @Component
 public class DataRegistry {
 
@@ -44,6 +46,8 @@ public class DataRegistry {
             JpaRepository<?, ?> repository = bean.getValue();
             Class<?> entityClass = resolveEntityClass(repository);
             if (entityClass == null) {
+                log.warn("Skipping repository bean '{}' ({}): could not resolve its managed entity type",
+                        bean.getKey(), repository.getClass());
                 continue;
             }
             EntityType<?> entityType = entityManager.getMetamodel().entity(entityClass);
