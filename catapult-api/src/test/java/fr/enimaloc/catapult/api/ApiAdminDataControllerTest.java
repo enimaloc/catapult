@@ -27,6 +27,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -210,5 +211,28 @@ class ApiAdminDataControllerTest {
                         .contentType("application/json")
                         .content("{\"user\":\"" + nonexistentUserId + "\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void delete_removesRow() throws Exception {
+        twDefinitionRepository.deleteAll();
+        TwDefinition d = new TwDefinition();
+        d.setId("delete-row");
+        d.setLabel("Delete row");
+        twDefinitionRepository.save(d);
+
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(delete("/api/admin/data/tw-definition/delete-row").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(get("/api/admin/data/tw-definition/delete-row"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void delete_unknownId_returns404() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(delete("/api/admin/data/tw-definition/does-not-exist").with(csrf()))
+                .andExpect(status().isNotFound());
     }
 }

@@ -11,6 +11,7 @@ import jakarta.persistence.metamodel.Attribute;
 import jakarta.persistence.metamodel.EntityType;
 import jakarta.persistence.metamodel.SingularAttribute;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -18,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -139,6 +141,22 @@ public class ApiAdminDataController {
         applyFields(entity, entry.entityType(), body);
         Object saved = entry.repository().save(entity);
         return toRowMap(saved, entry.entityType());
+    }
+
+    @DeleteMapping("/{repo}/{id}")
+    public ResponseEntity<Void> delete(@PathVariable String repo, @PathVariable String id) {
+        DataRegistry.Entry entry = requireEntry(repo);
+        Object entityId = IdCodec.decode(id, entry.entityType());
+        if (entry.repository().findById(entityId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown id " + id);
+        }
+        try {
+            entry.repository().deleteById(entityId);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Cannot delete: referenced by other data (" + e.getMostSpecificCause().getMessage() + ")");
+        }
+        return ResponseEntity.noContent().build();
     }
 
     @SuppressWarnings("unchecked")
