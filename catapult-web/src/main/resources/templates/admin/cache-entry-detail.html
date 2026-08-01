@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'caches', ~{::body}, null, 'container', null, null)}">
+<head>
+    <title th:text="#{admin.caches.page_title(${app.name})}">Catapult — Admin Caches</title>
+</head>
+<body>
+<!--/*@thymesvar id="cacheName" type="java.lang.String"*/-->
+<!--/*@thymesvar id="entryKey" type="java.lang.String"*/-->
+<!--/*@thymesvar id="detail" type="java.util.Map"*/-->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 style="margin:0"><span th:text="#{admin.caches.entry.title}">Entry detail</span> — <span th:text="${entryKey}"></span></h2>
+        <a th:href="@{/admin/caches/{name}(name=${cacheName})}" class="btn btn-sm" th:text="#{admin.caches.back}">&larr; Back</a>
+    </div>
+
+    <p th:if="${detail == null or detail.detail == null}" class="text-muted" th:text="#{admin.caches.entry.not_found}">
+        No DB record found for this entry.
+    </p>
+
+    <div th:if="${detail != null and detail.expiresInSeconds != null}" class="card" style="padding:0.75rem 1rem; margin-bottom:1rem;">
+        <span th:if="${detail.expiresInSeconds >= 0}"
+              th:text="#{admin.caches.entry.expires_in(${detail.expiresInSeconds})}">Expires in 3600s</span>
+        <span th:unless="${detail.expiresInSeconds >= 0}"
+              th:text="#{admin.caches.entry.expired_since(${-detail.expiresInSeconds})}">Expired 3600s ago</span>
+    </div>
+
+    <!-- chat-command-user-cache: detail.detail is a List of ChatCommandDefinition maps -->
+    <div th:if="${detail != null and detail.detail instanceof T(java.util.List)}" class="card">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.caches.column.name}">Name</th>
+                        <th>Template</th>
+                        <th>Enabled</th>
+                        <th>Permission</th>
+                        <th>Updated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="d : ${detail.detail}">
+                        <td th:text="${d.name}"></td>
+                        <td th:text="${d.template}"></td>
+                        <td th:text="${d.enabled}"></td>
+                        <td th:text="${d.permission}"></td>
+                        <td th:text="${d.updatedAt}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- igdb-game-cache/name-index/exe-index/ccl-cache/tw-*: detail.detail is a single entity map -->
+    <div th:if="${detail != null and detail.detail != null and !(detail.detail instanceof T(java.util.List))}" class="card">
+        <table class="table">
+            <tbody>
+                <tr th:each="field : ${detail.detail}">
+                    <td><strong th:text="${field.key}"></strong></td>
+                    <td th:text="${field.value}"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
