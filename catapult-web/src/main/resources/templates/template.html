@@ -106,7 +106,7 @@
         <span th:if="${channelUsername != null}" class="nav-channel-name" th:text="${channelUsername}"></span>
         <div class="dropdown" sec:authorize="hasRole('ADMIN')">
             <button type="button" class="nav-links-dropdown-toggle"
-                    th:classappend="${{'app','ccl','members','experiments','groups','whitelist','steam-keys','minecraft-accounts','dtdd-keys','dtdd-mapping','config','notifications','broadcast','igdb'}.contains(active_page)} ? ' active'"
+                    th:classappend="${{'app','ccl','members','experiments','groups','whitelist','steam-keys','minecraft-accounts','dtdd-keys','dtdd-mapping','config','notifications','broadcast','igdb','caches','data'}.contains(active_page)} ? ' active'"
                     onclick="toggleDropdown('admin-menu')" th:text="#{nav.admin_menu}">Admin ▾</button>
             <div class="dropdown-menu" id="admin-menu">
                 <a th:href="@{/app}" class="dropdown-item"
@@ -136,6 +136,10 @@
                    th:classappend="${active_page == 'notifications'} ? ' active'" th:text="#{nav.admin_notifications}">Notifications</a>
                 <a th:href="@{/admin/broadcast}" class="dropdown-item"
                    th:classappend="${active_page == 'broadcast'} ? ' active'">Broadcast</a>
+                <a th:href="@{/admin/caches}" class="dropdown-item"
+                   th:classappend="${active_page == 'caches'} ? ' active'" th:text="#{nav.caches}">Caches</a>
+                <a th:href="@{/admin/data}" class="dropdown-item"
+                   th:classappend="${active_page == 'data'} ? ' active'" th:text="#{admin.data.nav}">Data</a>
                 <a th:href="@{/dev/igdb}" class="dropdown-item" th:classappend="${active_page == 'igdb'} ? ' active'"
                    th:if="${#arrays.contains(@environment.getActiveProfiles(), 'dev')}">IGDB Explorer</a>
             </div>
