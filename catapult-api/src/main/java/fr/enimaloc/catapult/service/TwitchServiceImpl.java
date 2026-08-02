@@ -166,8 +166,25 @@ public class TwitchServiceImpl implements TwitchService {
         });
     }
 
-    private static String normalizeTitle(String name) {
-        return name.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    // IGDB and Twitch don't always agree on Arabic vs. Roman numerals for the same game
+    // (e.g. IGDB's "Red Dead Redemption 2" vs. Twitch's "Red Dead Redemption II") — normalize
+    // per word before stripping punctuation so the numeral match survives.
+    private static final Map<String, String> ROMAN_NUMERALS = Map.ofEntries(
+            Map.entry("i", "1"), Map.entry("ii", "2"), Map.entry("iii", "3"), Map.entry("iv", "4"),
+            Map.entry("v", "5"), Map.entry("vi", "6"), Map.entry("vii", "7"), Map.entry("viii", "8"),
+            Map.entry("ix", "9"), Map.entry("x", "10"), Map.entry("xi", "11"), Map.entry("xii", "12"),
+            Map.entry("xiii", "13"), Map.entry("xiv", "14"), Map.entry("xv", "15"), Map.entry("xvi", "16"),
+            Map.entry("xvii", "17"), Map.entry("xviii", "18"), Map.entry("xix", "19"), Map.entry("xx", "20")
+    );
+
+    static String normalizeTitle(String name) {
+        String[] words = name.toLowerCase(java.util.Locale.ROOT).split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String word : words) {
+            String stripped = word.replaceAll("[^a-z0-9]", "");
+            sb.append(ROMAN_NUMERALS.getOrDefault(stripped, stripped));
+        }
+        return sb.toString();
     }
 
     @Override
