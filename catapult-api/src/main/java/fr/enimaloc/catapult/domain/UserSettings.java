@@ -71,7 +71,7 @@ public class UserSettings {
         joinColumns = @JoinColumn(name = "user_id")
     )
     @Column(name = "ccl_id")
-    private Set<String> blockedCcls = new HashSet<>();
+    private Set<String> blockedCcls = new HashSet<>(Set.of("Gambling"));
 
     @Column(name = "apply_default_on_stream_start", nullable = false)
     private boolean applyDefaultOnStreamStart = true;
