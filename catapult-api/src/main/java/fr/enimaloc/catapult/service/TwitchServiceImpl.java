@@ -34,6 +34,7 @@ public class TwitchServiceImpl implements TwitchService {
     private final TwitchCategoryService twitchCategoryService;
     private final TwitchTokenService twitchTokenService;
     private final ExternalApiObservations apiObservations;
+    private final BotToggleService botToggleService;
 
     public static final String CLIENT_ID = "Client-Id";
     public static final String AUTHORIZATION = "Authorization";
@@ -44,6 +45,10 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public void updateChannel(UserAccount user, GameBinding binding) {
+        if (!isBotEnabled(user)) {
+            log.debug("Skipping Twitch channel update for user {} — bot disabled", user.getId());
+            return;
+        }
         apiObservations.observeRun("twitch", "update_channel", () -> {
             if (binding.getStatus() == GameBinding.Status.INCOMPLETE || binding.isIgnored()) {
                 log.debug("Skipping Twitch update for user {} — binding is {} or ignored",
@@ -57,6 +62,18 @@ public class TwitchServiceImpl implements TwitchService {
                     () -> log.warn("No Twitch token found for user {}", user.getId())
                 );
         });
+    }
+
+    /**
+     * Re-reads botEnabled from the database rather than trusting {@code user}'s field, since
+     * callers can hold long-lived or per-cycle snapshots (e.g. {@code TwitchEventSubService}'s
+     * WebSocket listener, {@code SchedulerService}'s poll loop) that predate a bot-disable that
+     * happened after the snapshot was taken.
+     */
+    private boolean isBotEnabled(UserAccount user) {
+        return userAccountRepository.findById(user.getId())
+            .map(UserAccount::isBotEnabled)
+            .orElse(false);
     }
 
     private void patchChannel(UserAccount user, String accessToken, Map<String, Object> body) {
@@ -93,8 +110,7 @@ public class TwitchServiceImpl implements TwitchService {
                 String refreshed = twitchTokenService.refreshAccessToken(token, user);
                 if (refreshed == null) {
                     log.warn("Twitch token invalid for user {} — pausing bot", user.getId());
-                    user.setBotEnabled(false);
-                    userAccountRepository.save(user);
+                    botToggleService.setBotEnabled(user, false);
                     return;
                 }
                 try {
@@ -103,8 +119,7 @@ public class TwitchServiceImpl implements TwitchService {
                         user.getId(), binding.getTwitchGameId());
                 } catch (Exception retryEx) {
                     log.warn("Twitch channel update failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
-                    user.setBotEnabled(false);
-                    userAccountRepository.save(user);
+                    botToggleService.setBotEnabled(user, false);
                 }
             } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 log.warn("Twitch rate limit hit for user {} — will retry next cycle", user.getId());
@@ -206,6 +221,10 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public void resetToDefault(UserAccount user) {
+        if (!isBotEnabled(user)) {
+            log.debug("Skipping Twitch channel reset for user {} — bot disabled", user.getId());
+            return;
+        }
         apiObservations.observeRun("twitch", "reset_to_default", () ->
             userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
                 if (settings.getNoGameTwitchGameId() == null || settings.getNoGameTwitchGameId().isBlank()) {
@@ -237,8 +256,7 @@ public class TwitchServiceImpl implements TwitchService {
                 String refreshed = twitchTokenService.refreshAccessToken(token, user);
                 if (refreshed == null) {
                     log.warn("Twitch token invalid for user {} during reset — pausing bot", user.getId());
-                    user.setBotEnabled(false);
-                    userAccountRepository.save(user);
+                    botToggleService.setBotEnabled(user, false);
                     return;
                 }
                 try {
@@ -247,8 +265,7 @@ public class TwitchServiceImpl implements TwitchService {
                         user.getId(), settings.getNoGameTwitchGameId());
                 } catch (Exception retryEx) {
                     log.warn("Twitch channel reset failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
-                    user.setBotEnabled(false);
-                    userAccountRepository.save(user);
+                    botToggleService.setBotEnabled(user, false);
                 }
             } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 log.warn("Twitch rate limit hit for user {} during reset — skipping", user.getId());
