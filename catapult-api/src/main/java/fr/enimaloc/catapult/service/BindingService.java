@@ -25,6 +25,14 @@ public class BindingService {
     private final IgdbGameDetailsService igdbGameDetailsService;
     private final TwitchService twitchService;
     private final TwResolverService twResolverService;
+    private final GameStateService gameStateService;
+
+    private boolean isActiveBinding(UserAccount user, GameBinding binding) {
+        return gameStateService.getLastKnownGame(user)
+            .map(active -> active.getSourceType() == binding.getSourceType()
+                && active.getSourceId().equals(binding.getSourceId()))
+            .orElse(false);
+    }
 
     @Transactional
     public GameBinding resolveOrCreate(UserAccount user, DetectedGame detectedGame) {
@@ -151,7 +159,9 @@ public class BindingService {
                 binding.setStatus(GameBinding.Status.MANUAL);
             }
             gameBindingRepository.save(binding);
-            twitchService.updateChannel(user, binding);
+            if (isActiveBinding(user, binding)) {
+                twitchService.updateChannel(user, binding);
+            }
         });
     }
 
@@ -160,7 +170,9 @@ public class BindingService {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             binding.setCclEnabled(enabled);
             gameBindingRepository.save(binding);
-            twitchService.updateChannel(user, binding);
+            if (isActiveBinding(user, binding)) {
+                twitchService.updateChannel(user, binding);
+            }
         });
     }
 
@@ -169,7 +181,9 @@ public class BindingService {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             binding.setTwEnabled(enabled);
             gameBindingRepository.save(binding);
-            twitchService.updateChannel(user, binding);
+            if (isActiveBinding(user, binding)) {
+                twitchService.updateChannel(user, binding);
+            }
         });
     }
 
@@ -190,7 +204,9 @@ public class BindingService {
             binding.getTws().addAll(tws);
             binding.setTwOverride(true);
             gameBindingRepository.save(binding);
-            twitchService.updateChannel(user, binding);
+            if (isActiveBinding(user, binding)) {
+                twitchService.updateChannel(user, binding);
+            }
         });
     }
 
@@ -212,7 +228,9 @@ public class BindingService {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             binding.setIgnored(ignored);
             gameBindingRepository.save(binding);
-            twitchService.updateChannel(user, binding);
+            if (isActiveBinding(user, binding)) {
+                twitchService.updateChannel(user, binding);
+            }
         });
     }
 
