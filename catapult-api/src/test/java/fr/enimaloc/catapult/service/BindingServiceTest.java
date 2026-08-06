@@ -33,6 +33,7 @@ class BindingServiceTest {
     @Mock private IgdbGameDetailsService igdbGameDetailsService;
     @Mock private TwitchService twitchService;
     @Mock private TwResolverService twResolverService;
+    @Mock private GameStateService gameStateService;
 
     private BindingService bindingService;
 
@@ -42,7 +43,7 @@ class BindingServiceTest {
 
     @BeforeEach
     void setup() {
-        bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService);
+        bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameStateService);
 
         user = new UserAccount();
         bindingId = UUID.randomUUID();
@@ -52,12 +53,18 @@ class BindingServiceTest {
         binding.setStatus(GameBinding.Status.AUTO);
         binding.setTwitchGameId("old-game-id");
         binding.setTwitchGameName("Old Game");
+        binding.setSourceId("steam-123");
+        binding.setSourceType(GameBinding.SourceType.STEAM);
         binding.getCcls().add("ViolentGraphic");
         binding.getCcls().add("Gambling");
 
         when(gameBindingRepository.findById(bindingId)).thenReturn(Optional.of(binding));
         when(gameBindingRepository.findByIdAndUser(bindingId, user)).thenReturn(Optional.of(binding));
         when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // binding is the user's currently active game by default; individual tests
+        // override this to exercise the "editing a non-active binding" path.
+        when(gameStateService.getLastKnownGame(user)).thenReturn(
+            Optional.of(new DetectedGame("steam-123", GameBinding.SourceType.STEAM, "Old Game")));
     }
 
     @Test
@@ -88,6 +95,26 @@ class BindingServiceTest {
         bindingService.updateBinding(user, bindingId, "new-id", "New Game", Set.of(), false);
 
         verify(twitchService).updateChannel(user, binding);
+    }
+
+    @Test
+    void updateBinding_bindingNotActive_doesNotCallTwitch() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(
+            Optional.of(new DetectedGame("other-game", GameBinding.SourceType.STEAM, "Other Game")));
+
+        bindingService.updateBinding(user, bindingId, "new-id", "New Game", Set.of(), false);
+
+        verifyNoInteractions(twitchService);
+    }
+
+    @Test
+    void toggleIgnored_bindingNotActive_doesNotCallTwitch() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+
+        bindingService.toggleIgnored(user, bindingId, true);
+
+        assertThat(binding.isIgnored()).isTrue();
+        verifyNoInteractions(twitchService);
     }
 
     @Test
