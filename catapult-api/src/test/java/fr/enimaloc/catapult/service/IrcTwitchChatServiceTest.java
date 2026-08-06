@@ -154,7 +154,8 @@ class IrcTwitchChatServiceTest {
         doReturn(deleteResponseSpec).when(deleteSpec).retrieve();
 
         IrcTwitchChatService service = new IrcTwitchChatService(
-            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), restClient, METER_REGISTRY);
+            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), restClient, METER_REGISTRY,
+            newRateLimiter());
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
 
         UserAccount user = new UserAccount();
@@ -196,7 +197,8 @@ class IrcTwitchChatServiceTest {
         doReturn(postResponseSpec).when(postBodySpec).retrieve();
 
         IrcTwitchChatService service = new IrcTwitchChatService(
-            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), restClient, METER_REGISTRY);
+            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), restClient, METER_REGISTRY,
+            newRateLimiter());
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
 
         UserAccount user = new UserAccount();
@@ -213,7 +215,50 @@ class IrcTwitchChatServiceTest {
         verify(restClient).post();
     }
 
+    @Test
+    void sendMessageWritesPrivmsgWhenRateLimiterHasCapacity() {
+        IrcTwitchChatService service = new IrcTwitchChatService(
+            null, null, null, mock(ApplicationEventPublisher.class), null, METER_REGISTRY, newRateLimiter());
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setTwitchId("bcast-id");
+        user.setTwitchUsername("streamer");
+        StringWriter sw = new StringWriter();
+        writersOf(service).put(user.getId(), new PrintWriter(sw, true));
+
+        service.sendMessage(user, "hello chat");
+
+        assertThat(sw.toString().trim()).isEqualTo("PRIVMSG #streamer :hello chat");
+    }
+
+    @Test
+    void sendMessageSkippedWhenRateLimiterHasNoCapacity() {
+        // permitsPerWindow=0, maxWaitMs=0 -> acquire() always fails immediately
+        TwitchChatRateLimiter exhaustedLimiter = new TwitchChatRateLimiter(0, 0, 30000, METER_REGISTRY);
+        IrcTwitchChatService service = new IrcTwitchChatService(
+            null, null, null, mock(ApplicationEventPublisher.class), null, METER_REGISTRY, exhaustedLimiter);
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setTwitchId("bcast-id");
+        user.setTwitchUsername("streamer");
+        StringWriter sw = new StringWriter();
+        writersOf(service).put(user.getId(), new PrintWriter(sw, true));
+
+        service.sendMessage(user, "hello chat");
+
+        assertThat(sw.toString()).isEmpty();
+    }
+
+    private static TwitchChatRateLimiter newRateLimiter() {
+        return new TwitchChatRateLimiter(18, 3000, 30000, METER_REGISTRY);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<UUID, PrintWriter> writersOf(IrcTwitchChatService service) {
+        return (Map<UUID, PrintWriter>) ReflectionTestUtils.getField(service, "writers");
+    }
+
     private IrcTwitchChatService buildService(ApplicationEventPublisher publisher) {
-        return new IrcTwitchChatService(null, null, null, publisher, null, METER_REGISTRY);
+        return new IrcTwitchChatService(null, null, null, publisher, null, METER_REGISTRY, newRateLimiter());
     }
 }
