@@ -49,6 +49,7 @@ class TwitchServiceTest {
     @Mock private RestClient restClient;
     @Mock private TwitchCategoryService twitchCategoryService;
     @Mock private TwitchTokenService twitchTokenService;
+    @Mock private BotToggleService botToggleService;
 
     @Spy
     private ExternalApiObservations apiObservations =
@@ -76,6 +77,7 @@ class TwitchServiceTest {
 
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
             .thenReturn(Optional.of(token));
+        when(userAccountRepository.findById(any())).thenReturn(Optional.of(user));
         when(tokenEncryptionService.decrypt("encrypted-token")).thenReturn("plain-token");
         when(twitchTokenService.resolveAccessToken(any(OAuthToken.class), eq(user))).thenReturn("plain-token");
         when(twitchTokenService.refreshAccessToken(any(OAuthToken.class), eq(user))).thenReturn(null);
@@ -201,8 +203,34 @@ class TwitchServiceTest {
         assertThat(user.isBotEnabled()).isTrue(); // pre-condition
         twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
-        assertThat(user.isBotEnabled()).isFalse();
-        verify(userAccountRepository).save(user);
+        verify(botToggleService).setBotEnabled(user, false);
+    }
+
+    @Test
+    void updateChannel_botDisabled_doesNotCallHelix() {
+        user.setBotEnabled(false);
+
+        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+
+        verifyNoInteractions(restClient, oAuthTokenRepository);
+    }
+
+    @Test
+    void updateChannel_staleInMemoryUserStillEnabled_butDbSaysDisabled_skipsHelix() {
+        // Simulates a caller (e.g. TwitchEventSubService's long-lived listener, or a
+        // SchedulerService poll cycle) holding a UserAccount snapshot taken before the bot
+        // was disabled elsewhere — the DB is the source of truth, not the in-memory flag.
+        UserAccount staleUser = new UserAccount();
+        staleUser.setId(user.getId());
+        staleUser.setTwitchId(user.getTwitchId());
+        staleUser.setBotEnabled(true);
+        when(userAccountRepository.findById(staleUser.getId())).thenReturn(Optional.of(user));
+        user.setBotEnabled(false);
+
+        twitchService.updateChannel(staleUser, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+
+        assertThat(staleUser.isBotEnabled()).isTrue(); // the stale flag itself never flips
+        verifyNoInteractions(restClient, oAuthTokenRepository);
     }
 
     @Test
@@ -432,8 +460,7 @@ class TwitchServiceTest {
 
         twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
-        assertThat(user.isBotEnabled()).isTrue();
-        verify(userAccountRepository, never()).save(user);
+        verify(botToggleService, never()).setBotEnabled(eq(user), anyBoolean());
     }
 
     @Test
@@ -444,8 +471,31 @@ class TwitchServiceTest {
 
         twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
-        assertThat(user.isBotEnabled()).isFalse();
-        verify(userAccountRepository).save(user);
+        verify(botToggleService).setBotEnabled(user, false);
+    }
+
+    @Test
+    void resetToDefault_botDisabled_doesNotCallHelix() {
+        user.setBotEnabled(false);
+
+        twitchService.resetToDefault(user);
+
+        verifyNoInteractions(restClient, userSettingsRepository);
+    }
+
+    @Test
+    void resetToDefault_staleInMemoryUserStillEnabled_butDbSaysDisabled_skipsHelix() {
+        UserAccount staleUser = new UserAccount();
+        staleUser.setId(user.getId());
+        staleUser.setTwitchId(user.getTwitchId());
+        staleUser.setBotEnabled(true);
+        when(userAccountRepository.findById(staleUser.getId())).thenReturn(Optional.of(user));
+        user.setBotEnabled(false);
+
+        twitchService.resetToDefault(staleUser);
+
+        assertThat(staleUser.isBotEnabled()).isTrue();
+        verifyNoInteractions(restClient, userSettingsRepository);
     }
 
     @Test
@@ -458,8 +508,7 @@ class TwitchServiceTest {
 
         twitchService.resetToDefault(user);
 
-        assertThat(user.isBotEnabled()).isFalse();
-        verify(userAccountRepository).save(user);
+        verify(botToggleService).setBotEnabled(user, false);
     }
 
     @Test
@@ -474,7 +523,6 @@ class TwitchServiceTest {
 
         twitchService.resetToDefault(user);
 
-        assertThat(user.isBotEnabled()).isTrue();
-        verify(userAccountRepository, never()).save(user);
+        verify(botToggleService, never()).setBotEnabled(eq(user), anyBoolean());
     }
 }

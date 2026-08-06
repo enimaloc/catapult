@@ -40,6 +40,9 @@ class AccountServiceTest {
     @Mock private GameBindingRepository gameBindingRepository;
     @Mock private GetterConfigRepository getterConfigRepository;
     @Mock private UserSettingsRepository userSettingsRepository;
+    @Mock private BotToggleService botToggleService;
+    @Mock private TwitchChatService twitchChatService;
+    @Mock private EventSubService twitchEventSubService;
     @InjectMocks private AccountService accountService;
 
     private UserAccount account;
@@ -56,6 +59,26 @@ class AccountServiceTest {
     }
 
     @Test
+    void initiateAccountDeletion_setsPendingDeletionAndDisablesBot() {
+        accountService.initiateAccountDeletion(account);
+
+        assertThat(account.getStatus()).isEqualTo(UserAccount.Status.PENDING_DELETION);
+        assertThat(account.getDeletionRequestedAt()).isNotNull();
+        verify(botToggleService).setBotEnabled(account, false);
+    }
+
+    @Test
+    void cancelAccountDeletion_reactivatesAndReenablesBot() {
+        account.setStatus(UserAccount.Status.PENDING_DELETION);
+
+        accountService.cancelAccountDeletion(account);
+
+        assertThat(account.getStatus()).isEqualTo(UserAccount.Status.ACTIVE);
+        assertThat(account.getDeletionRequestedAt()).isNull();
+        verify(botToggleService).setBotEnabled(account, true);
+    }
+
+    @Test
     void deleteAccountImmediately_deletesUserAndRevokesTwitchToken() {
         OAuthToken token = new OAuthToken();
         token.setId(UUID.randomUUID());
@@ -67,6 +90,8 @@ class AccountServiceTest {
         verify(oAuthTokenRepository).delete(token);
         verify(experimentOverrideRepository).deleteByTargetUser(account);
         verify(userAccountRepository).delete(account);
+        verify(twitchChatService).disconnect(account);
+        verify(twitchEventSubService).disconnect(account);
     }
 
     @Test
@@ -79,6 +104,8 @@ class AccountServiceTest {
         verify(oAuthTokenRepository, never()).delete(any(OAuthToken.class));
         verify(experimentOverrideRepository).deleteByTargetUser(account);
         verify(userAccountRepository).delete(account);
+        verify(twitchChatService).disconnect(account);
+        verify(twitchEventSubService).disconnect(account);
     }
 
     @Test
@@ -95,8 +122,7 @@ class AccountServiceTest {
         assertThat(account.getTwitchId()).isNull();
         assertThat(account.getTwitchUsername()).isNull();
         assertThat(account.getProfileImageUrl()).isNull();
-        assertThat(account.isBotEnabled()).isFalse();
-        verify(userAccountRepository).save(account);
+        verify(botToggleService).setBotEnabled(account, false);
     }
 
     @Test
@@ -111,8 +137,7 @@ class AccountServiceTest {
         assertThat(account.getTwitchId()).isNull();
         assertThat(account.getTwitchUsername()).isNull();
         assertThat(account.getProfileImageUrl()).isNull();
-        assertThat(account.isBotEnabled()).isFalse();
-        verify(userAccountRepository).save(account);
+        verify(botToggleService).setBotEnabled(account, false);
     }
 
     @Test

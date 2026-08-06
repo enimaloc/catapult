@@ -17,7 +17,7 @@ import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.ChannelAccessService;
 import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.settings.UserSettingsDto;
-import fr.enimaloc.catapult.service.EventSubService;
+import fr.enimaloc.catapult.service.BotToggleService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +50,7 @@ public class ApiChannelActionsController {
     private final UserSettingsRepository userSettingsRepository;
     private final ChannelAccessService channelAccessService;
     private final BindingService bindingService;
-    private final EventSubService twitchEventSubService;
+    private final BotToggleService botToggleService;
     private final TwitchService twitchService;
     private final GameStateService gameStateService;
     private final AccountService accountService;
@@ -139,15 +139,7 @@ public class ApiChannelActionsController {
         UserAccount viewer = resolveViewer(jwt);
         UserAccount user = resolveChannel(username, viewer);
         requireOwner(viewer, user);
-        boolean newState = !user.isBotEnabled();
-        user.setBotEnabled(newState);
-        userAccountRepository.save(user);
-        if (newState) {
-            twitchEventSubService.connect(user);
-        } else {
-            twitchEventSubService.disconnect(user);
-        }
-        channelEventPublisher.botToggled(user.getId(), newState);
+        botToggleService.setBotEnabled(user, !user.isBotEnabled());
     }
 
     @PostMapping("/settings/ccl")
