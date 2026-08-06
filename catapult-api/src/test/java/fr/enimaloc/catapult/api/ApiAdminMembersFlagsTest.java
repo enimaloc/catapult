@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.repository.UserFlagRepository;
 import fr.enimaloc.catapult.repository.UserGroupRepository;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.AdminMigrationService;
+import fr.enimaloc.catapult.service.BotToggleService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,7 @@ class ApiAdminMembersFlagsTest {
     @MockitoBean UserAccountRepository userAccountRepository;
     @MockitoBean StreamStateService streamStateService;
     @MockitoBean AccountService accountService;
+    @MockitoBean BotToggleService botToggleService;
     @MockitoBean AdminMigrationService adminMigrationService;
     @MockitoBean UserFlagRepository userFlagRepository;
     @MockitoBean UserGroupRepository userGroupRepository;
@@ -138,6 +140,22 @@ class ApiAdminMembersFlagsTest {
                 .andExpect(status().isNoContent());
 
         verify(userGroupRepository).save(any(UserGroup.class));
+    }
+
+    @Test
+    void toggleBot_delegatesToBotToggleServiceWithFlippedValue() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(userId);
+        user.setBotEnabled(true);
+        when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        mvc.perform(post("/api/admin/members/" + userId + "/bot/toggle")
+                        .with(adminJwt())
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(botToggleService).setBotEnabled(user, false);
     }
 
     @Test

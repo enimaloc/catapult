@@ -42,6 +42,9 @@ public class AccountService {
     private final GetterConfigRepository getterConfigRepository;
     private final UserSettingsRepository userSettingsRepository;
     private final Optional<XboxUserTokenService> xboxUserTokenService;
+    private final BotToggleService botToggleService;
+    private final TwitchChatService twitchChatService;
+    private final EventSubService twitchEventSubService;
 
     @Value("${app.account.deletion-delay-days:7}")
     private int deletionDelayDays;
@@ -54,8 +57,7 @@ public class AccountService {
     public void initiateAccountDeletion(UserAccount account) {
         account.setStatus(UserAccount.Status.PENDING_DELETION);
         account.setDeletionRequestedAt(Instant.now());
-        account.setBotEnabled(false);
-        userAccountRepository.save(account);
+        botToggleService.setBotEnabled(account, false);
         log.info("Account {} marked as PENDING_DELETION", account.getId());
     }
 
@@ -63,8 +65,7 @@ public class AccountService {
     public void cancelAccountDeletion(UserAccount account) {
         account.setStatus(UserAccount.Status.ACTIVE);
         account.setDeletionRequestedAt(null);
-        account.setBotEnabled(true);
-        userAccountRepository.save(account);
+        botToggleService.setBotEnabled(account, true);
         log.info("Account {} deletion cancelled", account.getId());
     }
 
@@ -90,6 +91,8 @@ public class AccountService {
     }
 
     private void deleteAccountPermanently(UserAccount account) {
+        twitchChatService.disconnect(account);
+        twitchEventSubService.disconnect(account);
         revokeTwitchToken(account);
         experimentOverrideRepository.deleteByTargetUser(account);
         experimentAssignmentRepository.deleteByUser(account);
@@ -157,9 +160,8 @@ public class AccountService {
         account.setTwitchId(null);
         account.setTwitchUsername(null);
         account.setProfileImageUrl(null);
-        account.setBotEnabled(false);
         account.setStatus(UserAccount.Status.INACTIVE);
-        userAccountRepository.save(account);
+        botToggleService.setBotEnabled(account, false);
         log.info("Admin unlinked Twitch for account {}", account.getId());
     }
 }
