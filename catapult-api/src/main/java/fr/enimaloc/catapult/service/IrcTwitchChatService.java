@@ -53,6 +53,7 @@ public class IrcTwitchChatService implements TwitchChatService {
     private final ApplicationEventPublisher eventPublisher;
     private final RestClient restClient;
     private final MeterRegistry meterRegistry;
+    private final TwitchChatRateLimiter chatRateLimiter;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -235,6 +236,13 @@ public class IrcTwitchChatService implements TwitchChatService {
         // Twitch caps a chat line at 500 chars; split + prefix so long
         // responses are delivered intact rather than silently truncated.
         for (String part : ChatMessageSplitter.split(message)) {
+            if (!chatRateLimiter.acquire(user.getTwitchId())) {
+                meterRegistry.counter("catapult.chat.commands.send",
+                    "sender", "irc", "outcome", "rate_limited").increment();
+                log.warn("[IRC] sendMessage skipped for user {}: rate limiter is pausing sender {}",
+                    user.getId(), user.getTwitchId());
+                return;
+            }
             writer.println("PRIVMSG " + channel + " :" + part);
         }
     }
