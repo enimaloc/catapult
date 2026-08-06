@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.repository.UserFlagRepository;
 import fr.enimaloc.catapult.repository.UserGroupRepository;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.AdminMigrationService;
+import fr.enimaloc.catapult.service.BotToggleService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,7 @@ public class ApiAdminMembersController {
     private final UserAccountRepository userAccountRepository;
     private final StreamStateService streamStateService;
     private final AccountService accountService;
+    private final BotToggleService botToggleService;
     private final AdminMigrationService adminMigrationService;
     private final Environment environment;
     private final UserFlagRepository userFlagRepository;
@@ -58,8 +60,7 @@ public class ApiAdminMembersController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void toggleBot(@PathVariable UUID id) {
         UserAccount user = findOrThrow(id);
-        user.setBotEnabled(!user.isBotEnabled());
-        userAccountRepository.save(user);
+        botToggleService.setBotEnabled(user, !user.isBotEnabled());
     }
 
     @PostMapping("/{id}/delete")
