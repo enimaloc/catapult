@@ -69,3 +69,6 @@ scripts/build.sh
 scripts/bump.sh
 scripts/dev-up.sh
 scripts/publish.sh
+docker-compose.override.yml
+e2e/package-lock.json
+test-results/
