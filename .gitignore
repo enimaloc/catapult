@@ -59,3 +59,13 @@ catapult_obs_local.py
 
 ### Generated ###
 **/src/main/resources/changelog.log
+
+### Local artifacts ###
+.run/
+/*.sql
+catapult-api/src/test/java/Tmp.java
+docs/
+scripts/build.sh
+scripts/bump.sh
+scripts/dev-up.sh
+scripts/publish.sh
