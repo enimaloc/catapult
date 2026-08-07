@@ -111,6 +111,14 @@ public class ChannelActionsController {
         return ackOrRedirect(hxRequest, username);
     }
 
+    @PostMapping("/game/recheck")
+    public ResponseEntity<Void> recheckGame(
+            @PathVariable String username,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest) {
+        apiClient.post("/api/channels/{username}/game/recheck", null, username);
+        return ackOrRedirect(hxRequest, username);
+    }
+
     @PostMapping("/settings/ccl")
     public ResponseEntity<Void> saveCclSettings(
             @PathVariable String username,

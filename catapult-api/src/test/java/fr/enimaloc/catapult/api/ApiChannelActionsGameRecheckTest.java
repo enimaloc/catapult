@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -37,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiChannelActionsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-class ApiChannelActionsBotToggleTest {
+class ApiChannelActionsGameRecheckTest {
 
     @Autowired MockMvc mvc;
 
@@ -60,27 +61,48 @@ class ApiChannelActionsBotToggleTest {
     }
 
     @Test
-    void toggleBot_ownerTogglesOwnBot_delegatesToBotToggleService() throws Exception {
+    void recheckGame_ownerWithActiveAccount_triggersManualCheck() throws Exception {
         UUID userId = UUID.randomUUID();
         UserAccount user = new UserAccount();
         user.setId(userId);
         user.setTwitchUsername("streamer");
-        user.setBotEnabled(true);
+        user.setStatus(UserAccount.Status.ACTIVE);
+        user.setBotEnabled(false);
 
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/settings/bot")
+        mvc.perform(post("/api/channels/streamer/game/recheck")
                         .with(userJwt(userId))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
 
-        verify(botToggleService).setBotEnabled(user, false);
+        verify(schedulerService).triggerManualCheck(user);
     }
 
     @Test
-    void toggleBot_nonOwner_forbidden() throws Exception {
+    void recheckGame_accountInactive_conflict() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(userId);
+        user.setTwitchUsername("streamer");
+        user.setStatus(UserAccount.Status.INACTIVE);
+
+        when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
+        when(channelAccessService.canAccess(user, user)).thenReturn(true);
+
+        mvc.perform(post("/api/channels/streamer/game/recheck")
+                        .with(userJwt(userId))
+                        .with(csrf()))
+                .andExpect(status().isConflict());
+
+        verify(schedulerService, never()).triggerManualCheck(user);
+    }
+
+    @Test
+    void recheckGame_nonOwner_forbidden() throws Exception {
         UUID viewerId = UUID.randomUUID();
         UserAccount viewer = new UserAccount();
         viewer.setId(viewerId);
@@ -89,15 +111,17 @@ class ApiChannelActionsBotToggleTest {
         UserAccount channelUser = new UserAccount();
         channelUser.setId(channelId);
         channelUser.setTwitchUsername("streamer");
-        channelUser.setBotEnabled(true);
+        channelUser.setStatus(UserAccount.Status.ACTIVE);
 
         when(userAccountRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
         when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(channelUser));
         when(channelAccessService.canAccess(viewer, channelUser)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/settings/bot")
+        mvc.perform(post("/api/channels/streamer/game/recheck")
                         .with(userJwt(viewerId))
                         .with(csrf()))
                 .andExpect(status().isForbidden());
+
+        verify(schedulerService, never()).triggerManualCheck(channelUser);
     }
 }

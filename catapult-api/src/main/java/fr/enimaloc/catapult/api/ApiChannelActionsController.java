@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import fr.enimaloc.catapult.service.BotToggleService;
 import fr.enimaloc.catapult.service.GameStateService;
+import fr.enimaloc.catapult.service.SchedulerService;
 import fr.enimaloc.catapult.service.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +55,7 @@ public class ApiChannelActionsController {
     private final TwitchService twitchService;
     private final GameStateService gameStateService;
     private final AccountService accountService;
+    private final SchedulerService schedulerService;
     private final TokenEncryptionService tokenEncryptionService;
     private final SteamApiKeyRepository steamApiKeyRepository;
     private final fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
@@ -140,6 +142,23 @@ public class ApiChannelActionsController {
         UserAccount user = resolveChannel(username, viewer);
         requireOwner(viewer, user);
         botToggleService.setBotEnabled(user, !user.isBotEnabled());
+    }
+
+    // ── Game detection ───────────────────────────────────────────────────────
+
+    @PostMapping("/game/recheck")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void recheckGame(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount user = resolveChannel(username, viewer);
+        requireOwner(viewer, user);
+        if (user.getStatus() != UserAccount.Status.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Account is not active");
+        }
+        schedulerService.triggerManualCheck(user);
     }
 
     @PostMapping("/settings/ccl")

@@ -103,6 +103,40 @@ class SchedulerServiceTest {
     }
 
     @Test
+    void triggerManualCheck_processesOnlyGivenUser() {
+        UserAccount user = new UserAccount(); user.setId(UUID.randomUUID());
+        when(gameGetterChain.resolve(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+
+        schedulerService.triggerManualCheck(user);
+
+        assertThat(registry.get("catapult.scheduler.manual-checks").counter().count())
+            .isEqualTo(1.0);
+        verify(userAccountRepository, org.mockito.Mockito.never())
+            .findByBotEnabledTrueAndStatus(any());
+    }
+
+    @Test
+    void triggerManualCheck_withSteamGetter_prefetchesOnlyThatUser() {
+        SteamGameGetter steamGetter = mock(SteamGameGetter.class);
+        when(steamGetter.prefetchBatch(any()))
+            .thenReturn(CompletableFuture.completedFuture(null));
+        UserAccount user = new UserAccount(); user.setId(UUID.randomUUID());
+        user.setSteamId("steam-1");
+
+        SchedulerService service = new SchedulerService(
+            userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
+            Optional.of(steamGetter), Optional.empty(), bindingService);
+        when(gameGetterChain.resolve(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+
+        service.triggerManualCheck(user);
+
+        verify(steamGetter).prefetchBatch(List.of(user));
+        verify(steamGetter).clearCycleCache();
+    }
+
+    @Test
     void onStartup_callsRefreshIncompleteBindings() {
         schedulerService.onStartup();
 
