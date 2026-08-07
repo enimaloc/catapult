@@ -306,6 +306,23 @@ class MinecraftFriendServiceTest {
     }
 
     @Test
+    void sync_inviteRejectedLinkNowDirectFriend_becomesAcceptedWithoutRetry() {
+        var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
+        link.setStatus(MinecraftFriendLink.Status.INVITE_REJECTED);
+        when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
+        when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());
+        when(minecraftService.getFriends("mc-token")).thenReturn(friendsListWith(
+                new MinecraftService.FriendsList.Friend("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_")));
+
+        service.syncFriendLinks();
+
+        verify(minecraftService, never()).addFriend(anyString(), any(), anyString());
+        assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.ACCEPTED);
+        assertThat(link.getAcceptedAt()).isNotNull();
+        verify(linkRepository).save(link);
+    }
+
+    @Test
     void sync_inviteRejectedLinkStillRejectedOnRetry_staysInviteRejected() {
         var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
         link.setStatus(MinecraftFriendLink.Status.INVITE_REJECTED);
