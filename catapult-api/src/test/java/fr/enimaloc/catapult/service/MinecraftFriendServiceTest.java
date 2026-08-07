@@ -288,6 +288,55 @@ class MinecraftFriendServiceTest {
         assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.ACCEPTED);
     }
 
+    @Test
+    void sync_inviteRejectedLinkNowIncoming_retriesAddFriendAndBecomesAccepted() {
+        var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
+        link.setStatus(MinecraftFriendLink.Status.INVITE_REJECTED);
+        when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
+        when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());
+        when(minecraftService.getFriends("mc-token")).thenReturn(friendsListWithIncoming(
+                new MinecraftService.FriendsList.Friend("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_")));
+
+        service.syncFriendLinks();
+
+        verify(minecraftService).addFriend("mc-token", null, "069a79f4-44e9-4726-a5be-fca90e38aaf5");
+        assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.ACCEPTED);
+        assertThat(link.getAcceptedAt()).isNotNull();
+        verify(linkRepository).save(link);
+    }
+
+    @Test
+    void sync_inviteRejectedLinkStillRejectedOnRetry_staysInviteRejected() {
+        var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
+        link.setStatus(MinecraftFriendLink.Status.INVITE_REJECTED);
+        when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
+        when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());
+        when(minecraftService.getFriends("mc-token")).thenReturn(friendsListWithIncoming(
+                new MinecraftService.FriendsList.Friend("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_")));
+        when(minecraftService.addFriend("mc-token", null, "069a79f4-44e9-4726-a5be-fca90e38aaf5"))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden", null, null, null));
+
+        service.syncFriendLinks();
+
+        assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.INVITE_REJECTED);
+        verify(linkRepository, never()).save(link);
+    }
+
+    @Test
+    void sync_inviteRejectedLinkNotYetIncoming_isLeftUntouched() {
+        var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
+        link.setStatus(MinecraftFriendLink.Status.INVITE_REJECTED);
+        when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
+        when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());
+        when(minecraftService.getFriends("mc-token")).thenReturn(friendsListWith());
+
+        service.syncFriendLinks();
+
+        verify(minecraftService, never()).addFriend(anyString(), any(), anyString());
+        assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.INVITE_REJECTED);
+        verify(linkRepository, never()).save(link);
+    }
+
     private MinecraftFriendLink pendingLink(String profileId, String name) {
         var link = new MinecraftFriendLink();
         link.setUser(user);
@@ -303,5 +352,10 @@ class MinecraftFriendServiceTest {
                 new MinecraftService.FriendsList.Friend[0],
                 new MinecraftService.FriendsList.Friend[0],
                 friends.length == 0);
+    }
+
+    private MinecraftService.FriendsList friendsListWithIncoming(MinecraftService.FriendsList.Friend... incoming) {
+        return new MinecraftService.FriendsList(new MinecraftService.FriendsList.Friend[0], incoming,
+                new MinecraftService.FriendsList.Friend[0], incoming.length == 0);
     }
 }
