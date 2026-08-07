@@ -54,6 +54,10 @@
         <div id="current-game-none" th:hidden="${currentGame != null}">
             <p class="text-muted" th:text="#{status.no_game}">Aucun jeu détecté</p>
         </div>
+        <form th:action="@{/channels/{u}/game/recheck(u=${channelUsername})}" method="post" ws:post="@{/channels/{u}/game/recheck(u=${channelUsername})}" ws:swap="none"> <!-- nosemgrep -->
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn btn-secondary" th:text="#{status.recheck_game}">Vérifier maintenant</button>
+        </form>
     </div>
 </div>
 </body>

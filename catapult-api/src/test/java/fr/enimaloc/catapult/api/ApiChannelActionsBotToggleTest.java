@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.BotToggleService;
 import fr.enimaloc.catapult.service.ChannelAccessService;
 import fr.enimaloc.catapult.service.GameStateService;
+import fr.enimaloc.catapult.service.SchedulerService;
 import fr.enimaloc.catapult.service.TwitchService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,7 @@ class ApiChannelActionsBotToggleTest {
     @MockitoBean TokenEncryptionService tokenEncryptionService;
     @MockitoBean SteamApiKeyRepository steamApiKeyRepository;
     @MockitoBean ChannelEventPublisher channelEventPublisher;
+    @MockitoBean SchedulerService schedulerService;
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor userJwt(UUID id) {
         return jwt().jwt(j -> j.subject(id.toString()).claim("twitchId", "123"))

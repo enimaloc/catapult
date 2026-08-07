@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
 @Service
@@ -38,42 +39,23 @@ public class SchedulerService {
     private final Optional<MinecraftPresenceGetter> minecraftPresenceGetter;
     private final BindingService bindingService;
 
+    /**
+     * Guards the prefetch→process→clear cycle so a manual {@link #triggerManualCheck}
+     * can never interleave with the scheduled {@link #poll}: both getters cache one
+     * cycle's results in a shared field, so running two cycles concurrently could let
+     * one overwrite or clear the other's cache mid-read.
+     */
+    private final ReentrantLock cycleLock = new ReentrantLock();
+
     @Scheduled(fixedRateString = "${app.polling.interval-seconds:60}000")
     public void poll() {
         Timer.Sample sample = Timer.start(meterRegistry);
+        cycleLock.lock();
         try {
             List<UserAccount> activeUsers = userAccountRepository
                 .findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
 
-            steamGameGetter.ifPresent(getter -> {
-                CompletableFuture<Void> prefetch = getter.prefetchBatch(
-                    activeUsers.stream().filter(u -> u.getSteamId() != null).toList()
-                );
-                try {
-                    prefetch.get(5, java.util.concurrent.TimeUnit.SECONDS);
-                } catch (java.util.concurrent.TimeoutException e) {
-                    prefetch.cancel(false);
-                    log.warn("Steam prefetch timed out after 5s — proceeding with partial results");
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } catch (java.util.concurrent.ExecutionException e) {
-                    log.warn("Steam prefetch failed: {}", e.getCause().getMessage());
-                }
-            });
-
-            minecraftPresenceGetter.ifPresent(getter -> {
-                CompletableFuture<Void> prefetch = getter.prefetchBatch();
-                try {
-                    prefetch.get(5, java.util.concurrent.TimeUnit.SECONDS);
-                } catch (java.util.concurrent.TimeoutException e) {
-                    prefetch.cancel(false);
-                    log.warn("Minecraft prefetch timed out after 5s — proceeding with partial results");
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } catch (java.util.concurrent.ExecutionException e) {
-                    log.warn("Minecraft prefetch failed: {}", e.getCause().getMessage());
-                }
-            });
+            prefetch(activeUsers);
 
             for (UserAccount user : activeUsers) {
                 try {
@@ -84,10 +66,64 @@ public class SchedulerService {
                 meterRegistry.counter("catapult.scheduler.users.polled").increment();
             }
         } finally {
-            steamGameGetter.ifPresent(SteamGameGetter::clearCycleCache);
-            minecraftPresenceGetter.ifPresent(MinecraftPresenceGetter::clearCycleCache);
+            clearPrefetchCaches();
+            cycleLock.unlock();
             sample.stop(Timer.builder("catapult.scheduler.poll.duration").register(meterRegistry));
         }
+    }
+
+    /**
+     * Runs a single-user detection cycle outside the scheduled poll, for a user whose
+     * bot is disabled (and so excluded from {@link #poll}'s query) but who still wants
+     * a one-off game check — e.g. via the "recheck" button on their channel page.
+     */
+    public void triggerManualCheck(UserAccount user) {
+        cycleLock.lock();
+        try {
+            prefetch(List.of(user));
+            processUser(user);
+            meterRegistry.counter("catapult.scheduler.manual-checks").increment();
+        } finally {
+            clearPrefetchCaches();
+            cycleLock.unlock();
+        }
+    }
+
+    private void prefetch(List<UserAccount> users) {
+        steamGameGetter.ifPresent(getter -> {
+            CompletableFuture<Void> prefetch = getter.prefetchBatch(
+                users.stream().filter(u -> u.getSteamId() != null).toList()
+            );
+            try {
+                prefetch.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (java.util.concurrent.TimeoutException e) {
+                prefetch.cancel(false);
+                log.warn("Steam prefetch timed out after 5s — proceeding with partial results");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (java.util.concurrent.ExecutionException e) {
+                log.warn("Steam prefetch failed: {}", e.getCause().getMessage());
+            }
+        });
+
+        minecraftPresenceGetter.ifPresent(getter -> {
+            CompletableFuture<Void> prefetch = getter.prefetchBatch();
+            try {
+                prefetch.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (java.util.concurrent.TimeoutException e) {
+                prefetch.cancel(false);
+                log.warn("Minecraft prefetch timed out after 5s — proceeding with partial results");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (java.util.concurrent.ExecutionException e) {
+                log.warn("Minecraft prefetch failed: {}", e.getCause().getMessage());
+            }
+        });
+    }
+
+    private void clearPrefetchCaches() {
+        steamGameGetter.ifPresent(SteamGameGetter::clearCycleCache);
+        minecraftPresenceGetter.ifPresent(MinecraftPresenceGetter::clearCycleCache);
     }
 
     @EventListener(ApplicationReadyEvent.class)
