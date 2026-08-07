@@ -66,6 +66,16 @@ class ApiAdminProviderTwitchControllerTest {
     }
 
     @Test
+    void games_tokenFetchFails_returnsRawErrorInsteadOfThrowing() {
+        when(twitchTokenService.getAppAccessToken()).thenThrow(new IllegalStateException("token endpoint down"));
+
+        var result = controller.games("Fortnite");
+
+        assertThat(result.hasError()).isTrue();
+        assertThat(result.error()).contains("token endpoint down");
+    }
+
+    @Test
     void users_unknownUserId_throws404() {
         UUID userId = UUID.randomUUID();
         when(userAccountRepository.findById(userId)).thenReturn(Optional.empty());
