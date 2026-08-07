@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.service.MinecraftService;
 import fr.enimaloc.catapult.service.MinecraftTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +25,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/admin/providers/minecraft")
 @RequiredArgsConstructor
+@ConditionalOnBooleanProperty("minecraft.enabled")
 public class ApiAdminProviderMinecraftController {
 
     private final MinecraftTokenService tokenService;
