@@ -38,46 +38,56 @@ public class ApiAdminProviderTwitchController {
 
     @GetMapping("/games")
     public RawProviderResponseSupport.RawProviderResponse games(@RequestParam String name) {
-        String token = twitchTokenService.getAppAccessToken();
-        return rawSupport.fetch(() -> restClient.get()
-                .uri(TWITCH_API_URL + "/games?name=" + name)
-                .header("Authorization", "Bearer " + token)
-                .header("Client-Id", twitchClientId)
-                .retrieve()
-                .body(String.class));
+        return rawSupport.fetch(() -> fetchGames(name));
     }
 
     @GetMapping("/users")
     public RawProviderResponseSupport.RawProviderResponse users(@RequestParam UUID userId) {
-        String token = resolveUserToken(userId);
-        return rawSupport.fetch(() -> restClient.get()
-                .uri(TWITCH_API_URL + "/users")
-                .header("Authorization", "Bearer " + token)
-                .header("Client-Id", twitchClientId)
-                .retrieve()
-                .body(String.class));
+        UserAccount user = findUser(userId);
+        OAuthToken token = findToken(user);
+        return rawSupport.fetch(() -> fetchUsers(token, user));
     }
 
     @GetMapping("/moderated-channels")
     public RawProviderResponseSupport.RawProviderResponse moderatedChannels(@RequestParam UUID userId) {
         UserAccount user = findUser(userId);
-        String token = resolveUserToken(user);
-        return rawSupport.fetch(() -> restClient.get()
-                .uri(TWITCH_API_URL + "/moderation/channels?user_id=" + user.getTwitchId())
+        OAuthToken token = findToken(user);
+        return rawSupport.fetch(() -> fetchModeratedChannels(token, user));
+    }
+
+    private String fetchGames(String name) {
+        String token = twitchTokenService.getAppAccessToken();
+        return restClient.get()
+                .uri(TWITCH_API_URL + "/games?name=" + name)
                 .header("Authorization", "Bearer " + token)
                 .header("Client-Id", twitchClientId)
                 .retrieve()
-                .body(String.class));
+                .body(String.class);
     }
 
-    private String resolveUserToken(UUID userId) {
-        return resolveUserToken(findUser(userId));
+    private String fetchUsers(OAuthToken token, UserAccount user) {
+        String accessToken = twitchTokenService.resolveAccessToken(token, user);
+        return restClient.get()
+                .uri(TWITCH_API_URL + "/users")
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Client-Id", twitchClientId)
+                .retrieve()
+                .body(String.class);
     }
 
-    private String resolveUserToken(UserAccount user) {
-        OAuthToken token = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+    private String fetchModeratedChannels(OAuthToken token, UserAccount user) {
+        String accessToken = twitchTokenService.resolveAccessToken(token, user);
+        return restClient.get()
+                .uri(TWITCH_API_URL + "/moderation/channels?user_id=" + user.getTwitchId())
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Client-Id", twitchClientId)
+                .retrieve()
+                .body(String.class);
+    }
+
+    private OAuthToken findToken(UserAccount user) {
+        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Aucun token Twitch lié pour cet utilisateur"));
-        return twitchTokenService.resolveAccessToken(token, user);
     }
 
     private UserAccount findUser(UUID userId) {
