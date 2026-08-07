@@ -169,6 +169,16 @@ class ApiMinecraftConnectControllerTest {
     }
 
     @Test
+    void get_inviteRejectedLink_exposesStatusAndServiceAccountUsername() {
+        when(friendService.getLink(user)).thenReturn(Optional.of(link(MinecraftFriendLink.Status.INVITE_REJECTED)));
+
+        var response = controller.status(jwt);
+
+        assertThat(response.status()).isEqualTo("INVITE_REJECTED");
+        assertThat(response.serviceAccountUsername()).isEqualTo("CatapultBot1");
+    }
+
+    @Test
     void get_gateClosed_returnsUnavailable() {
         when(gateService.isAvailableFor(user)).thenReturn(false);
 
