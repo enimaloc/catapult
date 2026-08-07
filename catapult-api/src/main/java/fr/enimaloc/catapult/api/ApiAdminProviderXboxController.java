@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.XboxUserTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,6 +22,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/admin/providers/xbox")
 @RequiredArgsConstructor
+@ConditionalOnBooleanProperty("xbox.enabled")
 public class ApiAdminProviderXboxController {
 
     private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid(";
