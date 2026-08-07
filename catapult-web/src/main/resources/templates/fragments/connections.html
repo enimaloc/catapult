@@ -186,6 +186,16 @@
                 </form>
             </div>
 
+            <!-- INVITE_REJECTED : le joueur bloque les demandes externes, ajout manuel requis -->
+            <div th:if="${minecraftStatus == 'INVITE_REJECTED'}" class="provider-warning">
+                <span th:text="#{connections.minecraft.invite_rejected(${minecraftBotUsername})}">Ce compte n'accepte pas les demandes d'ami externes. Ajoute CatapultBot1 toi-même en jeu (Social → ajouter un ami), puis clique sur Vérifier.</span>
+                <form th:action="@{/channels/{u}/settings/minecraft/check(u=${channelUsername})}" method="post" class="d-inline">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary"
+                            th:text="#{connections.minecraft.refresh}">Vérifier</button>
+                </form>
+            </div>
+
             <!-- ACCEPTED : lié -->
             <div th:if="${minecraftStatus == 'ACCEPTED'}">
                 <span class="badge badge-connected" th:text="#{connections.minecraft.linked(${minecraftName})}">Lié : jeb_</span>
