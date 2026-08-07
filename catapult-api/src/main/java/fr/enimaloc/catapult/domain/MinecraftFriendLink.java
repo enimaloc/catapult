@@ -14,7 +14,7 @@ import java.util.UUID;
 public class MinecraftFriendLink {
 
     public enum Status {
-        PENDING, ACCEPTED, REMOVED
+        PENDING, ACCEPTED, REMOVED, INVITE_REJECTED
     }
 
     @Id
