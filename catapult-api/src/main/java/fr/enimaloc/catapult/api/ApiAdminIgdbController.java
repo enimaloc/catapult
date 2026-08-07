@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.service.IgdbService;
 import fr.enimaloc.catapult.service.IgdbService.IgdbGame;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,6 +17,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/admin/igdb")
+@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
 public class ApiAdminIgdbController {
 
     private final IgdbService igdbService;

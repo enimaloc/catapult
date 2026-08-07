@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -18,6 +19,7 @@ import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/admin/dtdd-keys")
+@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
 public class ApiAdminDtddKeysController {
 
     private static final Pattern KEY_PATTERN = Pattern.compile("ddd_[A-Za-z0-9]{16,128}");

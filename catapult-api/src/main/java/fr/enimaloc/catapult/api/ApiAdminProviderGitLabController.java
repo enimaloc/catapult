@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.api.provider.RawProviderResponseSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,6 +14,7 @@ import org.springframework.web.client.RestClient;
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/providers/gitlab")
+@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
 @RequiredArgsConstructor
 public class ApiAdminProviderGitLabController {
 
