@@ -181,6 +181,13 @@ public class MinecraftFriendService {
                                     Function.identity(),
                                     (a, b) -> a));
 
+            Map<String, MinecraftService.FriendsList.Friend> byIncomingProfileId =
+                    Arrays.stream(friendsList.incomingRequests())
+                            .collect(Collectors.toMap(
+                                    f -> MinecraftService.normalizeProfileId(f.profileId()),
+                                    Function.identity(),
+                                    (a, b) -> a));
+
             for (MinecraftFriendLink link : links) {
                 MinecraftService.FriendsList.Friend friend =
                         byProfileId.get(MinecraftService.normalizeProfileId(link.getMinecraftProfileId()));
@@ -195,6 +202,30 @@ public class MinecraftFriendService {
                     link.setStatus(MinecraftFriendLink.Status.REMOVED);
                     log.info("Lien Minecraft retiré côté joueur: {} via {}", link.getMinecraftName(), account.getLabel());
                     changed = true;
+                } else if (link.getStatus() == MinecraftFriendLink.Status.INVITE_REJECTED) {
+                    if (friend != null) {
+                        link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
+                        link.setAcceptedAt(Instant.now());
+                        log.info("Lien Minecraft accepté (après rejet initial): {} via {}",
+                                link.getMinecraftName(), account.getLabel());
+                        changed = true;
+                    } else {
+                        MinecraftService.FriendsList.Friend incoming =
+                                byIncomingProfileId.get(MinecraftService.normalizeProfileId(link.getMinecraftProfileId()));
+                        if (incoming != null) {
+                            try {
+                                minecraftService.addFriend(token.get(), null, link.getMinecraftProfileId());
+                                link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
+                                link.setAcceptedAt(Instant.now());
+                                log.info("Lien Minecraft accepté (retry après invite manuelle): {} via {}",
+                                        link.getMinecraftName(), account.getLabel());
+                                changed = true;
+                            } catch (Exception retryFailure) {
+                                log.info("Retry addFriend toujours refusé pour {} via {}: {}",
+                                        link.getMinecraftName(), account.getLabel(), retryFailure.getMessage());
+                            }
+                        }
+                    }
                 }
 
                 if (friend != null && !friend.name().equals(link.getMinecraftName())) {
