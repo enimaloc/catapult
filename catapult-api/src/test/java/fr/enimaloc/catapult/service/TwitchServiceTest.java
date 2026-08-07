@@ -216,6 +216,15 @@ class TwitchServiceTest {
     }
 
     @Test
+    void updateChannel_accountInactive_doesNotCallHelix() {
+        user.setStatus(UserAccount.Status.INACTIVE);
+
+        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+
+        verifyNoInteractions(restClient, oAuthTokenRepository);
+    }
+
+    @Test
     void updateChannel_staleInMemoryUserStillEnabled_butDbSaysDisabled_skipsHelix() {
         // Simulates a caller (e.g. TwitchEventSubService's long-lived listener, or a
         // SchedulerService poll cycle) holding a UserAccount snapshot taken before the bot
@@ -477,6 +486,15 @@ class TwitchServiceTest {
     @Test
     void resetToDefault_botDisabled_doesNotCallHelix() {
         user.setBotEnabled(false);
+
+        twitchService.resetToDefault(user);
+
+        verifyNoInteractions(restClient, userSettingsRepository);
+    }
+
+    @Test
+    void resetToDefault_accountInactive_doesNotCallHelix() {
+        user.setStatus(UserAccount.Status.INACTIVE);
 
         twitchService.resetToDefault(user);
 

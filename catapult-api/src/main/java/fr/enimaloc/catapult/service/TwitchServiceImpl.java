@@ -45,8 +45,8 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public void updateChannel(UserAccount user, GameBinding binding) {
-        if (!isBotEnabled(user)) {
-            log.debug("Skipping Twitch channel update for user {} — bot disabled", user.getId());
+        if (!canActOnTwitch(user)) {
+            log.debug("Skipping Twitch channel update for user {} — bot disabled or account not active", user.getId());
             return;
         }
         apiObservations.observeRun("twitch", "update_channel", () -> {
@@ -65,14 +65,14 @@ public class TwitchServiceImpl implements TwitchService {
     }
 
     /**
-     * Re-reads botEnabled from the database rather than trusting {@code user}'s field, since
-     * callers can hold long-lived or per-cycle snapshots (e.g. {@code TwitchEventSubService}'s
-     * WebSocket listener, {@code SchedulerService}'s poll loop) that predate a bot-disable that
-     * happened after the snapshot was taken.
+     * Re-reads botEnabled/status from the database rather than trusting {@code user}'s fields,
+     * since callers can hold long-lived or per-cycle snapshots (e.g. {@code TwitchEventSubService}'s
+     * WebSocket listener, {@code SchedulerService}'s poll loop) that predate a bot-disable or
+     * account deactivation that happened after the snapshot was taken.
      */
-    private boolean isBotEnabled(UserAccount user) {
+    private boolean canActOnTwitch(UserAccount user) {
         return userAccountRepository.findById(user.getId())
-            .map(UserAccount::isBotEnabled)
+            .map(account -> account.isBotEnabled() && account.getStatus() == UserAccount.Status.ACTIVE)
             .orElse(false);
     }
 
@@ -221,8 +221,8 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public void resetToDefault(UserAccount user) {
-        if (!isBotEnabled(user)) {
-            log.debug("Skipping Twitch channel reset for user {} — bot disabled", user.getId());
+        if (!canActOnTwitch(user)) {
+            log.debug("Skipping Twitch channel reset for user {} — bot disabled or account not active", user.getId());
             return;
         }
         apiObservations.observeRun("twitch", "reset_to_default", () ->
