@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.GetterConfig;
 import fr.enimaloc.catapult.domain.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
@@ -41,6 +43,7 @@ public class MinecraftFriendService {
     private final MinecraftFriendLinkRepository linkRepository;
     private final MinecraftAccountLimitMarker limitMarker;
     private final GetterConfigRepository getterConfigRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public MinecraftFriendLink enroll(UserAccount user, String pseudo) {
@@ -74,8 +77,22 @@ public class MinecraftFriendService {
             try {
                 minecraftService.addFriend(token.get(), null, profile.dashedId());
             } catch (HttpClientErrorException e) {
-                // Code d'erreur de limite non documenté : tout 4xx sur l'ajout est
-                // traité comme limite atteinte, body loggé pour affiner.
+                if (isInviteRejected(e)) {
+                    log.info("Invite Minecraft rejetée par le joueur (confidentialité) pour {} via {}",
+                            profile.name(), account.getLabel());
+                    MinecraftFriendLink link = existing != null ? existing : new MinecraftFriendLink();
+                    link.setUser(user);
+                    link.setServiceAccount(account);
+                    link.setMinecraftProfileId(profile.dashedId());
+                    link.setMinecraftName(profile.name());
+                    link.setStatus(MinecraftFriendLink.Status.INVITE_REJECTED);
+                    link.setRequestedAt(Instant.now());
+                    link.setAcceptedAt(null);
+                    enableMinecraftGetter(user);
+                    return linkRepository.save(link);
+                }
+                // Code d'erreur de limite non documenté : tout 4xx (hors INVITE_REJECTED) sur
+                // l'ajout est traité comme limite atteinte, body loggé pour affiner.
                 log.warn("addFriend refusé pour {} ({}): {}", account.getLabel(),
                         e.getStatusCode(), e.getResponseBodyAsString());
                 limitMarker.markFull(account);
@@ -204,6 +221,21 @@ public class MinecraftFriendService {
                     link.getServiceAccount().getLabel(), link.getMinecraftProfileId());
         }
         linkRepository.delete(link);
+    }
+
+    /**
+     * Distingue un rejet par confidentialité (le joueur bloque les demandes
+     * externes) d'une vraie limite d'amis atteinte côté compte de service.
+     * Parsing défensif : tout échec retombe sur le comportement "compte plein".
+     */
+    private boolean isInviteRejected(HttpClientErrorException e) {
+        if (e.getStatusCode().value() != 403) return false;
+        try {
+            JsonNode body = objectMapper.readTree(e.getResponseBodyAsByteArray());
+            return "INVITE_REJECTED".equals(body.path("details").path("status").asText(null));
+        } catch (Exception parseFailure) {
+            return false;
+        }
     }
 
     @Getter

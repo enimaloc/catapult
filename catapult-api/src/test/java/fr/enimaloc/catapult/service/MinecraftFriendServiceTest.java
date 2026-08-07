@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
 import fr.enimaloc.catapult.domain.UserAccount;
@@ -14,8 +15,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,6 +59,7 @@ class MinecraftFriendServiceTest {
         when(linkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(getterConfigRepository.findByUserAndProvider(any(), any())).thenReturn(Optional.empty());
         when(getterConfigRepository.findByUserOrderByPriorityAsc(any())).thenReturn(List.of());
+        ReflectionTestUtils.setField(service, "objectMapper", new ObjectMapper());
     }
 
     private MinecraftServiceAccount account(String label, int order) {
@@ -96,6 +100,40 @@ class MinecraftFriendServiceTest {
         var link = service.enroll(user, "jeb_");
 
         verify(limitMarker).markFull(bot1);
+        assertThat(link.getServiceAccount()).isSameAs(bot2);
+    }
+
+    @Test
+    void enroll_inviteRejected_createsInviteRejectedLinkWithoutMarkingAccountFull() {
+        String body = """
+                {
+                  "path" : "/friends",
+                  "details" : { "status" : "INVITE_REJECTED" },
+                  "errorMessage" : "User does not have friends enabled or accept invites"
+                }
+                """;
+        when(minecraftService.addFriend(eq("mc-token"), isNull(), anyString()))
+                .thenThrow(HttpClientErrorException.create(
+                        HttpStatus.FORBIDDEN, "Forbidden", null,
+                        body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
+
+        var link = service.enroll(user, "jeb_");
+
+        assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.INVITE_REJECTED);
+        assertThat(link.getServiceAccount()).isSameAs(bot1);
+        verify(limitMarker, never()).markFull(any());
+    }
+
+    @Test
+    void enroll_forbiddenWithoutInviteRejectedBody_stillMarksAccountFull() {
+        when(minecraftService.addFriend(eq("mc-token"), isNull(), anyString()))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden", null, null, null))
+                .thenReturn(null);
+
+        var link = service.enroll(user, "jeb_");
+
+        verify(limitMarker).markFull(bot1);
+        assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.PENDING);
         assertThat(link.getServiceAccount()).isSameAs(bot2);
     }
 
