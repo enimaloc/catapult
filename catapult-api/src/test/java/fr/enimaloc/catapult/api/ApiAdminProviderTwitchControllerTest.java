@@ -80,7 +80,7 @@ class ApiAdminProviderTwitchControllerTest {
         UUID userId = UUID.randomUUID();
         when(userAccountRepository.findById(userId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> controller.users(userId))
+        assertThatThrownBy(() -> controller.users(userId, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("404");
     }
@@ -93,7 +93,7 @@ class ApiAdminProviderTwitchControllerTest {
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> controller.users(userId))
+        assertThatThrownBy(() -> controller.users(userId, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("404");
     }
@@ -109,9 +109,28 @@ class ApiAdminProviderTwitchControllerTest {
         when(twitchTokenService.resolveAccessToken(token, user)).thenReturn("user-token");
         doReturn("{\"data\":[{\"id\":\"123\",\"login\":\"someuser\"}]}").when(responseSpec).body(String.class);
 
-        var result = controller.users(userId);
+        var result = controller.users(userId, null);
 
         assertThat(result.status()).isEqualTo(200);
         assertThat(result.body()).contains("\"login\" : \"someuser\"");
+    }
+
+    @Test
+    void users_withLogin_appendsLoginQueryParam() {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(userId);
+        OAuthToken token = new OAuthToken();
+        when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.of(token));
+        when(twitchTokenService.resolveAccessToken(token, user)).thenReturn("user-token");
+        doReturn("{\"data\":[{\"id\":\"456\",\"login\":\"otheruser\"}]}").when(responseSpec).body(String.class);
+
+        var result = controller.users(userId, "otheruser");
+
+        assertThat(result.status()).isEqualTo(200);
+        org.mockito.ArgumentCaptor<String> uriCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(getSpec).uri(uriCaptor.capture());
+        assertThat(uriCaptor.getValue()).contains("login=otheruser");
     }
 }
