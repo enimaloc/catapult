@@ -32,6 +32,11 @@ public class MockTwitchService implements TwitchService {
     }
 
     @Override
+    public void setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
+        log.debug("[Mock Twitch] setCategory() — no-op for user {}", user.getId());
+    }
+
+    @Override
     public Optional<String> findCategoryIdByName(UserAccount user, String gameName) {
         return Optional.empty();
     }

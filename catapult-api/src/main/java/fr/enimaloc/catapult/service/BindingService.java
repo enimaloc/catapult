@@ -163,6 +163,19 @@ public class BindingService {
     }
 
     @Transactional
+    public void setTwitchGame(UserAccount user, UUID bindingId, String twitchGameId, String twitchGameName) {
+        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
+            binding.setTwitchGameId(twitchGameId);
+            binding.setTwitchGameName(twitchGameName);
+            binding.setStatus(GameBinding.Status.MANUAL);
+            gameBindingRepository.save(binding);
+            if (isActiveBinding(user, binding)) {
+                twitchService.updateChannel(user, binding);
+            }
+        });
+    }
+
+    @Transactional
     public void toggleCclEnabled(UserAccount user, UUID bindingId, boolean enabled) {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             binding.setCclEnabled(enabled);

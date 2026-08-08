@@ -207,6 +207,28 @@ class TwitchServiceTest {
     }
 
     @Test
+    void setCategory_botActive_patchesOnlyGameId() {
+        twitchService.setCategory(user, "12345", "Some Game");
+
+        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+        verify(patchSpec).uri(uriCaptor.capture());
+        assertThat(uriCaptor.getValue()).contains("/channels?broadcaster_id=" + user.getTwitchId());
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).isEqualTo(Map.of("game_id", "12345"));
+    }
+
+    @Test
+    void setCategory_botDisabled_skipsPatch() {
+        user.setBotEnabled(false);
+
+        twitchService.setCategory(user, "12345", "Some Game");
+
+        verifyNoInteractions(restClient, oAuthTokenRepository);
+    }
+
+    @Test
     void updateChannel_botDisabled_doesNotCallHelix() {
         user.setBotEnabled(false);
 

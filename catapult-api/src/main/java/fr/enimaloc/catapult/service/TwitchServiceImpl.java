@@ -64,6 +64,26 @@ public class TwitchServiceImpl implements TwitchService {
         });
     }
 
+    @Override
+    public void setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
+        if (!canActOnTwitch(user)) {
+            log.debug("Skipping Twitch category set for user {} — bot disabled or account not active", user.getId());
+            return;
+        }
+        apiObservations.observeRun("twitch", "set_category", () ->
+            oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+                .ifPresentOrElse(
+                    token -> {
+                        String accessToken = twitchTokenService.resolveAccessToken(token, user);
+                        patchChannel(user, accessToken, Map.of("game_id", twitchGameId));
+                        log.info("Twitch category set for user {} — game_id={} ({})",
+                            user.getId(), twitchGameId, twitchGameName);
+                    },
+                    () -> log.warn("No Twitch token found for user {}", user.getId())
+                )
+        );
+    }
+
     /**
      * Re-reads botEnabled/status from the database rather than trusting {@code user}'s fields,
      * since callers can hold long-lived or per-cycle snapshots (e.g. {@code TwitchEventSubService}'s
