@@ -42,10 +42,34 @@ class ApiAdminProviderSteamControllerTest {
     void appdetails_success_returnsRawPrettyJson() {
         doReturn("{\"440\":{\"success\":true}}").when(responseSpec).body(String.class);
 
-        var result = controller.appdetails("440");
+        var result = controller.appdetails("440", null, null);
 
         assertThat(result.status()).isEqualTo(200);
         assertThat(result.body()).contains("\"success\" : true");
         assertThat(result.hasError()).isFalse();
+    }
+
+    @Test
+    void appdetails_withCcAndLanguage_appendsQueryParams() {
+        doReturn("{\"440\":{\"success\":true}}").when(responseSpec).body(String.class);
+
+        var result = controller.appdetails("440", "fr", "french");
+
+        assertThat(result.status()).isEqualTo(200);
+        org.mockito.ArgumentCaptor<String> uriCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(getSpec).uri(uriCaptor.capture());
+        assertThat(uriCaptor.getValue()).contains("cc=fr").contains("l=french");
+    }
+
+    @Test
+    void appdetails_withoutCcAndLanguage_omitsQueryParams() {
+        doReturn("{\"440\":{\"success\":true}}").when(responseSpec).body(String.class);
+
+        var result = controller.appdetails("440", null, null);
+
+        assertThat(result.status()).isEqualTo(200);
+        org.mockito.ArgumentCaptor<String> uriCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(getSpec).uri(uriCaptor.capture());
+        assertThat(uriCaptor.getValue()).doesNotContain("cc=").doesNotContain("l=");
     }
 }

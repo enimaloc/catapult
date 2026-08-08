@@ -23,9 +23,19 @@ public class ApiAdminProviderSteamController {
     private final RawProviderResponseSupport rawSupport;
 
     @GetMapping("/appdetails")
-    public RawProviderResponseSupport.RawProviderResponse appdetails(@RequestParam String appId) {
+    public RawProviderResponseSupport.RawProviderResponse appdetails(
+            @RequestParam String appId,
+            @RequestParam(required = false) String cc,
+            @RequestParam(required = false) String l) {
+        StringBuilder uri = new StringBuilder(APP_DETAILS_URL + "?appids=" + appId);
+        if (cc != null && !cc.isBlank()) {
+            uri.append("&cc=").append(cc);
+        }
+        if (l != null && !l.isBlank()) {
+            uri.append("&l=").append(l);
+        }
         return rawSupport.fetch(() -> restClient.get()
-                .uri(APP_DETAILS_URL + "?appids=" + appId)
+                .uri(uri.toString())
                 .retrieve()
                 .body(String.class));
     }
