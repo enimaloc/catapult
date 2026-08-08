@@ -55,7 +55,7 @@ class ApiAdminProviderXboxControllerTest {
         UUID userId = UUID.randomUUID();
         when(userAccountRepository.findById(userId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> controller.presence(userId))
+        assertThatThrownBy(() -> controller.presence(userId, "all"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("404");
     }
@@ -68,7 +68,7 @@ class ApiAdminProviderXboxControllerTest {
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
         when(tokenService.getToken(user)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> controller.presence(userId))
+        assertThatThrownBy(() -> controller.presence(userId, "all"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("404");
     }
@@ -83,9 +83,41 @@ class ApiAdminProviderXboxControllerTest {
                 new XboxUserTokenService.XstsSession("xsts-token", "user-hash", "2533274999999999")));
         doReturn("{\"devices\":[]}").when(responseSpec).body(String.class);
 
-        var result = controller.presence(userId);
+        var result = controller.presence(userId, "all");
 
         assertThat(result.status()).isEqualTo(200);
         assertThat(result.body()).contains("\"devices\"");
+    }
+
+    @Test
+    void presence_invalidLevel_throws400() {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(userId);
+        when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(tokenService.getToken(user)).thenReturn(Optional.of(
+                new XboxUserTokenService.XstsSession("xsts-token", "user-hash", "2533274999999999")));
+
+        assertThatThrownBy(() -> controller.presence(userId, "not_a_level"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400");
+    }
+
+    @Test
+    void presence_customLevel_isUsedInRequestUri() {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(userId);
+        when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(tokenService.getToken(user)).thenReturn(Optional.of(
+                new XboxUserTokenService.XstsSession("xsts-token", "user-hash", "2533274999999999")));
+        doReturn("{\"devices\":[]}").when(responseSpec).body(String.class);
+
+        var result = controller.presence(userId, "device");
+
+        assertThat(result.status()).isEqualTo(200);
+        org.mockito.ArgumentCaptor<java.net.URI> uriCaptor = org.mockito.ArgumentCaptor.forClass(java.net.URI.class);
+        org.mockito.Mockito.verify(getSpec).uri(uriCaptor.capture());
+        assertThat(uriCaptor.getValue().toString()).contains("level=device");
     }
 }
