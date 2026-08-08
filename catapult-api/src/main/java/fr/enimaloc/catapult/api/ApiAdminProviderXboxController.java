@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -28,6 +29,7 @@ import java.util.UUID;
 public class ApiAdminProviderXboxController {
 
     private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid(";
+    private static final Set<String> VALID_LEVELS = Set.of("user", "device", "title", "all");
 
     private final XboxUserTokenService tokenService;
     private final UserAccountRepository userAccountRepository;
@@ -35,14 +37,21 @@ public class ApiAdminProviderXboxController {
     private final RawProviderResponseSupport rawSupport;
 
     @GetMapping("/presence")
-    public RawProviderResponseSupport.RawProviderResponse presence(@RequestParam UUID userId) {
+    public RawProviderResponseSupport.RawProviderResponse presence(
+            @RequestParam UUID userId,
+            @RequestParam(defaultValue = "all") String level) {
+        String normalizedLevel = level.toLowerCase();
+        if (!VALID_LEVELS.contains(normalizedLevel)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Level Xbox invalide: " + level);
+        }
+
         UserAccount user = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur inconnu"));
         XboxUserTokenService.XstsSession session = tokenService.getToken(user)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session Xbox indisponible pour cet utilisateur"));
 
         return rawSupport.fetch(() -> restClient.get()
-                .uri(URI.create(PRESENCE_URL + session.xuid() + ")?level=all"))
+                .uri(URI.create(PRESENCE_URL + session.xuid() + ")?level=" + normalizedLevel))
                 .header("Authorization", "XBL3.0 x=" + session.userHash() + ";" + session.token())
                 .header("x-xbl-contract-version", "3")
                 .retrieve()
