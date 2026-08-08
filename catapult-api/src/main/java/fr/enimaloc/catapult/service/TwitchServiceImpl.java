@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +37,8 @@ public class TwitchServiceImpl implements TwitchService {
     private final TwitchTokenService twitchTokenService;
     private final ExternalApiObservations apiObservations;
     private final BotToggleService botToggleService;
+    private final TwitchatNotifier twitchatNotifier;
+    private final CatapultCategoryChangeStateService categoryChangeStateService;
 
     public static final String CLIENT_ID = "Client-Id";
     public static final String AUTHORIZATION = "Authorization";
@@ -125,6 +129,10 @@ public class TwitchServiceImpl implements TwitchService {
             patchChannel(user, accessToken, body);
             log.info("Twitch channel updated for user {} — game_id={}, ccls={}",
                 user.getId(), binding.getTwitchGameId(), binding.getCcls());
+            String previousGameId = categoryChangeStateService
+                .recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId())
+                .orElse(null);
+            twitchatNotifier.onCategoryChangedByCatapult(user, binding.getTwitchGameId(), binding.getTwitchGameName(), previousGameId);
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
                 String refreshed = twitchTokenService.refreshAccessToken(token, user);

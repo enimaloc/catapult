@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +23,7 @@ class BotToggleServiceTest {
     @Mock private TwitchChatService twitchChatService;
     @Mock private EventSubService twitchEventSubService;
     @Mock private ChannelEventPublisher channelEventPublisher;
+    @Mock private TwitchatNotifier twitchatNotifier;
     @InjectMocks private BotToggleService botToggleService;
 
     private UserAccount user;
@@ -67,5 +69,19 @@ class BotToggleServiceTest {
 
         verify(userAccountRepository).save(user);
         verifyNoInteractions(twitchChatService, twitchEventSubService, channelEventPublisher);
+    }
+
+    @Test
+    void setBotEnabled_transition_notifiesTwitchat() {
+        botToggleService.setBotEnabled(user, false);
+
+        verify(twitchatNotifier).onBotToggled(user, false);
+    }
+
+    @Test
+    void setBotEnabled_noChange_doesNotNotifyTwitchat() {
+        botToggleService.setBotEnabled(user, true); // user already has botEnabled=true from @BeforeEach
+
+        verifyNoInteractions(twitchatNotifier);
     }
 }

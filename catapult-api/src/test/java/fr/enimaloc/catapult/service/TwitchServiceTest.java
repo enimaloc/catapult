@@ -11,6 +11,8 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchServiceImpl;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +52,8 @@ class TwitchServiceTest {
     @Mock private TwitchCategoryService twitchCategoryService;
     @Mock private TwitchTokenService twitchTokenService;
     @Mock private BotToggleService botToggleService;
+    @Mock private TwitchatNotifier twitchatNotifier;
+    @Mock private CatapultCategoryChangeStateService categoryChangeStateService;
 
     @Spy
     private ExternalApiObservations apiObservations =
@@ -204,6 +208,21 @@ class TwitchServiceTest {
         twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         verify(botToggleService).setBotEnabled(user, false);
+    }
+
+    @Test
+    void updateChannel_successfulPatch_recordsSelfSetState() {
+        GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
+        binding.setTwitchGameId("222");
+        binding.setTwitchGameName("New Game");
+
+        when(categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, "222"))
+            .thenReturn(Optional.of("111"));
+
+        twitchService.updateChannel(user, binding);
+
+        verify(categoryChangeStateService).recordCatapultChangeAndReturnPrevious(user, "222");
+        verify(twitchatNotifier).onCategoryChangedByCatapult(user, "222", "New Game", "111");
     }
 
     @Test
