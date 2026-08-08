@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatNotification;
 import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -74,6 +75,10 @@ public class ChannelEventPublisher {
 
     public void connectionChanged(UUID channelOwnerId, ProviderConnectionsDto provider) {
         publish(channelOwnerId, "connection.changed", Map.of("provider", provider));
+    }
+
+    public void twitchatNotify(UUID channelOwnerId, TwitchatNotification notification) {
+        redisPublisher.publishTwitchat(channelOwnerId, notification);
     }
 
     private void publish(UUID channelOwnerId, String name, Map<String, Object> data) {
