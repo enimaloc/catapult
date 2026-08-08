@@ -73,7 +73,8 @@ public class ApiAdminProviderMinecraftController {
     @GetMapping("/presence")
     public RawProviderResponseSupport.RawProviderResponse presence(
             @RequestParam UUID accountId,
-            @RequestParam(defaultValue = "ONLINE") String status) {
+            @RequestParam(defaultValue = "ONLINE") String status,
+            @RequestParam(required = false) String activityId) {
         String token = resolveAccountToken(accountId);
         MinecraftService.PresenceStatus presenceStatus;
         try {
@@ -82,7 +83,7 @@ public class ApiAdminProviderMinecraftController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Statut de présence invalide: " + status);
         }
         var body = new MinecraftService.PresenceUpdate(
-                presenceStatus, new MinecraftService.PresenceUpdate.JoinInfo(null, new String[0]));
+                presenceStatus, new MinecraftService.PresenceUpdate.JoinInfo(activityId, new String[0]));
         return rawSupport.fetch(() -> restClient.post()
                 .uri(URI.create(MinecraftService.MINECRAFT_SERVICE_URL + "/presence"))
                 .body(body)

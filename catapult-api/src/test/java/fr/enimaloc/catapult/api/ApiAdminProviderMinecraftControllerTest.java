@@ -116,7 +116,7 @@ class ApiAdminProviderMinecraftControllerTest {
         when(tokenService.getToken(account)).thenReturn(Optional.of("mc-token"));
         doReturn("{\"presence\":[]}").when(responseSpec).body(String.class);
 
-        var result = controller.presence(accountId, "ONLINE");
+        var result = controller.presence(accountId, "ONLINE", null);
 
         assertThat(result.status()).isEqualTo(200);
         assertThat(result.body()).contains("\"presence\"");
@@ -129,8 +129,25 @@ class ApiAdminProviderMinecraftControllerTest {
         when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
         when(tokenService.getToken(account)).thenReturn(Optional.of("mc-token"));
 
-        assertThatThrownBy(() -> controller.presence(accountId, "NOT_A_STATUS"))
+        assertThatThrownBy(() -> controller.presence(accountId, "NOT_A_STATUS", null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("400");
+    }
+
+    @Test
+    void presence_withActivityId_isUsedInRequestBody() {
+        UUID accountId = UUID.randomUUID();
+        MinecraftServiceAccount account = new MinecraftServiceAccount();
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(tokenService.getToken(account)).thenReturn(Optional.of("mc-token"));
+        doReturn("{\"presence\":[]}").when(responseSpec).body(String.class);
+
+        var result = controller.presence(accountId, "ONLINE", "party-42");
+
+        assertThat(result.status()).isEqualTo(200);
+        org.mockito.ArgumentCaptor<Object> bodyCaptor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        org.mockito.Mockito.verify(postBodySpec).body(bodyCaptor.capture());
+        var sentBody = (fr.enimaloc.catapult.service.MinecraftService.PresenceUpdate) bodyCaptor.getValue();
+        assertThat(sentBody.joinInfo().value()).isEqualTo("party-42");
     }
 }
