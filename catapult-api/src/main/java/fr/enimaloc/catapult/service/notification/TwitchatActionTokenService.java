@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.TwitchatActionType;
 import fr.enimaloc.catapult.repository.TwitchatActionTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -35,7 +36,7 @@ public class TwitchatActionTokenService {
         return token.getToken();
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<TwitchatActionToken> consume(UUID token) {
         if (repository.consume(token) == 0) {
             return Optional.empty();
