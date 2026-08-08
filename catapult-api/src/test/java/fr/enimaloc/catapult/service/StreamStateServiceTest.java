@@ -2,22 +2,28 @@ package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 class StreamStateServiceTest {
 
     private StreamStateService service;
+    private TwitchatNotifier twitchatNotifier;
     private UserAccount user;
 
     @BeforeEach
     void setUp() {
+        twitchatNotifier = org.mockito.Mockito.mock(TwitchatNotifier.class);
         service = new StreamStateService(
-                org.mockito.Mockito.mock(fr.enimaloc.catapult.service.notification.ChannelEventPublisher.class));
+                org.mockito.Mockito.mock(fr.enimaloc.catapult.service.notification.ChannelEventPublisher.class),
+                twitchatNotifier);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
@@ -77,5 +83,27 @@ class StreamStateServiceTest {
         service.setLive(u2, false);
         service.setLive(u3, true);
         assertThat(service.countLive()).isEqualTo(2L);
+    }
+
+    @Test
+    void setLive_transitionToLive_botEnabled_notifiesTwitchat() {
+        UserAccount botEnabledUser = new UserAccount();
+        botEnabledUser.setId(UUID.randomUUID());
+        botEnabledUser.setBotEnabled(true);
+
+        service.setLive(botEnabledUser, true);
+
+        verify(twitchatNotifier).onStreamStarted(botEnabledUser);
+    }
+
+    @Test
+    void setLive_transitionToLive_botDisabled_doesNotNotifyTwitchat() {
+        UserAccount botDisabledUser = new UserAccount();
+        botDisabledUser.setId(UUID.randomUUID());
+        botDisabledUser.setBotEnabled(false);
+
+        service.setLive(botDisabledUser, true);
+
+        verifyNoInteractions(twitchatNotifier);
     }
 }

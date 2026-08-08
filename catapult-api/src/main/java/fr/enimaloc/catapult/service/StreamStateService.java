@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service;
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,7 @@ public class StreamStateService {
     private final Map<UUID, GameBinding> pendingBinding = new ConcurrentHashMap<>();
 
     private final ChannelEventPublisher channelEventPublisher;
+    private final TwitchatNotifier twitchatNotifier;
 
     public boolean isLive(UserAccount user) {
         return liveStatus.getOrDefault(user.getId(), false);
@@ -30,6 +32,9 @@ public class StreamStateService {
         // same value is reapplied (idempotent setters are common).
         if (previous == null || previous.booleanValue() != live) {
             channelEventPublisher.streamStateChanged(user.getId(), live);
+            if (live && user.isBotEnabled()) {
+                twitchatNotifier.onStreamStarted(user);
+            }
         }
     }
 
