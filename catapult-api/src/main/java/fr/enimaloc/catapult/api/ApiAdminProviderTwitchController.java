@@ -44,10 +44,12 @@ public class ApiAdminProviderTwitchController {
     }
 
     @GetMapping("/users")
-    public RawProviderResponseSupport.RawProviderResponse users(@RequestParam UUID userId) {
+    public RawProviderResponseSupport.RawProviderResponse users(
+            @RequestParam UUID userId,
+            @RequestParam(required = false) String login) {
         UserAccount user = findUser(userId);
         OAuthToken token = findToken(user);
-        return rawSupport.fetch(() -> fetchUsers(token, user));
+        return rawSupport.fetch(() -> fetchUsers(token, user, login));
     }
 
     @GetMapping("/moderated-channels")
@@ -67,10 +69,11 @@ public class ApiAdminProviderTwitchController {
                 .body(String.class);
     }
 
-    private String fetchUsers(OAuthToken token, UserAccount user) {
+    private String fetchUsers(OAuthToken token, UserAccount user, String login) {
         String accessToken = twitchTokenService.resolveAccessToken(token, user);
+        String uri = TWITCH_API_URL + "/users" + (login != null && !login.isBlank() ? "?login=" + login : "");
         return restClient.get()
-                .uri(TWITCH_API_URL + "/users")
+                .uri(uri)
                 .header("Authorization", "Bearer " + accessToken)
                 .header("Client-Id", twitchClientId)
                 .retrieve()
