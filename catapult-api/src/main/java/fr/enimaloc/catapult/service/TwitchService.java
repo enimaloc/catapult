@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface TwitchService {
     void updateChannel(UserAccount user, GameBinding binding);
+    void setCategory(UserAccount user, String twitchGameId, String twitchGameName);
     Optional<String> findCategoryIdByName(UserAccount user, String gameName);
     List<TwitchCategory> searchCategories(UserAccount user, String query);
     void resetToDefault(UserAccount user);
