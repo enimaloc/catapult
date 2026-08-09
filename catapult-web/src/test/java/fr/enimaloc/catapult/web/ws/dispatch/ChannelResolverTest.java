@@ -158,4 +158,36 @@ class ChannelResolverTest {
     void resolveRedisToInternal_unknown_returns_null() {
         assertThat(resolver.resolveRedisToInternal("not.a.catapult.channel")).isNull();
     }
+
+    @Test
+    void resolvePublicToInternal_twitchatWidgetToken_enabled_resolvesToTwitchatChannel() {
+        UUID token = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        when(apiClient.get("/api/twitchat/widget/{token}/access",
+                ChannelResolver.TwitchatAccessResponse.class, token.toString()))
+                .thenReturn(new ChannelResolver.TwitchatAccessResponse(ownerId.toString(), true));
+
+        Optional<String> result = resolver.resolvePublicToInternal("twitchat.widget." + token, unauthSession());
+
+        assertThat(result).contains("catapult:events:twitchat:" + ownerId);
+    }
+
+    @Test
+    void resolvePublicToInternal_twitchatWidgetToken_disabledOrUnknown_returnsEmpty() {
+        UUID token = UUID.randomUUID();
+        when(apiClient.get("/api/twitchat/widget/{token}/access",
+                ChannelResolver.TwitchatAccessResponse.class, token.toString()))
+                .thenReturn(null);
+
+        Optional<String> result = resolver.resolvePublicToInternal("twitchat.widget." + token, unauthSession());
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void resolveRedisToInternal_twitchatChannel_passesThroughUnchanged() {
+        String redisChannel = "catapult:events:twitchat:" + UUID.randomUUID();
+
+        assertThat(resolver.resolveRedisToInternal(redisChannel)).isEqualTo(redisChannel);
+    }
 }
