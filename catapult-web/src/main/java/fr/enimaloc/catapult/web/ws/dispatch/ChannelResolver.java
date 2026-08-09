@@ -16,6 +16,8 @@ public class ChannelResolver {
     private static final String REDIS_USER_PREFIX = "catapult:events:user:";
     private static final String REDIS_CHANNEL_PREFIX = "catapult:events:channel:";
     private static final String PUBLIC_CHANNEL_VIEWED_PREFIX = "channel.viewed.";
+    private static final String PUBLIC_TWITCHAT_WIDGET_PREFIX = "twitchat.widget.";
+    private static final String REDIS_TWITCHAT_PREFIX = "catapult:events:twitchat:";
 
     private final ApiClient apiClient;
 
@@ -23,6 +25,9 @@ public class ChannelResolver {
         if (publicName == null) return Optional.empty();
         if (publicName.startsWith(PUBLIC_CHANNEL_VIEWED_PREFIX)) {
             return resolveChannelViewed(publicName.substring(PUBLIC_CHANNEL_VIEWED_PREFIX.length()), session);
+        }
+        if (publicName.startsWith(PUBLIC_TWITCHAT_WIDGET_PREFIX)) {
+            return resolveTwitchatWidget(publicName.substring(PUBLIC_TWITCHAT_WIDGET_PREFIX.length()));
         }
         return switch (publicName) {
             case "events.global" -> Optional.of("events.global");
@@ -43,6 +48,9 @@ public class ChannelResolver {
         }
         if (redisChannel.startsWith(REDIS_CHANNEL_PREFIX)) {
             return PUBLIC_CHANNEL_VIEWED_PREFIX + redisChannel.substring(REDIS_CHANNEL_PREFIX.length());
+        }
+        if (redisChannel.startsWith(REDIS_TWITCHAT_PREFIX)) {
+            return redisChannel;
         }
         return null;
     }
@@ -74,4 +82,20 @@ public class ChannelResolver {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AccessResponse(boolean accessible) {}
+
+    /**
+     * Resolves a {@code twitchat.widget.<token>} subscription by asking catapult-api
+     * whether the token is known and its owner has Twitchat notifications enabled.
+     * The internal channel name is the redis channel name itself (no rename), since
+     * broadcaster events are published straight to {@code catapult:events:twitchat:<ownerId>}.
+     */
+    private Optional<String> resolveTwitchatWidget(String token) {
+        TwitchatAccessResponse access = apiClient.get(
+                "/api/twitchat/widget/{token}/access", TwitchatAccessResponse.class, token);
+        if (access == null || !access.enabled()) return Optional.empty();
+        return Optional.of(REDIS_TWITCHAT_PREFIX + access.ownerId());
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record TwitchatAccessResponse(String ownerId, boolean enabled) {}
 }
