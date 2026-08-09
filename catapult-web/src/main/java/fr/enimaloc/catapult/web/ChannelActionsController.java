@@ -141,6 +141,29 @@ public class ChannelActionsController {
         return ackOrRedirect(hxRequest, username);
     }
 
+    @PostMapping("/settings/twitchat")
+    public ResponseEntity<Void> saveTwitchatSettings(
+            @PathVariable String username,
+            @RequestParam(defaultValue = "false") boolean enabled,
+            @RequestParam(required = false) String obsHost,
+            @RequestParam(required = false) Integer obsPort,
+            @RequestParam(required = false) String obsPassword,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest) {
+        apiClient.post("/api/channels/{username}/settings/twitchat",
+                new TwitchatSettingsBody(enabled, obsHost, obsPort,
+                        (obsPassword == null || obsPassword.isBlank()) ? null : obsPassword),
+                username);
+        return ackOrRedirect(hxRequest, username);
+    }
+
+    @PostMapping("/settings/twitchat/regenerate")
+    public ResponseEntity<Void> regenerateTwitchatToken(
+            @PathVariable String username,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest) {
+        apiClient.post("/api/channels/{username}/settings/twitchat/regenerate", null, username);
+        return ackOrRedirect(hxRequest, username);
+    }
+
     @PostMapping("/settings/no-game")
     public ResponseEntity<Void> saveNoGameSettings(
             @PathVariable String username,
@@ -289,6 +312,7 @@ public class ChannelActionsController {
     record UpdateBindingBody(String twitchGameId, String twitchGameName, Set<String> ccls) {}
     record CclSettingsBody(boolean cclEnabled, Set<String> blockedCcls) {}
     record TwSettingsBody(boolean enabled, Set<String> blockedTws) {}
+    record TwitchatSettingsBody(boolean enabled, String obsHost, Integer obsPort, String obsPassword) {}
     record TwSaveBody(Set<String> tws) {}
     record TwEnabledBody(boolean enabled) {}
     record NoGameSettingsBody(String twitchGameId, String twitchGameName, Set<String> ccls,
