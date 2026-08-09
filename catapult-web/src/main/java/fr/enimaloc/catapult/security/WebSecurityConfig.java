@@ -26,7 +26,7 @@ public class WebSecurityConfig {
                         .requestMatchers("/", "/login", "/auth/callback", "/join", "/privacy", "/error",
                                 "/css/**", "/js/**", "/images/**", "/webjars/**",
                                 "/changelog", "/changelog/**", "/actuator/**", "/status",
-                                "/ws", "/ws/**", "/.well-known/**").permitAll()
+                                "/ws", "/ws/**", "/.well-known/**", "/widget/twitchat/**").permitAll()
                         .requestMatchers("/admin/impersonate/exit").hasAuthority("ROLE_PREVIOUS_ADMINISTRATOR")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         // ThirdPartiesVerificationController : fichiers de vérification lus par des
