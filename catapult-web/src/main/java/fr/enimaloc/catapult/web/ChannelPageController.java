@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import fr.enimaloc.catapult.client.ApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
@@ -27,6 +28,9 @@ import java.util.UUID;
 public class ChannelPageController {
 
     private final ApiClient apiClient;
+
+    @Value("${catapult.web.public-url:}")
+    private String publicWebUrl;
 
     @GetMapping({"", "/{tab:dashboard|configuration|commands|invitations}"})
     public String channelPage(
@@ -185,6 +189,17 @@ public class ChannelPageController {
         model.addAttribute("twSettings", settings);
         model.addAttribute("noGameSettings", settings);
         model.addAttribute("incompleteFallbackSettings", settings);
+
+        // Twitchat notification widget settings — separate call, not part of UserSettingsDto.
+        // Owner-only on the API side (requireOwner), so only fetch it for the owner.
+        if (data.isOwner()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> twitchat = apiClient.get(
+                    "/api/channels/{username}/settings/twitchat", Map.class, username);
+            model.addAttribute("twitchatSettings", twitchat);
+            model.addAttribute("twitchatWidgetUrl", twitchat == null ? null
+                    : publicWebUrl + "/widget/twitchat/" + twitchat.get("widgetToken"));
+        }
 
         // DTDD mapping panel
         DtddMappingStatusDto dtdd = apiClient.get(
