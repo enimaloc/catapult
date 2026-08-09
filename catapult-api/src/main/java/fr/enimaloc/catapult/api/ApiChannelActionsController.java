@@ -21,6 +21,7 @@ import fr.enimaloc.catapult.service.BotToggleService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.SchedulerService;
 import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ import org.springframework.http.HttpStatus;
 import java.util.concurrent.TimeUnit;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,6 +61,7 @@ public class ApiChannelActionsController {
     private final TokenEncryptionService tokenEncryptionService;
     private final SteamApiKeyRepository steamApiKeyRepository;
     private final fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
+    private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
 
     @Autowired(required = false)
     private SteamApiKeyRotator rotator;
@@ -142,6 +145,45 @@ public class ApiChannelActionsController {
         UserAccount user = resolveChannel(username, viewer);
         requireOwner(viewer, user);
         botToggleService.setBotEnabled(user, !user.isBotEnabled());
+    }
+
+    @GetMapping("/settings/twitchat")
+    public TwitchatSettingsResponse getTwitchatSettings(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        var settings = twitchatWidgetSettingsService.getOrCreate(channelUser);
+        return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
+                settings.getObsPasswordEncrypted() != null, settings.getWidgetToken().toString());
+    }
+
+    @PostMapping("/settings/twitchat")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveTwitchatSettings(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody TwitchatSettingsBody body) {
+
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        twitchatWidgetSettingsService.updateSettings(channelUser, body.enabled(), body.obsHost(), body.obsPort(), body.obsPassword());
+    }
+
+    @PostMapping("/settings/twitchat/regenerate")
+    public TwitchatSettingsResponse regenerateTwitchatToken(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        var settings = twitchatWidgetSettingsService.regenerateToken(channelUser);
+        return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
+                settings.getObsPasswordEncrypted() != null, settings.getWidgetToken().toString());
     }
 
     // ── Game detection ───────────────────────────────────────────────────────
@@ -434,4 +476,6 @@ public class ApiChannelActionsController {
     public record SteamTokenSharingRequest(boolean shared) {}
     public record DeleteAccountRequest(String confirmUsername) {}
     public record DisconnectRequest(String provider) {}
+    public record TwitchatSettingsBody(boolean enabled, String obsHost, Integer obsPort, String obsPassword) {}
+    public record TwitchatSettingsResponse(boolean enabled, String obsHost, Integer obsPort, boolean hasPassword, String widgetToken) {}
 }
