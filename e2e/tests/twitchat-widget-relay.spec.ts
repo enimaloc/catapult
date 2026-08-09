@@ -7,6 +7,10 @@ import { publishRedis } from "./helpers/compose";
 // relay logic in twitchat-relay.js without a real OBS instance.
 
 test.describe("twitchat widget relay", () => {
+  // Precondition beyond the env vars checked below: the seeded widget token's backing
+  // TwitchatWidgetSettings row must also have obsHost/obsPort configured (not just exist) —
+  // otherwise twitchat-relay.js never calls obsWsConnect and this test times out waiting
+  // for a call that never happens.
   test.skip(
     !process.env.CATAPULT_E2E_TWITCHAT_WIDGET_TOKEN || !process.env.CATAPULT_E2E_TWITCHAT_OWNER_ID,
     "requires a seeded twitchat widget token/owner id; set CATAPULT_E2E_TWITCHAT_WIDGET_TOKEN/CATAPULT_E2E_TWITCHAT_OWNER_ID"
@@ -41,7 +45,9 @@ test.describe("twitchat widget relay", () => {
       })
     );
 
-    await page.waitForFunction(() => (window as any).__obsCalls && (window as any).__obsCalls.length > 0);
+    await page.waitForFunction(() => (window as any).__obsCalls && (window as any).__obsCalls.length > 0, undefined, {
+      timeout: 10_000
+    });
 
     const calls = await page.evaluate(() => (window as any).__obsCalls);
     expect(calls[0].requestType).toBe("BroadcastCustomEvent");
