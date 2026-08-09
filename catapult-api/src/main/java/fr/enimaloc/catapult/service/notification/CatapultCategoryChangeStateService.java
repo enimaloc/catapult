@@ -31,9 +31,32 @@ public class CatapultCategoryChangeStateService {
         return Optional.ofNullable(previous);
     }
 
-    public Optional<String> matchesCatapultChange(UserAccount user, String observedGameId) {
-        return repository.findById(user.getId())
-                .filter(state -> observedGameId != null && observedGameId.equals(state.getGameId()))
-                .map(CatapultCategoryChangeState::getPreviousGameId);
+    /**
+     * A category change Catapult made itself, as recognised from an inbound
+     * {@code channel.update}. {@code previousGameId} is nullable — there may be no
+     * category to revert to (first change ever recorded for this user).
+     */
+    public record SelfChange(String previousGameId) {}
+
+    /**
+     * Single-use check: matches only a marker still awaiting its {@code channel.update}
+     * (i.e. {@code appliedAt != null}) and clears that pending flag on a hit, so neither a
+     * redelivered {@code channel.update} nor a later manual change back to the same
+     * category is mistaken for a Catapult-driven one. {@code gameId}/{@code previousGameId}
+     * are deliberately kept: they are what the next Catapult change reports as its
+     * "previous category".
+     */
+    @Transactional
+    public Optional<SelfChange> consumeIfMatches(UserAccount user, String observedGameId) {
+        Optional<CatapultCategoryChangeState> match = repository.findById(user.getId())
+                .filter(state -> state.getAppliedAt() != null)
+                .filter(state -> observedGameId != null && observedGameId.equals(state.getGameId()));
+        if (match.isEmpty()) {
+            return Optional.empty();
+        }
+        CatapultCategoryChangeState state = match.get();
+        state.setAppliedAt(null);
+        repository.save(state);
+        return Optional.of(new SelfChange(state.getPreviousGameId()));
     }
 }

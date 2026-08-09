@@ -17,7 +17,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TwitchatActionExecutor {
 
-    public enum Result { EXECUTED, ALREADY_USED_OR_EXPIRED, USER_NOT_FOUND }
+    public enum Result { EXECUTED, ALREADY_USED_OR_EXPIRED, USER_NOT_FOUND, INVALID_PAYLOAD }
 
     private final TwitchatActionTokenService actionTokenService;
     private final UserAccountRepository userAccountRepository;
@@ -42,11 +42,30 @@ public class TwitchatActionExecutor {
         switch (token.getActionType()) {
             case REVERT_CATEGORY, REVERT_TO_APP_CATEGORY ->
                     twitchService.setCategory(user, payload.get("gameId"), payload.get("gameName"));
-            case BIND_GAME_CATEGORY -> bindingService.setTwitchGame(user,
-                    UUID.fromString(payload.get("bindingId")), payload.get("newGameId"), payload.get("newGameName"));
+            case BIND_GAME_CATEGORY -> {
+                UUID bindingId = parseUuid(payload.get("bindingId"));
+                // The token is already burned at this point — a malformed payload must yield a
+                // clean result, not a 500.
+                if (bindingId == null) {
+                    return Result.INVALID_PAYLOAD;
+                }
+                bindingService.setTwitchGame(user, bindingId,
+                        payload.get("newGameId"), payload.get("newGameName"));
+            }
             case DISABLE_BOT -> botToggleService.setBotEnabled(user, false);
             case ENABLE_BOT -> botToggleService.setBotEnabled(user, true);
         }
         return Result.EXECUTED;
+    }
+
+    private static UUID parseUuid(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }

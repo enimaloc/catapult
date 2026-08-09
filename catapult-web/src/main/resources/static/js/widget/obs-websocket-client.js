@@ -17,8 +17,18 @@
             const socket = new WebSocket("ws://" + host + ":" + port);
             const pending = new Map();
             let requestCounter = 0;
+            let settled = false;
 
-            socket.onerror = (err) => reject(err);
+            function settle(fn, value) {
+                if (settled) return;
+                settled = true;
+                fn(value);
+            }
+
+            socket.onerror = (err) => settle(reject, err);
+            // OBS closes cleanly (no error event) when Identify is rejected, e.g. wrong
+            // password — without this the connect() promise would never settle.
+            socket.onclose = () => settle(reject, new Error("connection closed"));
 
             socket.onmessage = async (event) => {
                 const frame = JSON.parse(event.data);
@@ -30,7 +40,7 @@
                     }
                     socket.send(JSON.stringify(identify));
                 } else if (frame.op === 2) {
-                    resolve({
+                    settle(resolve, {
                         call(requestType, requestData) {
                             return new Promise((res, rej) => {
                                 const requestId = "req-" + (++requestCounter);

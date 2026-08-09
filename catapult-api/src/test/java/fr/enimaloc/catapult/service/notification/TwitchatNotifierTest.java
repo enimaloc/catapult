@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -81,13 +82,27 @@ class TwitchatNotifierTest {
         binding.setId(UUID.randomUUID());
         binding.setTwitchGameId("111");
         binding.setTwitchGameName("Old Game");
-        when(bindingService.resolveOrCreate(user, detected)).thenReturn(binding);
+        when(bindingService.findBinding(user, detected)).thenReturn(Optional.of(binding));
 
         notifier.onCategoryChangedManually(user, "222", "New Game");
 
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(2); // bind + revert-to-app (differ: 111 != 222)
+    }
+
+    @Test
+    void onCategoryChangedManually_gameDetectedButNoBindingYet_skipsBindButtonAndCreatesNothing() {
+        DetectedGame detected = mock(DetectedGame.class);
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
+        when(bindingService.findBinding(user, detected)).thenReturn(Optional.empty());
+
+        notifier.onCategoryChangedManually(user, "222", "New Game");
+
+        verify(bindingService, never()).resolveOrCreate(any(), any());
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).isEmpty();
     }
 
     @Test
@@ -100,6 +115,32 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).isEmpty();
+    }
+
+    @Test
+    void onCategoryChangedByCatapult_noPreviousCategory_omitsRevertButton() {
+        notifier.onCategoryChangedByCatapult(user, "222", "New Game", null);
+
+        verify(actionTokenService, never()).generate(any(), eq(TwitchatActionType.REVERT_CATEGORY), any());
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).hasSize(1); // disable-bot only
+    }
+
+    @Test
+    void publishFailure_isSwallowedSoCallersAreNeverBroken() {
+        doThrow(new RuntimeException("redis down"))
+                .when(channelEventPublisher).twitchatNotify(any(), any());
+
+        assertThatCode(() -> notifier.onStreamStarted(user)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void settingsLookupFailure_isSwallowed() {
+        when(widgetSettingsService.getOrCreate(user)).thenThrow(new RuntimeException("db down"));
+
+        assertThatCode(() -> notifier.onBotToggled(user, true)).doesNotThrowAnyException();
+        verifyNoInteractions(channelEventPublisher);
     }
 
     @Test

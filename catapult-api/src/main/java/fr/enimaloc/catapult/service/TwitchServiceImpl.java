@@ -7,7 +7,6 @@ import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
-import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,7 +36,6 @@ public class TwitchServiceImpl implements TwitchService {
     private final TwitchTokenService twitchTokenService;
     private final ExternalApiObservations apiObservations;
     private final BotToggleService botToggleService;
-    private final TwitchatNotifier twitchatNotifier;
     private final CatapultCategoryChangeStateService categoryChangeStateService;
 
     public static final String CLIENT_ID = "Client-Id";
@@ -82,6 +80,10 @@ public class TwitchServiceImpl implements TwitchService {
                         patchChannel(user, accessToken, Map.of("game_id", twitchGameId));
                         log.info("Twitch category set for user {} — game_id={} ({})",
                             user.getId(), twitchGameId, twitchGameName);
+                        // Same self-set marker as doUpdateChannel: without it the channel.update
+                        // this PATCH triggers would be reported to the streamer as a manual change
+                        // (this path backs the Twitchat "Revert" buttons).
+                        categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, twitchGameId);
                     },
                     () -> log.warn("No Twitch token found for user {}", user.getId())
                 )
@@ -129,10 +131,9 @@ public class TwitchServiceImpl implements TwitchService {
             patchChannel(user, accessToken, body);
             log.info("Twitch channel updated for user {} — game_id={}, ccls={}",
                 user.getId(), binding.getTwitchGameId(), binding.getCcls());
-            String previousGameId = categoryChangeStateService
-                .recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId())
-                .orElse(null);
-            twitchatNotifier.onCategoryChangedByCatapult(user, binding.getTwitchGameId(), binding.getTwitchGameName(), previousGameId);
+            // Marker only: the Twitchat notification is emitted once, from
+            // TwitchEventSubService's channel.update handler, when Twitch confirms the change.
+            categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId());
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
                 String refreshed = twitchTokenService.refreshAccessToken(token, user);
@@ -145,6 +146,7 @@ public class TwitchServiceImpl implements TwitchService {
                     patchChannel(user, refreshed, body);
                     log.info("Twitch channel updated for user {} after token refresh — game_id={}",
                         user.getId(), binding.getTwitchGameId());
+                    categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId());
                 } catch (Exception retryEx) {
                     log.warn("Twitch channel update failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
                     botToggleService.setBotEnabled(user, false);

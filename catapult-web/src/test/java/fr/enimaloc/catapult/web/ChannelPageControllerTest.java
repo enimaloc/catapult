@@ -55,6 +55,9 @@ class ChannelPageControllerTest {
                 .thenReturn(null);
         if (data.isOwner()) {
             org.mockito.Mockito.lenient().when(apiClient.minecraftLinkState()).thenReturn(null);
+            org.mockito.Mockito.lenient()
+                    .when(apiClient.get(eq("/api/channels/{username}/settings/twitchat"), eq(Map.class), eq("streamer")))
+                    .thenReturn(null);
         }
     }
 

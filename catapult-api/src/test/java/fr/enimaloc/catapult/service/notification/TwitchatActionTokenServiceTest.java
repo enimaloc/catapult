@@ -53,7 +53,7 @@ class TwitchatActionTokenServiceTest {
         UUID token = UUID.randomUUID();
         TwitchatActionToken entity = new TwitchatActionToken();
         entity.setToken(token);
-        when(repository.consume(token)).thenReturn(1);
+        when(repository.consume(eq(token), any(Instant.class))).thenReturn(1);
         when(repository.findById(token)).thenReturn(Optional.of(entity));
 
         Optional<TwitchatActionToken> result = service.consume(token);
@@ -64,7 +64,7 @@ class TwitchatActionTokenServiceTest {
     @Test
     void consume_alreadyConsumedOrExpired_returnsEmpty() {
         UUID token = UUID.randomUUID();
-        when(repository.consume(token)).thenReturn(0);
+        when(repository.consume(eq(token), any(Instant.class))).thenReturn(0);
 
         Optional<TwitchatActionToken> result = service.consume(token);
 
