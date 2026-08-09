@@ -295,9 +295,13 @@ public class TwitchEventSubService implements EventSubService {
 
         if (!newCategoryId.equals(previous.categoryId())) {
             eventPublisher.publishEvent(new ChannelCategoryChangedEvent(this, user, newCategoryId, newCategoryName));
-            Optional<String> selfSetPrevious = categoryChangeStateService.matchesCatapultChange(user, newCategoryId);
-            if (selfSetPrevious.isPresent()) {
-                twitchatNotifier.onCategoryChangedByCatapult(user, newCategoryId, newCategoryName, selfSetPrevious.get());
+            // Sole producer of the "Catapult changed your category" notification: TwitchServiceImpl
+            // only records the marker, so one logical change yields exactly one notification.
+            Optional<CatapultCategoryChangeStateService.SelfChange> selfSet =
+                    categoryChangeStateService.consumeIfMatches(user, newCategoryId);
+            if (selfSet.isPresent()) {
+                twitchatNotifier.onCategoryChangedByCatapult(user, newCategoryId, newCategoryName,
+                        selfSet.get().previousGameId());
             } else {
                 twitchatNotifier.onCategoryChangedManually(user, newCategoryId, newCategoryName);
             }

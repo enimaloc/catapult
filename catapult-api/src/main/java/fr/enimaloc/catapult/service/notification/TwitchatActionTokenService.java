@@ -38,7 +38,7 @@ public class TwitchatActionTokenService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<TwitchatActionToken> consume(UUID token) {
-        if (repository.consume(token) == 0) {
+        if (repository.consume(token, Instant.now()) == 0) {
             return Optional.empty();
         }
         return repository.findById(token);

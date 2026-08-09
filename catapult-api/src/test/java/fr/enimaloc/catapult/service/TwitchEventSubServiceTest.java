@@ -126,7 +126,8 @@ class TwitchEventSubServiceTest {
 
     @Test
     void handleChannelUpdate_matchesSelfSetState_notifiesCatapultChange() {
-        when(categoryChangeStateService.matchesCatapultChange(user, "222")).thenReturn(Optional.of("111"));
+        when(categoryChangeStateService.consumeIfMatches(user, "222"))
+            .thenReturn(Optional.of(new CatapultCategoryChangeStateService.SelfChange("111")));
 
         String firstMessage = """
             {
@@ -150,7 +151,7 @@ class TwitchEventSubServiceTest {
 
     @Test
     void handleChannelUpdate_noSelfSetMatch_notifiesManualChange() {
-        when(categoryChangeStateService.matchesCatapultChange(user, "222")).thenReturn(Optional.empty());
+        when(categoryChangeStateService.consumeIfMatches(user, "222")).thenReturn(Optional.empty());
 
         String firstMessage = """
             {

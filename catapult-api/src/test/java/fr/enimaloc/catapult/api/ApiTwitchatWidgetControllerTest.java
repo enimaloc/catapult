@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
-import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +34,6 @@ class ApiTwitchatWidgetControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean TwitchatWidgetSettingsRepository widgetSettingsRepository;
-    @MockitoBean TwitchatWidgetSettingsService widgetSettingsService;
     @MockitoBean TwitchatActionExecutor actionExecutor;
     @MockitoBean TokenEncryptionService tokenEncryptionService;
 
@@ -86,6 +84,24 @@ class ApiTwitchatWidgetControllerTest {
                 .andExpect(jsonPath("$.obsHost").value("127.0.0.1"))
                 .andExpect(jsonPath("$.obsPort").value(4455))
                 .andExpect(jsonPath("$.obsPassword").value("pw"));
+    }
+
+    @Test
+    void config_disabledWidget_returns404() throws Exception {
+        UUID token = UUID.randomUUID();
+        UserAccount owner = new UserAccount();
+        owner.setId(UUID.randomUUID());
+        TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
+        settings.setUser(owner);
+        settings.setWidgetToken(token);
+        settings.setEnabled(false);
+        settings.setObsHost("127.0.0.1");
+        settings.setObsPort(4455);
+        settings.setObsPasswordEncrypted("ENC(pw)");
+        when(widgetSettingsRepository.findByWidgetToken(token)).thenReturn(Optional.of(settings));
+
+        mvc.perform(get("/api/twitchat/widget/{token}", token))
+                .andExpect(status().isNotFound());
     }
 
     @Test

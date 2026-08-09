@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <body>
-<section th:fragment="twitchat-settings" th:if="${isOwner}" class="card">
+<section th:fragment="twitchat-settings" th:if="${isOwner and twitchatSettings != null}" class="card">
     <div class="card-header">
         <h3 th:text="#{twitchat_settings.title}">Notifications Twitchat</h3>
     </div>

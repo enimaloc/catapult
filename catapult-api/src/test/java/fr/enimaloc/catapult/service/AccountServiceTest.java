@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.repository.CatapultCategoryChangeStateRepository;
 import fr.enimaloc.catapult.repository.ExperimentAssignmentRepository;
 import fr.enimaloc.catapult.repository.ExperimentEventRepository;
 import fr.enimaloc.catapult.repository.ExperimentFeedbackRepository;
@@ -10,11 +11,14 @@ import fr.enimaloc.catapult.repository.FeedbackSubmissionRepository;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.TwitchatActionTokenRepository;
+import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,6 +44,9 @@ class AccountServiceTest {
     @Mock private GameBindingRepository gameBindingRepository;
     @Mock private GetterConfigRepository getterConfigRepository;
     @Mock private UserSettingsRepository userSettingsRepository;
+    @Mock private TwitchatWidgetSettingsRepository twitchatWidgetSettingsRepository;
+    @Mock private CatapultCategoryChangeStateRepository catapultCategoryChangeStateRepository;
+    @Mock private TwitchatActionTokenRepository twitchatActionTokenRepository;
     @Mock private BotToggleService botToggleService;
     @Mock private TwitchChatService twitchChatService;
     @Mock private EventSubService twitchEventSubService;
@@ -92,6 +99,21 @@ class AccountServiceTest {
         verify(userAccountRepository).delete(account);
         verify(twitchChatService).disconnect(account);
         verify(twitchEventSubService).disconnect(account);
+    }
+
+    @Test
+    void deleteAccountImmediately_deletesTwitchatDependentRows() {
+        when(oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+
+        accountService.deleteAccountImmediately(account);
+
+        InOrder order = inOrder(twitchatWidgetSettingsRepository, catapultCategoryChangeStateRepository,
+            twitchatActionTokenRepository, userAccountRepository);
+        order.verify(twitchatWidgetSettingsRepository).deleteByUser(account);
+        order.verify(catapultCategoryChangeStateRepository).deleteByUser(account);
+        order.verify(twitchatActionTokenRepository).deleteByUserId(account.getId());
+        order.verify(userAccountRepository).delete(account);
     }
 
     @Test

@@ -253,4 +253,14 @@ public class BindingService {
     public Optional<GameBinding> findBinding(UserAccount user, UUID bindingId) {
         return gameBindingRepository.findByIdAndUser(bindingId, user);
     }
+
+    /**
+     * Read-only counterpart to {@link #resolveOrCreate}: the existing binding for a detected
+     * game, or empty when there is none. Creates and mutates nothing, so callers that merely
+     * describe the current state (notifications, read views) can't cause a write.
+     */
+    public Optional<GameBinding> findBinding(UserAccount user, DetectedGame detectedGame) {
+        return gameBindingRepository.findByUserAndSourceIdAndSourceType(
+            user, detectedGame.getSourceId(), detectedGame.getSourceType());
+    }
 }
