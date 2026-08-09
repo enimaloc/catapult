@@ -30,12 +30,20 @@
             }).catch((err) => console.error("[twitchat-relay] BroadcastCustomEvent failed", err));
         }
 
+        let subscribed = false;
+
+        function onNotifyFrame(frame) {
+            if (frame.name === "twitchat.notify") {
+                relay(frame.data);
+            }
+        }
+
         function subscribe() {
-            window.catapultWs.subscribe("twitchat.widget." + widgetToken, (frame) => {
-                if (frame.name === "twitchat.notify") {
-                    relay(frame.data);
-                }
-            });
+            if (subscribed) {
+                return;
+            }
+            subscribed = true;
+            window.catapultWs.subscribe("twitchat.widget." + widgetToken, onNotifyFrame);
         }
 
         if (window.catapultWs) {
