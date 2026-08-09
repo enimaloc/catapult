@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Catapult — relais Twitchat</title>
+</head>
+<body data-widget-token="[[${widgetToken}]]" data-obs-host="[[${obsHost}]]"
+      data-obs-port="[[${obsPort}]]" data-obs-password="[[${obsPassword}]]">
+<p>Relais Twitchat actif. Cette page peut rester ouverte en arrière-plan (onglet ou source web OBS).</p>
+<script th:src="@{/js/ws/ws-client.js}"></script>
+<script th:src="@{/js/widget/obs-websocket-client.js}"></script>
+<script th:src="@{/js/widget/twitchat-relay.js}"></script>
+</body>
+</html>
