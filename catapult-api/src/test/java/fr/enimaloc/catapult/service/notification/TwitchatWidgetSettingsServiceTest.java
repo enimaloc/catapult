@@ -92,6 +92,20 @@ class TwitchatWidgetSettingsServiceTest {
     }
 
     @Test
+    void updateSettings_blankHostAndNullPort_fallsBackToPlaceholderDefaults() {
+        TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
+        existing.setUser(user);
+        existing.setWidgetToken(UUID.randomUUID());
+        when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        TwitchatWidgetSettings result = service.updateSettings(user, true, "  ", null, null);
+
+        assertThat(result.getObsHost()).isEqualTo("127.0.0.1");
+        assertThat(result.getObsPort()).isEqualTo(4455);
+    }
+
+    @Test
     void regenerateToken_replacesTokenAndSaves() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);
