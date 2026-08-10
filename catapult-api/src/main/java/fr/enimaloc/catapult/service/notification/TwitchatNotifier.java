@@ -127,12 +127,16 @@ public class TwitchatNotifier {
     private TwitchatAction button(UserAccount user, String label, TwitchatActionType type,
                                    Map<String, String> payload, String theme) {
         UUID token = actionTokenService.generate(user.getId(), type, payload);
-        String url = publicWebUrl + "/widget/twitchat/action/" + token;
+        String url = stripTrailingSlash(publicWebUrl) + "/widget/twitchat/action/" + token;
         return TwitchatAction.urlButton(label, url, theme);
     }
 
     private void publish(UserAccount user, String message, List<TwitchatAction> actions) {
         channelEventPublisher.twitchatNotify(user.getId(), new TwitchatNotification(message, "message", actions));
+    }
+
+    private static String stripTrailingSlash(String url) {
+        return url != null && url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
     private static String nullToEmpty(String value) {

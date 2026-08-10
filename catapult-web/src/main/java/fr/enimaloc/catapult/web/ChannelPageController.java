@@ -138,6 +138,10 @@ public class ChannelPageController {
         return vars.toArray();
     }
 
+    private static String stripTrailingSlash(String url) {
+        return url != null && url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
     /**
      * Populates every model attribute the channel page (and all inlined fragments)
      * needs. Replaces the former per-fragment lazy controllers — the page now
@@ -198,7 +202,7 @@ public class ChannelPageController {
                     "/api/channels/{username}/settings/twitchat", Map.class, username);
             model.addAttribute("twitchatSettings", twitchat);
             model.addAttribute("twitchatWidgetUrl", twitchat == null ? null
-                    : publicWebUrl + "/widget/twitchat/" + twitchat.get("widgetToken"));
+                    : stripTrailingSlash(publicWebUrl) + "/widget/twitchat/" + twitchat.get("widgetToken"));
         }
 
         // DTDD mapping panel
