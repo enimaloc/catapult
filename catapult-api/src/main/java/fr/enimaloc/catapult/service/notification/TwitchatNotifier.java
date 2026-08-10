@@ -22,6 +22,10 @@ import java.util.UUID;
 @Component
 public class TwitchatNotifier {
 
+    // Author shown in Twitchat for every notification this feature sends. Fixed on purpose —
+    // these are all Catapult-originated events, not per-viewer messages.
+    private static final String AUTHOR_NAME = "Catapult";
+
     private final TwitchatWidgetSettingsService widgetSettingsService;
     private final TwitchatActionTokenService actionTokenService;
     private final ChannelEventPublisher channelEventPublisher;
@@ -60,7 +64,7 @@ public class TwitchatNotifier {
                         Map.of("gameId", previousGameId, "gameName", ""), "secondary"));
             }
             actions.add(button(user, "Désactiver le bot", TwitchatActionType.DISABLE_BOT, Map.of(), "alert"));
-            publish(user, "Catapult a changé la catégorie en " + newGameName + ".", actions);
+            publish(user, "Catapult a changé la catégorie en " + newGameName + ".", "change", actions);
         });
     }
 
@@ -83,7 +87,7 @@ public class TwitchatNotifier {
                             "secondary"));
                 }
             }
-            publish(user, "Catégorie changée manuellement en " + newGameName + ".", actions);
+            publish(user, "Catégorie changée manuellement en " + newGameName + ".", "user", actions);
         });
     }
 
@@ -92,7 +96,7 @@ public class TwitchatNotifier {
             if (!isWidgetEnabled(user)) return;
             List<TwitchatAction> actions = List.of(
                     button(user, "Désactiver le bot", TwitchatActionType.DISABLE_BOT, Map.of(), "alert"));
-            publish(user, "Le bot Catapult est actif.", actions);
+            publish(user, "Le bot Catapult est actif.", "live", actions);
         });
     }
 
@@ -102,7 +106,8 @@ public class TwitchatNotifier {
             TwitchatActionType action = enabled ? TwitchatActionType.DISABLE_BOT : TwitchatActionType.ENABLE_BOT;
             String label = enabled ? "Désactiver le bot" : "Réactiver le bot";
             List<TwitchatAction> actions = List.of(button(user, label, action, Map.of(), "secondary"));
-            publish(user, enabled ? "Le bot a été activé." : "Le bot a été désactivé.", actions);
+            publish(user, enabled ? "Le bot a été activé." : "Le bot a été désactivé.",
+                    enabled ? "online" : "offline", actions);
         });
     }
 
@@ -131,8 +136,9 @@ public class TwitchatNotifier {
         return TwitchatAction.urlButton(label, url, theme);
     }
 
-    private void publish(UserAccount user, String message, List<TwitchatAction> actions) {
-        channelEventPublisher.twitchatNotify(user.getId(), new TwitchatNotification(message, "message", actions));
+    private void publish(UserAccount user, String message, String icon, List<TwitchatAction> actions) {
+        channelEventPublisher.twitchatNotify(user.getId(),
+                new TwitchatNotification(message, "message", icon, AUTHOR_NAME, actions));
     }
 
     private static String stripTrailingSlash(String url) {

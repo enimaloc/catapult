@@ -72,6 +72,8 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(2);
+        assertThat(captor.getValue().icon()).isEqualTo("change");
+        assertThat(captor.getValue().authorName()).isEqualTo("Catapult");
     }
 
     @Test
@@ -89,6 +91,7 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(2); // bind + revert-to-app (differ: 111 != 222)
+        assertThat(captor.getValue().icon()).isEqualTo("user");
     }
 
     @Test
@@ -148,6 +151,9 @@ class TwitchatNotifierTest {
         notifier.onBotToggled(user, true);
 
         verify(actionTokenService).generate(user.getId(), TwitchatActionType.DISABLE_BOT, Map.of());
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().icon()).isEqualTo("online");
     }
 
     @Test
@@ -155,6 +161,9 @@ class TwitchatNotifierTest {
         notifier.onBotToggled(user, false);
 
         verify(actionTokenService).generate(user.getId(), TwitchatActionType.ENABLE_BOT, Map.of());
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().icon()).isEqualTo("offline");
     }
 
     @Test
@@ -162,5 +171,8 @@ class TwitchatNotifierTest {
         notifier.onStreamStarted(user);
 
         verify(actionTokenService).generate(user.getId(), TwitchatActionType.DISABLE_BOT, Map.of());
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().icon()).isEqualTo("live");
     }
 }
