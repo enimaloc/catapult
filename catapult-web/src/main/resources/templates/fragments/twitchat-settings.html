@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
 <section th:fragment="twitchat-settings" th:if="${isOwner and twitchatSettings != null}" class="card">
     <div class="card-header">
@@ -10,7 +10,8 @@
         quand tu la changes toi-même, ou quand le bot s'active/désactive.
     </p>
 
-    <form th:action="@{/channels/{u}/settings/twitchat(u=${channelUsername})}" method="post">
+    <form th:action="@{/channels/{u}/settings/twitchat(u=${channelUsername})}" method="post"
+          ws:post="@{/channels/{u}/settings/twitchat(u=${channelUsername})}" ws:swap="none"> <!-- nosemgrep -->
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <div class="inline-edit-fields">
             <div class="inline-edit-field">
