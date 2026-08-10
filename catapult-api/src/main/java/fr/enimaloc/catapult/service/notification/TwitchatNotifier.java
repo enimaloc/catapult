@@ -7,9 +7,9 @@ import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatAction;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatNotification;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -20,7 +20,6 @@ import java.util.UUID;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class TwitchatNotifier {
 
     private final TwitchatWidgetSettingsService widgetSettingsService;
@@ -31,6 +30,23 @@ public class TwitchatNotifier {
 
     @Value("${app.web-url:http://localhost:8081}")
     private String publicWebUrl;
+
+    // BindingService (transitively) depends back on TwitchServiceImpl, which sits upstream of
+    // this notifier in the bean graph (TwitchServiceImpl -> BotToggleService ->
+    // TwitchEventSubService -> StreamStateService/TwitchatNotifier -> BindingService ->
+    // TwitchServiceImpl) — @Lazy breaks that cycle by deferring BindingService resolution to
+    // first use instead of construction time.
+    public TwitchatNotifier(TwitchatWidgetSettingsService widgetSettingsService,
+                             TwitchatActionTokenService actionTokenService,
+                             ChannelEventPublisher channelEventPublisher,
+                             GameStateService gameStateService,
+                             @Lazy BindingService bindingService) {
+        this.widgetSettingsService = widgetSettingsService;
+        this.actionTokenService = actionTokenService;
+        this.channelEventPublisher = channelEventPublisher;
+        this.gameStateService = gameStateService;
+        this.bindingService = bindingService;
+    }
 
     public void onCategoryChangedByCatapult(UserAccount user, String newGameId, String newGameName,
                                              String previousGameId) {
