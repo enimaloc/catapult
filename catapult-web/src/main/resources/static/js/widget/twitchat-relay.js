@@ -19,6 +19,8 @@
                     data: {
                         message: notification.message,
                         style: notification.style,
+                        icon: notification.icon,
+                        user: notification.authorName ? { name: notification.authorName } : undefined,
                         actions: (notification.actions || []).map((a) => ({
                             label: a.label,
                             actionType: a.actionType,
