@@ -14,6 +14,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TwitchatWidgetSettingsService {
 
+    // Same values shown as placeholder text in the settings form — a blank field there looks
+    // filled-in to the user, so a blank submission is treated as "use the placeholder" rather
+    // than silently persisting null (which the relay page's obsHost/obsPort guard then hides).
+    private static final String DEFAULT_OBS_HOST = "127.0.0.1";
+    private static final int DEFAULT_OBS_PORT = 4455;
+
     private final TwitchatWidgetSettingsRepository repository;
     private final TokenEncryptionService tokenEncryptionService;
 
@@ -33,8 +39,8 @@ public class TwitchatWidgetSettingsService {
                                                   Integer obsPort, String obsPasswordPlaintext) {
         TwitchatWidgetSettings settings = getOrCreate(user);
         settings.setEnabled(enabled);
-        settings.setObsHost(obsHost);
-        settings.setObsPort(obsPort);
+        settings.setObsHost(obsHost == null || obsHost.isBlank() ? DEFAULT_OBS_HOST : obsHost);
+        settings.setObsPort(obsPort == null ? DEFAULT_OBS_PORT : obsPort);
         if (obsPasswordPlaintext != null) {
             settings.setObsPasswordEncrypted(tokenEncryptionService.encrypt(obsPasswordPlaintext));
         }
