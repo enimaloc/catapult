@@ -2,11 +2,16 @@ package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.TwitchatActionType;
+import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatAction;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatActionDefault;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatActionOverride;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatDefaultPayload;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatNotification;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -22,12 +27,9 @@ import java.util.UUID;
 @Component
 public class TwitchatNotifier {
 
-    // Author shown in Twitchat for every notification this feature sends. Fixed on purpose —
-    // these are all Catapult-originated events, not per-viewer messages.
-    private static final String AUTHOR_NAME = "Catapult";
-
     private final TwitchatWidgetSettingsService widgetSettingsService;
     private final TwitchatActionTokenService actionTokenService;
+    private final TwitchatPayloadPresetService payloadPresetService;
     private final ChannelEventPublisher channelEventPublisher;
     private final GameStateService gameStateService;
     private final BindingService bindingService;
@@ -36,17 +38,17 @@ public class TwitchatNotifier {
     private String publicWebUrl;
 
     // BindingService (transitively) depends back on TwitchServiceImpl, which sits upstream of
-    // this notifier in the bean graph (TwitchServiceImpl -> BotToggleService ->
-    // TwitchEventSubService -> StreamStateService/TwitchatNotifier -> BindingService ->
-    // TwitchServiceImpl) — @Lazy breaks that cycle by deferring BindingService resolution to
-    // first use instead of construction time.
+    // this notifier in the bean graph — @Lazy breaks that cycle by deferring BindingService
+    // resolution to first use instead of construction time.
     public TwitchatNotifier(TwitchatWidgetSettingsService widgetSettingsService,
                              TwitchatActionTokenService actionTokenService,
+                             TwitchatPayloadPresetService payloadPresetService,
                              ChannelEventPublisher channelEventPublisher,
                              GameStateService gameStateService,
                              @Lazy BindingService bindingService) {
         this.widgetSettingsService = widgetSettingsService;
         this.actionTokenService = actionTokenService;
+        this.payloadPresetService = payloadPresetService;
         this.channelEventPublisher = channelEventPublisher;
         this.gameStateService = gameStateService;
         this.bindingService = bindingService;
@@ -56,47 +58,47 @@ public class TwitchatNotifier {
                                              String previousGameId) {
         safely(user, "onCategoryChangedByCatapult", () -> {
             if (!isWidgetEnabled(user)) return;
-            List<TwitchatAction> actions = new ArrayList<>();
+            List<PendingAction> actions = new ArrayList<>();
             // No previous category recorded → nothing to revert to; a "Revert" button here would
             // PATCH Twitch with an empty game_id and simply unset the category.
             if (previousGameId != null) {
-                actions.add(button(user, "Revert", TwitchatActionType.REVERT_CATEGORY,
-                        Map.of("gameId", previousGameId, "gameName", ""), "secondary"));
+                actions.add(new PendingAction(TwitchatActionType.REVERT_CATEGORY,
+                        Map.of("gameId", previousGameId, "gameName", "")));
             }
-            actions.add(button(user, "Désactiver le bot", TwitchatActionType.DISABLE_BOT, Map.of(), "alert"));
-            publish(user, "Catapult a changé la catégorie en " + newGameName + ".", "change", actions);
+            actions.add(new PendingAction(TwitchatActionType.DISABLE_BOT, Map.of()));
+            publish(user, TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT,
+                    Map.of("gameName", newGameName), actions);
         });
     }
 
     public void onCategoryChangedManually(UserAccount user, String newGameId, String newGameName) {
         safely(user, "onCategoryChangedManually", () -> {
             if (!isWidgetEnabled(user)) return;
-            List<TwitchatAction> actions = new ArrayList<>();
+            List<PendingAction> actions = new ArrayList<>();
             // Read-only lookup on purpose: composing a notification must never create a binding.
             Optional<GameBinding> existing = gameStateService.getLastKnownGame(user)
                     .flatMap(detected -> bindingService.findBinding(user, detected));
             if (existing.isPresent()) {
                 GameBinding binding = existing.get();
-                actions.add(button(user, "Définir par défaut pour ce jeu", TwitchatActionType.BIND_GAME_CATEGORY,
-                        Map.of("bindingId", binding.getId().toString(), "newGameId", newGameId, "newGameName", newGameName),
-                        "primary"));
+                actions.add(new PendingAction(TwitchatActionType.BIND_GAME_CATEGORY,
+                        Map.of("bindingId", binding.getId().toString(), "newGameId", newGameId,
+                                "newGameName", newGameName)));
                 String appGameId = binding.getTwitchGameId();
                 if (appGameId != null && !appGameId.equals(newGameId)) {
-                    actions.add(button(user, "Retour à la catégorie de l'app", TwitchatActionType.REVERT_TO_APP_CATEGORY,
-                            Map.of("gameId", appGameId, "gameName", nullToEmpty(binding.getTwitchGameName())),
-                            "secondary"));
+                    actions.add(new PendingAction(TwitchatActionType.REVERT_TO_APP_CATEGORY,
+                            Map.of("gameId", appGameId, "gameName", nullToEmpty(binding.getTwitchGameName()))));
                 }
             }
-            publish(user, "Catégorie changée manuellement en " + newGameName + ".", "user", actions);
+            publish(user, TwitchatNotificationEventType.CATEGORY_CHANGED_MANUALLY,
+                    Map.of("gameName", newGameName), actions);
         });
     }
 
     public void onStreamStarted(UserAccount user) {
         safely(user, "onStreamStarted", () -> {
             if (!isWidgetEnabled(user)) return;
-            List<TwitchatAction> actions = List.of(
-                    button(user, "Désactiver le bot", TwitchatActionType.DISABLE_BOT, Map.of(), "alert"));
-            publish(user, "Le bot Catapult est actif.", "live", actions);
+            List<PendingAction> actions = List.of(new PendingAction(TwitchatActionType.DISABLE_BOT, Map.of()));
+            publish(user, TwitchatNotificationEventType.STREAM_STARTED, Map.of(), actions);
         });
     }
 
@@ -104,10 +106,10 @@ public class TwitchatNotifier {
         safely(user, "onBotToggled", () -> {
             if (!isWidgetEnabled(user)) return;
             TwitchatActionType action = enabled ? TwitchatActionType.DISABLE_BOT : TwitchatActionType.ENABLE_BOT;
-            String label = enabled ? "Désactiver le bot" : "Réactiver le bot";
-            List<TwitchatAction> actions = List.of(button(user, label, action, Map.of(), "secondary"));
-            publish(user, enabled ? "Le bot a été activé." : "Le bot a été désactivé.",
-                    enabled ? "online" : "offline", actions);
+            List<PendingAction> actions = List.of(new PendingAction(action, Map.of()));
+            publish(user,
+                    enabled ? TwitchatNotificationEventType.BOT_ENABLED : TwitchatNotificationEventType.BOT_DISABLED,
+                    Map.of(), actions);
         });
     }
 
@@ -129,16 +131,49 @@ public class TwitchatNotifier {
         return widgetSettingsService.getOrCreate(user).isEnabled();
     }
 
-    private TwitchatAction button(UserAccount user, String label, TwitchatActionType type,
-                                   Map<String, String> payload, String theme) {
-        UUID token = actionTokenService.generate(user.getId(), type, payload);
-        String url = stripTrailingSlash(publicWebUrl) + "/widget/twitchat/action/" + token;
-        return TwitchatAction.urlButton(label, url, theme);
+    /**
+     * Renders and publishes one notification. The active preset (if any) can override
+     * message/style/icon/authorName and the label/theme of each action already decided by the
+     * caller — it can never add, remove, or redirect an action: {@code pendingActions} and their
+     * tokenized URLs are always computed here, never by the preset.
+     */
+    private void publish(UserAccount user, TwitchatNotificationEventType eventType,
+                          Map<String, String> variables, List<PendingAction> pendingActions) {
+        TwitchatDefaultPayload defaults = TwitchatDefaultPayloads.DEFAULTS.get(eventType);
+        TwitchatPresetPayload preset = payloadPresetService.findActivePresetPayload(user, eventType).orElse(null);
+
+        String messageTemplate = nonBlankOr(preset == null ? null : preset.message(), defaults.message());
+        String message = substitute(messageTemplate, variables);
+        String style = nonBlankOr(preset == null ? null : preset.style(), defaults.style());
+        String icon = nonBlankOr(preset == null ? null : preset.icon(), defaults.icon());
+        String authorName = nonBlankOr(preset == null ? null : preset.authorName(), defaults.authorName());
+
+        List<TwitchatAction> actions = new ArrayList<>();
+        for (PendingAction pending : pendingActions) {
+            TwitchatActionDefault def = defaults.actions().get(pending.type());
+            TwitchatActionOverride override = preset == null || preset.actions() == null
+                    ? null : preset.actions().get(pending.type().name());
+            String label = nonBlankOr(override == null ? null : override.label(), def.label());
+            String theme = nonBlankOr(override == null ? null : override.theme(), def.theme());
+            UUID token = actionTokenService.generate(user.getId(), pending.type(), pending.payload());
+            String url = stripTrailingSlash(publicWebUrl) + "/widget/twitchat/action/" + token;
+            actions.add(TwitchatAction.urlButton(label, url, theme));
+        }
+
+        channelEventPublisher.twitchatNotify(user.getId(),
+                new TwitchatNotification(message, style, icon, authorName, actions));
     }
 
-    private void publish(UserAccount user, String message, String icon, List<TwitchatAction> actions) {
-        channelEventPublisher.twitchatNotify(user.getId(),
-                new TwitchatNotification(message, "message", icon, AUTHOR_NAME, actions));
+    private static String substitute(String template, Map<String, String> variables) {
+        String result = template;
+        for (Map.Entry<String, String> entry : variables.entrySet()) {
+            result = result.replace("{{" + entry.getKey() + "}}", entry.getValue() == null ? "" : entry.getValue());
+        }
+        return result;
+    }
+
+    private static String nonBlankOr(String value, String fallback) {
+        return value != null && !value.isBlank() ? value : fallback;
     }
 
     private static String stripTrailingSlash(String url) {
@@ -147,5 +182,8 @@ public class TwitchatNotifier {
 
     private static String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private record PendingAction(TwitchatActionType type, Map<String, String> payload) {
     }
 }

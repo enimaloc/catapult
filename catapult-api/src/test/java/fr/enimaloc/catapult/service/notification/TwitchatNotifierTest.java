@@ -31,6 +31,7 @@ class TwitchatNotifierTest {
 
     @Mock private TwitchatWidgetSettingsService widgetSettingsService;
     @Mock private TwitchatActionTokenService actionTokenService;
+    @Mock private TwitchatPayloadPresetService payloadPresetService;
     @Mock private ChannelEventPublisher channelEventPublisher;
     @Mock private GameStateService gameStateService;
     @Mock private BindingService bindingService;
@@ -48,6 +49,7 @@ class TwitchatNotifierTest {
         enabledSettings.setEnabled(true);
         lenient().when(widgetSettingsService.getOrCreate(user)).thenReturn(enabledSettings);
         lenient().when(actionTokenService.generate(any(), any(), any())).thenReturn(UUID.randomUUID());
+        lenient().when(payloadPresetService.findActivePresetPayload(any(), any())).thenReturn(Optional.empty());
     }
 
     @Test
@@ -174,5 +176,58 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().icon()).isEqualTo("live");
+    }
+
+    @Test
+    void onStreamStarted_activePreset_overridesMessageIconAndActionLabel() {
+        when(payloadPresetService.findActivePresetPayload(user, fr.enimaloc.catapult.domain.TwitchatNotificationEventType.STREAM_STARTED))
+                .thenReturn(Optional.of(new fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload(
+                        "On est en direct !", null, "custom-icon", "MonBot",
+                        Map.of("DISABLE_BOT", new fr.enimaloc.catapult.service.notification.dto.TwitchatActionOverride(
+                                "Stop", "primary")))));
+
+        notifier.onStreamStarted(user);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        TwitchatNotification n = captor.getValue();
+        assertThat(n.message()).isEqualTo("On est en direct !");
+        assertThat(n.icon()).isEqualTo("custom-icon");
+        assertThat(n.style()).isEqualTo("message"); // preset omitted style → default
+        assertThat(n.authorName()).isEqualTo("MonBot");
+        assertThat(n.actions()).hasSize(1);
+        assertThat(n.actions().get(0).label()).isEqualTo("Stop");
+        assertThat(n.actions().get(0).theme()).isEqualTo("primary");
+    }
+
+    @Test
+    void onCategoryChangedByCatapult_presetSubstitutesGameNameVariable() {
+        when(payloadPresetService.findActivePresetPayload(user, fr.enimaloc.catapult.domain.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
+                .thenReturn(Optional.of(new fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload(
+                        ">> {{gameName}} <<", null, null, null, null)));
+
+        notifier.onCategoryChangedByCatapult(user, "222", "Elden Ring", null);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().message()).isEqualTo(">> Elden Ring <<");
+    }
+
+    @Test
+    void onCategoryChangedByCatapult_presetOverridesUnappliedActionType_isIgnored() {
+        // Preset defines an override for REVERT_CATEGORY, but previousGameId is null so that
+        // action never applies — must not crash, and must not appear in the output.
+        when(payloadPresetService.findActivePresetPayload(user, fr.enimaloc.catapult.domain.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
+                .thenReturn(Optional.of(new fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload(
+                        "Changed.", null, null, null,
+                        Map.of("REVERT_CATEGORY", new fr.enimaloc.catapult.service.notification.dto.TwitchatActionOverride(
+                                "Undo", "secondary")))));
+
+        notifier.onCategoryChangedByCatapult(user, "222", "New Game", null);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).hasSize(1); // disable-bot only, unaffected by the unused override
+        assertThat(captor.getValue().actions().get(0).label()).isEqualTo("Désactiver le bot");
     }
 }
