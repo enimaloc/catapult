@@ -37,6 +37,7 @@ public class IgdbService {
     private static final String KEY_STEAM_PREFIX = "steam:";
     private static final String KEY_NAME_PREFIX  = "name:";
     private static final String KEY_EXE_PREFIX   = "exe:";
+    private static final String KEY_XBOX_PREFIX  = "xbox:";
 
     private final IgdbClient igdbClient;
     private final IgdbGameCacheRepository cacheRepository;
@@ -95,11 +96,13 @@ public class IgdbService {
 
     // ExternalGameSource IDs (-1 = not resolved)
     private volatile long steamSourceId = -1;
+    private volatile long xboxSourceId = -1;
     private volatile long twitchSourceId = -1;
 
     @PostConstruct
     public void init() {
         steamSourceId  = loadSourceId("Steam");
+        xboxSourceId   = loadSourceId("Microsoft");
         twitchSourceId = loadSourceId("Twitch");
         warmInMemoryCacheFromDb();
     }
@@ -128,6 +131,14 @@ public class IgdbService {
     public boolean evictExeIndex(String key) { return exeNameIndex.remove(key) != null; }
 
     public boolean evictCclCache(String key) { return cclCache.remove(key) != null; }
+
+    public Optional<IgdbGame> findByExternalAppId(GameBinding.SourceType sourceType, String appId) {
+        return switch (sourceType) {
+            case STEAM -> findBySteamAppId(appId);
+            case XBOX -> findByXboxAppId(appId);
+            default -> Optional.empty();
+        };
+    }
 
     public Optional<IgdbGame> findBySteamAppId(String appId) {
         if (clientId.isBlank()) return Optional.empty();
@@ -170,6 +181,46 @@ public class IgdbService {
         }
 
         Game game = results.get(0).getGame();
+        IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
+        igdbGameCache.put(resolved.id(), resolved.name());
+        igdbNameIndex.put(normalise(resolved.name()), resolved);
+        saveToDb(key, resolved);
+        return Optional.of(resolved);
+    }
+
+    public Optional<IgdbGame> findByXboxAppId(String appId) {
+        if (clientId.isBlank()) return Optional.empty();
+
+        // Check external ID table populated during preload
+        if (xboxSourceId >= 0) {
+            Optional<IgdbGameExternalId> extId = externalIdRepository.findBySourceIdAndUid(xboxSourceId, appId);
+            if (extId.isPresent()) {
+                String igdbId = extId.get().getIgdbId();
+                String name = igdbGameCache.get(igdbId);
+                if (name != null) {
+                    log.debug("IGDB external ID cache hit for Xbox appId={}", appId);
+                    meterRegistry.counter("catapult.igdb.cache.lookup", "method", "xbox", "result", "hit").increment();
+                    return Optional.of(new IgdbGame(igdbId, name));
+                }
+            }
+        }
+
+        // Legacy steam: key lookup in igdb_game_cache
+        String key = KEY_XBOX_PREFIX + appId;
+        Optional<IgdbGame> fromDb = lookupInDb(key);
+        if (fromDb.isPresent()) {
+            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "xbox", "result", "db_hit").increment();
+            return fromDb;
+        }
+
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return Optional.empty();
+
+        List<proto.ExternalGame> results = igdbClient.findExternalGameByUid(appId, xboxSourceId, token);
+        meterRegistry.counter("catapult.igdb.cache.lookup", "method", "xbox", "result", "miss").increment();
+        if (results.isEmpty()) return Optional.empty();
+
+        Game game = results.getFirst().getGame();
         IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
         igdbGameCache.put(resolved.id(), resolved.name());
         igdbNameIndex.put(normalise(resolved.name()), resolved);
