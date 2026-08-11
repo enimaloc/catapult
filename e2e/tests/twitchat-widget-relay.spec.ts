@@ -2,9 +2,15 @@ import { test, expect } from "@playwright/test";
 import { publishRedis } from "./helpers/compose";
 
 // The widget relay page has no OBS-websocket to talk to in CI, so we stub
-// obsWsConnect before the page's own script runs and assert on the calls
-// it makes to the stub's `call()` — this exercises the WS-subscribe →
-// relay logic in twitchat-relay.js without a real OBS instance.
+// obsWsConnect and assert on the calls it makes to the stub's `call()` —
+// this exercises the WS-subscribe → relay logic in twitchat-relay.js
+// without a real OBS instance.
+//
+// The stub MUST be injected via page.route() on obs-websocket-client.js
+// itself, not page.addInitScript(): the real obs-websocket-client.js does
+// `global.obsWsConnect = connect` when it loads, which runs AFTER an
+// addInitScript-installed stub and silently clobbers it — the test would
+// then try to talk to a real OBS-websocket instance and hang until timeout.
 
 test.describe("twitchat widget relay", () => {
   // Precondition beyond the env vars checked below: the seeded widget token's backing
@@ -22,15 +28,36 @@ test.describe("twitchat widget relay", () => {
 
     await page.addInitScript(() => {
       (window as any).__obsCalls = [];
-      (window as any).obsWsConnect = async () => ({
-        call: async (requestType: string, requestData: unknown) => {
-          (window as any).__obsCalls.push({ requestType, requestData });
-          return {};
-        }
+      // twitchat.widget.<token> is a fire-and-forget channel with no missed-event replay
+      // (see the event-driven-channel-page design doc) — publishing to Redis before the
+      // WS "subscribe" round-trip completes silently drops the message. This page only
+      // ever subscribes to one channel, so any ws:sub.ok is the one we're waiting for.
+      // Registered via addInitScript so the listener exists before ws-client.js runs.
+      (window as any).__subscribed = false;
+      document.addEventListener("ws:sub.ok", () => {
+        (window as any).__subscribed = true;
       });
     });
 
+    await page.route("**/js/widget/obs-websocket-client.js", (route) =>
+      route.fulfill({
+        contentType: "text/javascript",
+        body: `
+          window.obsWsConnect = async () => ({
+            call: async (requestType, requestData) => {
+              window.__obsCalls.push({ requestType, requestData });
+              return {};
+            }
+          });
+        `
+      })
+    );
+
     await page.goto(`/widget/twitchat/${widgetToken}`);
+
+    await page.waitForFunction(() => (window as any).__subscribed === true, undefined, {
+      timeout: 10_000
+    });
 
     publishRedis(
       `catapult:events:twitchat:${ownerId}`,
