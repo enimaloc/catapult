@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatWidgetConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ public class TwitchatWidgetSettingsService {
 
     private final TwitchatWidgetSettingsRepository repository;
     private final TokenEncryptionService tokenEncryptionService;
+    private final ChannelEventPublisher channelEventPublisher;
 
     @Transactional
     public TwitchatWidgetSettings getOrCreate(UserAccount user) {
@@ -44,7 +46,20 @@ public class TwitchatWidgetSettingsService {
         if (obsPasswordPlaintext != null) {
             settings.setObsPasswordEncrypted(tokenEncryptionService.encrypt(obsPasswordPlaintext));
         }
-        return repository.save(settings);
+        TwitchatWidgetSettings saved = repository.save(settings);
+        publishWidgetConfig(saved);
+        return saved;
+    }
+
+    // Pushed live so a widget page already open in a browser tab or OBS browser source picks
+    // up host/port/password changes and reconnects without needing a manual reload. Not sent
+    // from regenerateToken(): the whole point of regenerating is to cut off any existing
+    // session using the old token, so it must NOT be kept alive with fresh values.
+    private void publishWidgetConfig(TwitchatWidgetSettings settings) {
+        String password = settings.getObsPasswordEncrypted() == null
+                ? null : tokenEncryptionService.decrypt(settings.getObsPasswordEncrypted());
+        channelEventPublisher.twitchatWidgetSettingsUpdated(settings.getUser().getId(),
+                new TwitchatWidgetConfig(settings.getObsHost(), settings.getObsPort(), password));
     }
 
     @Transactional

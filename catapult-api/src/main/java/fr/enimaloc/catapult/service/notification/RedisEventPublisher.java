@@ -65,8 +65,8 @@ public class RedisEventPublisher {
         publish(CHANNEL_CHANNEL_PREFIX + channelOwnerId, name, data);
     }
 
-    public void publishTwitchat(UUID channelOwnerId, Object data) {
-        publish(CHANNEL_TWITCHAT_PREFIX + channelOwnerId, "twitchat.notify", data);
+    public void publishTwitchat(UUID channelOwnerId, String name, Object data) {
+        publish(CHANNEL_TWITCHAT_PREFIX + channelOwnerId, name, data);
     }
 
     private void publish(String channel, String name, Object data) {

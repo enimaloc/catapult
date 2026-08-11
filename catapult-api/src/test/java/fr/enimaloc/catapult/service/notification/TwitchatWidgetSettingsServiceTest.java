@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatWidgetConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,7 @@ class TwitchatWidgetSettingsServiceTest {
 
     @Mock private TwitchatWidgetSettingsRepository repository;
     @Mock private TokenEncryptionService tokenEncryptionService;
+    @Mock private ChannelEventPublisher channelEventPublisher;
     @InjectMocks private TwitchatWidgetSettingsService service;
 
     private UserAccount user;
@@ -66,6 +68,7 @@ class TwitchatWidgetSettingsServiceTest {
         existing.setWidgetToken(UUID.randomUUID());
         when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
         when(tokenEncryptionService.encrypt("s3cret")).thenReturn("ENC(s3cret)");
+        when(tokenEncryptionService.decrypt("ENC(s3cret)")).thenReturn("s3cret");
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         TwitchatWidgetSettings result = service.updateSettings(user, true, "127.0.0.1", 4455, "s3cret");
@@ -77,12 +80,32 @@ class TwitchatWidgetSettingsServiceTest {
     }
 
     @Test
+    void updateSettings_publishesLiveConfigForAnAlreadyOpenWidget() {
+        TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
+        existing.setUser(user);
+        existing.setWidgetToken(UUID.randomUUID());
+        when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
+        when(tokenEncryptionService.encrypt("s3cret")).thenReturn("ENC(s3cret)");
+        when(tokenEncryptionService.decrypt("ENC(s3cret)")).thenReturn("s3cret");
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateSettings(user, true, "127.0.0.1", 4455, "s3cret");
+
+        ArgumentCaptor<TwitchatWidgetConfig> captor = ArgumentCaptor.forClass(TwitchatWidgetConfig.class);
+        verify(channelEventPublisher).twitchatWidgetSettingsUpdated(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().obsHost()).isEqualTo("127.0.0.1");
+        assertThat(captor.getValue().obsPort()).isEqualTo(4455);
+        assertThat(captor.getValue().obsPassword()).isEqualTo("s3cret");
+    }
+
+    @Test
     void updateSettings_withNullPassword_keepsExistingEncryptedPassword() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);
         existing.setWidgetToken(UUID.randomUUID());
         existing.setObsPasswordEncrypted("ENC(old)");
         when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
+        when(tokenEncryptionService.decrypt("ENC(old)")).thenReturn("old");
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         TwitchatWidgetSettings result = service.updateSettings(user, true, "127.0.0.1", 4455, null);
@@ -103,6 +126,19 @@ class TwitchatWidgetSettingsServiceTest {
 
         assertThat(result.getObsHost()).isEqualTo("127.0.0.1");
         assertThat(result.getObsPort()).isEqualTo(4455);
+    }
+
+    @Test
+    void regenerateToken_doesNotPublishLiveConfig() {
+        TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
+        existing.setUser(user);
+        existing.setWidgetToken(UUID.randomUUID());
+        when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.regenerateToken(user);
+
+        verifyNoInteractions(channelEventPublisher);
     }
 
     @Test

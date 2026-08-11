@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatNotification;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -78,7 +79,11 @@ public class ChannelEventPublisher {
     }
 
     public void twitchatNotify(UUID channelOwnerId, TwitchatNotification notification) {
-        redisPublisher.publishTwitchat(channelOwnerId, notification);
+        redisPublisher.publishTwitchat(channelOwnerId, "twitchat.notify", notification);
+    }
+
+    public void twitchatWidgetSettingsUpdated(UUID channelOwnerId, TwitchatWidgetConfig config) {
+        redisPublisher.publishTwitchat(channelOwnerId, "twitchat.widget.settings.updated", config);
     }
 
     private void publish(UUID channelOwnerId, String name, Map<String, Object> data) {
