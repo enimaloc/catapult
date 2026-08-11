@@ -47,6 +47,8 @@ public class AccountService {
     private final TwitchatWidgetSettingsRepository twitchatWidgetSettingsRepository;
     private final CatapultCategoryChangeStateRepository catapultCategoryChangeStateRepository;
     private final TwitchatActionTokenRepository twitchatActionTokenRepository;
+    private final fr.enimaloc.catapult.repository.TwitchatActivePresetRepository twitchatActivePresetRepository;
+    private final fr.enimaloc.catapult.repository.TwitchatPayloadPresetRepository twitchatPayloadPresetRepository;
     private final Optional<XboxUserTokenService> xboxUserTokenService;
     private final BotToggleService botToggleService;
     private final TwitchChatService twitchChatService;
@@ -111,6 +113,8 @@ public class AccountService {
         twitchatWidgetSettingsRepository.deleteByUser(account);
         catapultCategoryChangeStateRepository.deleteByUser(account);
         twitchatActionTokenRepository.deleteByUserId(account.getId());
+        twitchatActivePresetRepository.deleteByUserId(account.getId());
+        twitchatPayloadPresetRepository.deleteByUser(account);
         // Pas d'endpoint de révocation officiel pour ces providers — suppression en base uniquement
 //        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
 //            oAuthTokenRepository.findByUserAndProvider(account, p)
