@@ -113,10 +113,13 @@ class AccountServiceTest {
         accountService.deleteAccountImmediately(account);
 
         InOrder order = inOrder(twitchatWidgetSettingsRepository, catapultCategoryChangeStateRepository,
-            twitchatActionTokenRepository, userAccountRepository);
+            twitchatActionTokenRepository, twitchatActivePresetRepository, twitchatPayloadPresetRepository,
+            userAccountRepository);
         order.verify(twitchatWidgetSettingsRepository).deleteByUser(account);
         order.verify(catapultCategoryChangeStateRepository).deleteByUser(account);
         order.verify(twitchatActionTokenRepository).deleteByUserId(account.getId());
+        order.verify(twitchatActivePresetRepository).deleteByUserId(account.getId());
+        order.verify(twitchatPayloadPresetRepository).deleteByUser(account);
         order.verify(userAccountRepository).delete(account);
     }
 
