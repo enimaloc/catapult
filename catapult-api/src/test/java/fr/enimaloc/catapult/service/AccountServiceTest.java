@@ -12,6 +12,8 @@ import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.TwitchatActionTokenRepository;
+import fr.enimaloc.catapult.repository.TwitchatActivePresetRepository;
+import fr.enimaloc.catapult.repository.TwitchatPayloadPresetRepository;
 import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
@@ -47,6 +49,8 @@ class AccountServiceTest {
     @Mock private TwitchatWidgetSettingsRepository twitchatWidgetSettingsRepository;
     @Mock private CatapultCategoryChangeStateRepository catapultCategoryChangeStateRepository;
     @Mock private TwitchatActionTokenRepository twitchatActionTokenRepository;
+    @Mock private TwitchatActivePresetRepository twitchatActivePresetRepository;
+    @Mock private TwitchatPayloadPresetRepository twitchatPayloadPresetRepository;
     @Mock private BotToggleService botToggleService;
     @Mock private TwitchChatService twitchChatService;
     @Mock private EventSubService twitchEventSubService;
