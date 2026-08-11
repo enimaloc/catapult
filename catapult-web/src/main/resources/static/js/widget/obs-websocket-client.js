@@ -25,6 +25,7 @@
             let requestCounter = 0;
             let settled = false;
             let connected = false;
+            let manuallyClosed = false;
 
             function settle(fn, value) {
                 if (settled) return;
@@ -41,7 +42,10 @@
                     rej(new Error("connection closed"));
                 }
                 pending.clear();
-                if (connected && typeof onDisconnect === "function") {
+                // Suppressed on an intentional close() — the caller already knows it's
+                // gone (it asked for that) and is about to open a replacement itself;
+                // firing onDisconnect here would trigger a redundant reconnect race.
+                if (connected && !manuallyClosed && typeof onDisconnect === "function") {
                     onDisconnect();
                 }
             };
@@ -67,6 +71,10 @@
                                     d: { requestType, requestId, requestData }
                                 }));
                             });
+                        },
+                        close() {
+                            manuallyClosed = true;
+                            socket.close();
                         }
                     });
                 } else if (frame.op === 7) {

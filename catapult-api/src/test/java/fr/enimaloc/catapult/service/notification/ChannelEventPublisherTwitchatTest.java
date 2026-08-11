@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.service.notification.dto.TwitchatAction;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatNotification;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatWidgetConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,6 +29,16 @@ class ChannelEventPublisherTwitchatTest {
 
         channelEventPublisher.twitchatNotify(ownerId, notification);
 
-        verify(redisPublisher).publishTwitchat(ownerId, notification);
+        verify(redisPublisher).publishTwitchat(ownerId, "twitchat.notify", notification);
+    }
+
+    @Test
+    void twitchatWidgetSettingsUpdated_delegatesToRedisPublisherOnTwitchatChannel() {
+        UUID ownerId = UUID.randomUUID();
+        TwitchatWidgetConfig config = new TwitchatWidgetConfig("127.0.0.1", 4455, "s3cret");
+
+        channelEventPublisher.twitchatWidgetSettingsUpdated(ownerId, config);
+
+        verify(redisPublisher).publishTwitchat(ownerId, "twitchat.widget.settings.updated", config);
     }
 }

@@ -2,13 +2,17 @@
     "use strict";
     const body = document.body;
     const widgetToken = body.dataset.widgetToken;
-    const obsHost = body.dataset.obsHost;
-    const obsPort = body.dataset.obsPort;
-    const obsPassword = body.dataset.obsPassword;
 
-    if (!widgetToken || !obsHost || !obsPort) {
+    if (!widgetToken) {
         return;
     }
+
+    // Mutable: a widget page left open across a settings save must pick up the new
+    // host/port/password live (see applyNewObsSettings) rather than keep dialing the
+    // values it was rendered with — see settings-updated handling below.
+    let obsHost = body.dataset.obsHost || null;
+    let obsPort = body.dataset.obsPort || null;
+    let obsPassword = body.dataset.obsPassword || "";
 
     // Reconnect strategy mirrors ws-client.js: exponential backoff capped at 30s, reset to
     // the floor on a successful (re)connect. Without this, an OBS restart or any transient
@@ -18,6 +22,12 @@
     const RECONNECT_CEILING_MS = 30000;
     let reconnectDelay = RECONNECT_FLOOR_MS;
     let obs = null;
+
+    // Bumped every time applyNewObsSettings swaps in new connection info, so an
+    // in-flight connect attempt or a pending reconnect timer started under the OLD
+    // host/port/password can recognise it has been superseded and quietly no-op
+    // instead of racing the new connection.
+    let generation = 0;
 
     function relay(notification) {
         if (!obs) {
@@ -46,28 +56,67 @@
         }).catch((err) => console.error("[twitchat-relay] BroadcastCustomEvent failed", err));
     }
 
-    function scheduleReconnect() {
-        setTimeout(connectToObs, reconnectDelay);
+    function scheduleReconnect(myGeneration) {
+        setTimeout(() => {
+            if (myGeneration !== generation) {
+                return; // settings changed under us — a fresh connectToObs() already owns this
+            }
+            connectToObs();
+        }, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_CEILING_MS);
     }
 
     function connectToObs() {
+        if (!obsHost || !obsPort) {
+            return; // not configured yet — applyNewObsSettings() will call back in once it is
+        }
+        const myGeneration = generation;
         obsWsConnect({
             host: obsHost,
             port: Number(obsPort),
             password: obsPassword,
             onDisconnect: () => {
+                if (myGeneration !== generation) return;
                 obs = null;
                 console.warn("[twitchat-relay] OBS-websocket connection lost, reconnecting…");
-                scheduleReconnect();
+                scheduleReconnect(myGeneration);
             }
         }).then((connection) => {
+            if (myGeneration !== generation) {
+                // Settings changed while this attempt was in flight — this connection is
+                // for stale credentials, close it rather than let it linger and relay on.
+                connection.close();
+                return;
+            }
             obs = connection;
             reconnectDelay = RECONNECT_FLOOR_MS;
         }).catch((err) => {
+            if (myGeneration !== generation) return;
             console.error("[twitchat-relay] OBS-websocket connection failed, retrying…", err);
-            scheduleReconnect();
+            scheduleReconnect(myGeneration);
         });
+    }
+
+    // Applies a live settings update pushed by the server (see the ws:event handling
+    // below). Handles all three cases uniformly: first-time configuration (host/port were
+    // never set at page load), a real change while already connected, and a no-op save
+    // (unrelated fields changed, host/port/password identical) — the last one is filtered
+    // out so an unrelated settings save doesn't bounce a healthy connection.
+    function applyNewObsSettings(newHost, newPort, newPassword) {
+        const normalizedPort = newPort == null ? null : String(newPort);
+        if (newHost === obsHost && normalizedPort === obsPort && (newPassword || "") === obsPassword) {
+            return;
+        }
+        generation++;
+        if (obs) {
+            obs.close();
+            obs = null;
+        }
+        obsHost = newHost || null;
+        obsPort = normalizedPort;
+        obsPassword = newPassword || "";
+        reconnectDelay = RECONNECT_FLOOR_MS;
+        connectToObs();
     }
 
     connectToObs();
@@ -94,8 +143,11 @@
         // with detail = the full frame, so filter event frames by their name.
         document.addEventListener("ws:event", (e) => {
             const frame = e.detail;
-            if (frame && frame.name === "twitchat.notify" && frame.data) {
+            if (!frame || !frame.data) return;
+            if (frame.name === "twitchat.notify") {
                 relay(frame.data);
+            } else if (frame.name === "twitchat.widget.settings.updated") {
+                applyNewObsSettings(frame.data.obsHost, frame.data.obsPort, frame.data.obsPassword);
             }
         });
         // ws-client.js already has its own reconnect-with-backoff for the catapult side,
