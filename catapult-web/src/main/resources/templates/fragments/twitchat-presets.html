@@ -37,7 +37,7 @@
                         <input type="text" name="name" th:value="${preset.name}" required>
                         <textarea name="payloadJson" rows="8" required th:text="${preset.payloadJson}"></textarea>
                         <button type="submit" th:text="#{common.save}">Enregistrer</button>
-                        <button type="button" th:onclick="'testTwitchatPreset(this, \'' + ${eventType} + '\')'"
+                        <button type="button" onclick="testTwitchatPreset(this)" th:attr="data-event-type=${eventType}"
                                 th:text="#{twitchat_presets.test}">Tester</button>
                     </form>
                     <form th:action="@{/channels/{u}/settings/twitchat/presets/{id}/delete(u=${channelUsername},id=${preset.id})}"
@@ -73,7 +73,7 @@
                 <textarea name="payloadJson" rows="8" required
                           th:text="${twitchatDefaultsJson != null ? twitchatDefaultsJson.get(eventType) : ''}"></textarea>
                 <button type="submit" th:text="#{twitchat_presets.create}">Créer</button>
-                <button type="button" th:onclick="'testTwitchatPreset(this, \'' + ${eventType} + '\')'"
+                <button type="button" onclick="testTwitchatPreset(this)" th:attr="data-event-type=${eventType}"
                         th:text="#{twitchat_presets.test}">Tester</button>
             </form>
         </details>
@@ -101,10 +101,11 @@
         // Sends whatever is currently in the sibling payloadJson textarea as a one-off test
         // notification — never saved, and the server mints ephemeral tokens for it (never
         // persisted), so any button in the test notification is inert if clicked for real.
-        window.testTwitchatPreset = function (button, eventType) {
+        window.testTwitchatPreset = function (button) {
+            var eventType = button.dataset.eventType;
             var form = button.closest("form");
             var textarea = form ? form.querySelector("textarea[name=payloadJson]") : null;
-            if (!textarea) return;
+            if (!textarea || !eventType) return;
             var container = document.getElementById("twitchat-presets-body");
             var username = container ? container.dataset.channelUsername : null;
             if (!username) return;
