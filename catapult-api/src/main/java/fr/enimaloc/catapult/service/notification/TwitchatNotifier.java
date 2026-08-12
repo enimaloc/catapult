@@ -158,6 +158,11 @@ public class TwitchatNotifier {
      * handles for any other invalid token; it can never trigger a real action.
      */
     public void sendTestNotification(UserAccount user, TwitchatNotificationEventType eventType, String payloadJson) {
+        if (!isWidgetEnabled(user)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "Le widget Twitchat est désactivé : active-le pour pouvoir tester une notification.");
+        }
         TwitchatPresetPayload preset = payloadPresetService.parseAndValidate(payloadJson);
         TwitchatDefaultPayload defaults = TwitchatDefaultPayloads.DEFAULTS.get(eventType);
         Map<String, String> variables = TEST_VARIABLES.getOrDefault(eventType, Map.of());

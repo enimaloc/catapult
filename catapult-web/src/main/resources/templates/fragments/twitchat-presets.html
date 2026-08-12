@@ -129,55 +129,88 @@
                 }
             };
             document.addEventListener("ws:response", onResponse);
-            if (window.catapultWs) window.catapultWs.send(frame);
+            var sent = window.catapultWs && window.catapultWs.send(frame);
+            if (!sent) {
+                document.removeEventListener("ws:response", onResponse);
+                alert("Connexion perdue : impossible d'envoyer le test.");
+            }
         };
 
-        (function () {
+        // #twitchat-presets-body is fully replaced (outerHTML swap) on every preset
+        // create/update/delete/activate — via ws-actions.js's applyResponse(), which
+        // uses DOMParser + replaceWith(), so this whole <script> block never re-executes
+        // after the very first render (see channel-tabs.js's executeScripts() comment for
+        // the same underlying DOM-spec behaviour). The population/wiring below therefore
+        // cannot attach anything to elements inside #twitchat-presets-body directly —
+        // those elements get destroyed and recreated on every swap. Instead it delegates
+        // from `document`, which is never replaced, and reads the quick-configs JSON fresh
+        // from the DOM each time rather than caching it in this closure (the data script
+        // tag itself gets swapped out along with everything else in the fragment).
+        function getTwitchatQuickConfigs() {
             var dataEl = document.getElementById("twitchat-quick-configs-data");
-            var quickConfigs = [];
-            try { quickConfigs = JSON.parse((dataEl && dataEl.textContent) || "[]"); } catch (e) { quickConfigs = []; }
+            try { return JSON.parse((dataEl && dataEl.textContent) || "[]"); } catch (e) { return []; }
+        }
 
-            document.querySelectorAll(".quick-config-select").forEach(function (select) {
-                if (select.__populated) return;
-                select.__populated = true;
-                var eventType = select.dataset.eventType;
-                quickConfigs.filter(function (qc) { return qc.eventType === eventType; }).forEach(function (qc) {
+        function populateQuickConfigSelect(select) {
+            // The placeholder "-- Choisir --" option is always rendered server-side as the
+            // only initial option, so more than one option means this node was already
+            // populated. Checked by inspecting the fresh DOM node itself (not a JS-object
+            // flag like select.__populated, which is lost whenever the node is destroyed
+            // and recreated by a swap).
+            if (select.options.length > 1) return;
+            var eventType = select.dataset.eventType;
+            getTwitchatQuickConfigs().filter(function (qc) { return qc.eventType === eventType; })
+                .forEach(function (qc) {
                     var opt = document.createElement("option");
                     opt.value = qc.key;
                     opt.textContent = qc.label;
                     select.appendChild(opt);
                 });
-                select.addEventListener("change", function () {
-                    var container = select.closest(".quick-configs").querySelector(".quick-config-params");
-                    container.innerHTML = "";
-                    var qc = quickConfigs.find(function (q) { return q.key === select.value; });
-                    if (!qc) return;
-                    qc.parameters.forEach(function (p) {
-                        var input = document.createElement("input");
-                        input.type = "text";
-                        input.placeholder = p.placeholder || p.label;
-                        input.dataset.paramKey = p.key;
-                        input.className = "quick-config-param-input";
-                        container.appendChild(input);
-                    });
-                });
+        }
+
+        window.applyQuickConfig = function (button) {
+            var wrapper = button.closest(".quick-configs");
+            var select = wrapper.querySelector(".quick-config-select");
+            var qc = getTwitchatQuickConfigs().find(function (q) { return q.key === select.value; });
+            if (!qc) return;
+            var json = qc.templateJson;
+            wrapper.querySelectorAll(".quick-config-param-input").forEach(function (input) {
+                json = json.split("{{param:" + input.dataset.paramKey + "}}").join(input.value);
+            });
+            var details = wrapper.closest("details");
+            var textarea = details ? details.querySelector("textarea[name=payloadJson]") : null;
+            if (textarea) textarea.value = json;
+            if (details) details.open = true;
+        };
+
+        if (!window.__twitchatQuickConfigsChangeBound) {
+            window.__twitchatQuickConfigsChangeBound = true;
+
+            // Populate a select's options the first time it's about to be interacted with —
+            // focusin fires (and bubbles) before the browser opens the dropdown, whether
+            // reached by mouse (mousedown focuses first) or keyboard (tab).
+            document.addEventListener("focusin", function (evt) {
+                var select = evt.target.closest ? evt.target.closest(".quick-config-select") : null;
+                if (select) populateQuickConfigSelect(select);
             });
 
-            window.applyQuickConfig = function (button) {
-                var wrapper = button.closest(".quick-configs");
-                var select = wrapper.querySelector(".quick-config-select");
-                var qc = quickConfigs.find(function (q) { return q.key === select.value; });
+            document.addEventListener("change", function (evt) {
+                if (!evt.target.matches || !evt.target.matches(".quick-config-select")) return;
+                var select = evt.target;
+                var paramsContainer = select.closest(".quick-configs").querySelector(".quick-config-params");
+                paramsContainer.innerHTML = "";
+                var qc = getTwitchatQuickConfigs().find(function (q) { return q.key === select.value; });
                 if (!qc) return;
-                var json = qc.templateJson;
-                wrapper.querySelectorAll(".quick-config-param-input").forEach(function (input) {
-                    json = json.split("{{param:" + input.dataset.paramKey + "}}").join(input.value);
+                qc.parameters.forEach(function (p) {
+                    var input = document.createElement("input");
+                    input.type = "text";
+                    input.placeholder = p.placeholder || p.label;
+                    input.dataset.paramKey = p.key;
+                    input.className = "quick-config-param-input";
+                    paramsContainer.appendChild(input);
                 });
-                var details = wrapper.closest("details");
-                var textarea = details ? details.querySelector("textarea[name=payloadJson]") : null;
-                if (textarea) textarea.value = json;
-                if (details) details.open = true;
-            };
-        })();
+            });
+        }
     </script>
 </div>
 </body>
