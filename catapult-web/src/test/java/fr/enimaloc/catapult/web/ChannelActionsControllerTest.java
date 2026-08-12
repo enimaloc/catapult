@@ -54,8 +54,8 @@ class ChannelActionsControllerTest {
 
     @Test
     void createTwitchatPreset_postsThenReturnsFragment() {
-        when(apiClient.post(eq("/api/channels/{username}/twitchat/presets"), any(), eq(Object.class), eq("streamer")))
-                .thenReturn(new Object());
+        when(apiClient.postForResult(eq("/api/channels/{username}/twitchat/presets"), any(), eq("streamer")))
+                .thenReturn(new ApiClient.ApiResult(200, Map.of("id", "p1")));
         when(apiClient.get(eq("/api/channels/{username}/twitchat/presets"),
                 any(ParameterizedTypeReference.class), eq("streamer"))).thenReturn(List.of());
         when(apiClient.get(eq("/api/channels/{username}/twitchat/active-presets"), eq(Map.class), eq("streamer")))
@@ -67,13 +67,13 @@ class ChannelActionsControllerTest {
 
         assertThat(view).isEqualTo("fragments/twitchat-presets :: twitchat-presets-body");
         assertThat(model.getAttribute("twitchatPresetError")).isNull();
-        verify(apiClient).post(eq("/api/channels/{username}/twitchat/presets"), any(), eq(Object.class), eq("streamer"));
+        verify(apiClient).postForResult(eq("/api/channels/{username}/twitchat/presets"), any(), eq("streamer"));
     }
 
     @Test
     void createTwitchatPreset_noJsSubmit_returnsRedirect() {
-        when(apiClient.post(eq("/api/channels/{username}/twitchat/presets"), any(), eq(Object.class), eq("streamer")))
-                .thenReturn(new Object());
+        when(apiClient.postForResult(eq("/api/channels/{username}/twitchat/presets"), any(), eq("streamer")))
+                .thenReturn(new ApiClient.ApiResult(200, Map.of("id", "p1")));
 
         Model model = new ExtendedModelMap();
         String view = newController().createTwitchatPreset("streamer", "STREAM_STARTED", "Discret",
@@ -84,8 +84,8 @@ class ChannelActionsControllerTest {
 
     @Test
     void createTwitchatPreset_apiFailure_setsErrorAttribute() {
-        when(apiClient.post(eq("/api/channels/{username}/twitchat/presets"), any(), eq(Object.class), eq("streamer")))
-                .thenReturn(null);
+        when(apiClient.postForResult(eq("/api/channels/{username}/twitchat/presets"), any(), eq("streamer")))
+                .thenReturn(new ApiClient.ApiResult(400, Map.of("message", "message ne doit pas être vide")));
         when(apiClient.get(eq("/api/channels/{username}/twitchat/presets"),
                 any(ParameterizedTypeReference.class), eq("streamer"))).thenReturn(List.of());
         when(apiClient.get(eq("/api/channels/{username}/twitchat/active-presets"), eq(Map.class), eq("streamer")))
@@ -97,5 +97,57 @@ class ChannelActionsControllerTest {
 
         assertThat(view).isEqualTo("fragments/twitchat-presets :: twitchat-presets-body");
         assertThat(model.getAttribute("twitchatPresetError")).isNotNull();
+        assertThat(model.getAttribute("twitchatPresetError")).asString()
+                .contains("message ne doit pas être vide");
+    }
+
+    @Test
+    void createTwitchatPreset_apiFailure_noJsSubmit_doesNotLeakErrorIntoModel() {
+        when(apiClient.postForResult(eq("/api/channels/{username}/twitchat/presets"), any(), eq("streamer")))
+                .thenReturn(new ApiClient.ApiResult(400, Map.of("message", "message ne doit pas être vide")));
+
+        Model model = new ExtendedModelMap();
+        String view = newController().createTwitchatPreset("streamer", "STREAM_STARTED", "Discret",
+                "not json", null, model);
+
+        assertThat(view).isEqualTo("redirect:/channels/streamer");
+        assertThat(model.getAttribute("twitchatPresetError")).isNull();
+    }
+
+    @Test
+    void updateTwitchatPreset_success_setsNoErrorAttribute() {
+        when(apiClient.putForResult(eq("/api/channels/{username}/twitchat/presets/{id}"), any(),
+                eq("streamer"), eq("p1")))
+                .thenReturn(new ApiClient.ApiResult(200, Map.of()));
+        when(apiClient.get(eq("/api/channels/{username}/twitchat/presets"),
+                any(ParameterizedTypeReference.class), eq("streamer"))).thenReturn(List.of());
+        when(apiClient.get(eq("/api/channels/{username}/twitchat/active-presets"), eq(Map.class), eq("streamer")))
+                .thenReturn(Map.of());
+
+        Model model = new ExtendedModelMap();
+        String view = newController().updateTwitchatPreset("streamer", "p1", "Discret",
+                "{\"message\":\"Live.\"}", "true", model);
+
+        assertThat(view).isEqualTo("fragments/twitchat-presets :: twitchat-presets-body");
+        assertThat(model.getAttribute("twitchatPresetError")).isNull();
+    }
+
+    @Test
+    void updateTwitchatPreset_apiFailure_setsErrorAttribute() {
+        when(apiClient.putForResult(eq("/api/channels/{username}/twitchat/presets/{id}"), any(),
+                eq("streamer"), eq("p1")))
+                .thenReturn(new ApiClient.ApiResult(400, Map.of("message", "JSON invalide")));
+        when(apiClient.get(eq("/api/channels/{username}/twitchat/presets"),
+                any(ParameterizedTypeReference.class), eq("streamer"))).thenReturn(List.of());
+        when(apiClient.get(eq("/api/channels/{username}/twitchat/active-presets"), eq(Map.class), eq("streamer")))
+                .thenReturn(Map.of());
+
+        Model model = new ExtendedModelMap();
+        String view = newController().updateTwitchatPreset("streamer", "p1", "Discret",
+                "not json", "true", model);
+
+        assertThat(view).isEqualTo("fragments/twitchat-presets :: twitchat-presets-body");
+        assertThat(model.getAttribute("twitchatPresetError")).isNotNull();
+        assertThat(model.getAttribute("twitchatPresetError")).asString().contains("JSON invalide");
     }
 }

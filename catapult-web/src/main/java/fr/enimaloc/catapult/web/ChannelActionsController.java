@@ -190,11 +190,10 @@ public class ChannelActionsController {
             @RequestParam String payloadJson,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model) {
-        Object created = apiClient.post("/api/channels/{username}/twitchat/presets",
-                new TwitchatPresetBody(eventType, name, payloadJson), Object.class, username);
-        if (created == null) {
-            model.addAttribute("twitchatPresetError",
-                    "Preset invalide : vérifiez le JSON et que le champ message n'est pas vide.");
+        ApiClient.ApiResult result = apiClient.postForResult("/api/channels/{username}/twitchat/presets",
+                new TwitchatPresetBody(eventType, name, payloadJson), username);
+        if (!isSuccess(result) && hxRequest != null) {
+            model.addAttribute("twitchatPresetError", twitchatPresetErrorMessage(result));
         }
         return presetsResult(username, hxRequest, model);
     }
@@ -207,11 +206,10 @@ public class ChannelActionsController {
             @RequestParam String payloadJson,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model) {
-        boolean success = apiClient.put("/api/channels/{username}/twitchat/presets/{id}",
+        ApiClient.ApiResult result = apiClient.putForResult("/api/channels/{username}/twitchat/presets/{id}",
                 new TwitchatPresetUpdateBody(name, payloadJson), username, id);
-        if (!success) {
-            model.addAttribute("twitchatPresetError",
-                    "Preset invalide : vérifiez le JSON et que le champ message n'est pas vide.");
+        if (!isSuccess(result) && hxRequest != null) {
+            model.addAttribute("twitchatPresetError", twitchatPresetErrorMessage(result));
         }
         return presetsResult(username, hxRequest, model);
     }
@@ -245,6 +243,23 @@ public class ChannelActionsController {
      * (degraded/no-JS) get the 302 PRG redirect back to the channel page,
      * same as every other handler in this class.
      */
+    private static boolean isSuccess(ApiClient.ApiResult result) {
+        return result.status() >= 200 && result.status() < 300;
+    }
+
+    /**
+     * Builds the French error message shown when a preset save fails backend
+     * validation, surfacing catapult-api's error body ({@code message}, from
+     * Spring's default error response shape) when present.
+     */
+    private static String twitchatPresetErrorMessage(ApiClient.ApiResult result) {
+        Object message = result.body() == null ? null : result.body().get("message");
+        String detail = message == null || String.valueOf(message).isBlank()
+                ? "vérifiez le JSON et que le champ message n'est pas vide."
+                : String.valueOf(message);
+        return "Preset invalide : " + detail;
+    }
+
     private String presetsResult(String username, String hxRequest, Model model) {
         if (hxRequest != null) {
             populateTwitchatPresetsModel(username, model);
