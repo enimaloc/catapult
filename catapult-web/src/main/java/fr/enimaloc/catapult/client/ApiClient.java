@@ -504,6 +504,23 @@ public class ApiClient {
                 .body(Map.of("deviceCode", deviceCode)));
     }
 
+    /**
+     * POST that returns the raw status + body instead of throwing on 4xx/5xx,
+     * so the caller can distinguish a genuine backend validation failure from
+     * a successful call (unlike {@link #post(String, Object, Class, Object...)},
+     * whose {@code retrieve()} silently converts the body regardless of status
+     * because the shared {@code defaultStatusHandler} only logs 4xx, it never
+     * rethrows).
+     */
+    public ApiResult postForResult(String path, Object body, Object... uriVars) {
+        return exchangeForResult(() -> restClient.post().uri(path, uriVars).body(body));
+    }
+
+    /** Same as {@link #postForResult(String, Object, Object...)} but for PUT. */
+    public ApiResult putForResult(String path, Object body, Object... uriVars) {
+        return exchangeForResult(() -> restClient.put().uri(path, uriVars).body(body));
+    }
+
     public boolean adminMinecraftPatch(UUID id, Map<String, Object> body) {
         try {
             return restClient.method(HttpMethod.PATCH)
