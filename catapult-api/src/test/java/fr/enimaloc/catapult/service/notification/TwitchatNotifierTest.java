@@ -501,6 +501,19 @@ class TwitchatNotifierTest {
     }
 
     @Test
+    void sendTestNotification_disabledWidget_throwsAndNeverPublishes() {
+        TwitchatWidgetSettings disabled = new TwitchatWidgetSettings();
+        disabled.setEnabled(false);
+        when(widgetSettingsService.getOrCreate(user)).thenReturn(disabled);
+
+        assertThatThrownBy(() -> notifier.sendTestNotification(user, TwitchatNotificationEventType.STREAM_STARTED,
+                "{\"message\":\"Hi\"}"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verifyNoInteractions(channelEventPublisher);
+        verifyNoInteractions(payloadPresetService);
+    }
+
+    @Test
     void sendTestNotification_invalidJson_throwsBadRequestInsteadOfSwallowing() {
         when(payloadPresetService.parseAndValidate("not json"))
                 .thenThrow(new org.springframework.web.server.ResponseStatusException(
