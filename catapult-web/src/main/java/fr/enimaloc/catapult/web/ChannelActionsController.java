@@ -242,8 +242,11 @@ public class ChannelActionsController {
             @RequestParam String eventType,
             @RequestParam String payloadJson,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest) {
-        apiClient.post("/api/channels/{username}/twitchat/presets/test",
+        ApiClient.ApiResult result = apiClient.postForResult("/api/channels/{username}/twitchat/presets/test",
                 new TwitchatPresetTestBody(eventType, payloadJson), username);
+        if (!isSuccess(result)) {
+            return ResponseEntity.status(result.status()).build();
+        }
         return ackOrRedirect(hxRequest, username);
     }
 

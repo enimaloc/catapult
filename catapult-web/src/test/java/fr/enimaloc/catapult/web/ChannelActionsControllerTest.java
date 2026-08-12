@@ -6,6 +6,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 
@@ -149,5 +151,27 @@ class ChannelActionsControllerTest {
         assertThat(view).isEqualTo("fragments/twitchat-presets :: twitchat-presets-body");
         assertThat(model.getAttribute("twitchatPresetError")).isNotNull();
         assertThat(model.getAttribute("twitchatPresetError")).asString().contains("JSON invalide");
+    }
+
+    @Test
+    void testTwitchatPreset_success_returnsNoContent() {
+        when(apiClient.postForResult(eq("/api/channels/{username}/twitchat/presets/test"), any(), eq("streamer")))
+                .thenReturn(new ApiClient.ApiResult(200, Map.of()));
+
+        ResponseEntity<Void> response = newController().testTwitchatPreset("streamer", "STREAM_STARTED",
+                "{\"message\":\"Live.\"}", "true");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    @Test
+    void testTwitchatPreset_apiFailure_returnsErrorStatusNotAck() {
+        when(apiClient.postForResult(eq("/api/channels/{username}/twitchat/presets/test"), any(), eq("streamer")))
+                .thenReturn(new ApiClient.ApiResult(400, Map.of("message", "JSON invalide")));
+
+        ResponseEntity<Void> response = newController().testTwitchatPreset("streamer", "STREAM_STARTED",
+                "not json", "true");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 }
