@@ -243,6 +243,47 @@ class TwitchatNotifierTest {
     }
 
     @Test
+    void onStreamStarted_presetActionWithMalformedLowercasePlaceholder_isDropped() {
+        // A typo'd placeholder ({{action:disable_bot}} instead of DISABLE_BOT) must still be
+        // *detected* as an attempted placeholder so the entry gets dropped, rather than slipping
+        // through with the literal unresolved text left in the URL sent to Twitchat.
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.STREAM_STARTED))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "On est en direct !", null, null, null,
+                        List.of(new TwitchatRawAction("Stop", "url",
+                                "https://example.com/act/{{action:disable_bot}}", "primary")))));
+
+        notifier.onStreamStarted(user);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).isEmpty();
+        verify(actionTokenService, never()).generate(any(), any(), any());
+    }
+
+    @Test
+    void onStreamStarted_presetActionWithWhitespaceInPlaceholder_stillResolves() {
+        // Stray whitespace around a *valid* placeholder (e.g. from copy/paste) shouldn't break
+        // resolution: the detector tolerates it, the type name still parses exactly, and the
+        // substitution replaces the original (whitespace-containing) matched text with the token.
+        UUID token = UUID.randomUUID();
+        when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.DISABLE_BOT), eq(Map.of())))
+                .thenReturn(token);
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.STREAM_STARTED))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "On est en direct !", null, null, null,
+                        List.of(new TwitchatRawAction("Stop", "url",
+                                "https://example.com/act/{{ action:DISABLE_BOT }}", "primary")))));
+
+        notifier.onStreamStarted(user);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).hasSize(1);
+        assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://example.com/act/" + token);
+    }
+
+    @Test
     void onCategoryChangedByCatapult_presetActionsMixApplicableAndInapplicable_keepsOnlyApplicable() {
         UUID disableBotToken = UUID.randomUUID();
         when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.DISABLE_BOT), eq(Map.of())))

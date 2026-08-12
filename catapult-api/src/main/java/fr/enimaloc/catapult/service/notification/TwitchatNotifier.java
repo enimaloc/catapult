@@ -30,7 +30,12 @@ import java.util.regex.Pattern;
 @Component
 public class TwitchatNotifier {
 
-    private static final Pattern ACTION_PLACEHOLDER = Pattern.compile("\\{\\{action:([A-Z_]+)\\}\\}");
+    // Detection is intentionally permissive: it must catch any {{action:...}}-shaped text,
+    // including malformed variants (wrong case, stray whitespace, hyphens, empty), so that
+    // renderPresetActions can recognize it as an *attempted* placeholder and drop the entry
+    // rather than silently ship the literal text to Twitchat. Strict validation of the type
+    // name itself happens separately in parseActionType (case-sensitive TwitchatActionType.valueOf).
+    private static final Pattern ACTION_PLACEHOLDER = Pattern.compile("\\{\\{\\s*action\\s*:\\s*([^}]*?)\\s*\\}\\}");
 
     private final TwitchatWidgetSettingsService widgetSettingsService;
     private final TwitchatActionTokenService actionTokenService;
@@ -192,6 +197,11 @@ public class TwitchatNotifier {
         for (TwitchatRawAction raw : rawActions) {
             if (raw.url() == null) continue;
             List<TwitchatActionType> referenced = new ArrayList<>();
+            // Original matched text per referenced type, kept alongside `referenced` so the
+            // substitution loop below can replace exactly what was matched (which may contain
+            // whitespace the canonical "{{action:TYPE}}" form doesn't), rather than reconstructing
+            // a fixed string that could fail to find/replace whitespace-variant originals.
+            List<String> matchedTexts = new ArrayList<>();
             boolean allApplicable = true;
             Matcher matcher = ACTION_PLACEHOLDER.matcher(raw.url());
             while (matcher.find()) {
@@ -201,16 +211,18 @@ public class TwitchatNotifier {
                     break;
                 }
                 referenced.add(type);
+                matchedTexts.add(matcher.group(0));
             }
             if (!allApplicable) continue;
 
             String resolvedUrl = raw.url();
-            for (TwitchatActionType type : referenced) {
+            for (int i = 0; i < referenced.size(); i++) {
+                TwitchatActionType type = referenced.get(i);
                 String token = tokenByType.computeIfAbsent(type, t -> {
                     PendingAction pending = pendingByType.get(t);
                     return actionTokenService.generate(user.getId(), t, pending.payload()).toString();
                 });
-                resolvedUrl = resolvedUrl.replace("{{action:" + type.name() + "}}", token);
+                resolvedUrl = resolvedUrl.replace(matchedTexts.get(i), token);
             }
             actions.add(new TwitchatAction(raw.label(), raw.actionType() == null ? "url" : raw.actionType(),
                     resolvedUrl, raw.theme()));
