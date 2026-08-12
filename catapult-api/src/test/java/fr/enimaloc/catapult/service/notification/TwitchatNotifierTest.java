@@ -280,4 +280,96 @@ class TwitchatNotifierTest {
         assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://example.com/static");
         verify(actionTokenService, never()).generate(any(), any(), any());
     }
+
+    @Test
+    void onCategoryChangedManually_presetActionWithTwoPlaceholders_resolvesBoth() {
+        DetectedGame detected = mock(DetectedGame.class);
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
+        GameBinding binding = new GameBinding();
+        binding.setId(UUID.randomUUID());
+        binding.setTwitchGameId("111");
+        binding.setTwitchGameName("Old Game");
+        when(bindingService.findBinding(user, detected)).thenReturn(Optional.of(binding));
+
+        UUID bindToken = UUID.randomUUID();
+        UUID revertToken = UUID.randomUUID();
+        when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.BIND_GAME_CATEGORY), any()))
+                .thenReturn(bindToken);
+        when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.REVERT_TO_APP_CATEGORY), any()))
+                .thenReturn(revertToken);
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.CATEGORY_CHANGED_MANUALLY))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "Changed.", null, null, null,
+                        List.of(new TwitchatRawAction("Both", "url",
+                                "https://x/{{action:BIND_GAME_CATEGORY}}/{{action:REVERT_TO_APP_CATEGORY}}",
+                                "primary")))));
+
+        // existing binding whose Twitch game id (111) differs from the new one (222) →
+        // BIND_GAME_CATEGORY and REVERT_TO_APP_CATEGORY both become pending together.
+        notifier.onCategoryChangedManually(user, "222", "New Game");
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).hasSize(1);
+        assertThat(captor.getValue().actions().get(0).url())
+                .isEqualTo("https://x/" + bindToken + "/" + revertToken);
+    }
+
+    @Test
+    void onCategoryChangedByCatapult_presetEntryMixesApplicableAndInapplicablePlaceholders_isDroppedWithNoTokenGenerated() {
+        // Single entry references both DISABLE_BOT (always pending) and REVERT_CATEGORY
+        // (inapplicable here since previousGameId is null). The two-pass discover-then-generate
+        // design must find the inapplicable placeholder before generating a token for the
+        // applicable one, so the entry is dropped with zero token generation for DISABLE_BOT too.
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "Changed.", null, null, null,
+                        List.of(new TwitchatRawAction("Mixed", "url",
+                                "https://x/{{action:DISABLE_BOT}}/{{action:REVERT_CATEGORY}}", "primary")))));
+
+        notifier.onCategoryChangedByCatapult(user, "222", "New Game", null);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).isEmpty();
+        verify(actionTokenService, never()).generate(any(), eq(TwitchatActionType.DISABLE_BOT), any());
+        verify(actionTokenService, never()).generate(any(), eq(TwitchatActionType.REVERT_CATEGORY), any());
+    }
+
+    @Test
+    void onStreamStarted_twoPresetActionsReferenceSameType_tokenGeneratedOnceAndSharedAcrossBoth() {
+        UUID token = UUID.randomUUID();
+        when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.DISABLE_BOT), eq(Map.of())))
+                .thenReturn(token);
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.STREAM_STARTED))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "On est en direct !", null, null, null,
+                        List.of(
+                                new TwitchatRawAction("Stop A", "url", "https://a/{{action:DISABLE_BOT}}", "primary"),
+                                new TwitchatRawAction("Stop B", "url", "https://b/{{action:DISABLE_BOT}}", "alert")))));
+
+        notifier.onStreamStarted(user);
+
+        verify(actionTokenService, times(1)).generate(eq(user.getId()), eq(TwitchatActionType.DISABLE_BOT), eq(Map.of()));
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).hasSize(2);
+        assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://a/" + token);
+        assertThat(captor.getValue().actions().get(1).url()).isEqualTo("https://b/" + token);
+    }
+
+    @Test
+    void onStreamStarted_presetActionTypeNull_defaultsToUrl() {
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.STREAM_STARTED))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "On est en direct !", null, null, null,
+                        List.of(new TwitchatRawAction("Mon site", null, "https://example.com/static", "primary")))));
+
+        notifier.onStreamStarted(user);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).hasSize(1);
+        assertThat(captor.getValue().actions().get(0).actionType()).isEqualTo("url");
+    }
 }
