@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.SchedulerService;
 import fr.enimaloc.catapult.service.TwitchService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import fr.enimaloc.catapult.service.notification.TwitchatPayloadPresetService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,7 @@ class ApiChannelActionsBotToggleTest {
     @MockitoBean ChannelEventPublisher channelEventPublisher;
     @MockitoBean TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     @MockitoBean TwitchatPayloadPresetService twitchatPayloadPresetService;
+    @MockitoBean TwitchatNotifier twitchatNotifier;
     @MockitoBean SchedulerService schedulerService;
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor userJwt(UUID id) {

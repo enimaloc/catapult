@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.SchedulerService;
 import fr.enimaloc.catapult.service.TwitchService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import fr.enimaloc.catapult.service.notification.TwitchatPayloadPresetService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,7 @@ class ApiChannelActionsTwitchatPresetsTest {
     @MockitoBean SchedulerService schedulerService;
     @MockitoBean TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     @MockitoBean TwitchatPayloadPresetService twitchatPayloadPresetService;
+    @MockitoBean TwitchatNotifier twitchatNotifier;
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor userJwt(UUID id) {
         return jwt().jwt(j -> j.subject(id.toString()).claim("twitchId", "123"))
@@ -146,6 +148,21 @@ class ApiChannelActionsTwitchatPresetsTest {
                 .andExpect(status().isNoContent());
 
         verify(twitchatPayloadPresetService).setActivePreset(user, TwitchatNotificationEventType.STREAM_STARTED, presetId);
+    }
+
+    @Test
+    void testTwitchatPreset_owner_delegatesToNotifier() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = stubOwner(userId, "streamer");
+
+        mvc.perform(post("/api/channels/streamer/twitchat/presets/test")
+                        .with(userJwt(userId)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"eventType\":\"STREAM_STARTED\",\"payloadJson\":\"{\\\"message\\\":\\\"Hi\\\"}\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(twitchatNotifier).sendTestNotification(user, TwitchatNotificationEventType.STREAM_STARTED,
+                "{\"message\":\"Hi\"}");
     }
 
     @Test

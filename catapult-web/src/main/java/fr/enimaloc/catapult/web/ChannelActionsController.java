@@ -236,6 +236,17 @@ public class ChannelActionsController {
         return presetsResult(username, hxRequest, model);
     }
 
+    @PostMapping("/settings/twitchat/presets/test")
+    public ResponseEntity<Void> testTwitchatPreset(
+            @PathVariable String username,
+            @RequestParam String eventType,
+            @RequestParam String payloadJson,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest) {
+        apiClient.post("/api/channels/{username}/twitchat/presets/test",
+                new TwitchatPresetTestBody(eventType, payloadJson), username);
+        return ackOrRedirect(hxRequest, username);
+    }
+
     /**
      * WS-routed callers set {@code HX-Request: true} and get the re-rendered
      * fragment directly (per this group's documented deviation from the
@@ -442,6 +453,7 @@ public class ChannelActionsController {
     record TwitchatPresetBody(String eventType, String name, String payloadJson) {}
     record TwitchatPresetUpdateBody(String name, String payloadJson) {}
     record TwitchatActivePresetBody(String presetId) {}
+    record TwitchatPresetTestBody(String eventType, String payloadJson) {}
     record TwSaveBody(Set<String> tws) {}
     record TwEnabledBody(boolean enabled) {}
     record NoGameSettingsBody(String twitchGameId, String twitchGameName, Set<String> ccls,

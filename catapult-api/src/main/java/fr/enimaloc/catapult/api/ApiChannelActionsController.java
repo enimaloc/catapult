@@ -23,6 +23,7 @@ import fr.enimaloc.catapult.service.BotToggleService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.SchedulerService;
 import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import fr.enimaloc.catapult.service.notification.TwitchatPayloadPresetService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +72,7 @@ public class ApiChannelActionsController {
     private final fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     private final TwitchatPayloadPresetService twitchatPayloadPresetService;
+    private final TwitchatNotifier twitchatNotifier;
 
     @Autowired(required = false)
     private SteamApiKeyRotator rotator;
@@ -263,6 +265,17 @@ public class ApiChannelActionsController {
         requireOwner(viewer, channelUser);
         UUID presetId = body.presetId() == null || body.presetId().isBlank() ? null : UUID.fromString(body.presetId());
         twitchatPayloadPresetService.setActivePreset(channelUser, parseEventType(eventType), presetId);
+    }
+
+    @PostMapping("/twitchat/presets/test")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void testTwitchatPreset(
+            @PathVariable String username, @AuthenticationPrincipal Jwt jwt,
+            @RequestBody TwitchatPresetTestBody body) {
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        twitchatNotifier.sendTestNotification(channelUser, parseEventType(body.eventType()), body.payloadJson());
     }
 
     private static TwitchatNotificationEventType parseEventType(String raw) {
@@ -574,4 +587,5 @@ public class ApiChannelActionsController {
     record TwitchatPresetBody(String eventType, String name, String payloadJson) {}
     record TwitchatPresetUpdateBody(String name, String payloadJson) {}
     record TwitchatActivePresetBody(String presetId) {}
+    record TwitchatPresetTestBody(String eventType, String payloadJson) {}
 }
