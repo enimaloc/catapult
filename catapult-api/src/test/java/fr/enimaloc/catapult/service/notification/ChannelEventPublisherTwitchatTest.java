@@ -25,7 +25,7 @@ class ChannelEventPublisherTwitchatTest {
         UUID ownerId = UUID.randomUUID();
         TwitchatNotification notification = new TwitchatNotification(
                 "Le bot a été activé.", "message", "online", "Catapult",
-                List.of(new TwitchatAction("Désactiver le bot", "url", "https://x/y", "alert")));
+                List.of(new TwitchatAction("Désactiver le bot", "url", "https://x/y", null, "alert")));
 
         channelEventPublisher.twitchatNotify(ownerId, notification);
 

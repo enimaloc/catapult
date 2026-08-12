@@ -191,43 +191,78 @@ public class TwitchatNotifier {
         for (PendingAction pending : pendingActions) {
             pendingByType.put(pending.type(), pending);
         }
-
         Map<TwitchatActionType, String> tokenByType = new EnumMap<>(TwitchatActionType.class);
+        return renderRawActions(rawActions, pendingByType, tokenByType,
+                type -> actionTokenService.generate(user.getId(), type, pendingByType.get(type).payload())
+                        .toString());
+    }
+
+    /**
+     * The preset owns the full actions array. Each entry's `url` and `message` may reference
+     * {@code {{action:TYPE}}} placeholders, resolved to that action type's token — but only if
+     * the type is currently applicable (present in {@code pendingByType}). An entry referencing
+     * an inapplicable or unrecognized type in EITHER field is dropped entirely rather than sent
+     * with an unresolved placeholder. Entries with no placeholder in a given field keep that
+     * field verbatim (including null). A token is minted at most once per action type, shared
+     * across every entry that references it, via {@code tokenMinter} — production rendering
+     * mints a real persisted token; test rendering (Task 2) mints an ephemeral, never-persisted
+     * one, reusing this exact same resolution algorithm.
+     */
+    private List<TwitchatAction> renderRawActions(List<TwitchatRawAction> rawActions,
+                                                    Map<TwitchatActionType, PendingAction> pendingByType,
+                                                    Map<TwitchatActionType, String> tokenByType,
+                                                    java.util.function.Function<TwitchatActionType, String> tokenMinter) {
         List<TwitchatAction> actions = new ArrayList<>();
         for (TwitchatRawAction raw : rawActions) {
-            if (raw.url() == null) continue;
-            List<TwitchatActionType> referenced = new ArrayList<>();
-            // Original matched text per referenced type, kept alongside `referenced` so the
-            // substitution loop below can replace exactly what was matched (which may contain
-            // whitespace the canonical "{{action:TYPE}}" form doesn't), rather than reconstructing
-            // a fixed string that could fail to find/replace whitespace-variant originals.
-            List<String> matchedTexts = new ArrayList<>();
-            boolean allApplicable = true;
-            Matcher matcher = ACTION_PLACEHOLDER.matcher(raw.url());
-            while (matcher.find()) {
-                TwitchatActionType type = parseActionType(matcher.group(1));
-                if (type == null || !pendingByType.containsKey(type)) {
-                    allApplicable = false;
-                    break;
-                }
-                referenced.add(type);
-                matchedTexts.add(matcher.group(0));
-            }
-            if (!allApplicable) continue;
+            PlaceholderScan urlScan = scanPlaceholders(raw.url(), pendingByType);
+            PlaceholderScan messageScan = scanPlaceholders(raw.message(), pendingByType);
+            if (!urlScan.allApplicable() || !messageScan.allApplicable()) continue;
 
-            String resolvedUrl = raw.url();
-            for (int i = 0; i < referenced.size(); i++) {
-                TwitchatActionType type = referenced.get(i);
-                String token = tokenByType.computeIfAbsent(type, t -> {
-                    PendingAction pending = pendingByType.get(t);
-                    return actionTokenService.generate(user.getId(), t, pending.payload()).toString();
-                });
-                resolvedUrl = resolvedUrl.replace(matchedTexts.get(i), token);
-            }
+            String resolvedUrl = substituteActionPlaceholders(raw.url(), urlScan, tokenByType, tokenMinter);
+            String resolvedMessage = substituteActionPlaceholders(raw.message(), messageScan, tokenByType, tokenMinter);
             actions.add(new TwitchatAction(raw.label(), raw.actionType() == null ? "url" : raw.actionType(),
-                    resolvedUrl, raw.theme()));
+                    resolvedUrl, resolvedMessage, raw.theme()));
         }
         return actions;
+    }
+
+    /**
+     * Finds every {@code {{action:TYPE}}}-shaped occurrence in a single action field (url or
+     * message). {@code allApplicable} becomes false as soon as one occurrence resolves to an
+     * unknown or currently-inapplicable type — the caller must then drop the whole entry, never
+     * send a partially resolved field. A null field trivially scans as "nothing to resolve".
+     */
+    private PlaceholderScan scanPlaceholders(String field, Map<TwitchatActionType, PendingAction> pendingByType) {
+        if (field == null) return new PlaceholderScan(true, new ArrayList<>(), new ArrayList<>());
+        List<TwitchatActionType> referenced = new ArrayList<>();
+        List<String> matchedTexts = new ArrayList<>();
+        Matcher matcher = ACTION_PLACEHOLDER.matcher(field);
+        while (matcher.find()) {
+            TwitchatActionType type = parseActionType(matcher.group(1));
+            if (type == null || !pendingByType.containsKey(type)) {
+                return new PlaceholderScan(false, referenced, matchedTexts);
+            }
+            referenced.add(type);
+            matchedTexts.add(matcher.group(0));
+        }
+        return new PlaceholderScan(true, referenced, matchedTexts);
+    }
+
+    private String substituteActionPlaceholders(String field, PlaceholderScan scan,
+                                                 Map<TwitchatActionType, String> tokenByType,
+                                                 java.util.function.Function<TwitchatActionType, String> tokenMinter) {
+        if (field == null) return null;
+        String result = field;
+        for (int i = 0; i < scan.referenced().size(); i++) {
+            TwitchatActionType type = scan.referenced().get(i);
+            String token = tokenByType.computeIfAbsent(type, tokenMinter);
+            result = result.replace(scan.matchedTexts().get(i), token);
+        }
+        return result;
+    }
+
+    private record PlaceholderScan(boolean allApplicable, List<TwitchatActionType> referenced,
+                                    List<String> matchedTexts) {
     }
 
     private static TwitchatActionType parseActionType(String name) {

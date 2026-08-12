@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.GameStateService;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatAction;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatNotification;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatRawAction;
@@ -191,7 +192,7 @@ class TwitchatNotifierTest {
                 .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "On est en direct !", null, "custom-icon", "MonBot",
                         List.of(new TwitchatRawAction("Stop", "url",
-                                "https://example.com/act/{{action:DISABLE_BOT}}", "primary")))));
+                                "https://example.com/act/{{action:DISABLE_BOT}}", null, "primary")))));
 
         notifier.onStreamStarted(user);
 
@@ -229,7 +230,7 @@ class TwitchatNotifierTest {
                 .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "Changed.", null, null, null,
                         List.of(new TwitchatRawAction("Undo", "url",
-                                "https://x/{{action:REVERT_CATEGORY}}", "secondary")))));
+                                "https://x/{{action:REVERT_CATEGORY}}", null, "secondary")))));
 
         notifier.onCategoryChangedByCatapult(user, "222", "New Game", null);
 
@@ -251,7 +252,7 @@ class TwitchatNotifierTest {
                 .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "On est en direct !", null, null, null,
                         List.of(new TwitchatRawAction("Stop", "url",
-                                "https://example.com/act/{{action:disable_bot}}", "primary")))));
+                                "https://example.com/act/{{action:disable_bot}}", null, "primary")))));
 
         notifier.onStreamStarted(user);
 
@@ -273,7 +274,7 @@ class TwitchatNotifierTest {
                 .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "On est en direct !", null, null, null,
                         List.of(new TwitchatRawAction("Stop", "url",
-                                "https://example.com/act/{{ action:DISABLE_BOT }}", "primary")))));
+                                "https://example.com/act/{{ action:DISABLE_BOT }}", null, "primary")))));
 
         notifier.onStreamStarted(user);
 
@@ -292,8 +293,8 @@ class TwitchatNotifierTest {
                 .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "Changed.", null, null, null,
                         List.of(
-                                new TwitchatRawAction("Undo", "url", "https://x/{{action:REVERT_CATEGORY}}", "secondary"),
-                                new TwitchatRawAction("Stop", "url", "https://x/{{action:DISABLE_BOT}}", "alert")))));
+                                new TwitchatRawAction("Undo", "url", "https://x/{{action:REVERT_CATEGORY}}", null, "secondary"),
+                                new TwitchatRawAction("Stop", "url", "https://x/{{action:DISABLE_BOT}}", null, "alert")))));
 
         // previousGameId == null → REVERT_CATEGORY never becomes pending, DISABLE_BOT always does
         notifier.onCategoryChangedByCatapult(user, "222", "New Game", null);
@@ -311,7 +312,7 @@ class TwitchatNotifierTest {
         when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
                 .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "Changed.", null, null, null,
-                        List.of(new TwitchatRawAction("Mon site", "url", "https://example.com/static", "primary")))));
+                        List.of(new TwitchatRawAction("Mon site", "url", "https://example.com/static", null, "primary")))));
 
         notifier.onCategoryChangedByCatapult(user, "222", "New Game", "111");
 
@@ -343,7 +344,7 @@ class TwitchatNotifierTest {
                         "Changed.", null, null, null,
                         List.of(new TwitchatRawAction("Both", "url",
                                 "https://x/{{action:BIND_GAME_CATEGORY}}/{{action:REVERT_TO_APP_CATEGORY}}",
-                                "primary")))));
+                                null, "primary")))));
 
         // existing binding whose Twitch game id (111) differs from the new one (222) →
         // BIND_GAME_CATEGORY and REVERT_TO_APP_CATEGORY both become pending together.
@@ -366,7 +367,7 @@ class TwitchatNotifierTest {
                 .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "Changed.", null, null, null,
                         List.of(new TwitchatRawAction("Mixed", "url",
-                                "https://x/{{action:DISABLE_BOT}}/{{action:REVERT_CATEGORY}}", "primary")))));
+                                "https://x/{{action:DISABLE_BOT}}/{{action:REVERT_CATEGORY}}", null, "primary")))));
 
         notifier.onCategoryChangedByCatapult(user, "222", "New Game", null);
 
@@ -386,8 +387,8 @@ class TwitchatNotifierTest {
                 .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "On est en direct !", null, null, null,
                         List.of(
-                                new TwitchatRawAction("Stop A", "url", "https://a/{{action:DISABLE_BOT}}", "primary"),
-                                new TwitchatRawAction("Stop B", "url", "https://b/{{action:DISABLE_BOT}}", "alert")))));
+                                new TwitchatRawAction("Stop A", "url", "https://a/{{action:DISABLE_BOT}}", null, "primary"),
+                                new TwitchatRawAction("Stop B", "url", "https://b/{{action:DISABLE_BOT}}", null, "alert")))));
 
         notifier.onStreamStarted(user);
 
@@ -404,7 +405,7 @@ class TwitchatNotifierTest {
         when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.STREAM_STARTED))
                 .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "On est en direct !", null, null, null,
-                        List.of(new TwitchatRawAction("Mon site", null, "https://example.com/static", "primary")))));
+                        List.of(new TwitchatRawAction("Mon site", null, "https://example.com/static", null, "primary")))));
 
         notifier.onStreamStarted(user);
 
@@ -412,5 +413,68 @@ class TwitchatNotifierTest {
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(1);
         assertThat(captor.getValue().actions().get(0).actionType()).isEqualTo("url");
+    }
+
+    @Test
+    void onStreamStarted_presetChatAction_resolvesPlaceholderInMessageField() {
+        UUID token = UUID.randomUUID();
+        when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.DISABLE_BOT), eq(Map.of())))
+                .thenReturn(token);
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.STREAM_STARTED))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "Live.", null, null, null,
+                        List.of(new TwitchatRawAction("Stop (chat)", "chat", null,
+                                "/so {{action:DISABLE_BOT}}", "secondary")))));
+
+        notifier.onStreamStarted(user);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).hasSize(1);
+        TwitchatAction action = captor.getValue().actions().get(0);
+        assertThat(action.actionType()).isEqualTo("chat");
+        assertThat(action.url()).isNull();
+        assertThat(action.message()).isEqualTo("/so " + token);
+    }
+
+    @Test
+    void onCategoryChangedByCatapult_presetActionMessageReferencesInapplicableType_isDropped() {
+        // previousGameId == null → REVERT_CATEGORY never becomes pending. The entry's `url` has
+        // no placeholder at all, but its `message` does — must still be dropped: applicability is
+        // checked across BOTH fields, not just url.
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "Changed.", null, null, null,
+                        List.of(new TwitchatRawAction("Undo", "chat", null,
+                                "/revert {{action:REVERT_CATEGORY}}", "secondary")))));
+
+        notifier.onCategoryChangedByCatapult(user, "222", "New Game", null);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).isEmpty();
+        verify(actionTokenService, never()).generate(any(), any(), any());
+    }
+
+    @Test
+    void onCategoryChangedByCatapult_presetActionReferencesDifferentTypesInUrlAndMessage_bothResolveIndependently() {
+        UUID disableBotToken = UUID.randomUUID();
+        when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.DISABLE_BOT), eq(Map.of())))
+                .thenReturn(disableBotToken);
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "Changed.", null, null, null,
+                        List.of(new TwitchatRawAction("Stop", "chat", "https://x/static",
+                                "/so {{action:DISABLE_BOT}}", "secondary")))));
+
+        // previousGameId == null: only DISABLE_BOT is pending — url has no placeholder (kept
+        // verbatim), message references DISABLE_BOT (resolves). Entry must be kept.
+        notifier.onCategoryChangedByCatapult(user, "222", "New Game", null);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).hasSize(1);
+        assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://x/static");
+        assertThat(captor.getValue().actions().get(0).message()).isEqualTo("/so " + disableBotToken);
     }
 }
