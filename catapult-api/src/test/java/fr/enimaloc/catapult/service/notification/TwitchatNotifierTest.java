@@ -4,10 +4,13 @@ import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.TwitchatActionType;
 import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatNotification;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatRawAction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -179,12 +183,15 @@ class TwitchatNotifierTest {
     }
 
     @Test
-    void onStreamStarted_activePreset_overridesMessageIconAndActionLabel() {
-        when(payloadPresetService.findActivePresetPayload(user, fr.enimaloc.catapult.domain.TwitchatNotificationEventType.STREAM_STARTED))
-                .thenReturn(Optional.of(new fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload(
+    void onStreamStarted_presetRawAction_resolvesPlaceholderToRawToken() {
+        UUID token = UUID.randomUUID();
+        when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.DISABLE_BOT), eq(Map.of())))
+                .thenReturn(token);
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.STREAM_STARTED))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "On est en direct !", null, "custom-icon", "MonBot",
-                        Map.of("DISABLE_BOT", new fr.enimaloc.catapult.service.notification.dto.TwitchatActionOverride(
-                                "Stop", "primary")))));
+                        List.of(new TwitchatRawAction("Stop", "url",
+                                "https://example.com/act/{{action:DISABLE_BOT}}", "primary")))));
 
         notifier.onStreamStarted(user);
 
@@ -198,12 +205,13 @@ class TwitchatNotifierTest {
         assertThat(n.actions()).hasSize(1);
         assertThat(n.actions().get(0).label()).isEqualTo("Stop");
         assertThat(n.actions().get(0).theme()).isEqualTo("primary");
+        assertThat(n.actions().get(0).url()).isEqualTo("https://example.com/act/" + token);
     }
 
     @Test
     void onCategoryChangedByCatapult_presetSubstitutesGameNameVariable() {
-        when(payloadPresetService.findActivePresetPayload(user, fr.enimaloc.catapult.domain.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
-                .thenReturn(Optional.of(new fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload(
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
                         ">> {{gameName}} <<", null, null, null, null)));
 
         notifier.onCategoryChangedByCatapult(user, "222", "Elden Ring", null);
@@ -214,20 +222,62 @@ class TwitchatNotifierTest {
     }
 
     @Test
-    void onCategoryChangedByCatapult_presetOverridesUnappliedActionType_isIgnored() {
-        // Preset defines an override for REVERT_CATEGORY, but previousGameId is null so that
-        // action never applies — must not crash, and must not appear in the output.
-        when(payloadPresetService.findActivePresetPayload(user, fr.enimaloc.catapult.domain.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
-                .thenReturn(Optional.of(new fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload(
+    void onCategoryChangedByCatapult_presetActionReferencingInapplicableType_isDropped() {
+        // Preset's only action entry references REVERT_CATEGORY, but previousGameId is null so
+        // that type never becomes pending — must not crash, and the entry must not appear.
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
                         "Changed.", null, null, null,
-                        Map.of("REVERT_CATEGORY", new fr.enimaloc.catapult.service.notification.dto.TwitchatActionOverride(
-                                "Undo", "secondary")))));
+                        List.of(new TwitchatRawAction("Undo", "url",
+                                "https://x/{{action:REVERT_CATEGORY}}", "secondary")))));
 
         notifier.onCategoryChangedByCatapult(user, "222", "New Game", null);
 
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
-        assertThat(captor.getValue().actions()).hasSize(1); // disable-bot only, unaffected by the unused override
-        assertThat(captor.getValue().actions().get(0).label()).isEqualTo("Désactiver le bot");
+        // The preset owns the array completely: it never mentioned DISABLE_BOT (unlike the old
+        // override-map model, which always rendered every applicable pending action), and its
+        // one REVERT_CATEGORY entry was dropped as inapplicable — so the result is empty.
+        assertThat(captor.getValue().actions()).isEmpty();
+        verify(actionTokenService, never()).generate(any(), any(), any());
+    }
+
+    @Test
+    void onCategoryChangedByCatapult_presetActionsMixApplicableAndInapplicable_keepsOnlyApplicable() {
+        UUID disableBotToken = UUID.randomUUID();
+        when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.DISABLE_BOT), eq(Map.of())))
+                .thenReturn(disableBotToken);
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "Changed.", null, null, null,
+                        List.of(
+                                new TwitchatRawAction("Undo", "url", "https://x/{{action:REVERT_CATEGORY}}", "secondary"),
+                                new TwitchatRawAction("Stop", "url", "https://x/{{action:DISABLE_BOT}}", "alert")))));
+
+        // previousGameId == null → REVERT_CATEGORY never becomes pending, DISABLE_BOT always does
+        notifier.onCategoryChangedByCatapult(user, "222", "New Game", null);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).hasSize(1);
+        assertThat(captor.getValue().actions().get(0).label()).isEqualTo("Stop");
+        assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://x/" + disableBotToken);
+        verify(actionTokenService, never()).generate(any(), eq(TwitchatActionType.REVERT_CATEGORY), any());
+    }
+
+    @Test
+    void onCategoryChangedByCatapult_presetActionWithoutPlaceholder_keptVerbatim() {
+        when(payloadPresetService.findActivePresetPayload(user, TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT))
+                .thenReturn(Optional.of(new TwitchatPresetPayload(
+                        "Changed.", null, null, null,
+                        List.of(new TwitchatRawAction("Mon site", "url", "https://example.com/static", "primary")))));
+
+        notifier.onCategoryChangedByCatapult(user, "222", "New Game", "111");
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).hasSize(1);
+        assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://example.com/static");
+        verify(actionTokenService, never()).generate(any(), any(), any());
     }
 }

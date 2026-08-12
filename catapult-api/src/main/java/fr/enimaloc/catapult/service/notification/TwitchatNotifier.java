@@ -8,24 +8,29 @@ import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatAction;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatActionDefault;
-import fr.enimaloc.catapult.service.notification.dto.TwitchatActionOverride;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatDefaultPayload;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatNotification;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload;
+import fr.enimaloc.catapult.service.notification.dto.TwitchatRawAction;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
 public class TwitchatNotifier {
+
+    private static final Pattern ACTION_PLACEHOLDER = Pattern.compile("\\{\\{action:([A-Z_]+)\\}\\}");
 
     private final TwitchatWidgetSettingsService widgetSettingsService;
     private final TwitchatActionTokenService actionTokenService;
@@ -131,12 +136,6 @@ public class TwitchatNotifier {
         return widgetSettingsService.getOrCreate(user).isEnabled();
     }
 
-    /**
-     * Renders and publishes one notification. The active preset (if any) can override
-     * message/style/icon/authorName and the label/theme of each action already decided by the
-     * caller — it can never add, remove, or redirect an action: {@code pendingActions} and their
-     * tokenized URLs are always computed here, never by the preset.
-     */
     private void publish(UserAccount user, TwitchatNotificationEventType eventType,
                           Map<String, String> variables, List<PendingAction> pendingActions) {
         TwitchatDefaultPayload defaults = TwitchatDefaultPayloads.DEFAULTS.get(eventType);
@@ -148,20 +147,83 @@ public class TwitchatNotifier {
         String icon = nonBlankOr(preset == null ? null : preset.icon(), defaults.icon());
         String authorName = nonBlankOr(preset == null ? null : preset.authorName(), defaults.authorName());
 
-        List<TwitchatAction> actions = new ArrayList<>();
-        for (PendingAction pending : pendingActions) {
-            TwitchatActionDefault def = defaults.actions().get(pending.type());
-            TwitchatActionOverride override = preset == null || preset.actions() == null
-                    ? null : preset.actions().get(pending.type().name());
-            String label = nonBlankOr(override == null ? null : override.label(), def.label());
-            String theme = nonBlankOr(override == null ? null : override.theme(), def.theme());
-            UUID token = actionTokenService.generate(user.getId(), pending.type(), pending.payload());
-            String url = stripTrailingSlash(publicWebUrl) + "/widget/twitchat/action/" + token;
-            actions.add(TwitchatAction.urlButton(label, url, theme));
-        }
+        List<TwitchatAction> actions = preset != null && preset.actions() != null
+                ? renderPresetActions(user, preset.actions(), pendingActions)
+                : renderDefaultActions(user, defaults, pendingActions);
 
         channelEventPublisher.twitchatNotify(user.getId(),
                 new TwitchatNotification(message, style, icon, authorName, actions));
+    }
+
+    /**
+     * No active preset (or preset has no `actions` field): one TwitchatAction per pending action,
+     * default label/theme for this event type, URL fully computed by the server.
+     */
+    private List<TwitchatAction> renderDefaultActions(UserAccount user, TwitchatDefaultPayload defaults,
+                                                        List<PendingAction> pendingActions) {
+        List<TwitchatAction> actions = new ArrayList<>();
+        for (PendingAction pending : pendingActions) {
+            TwitchatActionDefault def = defaults.actions().get(pending.type());
+            UUID token = actionTokenService.generate(user.getId(), pending.type(), pending.payload());
+            String url = stripTrailingSlash(publicWebUrl) + "/widget/twitchat/action/" + token;
+            actions.add(TwitchatAction.urlButton(def.label(), url, def.theme()));
+        }
+        return actions;
+    }
+
+    /**
+     * The preset owns the full actions array. Each entry's `url` may reference
+     * {@code {{action:TYPE}}} placeholders, resolved to that action type's raw token — but only
+     * if the type is currently applicable (present in {@code pendingActions}). An entry
+     * referencing an inapplicable or unrecognized type is dropped entirely rather than sent with
+     * an unresolved placeholder. Entries with no placeholder (static/custom URLs) are always
+     * kept verbatim. A token is generated only for types actually referenced by a kept-or-being-
+     * evaluated entry, never for types the preset doesn't reference at all.
+     */
+    private List<TwitchatAction> renderPresetActions(UserAccount user, List<TwitchatRawAction> rawActions,
+                                                       List<PendingAction> pendingActions) {
+        Map<TwitchatActionType, PendingAction> pendingByType = new EnumMap<>(TwitchatActionType.class);
+        for (PendingAction pending : pendingActions) {
+            pendingByType.put(pending.type(), pending);
+        }
+
+        Map<TwitchatActionType, String> tokenByType = new EnumMap<>(TwitchatActionType.class);
+        List<TwitchatAction> actions = new ArrayList<>();
+        for (TwitchatRawAction raw : rawActions) {
+            if (raw.url() == null) continue;
+            List<TwitchatActionType> referenced = new ArrayList<>();
+            boolean allApplicable = true;
+            Matcher matcher = ACTION_PLACEHOLDER.matcher(raw.url());
+            while (matcher.find()) {
+                TwitchatActionType type = parseActionType(matcher.group(1));
+                if (type == null || !pendingByType.containsKey(type)) {
+                    allApplicable = false;
+                    break;
+                }
+                referenced.add(type);
+            }
+            if (!allApplicable) continue;
+
+            String resolvedUrl = raw.url();
+            for (TwitchatActionType type : referenced) {
+                String token = tokenByType.computeIfAbsent(type, t -> {
+                    PendingAction pending = pendingByType.get(t);
+                    return actionTokenService.generate(user.getId(), t, pending.payload()).toString();
+                });
+                resolvedUrl = resolvedUrl.replace("{{action:" + type.name() + "}}", token);
+            }
+            actions.add(new TwitchatAction(raw.label(), raw.actionType() == null ? "url" : raw.actionType(),
+                    resolvedUrl, raw.theme()));
+        }
+        return actions;
+    }
+
+    private static TwitchatActionType parseActionType(String name) {
+        try {
+            return TwitchatActionType.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private static String substitute(String template, Map<String, String> variables) {

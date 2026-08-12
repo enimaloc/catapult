@@ -178,4 +178,16 @@ class TwitchatPayloadPresetServiceTest {
 
         assertThat(service.listPresets(user)).isSameAs(presets);
     }
+
+    @Test
+    void createPreset_oldActionsMapFormat_rejectedAsInvalidJson() {
+        // Guards the schema migration: a preset saved in the old
+        // Map<TwitchatActionType, {label,theme}> shape must fail Jackson deserialization against
+        // the new List<TwitchatRawAction> field type, not silently misinterpret it.
+        assertThatThrownBy(() -> service.createPreset(user, TwitchatNotificationEventType.STREAM_STARTED,
+                "Old format", "{\"message\":\"Live.\",\"actions\":{\"DISABLE_BOT\":{\"label\":\"Stop\",\"theme\":\"alert\"}}}"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
+    }
 }

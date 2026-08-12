@@ -1,12 +1,14 @@
 package fr.enimaloc.catapult.service.notification.dto;
 
-import java.util.Map;
+import java.util.List;
 
-// Jackson-deserialized shape of TwitchatPayloadPreset.payloadJson. All fields optional except
-// message (enforced by TwitchatPayloadPresetService at save time, not here) — a missing/blank
-// field falls back to TwitchatDefaultPayloads at render time. `actions` keys are
-// TwitchatActionType names (e.g. "REVERT_CATEGORY"); an entry for an action type that isn't
-// applicable to the current notification is simply never looked up.
+// Jackson-deserialized shape of TwitchatPayloadPreset.payloadJson. message/style/icon/authorName
+// are all optional (enforced non-blank only for message, by TwitchatPayloadPresetService at save
+// time) — a missing/blank one falls back to TwitchatDefaultPayloads at render time. `actions` is
+// the raw actions array sent to Twitchat verbatim, except for {{action:TYPE}} placeholder
+// resolution in each entry's `url` (see TwitchatNotifier). If `actions` is null, the notification
+// carries no action buttons — the preset owns the array completely, there is no per-entry
+// fallback to defaults.
 public record TwitchatPresetPayload(String message, String style, String icon, String authorName,
-                                     Map<String, TwitchatActionOverride> actions) {
+                                     List<TwitchatRawAction> actions) {
 }
