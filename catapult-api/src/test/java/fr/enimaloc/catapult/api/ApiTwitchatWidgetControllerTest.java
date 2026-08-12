@@ -134,4 +134,17 @@ class ApiTwitchatWidgetControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result").value("EXECUTED"));
     }
+
+    @Test
+    void quickConfigs_returnsCatalogWithBaseUrlResolved() throws Exception {
+        mvc.perform(get("/api/twitchat/quick-configs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].key").value("stream-started-disable-link"))
+                .andExpect(jsonPath("$[0].templateJson").value(org.hamcrest.Matchers.containsString(
+                        "http://localhost:8081/widget/twitchat/action/{{action:DISABLE_BOT}}")))
+                .andExpect(jsonPath("$[1].key").value("stream-started-disable-chat"))
+                .andExpect(jsonPath("$[1].parameters[0].key").value("command"))
+                .andExpect(jsonPath("$[1].templateJson").value(org.hamcrest.Matchers.containsString(
+                        "{{param:command}}")));
+    }
 }

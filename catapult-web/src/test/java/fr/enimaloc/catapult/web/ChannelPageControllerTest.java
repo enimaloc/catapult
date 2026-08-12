@@ -69,6 +69,10 @@ class ChannelPageControllerTest {
             org.mockito.Mockito.lenient()
                     .when(apiClient.get(eq("/api/twitchat/defaults"), eq(Map.class)))
                     .thenReturn(null);
+            org.mockito.Mockito.lenient()
+                    .when(apiClient.get(eq("/api/twitchat/quick-configs"),
+                            org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class)))
+                    .thenReturn(null);
         }
     }
 
