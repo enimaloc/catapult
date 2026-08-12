@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -48,7 +49,13 @@ class ApiTwitchatWidgetControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.STREAM_STARTED.message").value("Le bot Catapult est actif."))
                 .andExpect(jsonPath("$.STREAM_STARTED.icon").value("live"))
-                .andExpect(jsonPath("$.CATEGORY_CHANGED_BY_CATAPULT.actions.DISABLE_BOT.theme").value("alert"));
+                .andExpect(jsonPath("$.STREAM_STARTED.actions", hasSize(1)))
+                .andExpect(jsonPath("$.STREAM_STARTED.actions[0].label").value("Désactiver le bot"))
+                .andExpect(jsonPath("$.STREAM_STARTED.actions[0].actionType").value("url"))
+                .andExpect(jsonPath("$.STREAM_STARTED.actions[0].theme").value("alert"))
+                .andExpect(jsonPath("$.STREAM_STARTED.actions[0].url")
+                        .value("http://localhost:8081/widget/twitchat/action/{{action:DISABLE_BOT}}"))
+                .andExpect(jsonPath("$.CATEGORY_CHANGED_BY_CATAPULT.actions", hasSize(2)));
     }
 
     @Test

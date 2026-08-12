@@ -47,19 +47,29 @@ public class ApiTwitchatWidgetController {
         return ResponseEntity.ok(Map.of("result", result.name()));
     }
 
+    @org.springframework.beans.factory.annotation.Value("${app.web-url:http://localhost:8081}")
+    private String publicWebUrl;
+
     @GetMapping("/defaults")
     public Map<String, DefaultPayloadResponse> defaults() {
         Map<String, DefaultPayloadResponse> result = new java.util.LinkedHashMap<>();
+        String base = stripTrailingSlash(publicWebUrl);
         for (var entry : fr.enimaloc.catapult.service.notification.TwitchatDefaultPayloads.DEFAULTS.entrySet()) {
             var d = entry.getValue();
-            Map<String, Map<String, String>> actions = new java.util.LinkedHashMap<>();
-            d.actions().forEach((type, def) -> actions.put(type.name(), Map.of("label", def.label(), "theme", def.theme())));
+            java.util.List<DefaultActionResponse> actions = new java.util.ArrayList<>();
+            d.actions().forEach((type, def) -> actions.add(new DefaultActionResponse(def.label(), "url",
+                    base + "/widget/twitchat/action/{{action:" + type.name() + "}}", def.theme())));
             result.put(entry.getKey().name(),
                     new DefaultPayloadResponse(d.message(), d.style(), d.icon(), d.authorName(), actions));
         }
         return result;
     }
 
+    private static String stripTrailingSlash(String url) {
+        return url != null && url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
     public record DefaultPayloadResponse(String message, String style, String icon, String authorName,
-                                          Map<String, Map<String, String>> actions) {}
+                                          java.util.List<DefaultActionResponse> actions) {}
+    public record DefaultActionResponse(String label, String actionType, String url, String theme) {}
 }
