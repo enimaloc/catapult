@@ -49,6 +49,7 @@
                         label: a.label,
                         actionType: a.actionType,
                         url: a.url,
+                        message: a.message,
                         theme: a.theme
                     }))
                 }
