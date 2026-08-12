@@ -46,4 +46,20 @@ public class ApiTwitchatWidgetController {
         TwitchatActionExecutor.Result result = actionExecutor.execute(token);
         return ResponseEntity.ok(Map.of("result", result.name()));
     }
+
+    @GetMapping("/defaults")
+    public Map<String, DefaultPayloadResponse> defaults() {
+        Map<String, DefaultPayloadResponse> result = new java.util.LinkedHashMap<>();
+        for (var entry : fr.enimaloc.catapult.service.notification.TwitchatDefaultPayloads.DEFAULTS.entrySet()) {
+            var d = entry.getValue();
+            Map<String, Map<String, String>> actions = new java.util.LinkedHashMap<>();
+            d.actions().forEach((type, def) -> actions.put(type.name(), Map.of("label", def.label(), "theme", def.theme())));
+            result.put(entry.getKey().name(),
+                    new DefaultPayloadResponse(d.message(), d.style(), d.icon(), d.authorName(), actions));
+        }
+        return result;
+    }
+
+    public record DefaultPayloadResponse(String message, String style, String icon, String authorName,
+                                          Map<String, Map<String, String>> actions) {}
 }
