@@ -2,6 +2,7 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
 <div id="twitchat-presets-body" th:fragment="twitchat-presets-body">
+    <p class="text-muted" th:text="#{twitchat_presets.help_placeholders}">Variables disponibles...</p>
     <p th:if="${twitchatPresetError != null}" class="text-danger" th:text="${twitchatPresetError}">Erreur</p>
     <div th:each="eventType : ${twitchatEventTypes}" class="twitchat-preset-event-group" style="margin-top:16px">
         <h4 th:text="#{'twitchat_presets.event.' + ${eventType}}">Event</h4>
