@@ -175,9 +175,11 @@ public class ChannelActionsController {
     // already used by AdminController for experiment rules/overrides — is simpler than adding a
     // new WS event type for it.
     @GetMapping("/settings/twitchat/presets")
-    public String twitchatPresetsFragment(@PathVariable String username, Model model) {
-        populateTwitchatPresetsModel(username, model);
-        return "fragments/twitchat-presets :: twitchat-presets-body";
+    public String twitchatPresetsFragment(
+            @PathVariable String username,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest,
+            Model model) {
+        return presetsResult(username, hxRequest, model);
     }
 
     @PostMapping("/settings/twitchat/presets")
@@ -186,11 +188,15 @@ public class ChannelActionsController {
             @RequestParam String eventType,
             @RequestParam String name,
             @RequestParam String payloadJson,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model) {
-        apiClient.post("/api/channels/{username}/twitchat/presets",
-                new TwitchatPresetBody(eventType, name, payloadJson), username);
-        populateTwitchatPresetsModel(username, model);
-        return "fragments/twitchat-presets :: twitchat-presets-body";
+        Object created = apiClient.post("/api/channels/{username}/twitchat/presets",
+                new TwitchatPresetBody(eventType, name, payloadJson), Object.class, username);
+        if (created == null) {
+            model.addAttribute("twitchatPresetError",
+                    "Preset invalide : vérifiez le JSON et que le champ message n'est pas vide.");
+        }
+        return presetsResult(username, hxRequest, model);
     }
 
     @PostMapping("/settings/twitchat/presets/{id}/update")
@@ -199,18 +205,25 @@ public class ChannelActionsController {
             @PathVariable String id,
             @RequestParam String name,
             @RequestParam String payloadJson,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model) {
-        apiClient.put("/api/channels/{username}/twitchat/presets/{id}",
-                new TwitchatPresetUpdateBody(name, payloadJson), Void.class, username, id);
-        populateTwitchatPresetsModel(username, model);
-        return "fragments/twitchat-presets :: twitchat-presets-body";
+        boolean success = apiClient.put("/api/channels/{username}/twitchat/presets/{id}",
+                new TwitchatPresetUpdateBody(name, payloadJson), username, id);
+        if (!success) {
+            model.addAttribute("twitchatPresetError",
+                    "Preset invalide : vérifiez le JSON et que le champ message n'est pas vide.");
+        }
+        return presetsResult(username, hxRequest, model);
     }
 
     @PostMapping("/settings/twitchat/presets/{id}/delete")
-    public String deleteTwitchatPreset(@PathVariable String username, @PathVariable String id, Model model) {
+    public String deleteTwitchatPreset(
+            @PathVariable String username,
+            @PathVariable String id,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest,
+            Model model) {
         apiClient.delete("/api/channels/{username}/twitchat/presets/{id}", username, id);
-        populateTwitchatPresetsModel(username, model);
-        return "fragments/twitchat-presets :: twitchat-presets-body";
+        return presetsResult(username, hxRequest, model);
     }
 
     @PostMapping("/settings/twitchat/active-presets/{eventType}")
@@ -218,11 +231,26 @@ public class ChannelActionsController {
             @PathVariable String username,
             @PathVariable String eventType,
             @RequestParam(required = false) String presetId,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model) {
         apiClient.put("/api/channels/{username}/twitchat/active-presets/{eventType}",
                 new TwitchatActivePresetBody(presetId), Void.class, username, eventType);
-        populateTwitchatPresetsModel(username, model);
-        return "fragments/twitchat-presets :: twitchat-presets-body";
+        return presetsResult(username, hxRequest, model);
+    }
+
+    /**
+     * WS-routed callers set {@code HX-Request: true} and get the re-rendered
+     * fragment directly (per this group's documented deviation from the
+     * class's usual ResponseEntity<Void> pattern). Plain browser submits
+     * (degraded/no-JS) get the 302 PRG redirect back to the channel page,
+     * same as every other handler in this class.
+     */
+    private String presetsResult(String username, String hxRequest, Model model) {
+        if (hxRequest != null) {
+            populateTwitchatPresetsModel(username, model);
+            return "fragments/twitchat-presets :: twitchat-presets-body";
+        }
+        return "redirect:/channels/" + username;
     }
 
     private void populateTwitchatPresetsModel(String username, Model model) {
