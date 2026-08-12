@@ -190,4 +190,19 @@ class TwitchatPayloadPresetServiceTest {
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
                         .isEqualTo(HttpStatus.BAD_REQUEST));
     }
+
+    @Test
+    void parseAndValidate_validJson_returnsParsedPayload() {
+        TwitchatPresetPayload result = service.parseAndValidate("{\"message\":\"Live.\"}");
+
+        assertThat(result.message()).isEqualTo("Live.");
+    }
+
+    @Test
+    void parseAndValidate_blankMessage_rejectedWithBadRequest() {
+        assertThatThrownBy(() -> service.parseAndValidate("{\"message\":\"  \"}"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
+    }
 }

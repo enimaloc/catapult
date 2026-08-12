@@ -39,7 +39,7 @@ public class TwitchatPayloadPresetService {
     @Transactional
     public TwitchatPayloadPreset createPreset(UserAccount user, TwitchatNotificationEventType eventType,
                                                String name, String payloadJson) {
-        validatePayload(payloadJson);
+        parseAndValidate(payloadJson);
         TwitchatPayloadPreset preset = new TwitchatPayloadPreset();
         preset.setId(UUID.randomUUID());
         preset.setUser(user);
@@ -54,7 +54,7 @@ public class TwitchatPayloadPresetService {
 
     @Transactional
     public TwitchatPayloadPreset updatePreset(UserAccount user, UUID presetId, String name, String payloadJson) {
-        validatePayload(payloadJson);
+        parseAndValidate(payloadJson);
         TwitchatPayloadPreset preset = requireOwnedPreset(user, presetId);
         preset.setName(name);
         preset.setPayloadJson(payloadJson);
@@ -120,7 +120,13 @@ public class TwitchatPayloadPresetService {
         }
     }
 
-    private void validatePayload(String payloadJson) {
+    /**
+     * Parses and validates a preset's JSON: it must parse, and `message` must be non-blank.
+     * Throws ResponseStatusException(BAD_REQUEST) on failure. Public because TwitchatNotifier
+     * also needs it, for the "Test preset" button — rendering an unsaved preset must fail the
+     * same way saving it would, not silently produce a broken notification.
+     */
+    public TwitchatPresetPayload parseAndValidate(String payloadJson) {
         TwitchatPresetPayload parsed;
         try {
             parsed = jackson.readValue(payloadJson, TwitchatPresetPayload.class);
@@ -130,6 +136,7 @@ public class TwitchatPayloadPresetService {
         if (parsed.message() == null || parsed.message().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Preset message must not be blank");
         }
+        return parsed;
     }
 
     private TwitchatPayloadPreset requireOwnedPreset(UserAccount user, UUID presetId) {

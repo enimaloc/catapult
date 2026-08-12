@@ -37,6 +37,13 @@ public class TwitchatNotifier {
     // name itself happens separately in parseActionType (case-sensitive TwitchatActionType.valueOf).
     private static final Pattern ACTION_PLACEHOLDER = Pattern.compile("\\{\\{\\s*action\\s*:\\s*([^}]*?)\\s*\\}\\}");
 
+    // Dummy values used only by sendTestNotification — gameName is the only variable any event
+    // type currently substitutes, and only for the two category-change event types.
+    private static final Map<TwitchatNotificationEventType, Map<String, String>> TEST_VARIABLES = Map.of(
+            TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT, Map.of("gameName", "Jeu de test"),
+            TwitchatNotificationEventType.CATEGORY_CHANGED_MANUALLY, Map.of("gameName", "Jeu de test")
+    );
+
     private final TwitchatWidgetSettingsService widgetSettingsService;
     private final TwitchatActionTokenService actionTokenService;
     private final TwitchatPayloadPresetService payloadPresetService;
@@ -139,6 +146,39 @@ public class TwitchatNotifier {
 
     private boolean isWidgetEnabled(UserAccount user) {
         return widgetSettingsService.getOrCreate(user).isEnabled();
+    }
+
+    /**
+     * Renders and publishes a preview notification from a preset's JSON as currently edited —
+     * not necessarily saved. Every action type is treated as applicable (so the author sees every
+     * button they defined at once, regardless of the account's real current state) and every
+     * {{action:TYPE}} placeholder resolves to a random token that is NEVER written to
+     * twitchat_action_token — a real click on a test notification's button therefore always fails
+     * harmlessly through the same "unknown/expired token" path TwitchatActionExecutor already
+     * handles for any other invalid token; it can never trigger a real action.
+     */
+    public void sendTestNotification(UserAccount user, TwitchatNotificationEventType eventType, String payloadJson) {
+        TwitchatPresetPayload preset = payloadPresetService.parseAndValidate(payloadJson);
+        TwitchatDefaultPayload defaults = TwitchatDefaultPayloads.DEFAULTS.get(eventType);
+        Map<String, String> variables = TEST_VARIABLES.getOrDefault(eventType, Map.of());
+
+        String message = substitute(nonBlankOr(preset.message(), defaults.message()), variables);
+        String style = nonBlankOr(preset.style(), defaults.style());
+        String icon = nonBlankOr(preset.icon(), defaults.icon());
+        String authorName = nonBlankOr(preset.authorName(), defaults.authorName());
+        List<TwitchatAction> actions = preset.actions() == null ? List.of() : renderTestActions(preset.actions());
+
+        channelEventPublisher.twitchatNotify(user.getId(),
+                new TwitchatNotification(message, style, icon, authorName, actions));
+    }
+
+    private List<TwitchatAction> renderTestActions(List<TwitchatRawAction> rawActions) {
+        Map<TwitchatActionType, PendingAction> allTypesApplicable = new EnumMap<>(TwitchatActionType.class);
+        for (TwitchatActionType type : TwitchatActionType.values()) {
+            allTypesApplicable.put(type, new PendingAction(type, Map.of()));
+        }
+        Map<TwitchatActionType, String> tokenByType = new EnumMap<>(TwitchatActionType.class);
+        return renderRawActions(rawActions, allTypesApplicable, tokenByType, type -> UUID.randomUUID().toString());
     }
 
     private void publish(UserAccount user, TwitchatNotificationEventType eventType,

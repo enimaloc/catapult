@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
-<div id="twitchat-presets-body" th:fragment="twitchat-presets-body">
+<div id="twitchat-presets-body" th:fragment="twitchat-presets-body" th:attr="data-channel-username=${channelUsername}">
     <p class="text-muted" th:text="#{twitchat_presets.help_placeholders}">Variables disponibles...</p>
     <p th:if="${twitchatPresetError != null}" class="text-danger" th:text="${twitchatPresetError}">Erreur</p>
     <div th:each="eventType : ${twitchatEventTypes}" class="twitchat-preset-event-group" style="margin-top:16px">
@@ -36,6 +36,8 @@
                         <input type="text" name="name" th:value="${preset.name}" required>
                         <textarea name="payloadJson" rows="8" required th:text="${preset.payloadJson}"></textarea>
                         <button type="submit" th:text="#{common.save}">Enregistrer</button>
+                        <button type="button" th:onclick="'testTwitchatPreset(this, \'' + ${eventType} + '\')'"
+                                th:text="#{twitchat_presets.test}">Tester</button>
                     </form>
                     <form th:action="@{/channels/{u}/settings/twitchat/presets/{id}/delete(u=${channelUsername},id=${preset.id})}"
                           method="post"
@@ -61,6 +63,8 @@
                 <textarea name="payloadJson" rows="8" required
                           th:text="${twitchatDefaultsJson != null ? twitchatDefaultsJson.get(eventType) : ''}"></textarea>
                 <button type="submit" th:text="#{twitchat_presets.create}">Créer</button>
+                <button type="button" th:onclick="'testTwitchatPreset(this, \'' + ${eventType} + '\')'"
+                        th:text="#{twitchat_presets.test}">Tester</button>
             </form>
         </details>
     </div>
@@ -82,6 +86,40 @@
                 return false;
             }
             return true;
+        };
+
+        // Sends whatever is currently in the sibling payloadJson textarea as a one-off test
+        // notification — never saved, and the server mints ephemeral tokens for it (never
+        // persisted), so any button in the test notification is inert if clicked for real.
+        window.testTwitchatPreset = function (button, eventType) {
+            var form = button.closest("form");
+            var textarea = form ? form.querySelector("textarea[name=payloadJson]") : null;
+            if (!textarea) return;
+            var container = document.getElementById("twitchat-presets-body");
+            var username = container ? container.dataset.channelUsername : null;
+            if (!username) return;
+            var id = "twitchat-test-" + Math.random().toString(36).slice(2, 8);
+            var frame = {
+                type: "request",
+                id: id,
+                action: "mvc",
+                method: "POST",
+                path: "/channels/" + username + "/settings/twitchat/presets/test",
+                headers: { "HX-Request": "true" },
+                params: { eventType: eventType, payloadJson: textarea.value },
+                csrfToken: window.__wsCsrfToken || null
+            };
+            var onResponse = function (e) {
+                if (!e.detail || e.detail.id !== id) return;
+                document.removeEventListener("ws:response", onResponse);
+                if (e.detail.status && e.detail.status >= 400) {
+                    alert("Test impossible : vérifie le JSON du preset.");
+                } else {
+                    alert("Notification de test envoyée.");
+                }
+            };
+            document.addEventListener("ws:response", onResponse);
+            if (window.catapultWs) window.catapultWs.send(frame);
         };
     </script>
 </div>

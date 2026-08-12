@@ -28,6 +28,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -476,5 +477,51 @@ class TwitchatNotifierTest {
         assertThat(captor.getValue().actions()).hasSize(1);
         assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://x/static");
         assertThat(captor.getValue().actions().get(0).message()).isEqualTo("/so " + disableBotToken);
+    }
+
+    @Test
+    void sendTestNotification_validPreset_publishesWithDummyVariablesAndEphemeralTokens() {
+        String payloadJson = "{\"message\":\">> {{gameName}} <<\",\"actions\":[{\"label\":\"Revert\",\"actionType\":\"url\","
+                + "\"url\":\"https://x/{{action:REVERT_CATEGORY}}\",\"theme\":\"secondary\"}]}";
+        when(payloadPresetService.parseAndValidate(payloadJson)).thenReturn(new TwitchatPresetPayload(
+                ">> {{gameName}} <<", null, null, null,
+                List.of(new TwitchatRawAction("Revert", "url", "https://x/{{action:REVERT_CATEGORY}}", null,
+                        "secondary"))));
+
+        notifier.sendTestNotification(user, TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT, payloadJson);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        TwitchatNotification n = captor.getValue();
+        assertThat(n.message()).isEqualTo(">> Jeu de test <<");
+        assertThat(n.actions()).hasSize(1); // REVERT_CATEGORY treated as applicable in test mode
+        assertThat(n.actions().get(0).url()).startsWith("https://x/");
+        // The token is never persisted — actionTokenService must never be called for a test render.
+        verifyNoInteractions(actionTokenService);
+    }
+
+    @Test
+    void sendTestNotification_invalidJson_throwsBadRequestInsteadOfSwallowing() {
+        when(payloadPresetService.parseAndValidate("not json"))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST, "Invalid preset JSON"));
+
+        assertThatThrownBy(() -> notifier.sendTestNotification(user, TwitchatNotificationEventType.STREAM_STARTED,
+                "not json"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verifyNoInteractions(channelEventPublisher);
+    }
+
+    @Test
+    void sendTestNotification_noActionsField_publishesWithEmptyActions() {
+        String payloadJson = "{\"message\":\"Hi\"}";
+        when(payloadPresetService.parseAndValidate(payloadJson))
+                .thenReturn(new TwitchatPresetPayload("Hi", null, null, null, null));
+
+        notifier.sendTestNotification(user, TwitchatNotificationEventType.STREAM_STARTED, payloadJson);
+
+        ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
+        verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().actions()).isEmpty();
     }
 }
