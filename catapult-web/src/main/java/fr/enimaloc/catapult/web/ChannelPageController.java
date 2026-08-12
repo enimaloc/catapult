@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import java.util.UUID;
 public class ChannelPageController {
 
     private final ApiClient apiClient;
+    private final ObjectMapper jackson;
 
     @Value("${catapult.web.public-url:}")
     private String publicWebUrl;
@@ -203,6 +205,36 @@ public class ChannelPageController {
             model.addAttribute("twitchatSettings", twitchat);
             model.addAttribute("twitchatWidgetUrl", twitchat == null ? null
                     : stripTrailingSlash(publicWebUrl) + "/widget/twitchat/" + twitchat.get("widgetToken"));
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> twitchatPresets = apiClient.get(
+                    "/api/channels/{username}/twitchat/presets",
+                    new org.springframework.core.ParameterizedTypeReference<List<Map<String, Object>>>() {}, username);
+            @SuppressWarnings("unchecked")
+            Map<String, String> twitchatActivePresets = apiClient.get(
+                    "/api/channels/{username}/twitchat/active-presets", Map.class, username);
+            Map<String, List<Map<String, Object>>> twitchatPresetsByEvent = new java.util.LinkedHashMap<>();
+            for (String eventType : fr.enimaloc.catapult.web.TwitchatEventTypes.ALL) {
+                twitchatPresetsByEvent.put(eventType, new java.util.ArrayList<>());
+            }
+            if (twitchatPresets != null) {
+                for (Map<String, Object> preset : twitchatPresets) {
+                    twitchatPresetsByEvent
+                            .computeIfAbsent(String.valueOf(preset.get("eventType")), k -> new java.util.ArrayList<>())
+                            .add(preset);
+                }
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> twitchatDefaults = apiClient.get("/api/twitchat/defaults", Map.class);
+            Map<String, String> twitchatDefaultsJson = new java.util.LinkedHashMap<>();
+            if (twitchatDefaults != null) {
+                twitchatDefaults.forEach((eventType, payload) ->
+                        twitchatDefaultsJson.put(eventType, jackson.writeValueAsString(payload)));
+            }
+            model.addAttribute("twitchatEventTypes", fr.enimaloc.catapult.web.TwitchatEventTypes.ALL);
+            model.addAttribute("twitchatPresetsByEvent", twitchatPresetsByEvent);
+            model.addAttribute("twitchatActivePresets", twitchatActivePresets == null ? Map.of() : twitchatActivePresets);
+            model.addAttribute("twitchatDefaultsJson", twitchatDefaultsJson);
         }
 
         // DTDD mapping panel

@@ -2,9 +2,12 @@ package fr.enimaloc.catapult.web;
 
 import fr.enimaloc.catapult.client.ApiClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -13,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.net.URI;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -164,6 +169,84 @@ public class ChannelActionsController {
         return ackOrRedirect(hxRequest, username);
     }
 
+    // Deliberate deviation from this class's usual ResponseEntity<Void>+channel.viewed-event
+    // pattern (see class Javadoc): presets are a private, single-viewer settings CRUD with no
+    // multi-viewer sync need, so returning the re-rendered fragment directly — the same pattern
+    // already used by AdminController for experiment rules/overrides — is simpler than adding a
+    // new WS event type for it.
+    @GetMapping("/settings/twitchat/presets")
+    public String twitchatPresetsFragment(@PathVariable String username, Model model) {
+        populateTwitchatPresetsModel(username, model);
+        return "fragments/twitchat-presets :: twitchat-presets-body";
+    }
+
+    @PostMapping("/settings/twitchat/presets")
+    public String createTwitchatPreset(
+            @PathVariable String username,
+            @RequestParam String eventType,
+            @RequestParam String name,
+            @RequestParam String payloadJson,
+            Model model) {
+        apiClient.post("/api/channels/{username}/twitchat/presets",
+                new TwitchatPresetBody(eventType, name, payloadJson), username);
+        populateTwitchatPresetsModel(username, model);
+        return "fragments/twitchat-presets :: twitchat-presets-body";
+    }
+
+    @PostMapping("/settings/twitchat/presets/{id}/update")
+    public String updateTwitchatPreset(
+            @PathVariable String username,
+            @PathVariable String id,
+            @RequestParam String name,
+            @RequestParam String payloadJson,
+            Model model) {
+        apiClient.put("/api/channels/{username}/twitchat/presets/{id}",
+                new TwitchatPresetUpdateBody(name, payloadJson), Void.class, username, id);
+        populateTwitchatPresetsModel(username, model);
+        return "fragments/twitchat-presets :: twitchat-presets-body";
+    }
+
+    @PostMapping("/settings/twitchat/presets/{id}/delete")
+    public String deleteTwitchatPreset(@PathVariable String username, @PathVariable String id, Model model) {
+        apiClient.delete("/api/channels/{username}/twitchat/presets/{id}", username, id);
+        populateTwitchatPresetsModel(username, model);
+        return "fragments/twitchat-presets :: twitchat-presets-body";
+    }
+
+    @PostMapping("/settings/twitchat/active-presets/{eventType}")
+    public String setActiveTwitchatPreset(
+            @PathVariable String username,
+            @PathVariable String eventType,
+            @RequestParam(required = false) String presetId,
+            Model model) {
+        apiClient.put("/api/channels/{username}/twitchat/active-presets/{eventType}",
+                new TwitchatActivePresetBody(presetId), Void.class, username, eventType);
+        populateTwitchatPresetsModel(username, model);
+        return "fragments/twitchat-presets :: twitchat-presets-body";
+    }
+
+    private void populateTwitchatPresetsModel(String username, Model model) {
+        List<Map<String, Object>> presets = apiClient.get("/api/channels/{username}/twitchat/presets",
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {}, username);
+        @SuppressWarnings("unchecked")
+        Map<String, String> activePresets = apiClient.get("/api/channels/{username}/twitchat/active-presets",
+                Map.class, username);
+        Map<String, List<Map<String, Object>>> byEvent = new java.util.LinkedHashMap<>();
+        for (var eventType : fr.enimaloc.catapult.web.TwitchatEventTypes.ALL) {
+            byEvent.put(eventType, new java.util.ArrayList<>());
+        }
+        if (presets != null) {
+            for (Map<String, Object> preset : presets) {
+                byEvent.computeIfAbsent(String.valueOf(preset.get("eventType")), k -> new java.util.ArrayList<>())
+                        .add(preset);
+            }
+        }
+        model.addAttribute("channelUsername", username);
+        model.addAttribute("twitchatEventTypes", fr.enimaloc.catapult.web.TwitchatEventTypes.ALL);
+        model.addAttribute("twitchatPresetsByEvent", byEvent);
+        model.addAttribute("twitchatActivePresets", activePresets == null ? Map.of() : activePresets);
+    }
+
     @PostMapping("/settings/no-game")
     public ResponseEntity<Void> saveNoGameSettings(
             @PathVariable String username,
@@ -313,6 +396,9 @@ public class ChannelActionsController {
     record CclSettingsBody(boolean cclEnabled, Set<String> blockedCcls) {}
     record TwSettingsBody(boolean enabled, Set<String> blockedTws) {}
     record TwitchatSettingsBody(boolean enabled, String obsHost, Integer obsPort, String obsPassword) {}
+    record TwitchatPresetBody(String eventType, String name, String payloadJson) {}
+    record TwitchatPresetUpdateBody(String name, String payloadJson) {}
+    record TwitchatActivePresetBody(String presetId) {}
     record TwSaveBody(Set<String> tws) {}
     record TwEnabledBody(boolean enabled) {}
     record NoGameSettingsBody(String twitchGameId, String twitchGameName, Set<String> ccls,
