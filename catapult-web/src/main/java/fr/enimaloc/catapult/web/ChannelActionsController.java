@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.util.List;
@@ -36,6 +37,7 @@ import java.util.Set;
 public class ChannelActionsController {
 
     private final ApiClient apiClient;
+    private final ObjectMapper jackson;
 
     // ── Binding actions ───────────────────────────────────────────────────────
 
@@ -302,6 +304,11 @@ public class ChannelActionsController {
         model.addAttribute("twitchatEventTypes", fr.enimaloc.catapult.web.TwitchatEventTypes.ALL);
         model.addAttribute("twitchatPresetsByEvent", byEvent);
         model.addAttribute("twitchatActivePresets", activePresets == null ? Map.of() : activePresets);
+
+        List<Map<String, Object>> quickConfigs = apiClient.get("/api/twitchat/quick-configs",
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        String twitchatQuickConfigsJson = quickConfigs == null ? "[]" : jackson.writeValueAsString(quickConfigs);
+        model.addAttribute("twitchatQuickConfigsJson", twitchatQuickConfigsJson);
     }
 
     @PostMapping("/settings/no-game")

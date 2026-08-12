@@ -26,7 +26,7 @@ class ChannelActionsControllerTest {
     @Mock ApiClient apiClient;
 
     ChannelActionsController newController() {
-        return new ChannelActionsController(apiClient);
+        return new ChannelActionsController(apiClient, tools.jackson.databind.json.JsonMapper.builder().build());
     }
 
     @Test

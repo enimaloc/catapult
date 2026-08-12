@@ -65,6 +65,16 @@ public class ApiTwitchatWidgetController {
         return result;
     }
 
+    @GetMapping("/quick-configs")
+    public java.util.List<fr.enimaloc.catapult.service.notification.dto.TwitchatQuickConfig> quickConfigs() {
+        String base = stripTrailingSlash(publicWebUrl);
+        return fr.enimaloc.catapult.service.notification.TwitchatQuickConfigs.ALL.stream()
+                .map(qc -> new fr.enimaloc.catapult.service.notification.dto.TwitchatQuickConfig(
+                        qc.key(), qc.label(), qc.description(), qc.eventType(), qc.parameters(),
+                        qc.templateJson().replace("{{baseUrl}}", base)))
+                .toList();
+    }
+
     private static String stripTrailingSlash(String url) {
         return url != null && url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }

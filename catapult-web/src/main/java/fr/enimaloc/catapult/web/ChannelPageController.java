@@ -235,6 +235,12 @@ public class ChannelPageController {
             model.addAttribute("twitchatPresetsByEvent", twitchatPresetsByEvent);
             model.addAttribute("twitchatActivePresets", twitchatActivePresets == null ? Map.of() : twitchatActivePresets);
             model.addAttribute("twitchatDefaultsJson", twitchatDefaultsJson);
+
+            List<Map<String, Object>> twitchatQuickConfigs = apiClient.get("/api/twitchat/quick-configs",
+                    new org.springframework.core.ParameterizedTypeReference<List<Map<String, Object>>>() {});
+            String twitchatQuickConfigsJson = twitchatQuickConfigs == null
+                    ? "[]" : jackson.writeValueAsString(twitchatQuickConfigs);
+            model.addAttribute("twitchatQuickConfigsJson", twitchatQuickConfigsJson);
         }
 
         // DTDD mapping panel
