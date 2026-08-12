@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
+import fr.enimaloc.catapult.domain.TwitchatPayloadPreset;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
@@ -21,26 +23,30 @@ import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfigurati
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(
         controllers = ApiChannelActionsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-class ApiChannelActionsGameRecheckTest {
+class ApiChannelActionsTwitchatPresetsTest {
 
     @Autowired MockMvc mvc;
 
@@ -55,77 +61,106 @@ class ApiChannelActionsGameRecheckTest {
     @MockitoBean TokenEncryptionService tokenEncryptionService;
     @MockitoBean SteamApiKeyRepository steamApiKeyRepository;
     @MockitoBean ChannelEventPublisher channelEventPublisher;
+    @MockitoBean SchedulerService schedulerService;
     @MockitoBean TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     @MockitoBean TwitchatPayloadPresetService twitchatPayloadPresetService;
-    @MockitoBean SchedulerService schedulerService;
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor userJwt(UUID id) {
         return jwt().jwt(j -> j.subject(id.toString()).claim("twitchId", "123"))
                 .authorities(new SimpleGrantedAuthority("ROLE_USER"));
     }
 
-    @Test
-    void recheckGame_ownerWithActiveAccount_triggersManualCheck() throws Exception {
-        UUID userId = UUID.randomUUID();
+    private UserAccount stubOwner(UUID userId, String username) {
         UserAccount user = new UserAccount();
         user.setId(userId);
-        user.setTwitchUsername("streamer");
-        user.setStatus(UserAccount.Status.ACTIVE);
-        user.setBotEnabled(false);
-
+        user.setTwitchUsername(username);
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByTwitchUsername(username)).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
+        return user;
+    }
 
-        mvc.perform(post("/api/channels/streamer/game/recheck")
-                        .with(userJwt(userId))
-                        .with(csrf()))
+    @Test
+    void listPresets_owner_returnsMappedPresets() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = stubOwner(userId, "streamer");
+
+        TwitchatPayloadPreset preset = new TwitchatPayloadPreset();
+        preset.setId(UUID.randomUUID());
+        preset.setUser(user);
+        preset.setEventType(TwitchatNotificationEventType.STREAM_STARTED);
+        preset.setName("Discret");
+        preset.setPayloadJson("{\"message\":\"Live.\"}");
+        preset.setCreatedAt(Instant.now());
+        preset.setUpdatedAt(Instant.now());
+        when(twitchatPayloadPresetService.listPresets(user)).thenReturn(List.of(preset));
+
+        mvc.perform(get("/api/channels/streamer/twitchat/presets").with(userJwt(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Discret"))
+                .andExpect(jsonPath("$[0].eventType").value("STREAM_STARTED"));
+    }
+
+    @Test
+    void createPreset_owner_delegatesToService() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = stubOwner(userId, "streamer");
+        TwitchatPayloadPreset created = new TwitchatPayloadPreset();
+        created.setId(UUID.randomUUID());
+        created.setUser(user);
+        created.setEventType(TwitchatNotificationEventType.STREAM_STARTED);
+        created.setName("Discret");
+        created.setPayloadJson("{\"message\":\"Live.\"}");
+        when(twitchatPayloadPresetService.createPreset(user, TwitchatNotificationEventType.STREAM_STARTED,
+                "Discret", "{\"message\":\"Live.\"}")).thenReturn(created);
+
+        mvc.perform(post("/api/channels/streamer/twitchat/presets")
+                        .with(userJwt(userId)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"eventType\":\"STREAM_STARTED\",\"name\":\"Discret\",\"payloadJson\":\"{\\\"message\\\":\\\"Live.\\\"}\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Discret"));
+    }
+
+    @Test
+    void deletePreset_owner_delegatesToService() throws Exception {
+        UUID userId = UUID.randomUUID();
+        stubOwner(userId, "streamer");
+        UUID presetId = UUID.randomUUID();
+
+        mvc.perform(delete("/api/channels/streamer/twitchat/presets/{id}", presetId)
+                        .with(userJwt(userId)).with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void setActivePreset_owner_delegatesToService() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = stubOwner(userId, "streamer");
+        UUID presetId = UUID.randomUUID();
+
+        mvc.perform(put("/api/channels/streamer/twitchat/active-presets/{eventType}", "STREAM_STARTED")
+                        .with(userJwt(userId)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"presetId\":\"" + presetId + "\"}"))
                 .andExpect(status().isNoContent());
 
-        verify(schedulerService).triggerManualCheck(user);
+        verify(twitchatPayloadPresetService).setActivePreset(user, TwitchatNotificationEventType.STREAM_STARTED, presetId);
     }
 
     @Test
-    void recheckGame_accountInactive_conflict() throws Exception {
-        UUID userId = UUID.randomUUID();
-        UserAccount user = new UserAccount();
-        user.setId(userId);
-        user.setTwitchUsername("streamer");
-        user.setStatus(UserAccount.Status.INACTIVE);
-
-        when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
-        when(channelAccessService.canAccess(user, user)).thenReturn(true);
-
-        mvc.perform(post("/api/channels/streamer/game/recheck")
-                        .with(userJwt(userId))
-                        .with(csrf()))
-                .andExpect(status().isConflict());
-
-        verify(schedulerService, never()).triggerManualCheck(user);
-    }
-
-    @Test
-    void recheckGame_nonOwner_forbidden() throws Exception {
+    void listPresets_nonOwner_forbidden() throws Exception {
         UUID viewerId = UUID.randomUUID();
         UserAccount viewer = new UserAccount();
         viewer.setId(viewerId);
-
-        UUID channelId = UUID.randomUUID();
         UserAccount channelUser = new UserAccount();
-        channelUser.setId(channelId);
+        channelUser.setId(UUID.randomUUID());
         channelUser.setTwitchUsername("streamer");
-        channelUser.setStatus(UserAccount.Status.ACTIVE);
-
         when(userAccountRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
         when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(channelUser));
         when(channelAccessService.canAccess(viewer, channelUser)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/game/recheck")
-                        .with(userJwt(viewerId))
-                        .with(csrf()))
+        mvc.perform(get("/api/channels/streamer/twitchat/presets").with(userJwt(viewerId)))
                 .andExpect(status().isForbidden());
-
-        verify(schedulerService, never()).triggerManualCheck(channelUser);
     }
 }
