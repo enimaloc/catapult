@@ -25,7 +25,7 @@ class ChannelPageControllerTest {
     ChannelPageController controller;
 
     ChannelPageController newController() {
-        return new ChannelPageController(apiClient);
+        return new ChannelPageController(apiClient, tools.jackson.databind.json.JsonMapper.builder().build());
     }
 
     ChannelPageData ownerData() {
@@ -57,6 +57,17 @@ class ChannelPageControllerTest {
             org.mockito.Mockito.lenient().when(apiClient.minecraftLinkState()).thenReturn(null);
             org.mockito.Mockito.lenient()
                     .when(apiClient.get(eq("/api/channels/{username}/settings/twitchat"), eq(Map.class), eq("streamer")))
+                    .thenReturn(null);
+            org.mockito.Mockito.lenient()
+                    .when(apiClient.get(eq("/api/channels/{username}/twitchat/presets"),
+                            org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class),
+                            eq("streamer")))
+                    .thenReturn(null);
+            org.mockito.Mockito.lenient()
+                    .when(apiClient.get(eq("/api/channels/{username}/twitchat/active-presets"), eq(Map.class), eq("streamer")))
+                    .thenReturn(null);
+            org.mockito.Mockito.lenient()
+                    .when(apiClient.get(eq("/api/twitchat/defaults"), eq(Map.class)))
                     .thenReturn(null);
         }
     }
