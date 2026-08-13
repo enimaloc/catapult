@@ -169,9 +169,19 @@
 
             row.querySelector('.enabled-toggle').onchange = async (e) => {
                 try {
+                    // PUT /api/chat-commands/{id} validates the full UpsertRequest (name,
+                    // template, permission are @NotNull) — sending only {id, enabled} fails
+                    // validation with a 400. Re-send the command's current fields alongside
+                    // the toggled value, same as chat-command-editor.js does on save.
+                    const fallbacks = {};
+                    (cmd.fallbacks || []).forEach(fb => { fallbacks[fb.placeholder] = fb.fallbackText; });
                     const resp = await window.catapultWs.request('chat-commands.update', {
                         id: cmd.id,
-                        enabled: e.target.checked
+                        name: cmd.name,
+                        template: cmd.template,
+                        permission: cmd.permission,
+                        enabled: e.target.checked,
+                        fallbacks: fallbacks
                     });
                     Object.assign(cmd, resp.result);
                     reportSuccess(cmd.name + ' enregistrée');
