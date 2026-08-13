@@ -1844,10 +1844,10 @@ details summary { cursor: pointer; font-weight: 600; }
 .config-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .config-tab:hover { color: var(--text); }
 
-/* Centered section of the navbar (channel-page-tabbed-layout experiment tabs) */
+/* Centered section of the navbar (channel page tabs) */
 .navbar-center { flex: 1; display: flex; justify-content: center; min-width: 0; }
 
-/* Channel page tabs (channel-page-tabbed-layout experiment) — inline in the navbar */
+/* Channel page tabs — inline in the navbar */
 .channel-tabs { display: flex; align-items: center; gap: 4px; }
 .channel-tab { background: transparent; border: 0; padding: 4px 10px; cursor: pointer; color: var(--text-muted); font-size: 14px; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
 .channel-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
