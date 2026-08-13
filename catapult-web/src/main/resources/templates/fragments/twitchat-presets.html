@@ -159,9 +159,12 @@
             // flag like select.__populated, which is lost whenever the node is destroyed
             // and recreated by a swap).
             if (select.options.length > 1) return;
-            var eventType = select.dataset.eventType;
-            getTwitchatQuickConfigs().filter(function (qc) { return qc.eventType === eventType; })
-                .forEach(function (qc) {
+            // Quick configs apply to every event type — the picker isn't filtered by the
+            // section it's shown in. A config's own templateJson is a full preset (message
+            // tailored to whichever event it was written for), so applying one under a
+            // different event type just gives the streamer a starting point to edit, same as
+            // the per-event default-payload prefill already does.
+            getTwitchatQuickConfigs().forEach(function (qc) {
                     var opt = document.createElement("option");
                     opt.value = qc.key;
                     opt.textContent = qc.label;
