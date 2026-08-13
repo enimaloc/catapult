@@ -26,8 +26,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ChannelPageController {
 
-    private static final String TABBED_VARIANT = "tabbed";
-
     private final ApiClient apiClient;
 
     @GetMapping({"", "/{tab:dashboard|configuration|commands|invitations}"})
@@ -39,34 +37,32 @@ public class ChannelPageController {
             @RequestParam(required = false) String source,
             Model model) {
 
+        // Only the channel owner or one of their Twitch moderators ever reaches this
+        // point — fetchChannelPageData returns null (403/404 from the API) for anyone
+        // else — so the tabbed layout is always the right one here, for owner and
+        // moderator alike.
         ChannelPageData data = fetchChannelPageData(username, page, status, source);
         if (data == null) {
             return "redirect:/channels";
         }
         populateModel(model, data, username);
 
-        if (data.isOwner() && TABBED_VARIANT.equals(resolveTabbedLayoutVariant())) {
-            String resolvedTab = tab == null ? "dashboard" : tab;
-            if ("invitations".equals(resolvedTab) && !isInviteTabVariant(model)) {
-                return "redirect:/channels/{username}";
-            }
-            model.addAttribute("activeTab", resolvedTab);
-            if ("invitations".equals(resolvedTab)) {
-                populateInviteModel(model);
-            }
-            return "app-tabbed";
-        }
-        if (tab != null) {
+        String resolvedTab = tab == null ? "dashboard" : tab;
+        if ("invitations".equals(resolvedTab) && !isInviteTabVariant(model)) {
             return "redirect:/channels/{username}";
         }
-        return "app";
+        model.addAttribute("activeTab", resolvedTab);
+        if ("invitations".equals(resolvedTab)) {
+            populateInviteModel(model);
+        }
+        return "app-tabbed";
     }
 
     /** Lazy-loaded panel fragment for a tab not rendered at initial page load. */
     @GetMapping("/tabs/{tab:dashboard|configuration|commands|invitations}")
     public String tabFragment(@PathVariable String username, @PathVariable String tab, Model model) {
         ChannelPageData data = fetchChannelPageData(username, 0, null, null);
-        if (data == null || !data.isOwner()) {
+        if (data == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         if ("invitations".equals(tab) && !isInviteTabVariant(model)) {
@@ -111,17 +107,6 @@ public class ChannelPageController {
         if (source != null && !source.isBlank()) url.append("&source={source}");
         Object[] vars = buildVars(username, page, status, source);
         return apiClient.get(url.toString(), ChannelPageData.class, vars);
-    }
-
-    /** Returns the variant assigned for the channel-page-tabbed-layout experiment, or null if unresolved. */
-    private String resolveTabbedLayoutVariant() {
-        try {
-            Map<?, ?> raw = apiClient.get("/api/experiments/me/variant/channel-page-tabbed-layout", Map.class);
-            if (raw != null && raw.get("variant") instanceof String v) return v;
-        } catch (Exception e) {
-            log.debug("Could not fetch channel-page-tabbed-layout variant: {}", e.getMessage());
-        }
-        return null;
     }
 
     // ── SSE proxies ────────────────────────────────────────────────────────────
