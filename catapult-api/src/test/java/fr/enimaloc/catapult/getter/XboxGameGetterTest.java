@@ -50,7 +50,7 @@ class XboxGameGetterTest {
 
     @BeforeEach
     void setup() {
-        getter = new XboxGameGetter(restClient, oAuthTokenRepository, tokenService, apiObservations);
+        getter = new XboxGameGetter(restClient, oAuthTokenRepository, tokenService, apiObservations, Optional.empty());
         ReflectionTestUtils.setField(getter, "titleIdBlacklistRaw", "1626579248");
         ReflectionTestUtils.invokeMethod(getter, "init");
 
