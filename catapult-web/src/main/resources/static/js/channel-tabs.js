@@ -1,15 +1,14 @@
 /*
  * channel-tabs.js — drives the Dashboard/Configuration/Commandes tab nav on
- * the tabbed channel page (channel-page-tabbed-layout experiment, "tabbed"
- * variant). No-ops if #channel-tabs isn't present (control variant / other
- * pages).
+ * the channel page. No-ops if #channel-tabs isn't present (other pages).
  *
  * Behaviour:
  *   - Click on a .channel-tab button switches the visible panel.
  *   - The initially active tab's panel is already rendered server-side.
- *   - Other panels carry data-tab-path and are fetched once via
+ *   - Other panels carry data-tab-path and are fetched via
  *     window.catapultWs.mvc() (zero HTTP fetch), then marked data-loaded
- *     and simply shown/hidden on subsequent clicks.
+ *     and simply shown/hidden on subsequent clicks. A fetch that races the
+ *     WS handshake (WS_CLOSED) is retried once the connection authenticates.
  *   - The active tab is reflected in the URL via history.pushState so a
  *     refresh or shared link reopens on the same tab.
  */
@@ -46,9 +45,25 @@
       window.history.pushState({ tab: tab }, "", path);
     }
 
+    loadPanel(tab, panel);
+  }
+
+  // A tab clicked right after page load can race the WS handshake: mvc()
+  // resolves {ok:false, error:{code:"WS_CLOSED"}} when the socket isn't open
+  // yet (see ws-client.js), and without a retry the panel was left empty
+  // until the user did a full page reload. Retry once the connection is
+  // authenticated instead of giving up silently.
+  function loadPanel(tab, panel) {
     if (panel.dataset.loaded === "true" || !panel.dataset.tabPath) return;
     if (!window.catapultWs || typeof window.catapultWs.mvc !== "function") return;
     window.catapultWs.mvc({ method: "GET", path: panel.dataset.tabPath }).then(function (resp) {
+      if (resp && resp.ok === false && resp.error && resp.error.code === "WS_CLOSED") {
+        document.addEventListener("ws:auth.resolved", function retry() {
+          document.removeEventListener("ws:auth.resolved", retry);
+          loadPanel(tab, panel);
+        }, { once: true });
+        return;
+      }
       if (!resp || resp.ok === false || !resp.html) return;
       const parsed = new DOMParser().parseFromString(resp.html, "text/html");
       const replacement = parsed.body.firstElementChild;
