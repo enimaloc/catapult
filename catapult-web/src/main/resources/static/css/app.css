@@ -1892,9 +1892,9 @@ details summary { cursor: pointer; font-weight: 600; }
     background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px;
     padding: 12px; min-width: 340px; box-shadow: 0 4px 16px rgba(0,0,0,.3);
 }
-.twitchat-preset-list { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 4px; }
-.twitchat-preset-list > li { border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; }
-.twitchat-preset-list > li > details > summary { padding: 4px 0; line-height: 1.2; }
+.twitchat-preset-list { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 2px; }
+.twitchat-preset-list > li { border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; }
+.twitchat-preset-list > li > details > summary { padding: 2px 0; line-height: 1.1; font-size: .9em; }
 .twitchat-preset-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-width: 640px; }
 .twitchat-preset-form input[type="text"] {
     padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px;
