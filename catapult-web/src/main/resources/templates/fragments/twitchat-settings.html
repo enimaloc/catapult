@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
-<section th:fragment="twitchat-settings" th:if="${isOwner and twitchatSettings != null}" class="card"
-         th:attr="data-obs-host=${twitchatObsHost},data-obs-port=${twitchatObsPort},data-obs-password=${twitchatObsPassword},data-widget-url=${twitchatWidgetUrl}">
+<section th:fragment="twitchat-settings" th:if="${isOwner and twitchatSettings != null}" class="card">
     <div class="card-header">
         <h3 th:text="#{twitchat_settings.title}">Notifications Twitchat</h3>
     </div>
@@ -47,7 +46,8 @@
         </form>
     </div>
 
-    <div th:if="${twitchatObsHost != null and !#strings.isEmpty(twitchatObsHost)}" id="twitchat-obs-source-check" style="margin-top:16px">
+    <div th:if="${twitchatObsHost != null and !#strings.isEmpty(twitchatObsHost)}" id="twitchat-obs-source-check" style="margin-top:16px"
+         th:attr="data-obs-host=${twitchatObsHost},data-obs-port=${twitchatObsPort},data-obs-password=${twitchatObsPassword},data-widget-url=${twitchatWidgetUrl}">
         <p id="twitchat-obs-source-status" class="text-muted"
            th:attr="data-i18n-found=#{twitchat_settings.obs_source.found},data-i18n-unreachable=#{twitchat_settings.obs_source.unreachable}"
            th:text="#{twitchat_settings.obs_source.checking}">Vérification de la source OBS...</p>
