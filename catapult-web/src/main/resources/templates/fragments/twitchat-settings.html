@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
-<section th:fragment="twitchat-settings" th:if="${isOwner and twitchatSettings != null}" class="card">
+<section th:fragment="twitchat-settings" th:if="${isOwner and twitchatSettings != null}" class="card"
+         th:attr="data-obs-host=${twitchatObsHost},data-obs-port=${twitchatObsPort},data-obs-password=${twitchatObsPassword},data-widget-url=${twitchatWidgetUrl}">
     <div class="card-header">
         <h3 th:text="#{twitchat_settings.title}">Notifications Twitchat</h3>
     </div>
@@ -46,7 +47,122 @@
         </form>
     </div>
 
+    <div th:if="${twitchatObsHost != null and !#strings.isEmpty(twitchatObsHost)}" id="twitchat-obs-source-check" style="margin-top:16px">
+        <p id="twitchat-obs-source-status" class="text-muted"
+           th:attr="data-i18n-found=#{twitchat_settings.obs_source.found},data-i18n-unreachable=#{twitchat_settings.obs_source.unreachable}"
+           th:text="#{twitchat_settings.obs_source.checking}">Vérification de la source OBS...</p>
+        <div id="twitchat-obs-source-missing" style="display:none"
+             th:attr="data-i18n-create-failed=#{twitchat_settings.obs_source.create_failed}">
+            <p class="text-danger" th:text="#{twitchat_settings.obs_source.missing}">Aucune source de relais détectée dans OBS.</p>
+            <button type="button" class="btn btn-primary" onclick="window.catapultCreateTwitchatObsSource(this)"
+                    th:text="#{twitchat_settings.obs_source.create}">Créer la source dans OBS</button>
+        </div>
+        <p class="text-muted" style="margin-top:8px" th:text="#{twitchat_settings.obs_source.twitchat_reminder}">
+            N'oublie pas de configurer la connexion OBS dans Twitchat lui-même (Paramètres → Connexions → OBS) :
+            sans ça, Twitchat ne recevra jamais les notifications même si la source ci-dessus existe.
+        </p>
+    </div>
+
     <div th:insert="~{fragments/twitchat-presets :: twitchat-presets-body}"></div>
+
+    <script th:inline="none">
+        // Re-run every time this fragment loads (channel-tabs.js's executeScripts() re-creates
+        // and re-executes every <script> tag when the configuration tab is fetched) — but the
+        // OBS-websocket connection itself is cached on window, keyed by host/port, so switching
+        // tabs back and forth doesn't reconnect on every visit.
+        (function () {
+            var section = document.getElementById("twitchat-obs-source-check");
+            if (!section) return;
+            var host = section.dataset.obsHost;
+            var port = section.dataset.obsPort;
+            var password = section.dataset.obsPassword || "";
+            var widgetUrl = section.dataset.widgetUrl;
+            var statusEl = document.getElementById("twitchat-obs-source-status");
+            var missingEl = document.getElementById("twitchat-obs-source-missing");
+            if (!host || !port || !widgetUrl || !statusEl) return;
+
+            function showResult(found) {
+                if (found) {
+                    statusEl.textContent = statusEl.dataset.i18nFound;
+                    missingEl.style.display = "none";
+                } else {
+                    statusEl.style.display = "none";
+                    missingEl.style.display = "block";
+                }
+            }
+
+            function findExistingSource(obs) {
+                return obs.call("GetInputList", {}).then(function (res) {
+                    var candidates = ((res && res.inputs) || [])
+                        .filter(function (i) { return i.inputKind === "browser_source"; });
+                    var found = false;
+                    return candidates.reduce(function (chain, input) {
+                        return chain.then(function () {
+                            if (found) return;
+                            return obs.call("GetInputSettings", { inputName: input.inputName })
+                                .then(function (s) {
+                                    if (s && s.inputSettings && s.inputSettings.url === widgetUrl) found = true;
+                                })
+                                .catch(function () { /* ignore inputs we can't introspect */ });
+                        });
+                    }, Promise.resolve()).then(function () { return found; });
+                });
+            }
+
+            var cacheKey = host + ":" + port;
+            var cached = window.__catapultObsSourceCheck;
+            if (cached && cached.key === cacheKey) {
+                showResult(cached.found);
+                window.__catapultObsSourceConnection = cached.obs;
+                return;
+            }
+
+            statusEl.style.display = "block";
+            if (missingEl) missingEl.style.display = "none";
+            obsWsConnect({ host: host, port: Number(port), password: password })
+                .then(function (obs) {
+                    window.__catapultObsSourceConnection = obs;
+                    return findExistingSource(obs).then(function (found) {
+                        window.__catapultObsSourceCheck = { key: cacheKey, found: found, obs: obs };
+                        showResult(found);
+                    });
+                })
+                .catch(function () {
+                    statusEl.textContent = statusEl.dataset.i18nUnreachable;
+                });
+        })();
+
+        window.catapultCreateTwitchatObsSource = function (button) {
+            var section = document.getElementById("twitchat-obs-source-check");
+            var obs = window.__catapultObsSourceConnection;
+            if (!section || !obs) return;
+            var widgetUrl = section.dataset.widgetUrl;
+            var statusEl = document.getElementById("twitchat-obs-source-status");
+            var missingEl = document.getElementById("twitchat-obs-source-missing");
+            button.disabled = true;
+            obs.call("GetCurrentProgramScene", {})
+                .then(function (scene) {
+                    var sceneName = scene && (scene.currentProgramSceneName || scene.sceneName);
+                    return obs.call("CreateInput", {
+                        sceneName: sceneName,
+                        inputName: "Catapult — Relais Twitchat",
+                        inputKind: "browser_source",
+                        inputSettings: { url: widgetUrl, width: 100, height: 100 },
+                        sceneItemEnabled: true
+                    });
+                })
+                .then(function () {
+                    window.__catapultObsSourceCheck = { key: section.dataset.obsHost + ":" + section.dataset.obsPort, found: true, obs: obs };
+                    if (missingEl) missingEl.style.display = "none";
+                    statusEl.style.display = "block";
+                    statusEl.textContent = statusEl.dataset.i18nFound;
+                })
+                .catch(function () {
+                    button.disabled = false;
+                    alert(missingEl.dataset.i18nCreateFailed);
+                });
+        };
+    </script>
 </section>
 </body>
 </html>
