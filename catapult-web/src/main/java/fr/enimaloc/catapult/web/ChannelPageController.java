@@ -208,6 +208,19 @@ public class ChannelPageController {
             model.addAttribute("twitchatWidgetUrl", twitchat == null ? null
                     : stripTrailingSlash(publicWebUrl) + "/widget/twitchat/" + twitchat.get("widgetToken"));
 
+            // Decrypted OBS-websocket connection info, embedded server-side into the settings
+            // page the same way WidgetTwitchatController embeds it into the widget page itself
+            // (see /api/twitchat/widget/{token} — same call, same gate on `enabled`) — lets the
+            // settings page offer to detect/create the OBS browser source without a new endpoint.
+            if (twitchat != null && Boolean.TRUE.equals(twitchat.get("enabled"))) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> obsConfig = apiClient.get(
+                        "/api/twitchat/widget/{token}", Map.class, twitchat.get("widgetToken"));
+                model.addAttribute("twitchatObsHost", obsConfig == null ? null : obsConfig.get("obsHost"));
+                model.addAttribute("twitchatObsPort", obsConfig == null ? null : obsConfig.get("obsPort"));
+                model.addAttribute("twitchatObsPassword", obsConfig == null ? "" : obsConfig.getOrDefault("obsPassword", ""));
+            }
+
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> twitchatPresets = apiClient.get(
                     "/api/channels/{username}/twitchat/presets",
