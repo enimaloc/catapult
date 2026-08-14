@@ -5,9 +5,11 @@ import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -19,6 +21,7 @@ public class ApiTwitchatWidgetController {
     private final TwitchatWidgetSettingsRepository widgetSettingsRepository;
     private final TokenEncryptionService tokenEncryptionService;
     private final TwitchatActionExecutor actionExecutor;
+    private final MessageSource messageSource;
 
     public record AccessResponse(String ownerId, boolean enabled) {}
     public record ConfigResponse(String obsHost, Integer obsPort, String obsPassword) {}
@@ -66,12 +69,12 @@ public class ApiTwitchatWidgetController {
     }
 
     @GetMapping("/quick-configs")
-    public java.util.List<fr.enimaloc.catapult.service.notification.dto.TwitchatQuickConfig> quickConfigs() {
+    public java.util.List<fr.enimaloc.catapult.service.notification.dto.TwitchatQuickConfig> quickConfigs(Locale locale) {
         String base = stripTrailingSlash(publicWebUrl);
-        return fr.enimaloc.catapult.service.notification.TwitchatQuickConfigs.ALL.stream()
+        return fr.enimaloc.catapult.service.notification.TwitchatQuickConfigs.resolve(messageSource, locale).stream()
                 .map(qc -> new fr.enimaloc.catapult.service.notification.dto.TwitchatQuickConfig(
-                        qc.key(), qc.label(), qc.description(), qc.eventType(), qc.parameters(),
-                        qc.templateJson().replace("{{baseUrl}}", base)))
+                        qc.key(), qc.label(), qc.description().replace("{{baseUrl}}", base), qc.eventType(),
+                        qc.parameters(), qc.templateJson().replace("{{baseUrl}}", base)))
                 .toList();
     }
 
