@@ -42,7 +42,7 @@ public final class TwitchatQuickConfigs {
                     List.of(new RawParam("command", "so")),
                     "{\"message\":\"Le bot Catapult est actif.\",\"style\":\"message\",\"icon\":\"live\","
                             + "\"authorName\":\"Catapult\",\"actions\":[{\"label\":\"Désactiver le bot (chat)\","
-                            + "\"actionType\":\"chat\",\"message\":\"/{{param:command}} {{action:DISABLE_BOT}}\","
+                            + "\"actionType\":\"message\",\"message\":\"/{{param:command}} {{action:DISABLE_BOT}}\","
                             + "\"theme\":\"secondary\"}]}"
             )
     );
