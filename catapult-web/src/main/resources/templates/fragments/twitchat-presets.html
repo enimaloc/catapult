@@ -1,7 +1,13 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
 <body>
-<div id="twitchat-presets-body" th:fragment="twitchat-presets-body" th:attr="data-channel-username=${channelUsername}">
+<div id="twitchat-presets-body" th:fragment="twitchat-presets-body"
+     th:attr="data-channel-username=${channelUsername},
+              data-i18n-message-required=#{twitchat_presets.error.message_required},
+              data-i18n-invalid-json=#{twitchat_presets.error.invalid_json('')},
+              data-i18n-test-error=#{twitchat_presets.test.error},
+              data-i18n-test-success=#{twitchat_presets.test.success},
+              data-i18n-test-connection-lost=#{twitchat_presets.test.connection_lost}">
     <p class="text-muted" th:text="#{twitchat_presets.help_placeholders}">Variables disponibles...</p>
     <p th:if="${twitchatPresetError != null}" class="text-danger" th:text="${twitchatPresetError}">Erreur</p>
     <script type="application/json" id="twitchat-quick-configs-data" th:utext="${twitchatQuickConfigsJson}">[]</script>
@@ -129,19 +135,30 @@
     </div>
 
     <script th:inline="none">
+        // Uses the app's toast overlay when available (see maintenance-overlay.js), falling
+        // back to alert() only if that module hasn't loaded for some reason.
+        function notifyTwitchat(msg, kind) {
+            if (window.catapultOverlay && window.catapultOverlay.showToast) {
+                window.catapultOverlay.showToast(msg, { kind: kind, duration: kind === "error" ? 6000 : 3000 });
+            } else {
+                alert(msg);
+            }
+        }
+
         // Client-side feedback only — the server is the source of truth for validation
         // (TwitchatPayloadPresetService rejects invalid JSON / blank message with a 400).
         window.validateTwitchatPresetJson = function (form) {
             var textarea = form.querySelector("textarea[name=payloadJson]");
             if (!textarea) return true;
+            var container = document.getElementById("twitchat-presets-body");
             try {
                 var parsed = JSON.parse(textarea.value);
                 if (!parsed.message || !String(parsed.message).trim()) {
-                    alert("Le champ \"message\" est obligatoire dans le JSON du preset.");
+                    notifyTwitchat(container.dataset.i18nMessageRequired, "error");
                     return false;
                 }
             } catch (e) {
-                alert("JSON invalide : " + e.message);
+                notifyTwitchat(container.dataset.i18nInvalidJson + e.message, "error");
                 return false;
             }
             return true;
@@ -173,16 +190,16 @@
                 if (!e.detail || e.detail.id !== id) return;
                 document.removeEventListener("ws:response", onResponse);
                 if (e.detail.status && e.detail.status >= 400) {
-                    alert("Test impossible : vérifie le JSON du preset.");
+                    notifyTwitchat(container.dataset.i18nTestError, "error");
                 } else {
-                    alert("Notification de test envoyée.");
+                    notifyTwitchat(container.dataset.i18nTestSuccess, "success");
                 }
             };
             document.addEventListener("ws:response", onResponse);
             var sent = window.catapultWs && window.catapultWs.send(frame);
             if (!sent) {
                 document.removeEventListener("ws:response", onResponse);
-                alert("Connexion perdue : impossible d'envoyer le test.");
+                notifyTwitchat(container.dataset.i18nTestConnectionLost, "error");
             }
         };
 
@@ -254,6 +271,11 @@
             document.querySelectorAll("#quickConfigModalParams .quick-config-param-input").forEach(function (input) {
                 json = json.split("{{param:" + input.dataset.paramKey + "}}").join(input.value);
             });
+            try {
+                json = JSON.stringify(JSON.parse(json), null, 2);
+            } catch (e) {
+                // leave json as-is if parameter substitution produced invalid JSON
+            }
             var targets = Array.prototype.map.call(
                 document.querySelectorAll(".quick-config-target-event:checked"),
                 function (cb) { return cb.value; });
