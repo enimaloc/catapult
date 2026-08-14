@@ -8,6 +8,8 @@ import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +46,8 @@ class TwitchEventSubServiceTest {
     @Mock private StreamStateService streamStateService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RestClient restClient;
+    @Mock private TwitchatNotifier twitchatNotifier;
+    @Mock private CatapultCategoryChangeStateService categoryChangeStateService;
 
     @Mock private RestClient.RequestBodyUriSpec postUriSpec;
     @Mock private RestClient.RequestBodySpec postBodySpec;
@@ -118,6 +122,55 @@ class TwitchEventSubServiceTest {
         ArgumentCaptor<StreamOfflineEvent> captor = ArgumentCaptor.forClass(StreamOfflineEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().getUser()).isEqualTo(user);
+    }
+
+    @Test
+    void handleChannelUpdate_matchesSelfSetState_notifiesCatapultChange() {
+        when(categoryChangeStateService.consumeIfMatches(user, "222"))
+            .thenReturn(Optional.of(new CatapultCategoryChangeStateService.SelfChange("111")));
+
+        String firstMessage = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "111", "category_name": "Old Game", "content_classification_labels": [] } }
+            }
+            """;
+        String secondMessage = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "222", "category_name": "New Game", "content_classification_labels": [] } }
+            }
+            """;
+
+        service.handleMessage(user, token, firstMessage, false);
+        service.handleMessage(user, token, secondMessage, false);
+
+        verify(twitchatNotifier).onCategoryChangedByCatapult(user, "222", "New Game", "111");
+        verify(twitchatNotifier, never()).onCategoryChangedManually(any(), any(), any());
+    }
+
+    @Test
+    void handleChannelUpdate_noSelfSetMatch_notifiesManualChange() {
+        when(categoryChangeStateService.consumeIfMatches(user, "222")).thenReturn(Optional.empty());
+
+        String firstMessage = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "111", "category_name": "Old Game", "content_classification_labels": [] } }
+            }
+            """;
+        String secondMessage = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "222", "category_name": "New Game", "content_classification_labels": [] } }
+            }
+            """;
+
+        service.handleMessage(user, token, firstMessage, false);
+        service.handleMessage(user, token, secondMessage, false);
+
+        verify(twitchatNotifier).onCategoryChangedManually(user, "222", "New Game");
+        verify(twitchatNotifier, never()).onCategoryChangedByCatapult(any(), any(), any(), any());
     }
 
     @Test

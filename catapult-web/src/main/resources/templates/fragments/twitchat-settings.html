@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:ws="https://catapult.enimaloc.fr/ws">
+<body>
+<section th:fragment="twitchat-settings" th:if="${isOwner and twitchatSettings != null}" class="card">
+    <div class="card-header">
+        <h3 th:text="#{twitchat_settings.title}">Notifications Twitchat</h3>
+    </div>
+    <p class="text-muted mb-16" th:text="#{twitchat_settings.subtitle}">
+        Reçois une notification Twitchat (visible de toi seul) quand Catapult change ta catégorie,
+        quand tu la changes toi-même, ou quand le bot s'active/désactive.
+    </p>
+
+    <form th:action="@{/channels/{u}/settings/twitchat(u=${channelUsername})}" method="post"
+          ws:post="@{/channels/{u}/settings/twitchat(u=${channelUsername})}" ws:swap="none"> <!-- nosemgrep -->
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <div class="inline-edit-fields">
+            <div class="inline-edit-field">
+                <label th:text="#{twitchat_settings.enabled}">Activer</label>
+                <input type="checkbox" name="enabled" th:checked="${twitchatSettings.enabled}">
+            </div>
+            <div class="inline-edit-field">
+                <label th:text="#{twitchat_settings.obs_host}">Adresse OBS-websocket</label>
+                <input type="text" name="obsHost" th:value="${twitchatSettings.obsHost}" placeholder="127.0.0.1">
+            </div>
+            <div class="inline-edit-field">
+                <label th:text="#{twitchat_settings.obs_port}">Port OBS-websocket</label>
+                <input type="number" name="obsPort" th:value="${twitchatSettings.obsPort}" placeholder="4455">
+            </div>
+            <div class="inline-edit-field">
+                <label th:text="#{twitchat_settings.obs_password}">Mot de passe OBS-websocket</label>
+                <input type="password" name="obsPassword"
+                       th:placeholder="${twitchatSettings.hasPassword} ? #{twitchat_settings.password_unchanged} : ''">
+            </div>
+        </div>
+        <div class="inline-edit-actions" style="margin-top:12px">
+            <button type="submit" class="btn btn-primary" th:text="#{common.save}">Enregistrer</button>
+        </div>
+    </form>
+
+    <div style="margin-top:16px">
+        <label th:text="#{twitchat_settings.widget_url}">Lien à mettre dans une source web OBS (ou à ouvrir en onglet) :</label>
+        <code th:text="${twitchatWidgetUrl}">https://.../widget/twitchat/...</code>
+        <form th:action="@{/channels/{u}/settings/twitchat/regenerate(u=${channelUsername})}" method="post" style="display:inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn btn-secondary" th:text="#{twitchat_settings.regenerate}">Régénérer le lien</button>
+        </form>
+    </div>
+
+    <div th:if="${twitchatObsHost != null and !#strings.isEmpty(twitchatObsHost)}" id="twitchat-obs-source-check" style="margin-top:16px"
+         th:attr="data-obs-host=${twitchatObsHost},data-obs-port=${twitchatObsPort},data-obs-password=${twitchatObsPassword},data-widget-url=${twitchatWidgetUrl},data-widget-token=${twitchatSettings.widgetToken}">
+        <p id="twitchat-obs-source-status" class="text-muted"
+           th:attr="data-i18n-found=#{twitchat_settings.obs_source.found},data-i18n-unreachable=#{twitchat_settings.obs_source.unreachable}"
+           th:text="#{twitchat_settings.obs_source.checking}">Vérification de la source OBS...</p>
+        <div id="twitchat-obs-source-missing" style="display:none"
+             th:attr="data-i18n-create-failed=#{twitchat_settings.obs_source.create_failed}">
+            <p class="text-danger" th:text="#{twitchat_settings.obs_source.missing}">Aucune source de relais détectée dans OBS.</p>
+            <button type="button" class="btn btn-primary" onclick="window.catapultCreateTwitchatObsSource(this)"
+                    th:text="#{twitchat_settings.obs_source.create}">Créer la source dans OBS</button>
+        </div>
+        <p class="text-muted" style="margin-top:8px" th:text="#{twitchat_settings.obs_source.twitchat_reminder}">
+            N'oublie pas de configurer la connexion OBS dans Twitchat lui-même (Paramètres → Connexions → OBS) :
+            sans ça, Twitchat ne recevra jamais les notifications même si la source ci-dessus existe.
+        </p>
+    </div>
+
+    <div th:insert="~{fragments/twitchat-presets :: twitchat-presets-body}"></div>
+
+    <!--
+    Only ever loaded on the widget page (an OBS Browser Source) before this feature — the
+    settings page needs it too now to connect to OBS-websocket directly from the browser and
+    check/create the relay source (see the inline script below). Placed inside the fragment
+    itself, not app.html/configuration-tab.html, so channel-tabs.js's executeScripts() (which
+    re-creates every <script> tag, src or inline, when this tab is lazy-loaded) picks it up the
+    same way it would on a full page load — no separate wiring needed in the surrounding pages.
+    -->
+    <script th:src="@{/js/widget/obs-websocket-client.js}"></script>
+    <script th:inline="none">
+        // Re-run every time this fragment loads (channel-tabs.js's executeScripts() re-creates
+        // and re-executes every <script> tag when the configuration tab is fetched) — but the
+        // OBS-websocket connection itself is cached on window, keyed by host/port, so switching
+        // tabs back and forth doesn't reconnect on every visit.
+        //
+        // On a normal full-page load, the <script src> above blocks parsing until it's fetched,
+        // so obsWsConnect is guaranteed defined by the time this inline script runs. But when
+        // this fragment is lazy-loaded via channel-tabs.js's executeScripts() (configuration
+        // tab opened after initial load), BOTH scripts are re-created via createElement — the
+        // inline one runs synchronously immediately, while the external one is still fetching,
+        // so obsWsConnect may not exist yet. Poll briefly rather than assume load order.
+        function whenObsClientReady(fn, triesLeft) {
+            if (typeof window.obsWsConnect === "function") { fn(); return; }
+            if (triesLeft <= 0) return;
+            setTimeout(function () { whenObsClientReady(fn, triesLeft - 1); }, 20);
+        }
+
+        whenObsClientReady(function () {
+            var section = document.getElementById("twitchat-obs-source-check");
+            if (!section) return;
+            var host = section.dataset.obsHost;
+            var port = section.dataset.obsPort;
+            var password = section.dataset.obsPassword || "";
+            var widgetUrl = section.dataset.widgetUrl;
+            var statusEl = document.getElementById("twitchat-obs-source-status");
+            var missingEl = document.getElementById("twitchat-obs-source-missing");
+            if (!host || !port || !widgetUrl || !statusEl) return;
+
+            function showResult(found) {
+                if (found) {
+                    statusEl.textContent = statusEl.dataset.i18nFound;
+                    missingEl.style.display = "none";
+                } else {
+                    statusEl.style.display = "none";
+                    missingEl.style.display = "block";
+                }
+            }
+
+            function findExistingSource(obs) {
+                return obs.call("GetInputList", {}).then(function (res) {
+                    var candidates = ((res && res.inputs) || [])
+                        .filter(function (i) { return i.inputKind === "browser_source"; });
+                    var found = false;
+                    return candidates.reduce(function (chain, input) {
+                        return chain.then(function () {
+                            if (found) return;
+                            return obs.call("GetInputSettings", { inputName: input.inputName })
+                                .then(function (s) {
+                                    if (s && s.inputSettings && s.inputSettings.url === widgetUrl) found = true;
+                                })
+                                .catch(function () { /* ignore inputs we can't introspect */ });
+                        });
+                    }, Promise.resolve()).then(function () { return found; });
+                });
+            }
+
+            // window.__catapultObsSourceState tracks one connection attempt per host:port —
+            // set SYNCHRONOUSLY, before obsWsConnect() is even called, so that if this script
+            // runs again before the first attempt has settled (fragment re-render, executeScripts()
+            // firing twice, tab revisited quickly), the second run sees the in-flight marker
+            // immediately and skips reconnecting instead of racing a second OBS-websocket
+            // connection into existence.
+            var cacheKey = host + ":" + port;
+            var state = window.__catapultObsSourceState;
+            if (state && state.key === cacheKey) {
+                if (state.obs) {
+                    showResult(state.found);
+                }
+                return; // already connected, or a connection attempt is still in flight
+            }
+
+            window.__catapultObsSourceState = { key: cacheKey };
+            statusEl.style.display = "block";
+            if (missingEl) missingEl.style.display = "none";
+            obsWsConnect({ host: host, port: Number(port), password: password })
+                .then(function (obs) {
+                    return findExistingSource(obs).then(function (found) {
+                        window.__catapultObsSourceState = { key: cacheKey, obs: obs, found: found };
+                        showResult(found);
+                    });
+                })
+                .catch(function () {
+                    // Let a later run (re-opening the tab, fixing host/port) retry.
+                    if (window.__catapultObsSourceState && window.__catapultObsSourceState.key === cacheKey
+                            && !window.__catapultObsSourceState.obs) {
+                        window.__catapultObsSourceState = null;
+                    }
+                    statusEl.textContent = statusEl.dataset.i18nUnreachable;
+                });
+
+            // Fallback relay: the widget page (/widget/twitchat/{token}) is the normal way
+            // Twitchat notifications reach OBS, but it must actually be open (browser tab or
+            // OBS source) for that — nothing subscribes to twitchat.widget.<token> otherwise,
+            // and the event is silently dropped server-side (0 subscribers). Since this
+            // settings page already holds its own OBS-websocket connection (above, for the
+            // source check), reuse it to relay too whenever the widget page isn't around to
+            // do it itself.
+            //
+            // If BOTH this page and the widget page are open at once, both would otherwise
+            // relay the same notification twice — claimRelay() below coordinates via OBS's
+            // own shared "persistent data" store (the only state genuinely shared between
+            // them, since the widget page may run inside OBS's embedded browser with no
+            // localStorage/BroadcastChannel in common with a regular tab). A random jitter
+            // narrows, but doesn't fully close, the race window; if the coordination call
+            // itself fails, relay anyway rather than silently drop the notification.
+            var RELAY_DEDUP_REALM = "OBS_WEBSOCKET_DATA_REALM_GLOBAL";
+            var RELAY_DEDUP_SLOT = "catapult_twitchat_relay_dedup";
+            function claimRelay(obsConn, notificationId) {
+                var jitterMs = Math.floor(Math.random() * 150);
+                return new Promise(function (resolve) { setTimeout(resolve, jitterMs); })
+                    .then(function () {
+                        return obsConn.call("GetPersistentData", { realm: RELAY_DEDUP_REALM, slotName: RELAY_DEDUP_SLOT });
+                    })
+                    .then(function (res) {
+                        if (res && res.slotValue === notificationId) return false;
+                        return obsConn.call("SetPersistentData",
+                                { realm: RELAY_DEDUP_REALM, slotName: RELAY_DEDUP_SLOT, slotValue: notificationId })
+                            .then(function () { return true; });
+                    })
+                    .catch(function () { return true; });
+            }
+
+            var widgetToken = section.dataset.widgetToken;
+            if (widgetToken && window.catapultWs && !window.__catapultObsRelayFallbackBound) {
+                window.__catapultObsRelayFallbackBound = true;
+                window.catapultWs.subscribe("twitchat.widget." + widgetToken);
+                document.addEventListener("ws:event", function (e) {
+                    var frame = e.detail;
+                    if (!frame || !frame.data || frame.name !== "twitchat.notify") return;
+                    var relayState = window.__catapultObsSourceState;
+                    var obs = relayState && relayState.obs;
+                    if (!obs) return; // not connected right now — nothing to relay through
+                    var n = frame.data;
+                    claimRelay(obs, n.id).then(function (claimed) {
+                        if (!claimed) return;
+                        obs.call("BroadcastCustomEvent", {
+                            eventData: {
+                                origin: "twitchat",
+                                type: "CUSTOM_CHAT_MESSAGE",
+                                data: {
+                                    message: n.message,
+                                    style: n.style,
+                                    icon: n.icon,
+                                    user: n.authorName ? { name: n.authorName } : undefined,
+                                    actions: (n.actions || []).map(function (a) {
+                                        return { label: a.label, actionType: a.actionType, url: a.url,
+                                                 message: a.message, theme: a.theme };
+                                    })
+                                }
+                            }
+                        }).catch(function () { /* best-effort fallback — nothing more to do here */ });
+                    });
+                });
+            }
+        }, 50);
+
+        window.catapultCreateTwitchatObsSource = function (button) {
+            var section = document.getElementById("twitchat-obs-source-check");
+            var state = window.__catapultObsSourceState;
+            var obs = state && state.obs;
+            if (!section || !obs) return; // no live connection to reuse — nothing to act on
+            var widgetUrl = section.dataset.widgetUrl;
+            var statusEl = document.getElementById("twitchat-obs-source-status");
+            var missingEl = document.getElementById("twitchat-obs-source-missing");
+            button.disabled = true;
+            obs.call("GetCurrentProgramScene", {})
+                .then(function (scene) {
+                    var sceneName = scene && (scene.currentProgramSceneName || scene.sceneName);
+                    return obs.call("CreateInput", {
+                        sceneName: sceneName,
+                        inputName: "Catapult — Relais Twitchat",
+                        inputKind: "browser_source",
+                        inputSettings: { url: widgetUrl, width: 100, height: 100 },
+                        sceneItemEnabled: true
+                    });
+                })
+                .then(function () {
+                    state.found = true;
+                    if (missingEl) missingEl.style.display = "none";
+                    statusEl.style.display = "block";
+                    statusEl.textContent = statusEl.dataset.i18nFound;
+                })
+                .catch(function () {
+                    button.disabled = false;
+                    alert(missingEl.dataset.i18nCreateFailed);
+                });
+        };
+    </script>
+</section>
+</body>
+</html>

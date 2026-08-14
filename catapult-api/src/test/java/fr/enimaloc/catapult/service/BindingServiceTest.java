@@ -127,6 +127,39 @@ class BindingServiceTest {
     }
 
     @Test
+    void setTwitchGame_activeBinding_updatesFieldsAndReappliesToTwitch() {
+        bindingService.setTwitchGame(user, bindingId, "999", "New Game");
+
+        assertThat(binding.getTwitchGameId()).isEqualTo("999");
+        assertThat(binding.getTwitchGameName()).isEqualTo("New Game");
+        assertThat(binding.getStatus()).isEqualTo(GameBinding.Status.MANUAL);
+        verify(gameBindingRepository).save(binding);
+        verify(twitchService).updateChannel(user, binding);
+    }
+
+    @Test
+    void setTwitchGame_bindingNotActive_doesNotCallTwitch() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(
+            Optional.of(new DetectedGame("other-game", GameBinding.SourceType.STEAM, "Other Game")));
+
+        bindingService.setTwitchGame(user, bindingId, "999", "New Game");
+
+        assertThat(binding.getTwitchGameId()).isEqualTo("999");
+        verify(gameBindingRepository).save(binding);
+        verifyNoInteractions(twitchService);
+    }
+
+    @Test
+    void setTwitchGame_unknownId_doesNothing() {
+        when(gameBindingRepository.findByIdAndUser(bindingId, user)).thenReturn(Optional.empty());
+
+        bindingService.setTwitchGame(user, bindingId, "999", "New Game");
+
+        verifyNoInteractions(twitchService);
+        verify(gameBindingRepository, never()).save(any());
+    }
+
+    @Test
     void toggleCclEnabled_updatesFieldAndCallsTwitch() {
         binding.setCclEnabled(true);
 

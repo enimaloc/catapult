@@ -11,6 +11,8 @@ import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ import java.net.http.WebSocket;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -60,6 +63,8 @@ public class TwitchEventSubService implements EventSubService {
     private final ApplicationEventPublisher eventPublisher;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final TwitchatNotifier twitchatNotifier;
+    private final CatapultCategoryChangeStateService categoryChangeStateService;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -290,6 +295,16 @@ public class TwitchEventSubService implements EventSubService {
 
         if (!newCategoryId.equals(previous.categoryId())) {
             eventPublisher.publishEvent(new ChannelCategoryChangedEvent(this, user, newCategoryId, newCategoryName));
+            // Sole producer of the "Catapult changed your category" notification: TwitchServiceImpl
+            // only records the marker, so one logical change yields exactly one notification.
+            Optional<CatapultCategoryChangeStateService.SelfChange> selfSet =
+                    categoryChangeStateService.consumeIfMatches(user, newCategoryId);
+            if (selfSet.isPresent()) {
+                twitchatNotifier.onCategoryChangedByCatapult(user, newCategoryId, newCategoryName,
+                        selfSet.get().previousGameId());
+            } else {
+                twitchatNotifier.onCategoryChangedManually(user, newCategoryId, newCategoryName);
+            }
         }
         if (!newCcls.equals(previous.cclIds())) {
             eventPublisher.publishEvent(new ChannelCclChangedEvent(this, user, List.copyOf(newCcls)));

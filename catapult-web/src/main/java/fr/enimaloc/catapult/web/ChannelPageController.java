@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import fr.enimaloc.catapult.client.ApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
@@ -14,8 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +30,10 @@ import java.util.UUID;
 public class ChannelPageController {
 
     private final ApiClient apiClient;
+    private final ObjectMapper jackson;
+
+    @Value("${catapult.web.public-url:}")
+    private String publicWebUrl;
 
     @GetMapping({"", "/{tab:dashboard|configuration|commands|invitations}"})
     public String channelPage(
@@ -35,7 +42,8 @@ public class ChannelPageController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String source,
-            Model model) {
+            Model model,
+            Locale locale) {
 
         // Only the channel owner or one of their Twitch moderators ever reaches this
         // point — fetchChannelPageData returns null (403/404 from the API) for anyone
@@ -45,7 +53,7 @@ public class ChannelPageController {
         if (data == null) {
             return "redirect:/channels";
         }
-        populateModel(model, data, username);
+        populateModel(model, data, username, locale);
 
         String resolvedTab = tab == null ? "dashboard" : tab;
         if ("invitations".equals(resolvedTab) && !isInviteTabVariant(model)) {
@@ -60,7 +68,7 @@ public class ChannelPageController {
 
     /** Lazy-loaded panel fragment for a tab not rendered at initial page load. */
     @GetMapping("/tabs/{tab:dashboard|configuration|commands|invitations}")
-    public String tabFragment(@PathVariable String username, @PathVariable String tab, Model model) {
+    public String tabFragment(@PathVariable String username, @PathVariable String tab, Model model, Locale locale) {
         ChannelPageData data = fetchChannelPageData(username, 0, null, null);
         if (data == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
@@ -68,7 +76,7 @@ public class ChannelPageController {
         if ("invitations".equals(tab) && !isInviteTabVariant(model)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        populateModel(model, data, username);
+        populateModel(model, data, username, locale);
         if ("invitations".equals(tab)) {
             populateInviteModel(model);
         }
@@ -134,13 +142,17 @@ public class ChannelPageController {
         return vars.toArray();
     }
 
+    private static String stripTrailingSlash(String url) {
+        return url != null && url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
     /**
      * Populates every model attribute the channel page (and all inlined fragments)
      * needs. Replaces the former per-fragment lazy controllers — the page now
      * renders in a single round-trip with the complete state, and subsequent
      * updates arrive as WS events handled client-side.
      */
-    private void populateModel(Model model, ChannelPageData data, String username) {
+    private void populateModel(Model model, ChannelPageData data, String username, Locale locale) {
         // Core channel data
         model.addAttribute("channelUser", data.channelUser());
         model.addAttribute("channelUsername", data.channelUsername());
@@ -185,6 +197,66 @@ public class ChannelPageController {
         model.addAttribute("twSettings", settings);
         model.addAttribute("noGameSettings", settings);
         model.addAttribute("incompleteFallbackSettings", settings);
+
+        // Twitchat notification widget settings — separate call, not part of UserSettingsDto.
+        // Owner-only on the API side (requireOwner), so only fetch it for the owner.
+        if (data.isOwner()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> twitchat = apiClient.get(
+                    "/api/channels/{username}/settings/twitchat", Map.class, username);
+            model.addAttribute("twitchatSettings", twitchat);
+            model.addAttribute("twitchatWidgetUrl", twitchat == null ? null
+                    : stripTrailingSlash(publicWebUrl) + "/widget/twitchat/" + twitchat.get("widgetToken"));
+
+            // Decrypted OBS-websocket connection info, embedded server-side into the settings
+            // page the same way WidgetTwitchatController embeds it into the widget page itself
+            // (see /api/twitchat/widget/{token} — same call, same gate on `enabled`) — lets the
+            // settings page offer to detect/create the OBS browser source without a new endpoint.
+            if (twitchat != null && Boolean.TRUE.equals(twitchat.get("enabled"))) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> obsConfig = apiClient.get(
+                        "/api/twitchat/widget/{token}", Map.class, twitchat.get("widgetToken"));
+                model.addAttribute("twitchatObsHost", obsConfig == null ? null : obsConfig.get("obsHost"));
+                model.addAttribute("twitchatObsPort", obsConfig == null ? null : obsConfig.get("obsPort"));
+                model.addAttribute("twitchatObsPassword", obsConfig == null ? "" : obsConfig.getOrDefault("obsPassword", ""));
+            }
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> twitchatPresets = apiClient.get(
+                    "/api/channels/{username}/twitchat/presets",
+                    new org.springframework.core.ParameterizedTypeReference<List<Map<String, Object>>>() {}, username);
+            @SuppressWarnings("unchecked")
+            Map<String, String> twitchatActivePresets = apiClient.get(
+                    "/api/channels/{username}/twitchat/active-presets", Map.class, username);
+            Map<String, List<Map<String, Object>>> twitchatPresetsByEvent = new java.util.LinkedHashMap<>();
+            for (String eventType : fr.enimaloc.catapult.web.TwitchatEventTypes.ALL) {
+                twitchatPresetsByEvent.put(eventType, new java.util.ArrayList<>());
+            }
+            if (twitchatPresets != null) {
+                for (Map<String, Object> preset : twitchatPresets) {
+                    twitchatPresetsByEvent
+                            .computeIfAbsent(String.valueOf(preset.get("eventType")), k -> new java.util.ArrayList<>())
+                            .add(preset);
+                }
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> twitchatDefaults = apiClient.get("/api/twitchat/defaults", Map.class);
+            Map<String, String> twitchatDefaultsJson = new java.util.LinkedHashMap<>();
+            if (twitchatDefaults != null) {
+                twitchatDefaults.forEach((eventType, payload) ->
+                        twitchatDefaultsJson.put(eventType, jackson.writeValueAsString(payload)));
+            }
+            model.addAttribute("twitchatEventTypes", fr.enimaloc.catapult.web.TwitchatEventTypes.ALL);
+            model.addAttribute("twitchatPresetsByEvent", twitchatPresetsByEvent);
+            model.addAttribute("twitchatActivePresets", twitchatActivePresets == null ? Map.of() : twitchatActivePresets);
+            model.addAttribute("twitchatDefaultsJson", twitchatDefaultsJson);
+
+            List<Map<String, Object>> twitchatQuickConfigs = apiClient.getLocalized("/api/twitchat/quick-configs",
+                    new org.springframework.core.ParameterizedTypeReference<List<Map<String, Object>>>() {}, locale);
+            String twitchatQuickConfigsJson = twitchatQuickConfigs == null
+                    ? "[]" : jackson.writeValueAsString(twitchatQuickConfigs);
+            model.addAttribute("twitchatQuickConfigsJson", twitchatQuickConfigsJson);
+        }
 
         // DTDD mapping panel
         DtddMappingStatusDto dtdd = apiClient.get(

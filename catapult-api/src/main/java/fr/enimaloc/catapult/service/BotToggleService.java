@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class BotToggleService {
     private final TwitchChatService twitchChatService;
     private final EventSubService twitchEventSubService;
     private final ChannelEventPublisher channelEventPublisher;
+    private final TwitchatNotifier twitchatNotifier;
 
     @Transactional
     public void setBotEnabled(UserAccount user, boolean enabled) {
@@ -43,6 +45,7 @@ public class BotToggleService {
             twitchEventSubService.disconnect(user);
         }
         channelEventPublisher.botToggled(user.getId(), enabled);
+        twitchatNotifier.onBotToggled(user, enabled);
         log.info("botEnabled set to {} for user {}", enabled, user.getId());
     }
 }

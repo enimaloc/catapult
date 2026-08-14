@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchServiceImpl;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +51,7 @@ class TwitchServiceTest {
     @Mock private TwitchCategoryService twitchCategoryService;
     @Mock private TwitchTokenService twitchTokenService;
     @Mock private BotToggleService botToggleService;
+    @Mock private CatapultCategoryChangeStateService categoryChangeStateService;
 
     @Spy
     private ExternalApiObservations apiObservations =
@@ -204,6 +206,48 @@ class TwitchServiceTest {
         twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         verify(botToggleService).setBotEnabled(user, false);
+    }
+
+    @Test
+    void updateChannel_successfulPatch_recordsSelfSetStateWithoutNotifying() {
+        GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
+        binding.setTwitchGameId("222");
+        binding.setTwitchGameName("New Game");
+
+        twitchService.updateChannel(user, binding);
+
+        // TwitchatNotifier is no longer a collaborator of TwitchServiceImpl: the notification
+        // is emitted once, from TwitchEventSubService's channel.update handler.
+        verify(categoryChangeStateService).recordCatapultChangeAndReturnPrevious(user, "222");
+    }
+
+    @Test
+    void setCategory_successfulPatch_recordsSelfSetState() {
+        twitchService.setCategory(user, "12345", "Some Game");
+
+        verify(categoryChangeStateService).recordCatapultChangeAndReturnPrevious(user, "12345");
+    }
+
+    @Test
+    void setCategory_botActive_patchesOnlyGameId() {
+        twitchService.setCategory(user, "12345", "Some Game");
+
+        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+        verify(patchSpec).uri(uriCaptor.capture());
+        assertThat(uriCaptor.getValue()).contains("/channels?broadcaster_id=" + user.getTwitchId());
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).isEqualTo(Map.of("game_id", "12345"));
+    }
+
+    @Test
+    void setCategory_botDisabled_skipsPatch() {
+        user.setBotEnabled(false);
+
+        twitchService.setCategory(user, "12345", "Some Game");
+
+        verifyNoInteractions(restClient, oAuthTokenRepository);
     }
 
     @Test

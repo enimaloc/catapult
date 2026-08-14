@@ -106,6 +106,31 @@ public class ApiClient {
         }
     }
 
+    /**
+     * Same as {@link #get(String, ParameterizedTypeReference, Object...)} but forwards
+     * {@code locale} as the {@code Accept-Language} header — see
+     * {@link #get(String, Class, Locale, Object...)}.
+     *
+     * <p>Deliberately not an overload of {@code get(String, ParameterizedTypeReference, Object...)}:
+     * with both a {@code Locale} and an {@code Object...} tail, javac's variable-arity overload
+     * resolution silently picked the wrong one for at least one existing call site typed with
+     * generic {@code any()} Mockito matchers, breaking that test without a compile error.
+     */
+    public <T> T getLocalized(String path, ParameterizedTypeReference<T> responseType, Locale locale, Object... uriVars) {
+        try {
+            return restClient.get()
+                    .uri(path, uriVars)
+                    .header(HttpHeaders.ACCEPT_LANGUAGE, locale.toLanguageTag())
+                    .retrieve()
+                    .body(responseType);
+        } catch (Exception e) {
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("GET {} failed: {}", path, e.getMessage());
+            }
+            return null;
+        }
+    }
+
     public <T> T post(String path, Object body, Class<T> responseType, Object... uriVars) {
         try {
             var spec = restClient.post().uri(path, uriVars);
@@ -502,6 +527,23 @@ public class ApiClient {
         return exchangeForResult(() -> restClient.post()
                 .uri("/api/admin/minecraft-accounts/{id}/reauth", id)
                 .body(Map.of("deviceCode", deviceCode)));
+    }
+
+    /**
+     * POST that returns the raw status + body instead of throwing on 4xx/5xx,
+     * so the caller can distinguish a genuine backend validation failure from
+     * a successful call (unlike {@link #post(String, Object, Class, Object...)},
+     * whose {@code retrieve()} silently converts the body regardless of status
+     * because the shared {@code defaultStatusHandler} only logs 4xx, it never
+     * rethrows).
+     */
+    public ApiResult postForResult(String path, Object body, Object... uriVars) {
+        return exchangeForResult(() -> restClient.post().uri(path, uriVars).body(body));
+    }
+
+    /** Same as {@link #postForResult(String, Object, Object...)} but for PUT. */
+    public ApiResult putForResult(String path, Object body, Object... uriVars) {
+        return exchangeForResult(() -> restClient.put().uri(path, uriVars).body(body));
     }
 
     public boolean adminMinecraftPatch(UUID id, Map<String, Object> body) {

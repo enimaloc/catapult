@@ -1868,3 +1868,47 @@ details summary { cursor: pointer; font-weight: 600; }
 .admin-notif-dialog textarea { font-family: inherit; resize: vertical; }
 .admin-notif-dialog .label { display: block; font-size: 0.85em; color: var(--text-muted); font-weight: 600; }
 
+/* ============================================================
+   Twitchat presets
+   ============================================================ */
+.twitchat-preset-event-group + .twitchat-preset-event-group { margin-top: 16px; }
+.twitchat-preset-header { flex-wrap: wrap; gap: 12px; }
+.twitchat-preset-header h4 { margin: 0; white-space: nowrap; }
+.twitchat-preset-active-form { display: flex; align-items: center; gap: 8px; margin: 0; }
+.twitchat-preset-active-form label { font-size: .8em; font-weight: 600; white-space: nowrap; }
+.twitchat-preset-active-form select {
+    padding: 4px 8px; background: var(--bg-base); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text); font-size: 13px;
+}
+.twitchat-new-preset-header { margin-left: auto; position: relative; }
+.twitchat-new-preset-header > summary {
+    list-style: none; cursor: pointer; font-weight: 600; font-size: .85em;
+    padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px; white-space: nowrap;
+}
+.twitchat-new-preset-header > summary::-webkit-details-marker { display: none; }
+.twitchat-new-preset-header[open] > summary { border-color: var(--accent-strong); }
+.twitchat-new-preset-header > form {
+    position: absolute; right: 0; top: 100%; z-index: 10; margin-top: 4px;
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; min-width: 340px; box-shadow: 0 4px 16px rgba(0,0,0,.3);
+}
+.twitchat-preset-list { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 2px; }
+.twitchat-preset-list > li { border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; }
+.twitchat-preset-list > li > details > summary { padding: 2px 0; line-height: 1.1; font-size: .9em; }
+.twitchat-preset-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-width: 640px; }
+.twitchat-preset-form input[type="text"] {
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--bg-base); color: var(--text); box-sizing: border-box;
+}
+.twitchat-preset-form .query-textarea { width: 100%; box-sizing: border-box; }
+.modal-content select {
+    width: 100%; padding: 8px 12px; background: var(--bg-base); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 13px; margin-bottom: 4px; outline: none;
+}
+.modal-content select:focus { border-color: var(--accent-strong); }
+.quick-config-param-input {
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--bg-base); color: var(--text);
+}
+.quick-config-params { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-end; }
+

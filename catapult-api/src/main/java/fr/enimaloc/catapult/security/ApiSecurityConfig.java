@@ -72,7 +72,7 @@ public class ApiSecurityConfig {
         http
                 .securityMatcher("/api/**")
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health", "/api/config/**", "/api/changelog").permitAll()
+                        .requestMatchers("/api/health", "/api/config/**", "/api/changelog", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/twitchat/defaults").permitAll()
                         .requestMatchers("/api/auth/exchange").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
                         .requestMatchers("/api/admin/**").access(new WebExpressionAuthorizationManager(
