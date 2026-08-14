@@ -1872,8 +1872,9 @@ details summary { cursor: pointer; font-weight: 600; }
    Twitchat presets
    ============================================================ */
 .twitchat-preset-event-group + .twitchat-preset-event-group { margin-top: 16px; }
-.twitchat-preset-list { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
-.twitchat-preset-list > li { border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; }
+.twitchat-preset-list { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 4px; }
+.twitchat-preset-list > li { border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; }
+.twitchat-preset-list > li > details > summary { padding: 4px 0; line-height: 1.2; }
 .twitchat-preset-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-width: 640px; }
 .twitchat-preset-form input[type="text"] {
     padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px;
