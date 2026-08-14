@@ -131,33 +131,46 @@
                 });
             }
 
+            // window.__catapultObsSourceState tracks one connection attempt per host:port —
+            // set SYNCHRONOUSLY, before obsWsConnect() is even called, so that if this script
+            // runs again before the first attempt has settled (fragment re-render, executeScripts()
+            // firing twice, tab revisited quickly), the second run sees the in-flight marker
+            // immediately and skips reconnecting instead of racing a second OBS-websocket
+            // connection into existence.
             var cacheKey = host + ":" + port;
-            var cached = window.__catapultObsSourceCheck;
-            if (cached && cached.key === cacheKey) {
-                showResult(cached.found);
-                window.__catapultObsSourceConnection = cached.obs;
-                return;
+            var state = window.__catapultObsSourceState;
+            if (state && state.key === cacheKey) {
+                if (state.obs) {
+                    showResult(state.found);
+                }
+                return; // already connected, or a connection attempt is still in flight
             }
 
+            window.__catapultObsSourceState = { key: cacheKey };
             statusEl.style.display = "block";
             if (missingEl) missingEl.style.display = "none";
             obsWsConnect({ host: host, port: Number(port), password: password })
                 .then(function (obs) {
-                    window.__catapultObsSourceConnection = obs;
                     return findExistingSource(obs).then(function (found) {
-                        window.__catapultObsSourceCheck = { key: cacheKey, found: found, obs: obs };
+                        window.__catapultObsSourceState = { key: cacheKey, obs: obs, found: found };
                         showResult(found);
                     });
                 })
                 .catch(function () {
+                    // Let a later run (re-opening the tab, fixing host/port) retry.
+                    if (window.__catapultObsSourceState && window.__catapultObsSourceState.key === cacheKey
+                            && !window.__catapultObsSourceState.obs) {
+                        window.__catapultObsSourceState = null;
+                    }
                     statusEl.textContent = statusEl.dataset.i18nUnreachable;
                 });
         }, 50);
 
         window.catapultCreateTwitchatObsSource = function (button) {
             var section = document.getElementById("twitchat-obs-source-check");
-            var obs = window.__catapultObsSourceConnection;
-            if (!section || !obs) return;
+            var state = window.__catapultObsSourceState;
+            var obs = state && state.obs;
+            if (!section || !obs) return; // no live connection to reuse — nothing to act on
             var widgetUrl = section.dataset.widgetUrl;
             var statusEl = document.getElementById("twitchat-obs-source-status");
             var missingEl = document.getElementById("twitchat-obs-source-missing");
@@ -174,7 +187,7 @@
                     });
                 })
                 .then(function () {
-                    window.__catapultObsSourceCheck = { key: section.dataset.obsHost + ":" + section.dataset.obsPort, found: true, obs: obs };
+                    state.found = true;
                     if (missingEl) missingEl.style.display = "none";
                     statusEl.style.display = "block";
                     statusEl.textContent = statusEl.dataset.i18nFound;
