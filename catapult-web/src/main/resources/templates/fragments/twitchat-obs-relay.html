@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+Keeps the Twitchat notification relay alive regardless of which channel-page tab is open. It used
+to live inside twitchat-settings.html, which is only rendered on the "configuration" tab (tabbed
+layout) — so a notification fired while the streamer was on "dashboard" and the widget page wasn't
+open anywhere had nowhere to go. Included once at the page-shell level (app.html / app-tabbed.html)
+instead of inside a per-tab fragment, so it survives tab switches without reconnecting: the
+OBS-websocket connection is cached (by host:port) behind window.getCatapultObsConnection(), shared
+with twitchat-settings.html's own source-check script (config tab) so both reuse the same
+connection instead of opening two when both are present on the same page (classic layout).
+-->
+<div th:fragment="twitchat-obs-relay"
+     th:if="${isOwner and twitchatObsHost != null and !#strings.isEmpty(twitchatObsHost) and twitchatSettings != null and twitchatSettings.widgetToken != null}"
+     id="twitchat-obs-relay" style="display:none"
+     th:attr="data-obs-host=${twitchatObsHost},data-obs-port=${twitchatObsPort},data-obs-password=${twitchatObsPassword},data-widget-token=${twitchatSettings.widgetToken}">
+    <script th:src="@{/js/widget/obs-websocket-client.js}"></script>
+    <script th:inline="none">
+        (function () {
+            function whenObsClientReady(fn, triesLeft) {
+                if (typeof window.obsWsConnect === "function") { fn(); return; }
+                if (triesLeft <= 0) return;
+                setTimeout(function () { whenObsClientReady(fn, triesLeft - 1); }, 20);
+            }
+
+            // window.catapultWs is set up by ws-client.js, loaded with `defer` in the page
+            // <head> — it only becomes available once HTML parsing finishes, which is AFTER
+            // this plain (non-deferred) inline script already ran. A one-shot
+            // `if (window.catapultWs)` check here would silently never find it and the
+            // subscribe would never happen — poll instead, same pattern as whenObsClientReady.
+            function whenCatapultWsReady(fn, triesLeft) {
+                if (window.catapultWs) { fn(); return; }
+                if (triesLeft <= 0) return;
+                setTimeout(function () { whenCatapultWsReady(fn, triesLeft - 1); }, 50);
+            }
+
+            // Shared with twitchat-settings.html's source-check script (also present on the
+            // page whenever the classic non-tabbed layout is active): whichever of the two
+            // calls this first opens the connection, the other gets the same in-flight/settled
+            // promise back instead of dialing OBS-websocket twice. Defined defensively — same
+            // definition in both fragments — so it works regardless of which one's <script> the
+            // browser happens to run first.
+            if (!window.getCatapultObsConnection) {
+                window.getCatapultObsConnection = function (host, port, password) {
+                    var cacheKey = host + ":" + port;
+                    window.__catapultObsConnectPromises = window.__catapultObsConnectPromises || {};
+                    if (window.__catapultObsConnectPromises[cacheKey]) {
+                        return window.__catapultObsConnectPromises[cacheKey];
+                    }
+                    var promise = obsWsConnect({ host: host, port: Number(port), password: password })
+                        .then(function (obs) {
+                            window.__catapultObsSourceState = { key: cacheKey, obs: obs };
+                            return obs;
+                        })
+                        .catch(function (err) {
+                            delete window.__catapultObsConnectPromises[cacheKey];
+                            if (window.__catapultObsSourceState && window.__catapultObsSourceState.key === cacheKey
+                                    && !window.__catapultObsSourceState.obs) {
+                                window.__catapultObsSourceState = null;
+                            }
+                            throw err;
+                        });
+                    window.__catapultObsConnectPromises[cacheKey] = promise;
+                    return promise;
+                };
+            }
+
+            whenObsClientReady(function () {
+                var section = document.getElementById("twitchat-obs-relay");
+                if (!section) return;
+                var host = section.dataset.obsHost;
+                var port = section.dataset.obsPort;
+                var password = section.dataset.obsPassword || "";
+                var widgetToken = section.dataset.widgetToken;
+                if (!host || !port || !widgetToken) return;
+
+                var obsConnection = window.getCatapultObsConnection(host, port, password);
+                obsConnection
+                    .then(function () { console.debug("[twitchat-obs-relay] connecté à OBS-websocket."); })
+                    .catch(function (err) { console.debug("[twitchat-obs-relay] connexion OBS-websocket échouée :", err); });
+
+                // Coordinates relaying across every client connected to the same OBS-websocket
+                // server (widget page + this fallback, possibly both at once) via OBS's own
+                // shared "persistent data" store — the only state genuinely shared between them,
+                // since the widget page may run inside OBS's embedded browser with no
+                // localStorage/BroadcastChannel in common with a regular tab. A random jitter
+                // narrows, but doesn't fully close, the race window; if the coordination call
+                // itself fails, relay anyway rather than silently drop the notification.
+                var RELAY_DEDUP_REALM = "OBS_WEBSOCKET_DATA_REALM_GLOBAL";
+                var RELAY_DEDUP_SLOT = "catapult_twitchat_relay_dedup";
+                function claimRelay(obsConn, notificationId) {
+                    var jitterMs = Math.floor(Math.random() * 150);
+                    return new Promise(function (resolve) { setTimeout(resolve, jitterMs); })
+                        .then(function () {
+                            return obsConn.call("GetPersistentData", { realm: RELAY_DEDUP_REALM, slotName: RELAY_DEDUP_SLOT });
+                        })
+                        .then(function (res) {
+                            if (res && res.slotValue === notificationId) return false;
+                            return obsConn.call("SetPersistentData",
+                                    { realm: RELAY_DEDUP_REALM, slotName: RELAY_DEDUP_SLOT, slotValue: notificationId })
+                                .then(function () { return true; });
+                        })
+                        .catch(function () { return true; });
+                }
+
+                whenCatapultWsReady(function () {
+                    if (window.__catapultObsRelayFallbackBound) return;
+                    window.__catapultObsRelayFallbackBound = true;
+                    window.catapultWs.subscribe("twitchat.widget." + widgetToken);
+                    console.debug("[twitchat-obs-relay] abonné à twitchat.widget." + widgetToken);
+                    document.addEventListener("ws:event", function (e) {
+                        var frame = e.detail;
+                        if (!frame || !frame.data || frame.name !== "twitchat.notify") return;
+                        console.debug("[twitchat-obs-relay] notification reçue :", frame.data);
+                        var n = frame.data;
+                        obsConnection.then(function (obs) {
+                            return claimRelay(obs, n.id).then(function (claimed) {
+                                if (!claimed) {
+                                    console.debug("[twitchat-obs-relay] déjà relayée par un autre client, ignorée.");
+                                    return;
+                                }
+                                obs.call("BroadcastCustomEvent", {
+                                    eventData: {
+                                        origin: "twitchat",
+                                        type: "CUSTOM_CHAT_MESSAGE",
+                                        data: {
+                                            message: n.message,
+                                            style: n.style,
+                                            icon: n.icon,
+                                            user: n.authorName ? { name: n.authorName } : undefined,
+                                            actions: (n.actions || []).map(function (a) {
+                                                return { label: a.label, actionType: a.actionType, url: a.url,
+                                                         message: a.message, theme: a.theme };
+                                            })
+                                        }
+                                    }
+                                }).catch(function (err) { console.debug("[twitchat-obs-relay] BroadcastCustomEvent a échoué :", err); });
+                            });
+                        }).catch(function () { console.debug("[twitchat-obs-relay] pas de connexion OBS-websocket, notification abandonnée."); });
+                    });
+                }, 100);
+            }, 50);
+        })();
+    </script>
+</div>
+</body>
+</html>
