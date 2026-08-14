@@ -41,7 +41,7 @@ public final class TwitchatQuickConfigs {
                     TwitchatNotificationEventType.STREAM_STARTED.name(),
                     List.of(new RawParam("command", "so")),
                     "{\"message\":\"Le bot Catapult est actif.\",\"style\":\"message\",\"icon\":\"live\","
-                            + "\"authorName\":\"Catapult\",\"actions\":[{\"label\":\"Désactiver le bot (chat)\","
+                            + "\"authorName\":\"Catapult\",\"actions\":[{\"label\":\"Désactiver le bot\","
                             + "\"actionType\":\"message\",\"message\":\"/{{param:command}} {{action:DISABLE_BOT}}\","
                             + "\"theme\":\"secondary\"}]}"
             )
