@@ -5,64 +5,81 @@
     <p class="text-muted" th:text="#{twitchat_presets.help_placeholders}">Variables disponibles...</p>
     <p th:if="${twitchatPresetError != null}" class="text-danger" th:text="${twitchatPresetError}">Erreur</p>
     <script type="application/json" id="twitchat-quick-configs-data" th:utext="${twitchatQuickConfigsJson}">[]</script>
-    <div th:each="eventType : ${twitchatEventTypes}" class="twitchat-preset-event-group" style="margin-top:16px">
-        <h4 th:text="#{'twitchat_presets.event.' + ${eventType}}">Event</h4>
+    <div th:each="eventType : ${twitchatEventTypes}" class="card twitchat-preset-event-group">
+        <div class="card-header">
+            <h4 th:text="#{'twitchat_presets.event.' + ${eventType}}">Event</h4>
+        </div>
 
-        <form th:action="@{/channels/{u}/settings/twitchat/active-presets/{t}(u=${channelUsername},t=${eventType})}"
+        <form class="inline-edit-fields"
+              th:action="@{/channels/{u}/settings/twitchat/active-presets/{t}(u=${channelUsername},t=${eventType})}"
               method="post"
               ws:post="@{/channels/{u}/settings/twitchat/active-presets/{t}(u=${channelUsername},t=${eventType})}"
               ws:target="#twitchat-presets-body" ws:swap="outerHTML"> <!-- nosemgrep -->
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-            <label th:text="#{twitchat_presets.active_label}">Preset actif</label>
-            <select name="presetId" onchange="this.form.requestSubmit()">
-                <option value="" th:selected="${twitchatActivePresets.get(eventType) == null}"
-                        th:text="#{twitchat_presets.default_option}">Défaut</option>
-                <option th:each="preset : ${twitchatPresetsByEvent.get(eventType)}"
-                        th:value="${preset.id}"
-                        th:selected="${preset.id == twitchatActivePresets.get(eventType)}"
-                        th:text="${preset.name}">Preset name</option>
-            </select>
+            <div class="inline-edit-field">
+                <label th:text="#{twitchat_presets.active_label}">Preset actif</label>
+                <select name="presetId" onchange="this.form.requestSubmit()">
+                    <option value="" th:selected="${twitchatActivePresets.get(eventType) == null}"
+                            th:text="#{twitchat_presets.default_option}">Défaut</option>
+                    <option th:each="preset : ${twitchatPresetsByEvent.get(eventType)}"
+                            th:value="${preset.id}"
+                            th:selected="${preset.id == twitchatActivePresets.get(eventType)}"
+                            th:text="${preset.name}">Preset name</option>
+                </select>
+            </div>
         </form>
 
-        <ul>
+        <ul class="twitchat-preset-list">
             <li th:each="preset : ${twitchatPresetsByEvent.get(eventType)}">
                 <details>
                     <summary th:text="${preset.name}">Preset name</summary>
-                    <form th:action="@{/channels/{u}/settings/twitchat/presets/{id}/update(u=${channelUsername},id=${preset.id})}"
+                    <form class="twitchat-preset-form"
+                          th:action="@{/channels/{u}/settings/twitchat/presets/{id}/update(u=${channelUsername},id=${preset.id})}"
                           method="post"
                           ws:post="@{/channels/{u}/settings/twitchat/presets/{id}/update(u=${channelUsername},id=${preset.id})}"
                           ws:target="#twitchat-presets-body" ws:swap="outerHTML"
                           onsubmit="return window.validateTwitchatPresetJson(this)"> <!-- nosemgrep -->
                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                         <input type="text" name="name" th:value="${preset.name}" required>
-                        <textarea name="payloadJson" rows="8" required th:text="${preset.payloadJson}"></textarea>
-                        <button type="submit" th:text="#{common.save}">Enregistrer</button>
-                        <button type="button" onclick="testTwitchatPreset(this)" th:attr="data-event-type=${eventType}"
-                                th:text="#{twitchat_presets.test}">Tester</button>
+                        <textarea class="query-textarea" name="payloadJson" rows="8" required
+                                  th:text="${preset.payloadJson}"></textarea>
+                        <div class="inline-edit-actions">
+                            <button type="submit" class="btn btn-primary" th:text="#{common.save}">Enregistrer</button>
+                            <button type="button" class="btn btn-outline" onclick="testTwitchatPreset(this)"
+                                    th:attr="data-event-type=${eventType}"
+                                    th:text="#{twitchat_presets.test}">Tester</button>
+                        </div>
                     </form>
                     <form th:action="@{/channels/{u}/settings/twitchat/presets/{id}/delete(u=${channelUsername},id=${preset.id})}"
                           method="post"
                           ws:post="@{/channels/{u}/settings/twitchat/presets/{id}/delete(u=${channelUsername},id=${preset.id})}"
                           ws:target="#twitchat-presets-body" ws:swap="outerHTML"> <!-- nosemgrep -->
                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <button type="submit" th:text="#{twitchat_presets.delete}">Supprimer</button>
+                        <button type="submit" class="btn btn-danger btn-sm" th:text="#{twitchat_presets.delete}">Supprimer</button>
                     </form>
                 </details>
             </li>
         </ul>
 
-        <details>
+        <details class="twitchat-new-preset">
             <summary th:text="#{twitchat_presets.new}">+ Nouveau preset</summary>
             <div class="quick-configs">
-                <label th:text="#{twitchat_presets.quick_config_label}">Configuration rapide</label>
-                <select class="quick-config-select" th:attr="data-event-type=${eventType}">
-                    <option value="" th:text="#{twitchat_presets.quick_config_none}">-- Choisir --</option>
-                </select>
+                <div class="inline-edit-field">
+                    <label th:text="#{twitchat_presets.quick_config_label}">Configuration rapide</label>
+                    <select class="quick-config-select" th:attr="data-event-type=${eventType}">
+                        <option value="" th:text="#{twitchat_presets.quick_config_none}">-- Choisir --</option>
+                    </select>
+                </div>
                 <div class="quick-config-params"></div>
-                <button type="button" onclick="applyQuickConfig(this)"
-                        th:text="#{twitchat_presets.quick_config_apply}">Appliquer</button>
+                <div class="inline-edit-actions">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="applyQuickConfig(this)"
+                            th:text="#{twitchat_presets.quick_config_apply}">Appliquer</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="applyQuickConfigToAllEvents(this)"
+                            th:text="#{twitchat_presets.quick_config_apply_all}">Appliquer à tous les événements</button>
+                </div>
             </div>
-            <form th:action="@{/channels/{u}/settings/twitchat/presets(u=${channelUsername})}"
+            <form class="twitchat-preset-form"
+                  th:action="@{/channels/{u}/settings/twitchat/presets(u=${channelUsername})}"
                   method="post"
                   ws:post="@{/channels/{u}/settings/twitchat/presets(u=${channelUsername})}"
                   ws:target="#twitchat-presets-body" ws:swap="outerHTML"
@@ -70,11 +87,14 @@
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <input type="hidden" name="eventType" th:value="${eventType}"/>
                 <input type="text" name="name" required th:placeholder="#{twitchat_presets.name_placeholder}">
-                <textarea name="payloadJson" rows="8" required
+                <textarea class="query-textarea" name="payloadJson" rows="8" required
                           th:text="${twitchatDefaultsJson != null ? twitchatDefaultsJson.get(eventType) : ''}"></textarea>
-                <button type="submit" th:text="#{twitchat_presets.create}">Créer</button>
-                <button type="button" onclick="testTwitchatPreset(this)" th:attr="data-event-type=${eventType}"
-                        th:text="#{twitchat_presets.test}">Tester</button>
+                <div class="inline-edit-actions">
+                    <button type="submit" class="btn btn-primary" th:text="#{twitchat_presets.create}">Créer</button>
+                    <button type="button" class="btn btn-outline" onclick="testTwitchatPreset(this)"
+                            th:attr="data-event-type=${eventType}"
+                            th:text="#{twitchat_presets.test}">Tester</button>
+                </div>
             </form>
         </details>
     </div>
@@ -165,26 +185,49 @@
             // different event type just gives the streamer a starting point to edit, same as
             // the per-event default-payload prefill already does.
             getTwitchatQuickConfigs().forEach(function (qc) {
-                    var opt = document.createElement("option");
-                    opt.value = qc.key;
-                    opt.textContent = qc.label;
-                    select.appendChild(opt);
-                });
+                var opt = document.createElement("option");
+                opt.value = qc.key;
+                opt.textContent = qc.label;
+                select.appendChild(opt);
+            });
         }
 
-        window.applyQuickConfig = function (button) {
+        // Resolves the currently selected quick config (in the same .quick-configs wrapper as
+        // `button`) against its filled-in parameter inputs, returning the final JSON string, or
+        // null if nothing is selected. Shared by the single-section and apply-to-all buttons so
+        // the resolution logic (and its {{param:KEY}} substitution) only lives in one place.
+        function resolveSelectedQuickConfigJson(button) {
             var wrapper = button.closest(".quick-configs");
             var select = wrapper.querySelector(".quick-config-select");
             var qc = getTwitchatQuickConfigs().find(function (q) { return q.key === select.value; });
-            if (!qc) return;
+            if (!qc) return null;
             var json = qc.templateJson;
             wrapper.querySelectorAll(".quick-config-param-input").forEach(function (input) {
                 json = json.split("{{param:" + input.dataset.paramKey + "}}").join(input.value);
             });
-            var details = wrapper.closest("details");
+            return json;
+        }
+
+        window.applyQuickConfig = function (button) {
+            var json = resolveSelectedQuickConfigJson(button);
+            if (json === null) return;
+            var details = button.closest("details");
             var textarea = details ? details.querySelector("textarea[name=payloadJson]") : null;
             if (textarea) textarea.value = json;
             if (details) details.open = true;
+        };
+
+        // Pastes the same resolved quick config into every event type's "+ Nouveau preset"
+        // textarea at once, so a streamer doesn't have to re-pick and re-fill the same config
+        // five times. Each textarea still needs its own "Créer" click — this only prefills.
+        window.applyQuickConfigToAllEvents = function (button) {
+            var json = resolveSelectedQuickConfigJson(button);
+            if (json === null) return;
+            document.querySelectorAll(".twitchat-new-preset").forEach(function (details) {
+                var textarea = details.querySelector("textarea[name=payloadJson]");
+                if (textarea) textarea.value = json;
+                details.open = true;
+            });
         };
 
         if (!window.__twitchatQuickConfigsChangeBound) {
