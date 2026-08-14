@@ -18,6 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -41,7 +42,8 @@ public class ChannelPageController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String source,
-            Model model) {
+            Model model,
+            Locale locale) {
 
         // Only the channel owner or one of their Twitch moderators ever reaches this
         // point — fetchChannelPageData returns null (403/404 from the API) for anyone
@@ -51,7 +53,7 @@ public class ChannelPageController {
         if (data == null) {
             return "redirect:/channels";
         }
-        populateModel(model, data, username);
+        populateModel(model, data, username, locale);
 
         String resolvedTab = tab == null ? "dashboard" : tab;
         if ("invitations".equals(resolvedTab) && !isInviteTabVariant(model)) {
@@ -66,7 +68,7 @@ public class ChannelPageController {
 
     /** Lazy-loaded panel fragment for a tab not rendered at initial page load. */
     @GetMapping("/tabs/{tab:dashboard|configuration|commands|invitations}")
-    public String tabFragment(@PathVariable String username, @PathVariable String tab, Model model) {
+    public String tabFragment(@PathVariable String username, @PathVariable String tab, Model model, Locale locale) {
         ChannelPageData data = fetchChannelPageData(username, 0, null, null);
         if (data == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
@@ -74,7 +76,7 @@ public class ChannelPageController {
         if ("invitations".equals(tab) && !isInviteTabVariant(model)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        populateModel(model, data, username);
+        populateModel(model, data, username, locale);
         if ("invitations".equals(tab)) {
             populateInviteModel(model);
         }
@@ -150,7 +152,7 @@ public class ChannelPageController {
      * renders in a single round-trip with the complete state, and subsequent
      * updates arrive as WS events handled client-side.
      */
-    private void populateModel(Model model, ChannelPageData data, String username) {
+    private void populateModel(Model model, ChannelPageData data, String username, Locale locale) {
         // Core channel data
         model.addAttribute("channelUser", data.channelUser());
         model.addAttribute("channelUsername", data.channelUsername());
@@ -236,8 +238,8 @@ public class ChannelPageController {
             model.addAttribute("twitchatActivePresets", twitchatActivePresets == null ? Map.of() : twitchatActivePresets);
             model.addAttribute("twitchatDefaultsJson", twitchatDefaultsJson);
 
-            List<Map<String, Object>> twitchatQuickConfigs = apiClient.get("/api/twitchat/quick-configs",
-                    new org.springframework.core.ParameterizedTypeReference<List<Map<String, Object>>>() {});
+            List<Map<String, Object>> twitchatQuickConfigs = apiClient.getLocalized("/api/twitchat/quick-configs",
+                    new org.springframework.core.ParameterizedTypeReference<List<Map<String, Object>>>() {}, locale);
             String twitchatQuickConfigsJson = twitchatQuickConfigs == null
                     ? "[]" : jackson.writeValueAsString(twitchatQuickConfigs);
             model.addAttribute("twitchatQuickConfigsJson", twitchatQuickConfigsJson);

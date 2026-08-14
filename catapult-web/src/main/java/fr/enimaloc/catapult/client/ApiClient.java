@@ -106,6 +106,31 @@ public class ApiClient {
         }
     }
 
+    /**
+     * Same as {@link #get(String, ParameterizedTypeReference, Object...)} but forwards
+     * {@code locale} as the {@code Accept-Language} header — see
+     * {@link #get(String, Class, Locale, Object...)}.
+     *
+     * <p>Deliberately not an overload of {@code get(String, ParameterizedTypeReference, Object...)}:
+     * with both a {@code Locale} and an {@code Object...} tail, javac's variable-arity overload
+     * resolution silently picked the wrong one for at least one existing call site typed with
+     * generic {@code any()} Mockito matchers, breaking that test without a compile error.
+     */
+    public <T> T getLocalized(String path, ParameterizedTypeReference<T> responseType, Locale locale, Object... uriVars) {
+        try {
+            return restClient.get()
+                    .uri(path, uriVars)
+                    .header(HttpHeaders.ACCEPT_LANGUAGE, locale.toLanguageTag())
+                    .retrieve()
+                    .body(responseType);
+        } catch (Exception e) {
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("GET {} failed: {}", path, e.getMessage());
+            }
+            return null;
+        }
+    }
+
     public <T> T post(String path, Object body, Class<T> responseType, Object... uriVars) {
         try {
             var spec = restClient.post().uri(path, uriVars);
