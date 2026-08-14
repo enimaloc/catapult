@@ -171,10 +171,32 @@
             // and the event is silently dropped server-side (0 subscribers). Since this
             // settings page already holds its own OBS-websocket connection (above, for the
             // source check), reuse it to relay too whenever the widget page isn't around to
-            // do it itself. Note: if BOTH this page and the widget page are open at once, the
-            // notification gets sent to Twitchat twice — an accepted trade-off, since neither
-            // page can detect whether some other, possibly non-browser (OBS CEF) context is
-            // also relaying the same event.
+            // do it itself.
+            //
+            // If BOTH this page and the widget page are open at once, both would otherwise
+            // relay the same notification twice — claimRelay() below coordinates via OBS's
+            // own shared "persistent data" store (the only state genuinely shared between
+            // them, since the widget page may run inside OBS's embedded browser with no
+            // localStorage/BroadcastChannel in common with a regular tab). A random jitter
+            // narrows, but doesn't fully close, the race window; if the coordination call
+            // itself fails, relay anyway rather than silently drop the notification.
+            var RELAY_DEDUP_REALM = "OBS_WEBSOCKET_DATA_REALM_GLOBAL";
+            var RELAY_DEDUP_SLOT = "catapult_twitchat_relay_dedup";
+            function claimRelay(obsConn, notificationId) {
+                var jitterMs = Math.floor(Math.random() * 150);
+                return new Promise(function (resolve) { setTimeout(resolve, jitterMs); })
+                    .then(function () {
+                        return obsConn.call("GetPersistentData", { realm: RELAY_DEDUP_REALM, slotName: RELAY_DEDUP_SLOT });
+                    })
+                    .then(function (res) {
+                        if (res && res.slotValue === notificationId) return false;
+                        return obsConn.call("SetPersistentData",
+                                { realm: RELAY_DEDUP_REALM, slotName: RELAY_DEDUP_SLOT, slotValue: notificationId })
+                            .then(function () { return true; });
+                    })
+                    .catch(function () { return true; });
+            }
+
             var widgetToken = section.dataset.widgetToken;
             if (widgetToken && window.catapultWs && !window.__catapultObsRelayFallbackBound) {
                 window.__catapultObsRelayFallbackBound = true;
@@ -182,26 +204,29 @@
                 document.addEventListener("ws:event", function (e) {
                     var frame = e.detail;
                     if (!frame || !frame.data || frame.name !== "twitchat.notify") return;
-                    var state = window.__catapultObsSourceState;
-                    var obs = state && state.obs;
+                    var relayState = window.__catapultObsSourceState;
+                    var obs = relayState && relayState.obs;
                     if (!obs) return; // not connected right now — nothing to relay through
                     var n = frame.data;
-                    obs.call("BroadcastCustomEvent", {
-                        eventData: {
-                            origin: "twitchat",
-                            type: "CUSTOM_CHAT_MESSAGE",
-                            data: {
-                                message: n.message,
-                                style: n.style,
-                                icon: n.icon,
-                                user: n.authorName ? { name: n.authorName } : undefined,
-                                actions: (n.actions || []).map(function (a) {
-                                    return { label: a.label, actionType: a.actionType, url: a.url,
-                                             message: a.message, theme: a.theme };
-                                })
+                    claimRelay(obs, n.id).then(function (claimed) {
+                        if (!claimed) return;
+                        obs.call("BroadcastCustomEvent", {
+                            eventData: {
+                                origin: "twitchat",
+                                type: "CUSTOM_CHAT_MESSAGE",
+                                data: {
+                                    message: n.message,
+                                    style: n.style,
+                                    icon: n.icon,
+                                    user: n.authorName ? { name: n.authorName } : undefined,
+                                    actions: (n.actions || []).map(function (a) {
+                                        return { label: a.label, actionType: a.actionType, url: a.url,
+                                                 message: a.message, theme: a.theme };
+                                    })
+                                }
                             }
-                        }
-                    }).catch(function () { /* best-effort fallback — nothing more to do here */ });
+                        }).catch(function () { /* best-effort fallback — nothing more to do here */ });
+                    });
                 });
             }
         }, 50);
