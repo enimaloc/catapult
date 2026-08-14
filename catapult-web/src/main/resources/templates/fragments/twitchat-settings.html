@@ -65,12 +65,34 @@
 
     <div th:insert="~{fragments/twitchat-presets :: twitchat-presets-body}"></div>
 
+    <!--
+    Only ever loaded on the widget page (an OBS Browser Source) before this feature — the
+    settings page needs it too now to connect to OBS-websocket directly from the browser and
+    check/create the relay source (see the inline script below). Placed inside the fragment
+    itself, not app.html/configuration-tab.html, so channel-tabs.js's executeScripts() (which
+    re-creates every <script> tag, src or inline, when this tab is lazy-loaded) picks it up the
+    same way it would on a full page load — no separate wiring needed in the surrounding pages.
+    -->
+    <script th:src="@{/js/widget/obs-websocket-client.js}"></script>
     <script th:inline="none">
         // Re-run every time this fragment loads (channel-tabs.js's executeScripts() re-creates
         // and re-executes every <script> tag when the configuration tab is fetched) — but the
         // OBS-websocket connection itself is cached on window, keyed by host/port, so switching
         // tabs back and forth doesn't reconnect on every visit.
-        (function () {
+        //
+        // On a normal full-page load, the <script src> above blocks parsing until it's fetched,
+        // so obsWsConnect is guaranteed defined by the time this inline script runs. But when
+        // this fragment is lazy-loaded via channel-tabs.js's executeScripts() (configuration
+        // tab opened after initial load), BOTH scripts are re-created via createElement — the
+        // inline one runs synchronously immediately, while the external one is still fetching,
+        // so obsWsConnect may not exist yet. Poll briefly rather than assume load order.
+        function whenObsClientReady(fn, triesLeft) {
+            if (typeof window.obsWsConnect === "function") { fn(); return; }
+            if (triesLeft <= 0) return;
+            setTimeout(function () { whenObsClientReady(fn, triesLeft - 1); }, 20);
+        }
+
+        whenObsClientReady(function () {
             var section = document.getElementById("twitchat-obs-source-check");
             if (!section) return;
             var host = section.dataset.obsHost;
@@ -130,7 +152,7 @@
                 .catch(function () {
                     statusEl.textContent = statusEl.dataset.i18nUnreachable;
                 });
-        })();
+        }, 50);
 
         window.catapultCreateTwitchatObsSource = function (button) {
             var section = document.getElementById("twitchat-obs-source-check");
