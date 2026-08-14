@@ -3,9 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <title>Catapult — relais Twitchat</title>
+    <!--
+    Hidden by default: this page is meant to be added as an OBS Browser Source and show
+    nothing on stream. The streamer can reveal the activity log for debugging by adding
+    custom CSS in that source's settings, e.g. "#log{display:block}" — a plain selector at
+    the same specificity as the one below, so no !important is needed on either side; OBS
+    injects its Custom CSS after this stylesheet, so it wins the cascade tie.
+    -->
+    <style>
+        body { margin: 0; background: transparent; }
+        #log { display: none; font-family: monospace; font-size: 12px; white-space: pre-wrap;
+               padding: 8px; color: #0f0; background: #000; }
+    </style>
 </head>
 <body th:attr="data-widget-token=${widgetToken},data-obs-host=${obsHost},data-obs-port=${obsPort},data-obs-password=${obsPassword}">
-<p>Relais Twitchat actif. Cette page peut rester ouverte en arrière-plan (onglet ou source web OBS).</p>
+<div id="log"></div>
 <script th:src="@{/js/ws/ws-client.js}"></script>
 <script th:src="@{/js/widget/obs-websocket-client.js}"></script>
 <script th:src="@{/js/widget/twitchat-relay.js}"></script>

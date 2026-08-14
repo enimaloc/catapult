@@ -7,6 +7,23 @@
         return;
     }
 
+    // Visible-in-DOM activity log — hidden by default (see twitchat.html's stylesheet),
+    // revealable by the streamer via OBS Browser Source's "Custom CSS" field
+    // (e.g. "#log{display:block}"). Capped so a long-running OBS session doesn't grow
+    // the DOM unbounded.
+    const LOG_MAX_LINES = 200;
+    const logEl = document.getElementById("log");
+    function log(message) {
+        console.log("[twitchat-relay]", message);
+        if (!logEl) return;
+        const line = document.createElement("div");
+        line.textContent = "[" + new Date().toLocaleTimeString() + "] " + message;
+        logEl.appendChild(line);
+        while (logEl.childElementCount > LOG_MAX_LINES) {
+            logEl.removeChild(logEl.firstChild);
+        }
+    }
+
     // Mutable: a widget page left open across a settings save must pick up the new
     // host/port/password live (see applyNewObsSettings) rather than keep dialing the
     // values it was rendered with — see settings-updated handling below.
@@ -33,9 +50,10 @@
         if (!obs) {
             // Dropped, not queued: a stale relay isn't worth buffering for, and the
             // next live notification will go through once reconnected.
-            console.warn("[twitchat-relay] OBS-websocket not connected, dropping notification");
+            log("OBS-websocket non connecté, notification abandonnée");
             return;
         }
+        log("Relais de la notification : " + notification.message);
         obs.call("BroadcastCustomEvent", {
             eventData: {
                 origin: "twitchat",
@@ -54,7 +72,33 @@
                     }))
                 }
             }
-        }).catch((err) => console.error("[twitchat-relay] BroadcastCustomEvent failed", err));
+        }).catch((err) => log("BroadcastCustomEvent a échoué : " + err));
+    }
+
+    // Twitchat itself listens on the same OBS-websocket connection for a "TRIGGERS_GET_ALL"
+    // custom event and answers with "TRIGGER_LIST" ({triggers:[{id,name}]}) — the only
+    // discovery mechanism Twitchat's public API exposes for the streamer's configured
+    // triggers (see PublicAPI.ts / Chat.vue in Durss/Twitchat). Used here purely to surface
+    // what Twitchat currently sees in the activity log — e.g. to help confirm that the
+    // trigger a "chat command" quick configuration depends on has actually been created.
+    function requestTriggerList() {
+        if (!obs) return;
+        obs.call("BroadcastCustomEvent", {
+            eventData: { origin: "twitchat", type: "TRIGGERS_GET_ALL", data: {} }
+        }).catch((err) => log("TRIGGERS_GET_ALL a échoué : " + err));
+    }
+
+    function onObsCustomEvent(eventData) {
+        if (!eventData || eventData.origin !== "twitchat") return;
+        if (eventData.type === "TRIGGER_LIST") {
+            const triggers = (eventData.data && eventData.data.triggers) || [];
+            if (triggers.length === 0) {
+                log("Aucun trigger Twitchat détecté.");
+            } else {
+                log("Triggers Twitchat détectés (" + triggers.length + ") : "
+                    + triggers.map((t) => t.name).join(", "));
+            }
+        }
     }
 
     function scheduleReconnect(myGeneration) {
@@ -79,7 +123,7 @@
             onDisconnect: () => {
                 if (myGeneration !== generation) return;
                 obs = null;
-                console.warn("[twitchat-relay] OBS-websocket connection lost, reconnecting…");
+                log("Connexion OBS-websocket perdue, reconnexion…");
                 scheduleReconnect(myGeneration);
             }
         }).then((connection) => {
@@ -90,10 +134,13 @@
                 return;
             }
             obs = connection;
+            obs.on("CustomEvent", onObsCustomEvent);
             reconnectDelay = RECONNECT_FLOOR_MS;
+            log("Connecté à OBS-websocket.");
+            requestTriggerList();
         }).catch((err) => {
             if (myGeneration !== generation) return;
-            console.error("[twitchat-relay] OBS-websocket connection failed, retrying…", err);
+            log("Connexion OBS-websocket échouée, nouvel essai… (" + err + ")");
             scheduleReconnect(myGeneration);
         });
     }

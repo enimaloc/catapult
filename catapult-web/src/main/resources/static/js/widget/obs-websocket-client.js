@@ -22,6 +22,7 @@
         return new Promise((resolve, reject) => {
             const socket = new WebSocket("ws://" + host + ":" + port);
             const pending = new Map();
+            const listeners = new Map();
             let requestCounter = 0;
             let settled = false;
             let connected = false;
@@ -72,6 +73,19 @@
                                 }));
                             });
                         },
+                        // OBS-websocket events (op 5) — e.g. "CustomEvent", broadcast by any
+                        // client (including Twitchat itself) via BroadcastCustomEvent and
+                        // echoed back to every connected client, ourselves included.
+                        on(eventType, handler) {
+                            if (!listeners.has(eventType)) {
+                                listeners.set(eventType, new Set());
+                            }
+                            listeners.get(eventType).add(handler);
+                        },
+                        off(eventType, handler) {
+                            const handlers = listeners.get(eventType);
+                            if (handlers) handlers.delete(handler);
+                        },
                         close() {
                             manuallyClosed = true;
                             socket.close();
@@ -86,6 +100,11 @@
                         waiting.res(frame.d.responseData);
                     } else {
                         waiting.rej(frame.d.requestStatus);
+                    }
+                } else if (frame.op === 5) {
+                    const handlers = listeners.get(frame.d.eventType);
+                    if (handlers) {
+                        handlers.forEach((h) => h(frame.d.eventData));
                     }
                 }
             };
