@@ -47,7 +47,7 @@
     </div>
 
     <div th:if="${twitchatObsHost != null and !#strings.isEmpty(twitchatObsHost)}" id="twitchat-obs-source-check" style="margin-top:16px"
-         th:attr="data-obs-host=${twitchatObsHost},data-obs-port=${twitchatObsPort},data-obs-password=${twitchatObsPassword},data-widget-url=${twitchatWidgetUrl}">
+         th:attr="data-obs-host=${twitchatObsHost},data-obs-port=${twitchatObsPort},data-obs-password=${twitchatObsPassword},data-widget-url=${twitchatWidgetUrl},data-widget-token=${twitchatSettings.widgetToken}">
         <p id="twitchat-obs-source-status" class="text-muted"
            th:attr="data-i18n-found=#{twitchat_settings.obs_source.found},data-i18n-unreachable=#{twitchat_settings.obs_source.unreachable}"
            th:text="#{twitchat_settings.obs_source.checking}">Vérification de la source OBS...</p>
@@ -164,6 +164,46 @@
                     }
                     statusEl.textContent = statusEl.dataset.i18nUnreachable;
                 });
+
+            // Fallback relay: the widget page (/widget/twitchat/{token}) is the normal way
+            // Twitchat notifications reach OBS, but it must actually be open (browser tab or
+            // OBS source) for that — nothing subscribes to twitchat.widget.<token> otherwise,
+            // and the event is silently dropped server-side (0 subscribers). Since this
+            // settings page already holds its own OBS-websocket connection (above, for the
+            // source check), reuse it to relay too whenever the widget page isn't around to
+            // do it itself. Note: if BOTH this page and the widget page are open at once, the
+            // notification gets sent to Twitchat twice — an accepted trade-off, since neither
+            // page can detect whether some other, possibly non-browser (OBS CEF) context is
+            // also relaying the same event.
+            var widgetToken = section.dataset.widgetToken;
+            if (widgetToken && window.catapultWs && !window.__catapultObsRelayFallbackBound) {
+                window.__catapultObsRelayFallbackBound = true;
+                window.catapultWs.subscribe("twitchat.widget." + widgetToken);
+                document.addEventListener("ws:event", function (e) {
+                    var frame = e.detail;
+                    if (!frame || !frame.data || frame.name !== "twitchat.notify") return;
+                    var state = window.__catapultObsSourceState;
+                    var obs = state && state.obs;
+                    if (!obs) return; // not connected right now — nothing to relay through
+                    var n = frame.data;
+                    obs.call("BroadcastCustomEvent", {
+                        eventData: {
+                            origin: "twitchat",
+                            type: "CUSTOM_CHAT_MESSAGE",
+                            data: {
+                                message: n.message,
+                                style: n.style,
+                                icon: n.icon,
+                                user: n.authorName ? { name: n.authorName } : undefined,
+                                actions: (n.actions || []).map(function (a) {
+                                    return { label: a.label, actionType: a.actionType, url: a.url,
+                                             message: a.message, theme: a.theme };
+                                })
+                            }
+                        }
+                    }).catch(function () { /* best-effort fallback — nothing more to do here */ });
+                });
+            }
         }, 50);
 
         window.catapultCreateTwitchatObsSource = function (button) {
