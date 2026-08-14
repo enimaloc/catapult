@@ -53,26 +53,55 @@
             log("OBS-websocket non connecté, notification abandonnée");
             return;
         }
-        log("Relais de la notification : " + notification.message);
-        obs.call("BroadcastCustomEvent", {
-            eventData: {
-                origin: "twitchat",
-                type: "CUSTOM_CHAT_MESSAGE",
-                data: {
-                    message: notification.message,
-                    style: notification.style,
-                    icon: notification.icon,
-                    user: notification.authorName ? { name: notification.authorName } : undefined,
-                    actions: (notification.actions || []).map((a) => ({
-                        label: a.label,
-                        actionType: a.actionType,
-                        url: a.url,
-                        message: a.message,
-                        theme: a.theme
-                    }))
-                }
+        claimRelay(obs, notification.id).then((claimed) => {
+            if (!claimed) {
+                log("Notification déjà relayée par un autre client, ignorée.");
+                return;
             }
-        }).catch((err) => log("BroadcastCustomEvent a échoué : " + err));
+            log("Relais de la notification : " + notification.message);
+            obs.call("BroadcastCustomEvent", {
+                eventData: {
+                    origin: "twitchat",
+                    type: "CUSTOM_CHAT_MESSAGE",
+                    data: {
+                        message: notification.message,
+                        style: notification.style,
+                        icon: notification.icon,
+                        user: notification.authorName ? { name: notification.authorName } : undefined,
+                        actions: (notification.actions || []).map((a) => ({
+                            label: a.label,
+                            actionType: a.actionType,
+                            url: a.url,
+                            message: a.message,
+                            theme: a.theme
+                        }))
+                    }
+                }
+            }).catch((err) => log("BroadcastCustomEvent a échoué : " + err));
+        });
+    }
+
+    // Coordinates relaying across every client connected to the same OBS-websocket server
+    // (widget page + settings-page fallback, possibly both at once) via OBS's own shared
+    // "persistent data" store — the only state genuinely shared between them, since one may
+    // run inside OBS's embedded browser (no shared localStorage/BroadcastChannel with a
+    // regular browser tab). A random jitter before the check/claim narrows, but doesn't
+    // fully close, the race window between two clients relaying the same notification; if
+    // the coordination call itself fails, relay anyway rather than silently drop it.
+    const RELAY_DEDUP_REALM = "OBS_WEBSOCKET_DATA_REALM_GLOBAL";
+    const RELAY_DEDUP_SLOT = "catapult_twitchat_relay_dedup";
+
+    function claimRelay(obsConn, notificationId) {
+        const jitterMs = Math.floor(Math.random() * 150);
+        return new Promise((resolve) => setTimeout(resolve, jitterMs))
+            .then(() => obsConn.call("GetPersistentData", { realm: RELAY_DEDUP_REALM, slotName: RELAY_DEDUP_SLOT }))
+            .then((res) => {
+                if (res && res.slotValue === notificationId) return false;
+                return obsConn.call("SetPersistentData",
+                        { realm: RELAY_DEDUP_REALM, slotName: RELAY_DEDUP_SLOT, slotValue: notificationId })
+                    .then(() => true);
+            })
+            .catch(() => true);
     }
 
     // Twitchat itself listens on the same OBS-websocket connection for a "TRIGGERS_GET_ALL"
