@@ -31,6 +31,7 @@ public class RedisEventPublisher {
     public static final String CHANNEL_ADMIN  = "catapult:events:admin";
     public static final String CHANNEL_USER_PREFIX = "catapult:events:user:";
     public static final String CHANNEL_CHANNEL_PREFIX = "catapult:events:channel:";
+    public static final String CHANNEL_TWITCHAT_PREFIX = "catapult:events:twitchat:";
 
     private final StringRedisTemplate redis;
     private final ObjectMapper jackson;
@@ -62,6 +63,10 @@ public class RedisEventPublisher {
 
     public void publishChannel(UUID channelOwnerId, String name, Object data) {
         publish(CHANNEL_CHANNEL_PREFIX + channelOwnerId, name, data);
+    }
+
+    public void publishTwitchat(UUID channelOwnerId, String name, Object data) {
+        publish(CHANNEL_TWITCHAT_PREFIX + channelOwnerId, name, data);
     }
 
     private void publish(String channel, String name, Object data) {

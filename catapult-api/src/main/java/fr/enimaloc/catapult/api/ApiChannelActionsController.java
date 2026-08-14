@@ -2,6 +2,8 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
+import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
+import fr.enimaloc.catapult.domain.TwitchatPayloadPreset;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.SteamApiClient;
@@ -21,6 +23,9 @@ import fr.enimaloc.catapult.service.BotToggleService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.SchedulerService;
 import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
+import fr.enimaloc.catapult.service.notification.TwitchatPayloadPresetService;
+import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,15 +33,21 @@ import org.springframework.http.HttpStatus;
 import java.util.concurrent.TimeUnit;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -59,6 +70,9 @@ public class ApiChannelActionsController {
     private final TokenEncryptionService tokenEncryptionService;
     private final SteamApiKeyRepository steamApiKeyRepository;
     private final fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
+    private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
+    private final TwitchatPayloadPresetService twitchatPayloadPresetService;
+    private final TwitchatNotifier twitchatNotifier;
 
     @Autowired(required = false)
     private SteamApiKeyRotator rotator;
@@ -142,6 +156,139 @@ public class ApiChannelActionsController {
         UserAccount user = resolveChannel(username, viewer);
         requireOwner(viewer, user);
         botToggleService.setBotEnabled(user, !user.isBotEnabled());
+    }
+
+    @GetMapping("/settings/twitchat")
+    public TwitchatSettingsResponse getTwitchatSettings(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        var settings = twitchatWidgetSettingsService.getOrCreate(channelUser);
+        return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
+                settings.getObsPasswordEncrypted() != null, settings.getWidgetToken().toString());
+    }
+
+    @PostMapping("/settings/twitchat")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveTwitchatSettings(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody TwitchatSettingsBody body) {
+
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        twitchatWidgetSettingsService.updateSettings(channelUser, body.enabled(), body.obsHost(), body.obsPort(), body.obsPassword());
+    }
+
+    @PostMapping("/settings/twitchat/regenerate")
+    public TwitchatSettingsResponse regenerateTwitchatToken(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        var settings = twitchatWidgetSettingsService.regenerateToken(channelUser);
+        return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
+                settings.getObsPasswordEncrypted() != null, settings.getWidgetToken().toString());
+    }
+
+    @GetMapping("/twitchat/presets")
+    public List<TwitchatPresetResponse> listTwitchatPresets(
+            @PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        return twitchatPayloadPresetService.listPresets(channelUser).stream()
+                .map(ApiChannelActionsController::toPresetResponse)
+                .toList();
+    }
+
+    @PostMapping("/twitchat/presets")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TwitchatPresetResponse createTwitchatPreset(
+            @PathVariable String username, @AuthenticationPrincipal Jwt jwt,
+            @RequestBody TwitchatPresetBody body) {
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        TwitchatPayloadPreset preset = twitchatPayloadPresetService.createPreset(channelUser,
+                parseEventType(body.eventType()), body.name(), body.payloadJson());
+        return toPresetResponse(preset);
+    }
+
+    @PutMapping("/twitchat/presets/{id}")
+    public TwitchatPresetResponse updateTwitchatPreset(
+            @PathVariable String username, @PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+            @RequestBody TwitchatPresetUpdateBody body) {
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        TwitchatPayloadPreset preset = twitchatPayloadPresetService.updatePreset(channelUser, id,
+                body.name(), body.payloadJson());
+        return toPresetResponse(preset);
+    }
+
+    @DeleteMapping("/twitchat/presets/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTwitchatPreset(
+            @PathVariable String username, @PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        twitchatPayloadPresetService.deletePreset(channelUser, id);
+    }
+
+    @GetMapping("/twitchat/active-presets")
+    public Map<String, String> getActiveTwitchatPresets(
+            @PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        Map<String, String> result = new LinkedHashMap<>();
+        twitchatPayloadPresetService.getActivePresets(channelUser)
+                .forEach((eventType, presetId) -> result.put(eventType.name(), presetId.toString()));
+        return result;
+    }
+
+    @PutMapping("/twitchat/active-presets/{eventType}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void setActiveTwitchatPreset(
+            @PathVariable String username, @PathVariable String eventType, @AuthenticationPrincipal Jwt jwt,
+            @RequestBody TwitchatActivePresetBody body) {
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        UUID presetId = body.presetId() == null || body.presetId().isBlank() ? null : UUID.fromString(body.presetId());
+        twitchatPayloadPresetService.setActivePreset(channelUser, parseEventType(eventType), presetId);
+    }
+
+    @PostMapping("/twitchat/presets/test")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void testTwitchatPreset(
+            @PathVariable String username, @AuthenticationPrincipal Jwt jwt,
+            @RequestBody TwitchatPresetTestBody body) {
+        UserAccount viewer = resolveViewer(jwt);
+        UserAccount channelUser = resolveChannel(username, viewer);
+        requireOwner(viewer, channelUser);
+        twitchatNotifier.sendTestNotification(channelUser, parseEventType(body.eventType()), body.payloadJson());
+    }
+
+    private static TwitchatNotificationEventType parseEventType(String raw) {
+        try {
+            return TwitchatNotificationEventType.valueOf(raw);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown event type: " + raw);
+        }
+    }
+
+    private static TwitchatPresetResponse toPresetResponse(TwitchatPayloadPreset preset) {
+        return new TwitchatPresetResponse(preset.getId().toString(), preset.getEventType().name(),
+                preset.getName(), preset.getPayloadJson());
     }
 
     // ── Game detection ───────────────────────────────────────────────────────
@@ -434,4 +581,11 @@ public class ApiChannelActionsController {
     public record SteamTokenSharingRequest(boolean shared) {}
     public record DeleteAccountRequest(String confirmUsername) {}
     public record DisconnectRequest(String provider) {}
+    public record TwitchatSettingsBody(boolean enabled, String obsHost, Integer obsPort, String obsPassword) {}
+    public record TwitchatSettingsResponse(boolean enabled, String obsHost, Integer obsPort, boolean hasPassword, String widgetToken) {}
+    record TwitchatPresetResponse(String id, String eventType, String name, String payloadJson) {}
+    record TwitchatPresetBody(String eventType, String name, String payloadJson) {}
+    record TwitchatPresetUpdateBody(String name, String payloadJson) {}
+    record TwitchatActivePresetBody(String presetId) {}
+    record TwitchatPresetTestBody(String eventType, String payloadJson) {}
 }

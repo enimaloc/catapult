@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -19,6 +20,10 @@ public class WebSecurityConfig {
                                                    JwtSessionAuthFilter jwtFilter) throws Exception {
         http
                 .addFilterBefore(jwtFilter, AnonymousAuthenticationFilter.class)
+                // Required for @CrossOrigin (see WidgetTwitchatController.actionPage) to
+                // actually emit Access-Control-* headers — without this, Spring Security
+                // never delegates to the CorsConfigurationSource Spring MVC derives from it.
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
                         // /ws/auth-ticket is technically auth-only but stays permitAll so
                         // unauthenticated requests get a clean 401 from the controller instead of
@@ -26,7 +31,7 @@ public class WebSecurityConfig {
                         .requestMatchers("/", "/login", "/auth/callback", "/join", "/privacy", "/error",
                                 "/css/**", "/js/**", "/images/**", "/webjars/**",
                                 "/changelog", "/changelog/**", "/actuator/**", "/status",
-                                "/ws", "/ws/**", "/.well-known/**").permitAll()
+                                "/ws", "/ws/**", "/.well-known/**", "/widget/twitchat/**").permitAll()
                         .requestMatchers("/admin/impersonate/exit").hasAuthority("ROLE_PREVIOUS_ADMINISTRATOR")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         // ThirdPartiesVerificationController : fichiers de vérification lus par des

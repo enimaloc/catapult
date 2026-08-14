@@ -163,6 +163,19 @@ public class BindingService {
     }
 
     @Transactional
+    public void setTwitchGame(UserAccount user, UUID bindingId, String twitchGameId, String twitchGameName) {
+        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
+            binding.setTwitchGameId(twitchGameId);
+            binding.setTwitchGameName(twitchGameName);
+            binding.setStatus(GameBinding.Status.MANUAL);
+            gameBindingRepository.save(binding);
+            if (isActiveBinding(user, binding)) {
+                twitchService.updateChannel(user, binding);
+            }
+        });
+    }
+
+    @Transactional
     public void toggleCclEnabled(UserAccount user, UUID bindingId, boolean enabled) {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             binding.setCclEnabled(enabled);
@@ -239,5 +252,15 @@ public class BindingService {
 
     public Optional<GameBinding> findBinding(UserAccount user, UUID bindingId) {
         return gameBindingRepository.findByIdAndUser(bindingId, user);
+    }
+
+    /**
+     * Read-only counterpart to {@link #resolveOrCreate}: the existing binding for a detected
+     * game, or empty when there is none. Creates and mutates nothing, so callers that merely
+     * describe the current state (notifications, read views) can't cause a write.
+     */
+    public Optional<GameBinding> findBinding(UserAccount user, DetectedGame detectedGame) {
+        return gameBindingRepository.findByUserAndSourceIdAndSourceType(
+            user, detectedGame.getSourceId(), detectedGame.getSourceType());
     }
 }

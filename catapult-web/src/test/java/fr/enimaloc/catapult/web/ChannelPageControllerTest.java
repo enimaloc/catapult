@@ -25,7 +25,7 @@ class ChannelPageControllerTest {
     ChannelPageController controller;
 
     ChannelPageController newController() {
-        return new ChannelPageController(apiClient);
+        return new ChannelPageController(apiClient, tools.jackson.databind.json.JsonMapper.builder().build());
     }
 
     ChannelPageData ownerData() {
@@ -55,6 +55,25 @@ class ChannelPageControllerTest {
                 .thenReturn(null);
         if (data.isOwner()) {
             org.mockito.Mockito.lenient().when(apiClient.minecraftLinkState()).thenReturn(null);
+            org.mockito.Mockito.lenient()
+                    .when(apiClient.get(eq("/api/channels/{username}/settings/twitchat"), eq(Map.class), eq("streamer")))
+                    .thenReturn(null);
+            org.mockito.Mockito.lenient()
+                    .when(apiClient.get(eq("/api/channels/{username}/twitchat/presets"),
+                            org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class),
+                            eq("streamer")))
+                    .thenReturn(null);
+            org.mockito.Mockito.lenient()
+                    .when(apiClient.get(eq("/api/channels/{username}/twitchat/active-presets"), eq(Map.class), eq("streamer")))
+                    .thenReturn(null);
+            org.mockito.Mockito.lenient()
+                    .when(apiClient.get(eq("/api/twitchat/defaults"), eq(Map.class)))
+                    .thenReturn(null);
+            org.mockito.Mockito.lenient()
+                    .when(apiClient.getLocalized(eq("/api/twitchat/quick-configs"),
+                            org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class),
+                            org.mockito.ArgumentMatchers.any(java.util.Locale.class)))
+                    .thenReturn(null);
         }
     }
 
@@ -64,7 +83,7 @@ class ChannelPageControllerTest {
         stubChannelData(ownerData());
         Model model = new ExtendedModelMap();
 
-        String view = controller.channelPage("streamer", null, 0, null, null, model);
+        String view = controller.channelPage("streamer", null, 0, null, null, model, java.util.Locale.FRENCH);
 
         assertThat(view).isEqualTo("app-tabbed");
         assertThat(model.getAttribute("activeTab")).isEqualTo("dashboard");
@@ -76,7 +95,7 @@ class ChannelPageControllerTest {
         stubChannelData(ownerData());
         Model model = new ExtendedModelMap();
 
-        String view = controller.channelPage("streamer", "configuration", 0, null, null, model);
+        String view = controller.channelPage("streamer", "configuration", 0, null, null, model, java.util.Locale.FRENCH);
 
         assertThat(view).isEqualTo("app-tabbed");
         assertThat(model.getAttribute("activeTab")).isEqualTo("configuration");
@@ -88,8 +107,34 @@ class ChannelPageControllerTest {
         stubChannelData(moderatorData());
         Model model = new ExtendedModelMap();
 
-        String view = controller.channelPage("streamer", null, 0, null, null, model);
+        String view = controller.channelPage("streamer", null, 0, null, null, model, java.util.Locale.FRENCH);
 
+        assertThat(view).isEqualTo("app");
+    }
+
+    @Test
+    void ownerAssignedControlVariantRedirectsAwayFromTabUrl() {
+        controller = newController();
+        stubChannelData(ownerData());
+        Model model = new ExtendedModelMap();
+
+        String view = controller.channelPage("streamer", "configuration", 0, null, null, model, java.util.Locale.FRENCH);
+
+        assertThat(view).isEqualTo("redirect:/channels/{username}");
+    }
+
+    @Test
+    void nonOwnerNeverAssignedRendersClassicAppRegardlessOfTabParam() {
+        controller = newController();
+        stubChannelData(nonOwnerData());
+        Model model = new ExtendedModelMap();
+
+        String view = controller.channelPage("streamer", null, 0, null, null, model, java.util.Locale.FRENCH);
+
+        assertThat(view).isEqualTo("app");
+        // Non-owners are never assigned: the experiment variant endpoint must not be called.
+        org.mockito.Mockito.verify(apiClient, org.mockito.Mockito.never())
+                .get(eq("/api/experiments/me/variant/channel-page-tabbed-layout"), eq(Map.class));
         assertThat(view).isEqualTo("app-tabbed");
         assertThat(model.getAttribute("activeTab")).isEqualTo("dashboard");
     }
@@ -100,7 +145,7 @@ class ChannelPageControllerTest {
         stubChannelData(null);
         Model model = new ExtendedModelMap();
 
-        String view = controller.channelPage("streamer", null, 0, null, null, model);
+        String view = controller.channelPage("streamer", null, 0, null, null, model, java.util.Locale.FRENCH);
 
         assertThat(view).isEqualTo("redirect:/channels");
     }
@@ -111,7 +156,7 @@ class ChannelPageControllerTest {
         stubChannelData(null);
         Model model = new ExtendedModelMap();
 
-        assertThatThrownBy(() -> controller.tabFragment("streamer", "configuration", model))
+        assertThatThrownBy(() -> controller.tabFragment("streamer", "configuration", model, java.util.Locale.FRENCH))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403");
     }
@@ -122,7 +167,7 @@ class ChannelPageControllerTest {
         stubChannelData(ownerData());
         Model model = new ExtendedModelMap();
 
-        String view = controller.tabFragment("streamer", "configuration", model);
+        String view = controller.tabFragment("streamer", "configuration", model, java.util.Locale.FRENCH);
 
         assertThat(view).isEqualTo("fragments/configuration-tab :: configuration-tab");
     }
@@ -145,7 +190,7 @@ class ChannelPageControllerTest {
         Model model = new ExtendedModelMap();
         model.addAttribute("invitePlacementVariant", "nav-default");
 
-        String view = controller.channelPage("streamer", "invitations", 0, null, null, model);
+        String view = controller.channelPage("streamer", "invitations", 0, null, null, model, java.util.Locale.FRENCH);
 
         assertThat(view).isEqualTo("redirect:/channels/{username}");
     }
@@ -158,7 +203,7 @@ class ChannelPageControllerTest {
         model.addAttribute("invitePlacementVariant", "tab");
         org.mockito.Mockito.lenient().when(apiClient.get(eq("/api/invite"), eq(Map.class))).thenReturn(null);
 
-        String view = controller.channelPage("streamer", "invitations", 0, null, null, model);
+        String view = controller.channelPage("streamer", "invitations", 0, null, null, model, java.util.Locale.FRENCH);
 
         assertThat(view).isEqualTo("app-tabbed");
         assertThat(model.getAttribute("activeTab")).isEqualTo("invitations");
@@ -171,7 +216,7 @@ class ChannelPageControllerTest {
         Model model = new ExtendedModelMap();
         model.addAttribute("invitePlacementVariant", "card");
 
-        assertThatThrownBy(() -> controller.tabFragment("streamer", "invitations", model))
+        assertThatThrownBy(() -> controller.tabFragment("streamer", "invitations", model, java.util.Locale.FRENCH))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403");
     }
