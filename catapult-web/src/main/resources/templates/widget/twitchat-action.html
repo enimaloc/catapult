@@ -1,8 +1,16 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
-<head><meta charset="UTF-8"><title>Catapult</title></head>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, null, ~{::body}, ~{::style}, 'container', null, null)}">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${app.name}">Catapult</title>
+</head>
 <body>
-<p th:if="${executed}">Action effectuée — vous pouvez fermer cette page.</p>
-<p th:unless="${executed}">Ce lien a déjà été utilisé ou a expiré.</p>
+    <div class="card" style="text-align:center;padding:32px">
+        <p th:if="${executed}" th:text="#{widget.twitchat_action.executed}">Action effectuée — vous pouvez fermer cette page.</p>
+        <p th:unless="${executed}" th:text="#{widget.twitchat_action.expired}">Ce lien a déjà été utilisé ou a expiré.</p>
+        <button onclick="window.close()" class="btn btn-outline" th:text="#{closing.close}">Fermer</button>
+        <p class="text-muted" style="margin-top:20px;font-size:.9em" th:text="#{widget.twitchat_action.tip}">Astuce...</p>
+    </div>
 </body>
 </html>
