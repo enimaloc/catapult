@@ -1880,11 +1880,11 @@ details summary { cursor: pointer; font-weight: 600; }
     background: var(--bg-base); color: var(--text); box-sizing: border-box;
 }
 .twitchat-preset-form .query-textarea { width: 100%; box-sizing: border-box; }
-.quick-configs {
-    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;
-    margin: 10px 0; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 6px;
+.modal-content select {
+    width: 100%; padding: 8px 12px; background: var(--bg-base); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 13px; margin-bottom: 4px; outline: none;
 }
-.quick-configs select,
+.modal-content select:focus { border-color: var(--accent-strong); }
 .quick-config-param-input {
     padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px;
     background: var(--bg-base); color: var(--text);
