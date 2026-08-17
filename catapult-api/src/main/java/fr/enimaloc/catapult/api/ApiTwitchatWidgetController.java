@@ -74,6 +74,7 @@ public class ApiTwitchatWidgetController {
         return fr.enimaloc.catapult.service.notification.TwitchatQuickConfigs.resolve(messageSource, locale).stream()
                 .map(qc -> new fr.enimaloc.catapult.service.notification.dto.TwitchatQuickConfig(
                         qc.key(), qc.label(), qc.description().replace("{{baseUrl}}", base), qc.eventType(),
+                        qc.groupKey(), qc.groupLabel(), qc.variant(),
                         qc.parameters(), qc.templateJson().replace("{{baseUrl}}", base)))
                 .toList();
     }
