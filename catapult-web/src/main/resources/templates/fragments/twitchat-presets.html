@@ -7,14 +7,17 @@
               data-i18n-invalid-json=#{twitchat_presets.error.invalid_json('')},
               data-i18n-test-error=#{twitchat_presets.test.error},
               data-i18n-test-success=#{twitchat_presets.test.success},
-              data-i18n-test-connection-lost=#{twitchat_presets.test.connection_lost}">
+              data-i18n-test-connection-lost=#{twitchat_presets.test.connection_lost},
+              data-i18n-quick-config-link-help=#{twitchat_presets.quick_config_link_help},
+              data-i18n-quick-config-chat-help=#{twitchat_presets.quick_config_chat_help},
+              data-i18n-quick-config-command-label=#{twitchat_presets.quick_config_command_label}">
     <p class="text-muted" th:text="#{twitchat_presets.help_placeholders}">Variables disponibles...</p>
     <p th:if="${twitchatPresetError != null}" class="text-danger" th:text="${twitchatPresetError}">Erreur</p>
     <script type="application/json" id="twitchat-quick-configs-data" th:utext="${twitchatQuickConfigsJson}">[]</script>
 
     <div class="inline-edit-actions" style="margin-bottom:16px">
         <button type="button" class="btn btn-outline"
-                onclick="document.getElementById('quickConfigModal').style.display='flex'; populateQuickConfigModalSelect();"
+                onclick="document.getElementById('quickConfigModal').style.display='flex'; populateQuickConfigModal();"
                 th:text="#{twitchat_presets.quick_config_label}">Configuration rapide</button>
     </div>
 
@@ -24,8 +27,10 @@
 
             <div class="inline-edit-field">
                 <label th:text="#{twitchat_presets.quick_config_label}">Configuration rapide</label>
-                <select id="quickConfigModalSelect" onchange="onQuickConfigModalSelectChange()">
+                <select id="quickConfigModalSelect" onchange="onQuickConfigModalVariantChange()">
                     <option value="" th:text="#{twitchat_presets.quick_config_none}">-- Choisir --</option>
+                    <option value="link" th:text="#{twitchat_presets.quick_config_variant_link}">Lien</option>
+                    <option value="chat" th:text="#{twitchat_presets.quick_config_variant_chat}">Trigger</option>
                 </select>
             </div>
 
@@ -36,13 +41,10 @@
             <div id="quickConfigModalTargets" style="margin-top:12px">
                 <label style="display:flex; align-items:center; gap:6px; font-weight:600; cursor:pointer">
                     <input type="checkbox" id="quickConfigModalTargetAll" onchange="onQuickConfigModalTargetAllChange()">
-                    <span th:text="#{twitchat_presets.quick_config_target_all}">Tous les événements</span>
+                    <span th:text="#{twitchat_presets.quick_config_target_all}">Toutes les actions</span>
                 </label>
-                <label th:each="eventType : ${twitchatEventTypes}"
-                       style="display:flex; align-items:center; gap:6px; margin-top:4px; cursor:pointer">
-                    <input type="checkbox" class="quick-config-target-event" th:value="${eventType}">
-                    <span th:text="#{'twitchat_presets.event.' + ${eventType}}">Event</span>
-                </label>
+                <!-- One checkbox per action (groupKey), populated client-side from the
+                     quick-configs JSON — see populateQuickConfigModal() below. -->
             </div>
 
             <div class="modal-actions">
@@ -217,68 +219,88 @@
             try { return JSON.parse((dataEl && dataEl.textContent) || "[]"); } catch (e) { return []; }
         }
 
-        window.populateQuickConfigModalSelect = function () {
-            var select = document.getElementById("quickConfigModalSelect");
-            if (!select || select.options.length > 1) return; // already populated
+        // Builds the "action" checkboxes below the Lien/Trigger select — one per groupKey
+        // (a "-link"/"-chat" pair sharing the same action, e.g. "disable the bot on stream
+        // start"), deduped from the quick-configs JSON. Static list, built once per modal
+        // lifetime (the container is never swapped afterwards, unlike the select).
+        window.populateQuickConfigModal = function () {
+            var container = document.getElementById("quickConfigModalTargets");
+            if (!container || container.dataset.populated) return; // already populated
+            container.dataset.populated = "true";
+            var seenGroups = {};
             getTwitchatQuickConfigs().forEach(function (qc) {
-                var opt = document.createElement("option");
-                opt.value = qc.key;
-                opt.textContent = qc.label;
-                select.appendChild(opt);
+                if (seenGroups[qc.groupKey]) return;
+                seenGroups[qc.groupKey] = true;
+                var label = document.createElement("label");
+                label.style.cssText = "display:flex; align-items:center; gap:6px; margin-top:4px; cursor:pointer";
+                var input = document.createElement("input");
+                input.type = "checkbox";
+                input.className = "quick-config-target-action";
+                input.value = qc.groupKey;
+                var span = document.createElement("span");
+                span.textContent = qc.groupLabel;
+                label.appendChild(input);
+                label.appendChild(span);
+                container.appendChild(label);
             });
         };
 
-        // Refreshes the description ("tutoriel") text and per-parameter inputs for whichever
-        // quick config is currently selected in the modal.
-        window.onQuickConfigModalSelectChange = function () {
+        // Refreshes the description ("tutoriel") text and, for the "chat" (trigger) variant,
+        // the single shared "command name" input — every chat quick config uses the same
+        // {{param:command}} placeholder, so one input covers every checked action at once
+        // rather than asking for a command name per action.
+        window.onQuickConfigModalVariantChange = function () {
             var select = document.getElementById("quickConfigModalSelect");
+            var container = document.getElementById("twitchat-presets-body");
             var description = document.getElementById("quickConfigModalDescription");
             var paramsContainer = document.getElementById("quickConfigModalParams");
             paramsContainer.innerHTML = "";
-            var qc = getTwitchatQuickConfigs().find(function (q) { return q.key === select.value; });
-            if (!qc) {
-                description.textContent = "";
-                return;
-            }
-            description.textContent = qc.description || "";
-            (qc.parameters || []).forEach(function (p) {
+            if (select.value === "link") {
+                description.textContent = container.dataset.i18nQuickConfigLinkHelp || "";
+            } else if (select.value === "chat") {
+                description.textContent = container.dataset.i18nQuickConfigChatHelp || "";
                 var input = document.createElement("input");
                 input.type = "text";
-                input.placeholder = p.placeholder || p.label;
-                input.dataset.paramKey = p.key;
+                input.placeholder = container.dataset.i18nQuickConfigCommandLabel || "";
+                input.dataset.paramKey = "command";
                 input.className = "quick-config-param-input";
                 paramsContainer.appendChild(input);
-            });
+            } else {
+                description.textContent = "";
+            }
         };
 
-        // The "Tous les événements" checkbox is a one-shot convenience: checking/unchecking it
-        // sets every individual event checkbox to match, but doesn't keep tracking them
+        // The "Toutes les actions" checkbox is a one-shot convenience: checking/unchecking it
+        // sets every individual action checkbox to match, but doesn't keep tracking them
         // afterwards — a streamer can still fine-tune the selection by hand.
         window.onQuickConfigModalTargetAllChange = function () {
             var checked = document.getElementById("quickConfigModalTargetAll").checked;
-            document.querySelectorAll(".quick-config-target-event").forEach(function (cb) {
+            document.querySelectorAll(".quick-config-target-action").forEach(function (cb) {
                 cb.checked = checked;
             });
         };
 
         window.applyQuickConfigFromModal = function () {
             var select = document.getElementById("quickConfigModalSelect");
-            var qc = getTwitchatQuickConfigs().find(function (q) { return q.key === select.value; });
-            if (!qc) return;
-            var json = qc.templateJson;
-            document.querySelectorAll("#quickConfigModalParams .quick-config-param-input").forEach(function (input) {
-                json = json.split("{{param:" + input.dataset.paramKey + "}}").join(input.value);
-            });
-            try {
-                json = JSON.stringify(JSON.parse(json), null, 2);
-            } catch (e) {
-                // leave json as-is if parameter substitution produced invalid JSON
-            }
-            var targets = Array.prototype.map.call(
-                document.querySelectorAll(".quick-config-target-event:checked"),
+            var variant = select.value;
+            if (!variant) return;
+            var commandInput = document.querySelector('#quickConfigModalParams .quick-config-param-input[data-param-key="command"]');
+            var commandValue = commandInput ? commandInput.value : "";
+            var configs = getTwitchatQuickConfigs();
+            var groupKeys = Array.prototype.map.call(
+                document.querySelectorAll(".quick-config-target-action:checked"),
                 function (cb) { return cb.value; });
-            targets.forEach(function (eventType) {
-                var details = document.querySelector(".twitchat-new-preset[data-event-type=\"" + eventType + "\"]");
+            groupKeys.forEach(function (groupKey) {
+                var qc = configs.find(function (q) { return q.groupKey === groupKey && q.variant === variant; });
+                if (!qc) return;
+                var json = qc.templateJson;
+                if (commandInput) json = json.split("{{param:command}}").join(commandValue);
+                try {
+                    json = JSON.stringify(JSON.parse(json), null, 2);
+                } catch (e) {
+                    // leave json as-is if parameter substitution produced invalid JSON
+                }
+                var details = document.querySelector(".twitchat-new-preset[data-event-type=\"" + qc.eventType + "\"]");
                 var textarea = details ? details.querySelector("textarea[name=payloadJson]") : null;
                 if (textarea) textarea.value = json;
                 if (details) details.open = true;

@@ -33,7 +33,11 @@ public final class TwitchatQuickConfigs {
 
     private record RawParam(String key, String placeholder) {}
 
-    private record RawConfig(String key, String eventType, List<RawParam> params, String templateJson) {}
+    private record RawConfig(String key, String groupKey, String variant, String eventType,
+                              List<RawParam> params, String templateJson) {}
+
+    private static final String LINK_SUFFIX = "-link";
+    private static final String CHAT_SUFFIX = "-chat";
 
     private static RawConfig linkConfig(String key, TwitchatNotificationEventType eventType, String message,
                                          String icon, String actionLabel, String actionTypeToken, String theme) {
@@ -42,7 +46,8 @@ public final class TwitchatQuickConfigs {
                 + "\"actionType\":\"url\","
                 + "\"url\":\"{{baseUrl}}/widget/twitchat/action/{{action:" + actionTypeToken + "}}\","
                 + "\"theme\":\"" + theme + "\"}]}";
-        return new RawConfig(key, eventType.name(), List.of(), json);
+        String groupKey = key.substring(0, key.length() - LINK_SUFFIX.length());
+        return new RawConfig(key, groupKey, "link", eventType.name(), List.of(), json);
     }
 
     private static RawConfig chatConfig(String key, TwitchatNotificationEventType eventType, String message,
@@ -51,7 +56,8 @@ public final class TwitchatQuickConfigs {
                 + "\"authorName\":\"Catapult\",\"actions\":[{\"label\":\"" + actionLabel + "\","
                 + "\"actionType\":\"message\",\"message\":\"/{{param:command}} {{action:" + actionTypeToken + "}}\","
                 + "\"theme\":\"" + theme + "\"}]}";
-        return new RawConfig(key, eventType.name(), List.of(new RawParam("command", "so")), json);
+        String groupKey = key.substring(0, key.length() - CHAT_SUFFIX.length());
+        return new RawConfig(key, groupKey, "chat", eventType.name(), List.of(new RawParam("command", "so")), json);
     }
 
     private static final String STREAM_STARTED_MESSAGE = "Le bot Catapult est actif.";
@@ -104,6 +110,9 @@ public final class TwitchatQuickConfigs {
                         messageSource.getMessage("twitchat_quick_config." + rc.key() + ".label", null, locale),
                         messageSource.getMessage("twitchat_quick_config." + rc.key() + ".description", null, locale),
                         rc.eventType(),
+                        rc.groupKey(),
+                        messageSource.getMessage("twitchat_quick_config." + rc.groupKey() + ".group_label", null, locale),
+                        rc.variant(),
                         rc.params().stream()
                                 .map(p -> new TwitchatQuickConfigParam(
                                         p.key(),
