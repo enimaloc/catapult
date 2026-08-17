@@ -8,6 +8,7 @@
     <!--/*@thymesVar id="activeTab" type="java.lang.String"*/-->
     <!-- Tab nav buttons (#channel-tabs) live in the navbar (template.html), not here. -->
     <div id="main-content">
+        <div th:replace="~{fragments/twitchat-obs-relay :: twitchat-obs-relay}"></div>
         <div id="tab-panels">
             <th:block th:if="${activeTab == 'dashboard'}">
                 <div th:replace="~{fragments/dashboard-tab :: dashboard-tab}"></div>
