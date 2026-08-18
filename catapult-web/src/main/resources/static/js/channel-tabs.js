@@ -37,6 +37,7 @@
     document.querySelectorAll("#tab-panels [data-tab-panel]").forEach(function (p) {
       p.style.display = p === panel ? "" : "none";
     });
+    animatePanelIn(panel);
 
     const meta = document.querySelector('meta[name="channel-username"]');
     const username = meta ? meta.content : "";
@@ -46,6 +47,15 @@
     }
 
     loadPanel(tab, panel);
+  }
+
+  // Restarts the CSS keyframe animation even if the panel already carries the
+  // class from a previous switch (removing then re-adding without a reflow in
+  // between would be a no-op, since the browser batches the two class changes).
+  function animatePanelIn(panel) {
+    panel.classList.remove("tab-panel-enter");
+    void panel.offsetWidth;
+    panel.classList.add("tab-panel-enter");
   }
 
   // A tab clicked right after page load can race the WS handshake: mvc()
@@ -69,8 +79,10 @@
       const replacement = parsed.body.firstElementChild;
       if (!replacement) return;
       replacement.dataset.loaded = "true";
-      replacement.style.display = document.querySelector(".channel-tab.active")?.dataset.tab === tab ? "" : "none";
+      const isActive = document.querySelector(".channel-tab.active")?.dataset.tab === tab;
+      replacement.style.display = isActive ? "" : "none";
       panel.replaceWith(replacement);
+      if (isActive) animatePanelIn(replacement);
       if (window.catapultWsActions) window.catapultWsActions.bind(replacement);
       executeScripts(replacement);
     });

@@ -1853,6 +1853,13 @@ details summary { cursor: pointer; font-weight: 600; }
 .channel-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .channel-tab:hover { color: var(--text); }
 
+/* Fade + slide-up entrance for the active tab panel (channel-tabs.js toggles this class). */
+@keyframes tab-panel-fade-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.tab-panel-enter { animation: tab-panel-fade-in .32s ease-out; }
+
 /* Admin dropdown trigger (navbar) — mirrors .nav-links a */
 .nav-links-dropdown-toggle { background: transparent; border: 0; cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 4px 0; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
 .nav-links-dropdown-toggle:hover, .nav-links-dropdown-toggle.active { color: var(--text); border-bottom-color: var(--accent); }
