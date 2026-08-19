@@ -73,6 +73,7 @@ public class TwitchEventSubService implements EventSubService {
     private final Map<UUID, ChannelState> channelStates = new ConcurrentHashMap<>();
     private final Set<UUID> channelStateWarnedUsers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Long> keepaliveTimeoutSeconds = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> retryDelaySeconds = new ConcurrentHashMap<>();
     private final Map<UUID, ScheduledFuture<?>> watchdogs = new ConcurrentHashMap<>();
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ScheduledExecutorService watchdogExecutor = Executors.newScheduledThreadPool(2, r -> {
@@ -110,7 +111,7 @@ public class TwitchEventSubService implements EventSubService {
         disconnect(user);
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
             .ifPresentOrElse(
-                token -> openConnection(user, token, WS_URL, 1L, false),
+                token -> openConnection(user, token, WS_URL, false),
                 () -> log.debug("No Twitch token for user {} — skipping EventSub connect", user.getId())
             );
     }
@@ -118,6 +119,7 @@ public class TwitchEventSubService implements EventSubService {
     public void disconnect(UserAccount user) {
         cancelWatchdog(user.getId());
         keepaliveTimeoutSeconds.remove(user.getId());
+        retryDelaySeconds.remove(user.getId());
         WebSocket ws = connections.remove(user.getId());
         if (ws != null) {
             ws.sendClose(WebSocket.NORMAL_CLOSURE, "bot disabled");
@@ -127,35 +129,34 @@ public class TwitchEventSubService implements EventSubService {
         streamStateService.clear(user);
     }
 
-    private void openConnection(UserAccount user, OAuthToken token, String wsUrl,
-                                long retryDelaySeconds, boolean reconnectSession) {
+    private void openConnection(UserAccount user, OAuthToken token, String wsUrl, boolean reconnectSession) {
+        // Registration happens synchronously in EventSubListener.onOpen, not here: this
+        // CompletableFuture completes asynchronously and can lag behind onOpen, leaving a
+        // window where an immediate onError/onClose (e.g. "Connection reset" right after the
+        // handshake) would find no matching entry in `connections` and silently drop the
+        // reconnect — registering here was the root cause of connections never recovering.
         httpClient
             .newWebSocketBuilder()
-            .buildAsync(URI.create(wsUrl), new EventSubListener(user, token, retryDelaySeconds, reconnectSession))
+            .buildAsync(URI.create(wsUrl), new EventSubListener(user, token, reconnectSession))
             .whenComplete((ws, ex) -> {
                 if (ex != null) {
                     log.warn("Failed to open EventSub WebSocket for user {}: {}", user.getId(), ex.getMessage());
-                    scheduleReconnect(user, token, retryDelaySeconds);
-                } else {
-                    // A session_reconnect replaces the previous socket: register the new one
-                    // first, then close the old — its onClose sees a foreign socket and no-ops.
-                    WebSocket previous = connections.put(user.getId(), ws);
-                    if (previous != null && previous != ws) {
-                        previous.sendClose(WebSocket.NORMAL_CLOSURE, "replaced by newer session");
-                    }
+                    scheduleReconnect(user, token);
                 }
             });
     }
 
-    private void scheduleReconnect(UserAccount user, OAuthToken token, long delaySeconds) {
+    private void scheduleReconnect(UserAccount user, OAuthToken token) {
+        long delaySeconds = retryDelaySeconds.getOrDefault(user.getId(), 1L);
         long nextDelay = Math.min(delaySeconds * 2, MAX_RETRY_SECONDS);
+        retryDelaySeconds.put(user.getId(), nextDelay);
         CompletableFuture.delayedExecutor(delaySeconds, TimeUnit.SECONDS).execute(() -> {
             if (connections.containsKey(user.getId())) return;
             OAuthToken freshToken = oAuthTokenRepository
                 .findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
                 .orElse(token);
             // Always a brand-new session on the canonical URL: reconnect URLs are single-use
-            openConnection(user, freshToken, WS_URL, nextDelay, false);
+            openConnection(user, freshToken, WS_URL, false);
         });
     }
 
@@ -196,7 +197,7 @@ public class TwitchEventSubService implements EventSubService {
         if (!connections.remove(user.getId(), listener.webSocket)) return;
         log.warn("EventSub keepalive timeout for user {}, aborting and reconnecting", user.getId());
         listener.webSocket.abort();
-        scheduleReconnect(user, listener.token, listener.retryDelaySeconds);
+        scheduleReconnect(user, listener.token);
     }
 
     // Package-private for testing
@@ -210,6 +211,9 @@ public class TwitchEventSubService implements EventSubService {
                     String sessionId = session.path("id").asText();
                     long timeout = session.path("keepalive_timeout_seconds").asLong(DEFAULT_KEEPALIVE_SECONDS);
                     keepaliveTimeoutSeconds.put(user.getId(), timeout);
+                    // A live session proves the connection is healthy — reset the backoff so a
+                    // later, unrelated disconnect doesn't inherit delays from a past failure streak.
+                    retryDelaySeconds.remove(user.getId());
                     if (reconnectSession) {
                         // Reconnect via reconnect_url: Twitch carries subscriptions over,
                         // re-subscribing would only yield 409 Conflict noise.
@@ -224,7 +228,7 @@ public class TwitchEventSubService implements EventSubService {
                     OAuthToken freshToken = oAuthTokenRepository
                         .findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
                         .orElse(token);
-                    openConnection(user, freshToken, reconnectUrl, 1L, true);
+                    openConnection(user, freshToken, reconnectUrl, true);
                 }
                 case "notification" -> {
                     String subscriptionType = root.path("metadata").path("subscription_type").asText();
@@ -379,7 +383,6 @@ public class TwitchEventSubService implements EventSubService {
     class EventSubListener implements WebSocket.Listener {
         private final UserAccount user;
         private final OAuthToken token;
-        private final long retryDelaySeconds;
         private final boolean reconnectSession;
         private final StringBuilder buffer = new StringBuilder();
         // Written once by the WS callback thread in onOpen, then only read by the watchdog scheduler.
@@ -387,10 +390,9 @@ public class TwitchEventSubService implements EventSubService {
         @SuppressWarnings("java:S3077")
         private volatile WebSocket webSocket;
 
-        EventSubListener(UserAccount user, OAuthToken token, long retryDelaySeconds, boolean reconnectSession) {
+        EventSubListener(UserAccount user, OAuthToken token, boolean reconnectSession) {
             this.user = user;
             this.token = token;
-            this.retryDelaySeconds = retryDelaySeconds;
             this.reconnectSession = reconnectSession;
         }
 
@@ -398,6 +400,14 @@ public class TwitchEventSubService implements EventSubService {
         public void onOpen(WebSocket webSocket) {
             log.debug("EventSub WebSocket opened for user {}", user.getId());
             this.webSocket = webSocket;
+            // A session_reconnect replaces the previous socket: register the new one first,
+            // then close the old — its onClose sees a foreign socket and no-ops. Done here,
+            // synchronously with the handshake, so no error on this socket can race ahead of
+            // its own registration (see openConnection).
+            WebSocket previous = connections.put(user.getId(), webSocket);
+            if (previous != null && previous != webSocket) {
+                previous.sendClose(WebSocket.NORMAL_CLOSURE, "replaced by newer session");
+            }
             webSocket.request(1);
         }
 
@@ -423,7 +433,7 @@ public class TwitchEventSubService implements EventSubService {
             cancelWatchdog(user.getId());
             // Self-initiated closes de-register before closing, so reaching this point
             // means the server closed us — reconnect regardless of the status code.
-            scheduleReconnect(user, token, retryDelaySeconds);
+            scheduleReconnect(user, token);
             return null;
         }
 
@@ -432,7 +442,7 @@ public class TwitchEventSubService implements EventSubService {
             log.warn("EventSub WebSocket error for user {}: {}", user.getId(), error.getMessage());
             if (!connections.remove(user.getId(), webSocket)) return;
             cancelWatchdog(user.getId());
-            scheduleReconnect(user, token, retryDelaySeconds);
+            scheduleReconnect(user, token);
         }
     }
 }

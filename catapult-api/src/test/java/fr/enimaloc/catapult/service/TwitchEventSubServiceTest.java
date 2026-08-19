@@ -321,10 +321,57 @@ class TwitchEventSubServiceTest {
     }
 
     @Test
+    void handleMessage_sessionWelcome_resetsRetryBackoffAfterPriorFailures() {
+        // Simulate a prior string of failures that inflated the backoff far past the base delay.
+        Map<UUID, Long> retryDelays = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "retryDelaySeconds");
+        retryDelays.put(user.getId(), 32L);
+
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        // A successful session must reset the backoff so the next disconnect reconnects promptly.
+        assertThat(retryDelays).doesNotContainKey(user.getId());
+    }
+
+    @Test
+    void onOpen_registersConnectionSynchronously() {
+        WebSocket ws = mock(WebSocket.class);
+        TwitchEventSubService.EventSubListener listener =
+            service.new EventSubListener(user, token, false);
+
+        listener.onOpen(ws);
+
+        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
+        assertThat(connections).containsEntry(user.getId(), ws);
+    }
+
+    @Test
+    void onError_immediatelyAfterOnOpen_stillTriggersReconnectCleanup() {
+        // Reproduces a "Connection reset" landing right after the handshake succeeds, before
+        // any code outside the listener itself has had a chance to register the socket:
+        // onOpen must register synchronously so this compare-and-remove can't lose the race.
+        WebSocket ws = mock(WebSocket.class);
+        TwitchEventSubService.EventSubListener listener =
+            service.new EventSubListener(user, token, false);
+
+        listener.onOpen(ws);
+        listener.onError(ws, new java.io.IOException("Connection reset"));
+
+        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
+        assertThat(connections).doesNotContainKey(user.getId());
+    }
+
+    @Test
     void onClose_whenListenerWebSocketIsCurrent_deregistersConnection() {
         WebSocket ws = mock(WebSocket.class);
         TwitchEventSubService.EventSubListener listener =
-            service.new EventSubListener(user, token, 1L, false);
+            service.new EventSubListener(user, token, false);
 
         Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
         connections.put(user.getId(), ws);
@@ -339,7 +386,7 @@ class TwitchEventSubServiceTest {
         WebSocket staleWs = mock(WebSocket.class);
         WebSocket freshWs = mock(WebSocket.class);
         TwitchEventSubService.EventSubListener staleListener =
-            service.new EventSubListener(user, token, 1L, false);
+            service.new EventSubListener(user, token, false);
 
         // Simulate session_reconnect: connections now points to freshWs, staleListener is orphaned.
         Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
@@ -354,7 +401,7 @@ class TwitchEventSubServiceTest {
     void onWatchdogTrigger_whenListenerWebSocketIsCurrent_abortsAndRemovesFromConnections() {
         WebSocket ws = mock(WebSocket.class);
         TwitchEventSubService.EventSubListener listener =
-            service.new EventSubListener(user, token, 1L, false);
+            service.new EventSubListener(user, token, false);
         ReflectionTestUtils.setField(listener, "webSocket", ws);
 
         Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
@@ -371,7 +418,7 @@ class TwitchEventSubServiceTest {
         WebSocket staleWs = mock(WebSocket.class);
         WebSocket freshWs = mock(WebSocket.class);
         TwitchEventSubService.EventSubListener staleListener =
-            service.new EventSubListener(user, token, 1L, false);
+            service.new EventSubListener(user, token, false);
         ReflectionTestUtils.setField(staleListener, "webSocket", staleWs);
 
         // Simulate session_reconnect: connections now points to freshWs, staleListener is orphaned.
