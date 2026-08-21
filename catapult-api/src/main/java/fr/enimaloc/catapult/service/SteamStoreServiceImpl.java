@@ -159,10 +159,15 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             Optional<String> parentId = redirectResolver.resolveParentAppId(appId);
             if (parentId.isEmpty()) return Optional.empty(); // uncertain — don't cache, allow retry
 
-            String parentName = fetchAppDetailsData(parentId.get())
-                .map(d -> String.valueOf(d.get("name")))
+            Optional<Map<String, Object>> parentDataOpt = fetchAppDetailsData(parentId.get());
+            String parentName = parentDataOpt
+                .flatMap(d -> Optional.ofNullable(d.get("name")).map(String::valueOf))
                 .orElse(parentId.get());
             ResolvedParentApp resolved = new ResolvedParentApp(parentId.get(), parentName);
+            if (parentDataOpt.isEmpty()) {
+                // parent appdetails fetch failed (network/rate-limit) — don't cache a placeholder name, allow retry
+                return Optional.of(resolved);
+            }
             saveCached(new SteamAppParentEntry(appId, resolved.appId(), resolved.name()));
             return Optional.of(resolved);
         });
