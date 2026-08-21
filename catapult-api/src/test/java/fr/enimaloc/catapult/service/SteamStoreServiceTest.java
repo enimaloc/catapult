@@ -154,6 +154,16 @@ class SteamStoreServiceTest {
     }
 
     @Test
+    void resolveEffectiveApp_freshNegativeCacheHit_skipsNetworkCall() {
+        SteamAppParentEntry cached = new SteamAppParentEntry("730", null, null);
+        doReturn(java.util.Optional.of(cached)).when(steamAppParentRepository).findById("730");
+
+        assertThat(service.resolveEffectiveApp("730")).isEmpty();
+        verifyNoInteractions(restClient);
+        verifyNoInteractions(redirectResolver);
+    }
+
+    @Test
     void resolveEffectiveApp_fullgamePresent_returnsParentFromSameCall() {
         doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("100");
         Map<String, Object> body = Map.of("100", Map.of(
@@ -184,6 +194,20 @@ class SteamStoreServiceTest {
             .contains(new SteamStoreService.ResolvedParentApp("4009490", "Arctic Drive"));
         verify(steamAppParentRepository).save(argThat(e ->
             "4519120".equals(e.getAppId()) && "4009490".equals(e.getParentAppId()) && "Arctic Drive".equals(e.getParentName())));
+    }
+
+    @Test
+    void resolveEffectiveApp_playtestName_parentDetailsFetchFails_returnsIdFallbackWithoutCaching() {
+        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("4519120");
+        Map<String, Object> playtestBody = Map.of("4519120", Map.of(
+            "success", true, "data", Map.of("type", "game", "name", "Arctic Drive Playtest")));
+        Map<String, Object> failedParentBody = Map.of("4009490", Map.of("success", false));
+        doReturn(playtestBody).doReturn(failedParentBody).when(responseSpec).body(Map.class);
+        doReturn(java.util.Optional.of("4009490")).when(redirectResolver).resolveParentAppId("4519120");
+
+        assertThat(service.resolveEffectiveApp("4519120"))
+            .contains(new SteamStoreService.ResolvedParentApp("4009490", "4009490"));
+        verify(steamAppParentRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
