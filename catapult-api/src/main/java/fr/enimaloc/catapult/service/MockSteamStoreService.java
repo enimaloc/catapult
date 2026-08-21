@@ -18,7 +18,7 @@ public class MockSteamStoreService implements SteamStoreService {
     }
 
     @Override
-    public Optional<String> resolveFullGameAppId(String appId) {
+    public Optional<ResolvedParentApp> resolveEffectiveApp(String appId) {
         return Optional.empty();
     }
 
