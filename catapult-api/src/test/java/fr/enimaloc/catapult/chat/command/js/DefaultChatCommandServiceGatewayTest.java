@@ -4,6 +4,7 @@ import com.google.protobuf.Timestamp;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.IgdbClient;
 import fr.enimaloc.catapult.service.IgdbService;
+import fr.enimaloc.catapult.service.SteamStoreService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
@@ -45,13 +46,14 @@ class DefaultChatCommandServiceGatewayTest {
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
     @Mock private RestClient.ResponseSpec responseSpec;
+    @Mock private SteamStoreService steamStoreService;
 
     private DefaultChatCommandServiceGateway gateway;
 
     @BeforeEach
     void setUp() {
         gateway = new DefaultChatCommandServiceGateway(igdbClient, igdbService, restClient,
-            new ExternalApiObservations(ObservationRegistry.NOOP, new SimpleMeterRegistry()));
+            new ExternalApiObservations(ObservationRegistry.NOOP, new SimpleMeterRegistry()), steamStoreService);
         doReturn(getSpec).when(restClient).get();
         doReturn(headersSpec).when(getSpec).uri(anyString(), any(Object[].class));
         doReturn(responseSpec).when(headersSpec).retrieve();
@@ -424,5 +426,20 @@ class DefaultChatCommandServiceGatewayTest {
         when(getSpec.uri(anyString(), any(Object[].class))).thenThrow(new RuntimeException("network down"));
 
         assertThat(gateway.steamGame("1091500", null)).isEmpty();
+    }
+
+    @Test
+    void steamGameResolvesToParent_whenAppIdIsAPlaytest() {
+        when(steamStoreService.resolveEffectiveApp("4519120"))
+            .thenReturn(Optional.of(new SteamStoreService.ResolvedParentApp("4009490", "Arctic Drive")));
+        Map<String, Object> body = Map.of("4009490", Map.of(
+            "success", true, "data", Map.of("name", "Arctic Drive", "type", "game")));
+        doReturn(body).when(responseSpec).body(Map.class);
+
+        Optional<Object> result = gateway.steamGame("4519120", null);
+
+        assertThat(result).isPresent();
+        assertThat(((Map<?, ?>) result.get()).get("name")).isEqualTo("Arctic Drive");
+        org.mockito.Mockito.verify(getSpec).uri(anyString(), org.mockito.ArgumentMatchers.eq("4009490"), org.mockito.ArgumentMatchers.eq("english"));
     }
 }
