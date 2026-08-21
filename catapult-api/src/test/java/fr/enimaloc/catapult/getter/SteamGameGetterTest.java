@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.getter;
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.SteamStoreService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,12 +25,13 @@ class SteamGameGetterTest {
 
     @Mock SteamApiClient steamApiClient;
     @Mock TokenEncryptionService tokenEncryptionService;
+    @Mock SteamStoreService steamStoreService;
 
     SteamGameGetter getter;
 
     @BeforeEach
     void setUp() {
-        getter = new SteamGameGetter(steamApiClient, tokenEncryptionService);
+        getter = new SteamGameGetter(steamApiClient, tokenEncryptionService, steamStoreService);
     }
 
     @Test
@@ -87,5 +89,26 @@ class SteamGameGetterTest {
         user.setId(UUID.randomUUID());
 
         assertThat(getter.getCurrentGame(user)).isEmpty();
+    }
+
+    @Test
+    void getCurrentGame_resolvesParentApp_whenPlaytestDetected() throws Exception {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setSteamId("123");
+
+        when(steamApiClient.getPlayerSummaries(List.of("123")))
+            .thenReturn(CompletableFuture.completedFuture(
+                Map.of("123", Optional.of(new SteamApiClient.PlayerSummary("4519120", "Arctic Drive Playtest", "Streamer", "online")))
+            ));
+        when(steamStoreService.resolveEffectiveApp("4519120"))
+            .thenReturn(Optional.of(new SteamStoreService.ResolvedParentApp("4009490", "Arctic Drive")));
+
+        getter.prefetchBatch(List.of(user)).get();
+        Optional<DetectedGame> result = getter.getCurrentGame(user);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getSourceId()).isEqualTo("4009490");
+        assertThat(result.get().getSourceName()).isEqualTo("Arctic Drive");
     }
 }
