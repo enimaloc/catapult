@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.service;
 
+import fr.enimaloc.catapult.domain.SteamAppParentEntry;
+import fr.enimaloc.catapult.getter.SteamPlaytestRedirectResolver;
+import fr.enimaloc.catapult.repository.SteamAppParentRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -7,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,6 +32,10 @@ public class SteamStoreServiceImpl implements SteamStoreService {
 
     private final RestClient restClient;
     private final ExternalApiObservations apiObservations;
+    private final SteamAppParentRepository steamAppParentRepository;
+    private final SteamPlaytestRedirectResolver redirectResolver;
+
+    private static final java.time.Duration PARENT_CACHE_TTL = java.time.Duration.ofDays(30);
 
     @Override
     public Map<String, Set<String>> fetchCcls(Collection<String> appIds) {
@@ -120,34 +128,86 @@ public class SteamStoreServiceImpl implements SteamStoreService {
 
     @Override
     @SuppressWarnings("unchecked")
-    public Optional<String> resolveFullGameAppId(String appId) {
-        return apiObservations.observe("steam_store", "resolve_full_game", () -> {
-            String uri = APP_DETAILS_URL + "?appids=" + appId;
-            try {
-                Map<String, Object> response = restClient.get().uri(uri).retrieve().body(Map.class);
-                if (response == null) return Optional.empty();
+    public Optional<ResolvedParentApp> resolveEffectiveApp(String appId) {
+        return apiObservations.observe("steam_store", "resolve_effective_app", () -> {
+            Optional<SteamAppParentEntry> fresh = findCached(appId)
+                .filter(e -> e.getResolvedAt().isAfter(Instant.now().minus(PARENT_CACHE_TTL)));
+            if (fresh.isPresent()) {
+                SteamAppParentEntry entry = fresh.get();
+                return entry.getParentAppId() == null
+                    ? Optional.<ResolvedParentApp>empty()
+                    : Optional.of(new ResolvedParentApp(entry.getParentAppId(), entry.getParentName()));
+            }
 
-                Map<String, Object> entry = (Map<String, Object>) response.get(appId);
-                if (entry == null || !Boolean.TRUE.equals(entry.get("success"))) return Optional.empty();
+            Optional<Map<String, Object>> dataOpt = fetchAppDetailsData(appId);
+            if (dataOpt.isEmpty()) return Optional.empty();
+            Map<String, Object> data = dataOpt.get();
 
-                Map<String, Object> data = (Map<String, Object>) entry.get("data");
-                if (data == null) return Optional.empty();
+            Optional<ResolvedParentApp> viaFullGame = extractFullGame(data);
+            if (viaFullGame.isPresent()) {
+                saveCached(new SteamAppParentEntry(appId, viaFullGame.get().appId(), viaFullGame.get().name()));
+                return viaFullGame;
+            }
 
-                @SuppressWarnings("unchecked")
-                Map<String, Object> fullgame = (Map<String, Object>) data.get("fullgame");
-                if (fullgame == null) return Optional.empty();
-
-                Object id = fullgame.get("appid");
-                if (id == null) return Optional.empty();
-
-                String resolved = String.valueOf(id);
-                log.debug("Steam appId={} is a beta — resolved to fullgame.id={}", appId, resolved);
-                return Optional.of(resolved);
-            } catch (Exception e) {
-                log.warn("Steam appdetails failed resolving parentid for appId={}: {}", appId, e.getMessage());
+            boolean looksLikePlaytest = "game".equals(data.get("type"))
+                && String.valueOf(data.get("name")).endsWith("Playtest");
+            if (!looksLikePlaytest) {
+                saveCached(new SteamAppParentEntry(appId, null, null));
                 return Optional.empty();
             }
+
+            Optional<String> parentId = redirectResolver.resolveParentAppId(appId);
+            if (parentId.isEmpty()) return Optional.empty(); // uncertain — don't cache, allow retry
+
+            String parentName = fetchAppDetailsData(parentId.get())
+                .map(d -> String.valueOf(d.get("name")))
+                .orElse(parentId.get());
+            ResolvedParentApp resolved = new ResolvedParentApp(parentId.get(), parentName);
+            saveCached(new SteamAppParentEntry(appId, resolved.appId(), resolved.name()));
+            return Optional.of(resolved);
         });
+    }
+
+    /** DB-unavailable fallback: treat as a cache miss and resolve live rather than failing the call. */
+    private Optional<SteamAppParentEntry> findCached(String appId) {
+        try {
+            return steamAppParentRepository.findById(appId);
+        } catch (Exception e) {
+            log.warn("steam_app_parent lookup failed for appId={}: {}", appId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /** DB-unavailable fallback: a resolved result is still returned to the caller even if it can't be persisted. */
+    private void saveCached(SteamAppParentEntry entry) {
+        try {
+            steamAppParentRepository.save(entry);
+        } catch (Exception e) {
+            log.warn("steam_app_parent save failed for appId={}: {}", entry.getAppId(), e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<Map<String, Object>> fetchAppDetailsData(String appId) {
+        try {
+            Map<String, Object> response = restClient.get()
+                .uri(APP_DETAILS_URL + "?appids=" + appId).retrieve().body(Map.class);
+            if (response == null) return Optional.empty();
+            Map<String, Object> entry = (Map<String, Object>) response.get(appId);
+            if (entry == null || !Boolean.TRUE.equals(entry.get("success"))) return Optional.empty();
+            return Optional.ofNullable((Map<String, Object>) entry.get("data"));
+        } catch (Exception e) {
+            log.warn("Steam appdetails failed for appId={}: {}", appId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<ResolvedParentApp> extractFullGame(Map<String, Object> data) {
+        Map<String, Object> fullgame = (Map<String, Object>) data.get("fullgame");
+        if (fullgame == null || fullgame.get("appid") == null) return Optional.empty();
+        String name = fullgame.get("name") != null ? String.valueOf(fullgame.get("name")) : String.valueOf(fullgame.get("appid"));
+        return Optional.of(new ResolvedParentApp(String.valueOf(fullgame.get("appid")), name));
     }
 
     @SuppressWarnings("unchecked")

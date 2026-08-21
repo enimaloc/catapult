@@ -143,14 +143,18 @@ public class IgdbService {
     public Optional<IgdbGame> findBySteamAppId(String appId) {
         if (clientId.isBlank()) return Optional.empty();
 
+        String effectiveAppId = steamStoreService.resolveEffectiveApp(appId)
+            .map(SteamStoreService.ResolvedParentApp::appId)
+            .orElse(appId);
+
         // Check external ID table populated during preload
         if (steamSourceId >= 0) {
-            Optional<IgdbGameExternalId> extId = externalIdRepository.findBySourceIdAndUid(steamSourceId, appId);
+            Optional<IgdbGameExternalId> extId = externalIdRepository.findBySourceIdAndUid(steamSourceId, effectiveAppId);
             if (extId.isPresent()) {
                 String igdbId = extId.get().getIgdbId();
                 String name = igdbGameCache.get(igdbId);
                 if (name != null) {
-                    log.debug("IGDB external ID cache hit for Steam appId={}", appId);
+                    log.debug("IGDB external ID cache hit for Steam appId={}", effectiveAppId);
                     meterRegistry.counter("catapult.igdb.cache.lookup", "method", "steam", "result", "hit").increment();
                     return Optional.of(new IgdbGame(igdbId, name));
                 }
@@ -158,7 +162,7 @@ public class IgdbService {
         }
 
         // Legacy steam: key lookup in igdb_game_cache
-        String key = KEY_STEAM_PREFIX + appId;
+        String key = KEY_STEAM_PREFIX + effectiveAppId;
         Optional<IgdbGame> fromDb = lookupInDb(key);
         if (fromDb.isPresent()) {
             meterRegistry.counter("catapult.igdb.cache.lookup", "method", "steam", "result", "db_hit").increment();
@@ -168,17 +172,9 @@ public class IgdbService {
         String token = getOrRefreshAppToken();
         if (token.isBlank()) return Optional.empty();
 
-        List<proto.ExternalGame> results = igdbClient.findExternalGameByUid(appId, steamSourceId, token);
+        List<proto.ExternalGame> results = igdbClient.findExternalGameByUid(effectiveAppId, steamSourceId, token);
         meterRegistry.counter("catapult.igdb.cache.lookup", "method", "steam", "result", "miss").increment();
-        if (results.isEmpty()) {
-            // The app may be a beta build — resolve to its parent and retry once.
-            Optional<String> parentId = steamStoreService.resolveFullGameAppId(appId);
-            if (parentId.isPresent()) {
-                log.debug("Steam appId={} is a beta, retrying IGDB lookup with parentId={}", appId, parentId.get());
-                return findBySteamAppId(parentId.get());
-            }
-            return Optional.empty();
-        }
+        if (results.isEmpty()) return Optional.empty();
 
         Game game = results.get(0).getGame();
         IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());

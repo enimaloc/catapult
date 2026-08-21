@@ -8,8 +8,10 @@ import java.util.Set;
 public interface SteamStoreService {
     Map<String, Set<String>> fetchCcls(Collection<String> appIds);
 
-    // Returns the main game's app ID when the given app is a beta/demo/test build.
-    Optional<String> resolveFullGameAppId(String appId);
+    /** Base game the given appId belongs to, when appId is a demo/beta/playtest. */
+    record ResolvedParentApp(String appId, String name) {}
+
+    Optional<ResolvedParentApp> resolveEffectiveApp(String appId);
 
     /** Steam content_descriptors block flattened for TW resolution. */
     record SteamTwSignals(Set<Integer> contentDescriptorIds, String notesLowercase) {
