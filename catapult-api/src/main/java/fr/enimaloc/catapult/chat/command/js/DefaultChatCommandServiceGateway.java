@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.chat.command.js;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.service.IgdbClient;
 import fr.enimaloc.catapult.service.IgdbService;
+import fr.enimaloc.catapult.service.SteamStoreService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -39,6 +40,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
     private final IgdbService igdbService;
     private final RestClient restClient;
     private final ExternalApiObservations apiObservations;
+    private final SteamStoreService steamStoreService;
 
     @Override
     public Optional<IgdbGame> igdbGame(String query) {
@@ -261,18 +263,21 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
     public Optional<Object> steamGame(String appId, @Nullable String locale) {
         return apiObservations.observe("steam_store", "chat_command_get_game", () -> {
             try {
+                String effectiveAppId = steamStoreService.resolveEffectiveApp(appId)
+                        .map(SteamStoreService.ResolvedParentApp::appId)
+                        .orElse(appId);
                 // Steam's appdetails language parameter is "l" (e.g. l=french), not "locale" —
                 // defaulting to "english" both documents the fallback and keeps a single URI
                 // template (no branching on whether locale was supplied).
                 String lang = (locale != null && !locale.isBlank()) ? locale : "english";
                 Map<?, ?> body = restClient.get()
-                        .uri("https://store.steampowered.com/api/appdetails?appids={appId}&l={lang}", appId, lang)
+                        .uri("https://store.steampowered.com/api/appdetails?appids={appId}&l={lang}", effectiveAppId, lang)
                         .retrieve()
                         .body(Map.class);
                 if (body == null) return Optional.empty();
                 // Steam appdetails unwrapping (body.get(appId) -> success -> data -> field) mirrors
                 // fr.enimaloc.catapult.service.SteamStoreServiceImpl; not extracted to a shared helper here.
-                Map<?, ?> appEntry = (Map<?, ?>) body.get(appId);
+                Map<?, ?> appEntry = (Map<?, ?>) body.get(effectiveAppId);
                 if (appEntry == null || !Boolean.TRUE.equals(appEntry.get("success"))) return Optional.empty();
                 Map<?, ?> data = (Map<?, ?>) appEntry.get("data");
                 return Optional.ofNullable(data);

@@ -266,6 +266,21 @@ class IgdbServiceTest {
         assertThat(igdbService.findBySteamAppId("12345")).isEmpty();
     }
 
+    @Test
+    void findBySteamAppId_resolvesToParent_beforeLookup() {
+        setValidToken();
+        when(steamStoreService.resolveEffectiveApp("4519120"))
+            .thenReturn(Optional.of(new SteamStoreService.ResolvedParentApp("4009490", "Arctic Drive")));
+        Game game = Game.newBuilder().setId(99).setName("Arctic Drive").build();
+        ExternalGame ext = ExternalGame.newBuilder().setGame(game).build();
+        when(igdbClient.findExternalGameByUid("4009490", -1L, "test-token"))
+            .thenReturn(List.of(ext));
+
+        Optional<IgdbService.IgdbGame> result = igdbService.findBySteamAppId("4519120");
+
+        assertThat(result).contains(new IgdbService.IgdbGame("99", "Arctic Drive"));
+    }
+
     // --- findByName with igdbClient ---
 
     @Test
