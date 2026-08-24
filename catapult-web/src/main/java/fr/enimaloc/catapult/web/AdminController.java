@@ -89,6 +89,48 @@ public class AdminController {
         return "redirect:/admin/tw";
     }
 
+    @PostMapping("/tw/rebuild-untouched")
+    public String rebuildUntouchedTw() {
+        apiClient.post("/api/admin/tw/rebuild/force", null);
+        return "redirect:/admin/tw";
+    }
+
+    @GetMapping("/tw/{id}/keywords")
+    public String twKeywordsPage(@PathVariable String id, Model model) {
+        Map<String, Object> definition = apiClient.get("/api/admin/tw/{id}",
+                new ParameterizedTypeReference<Map<String, Object>>() {}, id);
+        List<String> keywords = apiClient.get("/api/admin/tw/{id}/steam-keywords",
+                new ParameterizedTypeReference<List<String>>() {}, id);
+        model.addAttribute("twId", id);
+        model.addAttribute("definition", definition);
+        model.addAttribute("keywords", keywords != null ? keywords : List.of());
+        return "admin/tw-keywords";
+    }
+
+    @PostMapping("/tw/{id}/keywords/add")
+    public String addTwKeyword(@PathVariable String id, @RequestParam String keyword) {
+        apiClient.post("/api/admin/tw/{id}/steam-keywords", Map.of("keyword", keyword), id);
+        return "redirect:/admin/tw/" + id + "/keywords";
+    }
+
+    @PostMapping("/tw/{id}/keywords/remove")
+    public String removeTwKeyword(@PathVariable String id, @RequestParam String keyword) {
+        apiClient.delete("/api/admin/tw/{id}/steam-keywords/{keyword}", id, keyword);
+        return "redirect:/admin/tw/" + id + "/keywords";
+    }
+
+    @PostMapping("/tw/{id}/keywords/test")
+    @ResponseBody
+    public Map<String, Object> testTwKeyword(@PathVariable String id,
+                                             @RequestParam String appId,
+                                             @RequestParam(required = false) String draftKeyword) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = apiClient.post("/api/admin/tw/{id}/steam-keywords/test",
+                Map.of("appId", appId, "draftKeyword", draftKeyword == null ? "" : draftKeyword),
+                Map.class, id);
+        return result != null ? result : Map.of("error", true);
+    }
+
     // ── Caches ───────────────────────────────────────────────────────────────
 
     @GetMapping("/caches")

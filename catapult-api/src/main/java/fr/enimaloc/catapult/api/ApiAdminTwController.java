@@ -47,10 +47,17 @@ public class ApiAdminTwController {
     public record IgdbDescriptorsBody(Set<Long> descriptorIds) {}
     public record SteamIdsBody(Set<Integer> ids) {}
     public record SteamKeywordsBody(Set<String> keywords) {}
+    public record SteamKeywordBody(String keyword) {}
+    public record SteamSignalTestBody(String appId, String draftKeyword) {}
 
     @GetMapping
     public List<TwDefinition> list() {
         return service.list();
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<TwDefinition> get(@PathVariable String id) {
+        return service.get(id).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
@@ -100,6 +107,28 @@ public class ApiAdminTwController {
     public ResponseEntity<Void> setSteamKw(@PathVariable String id, @RequestBody SteamKeywordsBody b) {
         service.replaceSteamKeywords(id, b.keywords() == null ? Set.of() : b.keywords());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/steam-keywords")
+    public List<String> listSteamKw(@PathVariable String id) {
+        return service.listSteamKeywords(id);
+    }
+
+    @PostMapping("/{id}/steam-keywords")
+    public ResponseEntity<Void> addSteamKw(@PathVariable String id, @RequestBody SteamKeywordBody b) {
+        service.addSteamKeyword(id, b.keyword());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/steam-keywords/{keyword}")
+    public ResponseEntity<Void> removeSteamKw(@PathVariable String id, @PathVariable String keyword) {
+        service.removeSteamKeyword(id, keyword);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/steam-keywords/test")
+    public AdminTwService.SteamSignalTestResult testSteamKw(@PathVariable String id, @RequestBody SteamSignalTestBody b) {
+        return service.testSteamSignals(id, b.appId(), b.draftKeyword());
     }
 
     @PostMapping("/rebuild")
