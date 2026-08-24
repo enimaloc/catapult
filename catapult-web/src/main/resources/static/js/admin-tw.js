@@ -56,6 +56,15 @@
     tr.appendChild(tdStatus);
 
     tr.appendChild(el("td", null, d.sortOrder != null ? d.sortOrder : 0));
+
+    var tdActions = el("td");
+    var link = document.createElement("a");
+    link.className = "btn btn-secondary";
+    link.href = "/admin/tw/" + encodeURIComponent(d.id) + "/keywords";
+    link.textContent = card.dataset.i18nManageKeywords || "Manage keywords";
+    tdActions.appendChild(link);
+    tr.appendChild(tdActions);
+
     return tr;
   }
 

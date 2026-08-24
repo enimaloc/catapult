@@ -17,10 +17,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -64,5 +68,53 @@ class ApiAdminTwControllerTest {
                         .content("{\"id\":\"ok\",\"label\":\"OK\",\"sortOrder\":1}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("ok"));
+    }
+
+    @Test
+    void get_returnsNotFoundWhenMissing() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        when(adminTwService.get("missing")).thenReturn(Optional.empty());
+        mvc.perform(get("/api/admin/tw/missing")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listSteamKeywords_returnsSavedKeywords() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        when(adminTwService.listSteamKeywords("gore")).thenReturn(List.of("blood", "gore"));
+        mvc.perform(get("/api/admin/tw/gore/steam-keywords"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("blood"));
+    }
+
+    @Test
+    void addSteamKeyword_delegatesToService() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(post("/api/admin/tw/gore/steam-keywords").with(csrf())
+                        .contentType("application/json")
+                        .content("{\"keyword\":\"blood\"}"))
+                .andExpect(status().isNoContent());
+        verify(adminTwService).addSteamKeyword("gore", "blood");
+    }
+
+    @Test
+    void removeSteamKeyword_delegatesToService() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(delete("/api/admin/tw/gore/steam-keywords/blood").with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(adminTwService).removeSteamKeyword("gore", "blood");
+    }
+
+    @Test
+    void testSteamKeywords_returnsMatchResult() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        when(adminTwService.testSteamSignals("gore", "730", "gore")).thenReturn(
+                new AdminTwService.SteamSignalTestResult("blood everywhere", List.of("blood"), true, Set.of(2)));
+        mvc.perform(post("/api/admin/tw/gore/steam-keywords/test").with(csrf())
+                        .contentType("application/json")
+                        .content("{\"appId\":\"730\",\"draftKeyword\":\"gore\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matchedKeywords[0]").value("blood"))
+                .andExpect(jsonPath("$.draftKeywordMatch").value(true))
+                .andExpect(jsonPath("$.matchedContentDescriptorIds[0]").value(2));
     }
 }

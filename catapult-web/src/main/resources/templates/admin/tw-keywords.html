@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{template::layout(~{::title}, 'tw', ~{::body}, ~{::head/script}, 'container', null, null)}">
+<head>
+    <title th:text="#{admin.tw_keywords.page_title(${app.name})}">Catapult — Admin TW Keywords</title>
+    <script th:src="@{/js/admin-tw-keywords.js}" defer></script>
+</head>
+<body>
+<!--/*@thymesvar id="twId" type="java.lang.String"*/-->
+<!--/*@thymesvar id="definition" type="java.util.Map"*/-->
+<!--/*@thymesvar id="keywords" type="java.util.List"*/-->
+    <p style="margin:0 0 1rem 0;">
+        <a th:href="@{/admin/tw}" th:text="#{admin.tw_keywords.back}">← Back to Trigger Warnings</a>
+    </p>
+
+    <h2 style="margin:0 0 1rem 0"
+        th:text="#{admin.tw_keywords.title(${definition != null ? definition.label : twId})}">Trigger Warning — Label</h2>
+
+    <div class="card" style="margin-bottom:1rem; padding:1rem;">
+        <form th:action="@{/admin/tw/{id}/keywords/add(id=${twId})}" method="post"
+              data-tw-kw-add-form style="display:flex; gap:0.5rem; align-items:center;"> <!-- nosemgrep -->
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <input type="text" name="keyword" required minlength="2" maxlength="50" data-tw-kw-draft-input
+                   th:placeholder="#{admin.tw_keywords.add.placeholder}" style="flex:1; max-width:320px;"/>
+            <button type="submit" class="btn btn-primary" th:text="#{admin.tw_keywords.add.button}">+ Add</button>
+        </form>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem;">
+        <div class="text-muted" th:if="${keywords.isEmpty()}" style="padding:1rem;">
+            <p th:text="#{admin.tw_keywords.empty}" style="margin:0">No Steam keyword defined for this trigger warning.</p>
+        </div>
+        <div class="table-container" th:unless="${keywords.isEmpty()}">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.tw_keywords.column.keyword}">Keyword</th>
+                        <th th:text="#{admin.tw_keywords.column.actions}">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="kw : ${keywords}">
+                        <td><span class="badge" th:text="${kw}"></span></td>
+                        <td>
+                            <form th:action="@{/admin/tw/{id}/keywords/remove(id=${twId})}" method="post"> <!-- nosemgrep -->
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <input type="hidden" name="keyword" th:value="${kw}"/>
+                                <button type="submit" class="btn btn-sm"
+                                        th:attr="data-confirm=#{admin.tw_keywords.remove.confirm}"
+                                        onclick="return confirm(this.dataset.confirm)"
+                                        th:text="#{admin.tw_keywords.remove.button}">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card" data-tw-kw-tester
+         style="padding:1rem;"
+         th:attr="data-test-url=@{/admin/tw/{id}/keywords/test(id=${twId})},
+                  data-csrf-header=${_csrf.headerName}, data-csrf-token=${_csrf.token},
+                  data-i18n-matched-keywords=#{admin.tw_keywords.tester.matched_keywords},
+                  data-i18n-matched-content-ids=#{admin.tw_keywords.tester.matched_content_ids},
+                  data-i18n-draft-match=#{admin.tw_keywords.tester.draft_match},
+                  data-i18n-draft-no-match=#{admin.tw_keywords.tester.draft_no_match},
+                  data-i18n-notes-label=#{admin.tw_keywords.tester.notes_label},
+                  data-i18n-none=#{admin.tw_keywords.tester.none},
+                  data-i18n-error=#{admin.tw_keywords.tester.error}">
+        <h3 style="margin-top:0;" th:text="#{admin.tw_keywords.tester.title}">Test against a Steam game</h3>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+            <input type="text" data-tw-kw-appid-input
+                   th:placeholder="#{admin.tw_keywords.tester.appid_placeholder}" style="flex:0 0 220px;"/>
+            <button type="button" class="btn btn-secondary" data-tw-kw-test-button
+                    th:text="#{admin.tw_keywords.tester.button}">Test</button>
+        </div>
+        <div data-tw-kw-test-result style="margin-top:1rem;"></div>
+    </div>
+</body>
+</html>

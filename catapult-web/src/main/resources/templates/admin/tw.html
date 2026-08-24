@@ -8,15 +8,26 @@
 <!--/*@thymesvar id="definitions" type="java.util.List"*/-->
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
         <h2 th:text="#{admin.tw.title}" style="margin:0">Administration — Trigger Warnings</h2>
-        <form th:action="@{/admin/tw/rebuild}" method="post" style="margin:0"
-              ws:post="@{/admin/tw/rebuild}" ws:swap="none">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-            <button type="submit" class="btn btn-secondary"
-                    th:title="#{admin.tw.rebuild.tooltip}"
-                    th:attr="data-confirm=#{admin.tw.rebuild.confirm}"
-                    onclick="return confirm(this.dataset.confirm)"
-                    th:text="#{admin.tw.rebuild.button}">⟳ Rebuild non-overridden mappings</button>
-        </form>
+        <div style="display:flex; gap:0.5rem;">
+            <form th:action="@{/admin/tw/rebuild-untouched}" method="post" style="margin:0"
+                  ws:post="@{/admin/tw/rebuild-untouched}" ws:swap="none">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit" class="btn btn-secondary"
+                        th:title="#{admin.tw.rebuild_untouched.tooltip}"
+                        th:attr="data-confirm=#{admin.tw.rebuild_untouched.confirm}"
+                        onclick="return confirm(this.dataset.confirm)"
+                        th:text="#{admin.tw.rebuild_untouched.button}">⟳ Update never-analyzed games</button>
+            </form>
+            <form th:action="@{/admin/tw/rebuild}" method="post" style="margin:0"
+                  ws:post="@{/admin/tw/rebuild}" ws:swap="none">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit" class="btn btn-secondary"
+                        th:title="#{admin.tw.rebuild.tooltip}"
+                        th:attr="data-confirm=#{admin.tw.rebuild.confirm}"
+                        onclick="return confirm(this.dataset.confirm)"
+                        th:text="#{admin.tw.rebuild.button}">⟳ Rebuild non-overridden mappings</button>
+            </form>
+        </div>
     </div>
 
     <div class="card" style="margin-bottom:1rem; padding:1rem;">
@@ -39,7 +50,8 @@
 
     <div class="card" data-tw-card
          th:attr="data-i18n-enabled=#{admin.tw.status.enabled},
-                  data-i18n-disabled=#{admin.tw.status.disabled}">
+                  data-i18n-disabled=#{admin.tw.status.disabled},
+                  data-i18n-manage-keywords=#{admin.tw.action.manage_keywords}">
         <div class="text-muted" data-tw-empty th:style="${definitions == null or definitions.isEmpty()} ? '' : 'display:none'">
             <p th:text="#{admin.tw.empty}" style="margin:0">No trigger warning defined.</p>
         </div>
@@ -51,6 +63,7 @@
                         <th th:text="#{admin.tw.column.label}">Label</th>
                         <th th:text="#{admin.tw.column.enabled}">Enabled</th>
                         <th th:text="#{admin.tw.column.sort_order}">Order</th>
+                        <th th:text="#{admin.tw.column.actions}">Actions</th>
                     </tr>
                 </thead>
                 <tbody data-tw-body>
@@ -64,6 +77,10 @@
                             <span th:unless="${d.enabled}" class="badge badge-warning" th:text="#{admin.tw.status.disabled}">✗</span>
                         </td>
                         <td th:text="${d.sortOrder}"></td>
+                        <td>
+                            <a class="btn btn-secondary" th:href="@{/admin/tw/{id}/keywords(id=${d.id})}"
+                               th:text="#{admin.tw.action.manage_keywords}">Manage keywords</a>
+                        </td>
                     </tr>
                 </tbody>
             </table>

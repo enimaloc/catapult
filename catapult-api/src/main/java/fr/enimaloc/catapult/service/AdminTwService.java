@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -30,9 +31,14 @@ public class AdminTwService {
     private final TwSteamKeywordRepository steamKwRepo;
     private final GameBindingRepository bindingRepo;
     private final ApplicationEventPublisher events;
+    private final SteamStoreService steamStoreService;
 
     public List<TwDefinition> list() {
         return defRepo.findAllByOrderBySortOrderAscIdAsc();
+    }
+
+    public Optional<TwDefinition> get(String twId) {
+        return defRepo.findById(twId);
     }
 
     @Transactional
@@ -119,15 +125,83 @@ public class AdminTwService {
         steamKwRepo.deleteAllByTwId(twId);
         Set<String> seen = new HashSet<>();
         for (String k : keywords) {
-            String norm = k == null ? null : k.toLowerCase(Locale.ROOT).trim();
-            if (norm == null || norm.length() < 2 || norm.length() > KEYWORD_MAX) continue;
-            if (!seen.add(norm)) continue;
+            String norm = normalizeKeyword(k);
+            if (norm == null || !seen.add(norm)) continue;
             TwSteamKeyword m = new TwSteamKeyword();
             m.setTwId(twId);
             m.setKeyword(norm);
             steamKwRepo.save(m);
         }
         events.publishEvent(new TwDefinitionsChangedEvent(this));
+    }
+
+    public List<String> listSteamKeywords(String twId) {
+        requireExists(twId);
+        return steamKwRepo.findAllByTwId(twId).stream()
+            .map(TwSteamKeyword::getKeyword)
+            .sorted()
+            .toList();
+    }
+
+    @Transactional
+    public void addSteamKeyword(String twId, String keyword) {
+        requireExists(twId);
+        String norm = normalizeKeyword(keyword);
+        if (norm == null)
+            throw new IllegalArgumentException("Invalid keyword; 2.." + KEYWORD_MAX + " chars required");
+        boolean exists = steamKwRepo.findAllByTwId(twId).stream()
+            .anyMatch(k -> k.getKeyword().equals(norm));
+        if (exists) return;
+        TwSteamKeyword m = new TwSteamKeyword();
+        m.setTwId(twId);
+        m.setKeyword(norm);
+        steamKwRepo.save(m);
+        events.publishEvent(new TwDefinitionsChangedEvent(this));
+    }
+
+    @Transactional
+    public void removeSteamKeyword(String twId, String keyword) {
+        requireExists(twId);
+        String norm = normalizeKeyword(keyword);
+        if (norm == null) return;
+        steamKwRepo.findAllByTwId(twId).stream()
+            .filter(k -> k.getKeyword().equals(norm))
+            .forEach(steamKwRepo::delete);
+        events.publishEvent(new TwDefinitionsChangedEvent(this));
+    }
+
+    /** Preview which of a TW's saved Steam signals match a given Steam app's store page. */
+    public record SteamSignalTestResult(
+        String notes, List<String> matchedKeywords, Boolean draftKeywordMatch,
+        Set<Integer> matchedContentDescriptorIds) {}
+
+    public SteamSignalTestResult testSteamSignals(String twId, String appId, String draftKeyword) {
+        requireExists(twId);
+        SteamStoreService.SteamTwSignals signals = steamStoreService.fetchTwSignals(List.of(appId))
+            .getOrDefault(appId, SteamStoreService.SteamTwSignals.empty());
+        String notes = signals.notesLowercase();
+
+        List<String> matchedKeywords = steamKwRepo.findAllByTwId(twId).stream()
+            .map(TwSteamKeyword::getKeyword)
+            .filter(notes::contains)
+            .sorted()
+            .toList();
+
+        String normDraft = normalizeKeyword(draftKeyword);
+        Boolean draftMatch = normDraft == null ? null : notes.contains(normDraft);
+
+        Set<Integer> matchedContentIds = steamIdRepo.findAllByTwId(twId).stream()
+            .map(TwSteamContentIdMapping::getSteamContentId)
+            .filter(signals.contentDescriptorIds()::contains)
+            .collect(Collectors.toCollection(TreeSet::new));
+
+        return new SteamSignalTestResult(notes, matchedKeywords, draftMatch, matchedContentIds);
+    }
+
+    private String normalizeKeyword(String k) {
+        String norm = k == null ? null : k.toLowerCase(Locale.ROOT).trim();
+        if (norm == null || norm.length() < 2 || norm.length() > KEYWORD_MAX) return null;
+        return norm;
     }
 
     // --- validation ---
