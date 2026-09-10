@@ -61,6 +61,8 @@ test:
 .release-common: &release-common
   stage: release
   image: docker:latest
+  tags:
+    - privileged
   services:
     - docker:dind
   variables:
