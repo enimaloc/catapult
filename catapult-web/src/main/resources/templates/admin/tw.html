@@ -27,6 +27,15 @@
                         onclick="return confirm(this.dataset.confirm)"
                         th:text="#{admin.tw.rebuild.button}">⟳ Rebuild non-overridden mappings</button>
             </form>
+            <form th:action="@{/admin/tw/rebuild-force-pinned}" method="post" style="margin:0"
+                  ws:post="@{/admin/tw/rebuild-force-pinned}" ws:swap="none">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit" class="btn btn-danger"
+                        th:title="#{admin.tw.rebuild_force_pinned.tooltip}"
+                        th:attr="data-confirm=#{admin.tw.rebuild_force_pinned.confirm}"
+                        onclick="return confirm(this.dataset.confirm)"
+                        th:text="#{admin.tw.rebuild_force_pinned.button}">⚠ Force-rebuild ALL (overwrites pinned)</button>
+            </form>
         </div>
     </div>
 

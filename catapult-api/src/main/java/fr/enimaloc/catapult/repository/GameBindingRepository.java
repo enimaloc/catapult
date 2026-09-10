@@ -51,4 +51,15 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
         "AND b.twOverride = false AND b.status IN ('AUTO','MANUAL')")
     org.springframework.data.domain.Page<GameBinding> findCandidatesForTwRebuild(
         org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Widest net — includes bindings the streamer has pinned manually
+     * ({@code twOverride=true}). Drives the admin "force-rebuild, override
+     * pinned choices" action; use with care.
+     */
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT b FROM GameBinding b WHERE b.ignored = false " +
+        "AND b.status IN ('AUTO','MANUAL')")
+    org.springframework.data.domain.Page<GameBinding> findAllCandidatesForTwForceRebuild(
+        org.springframework.data.domain.Pageable pageable);
 }

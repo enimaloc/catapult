@@ -95,6 +95,12 @@ public class AdminController {
         return "redirect:/admin/tw";
     }
 
+    @PostMapping("/tw/rebuild-force-pinned")
+    public String rebuildForcePinnedTw() {
+        apiClient.post("/api/admin/tw/rebuild/force-pinned", null);
+        return "redirect:/admin/tw";
+    }
+
     @GetMapping("/tw/{id}/keywords")
     public String twKeywordsPage(@PathVariable String id, Model model) {
         Map<String, Object> definition = apiClient.get("/api/admin/tw/{id}",
