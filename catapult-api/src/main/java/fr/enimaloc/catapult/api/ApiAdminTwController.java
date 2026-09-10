@@ -148,4 +148,13 @@ public class ApiAdminTwController {
         backfillService.rebuildAll();
         return ResponseEntity.accepted().build();
     }
+
+    @PostMapping("/rebuild/force-pinned")
+    public ResponseEntity<Void> rebuildMappingsIncludingPinned() {
+        if (backfillService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+        backfillService.forceRebuildAllIncludingPinned();
+        return ResponseEntity.accepted().build();
+    }
 }
