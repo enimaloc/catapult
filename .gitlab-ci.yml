@@ -18,6 +18,8 @@ build:
 test:
   stage: test
   image: eclipse-temurin:21-jdk
+  tags:
+    - privileged
   services:
     - name: postgres:16
       alias: postgres
