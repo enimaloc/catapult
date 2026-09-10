@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.TwDefinition;
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
 import fr.enimaloc.catapult.service.AdminCclService;
 import fr.enimaloc.catapult.service.AdminTwService;
+import fr.enimaloc.catapult.service.TwBackfillService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,6 +44,15 @@ class ApiAdminTwControllerTest {
     @MockitoBean AdminTwService adminTwService;
     @MockitoBean AdminCclService adminCclService;
     @MockitoBean TwitchLoginSuccessHandler twitchLoginSuccessHandler;
+    @MockitoBean TwBackfillService twBackfillService;
+
+    @Test
+    void rebuildForcePinned_delegatesToBackfillService() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(post("/api/admin/tw/rebuild/force-pinned").with(csrf()))
+                .andExpect(status().isAccepted());
+        verify(twBackfillService).forceRebuildAllIncludingPinned();
+    }
 
     @Test
     void list_returnsDefinitions() throws Exception {

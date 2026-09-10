@@ -68,6 +68,35 @@ class TwBackfillServiceTest {
         verify(appRepo).save(any(AppState.class));
     }
 
+    @Test
+    void forceRebuildAllIncludingPinned_doesNotSkipOverriddenBindings() {
+        AppStateRepository appRepo = mock(AppStateRepository.class);
+        GameBindingRepository bRepo = mock(GameBindingRepository.class);
+
+        GameBinding pinned = new GameBinding();
+        pinned.setId(UUID.randomUUID());
+        pinned.setSourceType(GameBinding.SourceType.STEAM);
+        pinned.setSourceId("99");
+        pinned.setSourceName("Pinned Game");
+        pinned.setTwOverride(true);
+        pinned.setTws(Set.of("old_tw"));
+
+        when(bRepo.findAllCandidatesForTwForceRebuild(any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(pinned)));
+
+        IgdbService igdb = mock(IgdbService.class);
+        when(igdb.resolveIgdbIdForBinding(pinned)).thenReturn(Optional.of("igdb99"));
+        when(igdb.fetchDescriptorIds("igdb99")).thenReturn(Set.of(20L));
+        TwResolverService res = mock(TwResolverService.class);
+        when(res.suggest(any())).thenReturn(Set.of("new_tw"));
+
+        TwBackfillService svc = build(appRepo, bRepo, igdb, res);
+        svc.forceRebuildAllIncludingPinned();
+
+        verify(bRepo).save(pinned);
+        assertThat(pinned.getTws()).containsExactly("new_tw");
+    }
+
     private TwBackfillService build(AppStateRepository app, GameBindingRepository b,
                                     IgdbService igdb, TwResolverService res) {
         TwBackfillService s = new TwBackfillService(app, b, igdb, res, new SimpleMeterRegistry());

@@ -83,6 +83,20 @@ public class TwBackfillService {
         log.info("TW rebuild done: processed={} skipped={} failed={}", c.processed, c.skipped, c.failed);
     }
 
+    /**
+     * Admin-triggered rebuild: re-resolve TW suggestions for every eligible
+     * binding, INCLUDING those a streamer has pinned manually
+     * ({@code twOverride=true}). Overwrites pinned choices — only meant for
+     * a deliberate, one-off catalog-wide re-tag (e.g. after a large keyword
+     * seed), not routine use.
+     */
+    @Async
+    public void forceRebuildAllIncludingPinned() {
+        log.info("TW force-rebuild (including pinned) starting (throttle={}/s, batchSize={})", throttle, batchSize);
+        Counts c = processForceAll();
+        log.info("TW force-rebuild done: processed={} skipped={} failed={}", c.processed, c.skipped, c.failed);
+    }
+
     private static class Counts {
         int processed;
         int skipped;
@@ -110,6 +124,44 @@ public class TwBackfillService {
                     meterRegistry.counter("catapult.tw." + mode + ".skipped").increment();
                     continue;
                 }
+                try {
+                    Optional<String> igdbId = igdbService.resolveIgdbIdForBinding(b);
+                    Set<Long> descIds = igdbId.map(igdbService::fetchDescriptorIds).orElse(Set.of());
+                    String steamApp = b.getSourceType() == GameBinding.SourceType.STEAM ? b.getSourceId() : null;
+                    Set<String> tws = resolver.suggest(new TwResolverService.SuggestInput(
+                        igdbId.orElse(null), descIds, steamApp, b.getSourceName()));
+                    log.debug("[TW] {} mapping for binding {} game '{}' (igdb={}): {}",
+                        mode, b.getId(), b.getSourceName(), igdbId.orElse(null), tws);
+                    b.setTws(tws);
+                    bindingRepo.save(b);
+                    c.processed++;
+                    meterRegistry.counter("catapult.tw." + mode + ".processed").increment();
+                } catch (Exception e) {
+                    log.warn("TW {} failed for binding {}: {}", mode, b.getId(), e.getMessage());
+                    c.failed++;
+                    meterRegistry.counter("catapult.tw." + mode + ".failed").increment();
+                }
+                try {
+                    Thread.sleep(sleepMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return c;
+                }
+            }
+        } while (batch.hasNext());
+        return c;
+    }
+
+    /** Same loop body as {@link #process}, but never skips on {@code twOverride}. */
+    private Counts processForceAll() {
+        long sleepMs = 1000L / Math.max(throttle, 1);
+        Counts c = new Counts();
+        int page = 0;
+        Page<GameBinding> batch;
+        String mode = "force_all";
+        do {
+            batch = bindingRepo.findAllCandidatesForTwForceRebuild(PageRequest.of(page++, batchSize));
+            for (GameBinding b : batch) {
                 try {
                     Optional<String> igdbId = igdbService.resolveIgdbIdForBinding(b);
                     Set<Long> descIds = igdbId.map(igdbService::fetchDescriptorIds).orElse(Set.of());
