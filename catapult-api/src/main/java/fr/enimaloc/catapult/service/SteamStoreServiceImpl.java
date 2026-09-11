@@ -207,6 +207,33 @@ public class SteamStoreServiceImpl implements SteamStoreService {
         }
     }
 
+    @Override
+    @SuppressWarnings("unchecked")
+    public Optional<String> fetchDescription(String appId, Locale locale) {
+        return apiObservations.observe("steam_store", "fetch_description", () -> {
+            String effectiveAppId = resolveEffectiveApp(appId)
+                    .map(ResolvedParentApp::appId)
+                    .orElse(appId);
+            String lang = SteamLanguages.fromLocale(locale);
+            try {
+                Map<String, Object> response = restClient.get()
+                        .uri(APP_DETAILS_URL + "?appids=" + effectiveAppId + "&l=" + lang)
+                        .retrieve()
+                        .body(Map.class);
+                if (response == null) return Optional.empty();
+                Map<String, Object> entry = (Map<String, Object>) response.get(effectiveAppId);
+                if (entry == null || !Boolean.TRUE.equals(entry.get("success"))) return Optional.empty();
+                Map<String, Object> data = (Map<String, Object>) entry.get("data");
+                if (data == null) return Optional.empty();
+                String description = String.valueOf(data.getOrDefault("short_description", ""));
+                return description.isBlank() ? Optional.empty() : Optional.of(description);
+            } catch (Exception e) {
+                log.warn("Steam fetchDescription failed for appId={}: {}", appId, e.getMessage());
+                return Optional.empty();
+            }
+        });
+    }
+
     @SuppressWarnings("unchecked")
     private Optional<ResolvedParentApp> extractFullGame(Map<String, Object> data) {
         Map<String, Object> fullgame = (Map<String, Object>) data.get("fullgame");

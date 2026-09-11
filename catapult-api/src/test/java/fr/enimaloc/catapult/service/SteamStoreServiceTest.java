@@ -262,4 +262,37 @@ class SteamStoreServiceTest {
         assertThat(service.resolveEffectiveApp("4519120")).isEmpty();
         org.mockito.Mockito.verify(restClient, org.mockito.Mockito.atLeastOnce()).get();
     }
+
+    @Test
+    void fetchDescription_present_returnsShortDescription() {
+        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("100");
+        Map<String, Object> body = Map.of("100", Map.of(
+            "success", true,
+            "data", Map.of("type", "game", "name", "Some Game",
+                "short_description", "Une description en français.")
+        ));
+        givenSteamResponse(body);
+
+        assertThat(service.fetchDescription("100", java.util.Locale.FRENCH))
+            .contains("Une description en français.");
+    }
+
+    @Test
+    void fetchDescription_blank_returnsEmpty() {
+        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("100");
+        Map<String, Object> body = Map.of("100", Map.of(
+            "success", true, "data", Map.of("type", "game", "name", "Some Game", "short_description", "")
+        ));
+        givenSteamResponse(body);
+
+        assertThat(service.fetchDescription("100", java.util.Locale.ENGLISH)).isEmpty();
+    }
+
+    @Test
+    void fetchDescription_unknownApp_returnsEmpty() {
+        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("100");
+        givenSteamResponse(Map.of("100", Map.of("success", false)));
+
+        assertThat(service.fetchDescription("100", java.util.Locale.ENGLISH)).isEmpty();
+    }
 }

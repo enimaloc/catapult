@@ -4,6 +4,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -25,5 +26,10 @@ public class MockSteamStoreService implements SteamStoreService {
     @Override
     public Map<String, SteamTwSignals> fetchTwSignals(Collection<String> appIds) {
         return Map.of();
+    }
+
+    @Override
+    public Optional<String> fetchDescription(String appId, Locale locale) {
+        return Optional.empty();
     }
 }

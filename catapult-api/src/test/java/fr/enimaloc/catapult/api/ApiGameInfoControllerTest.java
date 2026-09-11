@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.IgdbService;
+import fr.enimaloc.catapult.service.SteamStoreService;
 import fr.enimaloc.catapult.service.WidgetTokenService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -47,6 +49,7 @@ class ApiGameInfoControllerTest {
     @MockitoBean GameBindingRepository gameBindingRepository;
     @MockitoBean IgdbService igdbService;
     @MockitoBean IgdbGameDetailsService igdbGameDetailsService;
+    @MockitoBean SteamStoreService steamStoreService;
 
     @Test
     void gameInfo_unknownToken_returns404() throws Exception {
@@ -124,6 +127,57 @@ class ApiGameInfoControllerTest {
                 .andExpect(jsonPath("$.rating").value(85.0))
                 .andExpect(jsonPath("$.aggregatedRating").value(78.5))
                 .andExpect(jsonPath("$.releaseDate").exists());
+    }
+
+    @Test
+    void gameInfo_steamDescriptionAvailable_takesPriorityOverIgdbSummary() throws Exception {
+        UUID token = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        DetectedGame detected = new DetectedGame("440", GameBinding.SourceType.STEAM, "Team Fortress 2");
+
+        IgdbGameDetails details = new IgdbGameDetails();
+        details.setIgdbId("1234");
+        details.setSummary("IGDB generic summary.");
+
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(user));
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
+        when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "440", GameBinding.SourceType.STEAM))
+                .thenReturn(Optional.empty());
+        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "440"))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("1234", "Team Fortress 2")));
+        when(igdbGameDetailsService.getDetails("1234")).thenReturn(Optional.of(details));
+        when(steamStoreService.fetchDescription("440", Locale.FRENCH))
+                .thenReturn(Optional.of("Description Steam en français."));
+
+        mvc.perform(get("/api/game/{uuid}?lang=fr", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Description Steam en français."));
+    }
+
+    @Test
+    void gameInfo_noStoreDescription_fallsBackToIgdbSummary() throws Exception {
+        UUID token = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        DetectedGame detected = new DetectedGame("440", GameBinding.SourceType.STEAM, "Team Fortress 2");
+
+        IgdbGameDetails details = new IgdbGameDetails();
+        details.setIgdbId("1234");
+        details.setSummary("IGDB generic summary.");
+
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(user));
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
+        when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "440", GameBinding.SourceType.STEAM))
+                .thenReturn(Optional.empty());
+        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "440"))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("1234", "Team Fortress 2")));
+        when(igdbGameDetailsService.getDetails("1234")).thenReturn(Optional.of(details));
+        when(steamStoreService.fetchDescription("440", Locale.ENGLISH)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/game/{uuid}", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("IGDB generic summary."));
     }
 
     @Test

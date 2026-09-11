@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.IgdbService;
+import fr.enimaloc.catapult.service.SteamStoreService;
 import fr.enimaloc.catapult.service.WidgetTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
@@ -41,6 +42,7 @@ public class ApiGameInfoController {
     private final GameBindingRepository gameBindingRepository;
     private final IgdbService igdbService;
     private final IgdbGameDetailsService igdbGameDetailsService;
+    private final SteamStoreService steamStoreService;
     private final MessageSource messageSource;
 
     public record GameInfoResponse(String name, String igdbUrl, GameBinding.SourceType sourceType,
@@ -99,7 +101,7 @@ public class ApiGameInfoController {
                 detected.getSourceType(),
                 storeName(detected.getSourceType(), locale),
                 storeUrl(detected, details.orElse(null)),
-                details.map(IgdbGameDetails::getSummary).orElse(null),
+                description(detected, locale, details).orElse(null),
                 binding == null ? null : binding.getTwitchGameId(),
                 binding == null ? null : binding.getTwitchGameName(),
                 tws,
@@ -111,6 +113,18 @@ public class ApiGameInfoController {
                 details.map(IgdbGameDetails::getRating).orElse(null),
                 details.map(IgdbGameDetails::getAggregatedRating).orElse(null),
                 details.map(IgdbGameDetails::getFirstReleaseDate).orElse(null));
+    }
+
+    // The store's own description takes priority (locale-matched to the "lang" param), since it's
+    // written for that specific release/platform; IGDB's summary is a generic fallback for stores
+    // with no description API (or Steam with none in the requested language) so the field is
+    // rarely empty. Only Steam has a description API integrated today.
+    private Optional<String> description(DetectedGame detected, Locale locale, Optional<IgdbGameDetails> details) {
+        Optional<String> storeDescription = detected.getSourceType() == GameBinding.SourceType.STEAM
+                && detected.getSourceId() != null
+                ? steamStoreService.fetchDescription(detected.getSourceId(), locale)
+                : Optional.empty();
+        return storeDescription.or(() -> details.map(IgdbGameDetails::getSummary));
     }
 
     // tws/ccls are unordered Sets, so sort for a deterministic display string;
