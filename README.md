@@ -1,7 +1,7 @@
 # Catapult
 
-[![Pipeline](https://git.enimaloc.fr/enimaloc/catapult/badges/master/pipeline.svg)](https://git.enimaloc.fr/enimaloc/catapult/-/pipelines)
-[![Coverage](https://git.enimaloc.fr/enimaloc/catapult/badges/master/coverage.svg)](https://git.enimaloc.fr/enimaloc/catapult/-/jobs)
+[![Tests](https://github.com/enimaloc/catapult/actions/workflows/test.yml/badge.svg)](https://github.com/enimaloc/catapult/actions/workflows/test.yml)
+[![Build](https://github.com/enimaloc/catapult/actions/workflows/build.yml/badge.svg)](https://github.com/enimaloc/catapult/actions/workflows/build.yml)
 
 Outil d'automatisation pour streamers Twitch : détecte le jeu en cours et met à jour automatiquement la catégorie Twitch ainsi que les labels de classification de contenu (CCL) selon les données IGDB.
 

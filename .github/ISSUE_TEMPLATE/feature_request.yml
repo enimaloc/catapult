@@ -1,0 +1,41 @@
+name: ✨ Feature request
+description: Proposer une nouvelle fonctionnalité ou une amélioration
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problème / besoin
+      description: Quel problème cette fonctionnalité résout-elle ?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution proposée
+    validations:
+      required: true
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module concerné
+      options:
+        - catapult-api
+        - catapult-web
+        - Chat commands
+        - Détection de jeu (Steam/Xbox/Battle.net)
+        - DoesTheDogDie
+        - A/B testing / expérimentations
+        - Admin
+        - Autre / inconnu
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+    validations:
+      required: false
