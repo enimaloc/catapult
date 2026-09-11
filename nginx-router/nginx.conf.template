@@ -61,6 +61,13 @@ server {
         error_page 502 503 504 = @maintenance;
     }
 
+    # ── Widget-token-authenticated public API (OBS browser sources fetch this
+    # directly, unlike other /api/** routes which catapult-web calls server-side) ─
+    location /api/game/ {
+        proxy_pass http://backend;
+        error_page 502 503 504 = @maintenance;
+    }
+
     # ── Probe used by maintenance page to detect catapult-web recovery ──────────
     # No error_page fallback here: 502/503/504 bubble up to the browser as-is.
     location = /up {
