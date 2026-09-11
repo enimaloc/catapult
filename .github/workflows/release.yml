@@ -20,6 +20,21 @@ jobs:
           git checkout -b "v/${GITHUB_REF_NAME}"
           git push origin "v/${GITHUB_REF_NAME}"
 
+  github-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-ALPHA') || contains(github.ref_name, '-BETA') }}
+
   release-api:
     runs-on: ubuntu-latest
     permissions:
