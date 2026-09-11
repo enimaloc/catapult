@@ -65,10 +65,7 @@ catapult_obs_local.py
 /*.sql
 catapult-api/src/test/java/Tmp.java
 docs/
-scripts/build.sh
-scripts/bump.sh
-scripts/dev-up.sh
-scripts/publish.sh
+scripts/*
 docker-compose.override.yml
 e2e/package-lock.json
 test-results/
