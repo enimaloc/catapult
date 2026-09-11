@@ -30,4 +30,6 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
     List<UserAccount> findByStatus(UserAccount.Status status);
 
     Optional<UserAccount> findBySystemAccountTrue();
+
+    Optional<UserAccount> findByWidgetToken(UUID widgetToken);
 }

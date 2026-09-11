@@ -24,9 +24,6 @@ public class TwitchatWidgetSettings {
     @Column(nullable = false)
     private boolean enabled = false;
 
-    @Column(name = "widget_token", nullable = false, unique = true)
-    private UUID widgetToken;
-
     @Column(name = "obs_host")
     private String obsHost;
 

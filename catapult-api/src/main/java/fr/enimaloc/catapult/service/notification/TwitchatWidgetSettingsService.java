@@ -4,12 +4,11 @@ import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.WidgetTokenService;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatWidgetConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,14 +23,15 @@ public class TwitchatWidgetSettingsService {
     private final TwitchatWidgetSettingsRepository repository;
     private final TokenEncryptionService tokenEncryptionService;
     private final ChannelEventPublisher channelEventPublisher;
+    private final WidgetTokenService widgetTokenService;
 
     @Transactional
     public TwitchatWidgetSettings getOrCreate(UserAccount user) {
+        widgetTokenService.getOrCreate(user);
         return repository.findById(user.getId()).orElseGet(() -> {
             TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
             settings.setUser(user);
             settings.setEnabled(false);
-            settings.setWidgetToken(UUID.randomUUID());
             return repository.save(settings);
         });
     }
@@ -65,7 +65,7 @@ public class TwitchatWidgetSettingsService {
     @Transactional
     public TwitchatWidgetSettings regenerateToken(UserAccount user) {
         TwitchatWidgetSettings settings = getOrCreate(user);
-        settings.setWidgetToken(UUID.randomUUID());
-        return repository.save(settings);
+        widgetTokenService.regenerate(user);
+        return settings;
     }
 }
