@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service;
 
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -21,4 +22,11 @@ public interface SteamStoreService {
     }
 
     Map<String, SteamTwSignals> fetchTwSignals(Collection<String> appIds);
+
+    /**
+     * Store-page short description for the given app, in the given locale (mapped to Steam's
+     * own language names internally — Steam does not accept ISO codes). Empty when Steam has
+     * none in that language or the app doesn't resolve (unknown appId, API failure).
+     */
+    Optional<String> fetchDescription(String appId, Locale locale);
 }
