@@ -70,10 +70,10 @@ class ApiChannelActionsTwitchatSettingsTest {
     }
 
     private static TwitchatWidgetSettings settingsFor(UserAccount user, UUID widgetToken) {
+        user.setWidgetToken(widgetToken);
         TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
         settings.setUser(user);
         settings.setEnabled(true);
-        settings.setWidgetToken(widgetToken);
         settings.setObsHost("127.0.0.1");
         settings.setObsPort(4455);
         settings.setObsPasswordEncrypted("ENC(pw)");

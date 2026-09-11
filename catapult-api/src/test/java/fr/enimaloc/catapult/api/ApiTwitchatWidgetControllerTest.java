@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.WidgetTokenService;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,7 @@ class ApiTwitchatWidgetControllerTest {
     @Autowired MockMvc mvc;
 
     @MockitoBean TwitchatWidgetSettingsRepository widgetSettingsRepository;
+    @MockitoBean WidgetTokenService widgetTokenService;
     @MockitoBean TokenEncryptionService tokenEncryptionService;
     @MockitoBean TwitchatActionExecutor actionExecutor;
 
@@ -64,9 +66,9 @@ class ApiTwitchatWidgetControllerTest {
     @Test
     void access_unknownToken_returns404() throws Exception {
         UUID token = UUID.randomUUID();
-        when(widgetSettingsRepository.findByWidgetToken(token)).thenReturn(Optional.empty());
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.empty());
 
-        mvc.perform(get("/api/twitchat/widget/{token}/access", token))
+        mvc.perform(get("/api/twitchat/widget/{uuid}/access", token))
                 .andExpect(status().isNotFound());
     }
 
@@ -76,13 +78,14 @@ class ApiTwitchatWidgetControllerTest {
         UUID ownerId = UUID.randomUUID();
         UserAccount owner = new UserAccount();
         owner.setId(ownerId);
+        owner.setWidgetToken(token);
         TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
         settings.setUser(owner);
-        settings.setWidgetToken(token);
         settings.setEnabled(true);
-        when(widgetSettingsRepository.findByWidgetToken(token)).thenReturn(Optional.of(settings));
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(owner));
+        when(widgetSettingsRepository.findById(ownerId)).thenReturn(Optional.of(settings));
 
-        mvc.perform(get("/api/twitchat/widget/{token}/access", token))
+        mvc.perform(get("/api/twitchat/widget/{uuid}/access", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ownerId").value(ownerId.toString()))
                 .andExpect(jsonPath("$.enabled").value(true));
@@ -93,17 +96,18 @@ class ApiTwitchatWidgetControllerTest {
         UUID token = UUID.randomUUID();
         UserAccount owner = new UserAccount();
         owner.setId(UUID.randomUUID());
+        owner.setWidgetToken(token);
         TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
         settings.setUser(owner);
-        settings.setWidgetToken(token);
         settings.setEnabled(true);
         settings.setObsHost("127.0.0.1");
         settings.setObsPort(4455);
         settings.setObsPasswordEncrypted("ENC(pw)");
-        when(widgetSettingsRepository.findByWidgetToken(token)).thenReturn(Optional.of(settings));
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(owner));
+        when(widgetSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
         when(tokenEncryptionService.decrypt("ENC(pw)")).thenReturn("pw");
 
-        mvc.perform(get("/api/twitchat/widget/{token}", token))
+        mvc.perform(get("/api/twitchat/widget/{uuid}", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.obsHost").value("127.0.0.1"))
                 .andExpect(jsonPath("$.obsPort").value(4455))
@@ -115,16 +119,17 @@ class ApiTwitchatWidgetControllerTest {
         UUID token = UUID.randomUUID();
         UserAccount owner = new UserAccount();
         owner.setId(UUID.randomUUID());
+        owner.setWidgetToken(token);
         TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
         settings.setUser(owner);
-        settings.setWidgetToken(token);
         settings.setEnabled(false);
         settings.setObsHost("127.0.0.1");
         settings.setObsPort(4455);
         settings.setObsPasswordEncrypted("ENC(pw)");
-        when(widgetSettingsRepository.findByWidgetToken(token)).thenReturn(Optional.of(settings));
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(owner));
+        when(widgetSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
 
-        mvc.perform(get("/api/twitchat/widget/{token}", token))
+        mvc.perform(get("/api/twitchat/widget/{uuid}", token))
                 .andExpect(status().isNotFound());
     }
 

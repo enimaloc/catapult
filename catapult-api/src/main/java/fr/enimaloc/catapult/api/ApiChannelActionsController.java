@@ -168,7 +168,7 @@ public class ApiChannelActionsController {
         requireOwner(viewer, channelUser);
         var settings = twitchatWidgetSettingsService.getOrCreate(channelUser);
         return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
-                settings.getObsPasswordEncrypted() != null, settings.getWidgetToken().toString());
+                settings.getObsPasswordEncrypted() != null, channelUser.getWidgetToken().toString());
     }
 
     @PostMapping("/settings/twitchat")
@@ -194,7 +194,7 @@ public class ApiChannelActionsController {
         requireOwner(viewer, channelUser);
         var settings = twitchatWidgetSettingsService.regenerateToken(channelUser);
         return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
-                settings.getObsPasswordEncrypted() != null, settings.getWidgetToken().toString());
+                settings.getObsPasswordEncrypted() != null, channelUser.getWidgetToken().toString());
     }
 
     @GetMapping("/twitchat/presets")

@@ -16,11 +16,11 @@ public class WidgetTwitchatController {
 
     private final ApiClient apiClient;
 
-    @GetMapping("/widget/twitchat/{token}")
-    public String widgetPage(@PathVariable String token, Model model) {
+    @GetMapping("/widget/twitchat/{uuid}")
+    public String widgetPage(@PathVariable String uuid, Model model) {
         @SuppressWarnings("unchecked")
-        Map<String, Object> config = apiClient.get("/api/twitchat/widget/{token}", Map.class, token);
-        model.addAttribute("widgetToken", token);
+        Map<String, Object> config = apiClient.get("/api/twitchat/widget/{uuid}", Map.class, uuid);
+        model.addAttribute("widgetToken", uuid);
         model.addAttribute("obsHost", config == null ? null : config.get("obsHost"));
         model.addAttribute("obsPort", config == null ? null : config.get("obsPort"));
         model.addAttribute("obsPassword", config == null ? "" : config.getOrDefault("obsPassword", ""));

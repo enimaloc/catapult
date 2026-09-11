@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.WidgetTokenService;
 import fr.enimaloc.catapult.service.notification.dto.TwitchatWidgetConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ class TwitchatWidgetSettingsServiceTest {
     @Mock private TwitchatWidgetSettingsRepository repository;
     @Mock private TokenEncryptionService tokenEncryptionService;
     @Mock private ChannelEventPublisher channelEventPublisher;
+    @Mock private WidgetTokenService widgetTokenService;
     @InjectMocks private TwitchatWidgetSettingsService service;
 
     private UserAccount user;
@@ -36,15 +38,15 @@ class TwitchatWidgetSettingsServiceTest {
     }
 
     @Test
-    void getOrCreate_noExistingSettings_createsDisabledWithFreshToken() {
+    void getOrCreate_noExistingSettings_createsDisabledAndEnsuresToken() {
         when(repository.findById(user.getId())).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         TwitchatWidgetSettings settings = service.getOrCreate(user);
 
         assertThat(settings.isEnabled()).isFalse();
-        assertThat(settings.getWidgetToken()).isNotNull();
         assertThat(settings.getUser()).isEqualTo(user);
+        verify(widgetTokenService).getOrCreate(user);
         verify(repository).save(settings);
     }
 
@@ -52,12 +54,12 @@ class TwitchatWidgetSettingsServiceTest {
     void getOrCreate_existingSettings_returnsWithoutSaving() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);
-        existing.setWidgetToken(UUID.randomUUID());
         when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
 
         TwitchatWidgetSettings result = service.getOrCreate(user);
 
         assertThat(result).isSameAs(existing);
+        verify(widgetTokenService).getOrCreate(user);
         verify(repository, never()).save(any());
     }
 
@@ -65,7 +67,6 @@ class TwitchatWidgetSettingsServiceTest {
     void updateSettings_withNewPassword_encryptsAndSaves() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);
-        existing.setWidgetToken(UUID.randomUUID());
         when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
         when(tokenEncryptionService.encrypt("s3cret")).thenReturn("ENC(s3cret)");
         when(tokenEncryptionService.decrypt("ENC(s3cret)")).thenReturn("s3cret");
@@ -83,7 +84,6 @@ class TwitchatWidgetSettingsServiceTest {
     void updateSettings_publishesLiveConfigForAnAlreadyOpenWidget() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);
-        existing.setWidgetToken(UUID.randomUUID());
         when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
         when(tokenEncryptionService.encrypt("s3cret")).thenReturn("ENC(s3cret)");
         when(tokenEncryptionService.decrypt("ENC(s3cret)")).thenReturn("s3cret");
@@ -102,7 +102,6 @@ class TwitchatWidgetSettingsServiceTest {
     void updateSettings_withNullPassword_keepsExistingEncryptedPassword() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);
-        existing.setWidgetToken(UUID.randomUUID());
         existing.setObsPasswordEncrypted("ENC(old)");
         when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
         when(tokenEncryptionService.decrypt("ENC(old)")).thenReturn("old");
@@ -118,7 +117,6 @@ class TwitchatWidgetSettingsServiceTest {
     void updateSettings_blankHostAndNullPort_fallsBackToPlaceholderDefaults() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);
-        existing.setWidgetToken(UUID.randomUUID());
         when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -132,9 +130,7 @@ class TwitchatWidgetSettingsServiceTest {
     void regenerateToken_doesNotPublishLiveConfig() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);
-        existing.setWidgetToken(UUID.randomUUID());
         when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.regenerateToken(user);
 
@@ -142,17 +138,14 @@ class TwitchatWidgetSettingsServiceTest {
     }
 
     @Test
-    void regenerateToken_replacesTokenAndSaves() {
+    void regenerateToken_delegatesToWidgetTokenService() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);
-        UUID oldToken = UUID.randomUUID();
-        existing.setWidgetToken(oldToken);
         when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         TwitchatWidgetSettings result = service.regenerateToken(user);
 
-        assertThat(result.getWidgetToken()).isNotEqualTo(oldToken);
-        verify(repository).save(existing);
+        assertThat(result).isSameAs(existing);
+        verify(widgetTokenService).regenerate(user);
     }
 }

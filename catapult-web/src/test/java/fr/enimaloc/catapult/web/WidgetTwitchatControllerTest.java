@@ -32,10 +32,10 @@ class WidgetTwitchatControllerTest {
     @Test
     void widgetPage_rendersConfigFromApi() throws Exception {
         UUID token = UUID.randomUUID();
-        when(apiClient.get("/api/twitchat/widget/{token}", Map.class, token.toString()))
+        when(apiClient.get("/api/twitchat/widget/{uuid}", Map.class, token.toString()))
                 .thenReturn(Map.of("obsHost", "127.0.0.1", "obsPort", 4455, "obsPassword", "pw"));
 
-        mvc.perform(get("/widget/twitchat/{token}", token))
+        mvc.perform(get("/widget/twitchat/{uuid}", token))
                 .andExpect(status().isOk())
                 .andExpect(view().name("widget/twitchat"))
                 .andExpect(model().attribute("obsHost", "127.0.0.1"))

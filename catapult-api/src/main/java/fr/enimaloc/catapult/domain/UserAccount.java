@@ -47,6 +47,12 @@ public class UserAccount {
     @Column(name = "bot_enabled", nullable = false)
     private boolean botEnabled = true;
 
+    // Generic per-user identity token for widget-scoped API routes (twitchat widget,
+    // and future ones like game/IGDB/Steam lookups) — one shared secret rather than
+    // a token per feature, so rotating it revokes access everywhere at once.
+    @Column(name = "widget_token", unique = true)
+    private UUID widgetToken;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Status status = Status.ACTIVE;
