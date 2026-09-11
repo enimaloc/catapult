@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
@@ -41,6 +42,10 @@ public class ApiSecurityConfig {
     public SecurityFilterChain devApiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .securityMatcher("/api/**")
+                // Required for @CrossOrigin (see ApiGameInfoController) to actually emit
+                // Access-Control-* headers — without this, Spring Security never delegates
+                // to the CorsConfigurationSource Spring MVC derives from it.
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().permitAll()
                 )
@@ -71,6 +76,10 @@ public class ApiSecurityConfig {
     public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .securityMatcher("/api/**")
+                // Required for @CrossOrigin (see ApiGameInfoController) to actually emit
+                // Access-Control-* headers — without this, Spring Security never delegates
+                // to the CorsConfigurationSource Spring MVC derives from it.
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/health", "/api/config/**", "/api/changelog", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/twitchat/defaults", "/api/game/**").permitAll()
                         .requestMatchers("/api/auth/exchange").permitAll()
