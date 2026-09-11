@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.service.WidgetTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -52,6 +53,14 @@ public class ApiGameInfoController {
 
     // "lang" is a query param rather than relying on Accept-Language: this route is meant to be
     // pasted as a plain URL into an OBS browser source / overlay, which sends no such header.
+    //
+    // Open to any origin: the widget token in the URL is the only access control (same trust
+    // model as pasting the URL into OBS/Twitchat/any other overlay tool), and the response carries
+    // no cookies/credentials, so there's nothing origin-restriction would protect here. Twitchat's
+    // "HTTP call" trigger action in particular fetches this in the background from its own page
+    // context (confirmed via HAR: Origin: https://twitchat.fr) — same quirk as
+    // WidgetTwitchatController.actionPage, generalized to any caller instead of one hardcoded origin.
+    @CrossOrigin(origins = "*")
     @GetMapping("/{uuid}")
     public ResponseEntity<GameInfoResponse> gameInfo(@PathVariable UUID uuid,
                                                       @RequestParam(name = "lang", required = false) String lang) {
