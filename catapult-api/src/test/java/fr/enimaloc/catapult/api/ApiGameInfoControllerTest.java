@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.IgdbService;
 import fr.enimaloc.catapult.service.SteamStoreService;
+import fr.enimaloc.catapult.service.TwLabelService;
 import fr.enimaloc.catapult.service.WidgetTokenService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,7 @@ class ApiGameInfoControllerTest {
     @MockitoBean IgdbService igdbService;
     @MockitoBean IgdbGameDetailsService igdbGameDetailsService;
     @MockitoBean SteamStoreService steamStoreService;
+    @MockitoBean TwLabelService twLabelService;
 
     @Test
     void gameInfo_unknownToken_returns404() throws Exception {
@@ -107,6 +109,8 @@ class ApiGameInfoControllerTest {
         when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "440"))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("1234", "Team Fortress 2")));
         when(igdbGameDetailsService.getDetails("1234")).thenReturn(Optional.of(details));
+        when(twLabelService.resolve("violence", Locale.ENGLISH)).thenReturn("Violence");
+        when(twLabelService.resolve("gore", Locale.ENGLISH)).thenReturn("Gore");
 
         mvc.perform(get("/api/game/{uuid}", token))
                 .andExpect(status().isOk())
@@ -118,15 +122,16 @@ class ApiGameInfoControllerTest {
                 .andExpect(jsonPath("$.twitchGameId").value("658"))
                 .andExpect(jsonPath("$.twitchGameName").value("Team Fortress 2"))
                 .andExpect(jsonPath("$.sourceType").value("STEAM"))
-                .andExpect(jsonPath("$.tws", org.hamcrest.Matchers.containsInAnyOrder("violence", "gore")))
-                .andExpect(jsonPath("$.twsJoined").value("gore, violence"))
+                .andExpect(jsonPath("$.tws", org.hamcrest.Matchers.containsInAnyOrder("Violence", "Gore")))
+                .andExpect(jsonPath("$.twsJoined").value("Gore, Violence"))
                 .andExpect(jsonPath("$.ccls", org.hamcrest.Matchers.containsInAnyOrder("blood", "alcohol")))
                 .andExpect(jsonPath("$.cclsJoined").value("alcohol, blood"))
                 .andExpect(jsonPath("$.platforms", org.hamcrest.Matchers.contains("PC", "Xbox 360")))
                 .andExpect(jsonPath("$.platformsJoined").value("PC, Xbox 360"))
                 .andExpect(jsonPath("$.rating").value(85.0))
                 .andExpect(jsonPath("$.aggregatedRating").value(78.5))
-                .andExpect(jsonPath("$.releaseDate").exists());
+                .andExpect(jsonPath("$.releaseDate").exists())
+                .andExpect(jsonPath("$.version").value(1));
     }
 
     @Test
@@ -229,5 +234,27 @@ class ApiGameInfoControllerTest {
         mvc.perform(get("/api/game/{uuid}?lang=fr", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.storeName").value("Manuel"));
+    }
+
+    @Test
+    void gameInfo_vOmitted_defaultsToLatestVersion() throws Exception {
+        UUID token = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        DetectedGame detected = new DetectedGame(null, GameBinding.SourceType.MANUAL, "Some Unlisted Game");
+
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(user));
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
+        when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, null, GameBinding.SourceType.MANUAL))
+                .thenReturn(Optional.empty());
+        when(igdbService.findByName("Some Unlisted Game")).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/game/{uuid}", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1));
+
+        mvc.perform(get("/api/game/{uuid}?v=1", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1));
     }
 }

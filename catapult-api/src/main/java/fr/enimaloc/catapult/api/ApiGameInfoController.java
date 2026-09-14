@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.IgdbService;
 import fr.enimaloc.catapult.service.SteamStoreService;
+import fr.enimaloc.catapult.service.TwLabelService;
 import fr.enimaloc.catapult.service.WidgetTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
@@ -43,7 +44,13 @@ public class ApiGameInfoController {
     private final IgdbService igdbService;
     private final IgdbGameDetailsService igdbGameDetailsService;
     private final SteamStoreService steamStoreService;
+    private final TwLabelService twLabelService;
     private final MessageSource messageSource;
+
+    // Bumped whenever the response schema changes in a way old callers might not expect
+    // (e.g. "tws" switching from raw ids to localized labels). Callers pin an older value
+    // via "v" to keep receiving that schema; omitting it always tracks the latest one.
+    private static final int LATEST_VERSION = 1;
 
     public record GameInfoResponse(String name, String igdbUrl, GameBinding.SourceType sourceType,
                                     String storeName, String storeUrl, String description,
@@ -51,7 +58,8 @@ public class ApiGameInfoController {
                                     Set<String> tws, String twsJoined,
                                     Set<String> ccls, String cclsJoined,
                                     List<String> platforms, String platformsJoined,
-                                    Double rating, Double aggregatedRating, Instant releaseDate) {}
+                                    Double rating, Double aggregatedRating, Instant releaseDate,
+                                    int version) {}
 
     // "lang" is a query param rather than relying on Accept-Language: this route is meant to be
     // pasted as a plain URL into an OBS browser source / overlay, which sends no such header.
@@ -65,7 +73,8 @@ public class ApiGameInfoController {
     @CrossOrigin(origins = "*")
     @GetMapping("/{uuid}")
     public ResponseEntity<GameInfoResponse> gameInfo(@PathVariable UUID uuid,
-                                                      @RequestParam(name = "lang", required = false) String lang) {
+                                                      @RequestParam(name = "lang", required = false) String lang,
+                                                      @RequestParam(name = "v", required = false) Integer v) {
         Optional<UserAccount> user = widgetTokenService.resolve(uuid);
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -76,20 +85,24 @@ public class ApiGameInfoController {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(buildResponse(user.get(), detected.get(), parseLocale(lang)));
+        return ResponseEntity.ok(buildResponse(user.get(), detected.get(), parseLocale(lang), resolveVersion(v)));
     }
 
     private static Locale parseLocale(String lang) {
         return lang == null || lang.isBlank() ? Locale.ENGLISH : Locale.forLanguageTag(lang);
     }
 
-    private GameInfoResponse buildResponse(UserAccount user, DetectedGame detected, Locale locale) {
+    private static int resolveVersion(Integer v) {
+        return v == null ? LATEST_VERSION : v;
+    }
+
+    private GameInfoResponse buildResponse(UserAccount user, DetectedGame detected, Locale locale, int version) {
         GameBinding binding = gameBindingRepository
                 .findByUserAndSourceIdAndSourceType(user, detected.getSourceId(), detected.getSourceType())
                 .orElse(null);
 
         Optional<IgdbGameDetails> details = resolveIgdbId(detected).flatMap(igdbGameDetailsService::getDetails);
-        Set<String> tws = binding == null ? Set.of() : binding.getTws();
+        Set<String> tws = localizeTws(binding == null ? Set.of() : binding.getTws(), locale);
         Set<String> ccls = binding == null ? Set.of() : binding.getCcls();
         List<String> platforms = details.map(IgdbGameDetails::getPlatforms).orElse(List.of());
 
@@ -112,7 +125,12 @@ public class ApiGameInfoController {
                 String.join(", ", platforms),
                 details.map(IgdbGameDetails::getRating).orElse(null),
                 details.map(IgdbGameDetails::getAggregatedRating).orElse(null),
-                details.map(IgdbGameDetails::getFirstReleaseDate).orElse(null));
+                details.map(IgdbGameDetails::getFirstReleaseDate).orElse(null),
+                version);
+    }
+
+    private Set<String> localizeTws(Set<String> tws, Locale locale) {
+        return tws.stream().map(id -> twLabelService.resolve(id, locale)).collect(Collectors.toSet());
     }
 
     // The store's own description takes priority (locale-matched to the "lang" param), since it's
