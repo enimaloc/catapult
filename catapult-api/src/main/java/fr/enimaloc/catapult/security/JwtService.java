@@ -19,9 +19,10 @@ public class JwtService {
 
     public JwtService(
             SecretKey jwtSecretKey,
-            @Value("${app.jwt.expiry-hours:24}") long expiryHours) {
+            // -1 (the default) means sessions never expire; any non-negative value is taken as hours.
+            @Value("${app.jwt.expiry-hours:-1}") long expiryHours) {
         this.key = jwtSecretKey;
-        this.expiryMillis = TimeUnit.HOURS.toMillis(expiryHours);
+        this.expiryMillis = expiryHours < 0 ? -1 : TimeUnit.HOURS.toMillis(expiryHours);
     }
 
     public String generate(CatapultOAuth2User user) {
@@ -33,15 +34,16 @@ public class JwtService {
     }
 
     public String generateForUser(UserAccount account, List<String> roles) {
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(account.getId().toString())
                 .claim("twitchId", account.getTwitchId())
                 .claim("username", account.getTwitchUsername())
                 .claim("roles", roles)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expiryMillis))
-                .signWith(key)
-                .compact();
+                .issuedAt(new Date());
+        if (expiryMillis >= 0) {
+            builder.expiration(new Date(System.currentTimeMillis() + expiryMillis));
+        }
+        return builder.signWith(key).compact();
     }
 
     public Claims validate(String token) {
