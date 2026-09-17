@@ -15,7 +15,7 @@ public record SteamDetailResponse(String storeUrl, Set<String> ccls, ParentApp p
     public record ParentApp(@JsonIgnore String baseUrl, @JsonUnwrapped SteamStoreService.ResolvedParentApp parentApp) {
         @JsonGetter
         public String more() {
-            return baseUrl + "/api/v" + ApiV2.VERSION + "/steam/" + parentApp.appId();
+            return baseUrl + ApiV2.PATH + "/steam/" + parentApp.appId();
         }
     }
 
@@ -52,20 +52,20 @@ public record SteamDetailResponse(String storeUrl, Set<String> ccls, ParentApp p
         public record Demo(@JsonIgnore String baseUrl, @JsonUnwrapped SteamStoreService.SteamStorePage.Demo demo) {
             @JsonGetter
             public String more() {
-                return baseUrl + "/api/v" + ApiV2.VERSION + "/steam/" + demo.appid();
+                return baseUrl + ApiV2.PATH + "/steam/" + demo.appid();
             }
         }
 
         public record FullGame(@JsonIgnore String baseUrl, @JsonUnwrapped SteamStoreService.SteamStorePage.FullGame fullGame) {
             @JsonGetter
             public String more() {
-                return baseUrl + "/api/v" + ApiV2.VERSION + "/steam/" + fullGame.appid();
+                return baseUrl + ApiV2.PATH + "/steam/" + fullGame.appid();
             }
         }
 
         public record Dlc(int appId, String more) {
             public Dlc(String baseUrl, int appId) {
-                this(appId, baseUrl + "/api/v" + ApiV2.VERSION + "/steam/" + appId);
+                this(appId, baseUrl + ApiV2.PATH + "/steam/" + appId);
             }
         }
     }
