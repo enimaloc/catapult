@@ -1,10 +1,11 @@
 package fr.enimaloc.catapult.api.userapi;
 
 import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import jakarta.servlet.Filter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -43,5 +44,21 @@ public class OpenApiConfig {
                         .description("Optional — the dashboard JWT, if you want the \"uuid\" "
                                 + "examples pre-filled with your own real data instead of a "
                                 + "generic backdoor value. No endpoint here actually requires it."));
+    }
+
+    /**
+     * Defense-in-depth alongside {@link SwaggerUiJwtTransformer}'s use of a URL fragment (never
+     * sent to the server) rather than a query param for the one-time JWT link: a browser that,
+     * despite that, still ends up navigating away from a Swagger UI page carrying a token in its
+     * URL won't leak it to the next origin via Referer.
+     */
+    @Bean
+    public FilterRegistrationBean<Filter> swaggerUiReferrerPolicyFilter() {
+        FilterRegistrationBean<Filter> registration = new FilterRegistrationBean<>((request, response, chain) -> {
+            ((jakarta.servlet.http.HttpServletResponse) response).setHeader("Referrer-Policy", "no-referrer");
+            chain.doFilter(request, response);
+        });
+        registration.addUrlPatterns("/swagger-ui/*", "/api/v3/api-docs", "/api/v3/api-docs/*");
+        return registration;
     }
 }
