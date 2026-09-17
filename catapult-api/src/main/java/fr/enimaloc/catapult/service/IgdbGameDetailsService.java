@@ -8,8 +8,16 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import proto.ExternalGame;
+import proto.Franchise;
 import proto.Game;
+import proto.GameMode;
+import proto.GameVideo;
+import proto.Genre;
+import proto.Keyword;
 import proto.Platform;
+import proto.PlayerPerspective;
+import proto.Screenshot;
+import proto.Theme;
 import proto.Website;
 
 import java.time.Duration;
@@ -110,9 +118,31 @@ public class IgdbGameDetailsService {
         entity.setAggregatedRating(game.getAggregatedRating() > 0 ? game.getAggregatedRating() : null);
         entity.setPlatforms(game.getPlatformsList().stream().map(Platform::getName).toList());
         entity.setDlcNames(game.getDlcsList().stream().map(Game::getName).toList());
+        entity.setDlcIds(game.getDlcsList().stream().map(g -> String.valueOf(g.getId())).toList());
         entity.setSimilarGameNames(game.getSimilarGamesList().stream().map(Game::getName).toList());
+        entity.setSimilarGameIds(game.getSimilarGamesList().stream().map(g -> String.valueOf(g.getId())).toList());
+        entity.setGenres(game.getGenresList().stream().map(Genre::getName).toList());
+        entity.setGameModes(game.getGameModesList().stream().map(GameMode::getName).toList());
+        entity.setThemes(game.getThemesList().stream().map(Theme::getName).toList());
+        entity.setPlayerPerspectives(game.getPlayerPerspectivesList().stream().map(PlayerPerspective::getName).toList());
+        entity.setKeywords(game.getKeywordsList().stream().map(Keyword::getName).toList());
+        entity.setFranchiseNames(game.getFranchisesList().stream().map(Franchise::getName).toList());
+        entity.setScreenshotUrls(game.getScreenshotsList().stream().map(Screenshot::getUrl)
+                .map(IgdbGameDetailsService::normalizeUrl).toList());
+        entity.setVideoIds(game.getVideosList().stream().map(GameVideo::getVideoId).toList());
+        entity.setCoverUrl(game.hasCover() ? normalizeUrl(game.getCover().getUrl()) : null);
+        entity.setStoryline(game.getStoryline().isBlank() ? null : game.getStoryline());
+        // Same 0-vs-unset ambiguity as rating/aggregatedRating above.
+        entity.setTotalRating(game.getTotalRating() > 0 ? game.getTotalRating() : null);
+        entity.setTotalRatingCount(game.getTotalRatingCount() > 0 ? game.getTotalRatingCount() : null);
         entity.setFetchedAt(Instant.now());
         return repository.save(entity);
+    }
+
+    // IGDB image URLs (cover, screenshots) are protocol-relative ("//images.igdb.com/...") —
+    // resolved fine in a browser <img src>, but invalid as a bare API response value.
+    private static String normalizeUrl(String url) {
+        return url != null && url.startsWith("//") ? "https:" + url : url;
     }
 
     private Map<String, String> extractWebsites(Game game) {
