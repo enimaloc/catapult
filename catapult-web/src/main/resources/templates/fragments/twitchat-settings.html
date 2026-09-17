@@ -44,6 +44,10 @@
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button type="submit" class="btn btn-secondary" th:text="#{twitchat_settings.regenerate}">Régénérer le lien</button>
         </form>
+        <p class="text-muted" style="margin-top:4px">
+            <a th:href="@{/swagger-ui/index.html}" target="_blank" rel="noopener"
+               th:text="#{twitchat_settings.api_docs}">Ce lien (et l'API game-info sous-jacente) est documenté ici</a>
+        </p>
     </div>
 
     <div th:if="${twitchatObsHost != null and !#strings.isEmpty(twitchatObsHost)}" id="twitchat-obs-source-check" style="margin-top:16px"
