@@ -27,56 +27,61 @@ import java.nio.charset.StandardCharsets;
  * (it's declared {@code @ConditionalOnMissingBean}) — everything not touched here (css, other
  * assets, oauth2-redirect handling, ...) still goes through the inherited default behavior.
  */
-@Component
+//@Component TODO: Disables until completed
 public class SwaggerUiJwtTransformer extends SwaggerIndexPageTransformer {
 
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
     private static final String JWT_WIDGET = """
-            <div style="padding:10px 16px;background:#1b1b1b;color:#eee;font:14px/1.4 -apple-system,sans-serif;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <label for="catapult-jwt">Dashboard JWT (optional — personalizes the "uuid" example):</label>
-              <input type="password" id="catapult-jwt" style="flex:0 0 340px" placeholder="Paste your JWT here, or open #jwt=... once">
-              <button id="catapult-jwt-save" type="button">Save &amp; reload</button>
-              <button id="catapult-jwt-clear" type="button">Clear</button>
-            </div>
             <script>
               (function () {
-                // A #jwt=... URL fragment is consumed immediately — before swagger-initializer.js's
-                // window.onload runs and builds the requestInterceptor closure below — so a link
-                // with the token pre-filled works without the reload the manual "Save" button needs.
-                // Deliberately a fragment, not a ?jwt=... query param: fragments are never sent to
-                // the server (no access-log/Referer leak) and are stripped right away so the token
-                // doesn't linger in the address bar or browser history any longer than this one load.
-                var fromUrl = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('jwt');
-                if (fromUrl) {
-                  window.localStorage.setItem('catapult-jwt', fromUrl);
-                  window.history.replaceState({}, '', window.location.pathname + window.location.search);
-                }
-
-                var input = document.getElementById('catapult-jwt');
-                var saved = window.localStorage.getItem('catapult-jwt');
-                if (saved) { input.value = saved; }
-                document.getElementById('catapult-jwt-save').addEventListener('click', function () {
-                  if (input.value) { window.localStorage.setItem('catapult-jwt', input.value); }
-                  else { window.localStorage.removeItem('catapult-jwt'); }
-                  window.location.reload();
-                });
-                document.getElementById('catapult-jwt-clear').addEventListener('click', function () {
-                  window.localStorage.removeItem('catapult-jwt');
-                  input.value = '';
-                  window.location.reload();
-                });
-              })();
+                               const uuid = window.localStorage.getItem("catapult_widget_uuid");
+                               if (!uuid) return;
+            
+                               const observer = new MutationObserver(() => {
+                                 for (const el of document.querySelectorAll("input")) {
+                                   if (el.value === "00000000-0000-0000-0001-000000000190") {
+                                     el.value = uuid;
+                                     el.dispatchEvent(new Event("input", { bubbles: true }));
+                                     el.dispatchEvent(new Event("change", { bubbles: true }));
+                                   }
+                                 }
+                               });
+            
+                               observer.observe(document.body, {
+                                 childList: true,
+                                 subtree: true
+                               });
+                             })();
             </script>
             """;
 
     private static final String REQUEST_INTERCEPTOR = """
-            requestInterceptor: function (req) {
-                  var token = window.localStorage.getItem('catapult-jwt');
-                  if (token) { req.headers['Authorization'] = 'Bearer ' + token; }
-                  return req;
-                },
             """;
+
+    private static final String UUID_PLUGIN = """
+        const CatapultPlugin = function() {
+            return {
+                wrapComponents: {
+                    parameterRow: (Original) => (props) => {
+                        const uuid = window.localStorage.getItem('catapult_widget_uuid');
+
+                        if (uuid && props.parameter?.name === 'uuid') {
+                            props = {
+                                ...props,
+                                parameter: {
+                                    ...props.parameter,
+                                    example: uuid
+                                }
+                            };
+                        }
+
+                        return Original(props);
+                    }
+                }
+            };
+        };
+        """;
 
     public SwaggerUiJwtTransformer(SwaggerUiConfigProperties swaggerUiConfig, SwaggerUiOAuthProperties swaggerUiOAuthProperties,
             SwaggerWelcomeCommon swaggerWelcomeCommon, ObjectMapperProvider objectMapperProvider) {
@@ -94,7 +99,7 @@ public class SwaggerUiJwtTransformer extends SwaggerIndexPageTransformer {
         }
         if (PATH_MATCHER.match("**/swagger-ui/**/index.html", url)) {
             String html = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            String patched = html.replace("<div id=\"swagger-ui\"></div>", JWT_WIDGET + "\n    <div id=\"swagger-ui\"></div>");
+            String patched = html.replace("<div id=\"swagger-ui\"></div>",  "<div id=\"swagger-ui\"></div>\n" + JWT_WIDGET);
             return new TransformedResource(resource, patched.getBytes(StandardCharsets.UTF_8));
         }
         return super.transform(request, resource, transformerChain);
