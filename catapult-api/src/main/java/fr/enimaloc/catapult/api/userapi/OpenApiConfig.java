@@ -35,15 +35,7 @@ public class OpenApiConfig {
 
     @Bean
     public OpenAPI openApi() {
-        return new OpenAPI()
-                .servers(List.of(new Server().url(baseUrl)))
-                .schemaRequirement(BEARER_SCHEME, new SecurityScheme()
-                        .type(SecurityScheme.Type.HTTP)
-                        .scheme("bearer")
-                        .bearerFormat("JWT")
-                        .description("Optional — the dashboard JWT, if you want the \"uuid\" "
-                                + "examples pre-filled with your own real data instead of a "
-                                + "generic backdoor value. No endpoint here actually requires it."));
+        return new OpenAPI().servers(List.of(new Server().url(baseUrl)));
     }
 
     /**
