@@ -36,8 +36,12 @@ public class DtddService {
     public Optional<DtddTopics> getTopics(String igdbId, String name) {
         DtddGameMapping mapping = mappingService.resolve(igdbId, name);
         if (mapping.getDtddId() == null) return Optional.empty();
-        Long dtddId = mapping.getDtddId();
+        return getTopics(mapping.getDtddId());
+    }
 
+    /** Same cache-then-fetch logic as {@link #getTopics(String, String)}, for callers that already have the dtddId (e.g. the /dtdd/{dtddId} detail route) and don't need the igdb-name mapping step. */
+    @Transactional
+    public Optional<DtddTopics> getTopics(long dtddId) {
         Optional<DtddTopicsCache> cached = topicsRepo.findById(dtddId);
         if (cached.isPresent()) {
             DtddTopicsCache c = cached.get();
