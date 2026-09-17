@@ -6,6 +6,13 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.service.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +24,9 @@ import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping(value = {"/api/game", "/api/v1"})
+@RequestMapping(value = {"/api/game"})
+@Tag(name = "User API v1 (frozen)", description = "Legacy, schema-frozen widget game-info "
+        + "endpoint. No new fields ship here — see \"User API v2\" for anything new.")
 public class UserApiV1Controller {
 
     private final WidgetTokenService widgetTokenService;
@@ -52,10 +61,33 @@ public class UserApiV1Controller {
     // "HTTP call" trigger action in particular fetches this in the background from its own page
     // context (confirmed via HAR: Origin: https://twitchat.fr) — same quirk as
     // WidgetTwitchatController.actionPage, generalized to any caller instead of one hardcoded origin.
+    @Operation(summary = "Get the widget's currently-detected game (v1, frozen schema)",
+            description = "Resolves the widget token to a user, looks up their last-detected "
+                    + "game, and returns a flat, IGDB/Steam-enriched summary of it (store name, "
+                    + "trigger warnings, content labels, platforms, rating...). This schema is "
+                    + "frozen — pin to it for stability, or move to /api/v2 for new fields.",
+            deprecated = true)
+    @ApiResponse(responseCode = "200", description = "The widget's currently-detected game.")
+    @ApiResponse(responseCode = "404", description = "Unknown widget token, or the widget has no "
+            + "detected game yet.", content = @Content)
     @CrossOrigin(origins = "*")
     @GetMapping("/{uuid}")
-    public ResponseEntity<GameInfoResponse> gameInfo(@PathVariable UUID uuid,
-                                                     @RequestParam(name = "lang", required = false) String lang) {
+    public ResponseEntity<GameInfoResponse> gameInfo(
+            @Parameter(description = "Per-user widget token (not a JWT) — the sole access control "
+                    + "for this public, no-cookie endpoint.", in = ParameterIn.PATH)
+            @PathVariable UUID uuid,
+            @Parameter(description = "BCP 47 language tag for localized fields (store name, "
+                    + "trigger warning labels, Steam description). Falls back to the "
+                    + "Accept-Language request header, then English.",
+                    example = "fr", schema = @Schema(defaultValue = "en"))
+            @RequestParam(name = "lang", required = false) String lang,
+            @Parameter(description = "Fallback for \"lang\" when that query param is omitted — "
+                    + "used by clients that can set headers (this route is also meant to be "
+                    + "pasted as a plain URL into an OBS browser source, which sends no custom "
+                    + "headers, hence \"lang\" taking priority). The highest-quality (\"q=\") tag "
+                    + "is used; unparseable values are ignored.",
+                    in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         Optional<UserAccount> user = widgetTokenService.resolve(uuid);
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -66,11 +98,29 @@ public class UserApiV1Controller {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(buildResponse(user.get(), detected.get(), parseLocale(lang)));
+        return ResponseEntity.ok(buildResponse(user.get(), detected.get(), parseLocale(lang, acceptLanguage)));
     }
 
-    private static Locale parseLocale(String lang) {
-        return lang == null || lang.isBlank() ? Locale.ENGLISH : Locale.forLanguageTag(lang);
+    // "lang" wins when present (it's the mechanism that works from a plain pasted OBS URL, with
+    // no header control); Accept-Language is the fallback for clients that do set headers. A
+    // request with neither, or an unparseable Accept-Language value, gets English — deliberately
+    // not the JVM/server default locale, which would make behavior depend on the deploy
+    // environment instead of being a documented, stable contract.
+    private static Locale parseLocale(String lang, String acceptLanguage) {
+        if (lang != null && !lang.isBlank()) {
+            return Locale.forLanguageTag(lang);
+        }
+        if (acceptLanguage != null && !acceptLanguage.isBlank()) {
+            try {
+                List<Locale.LanguageRange> ranges = Locale.LanguageRange.parse(acceptLanguage);
+                if (!ranges.isEmpty()) {
+                    return Locale.forLanguageTag(ranges.get(0).getRange());
+                }
+            } catch (IllegalArgumentException ignored) {
+                // malformed Accept-Language header — fall through to the default
+            }
+        }
+        return Locale.ENGLISH;
     }
 
     private GameInfoResponse buildResponse(UserAccount user, DetectedGame detected, Locale locale) {
