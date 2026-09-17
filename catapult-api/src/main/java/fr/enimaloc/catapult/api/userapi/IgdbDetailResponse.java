@@ -24,7 +24,7 @@ public record IgdbDetailResponse(@JsonIgnore String baseUrl, String slug, String
     public record IgdbRef(String igdbId, String name, @JsonIgnore String baseUrl) {
         @JsonGetter
         public String more() {
-            return baseUrl + "/api/v" + ApiV2.VERSION + "/igdb/" + igdbId;
+            return baseUrl + ApiV2.PATH + "/igdb/" + igdbId;
         }
     }
 
@@ -72,7 +72,7 @@ public record IgdbDetailResponse(@JsonIgnore String baseUrl, String slug, String
     public record WebsiteLink(String url, @JsonIgnore String baseUrl, @JsonIgnore String path) {
         @JsonGetter
         public String more() {
-            return baseUrl + "/api/v" + ApiV2.VERSION + path;
+            return baseUrl + ApiV2.PATH + path;
         }
     }
 

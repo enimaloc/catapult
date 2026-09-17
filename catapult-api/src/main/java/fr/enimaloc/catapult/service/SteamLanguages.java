@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service;
 
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -7,7 +8,19 @@ import java.util.Locale;
  * parameter of {@code appdetails}, e.g. {@code "french"}) — Steam does not accept ISO codes.
  * Unmapped languages fall back to {@code "english"}, Steam's own default.
  */
-final class SteamLanguages {
+public final class SteamLanguages {
+
+    /**
+     * BCP 47 tags for every language {@link #fromLocale} maps to a distinct Steam language name
+     * (kept in sync with the switch below by hand — there's no reflection-based way to derive
+     * this list from a switch expression's case labels). Informational/for API docs only (e.g.
+     * the "lang" parameter's Swagger schema on Steam-only endpoints); {@link #fromLocale} itself
+     * doesn't consult this list and falls back to English for anything not listed here too.
+     */
+    public static final List<String> SUPPORTED_LOCALES = List.of(
+            "en", "fr", "de", "it", "es", "pt", "pt-BR", "zh", "zh-TW", "zh-HK", "ru", "ja", "ko",
+            "th", "tr", "uk", "nl", "da", "fi", "no", "sv", "pl", "hu", "cs", "ro", "bg", "el",
+            "vi", "ar", "id");
 
     private SteamLanguages() {
     }
