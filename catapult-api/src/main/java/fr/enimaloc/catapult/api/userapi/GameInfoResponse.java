@@ -6,10 +6,6 @@ import com.fasterxml.jackson.annotation.JsonView;
 import fr.enimaloc.catapult.service.SteamStoreService;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -86,17 +82,17 @@ public record GameInfoResponse(@JsonView(Summary.class) boolean inGame, IgdbObje
             String appId, String name, String description, SteamStoreService.SteamStorePage.Category[] categories,
             String[] developers, String legalNotice, String headerImage,
             SteamStoreService.SteamStorePage.ReleaseDate steamReleaseDate,
-            SteamStoreService.SteamStorePage.ContentDescriptors contentDescriptors, String more)
+            SteamStoreService.SteamStorePage.ContentDescriptors contentDescriptors,
+            @JsonIgnore Locale locale, String more)
             implements HasName, HasDescription, HasReleaseDate, HasMore {
         @Override
         public Instant releaseDate() {
-            return LocalDate.parse(steamReleaseDate.date(), DateTimeFormatter.ofPattern("d MMM uuuu"))
-                    .atStartOfDay(ZoneId.of("UTC")).toInstant(); // TODO Fix with Locale
+            return SteamReleaseDate.parse(steamReleaseDate, locale);
         }
 
         @Override
         public boolean comingSoon() {
-            return steamReleaseDate.comingSoon();
+            return steamReleaseDate != null && steamReleaseDate.comingSoon();
         }
     }
 
