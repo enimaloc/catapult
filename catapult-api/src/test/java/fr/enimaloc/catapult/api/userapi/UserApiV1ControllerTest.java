@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.api;
+package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.config.I18nConfig;
 import fr.enimaloc.catapult.domain.GameBinding;
@@ -25,7 +25,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.Mockito.when;
@@ -34,14 +33,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(
-        controllers = ApiGameInfoController.class,
+        controllers = UserApiV1Controller.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 // /api/game/** is permitAll (widget-token authenticated, no JWT) in ApiSecurityConfig,
 // so disabling filters here does not hide an auth regression.
 @AutoConfigureMockMvc(addFilters = false)
 @Import(I18nConfig.class)
-class ApiGameInfoControllerTest {
+class UserApiV1ControllerTest {
 
     @Autowired MockMvc mvc;
 
@@ -237,7 +236,7 @@ class ApiGameInfoControllerTest {
     }
 
     @Test
-    void gameInfo_vOmitted_defaultsToLatestVersion() throws Exception {
+    void gameInfo_alwaysReturnsVersion1() throws Exception {
         UUID token = UUID.randomUUID();
         UserAccount user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -250,10 +249,6 @@ class ApiGameInfoControllerTest {
         when(igdbService.findByName("Some Unlisted Game")).thenReturn(Optional.empty());
 
         mvc.perform(get("/api/game/{uuid}", token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.version").value(1));
-
-        mvc.perform(get("/api/game/{uuid}?v=1", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value(1));
     }

@@ -1,42 +1,24 @@
-package fr.enimaloc.catapult.api;
+package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.IgdbGameDetails;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
-import fr.enimaloc.catapult.service.GameStateService;
-import fr.enimaloc.catapult.service.IgdbGameDetailsService;
-import fr.enimaloc.catapult.service.IgdbService;
-import fr.enimaloc.catapult.service.SteamStoreService;
-import fr.enimaloc.catapult.service.TwLabelService;
-import fr.enimaloc.catapult.service.WidgetTokenService;
+import fr.enimaloc.catapult.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
-// Authenticated by the same per-user widget token as the twitchat widget (see
-// WidgetTokenService) — meant for public overlay/OBS consumption, not the
-// JWT-authenticated dashboard API. Deliberately not nested under /api/widget:
-// this normalizes game info, it isn't itself a widget.
-@RestController
-@RequestMapping("/api/game")
 @RequiredArgsConstructor
-public class ApiGameInfoController {
+@RestController
+@RequestMapping(value = {"/api/game", "/api/v1"})
+public class UserApiV1Controller {
 
     private final WidgetTokenService widgetTokenService;
     private final GameStateService gameStateService;
@@ -47,19 +29,19 @@ public class ApiGameInfoController {
     private final TwLabelService twLabelService;
     private final MessageSource messageSource;
 
-    // Bumped whenever the response schema changes in a way old callers might not expect
-    // (e.g. "tws" switching from raw ids to localized labels). Callers pin an older value
-    // via "v" to keep receiving that schema; omitting it always tracks the latest one.
-    private static final int LATEST_VERSION = 1;
+    // V1's response schema is now frozen: schema changes ship as a new controller (see
+    // UserApiV2Controller) under its own path prefix rather than as a query-param-selected
+    // variant of this one.
+    private static final int VERSION = 1;
 
     public record GameInfoResponse(String name, String igdbUrl, GameBinding.SourceType sourceType,
-                                    String storeName, String storeUrl, String description,
-                                    String twitchGameId, String twitchGameName,
-                                    Set<String> tws, String twsJoined,
-                                    Set<String> ccls, String cclsJoined,
-                                    List<String> platforms, String platformsJoined,
-                                    Double rating, Double aggregatedRating, Instant releaseDate,
-                                    int version) {}
+                                   String storeName, String storeUrl, String description,
+                                   String twitchGameId, String twitchGameName,
+                                   Set<String> tws, String twsJoined,
+                                   Set<String> ccls, String cclsJoined,
+                                   List<String> platforms, String platformsJoined,
+                                   Double rating, Double aggregatedRating, Instant releaseDate,
+                                   int version) {}
 
     // "lang" is a query param rather than relying on Accept-Language: this route is meant to be
     // pasted as a plain URL into an OBS browser source / overlay, which sends no such header.
@@ -73,8 +55,7 @@ public class ApiGameInfoController {
     @CrossOrigin(origins = "*")
     @GetMapping("/{uuid}")
     public ResponseEntity<GameInfoResponse> gameInfo(@PathVariable UUID uuid,
-                                                      @RequestParam(name = "lang", required = false) String lang,
-                                                      @RequestParam(name = "v", required = false) Integer v) {
+                                                     @RequestParam(name = "lang", required = false) String lang) {
         Optional<UserAccount> user = widgetTokenService.resolve(uuid);
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -85,18 +66,14 @@ public class ApiGameInfoController {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(buildResponse(user.get(), detected.get(), parseLocale(lang), resolveVersion(v)));
+        return ResponseEntity.ok(buildResponse(user.get(), detected.get(), parseLocale(lang)));
     }
 
     private static Locale parseLocale(String lang) {
         return lang == null || lang.isBlank() ? Locale.ENGLISH : Locale.forLanguageTag(lang);
     }
 
-    private static int resolveVersion(Integer v) {
-        return v == null ? LATEST_VERSION : v;
-    }
-
-    private GameInfoResponse buildResponse(UserAccount user, DetectedGame detected, Locale locale, int version) {
+    private GameInfoResponse buildResponse(UserAccount user, DetectedGame detected, Locale locale) {
         GameBinding binding = gameBindingRepository
                 .findByUserAndSourceIdAndSourceType(user, detected.getSourceId(), detected.getSourceType())
                 .orElse(null);
@@ -126,7 +103,7 @@ public class ApiGameInfoController {
                 details.map(IgdbGameDetails::getRating).orElse(null),
                 details.map(IgdbGameDetails::getAggregatedRating).orElse(null),
                 details.map(IgdbGameDetails::getFirstReleaseDate).orElse(null),
-                version);
+                VERSION);
     }
 
     private Set<String> localizeTws(Set<String> tws, Locale locale) {
@@ -154,7 +131,7 @@ public class ApiGameInfoController {
     private Optional<String> resolveIgdbId(DetectedGame detected) {
         return (detected.getSourceId() != null
                 ? igdbService.findByExternalAppId(detected.getSourceType(), detected.getSourceId())
-                        .or(() -> igdbService.findByName(detected.getSourceName()))
+                .or(() -> igdbService.findByName(detected.getSourceName()))
                 : igdbService.findByName(detected.getSourceName()))
                 .map(IgdbService.IgdbGame::id);
     }
