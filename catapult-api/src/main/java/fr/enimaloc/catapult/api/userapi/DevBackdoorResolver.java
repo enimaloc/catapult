@@ -70,4 +70,40 @@ public class DevBackdoorResolver {
         }).orElse(sourceId);
         return Optional.of(new DetectedGame(sourceId, type, name));
     }
+
+    /**
+     * Inverse of {@link #resolve}: builds a backdoor UUID that decodes back to the given
+     * (type, sourceId) pair — used to turn a real {@link GameBinding} into a "try it out"-able
+     * example (see the OpenAPI OperationCustomizer). Only STEAM (plain decimal appId) and XBOX
+     * (base36 product id) round-trip through this scheme; BATTLENET/MANUAL/MINECRAFT don't have a
+     * nibble assigned at all, and any sourceId that doesn't parse for its type is also rejected.
+     */
+    public Optional<UUID> encode(GameBinding.SourceType type, String sourceId) {
+        if (sourceId == null || sourceId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return switch (type) {
+                case STEAM -> {
+                    long payload = Long.parseLong(sourceId);
+                    if (payload < 0 || (payload & ~BACKDOOR_MASK_SECOND_ENTIER) != 0) {
+                        yield Optional.empty(); // negative, or doesn't fit the 48-bit low payload
+                    }
+                    yield Optional.of(new UUID(0L, (1L << 48) | payload));
+                }
+                case XBOX -> {
+                    long payload = Long.parseLong(sourceId, 36);
+                    if (payload < 0) {
+                        yield Optional.empty(); // shouldn't happen: 36^12 < 2^63, see class javadoc
+                    }
+                    long lowPayload = payload & BACKDOOR_MASK_SECOND_ENTIER;
+                    long highPayload = (payload >>> 48) & BACKDOOR_MASK_MSB_PAYLOAD;
+                    yield Optional.of(new UUID(highPayload, (2L << 48) | lowPayload));
+                }
+                default -> Optional.empty();
+            };
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
 }
