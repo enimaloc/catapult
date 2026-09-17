@@ -65,6 +65,7 @@ dependencies {
 
     // JWT generation/validation
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:$jjwtVersion")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:$jjwtVersion")
 
