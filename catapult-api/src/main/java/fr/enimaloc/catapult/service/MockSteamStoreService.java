@@ -32,4 +32,9 @@ public class MockSteamStoreService implements SteamStoreService {
     public Optional<String> fetchDescription(String appId, Locale locale) {
         return Optional.empty();
     }
+
+    @Override
+    public Optional<SteamStorePage> fetchData(String appId, Locale locale, boolean resolveEffectiveParent) {
+        return Optional.empty();
+    }
 }
