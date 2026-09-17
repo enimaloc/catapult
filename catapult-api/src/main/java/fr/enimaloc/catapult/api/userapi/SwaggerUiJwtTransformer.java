@@ -35,12 +35,26 @@ public class SwaggerUiJwtTransformer extends SwaggerIndexPageTransformer {
     private static final String JWT_WIDGET = """
             <div style="padding:10px 16px;background:#1b1b1b;color:#eee;font:14px/1.4 -apple-system,sans-serif;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <label for="catapult-jwt">Dashboard JWT (optional — personalizes the "uuid" example):</label>
-              <input type="password" id="catapult-jwt" style="flex:0 0 340px" placeholder="Paste your JWT here">
+              <input type="password" id="catapult-jwt" style="flex:0 0 340px" placeholder="Paste your JWT here, or open ?jwt=... once">
               <button id="catapult-jwt-save" type="button">Save &amp; reload</button>
               <button id="catapult-jwt-clear" type="button">Clear</button>
             </div>
             <script>
               (function () {
+                // A ?jwt=... query param is consumed immediately — before swagger-initializer.js's
+                // window.onload runs and builds the requestInterceptor closure below — so a link
+                // with the token pre-filled works without the reload the manual "Save" button needs.
+                // The param is stripped right away so the token doesn't linger in the address bar
+                // or browser history any longer than this one load.
+                var params = new URLSearchParams(window.location.search);
+                var fromUrl = params.get('jwt');
+                if (fromUrl) {
+                  window.localStorage.setItem('catapult-jwt', fromUrl);
+                  params.delete('jwt');
+                  var query = params.toString();
+                  window.history.replaceState({}, '', window.location.pathname + (query ? '?' + query : '') + window.location.hash);
+                }
+
                 var input = document.getElementById('catapult-jwt');
                 var saved = window.localStorage.getItem('catapult-jwt');
                 if (saved) { input.value = saved; }
