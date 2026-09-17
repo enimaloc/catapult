@@ -111,12 +111,13 @@ public class UserApiV2Controller {
 
         GameInfoResponse.SteamObject steam = null;
         if (detected.get().getSourceType() == GameBinding.SourceType.STEAM && detected.get().getSourceId() != null) {
-            Optional<SteamStoreService.SteamStorePage> pageOpt = steamStoreService.fetchData(detected.get().getSourceId(), parseLocale(lang));
+            Locale steamLocale = parseLocale(lang);
+            Optional<SteamStoreService.SteamStorePage> pageOpt = steamStoreService.fetchData(detected.get().getSourceId(), steamLocale);
             if (pageOpt.isPresent()) {
                 SteamStoreService.SteamStorePage page = pageOpt.get();
                 steam = new GameInfoResponse.SteamObject(detected.get().getSourceId(), page.name(), page.shortDescription(),
                         page.categories(), page.developers(), page.legalNotice(), page.headerImage(),
-                        page.releaseDate(), page.contentDescriptors(),
+                        page.releaseDate(), page.contentDescriptors(), steamLocale,
                         moreUrl("/steam/" + detected.get().getSourceId()));
             }
         }
@@ -174,7 +175,8 @@ public class UserApiV2Controller {
     @GetMapping("/steam/{appId}")
     public ResponseEntity<SteamDetailResponse> steamDetail(@PathVariable String appId,
                                                             @RequestParam(name = "lang", required = false) String lang) {
-        Optional<SteamStoreService.SteamStorePage> page = steamStoreService.fetchData(appId, parseLocale(lang), false);
+        Locale steamLocale = parseLocale(lang);
+        Optional<SteamStoreService.SteamStorePage> page = steamStoreService.fetchData(appId, steamLocale, false);
         if (page.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -182,7 +184,7 @@ public class UserApiV2Controller {
         SteamStoreService.ResolvedParentApp parentApp = steamStoreService.resolveEffectiveApp(appId).orElse(null);
         return ResponseEntity.ok(new SteamDetailResponse("https://store.steampowered.com/app/" + appId,
                 ccls, parentApp == null ? null : new SteamDetailResponse.ParentApp(baseUrl, parentApp),
-                new SteamDetailResponse.Page(baseUrl, page.get())));
+                new SteamDetailResponse.Page(baseUrl, steamLocale, page.get())));
     }
 
     @GetMapping("/xbox/{productId}")
