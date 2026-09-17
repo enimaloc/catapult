@@ -58,18 +58,13 @@ public class ApiSecurityConfig {
     }
 
     @Bean
+    @Profile("dev")
     BearerTokenResolver bearerTokenResolver() {
         DefaultBearerTokenResolver resolver = new DefaultBearerTokenResolver();
 
         return request -> {
             if (request.getRequestURI().startsWith("/api/config/app")
-                    || request.getRequestURI().startsWith("/api/config/providers")
-                    // Swagger UI's own requestInterceptor (see SwaggerUiJwtTransformer) attaches
-                    // whatever JWT is saved in the browser to this request unconditionally, so it
-                    // can be stale/malformed long after the user pasted it — resolving it here
-                    // would 401 the whole docs page instead of just falling back to the generic
-                    // "uuid" example. ExampleUuidCustomizer decodes it itself, tolerating failure.
-                    || request.getRequestURI().startsWith("/api/v3/api-docs")) {
+                    || request.getRequestURI().startsWith("/api/config/providers")) {
                 return null; // Ignore le header Authorization
             }
             return resolver.resolve(request);
