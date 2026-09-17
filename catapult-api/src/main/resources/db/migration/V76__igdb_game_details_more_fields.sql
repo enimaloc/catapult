@@ -1,0 +1,12 @@
+ALTER TABLE igdb_game_details ADD COLUMN genres_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE igdb_game_details ADD COLUMN game_modes_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE igdb_game_details ADD COLUMN themes_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE igdb_game_details ADD COLUMN player_perspectives_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE igdb_game_details ADD COLUMN keywords_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE igdb_game_details ADD COLUMN franchise_names_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE igdb_game_details ADD COLUMN screenshot_urls_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE igdb_game_details ADD COLUMN video_ids_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE igdb_game_details ADD COLUMN cover_url VARCHAR(512);
+ALTER TABLE igdb_game_details ADD COLUMN storyline TEXT;
+ALTER TABLE igdb_game_details ADD COLUMN total_rating DOUBLE PRECISION;
+ALTER TABLE igdb_game_details ADD COLUMN total_rating_count INTEGER;

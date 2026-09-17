@@ -66,7 +66,62 @@ public class IgdbGameDetails {
     @Column(name = "dlc_names_json", nullable = false, columnDefinition = "jsonb")
     private List<String> dlcNames = new ArrayList<>();
 
+    // Same index order as dlcNames (both built from a single pass over Game#getDlcsList() in
+    // IgdbGameDetailsService), so callers can zip them into (id, name) pairs.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "dlc_ids_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> dlcIds = new ArrayList<>();
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "similar_game_names_json", nullable = false, columnDefinition = "jsonb")
     private List<String> similarGameNames = new ArrayList<>();
+
+    // Same index order as similarGameNames — see dlcIds above.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "similar_game_ids_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> similarGameIds = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "genres_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> genres = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "game_modes_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> gameModes = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "themes_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> themes = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "player_perspectives_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> playerPerspectives = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "keywords_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> keywords = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "franchise_names_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> franchiseNames = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "screenshot_urls_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> screenshotUrls = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "video_ids_json", nullable = false, columnDefinition = "jsonb")
+    private List<String> videoIds = new ArrayList<>();
+
+    @Column(name = "cover_url", length = 512)
+    private String coverUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String storyline;
+
+    @Column(name = "total_rating")
+    private Double totalRating;
+
+    @Column(name = "total_rating_count")
+    private Integer totalRatingCount;
 }
