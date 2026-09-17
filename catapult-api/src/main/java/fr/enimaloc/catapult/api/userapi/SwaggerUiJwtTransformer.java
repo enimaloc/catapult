@@ -16,72 +16,44 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Replaces springdoc's default Swagger UI index page/initializer so a dashboard JWT can be
- * attached to every request Swagger UI makes — including the very first fetch of
- * /api/v3/api-docs itself, which the built-in "Authorize" dialog does NOT cover (it only applies
- * to later "Try it out" calls, well after the spec — and its example values — were already
- * generated server-side). See {@link ExampleUuidCustomizer}, which reads that request's auth to
- * resolve the "uuid" path parameter's example.
+ * Swaps the generic backdoor "uuid" example for the caller's own widget token, entirely
+ * client-side: the dashboard (twitchat-settings.html) already writes it to
+ * {@code localStorage['catapult_widget_uuid']} for a logged-in user, and this page is same-origin
+ * with it (both sit behind nginx on the same host) — no server round-trip, no auth token of any
+ * kind ever touches this feature.
  *
  * <p>Registering this as a bean overrides springdoc's own {@code SwaggerIndexTransformer}
  * (it's declared {@code @ConditionalOnMissingBean}) — everything not touched here (css, other
  * assets, oauth2-redirect handling, ...) still goes through the inherited default behavior.
  */
-//@Component TODO: Disables until completed
+@Component
 public class SwaggerUiJwtTransformer extends SwaggerIndexPageTransformer {
 
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
-    private static final String JWT_WIDGET = """
+    private static final String GENERIC_BACKDOOR_UUID = "00000000-0000-0000-0001-000000000190";
+
+    private static final String UUID_SWAP_SCRIPT = """
             <script>
               (function () {
-                               const uuid = window.localStorage.getItem("catapult_widget_uuid");
-                               if (!uuid) return;
-            
-                               const observer = new MutationObserver(() => {
-                                 for (const el of document.querySelectorAll("input")) {
-                                   if (el.value === "00000000-0000-0000-0001-000000000190") {
-                                     el.value = uuid;
-                                     el.dispatchEvent(new Event("input", { bubbles: true }));
-                                     el.dispatchEvent(new Event("change", { bubbles: true }));
-                                   }
-                                 }
-                               });
-            
-                               observer.observe(document.body, {
-                                 childList: true,
-                                 subtree: true
-                               });
-                             })();
-            </script>
-            """;
+                var uuid = window.localStorage.getItem('catapult_widget_uuid');
+                if (!uuid) { return; }
 
-    private static final String REQUEST_INTERCEPTOR = """
-            """;
-
-    private static final String UUID_PLUGIN = """
-        const CatapultPlugin = function() {
-            return {
-                wrapComponents: {
-                    parameterRow: (Original) => (props) => {
-                        const uuid = window.localStorage.getItem('catapult_widget_uuid');
-
-                        if (uuid && props.parameter?.name === 'uuid') {
-                            props = {
-                                ...props,
-                                parameter: {
-                                    ...props.parameter,
-                                    example: uuid
-                                }
-                            };
-                        }
-
-                        return Original(props);
+                // Swagger UI only materializes an <input> for a parameter once "Try it out" is
+                // clicked, pre-filled from the (generic, backend-baked) example — so watch for it
+                // rather than trying to patch the spec/schema up front.
+                new MutationObserver(function () {
+                  document.querySelectorAll('input').forEach(function (el) {
+                    if (el.value === '%s') {
+                      el.value = uuid;
+                      el.dispatchEvent(new Event('input', { bubbles: true }));
+                      el.dispatchEvent(new Event('change', { bubbles: true }));
                     }
-                }
-            };
-        };
-        """;
+                  });
+                }).observe(document.body, { childList: true, subtree: true });
+              })();
+            </script>
+            """.formatted(GENERIC_BACKDOOR_UUID);
 
     public SwaggerUiJwtTransformer(SwaggerUiConfigProperties swaggerUiConfig, SwaggerUiOAuthProperties swaggerUiOAuthProperties,
             SwaggerWelcomeCommon swaggerWelcomeCommon, ObjectMapperProvider objectMapperProvider) {
@@ -91,15 +63,9 @@ public class SwaggerUiJwtTransformer extends SwaggerIndexPageTransformer {
     @Override
     public Resource transform(HttpServletRequest request, Resource resource, ResourceTransformerChain transformerChain) throws IOException {
         String url = resource.getURL().toString();
-        if (PATH_MATCHER.match("**/swagger-ui/**/swagger-initializer.js", url)) {
-            Resource base = super.transform(request, resource, transformerChain);
-            String js = new String(base.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            String patched = js.replaceFirst("SwaggerUIBundle\\(\\{", "SwaggerUIBundle({\n    " + REQUEST_INTERCEPTOR);
-            return new TransformedResource(resource, patched.getBytes(StandardCharsets.UTF_8));
-        }
         if (PATH_MATCHER.match("**/swagger-ui/**/index.html", url)) {
             String html = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            String patched = html.replace("<div id=\"swagger-ui\"></div>",  "<div id=\"swagger-ui\"></div>\n" + JWT_WIDGET);
+            String patched = html.replace("<div id=\"swagger-ui\"></div>", "<div id=\"swagger-ui\"></div>\n" + UUID_SWAP_SCRIPT);
             return new TransformedResource(resource, patched.getBytes(StandardCharsets.UTF_8));
         }
         return super.transform(request, resource, transformerChain);
