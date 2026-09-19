@@ -7,6 +7,8 @@ import fr.enimaloc.catapult.domain.GameBinding;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
+import fr.enimaloc.catapult.api.userapi.ApiV2;
+import fr.enimaloc.catapult.api.userapi.DevBackdoorResolver;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.repository.DtddGameCacheRepository;
@@ -78,6 +80,10 @@ public class ApiChannelDataController {
     private final DtddGameCacheRepository dtddGameCacheRepo;
     private final DtddMappingProposalRepository dtddProposalRepo;
     private final OAuthTokenRepository oAuthTokenRepository;
+    private final DevBackdoorResolver devBackdoorResolver;
+
+    private static final Set<GameBinding.SourceType> BACKDOOR_ENCODABLE =
+            Set.of(GameBinding.SourceType.STEAM, GameBinding.SourceType.XBOX);
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -129,6 +135,7 @@ public class ApiChannelDataController {
 
         Optional<DetectedGame> currentGame = gameStateService.getLastKnownGame(channelUser);
         GameDto currentGameDto = currentGame.map(g -> new GameDto(g.getSourceName(), g.getSourceType().name())).orElse(null);
+        String exampleUuid = resolveExampleUuid(channelUser, currentGame);
 
         PageRequest pageRequest = PageRequest.of(page, 20);
         Page<GameBinding> bindings;
@@ -247,8 +254,42 @@ public class ApiChannelDataController {
                 steamOfflineMode,
                 steamProfileCacheTtlMinutes,
                 hasXboxProvider,
-                hasXbox
+                hasXbox,
+                exampleUuid
         );
+    }
+
+    /**
+     * A "try it out"-able uuid for the Swagger docs' {@code uuid} path parameter (see
+     * SwaggerUiJwtTransformer / twitchat-settings.html, which stores this in
+     * {@code localStorage['catapult_widget_uuid']} for a logged-in dashboard user):
+     * <ol>
+     *   <li>the currently detected game, backdoor-encoded, if its source type supports it — more
+     *       demonstrative than the widget token alone, which would still resolve correctly but
+     *       just look like the same live data either way;
+     *   <li>otherwise the most recently touched encodable binding on record;
+     *   <li>otherwise the account's own widget token — this is the actual point of the feature:
+     *       a real, logged-in user should never fall through to the generic shared example.
+     * </ol>
+     * The generic example (ApiV2.GENERIC_UUID_EXAMPLE, baked into the spec as the schema default)
+     * is what an anonymous Swagger visitor sees — this method is never involved for them, since
+     * nothing here runs unless they're on their own /channels/{username} dashboard page.
+     */
+    private String resolveExampleUuid(UserAccount channelUser, Optional<DetectedGame> currentGame) {
+        Optional<UUID> encoded = currentGame
+                .filter(game -> BACKDOOR_ENCODABLE.contains(game.getSourceType()))
+                .flatMap(game -> devBackdoorResolver.encode(game.getSourceType(), game.getSourceId()));
+
+        if (encoded.isEmpty()) {
+            encoded = gameBindingRepository
+                    .findFirstByUserAndSourceTypeInOrderByUpdatedAtDesc(channelUser, BACKDOOR_ENCODABLE)
+                    .flatMap(binding -> devBackdoorResolver.encode(binding.getSourceType(), binding.getSourceId()));
+        }
+
+        return encoded.map(UUID::toString)
+                .orElseGet(() -> channelUser.getWidgetToken() != null
+                        ? channelUser.getWidgetToken().toString()
+                        : ApiV2.GENERIC_UUID_EXAMPLE);
     }
 
     @PostMapping("/steam/refresh-profile-cache")
@@ -446,7 +487,8 @@ public class ApiChannelDataController {
             boolean steamOfflineMode,
             long steamProfileCacheTtlMinutes,
             boolean hasXboxProvider,
-            boolean hasXbox
+            boolean hasXbox,
+            String exampleUuid
     ) {}
 
     public record ChannelUserDto(String id, String twitchId, String twitchUsername, String profileImageUrl) {}

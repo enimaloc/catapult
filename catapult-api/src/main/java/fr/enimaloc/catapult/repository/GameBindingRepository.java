@@ -26,6 +26,15 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
 
     Optional<GameBinding> findByIdAndUser(UUID id, UserAccount user);
 
+    /**
+     * Most recently touched binding of one of the given source types — used to fall back to "the
+     * last game they played" for a Swagger "try it out" example when nothing is currently detected
+     * (see ApiChannelDataController).
+     */
+    Optional<GameBinding> findFirstByUserAndSourceTypeInOrderByUpdatedAtDesc(
+        UserAccount user, java.util.Collection<GameBinding.SourceType> sourceTypes
+    );
+
     void deleteByUser(UserAccount user);
 
     List<GameBinding> findAllByStatusAndIgnoredFalse(GameBinding.Status status);

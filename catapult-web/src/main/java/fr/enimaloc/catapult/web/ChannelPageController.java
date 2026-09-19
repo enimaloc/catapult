@@ -177,6 +177,7 @@ public class ChannelPageController {
         model.addAttribute("steamProfileCacheTtlMinutes", data.steamProfileCacheTtlMinutes());
         model.addAttribute("hasXboxProvider", data.hasXboxProvider());
         model.addAttribute("hasXbox", data.hasXbox());
+        model.addAttribute("widgetExampleUuid", data.exampleUuid());
 
         // Liaison Minecraft : uniquement pour le propriétaire (l'API est scoped au JWT courant)
         if (data.isOwner()) {
@@ -296,7 +297,8 @@ public class ChannelPageController {
             boolean steamOfflineMode,
             long steamProfileCacheTtlMinutes,
             boolean hasXboxProvider,
-            boolean hasXbox
+            boolean hasXbox,
+            String exampleUuid
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
