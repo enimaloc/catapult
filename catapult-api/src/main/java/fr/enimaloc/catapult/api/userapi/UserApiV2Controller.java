@@ -175,9 +175,16 @@ public class UserApiV2Controller {
             Optional<SteamStoreService.SteamStorePage> pageOpt = steamStoreService.fetchData(detected.get().getSourceId(), locale);
             if (pageOpt.isPresent()) {
                 SteamStoreService.SteamStorePage page = pageOpt.get();
+                GameInfoResponse.IaDisclosure ia = steamStoreService.fetchIADisclosure(detected.get().getSourceId(), locale)
+                        .map(html -> {
+                            boolean hasDisclosure = SteamIADisclosure.hasDisclosure(html);
+                            String note = hasDisclosure ? SteamIADisclosure.extractDeveloperDescription(html).orElse(null) : null;
+                            return new GameInfoResponse.IaDisclosure(hasDisclosure, note);
+                        })
+                        .orElse(new GameInfoResponse.IaDisclosure(false, null));
                 steam = new GameInfoResponse.SteamObject(detected.get().getSourceId(), page.name(), page.shortDescription(),
                         page.categories(), page.developers(), page.legalNotice(), page.headerImage(),
-                        page.releaseDate(), page.contentDescriptors(), locale,
+                        page.releaseDate(), page.contentDescriptors(), ia, locale,
                         moreUrl("/steam/" + detected.get().getSourceId()));
             }
         }
@@ -270,8 +277,15 @@ public class UserApiV2Controller {
         }
         Set<String> ccls = steamStoreService.fetchCcls(List.of(appId)).getOrDefault(appId, Set.of());
         SteamStoreService.ResolvedParentApp parentApp = steamStoreService.resolveEffectiveApp(appId).orElse(null);
+        GameInfoResponse.IaDisclosure ia = steamStoreService.fetchIADisclosure(appId, steamLocale)
+                .map(html -> {
+                    boolean hasDisclosure = SteamIADisclosure.hasDisclosure(html);
+                    String note = hasDisclosure ? SteamIADisclosure.extractDeveloperDescription(html).orElse(null) : null;
+                    return new GameInfoResponse.IaDisclosure(hasDisclosure, note);
+                })
+                .orElse(new GameInfoResponse.IaDisclosure(false, null));
         return ResponseEntity.ok(new SteamDetailResponse("https://store.steampowered.com/app/" + appId,
-                ccls, parentApp == null ? null : new SteamDetailResponse.ParentApp(baseUrl, parentApp),
+                ccls, ia, parentApp == null ? null : new SteamDetailResponse.ParentApp(baseUrl, parentApp),
                 new SteamDetailResponse.Page(baseUrl, steamLocale, page.get())));
     }
 

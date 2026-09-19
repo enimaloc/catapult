@@ -64,6 +64,12 @@ public record GameInfoResponse(@JsonView(Summary.class) boolean inGame, IgdbObje
                 .findFirst().orElse(null);
     }
 
+    @JsonView(Summary.class)
+    public IaDisclosure ia() {
+        return streamObjectsOf(HasIaDisclosure.class).map(HasIaDisclosure::ia)
+                .findFirst().orElse(null);
+    }
+
     public record IgdbObject(String igdbId, String slug, String summary, String coverUrl,
                              List<String> genres, String more)
             implements HasDescription, HasMore {
@@ -83,8 +89,8 @@ public record GameInfoResponse(@JsonView(Summary.class) boolean inGame, IgdbObje
             String[] developers, String legalNotice, String headerImage,
             SteamStoreService.SteamStorePage.ReleaseDate steamReleaseDate,
             SteamStoreService.SteamStorePage.ContentDescriptors contentDescriptors,
-            @JsonIgnore Locale locale, String more)
-            implements HasName, HasDescription, HasReleaseDate, HasMore {
+            IaDisclosure ia, @JsonIgnore Locale locale, String more)
+            implements HasName, HasDescription, HasReleaseDate, HasMore, HasIaDisclosure {
         @Override
         public Instant releaseDate() {
             return SteamReleaseDate.parse(steamReleaseDate, locale);
@@ -107,6 +113,8 @@ public record GameInfoResponse(@JsonView(Summary.class) boolean inGame, IgdbObje
                                  String more)
             implements HasMore, HasTW {}
 
+    public record IaDisclosure(@JsonView(Summary.class) boolean hasDisclosure, @JsonView(Summary.class) String note) {}
+
     public interface Summary {}
 
     public interface HasName {
@@ -128,5 +136,9 @@ public record GameInfoResponse(@JsonView(Summary.class) boolean inGame, IgdbObje
     public interface HasReleaseDate {
         boolean comingSoon();
         Instant releaseDate();
+    }
+
+    public interface HasIaDisclosure {
+        IaDisclosure ia();
     }
 }
