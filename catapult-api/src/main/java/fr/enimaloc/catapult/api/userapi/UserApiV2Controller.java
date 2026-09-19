@@ -95,7 +95,8 @@ public class UserApiV2Controller {
     public ResponseEntity<GameInfoResponse> gameInfo(
             @Parameter(description = "Per-user widget token, or a dev/test backdoor UUID (see "
                     + "DevBackdoorResolver) — the sole access control for this public endpoint.",
-                    in = ParameterIn.PATH)
+                    in = ParameterIn.PATH, example = ApiV2.GENERIC_UUID_EXAMPLE,
+                    schema = @Schema(defaultValue = ApiV2.GENERIC_UUID_EXAMPLE))
             @PathVariable UUID uuid,
             @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
             @RequestParam(name = "lang", required = false) String lang,
@@ -132,7 +133,8 @@ public class UserApiV2Controller {
     public ResponseEntity<GameInfoResponse> summary(
             @Parameter(description = "Per-user widget token, or a dev/test backdoor UUID (see "
                     + "DevBackdoorResolver) — the sole access control for this public endpoint.",
-                    in = ParameterIn.PATH)
+                    in = ParameterIn.PATH, example = ApiV2.GENERIC_UUID_EXAMPLE,
+                    schema = @Schema(defaultValue = ApiV2.GENERIC_UUID_EXAMPLE))
             @PathVariable UUID uuid,
             @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
             @RequestParam(name = "lang", required = false) String lang,
