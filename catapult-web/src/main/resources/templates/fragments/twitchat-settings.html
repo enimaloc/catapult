@@ -51,7 +51,7 @@
     </div>
 
     <div id="widget-settings"
-         th:attr="data-obs-host=${twitchatObsHost},data-obs-port=${twitchatObsPort},data-obs-password=${twitchatObsPassword},data-widget-url=${twitchatWidgetUrl},data-widget-token=${twitchatSettings.widgetToken}"></div>
+         th:attr="data-obs-host=${twitchatObsHost},data-obs-port=${twitchatObsPort},data-obs-password=${twitchatObsPassword},data-widget-url=${twitchatWidgetUrl},data-widget-token=${twitchatSettings.widgetToken},data-example-uuid=${widgetExampleUuid}"></div>
     <div th:if="${twitchatObsHost != null and !#strings.isEmpty(twitchatObsHost)}" id="twitchat-obs-source-check" style="margin-top:16px"
          th:attr="data-obs-host=${twitchatObsHost},data-obs-port=${twitchatObsPort},data-obs-password=${twitchatObsPassword},data-widget-url=${twitchatWidgetUrl},data-widget-token=${twitchatSettings.widgetToken}">
         <p id="twitchat-obs-source-status" class="text-muted"
@@ -272,7 +272,10 @@
         (function () {
             let settings = document.getElementById("widget-settings")
             if (settings) {
-                localStorage.setItem('catapult_widget_uuid', settings.dataset.widgetToken);
+                // Prefer a uuid that already resolves to real game data (current game, else last
+                // played) over the plain widget token, which just returns "not currently playing"
+                // when nothing is detected — see ApiChannelDataController#resolveExampleUuid.
+                localStorage.setItem('catapult_widget_uuid', settings.dataset.exampleUuid || settings.dataset.widgetToken);
             }
         })()
     </script>
