@@ -11,7 +11,8 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
 
-public record SteamDetailResponse(String storeUrl, Set<String> ccls, ParentApp parentApp, Page page) {
+public record SteamDetailResponse(String storeUrl, Set<String> ccls, GameInfoResponse.IaDisclosure ia,
+                                  ParentApp parentApp, Page page) {
     public record ParentApp(@JsonIgnore String baseUrl, @JsonUnwrapped SteamStoreService.ResolvedParentApp parentApp) {
         @JsonGetter
         public String more() {
