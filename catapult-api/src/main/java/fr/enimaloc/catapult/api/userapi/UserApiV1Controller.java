@@ -74,7 +74,9 @@ public class UserApiV1Controller {
     @GetMapping("/{uuid}")
     public ResponseEntity<GameInfoResponse> gameInfo(
             @Parameter(description = "Per-user widget token (not a JWT) — the sole access control "
-                    + "for this public, no-cookie endpoint.", in = ParameterIn.PATH)
+                    + "for this public, no-cookie endpoint.", in = ParameterIn.PATH,
+                    example = ApiV2.GENERIC_UUID_EXAMPLE,
+                    schema = @Schema(defaultValue = ApiV2.GENERIC_UUID_EXAMPLE))
             @PathVariable UUID uuid,
             @Parameter(description = "BCP 47 language tag for localized fields (store name, "
                     + "trigger warning labels, Steam description). Falls back to the "

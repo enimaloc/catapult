@@ -31,13 +31,18 @@ public class SwaggerUiJwtTransformer extends SwaggerIndexPageTransformer {
 
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
-    private static final String GENERIC_BACKDOOR_UUID = "00000000-0000-0000-0001-000000000190";
-
     private static final String UUID_SWAP_SCRIPT = """
             <script>
               (function () {
                 var uuid = window.localStorage.getItem('catapult_widget_uuid');
                 if (!uuid) { return; }
+
+                // Swagger UI's <input> is React-controlled: assigning el.value directly goes
+                // through the setter React itself wrapped, so React's tracked state never notices
+                // the change and "Execute" still submits the old value even though the field LOOKS
+                // updated. Going through the native setter first (bypassing React's override) is
+                // what makes the follow-up 'input' event actually register as a real change.
+                var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
 
                 // Swagger UI only materializes an <input> for a parameter once "Try it out" is
                 // clicked, pre-filled from the (generic, backend-baked) example — so watch for it
@@ -45,7 +50,7 @@ public class SwaggerUiJwtTransformer extends SwaggerIndexPageTransformer {
                 new MutationObserver(function () {
                   document.querySelectorAll('input').forEach(function (el) {
                     if (el.value === '%s') {
-                      el.value = uuid;
+                      nativeInputValueSetter.call(el, uuid);
                       el.dispatchEvent(new Event('input', { bubbles: true }));
                       el.dispatchEvent(new Event('change', { bubbles: true }));
                     }
@@ -53,7 +58,7 @@ public class SwaggerUiJwtTransformer extends SwaggerIndexPageTransformer {
                 }).observe(document.body, { childList: true, subtree: true });
               })();
             </script>
-            """.formatted(GENERIC_BACKDOOR_UUID);
+            """.formatted(ApiV2.GENERIC_UUID_EXAMPLE);
 
     public SwaggerUiJwtTransformer(SwaggerUiConfigProperties swaggerUiConfig, SwaggerUiOAuthProperties swaggerUiOAuthProperties,
             SwaggerWelcomeCommon swaggerWelcomeCommon, ObjectMapperProvider objectMapperProvider) {
