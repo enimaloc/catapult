@@ -32,7 +32,7 @@ class IgdbGetCurrentGameFunctionTest {
         assertThat(fn.namespace()).isEqualTo("igdb");
         assertThat(fn.name()).isEqualTo("getCurrentGame");
         assertThat(fn.parameterNames()).isEmpty();
-        assertThat(fn.returnKeys()).containsExactly("name", "summary", "releaseDate", "storeUrl",
+        assertThat(fn.returnKeys()).containsExactly("name", "summary", "steamReleaseDate", "storeUrl",
             "storeSteamUrl", "storeXboxUrl", "storeBattlenetUrl", "storeOfficialUrl",
             "igdbUrl", "ageRating", "rating", "criticRating", "platforms");
 
@@ -40,7 +40,7 @@ class IgdbGetCurrentGameFunctionTest {
         Map<String, Object> result = (Map<String, Object>) fn.invoke(user, new Object[0]);
         assertThat(result.get("name")).isEqualTo("Valorant");
         assertThat(result.get("summary")).isEqualTo("A tactical shooter");
-        assertThat(result.get("releaseDate")).isEqualTo("2020-06-02");
+        assertThat(result.get("steamReleaseDate")).isEqualTo("2020-06-02");
         assertThat(result.get("storeUrl")).isEqualTo("https://store/730");
         assertThat(result.get("storeSteamUrl")).isEqualTo("https://store/730");
         assertThat(result.get("storeXboxUrl")).isEqualTo("");
@@ -79,7 +79,7 @@ class IgdbGetCurrentGameFunctionTest {
         Map<String, Object> result = (Map<String, Object>) fn.invoke(user, new Object[0]);
         assertThat(result.get("name")).isEqualTo("Unknown Game");
         assertThat(result.get("summary")).isEqualTo("");
-        assertThat(result.get("releaseDate")).isEqualTo("");
+        assertThat(result.get("steamReleaseDate")).isEqualTo("");
         assertThat(result.get("igdbUrl")).isEqualTo("");
         assertThat(result.get("platforms")).isEqualTo("");
     }

@@ -56,7 +56,7 @@ public class ChatCommandContextGetMigration implements CommandLineRunner {
     private static final Map<String, Expression> REPLACEMENTS = Map.ofEntries(
         Map.entry("game#name", new PropertyGetExpr(IGDB_CURRENT_GAME, "name")),
         Map.entry("game#summary", new PropertyGetExpr(IGDB_CURRENT_GAME, "summary")),
-        Map.entry("game#release_date", new PropertyGetExpr(IGDB_CURRENT_GAME, "releaseDate")),
+        Map.entry("game#release_date", new PropertyGetExpr(IGDB_CURRENT_GAME, "steamReleaseDate")),
         Map.entry("game#store#url", new PropertyGetExpr(IGDB_CURRENT_GAME, "storeUrl")),
         Map.entry("game#store#steam", new PropertyGetExpr(IGDB_CURRENT_GAME, "storeSteamUrl")),
         Map.entry("game#store#xbox", new PropertyGetExpr(IGDB_CURRENT_GAME, "storeXboxUrl")),

@@ -40,7 +40,7 @@ class ChatCommandLegacyPresetMigrationTest {
         new ChatCommandLegacyPresetMigration(repository).run();
 
         assertThat(def.getTemplate()).isEqualTo(
-            "{if igdb#getCurrentGame().releaseDate != \"\"}Sortie le {print igdb#getCurrentGame().releaseDate}{/if}");
+            "{if igdb#getCurrentGame().steamReleaseDate != \"\"}Sortie le {print igdb#getCurrentGame().steamReleaseDate}{/if}");
     }
 
     @Test
