@@ -46,6 +46,6 @@ public interface ChatCommandServiceGateway {
     Optional<List<String>> igdbDlcs(String igdbId);
 
     /** The fields IGDB actually returns for a game search — {@code igdb#getGame}'s return shape. */
-    record IgdbGame(String id, String name, String summary, String releaseDate, String rating,
+    record IgdbGame(String id, String name, String summary, String steamReleaseDate, String rating,
                      String criticRating, String platforms, String igdbUrl) {}
 }

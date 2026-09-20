@@ -87,7 +87,7 @@ class DefaultChatCommandServiceGatewayTest {
         assertThat(game.id()).isEqualTo("1234");
         assertThat(game.name()).isEqualTo("VALORANT");
         assertThat(game.summary()).isEqualTo("A tactical shooter.");
-        assertThat(game.releaseDate()).isEqualTo("2020-06-02");
+        assertThat(game.steamReleaseDate()).isEqualTo("2020-06-02");
         assertThat(game.rating()).isEqualTo("85");
         assertThat(game.criticRating()).isEqualTo("80");
         assertThat(game.platforms()).isEqualTo("PC, PlayStation 5");
@@ -106,7 +106,7 @@ class DefaultChatCommandServiceGatewayTest {
         assertThat(result.get().id()).isEqualTo("1234");
         assertThat(result.get().name()).isEqualTo("VALORANT");
         assertThat(result.get().summary()).isEmpty();
-        assertThat(result.get().releaseDate()).isEmpty();
+        assertThat(result.get().steamReleaseDate()).isEmpty();
     }
 
     @Test

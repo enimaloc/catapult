@@ -21,7 +21,7 @@ import java.util.List;
 public class IgdbGetCurrentGameFunction implements ServiceFunction {
 
     /** All-{@code ""} fields when no game is currently detected or IGDB has no data for it. */
-    public record Result(String name, String summary, String releaseDate, String storeUrl,
+    public record Result(String name, String summary, String steamReleaseDate, String storeUrl,
                           String storeSteamUrl, String storeXboxUrl, String storeBattlenetUrl,
                           String storeOfficialUrl, String igdbUrl, String ageRating, String rating,
                           String criticRating, String platforms) {}

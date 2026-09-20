@@ -25,7 +25,7 @@ class IgdbGetGameFunctionTest {
         assertThat(fn.name()).isEqualTo("getGame");
         assertThat(fn.parameterNames()).containsExactly("query");
         assertThat(fn.returnKeys()).containsExactly(
-            "id", "name", "summary", "releaseDate", "rating", "criticRating", "platforms", "igdbUrl");
+            "id", "name", "summary", "steamReleaseDate", "rating", "criticRating", "platforms", "igdbUrl");
 
         Object result = fn.invoke(null, new Object[]{"Valorant"});
 
@@ -35,7 +35,7 @@ class IgdbGetGameFunctionTest {
         assertThat(map).containsEntry("id", "1234")
             .containsEntry("name", "VALORANT")
             .containsEntry("summary", "A tactical shooter.")
-            .containsEntry("releaseDate", "2020-06-02")
+            .containsEntry("steamReleaseDate", "2020-06-02")
             .containsEntry("rating", "85")
             .containsEntry("criticRating", "80")
             .containsEntry("platforms", "PC, PlayStation 5")
@@ -58,7 +58,7 @@ class IgdbGetGameFunctionTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> map = (Map<String, Object>) result;
         assertThat(map).containsOnlyKeys(
-            "id", "name", "summary", "releaseDate", "rating", "criticRating", "platforms", "igdbUrl");
+            "id", "name", "summary", "steamReleaseDate", "rating", "criticRating", "platforms", "igdbUrl");
         assertThat(map.values()).allMatch(""::equals);
     }
 }

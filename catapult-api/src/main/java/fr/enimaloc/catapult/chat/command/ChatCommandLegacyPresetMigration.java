@@ -51,13 +51,13 @@ public class ChatCommandLegacyPresetMigration implements CommandLineRunner {
         ),
         "release", Map.of(
             "Released on {game#release_date}",
-            "{if igdb#getCurrentGame().releaseDate != \"\"}Released on {print igdb#getCurrentGame().releaseDate}{/if}",
+            "{if igdb#getCurrentGame().steamReleaseDate != \"\"}Released on {print igdb#getCurrentGame().steamReleaseDate}{/if}",
             "Sortie le {game#release_date}",
-            "{if igdb#getCurrentGame().releaseDate != \"\"}Sortie le {print igdb#getCurrentGame().releaseDate}{/if}",
-            "Released on {print igdb#getCurrentGame().releaseDate}",
-            "{if igdb#getCurrentGame().releaseDate != \"\"}Released on {print igdb#getCurrentGame().releaseDate}{/if}",
-            "Sortie le {print igdb#getCurrentGame().releaseDate}",
-            "{if igdb#getCurrentGame().releaseDate != \"\"}Sortie le {print igdb#getCurrentGame().releaseDate}{/if}"
+            "{if igdb#getCurrentGame().steamReleaseDate != \"\"}Sortie le {print igdb#getCurrentGame().steamReleaseDate}{/if}",
+            "Released on {print igdb#getCurrentGame().steamReleaseDate}",
+            "{if igdb#getCurrentGame().steamReleaseDate != \"\"}Released on {print igdb#getCurrentGame().steamReleaseDate}{/if}",
+            "Sortie le {print igdb#getCurrentGame().steamReleaseDate}",
+            "{if igdb#getCurrentGame().steamReleaseDate != \"\"}Sortie le {print igdb#getCurrentGame().steamReleaseDate}{/if}"
         ),
         "igdb", Map.of(
             "IGDB page: {game#igdb#url}",
