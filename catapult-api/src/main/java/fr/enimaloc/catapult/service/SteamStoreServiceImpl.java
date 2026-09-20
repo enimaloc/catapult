@@ -1,7 +1,5 @@
 package fr.enimaloc.catapult.service;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
-import com.fasterxml.jackson.annotation.JsonValue;
 import fr.enimaloc.catapult.domain.SteamAppParentEntry;
 import fr.enimaloc.catapult.getter.SteamPlaytestRedirectResolver;
 import fr.enimaloc.catapult.repository.SteamAppParentRepository;
@@ -208,7 +206,7 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             String effectiveAppId = resolveEffectiveParent ? resolveEffectiveApp(appId)
                     .map(ResolvedParentApp::appId)
                     .orElse(appId) : appId;
-            String lang = SteamLanguages.fromLocale(locale);
+            SteamLanguage lang = SteamLanguage.fromLocale(locale);
             record ResponseData(boolean success, SteamStorePage data) {}
             try {
                 Map<String, ResponseData> response = restClient.get()
@@ -219,6 +217,27 @@ public class SteamStoreServiceImpl implements SteamStoreService {
                 return Optional.ofNullable(response.get(effectiveAppId).data());
             } catch (Exception e) {
                 log.warn("Steam fetchData failed for appId={}: {}", appId, e.getMessage(), e);
+                return Optional.empty();
+            }
+        });
+    }
+
+    @Override
+    public Optional<String> fetchIADisclosure(String appId, Locale locale) {
+        return apiObservations.observe("steam_store", "fetch_ia_disclosure", () -> {
+            String effectiveAppId = resolveEffectiveApp(appId)
+                    .map(ResolvedParentApp::appId)
+                    .orElse(appId);
+            SteamLanguage lang = SteamLanguage.fromLocale(locale);
+            try {
+                String response = restClient.get()
+                        .uri("https://store.steampowered.com/app/" + effectiveAppId + "?l=" + lang)
+                        .retrieve()
+                        .body(String.class);
+                if (response == null || response.isBlank()) return Optional.empty();
+                return Optional.of(response);
+            } catch (Exception e) {
+                log.warn("Steam fetchIADisclosure failed for appId={}: {}", appId, e.getMessage(), e);
                 return Optional.empty();
             }
         });
