@@ -81,7 +81,7 @@ public class ApiSecurityConfig {
                 // to the CorsConfigurationSource Spring MVC derives from it.
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health", "/api/config/**", "/api/changelog", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/twitchat/defaults", "/api/game/**", "/api/user/**", "/api/v3/api-docs").permitAll()
+                        .requestMatchers("/api/health", "/api/config/**", "/api/changelog", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/twitchat/defaults", "/api/game/**", "/api/user/**", "/api/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/auth/exchange").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
                         .requestMatchers("/api/admin/**").access(new WebExpressionAuthorizationManager(
