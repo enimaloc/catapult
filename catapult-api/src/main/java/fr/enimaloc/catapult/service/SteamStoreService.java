@@ -3,12 +3,9 @@ package fr.enimaloc.catapult.service;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.RequiredArgsConstructor;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -35,6 +32,8 @@ public interface SteamStoreService {
      * none in that language or the app doesn't resolve (unknown appId, API failure).
      */
     Optional<String> fetchDescription(String appId, Locale locale);
+
+    Optional<String> fetchIADisclosure(String appId, Locale locale);
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SteamStorePage(
