@@ -1,0 +1,85 @@
+<mdui-layout-main th:fragment="landing" id="landing">
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-glow"></div>
+        <div class="hero-content">
+            <mdui-chip class="hero-chip">
+                <mdui-icon slot="icon" name="rocket_launch"></mdui-icon>
+                <span th:text="#{hero.badge}">hero.badge</span>
+            </mdui-chip>
+
+            <h1 th:text="#{hero.title}">hero.title</h1>
+
+            <p class="hero-description" th:text="#{hero.description}">hero.description</p>
+
+            <div class="hero-actions">
+                <mdui-button variant="filled" size="large" href="/oauth2/authorization/twitch">
+                    <mdui-icon slot="icon" name="login"></mdui-icon>
+                    <span th:text="#{hero.login}">hero.login</span>
+                </mdui-button>
+
+                <mdui-button variant="outlined" size="large" href="#features" th:text="#{hero.discover}">hero.discover
+                </mdui-button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="section">
+        <div class="section-header">
+            <span class="eyebrow" th:text="#{features.eyebrow}">features.eyebrow</span>
+            <h2 th:text="#{features.title}">features.title</h2>
+            <p th:text="#{features.description}">features.description</p>
+        </div>
+
+        <div class="features-grid">
+            <mdui-card th:each="feature : ${features}" variant="outlined" class="feature-card">
+                <div class="feature-icon">
+                    <mdui-icon th:name="${feature.icon()}"></mdui-icon>
+                </div>
+                <h3 th:text="#{${feature.titleKey()}}"></h3>
+                <p th:text="#{${feature.descriptionKey()}}"></p>
+            </mdui-card>
+        </div>
+    </section>
+
+
+    <!-- Platforms -->
+    <section class="platform-section">
+        <div class="section-header">
+            <span class="eyebrow" th:text="#{platforms.eyebrow}">platforms.eyebrow</span>
+            <h2 th:text="#{platforms.title}"></h2>
+            <p th:text="#{platforms.description}"></p>
+        </div>
+
+        <div class="platforms">
+            <mdui-card th:each="plaftorm : ${platforms}" variant="outlined" class="platform-card">
+                <div th:if="${plaftorm.iconType().equals(T(fr.enimaloc.catapult.dto.index.PlatformDto.IconType).TEXT)}"
+                     th:text="${plaftorm.icon()}" class="platform-icon"></div>
+                <div th:if="${plaftorm.iconType().equals(T(fr.enimaloc.catapult.dto.index.PlatformDto.IconType).MDUI_ICON)}"
+                     class="platform-icon">
+                    <mdui-icon th:name="${plaftorm.icon()}"></mdui-icon>
+                </div>
+                <div class="platform-content">
+                    <h3 th:text="#{${plaftorm.titleKey()}}"></h3>
+                    <p th:text="#{${plaftorm.descriptionKey()}}"></p>
+                </div>
+            </mdui-card>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <mdui-card variant="outlined" class="cta-card">
+            <div class="cta-content">
+                <span class="eyebrow" th:text="#{cta.eyebrow}">cta.eyebrow</span>
+                <h2 th:text="#{cta.title}">cta.title</h2>
+                <p th:text="#{cta.description}">cta.description</p>
+            </div>
+
+            <mdui-button variant="filled" size="large" href="/oauth2/authorization/twitch" th:text="#{cta.button}">
+                <mdui-icon slot="end-icon" name="arrow_forward"></mdui-icon>
+            </mdui-button>
+        </mdui-card>
+    </section>
+</mdui-layout-main>

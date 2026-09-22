@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Catapult</title>
+
+    <link rel="stylesheet" href="_static/mdui/2.1.4/mdui.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="/css/catapult.css">
+
+    <script src="_static/mdui/2.1.4/mdui.global.js"></script>
+    <script th:inline="javascript">
+        window.Catapult = {
+            page: /*[[${page}]]*/,
+            spa: /*[[${spa}]]*/
+        };
+    </script>
+</head>
+
+<body>
+<mdui-layout>
+    <!-- Navigation -->
+    <mdui-top-app-bar class="app-bar">
+        <a data-link href="/">
+            <mdui-top-app-bar-title>
+            <span class="brand">
+                <span class="brand-icon">🚀</span>
+                <span th:text="#{app.brand}">app.brand</span>
+            </span>
+            </mdui-top-app-bar-title>
+        </a>
+
+        <div slot="end-icon">
+            <mdui-button variant="text" href="/oauth2/authorization/twitch" th:text="#{nav.login}">nav.login
+            </mdui-button>
+        </div>
+
+    </mdui-top-app-bar>
+
+    <div id="app">
+        <!--        <th:block th:if="${page.isEmpty()}"><div th:replace="~{pages/landing :: landing}"></div></th:block>-->
+        <!--        <th:block th:if="${page == 'privacy'}"><div th:replace="~{pages/privacy :: privacy}"></div></th:block>-->
+        <th:block th:each="spaPage : ${spa}" th:if="${page == spaPage.getId()}">
+            <div th:replace="~{${spaPage.getTemplate()} :: ${spaPage.getFragment()}}"></div>
+        </th:block>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-brand">
+            <span class="brand-icon">🚀</span><span th:text="#{app.brand}">app.brand</span>
+        </div>
+
+        <div class="footer-links">
+            <a data-link href="/privacy" th:text="#{footer.privacy}">footer.privacy</a>
+            <a href="https://github.com/enimaloc/catapult" target="_blank" rel="noopener noreferrer"
+               th:text="#{footer.github}">footer.github</a>
+            <span class="version" th:text="#{footer.version('TODO: Fetch version')}">footer.version</span>
+        </div>
+    </footer>
+</mdui-layout>
+
+<script src="/js/catapult.js"></script>
+<script src="/js/spa.js"></script>
+</body>
+</html>
