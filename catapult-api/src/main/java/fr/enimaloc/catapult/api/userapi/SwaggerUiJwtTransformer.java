@@ -6,6 +6,7 @@ import org.springdoc.core.properties.SwaggerUiOAuthProperties;
 import org.springdoc.core.providers.ObjectMapperProvider;
 import org.springdoc.webmvc.ui.SwaggerIndexPageTransformer;
 import org.springdoc.webmvc.ui.SwaggerWelcomeCommon;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
@@ -27,6 +28,7 @@ import java.nio.charset.StandardCharsets;
  * assets, oauth2-redirect handling, ...) still goes through the inherited default behavior.
  */
 @Component
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class SwaggerUiJwtTransformer extends SwaggerIndexPageTransformer {
 
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
