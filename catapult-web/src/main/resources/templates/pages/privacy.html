@@ -1,0 +1,22 @@
+<div th:fragment="privacy">
+    <section class="section privacy-section">
+        <div class="section-header">
+            <span class="eyebrow" th:text="#{privacy.eyebrow}">privacy.eyebrow</span>
+            <h1 th:text="#{privacy.title}">privacy.title</h1>
+            <p th:text="#{privacy.description}">privacy.description</p>
+        </div>
+
+        <mdui-card class="privacy-card" variant="outlined">
+            <div class="privacy-content"th:utext="${privacy}"></div>
+
+            <mdui-divider></mdui-divider>
+
+            <p th:text="#{privacy.last-update(
+                    ${#temporals.format(lastUpdate,#messages.msg('format.date'))},
+                    ${#temporals.format(lastUpdate,#messages.msg('format.time'))}
+                )}">
+                privacy.last-update(${#temporals.format(lastUpdate,T(java.time.format.FormatStyle).LONG,#locale})
+            </p>
+        </mdui-card>
+    </section>
+</div>

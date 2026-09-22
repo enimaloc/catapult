@@ -1,0 +1,914 @@
+:root {
+    color-scheme: dark;
+
+    /*
+     * Catapult colors
+     */
+
+    --catapult-background: #0b0d12;
+
+    --catapult-surface: #11141b;
+    --catapult-surface-elevated: #181c25;
+
+    --catapult-border: #292e3a;
+    --catapult-border-hover: #3b4252;
+
+    --catapult-text: #f4f6fb;
+    --catapult-text-secondary: #aeb4c0;
+    --catapult-text-muted: #747b89;
+
+    --catapult-primary: #8b5cf6;
+    --catapult-primary-hover: #a78bfa;
+    --catapult-primary-dark: #6d28d9;
+
+    --catapult-max-width: 1180px;
+    --catapult-radius: 20px;
+
+    --catapult-gradient:
+            linear-gradient(
+                    135deg,
+                    #a78bfa 0%,
+                    #818cf8 50%,
+                    #60a5fa 100%
+            );
+}
+
+
+/*
+ * Base
+ */
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+
+    background: var(--catapult-background);
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+
+    background: var(--catapult-background);
+
+    color: var(--catapult-text);
+
+    font-family:
+            Inter,
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
+}
+
+
+/*
+ * mdui
+ */
+
+mdui-layout {
+    min-height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+
+    background: var(--catapult-background);
+}
+
+mdui-layout-main {
+    flex: 1 0 auto;
+
+    background: var(--catapult-background);
+}
+
+mdui-top-app-bar {
+    --mdui-color-surface: rgba(11, 13, 18, 0.78);
+}
+
+
+/*
+ * Navigation
+ */
+
+.app-bar {
+    position: sticky;
+
+    top: 0;
+
+    z-index: 100;
+
+    backdrop-filter: blur(18px);
+
+    border-bottom:
+            1px solid rgba(255, 255, 255, 0.06);
+}
+
+.brand {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 9px;
+
+    font-weight: 700;
+}
+
+.brand-icon {
+    font-size: 1.2em;
+}
+
+
+/*
+ * Hero
+ */
+
+.hero {
+    position: relative;
+
+    min-height: 680px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 100px 24px;
+
+    overflow: hidden;
+}
+
+.hero-glow {
+    position: absolute;
+
+    width: 800px;
+    height: 600px;
+
+    top: -300px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    background:
+            radial-gradient(
+                    ellipse,
+                    rgba(124, 58, 237, 0.24) 0%,
+                    rgba(99, 102, 241, 0.10) 35%,
+                    transparent 70%
+            );
+
+    pointer-events: none;
+}
+
+.hero-content {
+    position: relative;
+
+    z-index: 1;
+
+    width: min(820px, 100%);
+
+    text-align: center;
+}
+
+.hero-chip {
+    margin-bottom: 28px;
+}
+
+.hero h1 {
+    margin: 0;
+
+    font-size:
+            clamp(3rem, 7vw, 5.5rem);
+
+    line-height: 0.98;
+
+    letter-spacing: -0.065em;
+
+    font-weight: 800;
+}
+
+.hero h1 span {
+    display: block;
+
+    margin-top: 8px;
+
+    background: var(--catapult-gradient);
+
+    -webkit-background-clip: text;
+    background-clip: text;
+
+    color: transparent;
+}
+
+.hero-description {
+    max-width: 650px;
+
+    margin: 32px auto 0;
+
+    color: var(--catapult-text-secondary);
+
+    font-size: 1.18rem;
+
+    line-height: 1.7;
+}
+
+.hero-actions {
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    gap: 12px;
+
+    margin-top: 40px;
+
+    flex-wrap: wrap;
+}
+
+
+/*
+ * Sections
+ */
+
+.section,
+.platform-section,
+.cta-section {
+    width:
+            min(
+                    var(--catapult-max-width),
+                    calc(100% - 48px)
+            );
+
+    margin: 0 auto;
+}
+
+.section {
+    padding: 100px 0;
+}
+
+.section-header {
+    margin-bottom: 48px;
+}
+
+.eyebrow {
+    display: block;
+
+    color: var(--catapult-primary-hover);
+
+    font-size: 0.72rem;
+
+    font-weight: 750;
+
+    letter-spacing: 0.16em;
+}
+
+.section-header h2 {
+    margin: 10px 0 12px;
+
+    color: var(--catapult-text);
+
+    font-size:
+            clamp(2rem, 4vw, 3rem);
+
+    line-height: 1.1;
+
+    letter-spacing: -0.045em;
+}
+
+.section-header p {
+    max-width: 650px;
+
+    margin: 0;
+
+    color: var(--catapult-text-secondary);
+
+    font-size: 1rem;
+
+    line-height: 1.65;
+}
+
+
+/*
+ * Feature cards
+ */
+
+.features-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+    gap: 18px;
+}
+
+.feature-card {
+    min-height: 230px;
+
+    padding: 28px;
+
+    border-radius: var(--catapult-radius);
+
+    background: var(--catapult-surface);
+
+    border:
+            1px solid var(--catapult-border);
+
+    color: var(--catapult-text);
+
+    transition:
+            transform 150ms ease,
+            background-color 150ms ease,
+            border-color 150ms ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-4px);
+
+    background:
+            var(--catapult-surface-elevated);
+
+    border-color:
+            var(--catapult-border-hover);
+}
+
+.feature-icon {
+    width: 48px;
+    height: 48px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    margin-bottom: 22px;
+
+    border-radius: 14px;
+
+    background:
+            rgba(139, 92, 246, 0.13);
+
+    color:
+            var(--catapult-primary-hover);
+}
+
+.feature-icon mdui-icon {
+    font-size: 24px;
+}
+
+.feature-card h3 {
+    margin: 0 0 10px;
+
+    color: var(--catapult-text);
+
+    font-size: 1.12rem;
+
+    line-height: 1.3;
+}
+
+.feature-card p {
+    margin: 0;
+
+    color: var(--catapult-text-secondary);
+
+    line-height: 1.65;
+}
+
+
+/*
+ * Platforms
+ */
+
+.platform-section {
+    padding: 80px 0;
+}
+
+.platforms {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+    gap: 18px;
+}
+
+.platform-card {
+    min-height: 120px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 18px;
+
+    padding: 24px;
+
+    border-radius: var(--catapult-radius);
+
+    background: var(--catapult-surface);
+
+    border:
+            1px solid var(--catapult-border);
+
+    color: var(--catapult-text);
+
+    transition:
+            transform 150ms ease,
+            background-color 150ms ease,
+            border-color 150ms ease;
+}
+
+.platform-card:hover {
+    transform: translateY(-3px);
+
+    background:
+            var(--catapult-surface-elevated);
+
+    border-color:
+            var(--catapult-border-hover);
+}
+
+.platform-icon {
+    width: 52px;
+    height: 52px;
+
+    flex: 0 0 52px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 15px;
+
+    font-size: 1.8rem;
+
+    background:
+            rgba(255, 255, 255, 0.05);
+}
+
+.platform-icon mdui-icon {
+    font-size: 28px;
+}
+
+.platform-content h3 {
+    margin: 0 0 5px;
+
+    color: var(--catapult-text);
+
+    font-size: 1.05rem;
+}
+
+.platform-content p {
+    margin: 0;
+
+    color: var(--catapult-text-secondary);
+
+    font-size: 0.9rem;
+}
+
+
+/*
+ * CTA
+ */
+
+.cta-section {
+    padding: 80px 0 120px;
+}
+
+.cta-card {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 32px;
+
+    padding: 42px;
+
+    border-radius: 24px;
+
+    background:
+            radial-gradient(
+                    circle at 100% 0%,
+                    rgba(139, 92, 246, 0.16),
+                    transparent 45%
+            ),
+            var(--catapult-surface);
+
+    border:
+            1px solid var(--catapult-border);
+}
+
+.cta-content h2 {
+    margin: 8px 0 10px;
+
+    color: var(--catapult-text);
+
+    font-size: 2rem;
+
+    letter-spacing: -0.035em;
+}
+
+.cta-content p {
+    margin: 0;
+
+    color: var(--catapult-text-secondary);
+
+    line-height: 1.6;
+}
+
+
+/*
+ * Footer
+ */
+.footer {
+    width:
+            min(
+                    var(--catapult-max-width),
+                    calc(100% - 48px)
+            );
+
+    margin: 0 auto;
+
+    padding: 28px 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    color: var(--catapult-text-muted);
+
+    border-top:
+            1px solid rgba(255, 255, 255, 0.07);
+}
+
+.footer-brand {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    color: var(--catapult-text-secondary);
+
+    font-weight: 650;
+}
+
+.footer-links {
+    display: flex;
+
+    align-items: center;
+
+    gap: 20px;
+
+    flex-wrap: wrap;
+}
+
+.footer a {
+    color: var(--catapult-text-muted);
+
+    text-decoration: none;
+
+    transition: color 120ms ease;
+}
+
+.footer a:hover {
+    color: var(--catapult-text);
+}
+
+.version {
+    padding: 5px 9px;
+
+    border-radius: 8px;
+
+    background: rgba(255, 255, 255, 0.05);
+
+    font-size: 0.75rem;
+}
+
+
+/*
+ * Responsive
+ */
+
+@media (max-width: 900px) {
+
+    .features-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .platforms {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+@media (max-width: 650px) {
+
+    .hero {
+        min-height: 600px;
+
+        padding:
+                80px 20px;
+    }
+
+    .hero h1 {
+        font-size: 3.1rem;
+    }
+
+    .hero-description {
+        font-size: 1rem;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+    }
+
+    .hero-actions mdui-button {
+        width: 100%;
+    }
+
+    .section,
+    .platform-section,
+    .cta-section {
+        width:
+                calc(100% - 32px);
+    }
+
+    .section {
+        padding: 70px 0;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cta-card {
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        padding: 30px;
+    }
+
+    .cta-card mdui-button {
+        width: 100%;
+    }
+
+    .footer {
+        width:
+                calc(100% - 32px);
+
+        flex-direction: column;
+
+        align-items: flex-start;
+    }
+
+}
+
+/*
+ * Privacy
+ */
+
+.privacy-page {
+    width: 100%;
+}
+
+.privacy-section {
+    padding-top: 80px;
+    padding-bottom: 100px;
+}
+
+.privacy-section .section-header {
+    max-width: 760px;
+}
+
+.privacy-section .section-header h1 {
+    margin: 10px 0 16px;
+
+    color: var(--catapult-text);
+
+    font-size:
+            clamp(2.5rem, 5vw, 4rem);
+
+    line-height: 1.05;
+
+    letter-spacing: -0.05em;
+}
+
+
+/*
+ * Privacy card
+ */
+
+.privacy-card {
+    display: block;
+
+    width: 100%;
+    max-width: none;
+
+    margin-top: 48px;
+
+    padding: 36px;
+
+    border-radius:
+            var(--catapult-radius);
+
+    background:
+            var(--catapult-surface);
+
+    border:
+            1px solid var(--catapult-border);
+
+    color:
+            var(--catapult-text);
+
+    overflow: hidden;
+
+    transition:
+            background-color 150ms ease,
+            border-color 150ms ease;
+}
+
+.privacy-card:hover {
+    background:
+            var(--catapult-surface-elevated);
+
+    border-color:
+            var(--catapult-border-hover);
+}
+
+
+/*
+ * Privacy content
+ */
+
+.privacy-content {
+    width: 100%;
+}
+
+.privacy-content section {
+    width: 100%;
+
+    padding: 0;
+}
+
+.privacy-content section + section {
+    margin-top: 28px;
+
+    padding-top: 28px;
+
+    border-top:
+            1px solid var(--catapult-border);
+}
+
+
+/*
+ * Headings
+ */
+
+.privacy-content h2 {
+    margin: 0 0 12px;
+
+    color:
+            var(--catapult-text);
+
+    font-size: 1.25rem;
+
+    line-height: 1.35;
+
+    letter-spacing: -0.02em;
+}
+
+
+/*
+ * Text
+ */
+
+.privacy-content p {
+    margin: 0;
+
+    color:
+            var(--catapult-text-secondary);
+
+    font-size: 1rem;
+
+    line-height: 1.7;
+}
+
+
+/*
+ * Lists
+ */
+
+.privacy-content ul {
+    margin: 0;
+
+    padding-left: 24px;
+
+    color:
+            var(--catapult-text-secondary);
+}
+
+.privacy-content li {
+    color:
+            var(--catapult-text-secondary);
+
+    line-height: 1.7;
+}
+
+.privacy-content li + li {
+    margin-top: 6px;
+}
+
+
+/*
+ * Links
+ */
+
+.privacy-content a {
+    color:
+            var(--catapult-primary-hover);
+
+    text-decoration: none;
+
+    transition:
+            color 120ms ease;
+}
+
+.privacy-content a:hover {
+    color:
+            var(--catapult-text);
+}
+
+
+/*
+ * Last update
+ */
+
+.privacy-last-update {
+    margin: 24px 0 0;
+
+    padding-top: 20px;
+
+    border-top:
+            1px solid var(--catapult-border);
+
+    color:
+            var(--catapult-text-muted);
+
+    font-size: 0.85rem;
+
+    line-height: 1.5;
+}
+
+
+/*
+ * Mdui
+ *
+ * On garde les couleurs Catapult pour éviter que le thème
+ * Mdui clair ne réintroduise une surface blanche.
+ */
+
+.privacy-card mdui-divider {
+    --mdui-color-divider:
+            var(--catapult-border);
+}
+
+
+/*
+ * Responsive
+ */
+
+@media (max-width: 650px) {
+
+    .privacy-section {
+        padding-top: 60px;
+
+        padding-bottom: 70px;
+    }
+
+    .privacy-card {
+        margin-top: 32px;
+
+        padding: 24px;
+    }
+
+    .privacy-content h2 {
+        font-size: 1.15rem;
+    }
+
+    .privacy-content p,
+    .privacy-content li {
+        font-size: 0.95rem;
+    }
+
+}
