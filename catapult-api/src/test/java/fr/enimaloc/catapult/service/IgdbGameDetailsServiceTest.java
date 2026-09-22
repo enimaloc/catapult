@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import proto.ExternalGame;
 import proto.ExternalGameSource;
@@ -53,7 +54,8 @@ class IgdbGameDetailsServiceTest {
     @BeforeEach
     void setup() {
         meterRegistry = new SimpleMeterRegistry();
-        service = new IgdbGameDetailsService(repository, igdbClient, igdbService, meterRegistry, refreshExecutor);
+        service = new IgdbGameDetailsService(repository, igdbClient, igdbService, meterRegistry, refreshExecutor, null);
+        ReflectionTestUtils.setField(service, "self", service);
         ReflectionTestUtils.setField(service, "cacheTtlHours", 168);
         when(igdbService.getAppToken()).thenReturn(TOKEN);
     }
@@ -85,7 +87,7 @@ class IgdbGameDetailsServiceTest {
             .setSummary("A summary.")
             .build();
         when(igdbClient.fetchGameDetails(IGDB_ID, TOKEN)).thenReturn(Optional.of(game));
-        when(repository.save(any(IgdbGameDetails.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any(IgdbGameDetails.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Optional<IgdbGameDetails> result = service.getDetails(IGDB_ID);
 
@@ -94,7 +96,7 @@ class IgdbGameDetailsServiceTest {
         assertThat(result.get().getSummary()).isEqualTo("A summary.");
 
         ArgumentCaptor<IgdbGameDetails> captor = ArgumentCaptor.forClass(IgdbGameDetails.class);
-        verify(repository).save(captor.capture());
+        verify(repository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getIgdbId()).isEqualTo(IGDB_ID);
         assertThat(captor.getValue().getSlug()).isEqualTo("new-slug");
         assertThat(captor.getValue().getFetchedAt()).isNotNull();
@@ -143,7 +145,35 @@ class IgdbGameDetailsServiceTest {
         Optional<IgdbGameDetails> result = service.getDetails(IGDB_ID);
 
         assertThat(result).isEmpty();
-        verify(repository, never()).save(any());
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cache_miss_concurrent_insert_by_another_poll_cycle_recovers_existing_row() {
+        // Simulates two schedulers (another user, or another app instance) racing to
+        // cache the same igdb_id: both see a miss, both fetch from IGDB, but only the
+        // first insert wins — the loser must recover the winner's row instead of
+        // propagating the unique-constraint violation up through the poll loop.
+        when(repository.findById(IGDB_ID)).thenReturn(Optional.empty());
+        Game game = Game.newBuilder()
+            .setId(Long.parseLong(IGDB_ID))
+            .setSlug("new-slug")
+            .build();
+        when(igdbClient.fetchGameDetails(IGDB_ID, TOKEN)).thenReturn(Optional.of(game));
+
+        IgdbGameDetails winner = new IgdbGameDetails();
+        winner.setIgdbId(IGDB_ID);
+        winner.setSlug("winner-slug");
+        DataIntegrityViolationException conflict = new DataIntegrityViolationException("duplicate key");
+        when(repository.saveAndFlush(any(IgdbGameDetails.class))).thenThrow(conflict);
+        when(repository.findById(IGDB_ID))
+            .thenReturn(Optional.empty())
+            .thenReturn(Optional.of(winner));
+
+        Optional<IgdbGameDetails> result = service.getDetails(IGDB_ID);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getSlug()).isEqualTo("winner-slug");
     }
 
     @Test
@@ -169,7 +199,7 @@ class IgdbGameDetailsServiceTest {
             .addExternalGames(ext)
             .build();
         when(igdbClient.fetchGameDetails(IGDB_ID, TOKEN)).thenReturn(Optional.of(game));
-        when(repository.save(any(IgdbGameDetails.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any(IgdbGameDetails.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Optional<IgdbGameDetails> result = service.getDetails(IGDB_ID);
 
@@ -196,7 +226,7 @@ class IgdbGameDetailsServiceTest {
             .addSimilarGames(similar)
             .build();
         when(igdbClient.fetchGameDetails(IGDB_ID, TOKEN)).thenReturn(Optional.of(game));
-        when(repository.save(any(IgdbGameDetails.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any(IgdbGameDetails.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Optional<IgdbGameDetails> result = service.getDetails(IGDB_ID);
 
@@ -216,7 +246,7 @@ class IgdbGameDetailsServiceTest {
             .setSlug("mystery-game")
             .build();
         when(igdbClient.fetchGameDetails(IGDB_ID, TOKEN)).thenReturn(Optional.of(game));
-        when(repository.save(any(IgdbGameDetails.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any(IgdbGameDetails.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Optional<IgdbGameDetails> result = service.getDetails(IGDB_ID);
 
