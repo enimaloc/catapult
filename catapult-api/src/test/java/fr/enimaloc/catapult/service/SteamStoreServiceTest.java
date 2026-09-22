@@ -16,7 +16,10 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -25,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doReturn;
@@ -48,6 +52,12 @@ class SteamStoreServiceTest {
 
     @InjectMocks private SteamStoreServiceImpl service;
 
+    // Test fixtures only set the fields each case cares about — unlike Steam's real
+    // appdetails payload, which always populates every field.
+    private final JsonMapper mapper = JsonMapper.builder()
+        .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+        .build();
+
     @BeforeEach
     void setupRestClientChain() {
         doReturn(getSpec).when(restClient).get();
@@ -55,8 +65,20 @@ class SteamStoreServiceTest {
         doReturn(responseSpec).when(headersSpec).retrieve();
     }
 
+    /**
+     * Fixtures describe Steam's appdetails JSON as plain maps; the real RestClient
+     * deserializes that JSON into {@code Map<String, SteamStoreServiceImpl.ResponseData>}
+     * via {@code body(ParameterizedTypeReference)}, so the stub must return the same
+     * typed shape (not the raw map) or the service's {@code .success()}/{@code .data()}
+     * calls throw a ClassCastException.
+     */
+    private Map<String, SteamStoreServiceImpl.ResponseData> toTypedResponse(Map<String, Object> response) {
+        return mapper.convertValue(response,
+            new tools.jackson.core.type.TypeReference<Map<String, SteamStoreServiceImpl.ResponseData>>() {});
+    }
+
     private void givenSteamResponse(Map<String, Object> response) {
-        doReturn(response).when(responseSpec).body(Map.class);
+        doReturn(toTypedResponse(response)).when(responseSpec).body(any(ParameterizedTypeReference.class));
     }
 
     private Map<String, Object> steamEntry(String org, String rating, String descriptors) {
@@ -132,7 +154,7 @@ class SteamStoreServiceTest {
 
     @Test
     void fetchCcls_nullResponse_returnsEmpty() {
-        doReturn(null).when(responseSpec).body(Map.class);
+        doReturn(null).when(responseSpec).body(any(ParameterizedTypeReference.class));
 
         assertThat(service.fetchCcls(List.of("100"))).isEmpty();
     }
@@ -187,7 +209,8 @@ class SteamStoreServiceTest {
             "success", true, "data", Map.of("type", "game", "name", "Arctic Drive Playtest")));
         Map<String, Object> parentBody = Map.of("4009490", Map.of(
             "success", true, "data", Map.of("type", "game", "name", "Arctic Drive")));
-        doReturn(playtestBody).doReturn(parentBody).when(responseSpec).body(Map.class);
+        doReturn(toTypedResponse(playtestBody)).doReturn(toTypedResponse(parentBody))
+            .when(responseSpec).body(any(ParameterizedTypeReference.class));
         doReturn(java.util.Optional.of("4009490")).when(redirectResolver).resolveParentAppId("4519120");
 
         assertThat(service.resolveEffectiveApp("4519120"))
@@ -202,7 +225,8 @@ class SteamStoreServiceTest {
         Map<String, Object> playtestBody = Map.of("4519120", Map.of(
             "success", true, "data", Map.of("type", "game", "name", "Arctic Drive Playtest")));
         Map<String, Object> failedParentBody = Map.of("4009490", Map.of("success", false));
-        doReturn(playtestBody).doReturn(failedParentBody).when(responseSpec).body(Map.class);
+        doReturn(toTypedResponse(playtestBody)).doReturn(toTypedResponse(failedParentBody))
+            .when(responseSpec).body(any(ParameterizedTypeReference.class));
         doReturn(java.util.Optional.of("4009490")).when(redirectResolver).resolveParentAppId("4519120");
 
         assertThat(service.resolveEffectiveApp("4519120"))
