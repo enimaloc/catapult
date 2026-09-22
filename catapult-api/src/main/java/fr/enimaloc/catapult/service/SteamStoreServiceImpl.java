@@ -37,6 +37,9 @@ public class SteamStoreServiceImpl implements SteamStoreService {
 
     private static final java.time.Duration PARENT_CACHE_TTL = java.time.Duration.ofDays(30);
 
+    /** One entry of Steam's appdetails batch response. Package-visible for unit testing. */
+    record ResponseData(boolean success, SteamStorePage data) {}
+
     @Override
     public Map<String, Set<String>> fetchCcls(Collection<String> appIds) {
         if (appIds.isEmpty()) return Map.of();
@@ -47,7 +50,8 @@ public class SteamStoreServiceImpl implements SteamStoreService {
                     Optional<SteamStorePage> pageOpt = fetchData(appId, Locale.ENGLISH);
                     if (pageOpt.isEmpty()) return Map.of();
                     SteamStorePage page = pageOpt.get();
-                    result.put(appId, extractCcls(page));
+                    Set<String> ccls = extractCcls(page);
+                    if (!ccls.isEmpty()) result.put(appId, ccls);
                 }
                 log.debug("Steam store fetch for {} appIds: {} had rating data", appIds.size(), result.size());
                 return result;
@@ -66,8 +70,10 @@ public class SteamStoreServiceImpl implements SteamStoreService {
 
         if (ratings == null) return ccls;
         for (SteamStorePage.Ratings.Rating entry : ratings.entries()) {
+            String descriptors = entry.descriptors() == null ? "" : entry.descriptors().toLowerCase(Locale.ROOT);
+            if (descriptors.isBlank()) continue;
             KEYWORDS.forEach((id, keyword) -> {
-                if (keyword.stream().anyMatch(entry.descriptors()::contains)) ccls.add(id);
+                if (keyword.stream().anyMatch(descriptors::contains)) ccls.add(id);
             });
         }
 
@@ -207,7 +213,6 @@ public class SteamStoreServiceImpl implements SteamStoreService {
                     .map(ResolvedParentApp::appId)
                     .orElse(appId) : appId;
             SteamLanguage lang = SteamLanguage.fromLocale(locale);
-            record ResponseData(boolean success, SteamStorePage data) {}
             try {
                 Map<String, ResponseData> response = restClient.get()
                         .uri(APP_DETAILS_URL + "?appids=" + effectiveAppId + "&l=" + lang)
