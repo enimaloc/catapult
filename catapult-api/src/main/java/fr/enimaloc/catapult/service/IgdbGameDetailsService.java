@@ -6,7 +6,11 @@ import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import proto.ExternalGame;
 import proto.Franchise;
 import proto.Game;
@@ -42,6 +46,7 @@ public class IgdbGameDetailsService {
     private final IgdbService igdbService;
     private final MeterRegistry meterRegistry;
     private final Executor refreshExecutor;
+    private final IgdbGameDetailsService self;
 
     @Value("${app.igdb.details-cache-ttl-hours:168}")
     private int cacheTtlHours;
@@ -50,12 +55,14 @@ public class IgdbGameDetailsService {
                                   IgdbClient igdbClient,
                                   IgdbService igdbService,
                                   MeterRegistry meterRegistry,
-                                  @Qualifier("igdbRefreshExecutor") Executor refreshExecutor) {
+                                  @Qualifier("igdbRefreshExecutor") Executor refreshExecutor,
+                                  @Lazy IgdbGameDetailsService self) {
         this.repository = repository;
         this.igdbClient = igdbClient;
         this.igdbService = igdbService;
         this.meterRegistry = meterRegistry;
         this.refreshExecutor = refreshExecutor;
+        this.self = self;
     }
 
     /**
@@ -136,7 +143,23 @@ public class IgdbGameDetailsService {
         entity.setTotalRating(game.getTotalRating() > 0 ? game.getTotalRating() : null);
         entity.setTotalRatingCount(game.getTotalRatingCount() > 0 ? game.getTotalRatingCount() : null);
         entity.setFetchedAt(Instant.now());
-        return repository.save(entity);
+        return self.saveOrGetExisting(entity);
+    }
+
+    /**
+     * Persists a freshly-fetched entry, tolerating the race where a concurrent
+     * poll cycle (another user, another app instance) fetched and committed the
+     * same igdb_id first: the insert's own transaction (isolated via REQUIRES_NEW
+     * so its abort on conflict can't poison the caller's transaction) fails on the
+     * unique constraint, and we fall back to the row the winner already saved.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public IgdbGameDetails saveOrGetExisting(IgdbGameDetails entity) {
+        try {
+            return repository.saveAndFlush(entity);
+        } catch (DataIntegrityViolationException e) {
+            return repository.findById(entity.getIgdbId()).orElseThrow(() -> e);
+        }
     }
 
     // IGDB image URLs (cover, screenshots) are protocol-relative ("//images.igdb.com/...") —
