@@ -911,4 +911,132 @@ mdui-top-app-bar {
         font-size: 0.95rem;
     }
 
+}/*
+ * Error
+ */
+
+.error-page {
+    min-height: 620px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    text-align: center;
+}
+
+.error-content {
+    width: min(700px, 100%);
+
+    margin: 0 auto;
+}
+
+
+/*
+ * Error code
+ */
+
+.error-code {
+    display: block;
+
+    margin-bottom: 18px;
+
+    background: var(--catapult-gradient);
+
+    -webkit-background-clip: text;
+    background-clip: text;
+
+    color: transparent;
+
+    font-size:
+            clamp(6rem, 18vw, 11rem);
+
+    font-weight: 800;
+
+    line-height: 0.85;
+
+    letter-spacing: -0.08em;
+}
+
+
+/*
+ * Title
+ */
+
+.error-content h1 {
+    margin: 12px 0 16px;
+
+    color: var(--catapult-text);
+
+    font-size:
+            clamp(2rem, 5vw, 3.5rem);
+
+    line-height: 1.05;
+
+    letter-spacing: -0.05em;
+}
+
+
+/*
+ * Description
+ */
+
+.error-description {
+    max-width: 600px;
+
+    margin: 0 auto;
+
+    color: var(--catapult-text-secondary);
+
+    font-size: 1.1rem;
+
+    line-height: 1.7;
+}
+
+
+/*
+ * Actions
+ */
+
+.error-actions {
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    gap: 12px;
+
+    margin-top: 36px;
+
+    flex-wrap: wrap;
+}
+
+
+/*
+ * Responsive
+ */
+
+@media (max-width: 650px) {
+
+    .error-page {
+        min-height: 560px;
+    }
+
+    .error-code {
+        font-size: 7rem;
+    }
+
+    .error-description {
+        font-size: 1rem;
+    }
+
+    .error-actions {
+        flex-direction: column;
+    }
+
+    .error-actions mdui-button {
+        width: 100%;
+    }
+
 }
