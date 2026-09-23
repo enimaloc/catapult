@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 public class ModelFiller {
     private final Optional<BuildProperties> buildProperties;
     private final MessageSource messageSource;
+    private final ApiService apiService;
 
     public void defaultAttr(Model model, String page) {
         model.addAttribute("features", IndexController.FEATURES);
@@ -66,8 +68,18 @@ public class ModelFiller {
     public void fill(Model model, String page, Locale locale, HttpServletRequest request) throws IOException {
         switch (page) {
             case "privacy" -> privacy(model, locale);
+            case "channels" -> channels(model);
         }
         defaultAttr(model, page, locale);
+    }
+
+    public void channels(Model model) {
+        model.addAttribute("channels", apiService.channelList().channels());
+    }
+
+    public void channel(Model model, String username) {
+        model.addAttribute("username", username);
+        model.addAttribute("channelPage", apiService.channelPage(username, 0, null, null));
     }
 
     public void error(Model model, HttpServletRequest request) {
