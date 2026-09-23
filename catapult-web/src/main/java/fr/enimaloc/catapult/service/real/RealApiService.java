@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.common.dto.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.SaveBody;
+import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
+import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
@@ -98,5 +100,27 @@ public class RealApiService implements ApiService {
     @Override
     public void toggleTwEnabled(String bindingId, boolean enabled) {
         client.postVoid("/api/channel/bindings/{bindingId}/tw-enabled", new TwEnabledBody(enabled), bindingId);
+    }
+
+    @Override
+    public void saveSteamToken(String username, String token, boolean shared) {
+        client.postVoid("/api/channels/{username}/settings/steam-personal-token",
+                new SteamTokenRequest(token, shared), username);
+    }
+
+    @Override
+    public void steamTokenSharing(String username, boolean shared) {
+        client.postVoid("/api/channels/{username}/settings/steam-personal-token/sharing",
+                new SteamTokenSharingRequest(shared), username);
+    }
+
+    @Override
+    public void deleteSteamToken(String username) {
+        client.postVoid("/api/channels/{username}/settings/steam-personal-token/delete", null, username);
+    }
+
+    @Override
+    public void refreshSteamProfileCache(String username) {
+        client.postVoid("/api/channels/{username}/steam/refresh-profile-cache", null, username);
     }
 }

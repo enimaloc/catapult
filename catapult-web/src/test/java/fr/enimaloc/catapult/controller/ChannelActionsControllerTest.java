@@ -109,4 +109,40 @@ class ChannelActionsControllerTest {
 
         verify(apiService).toggleTwEnabled("abc-123", true);
     }
+
+    @Test
+    void saveSteamToken_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/steam-personal-token").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"secret-token\",\"shared\":true}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveSteamToken("enimaloc", "secret-token", true);
+    }
+
+    @Test
+    void steamTokenSharing_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/steam-personal-token/sharing").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"shared\":false}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).steamTokenSharing("enimaloc", false);
+    }
+
+    @Test
+    void deleteSteamToken_callsApiService() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/steam-personal-token/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).deleteSteamToken("enimaloc");
+    }
+
+    @Test
+    void refreshSteamProfileCache_callsApiService() throws Exception {
+        mvc.perform(post("/channel/enimaloc/steam/refresh-profile-cache").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).refreshSteamProfileCache("enimaloc");
+    }
 }
