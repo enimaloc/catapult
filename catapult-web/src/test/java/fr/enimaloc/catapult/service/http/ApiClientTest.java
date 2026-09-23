@@ -30,18 +30,56 @@ class ApiClientTest {
     }
 
     @Test
-    void postVoid_sendsJsonBody() throws InterruptedException {
+    void postVoid_noBody_noUriVars() throws InterruptedException {
         server.enqueue(new MockResponse().setResponseCode(204));
 
-        client.postVoid("/api/channels/{username}/settings/bot", "enimaloc");
+        client.postVoid("/api/settings", null);
+
+        RecordedRequest recorded = server.takeRequest();
+        assertThat(recorded.getMethod()).isEqualTo("POST");
+        assertThat(recorded.getPath()).isEqualTo("/api/settings");
+        assertThat(recorded.getBody().readUtf8()).isEmpty();
+    }
+
+    @Test
+    void postVoid_noBody_withOneUriVar() throws InterruptedException {
+        server.enqueue(new MockResponse().setResponseCode(204));
+
+        client.postVoid("/api/channels/{username}/settings/bot", null, "enimaloc");
 
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getMethod()).isEqualTo("POST");
         assertThat(recorded.getPath()).isEqualTo("/api/channels/enimaloc/settings/bot");
+        assertThat(recorded.getBody().readUtf8()).isEmpty();
     }
 
     @Test
-    void postVoid_withBody_sendsSerializedJson() throws InterruptedException {
+    void postVoid_withBody_noUriVars() throws InterruptedException {
+        server.enqueue(new MockResponse().setResponseCode(204));
+
+        record ConfigBody(String setting) {}
+        client.postVoid("/api/settings", new ConfigBody("value"));
+
+        RecordedRequest recorded = server.takeRequest();
+        assertThat(recorded.getPath()).isEqualTo("/api/settings");
+        assertThat(recorded.getBody().readUtf8()).contains("\"setting\":\"value\"");
+    }
+
+    @Test
+    void postVoid_withBody_withOneUriVar() throws InterruptedException {
+        server.enqueue(new MockResponse().setResponseCode(204));
+
+        record ToggleBody(boolean enabled) {}
+        client.postVoid("/api/channels/{username}/settings/toggle",
+                new ToggleBody(true), "enimaloc");
+
+        RecordedRequest recorded = server.takeRequest();
+        assertThat(recorded.getPath()).isEqualTo("/api/channels/enimaloc/settings/toggle");
+        assertThat(recorded.getBody().readUtf8()).contains("\"enabled\":true");
+    }
+
+    @Test
+    void postVoid_withBody_withMultipleUriVars() throws InterruptedException {
         server.enqueue(new MockResponse().setResponseCode(204));
 
         record ToggleBody(boolean enabled) {}
