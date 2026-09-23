@@ -81,8 +81,8 @@ public class ModelFiller {
         model.addAttribute("username", username);
         var channelPage = apiService.channelPage(username, page, status, source);
         model.addAttribute("channelPage", channelPage);
-        model.addAttribute("channelSettings", apiService.channelSettings(username));
         if (channelPage.isOwner()) {
+            model.addAttribute("channelSettings", apiService.channelSettings(username));
             model.addAttribute("minecraftLink", apiService.minecraftStatus(username));
         }
     }
