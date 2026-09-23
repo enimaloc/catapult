@@ -40,9 +40,8 @@
     </mdui-top-app-bar>
 
     <div id="app">
-        <!--        <th:block th:if="${page.isEmpty()}"><div th:replace="~{pages/landing :: landing}"></div></th:block>-->
-        <!--        <th:block th:if="${page == 'privacy'}"><div th:replace="~{pages/privacy :: privacy}"></div></th:block>-->
-        <th:block th:each="spaPage : ${spa}" th:if="${page == spaPage.getId()}">
+        <th:block th:if="${error}"><div th:replace="~{pages/error::error}"></div></th:block>
+        <th:block th:unless="${error}" th:each="spaPage : ${spa}" th:if="${page == spaPage.getId()}">
             <div th:replace="~{${spaPage.getTemplate()} :: ${spaPage.getFragment()}}"></div>
         </th:block>
     </div>

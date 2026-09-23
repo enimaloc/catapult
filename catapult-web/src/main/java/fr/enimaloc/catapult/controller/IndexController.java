@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.dto.index.FeatureDto;
 import fr.enimaloc.catapult.dto.index.PlatformDto;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 
 @Controller
 @RequiredArgsConstructor
@@ -39,13 +39,18 @@ public class IndexController {
     private final ModelFiller filler;
 
     @GetMapping
-    String index(Model model, Locale locale) throws IOException {
-        return index(model, "", locale);
+    String index(Model model, Locale locale, HttpServletRequest request) throws IOException {
+        return index(model, "", locale, request);
     }
 
     @GetMapping({"/{page}"})
-    String index(Model model, @PathVariable String page, Locale locale) throws IOException {
-        filler.fill(model, page, locale);
+    String index(Model model, @PathVariable String page, Locale locale, HttpServletRequest request) throws IOException {
+        boolean unknownPage = SPA.stream().map(SPAPage::getId).noneMatch(page::equals);
+        model.addAttribute("error", unknownPage);
+        if (unknownPage) {
+            filler.error(model, 404);
+        }
+        filler.fill(model, page, locale, request);
         return "index";
     }
 

@@ -18,13 +18,17 @@ async function navigate(path, push = true) {
     }
 
     const response = await fetch(route.templateUrl);
+    const html = await response.text();
 
     if (!response.ok) {
-        window.location.href = path;
+        // Server-side error: the response body is the error fragment
+        // (see ErrorPageController), render it in place instead of
+        // reloading the whole page.
+        app.innerHTML = html;
         return;
     }
 
-    app.innerHTML = await response.text();
+    app.innerHTML = html;
 
     if (push) {
         history.pushState(
