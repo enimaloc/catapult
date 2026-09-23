@@ -1,4 +1,5 @@
 const app = document.querySelector("#app");
+const progress = document.querySelector("#nav-progress");
 
 const config = window.Catapult;
 
@@ -9,6 +10,13 @@ const routes = Object.fromEntries(
     ])
 );
 
+function updateActiveLink(path) {
+    document.querySelectorAll("a[data-link]").forEach(a => {
+        const href = new URL(a.href).pathname.replace(/^\/+|\/+$/g, "");
+        a.classList.toggle("active", href === path);
+    });
+}
+
 async function navigate(path, push = true) {
     const route = routes[path];
 
@@ -17,18 +25,32 @@ async function navigate(path, push = true) {
         return;
     }
 
-    const response = await fetch(route.templateUrl);
+    progress.hidden = false;
+
+    let response;
+    try {
+        response = await fetch(route.templateUrl);
+    } catch {
+        // Network failure (offline, timeout, ...): fall back to a full
+        // navigation so the browser's own error handling takes over.
+        window.location.href = path;
+        return;
+    } finally {
+        progress.hidden = true;
+    }
+
     const html = await response.text();
+    app.innerHTML = html;
 
     if (!response.ok) {
         // Server-side error: the response body is the error fragment
         // (see ErrorPageController), render it in place instead of
         // reloading the whole page.
-        app.innerHTML = html;
         return;
     }
 
-    app.innerHTML = html;
+    document.title = config.titles[route.id] ?? document.title;
+    updateActiveLink(path);
 
     if (push) {
         history.pushState(
@@ -46,6 +68,8 @@ async function navigate(path, push = true) {
         behavior: "instant"
     });
 }
+
+updateActiveLink(config.page);
 
 document.addEventListener("click", event => {
     const el = event.target.closest("a[data-link]");
