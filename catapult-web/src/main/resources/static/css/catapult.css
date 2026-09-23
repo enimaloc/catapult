@@ -584,6 +584,12 @@ mdui-top-app-bar {
     color: var(--catapult-text);
 }
 
+a[data-link].active {
+    color: var(--catapult-text);
+
+    font-weight: 650;
+}
+
 .version {
     padding: 5px 9px;
 

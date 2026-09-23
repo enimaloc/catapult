@@ -32,8 +32,8 @@ public class IndexController {
             new PlatformDto("sports_esports", "platforms.xbox")
     );
     public static final List<SPAPage> SPA = List.of(
-            new SPAPage("", "pages/landing", "landing", "/spa/landing"),
-            new SPAPage("privacy", "pages/privacy")
+            new SPAPage("", "pages/landing", "landing", "/spa/landing", "page.title.landing"),
+            new SPAPage("privacy", "pages/privacy", "privacy", "/spa/privacy", "page.title.privacy")
     );
 
     private final ModelFiller filler;
@@ -79,16 +79,14 @@ public class IndexController {
         private final String template;
         private final String fragment;
         private final String templateUrl;
+        private final String titleKey;
 
-        public SPAPage(String id, String template) {
-            this(id, template, id, "/spa/" + id);
-        }
-
-        public SPAPage(String id, String template, String fragment, String templateUrl) {
+        public SPAPage(String id, String template, String fragment, String templateUrl, String titleKey) {
             this.id = id;
             this.template = template;
             this.fragment = fragment;
             this.templateUrl = templateUrl;
+            this.titleKey = titleKey;
         }
     }
 }

@@ -4,6 +4,7 @@ import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.info.BuildProperties;
+import org.springframework.context.MessageSource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
@@ -13,18 +14,33 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 public class ModelFiller {
     private final Optional<BuildProperties> buildProperties;
+    private final MessageSource messageSource;
 
     public void defaultAttr(Model model, String page) {
         model.addAttribute("features", IndexController.FEATURES);
         model.addAttribute("platforms", IndexController.PLATFORMS);
         model.addAttribute("page", page == null ? "" : page);
         model.addAttribute("spa", IndexController.SPA);
+    }
+
+    public void defaultAttr(Model model, String page, Locale locale) {
+        defaultAttr(model, page);
+        model.addAttribute("titles", titles(locale));
+    }
+
+    private Map<String, String> titles(Locale locale) {
+        return IndexController.SPA.stream().collect(Collectors.toMap(
+                IndexController.SPAPage::getId,
+                spaPage -> messageSource.getMessage(spaPage.getTitleKey(), null, spaPage.getTitleKey(), locale)
+        ));
     }
 
     public void privacy(Model model, Locale locale) throws IOException {
@@ -51,7 +67,7 @@ public class ModelFiller {
         switch (page) {
             case "privacy" -> privacy(model, locale);
         }
-        defaultAttr(model, page);
+        defaultAttr(model, page, locale);
     }
 
     public void error(Model model, HttpServletRequest request) {

@@ -14,7 +14,8 @@
     <script th:inline="javascript">
         window.Catapult = {
             page: /*[[${page}]]*/,
-            spa: /*[[${spa}]]*/
+            spa: /*[[${spa}]]*/,
+            titles: /*[[${titles}]]*/
         };
     </script>
 </head>
@@ -38,6 +39,8 @@
         </div>
 
     </mdui-top-app-bar>
+
+    <mdui-linear-progress id="nav-progress" hidden></mdui-linear-progress>
 
     <div id="app">
         <th:block th:if="${error}"><div th:replace="~{pages/error::error}"></div></th:block>
