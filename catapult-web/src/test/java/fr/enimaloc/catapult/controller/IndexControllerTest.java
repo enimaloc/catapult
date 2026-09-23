@@ -89,4 +89,19 @@ class IndexControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("channelPage", data));
     }
+
+    @Test
+    void channelFullPage_threadsPageAndFilterParams() throws Exception {
+        ChannelPageData data = new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null,
+                new PagedBindings(2, 5, 90, List.of()),
+                List.of(), java.util.Set.of(), List.of(), java.util.Set.of(),
+                "AUTO", null, false, false, false, false, false, false, false, 15L, false, false, "uuid");
+        when(apiService.channelPage("enimaloc", 2, "AUTO", null)).thenReturn(data);
+
+        mvc.perform(get("/channel/enimaloc").param("page", "2").param("status", "AUTO"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("channelPage", data));
+    }
 }

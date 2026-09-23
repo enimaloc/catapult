@@ -23,6 +23,38 @@
                          id="channel-bot-toggle"></mdui-switch>
             <label th:if="${ch.isOwner()}" for="channel-bot-toggle" th:text="#{channel.status.bot_enabled}">Bot activé</label>
         </mdui-card>
+
+        <div class="section-header">
+            <h2 th:text="#{channel.bindings.title}">Associations</h2>
+            <div class="bindings-filters">
+                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()})}" th:text="#{channel.bindings.filter.all}">Toutes</a>
+                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='AUTO')}" th:text="#{channel.bindings.filter.auto}">Auto</a>
+                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='MANUAL')}" th:text="#{channel.bindings.filter.manual}">Manuel</a>
+                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='INCOMPLETE')}" th:text="#{channel.bindings.filter.incomplete}">Incomplet</a>
+                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},source='STEAM')}" th:text="#{channel.bindings.filter.steam}">Steam</a>
+            </div>
+        </div>
+
+        <mdui-list id="channel-bindings-list">
+            <mdui-list-item th:each="b : ${ch.bindings().content()}" th:attr="data-binding-id=${b.id()}">
+                <span th:text="${b.twitchGameName() ?: '—'}">Game</span>
+                <mdui-chip th:each="ccl : ${b.ccls()}" th:text="${ccl}">ccl</mdui-chip>
+                <span th:text="${b.status()}">STATUS</span>
+            </mdui-list-item>
+            <mdui-list-item th:if="${ch.bindings().content().isEmpty()}" th:text="#{channel.bindings.empty}">
+                Aucune association.
+            </mdui-list-item>
+        </mdui-list>
+
+        <div class="bindings-pagination" th:if="${ch.bindings().totalPages() > 1}">
+            <a data-link th:unless="${ch.bindings().first()}"
+               th:href="@{/channel/{u}(u=${ch.channelUsername()},page=${ch.bindings().number()-1},status=${ch.filterStatus()},source=${ch.filterSource()})}"
+               th:text="#{channel.bindings.prev}">Précédent</a>
+            <span th:text="${ch.bindings().number()+1} + ' / ' + ${ch.bindings().totalPages()}">1 / 1</span>
+            <a data-link th:unless="${ch.bindings().last()}"
+               th:href="@{/channel/{u}(u=${ch.channelUsername()},page=${ch.bindings().number()+1},status=${ch.filterStatus()},source=${ch.filterSource()})}"
+               th:text="#{channel.bindings.next}">Suivant</a>
+        </div>
     </section>
     <script src="/js/channel-status.js"></script>
 </mdui-layout-main>
