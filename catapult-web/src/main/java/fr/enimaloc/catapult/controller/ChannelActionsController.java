@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.SaveBody;
 import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
@@ -151,5 +152,12 @@ public class ChannelActionsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveTwSettings(@PathVariable String username, @RequestBody TwSettingsRequest body) {
         apiService.saveTwSettings(username, body.enabled(), body.blockedTws());
+    }
+
+    @PostMapping("/channel/{username}/settings/no-game")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveNoGameSettings(@PathVariable String username, @RequestBody NoGameSettingsRequest body) {
+        apiService.saveNoGameSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls(),
+                body.applyOnStreamStart(), body.applyOnNoGame(), body.applyOnStreamEnd());
     }
 }

@@ -203,4 +203,15 @@ class ChannelActionsControllerTest {
 
         verify(apiService).saveTwSettings("enimaloc", true, java.util.Set.of("jumpscares"));
     }
+
+    @Test
+    void saveNoGameSettings_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/no-game").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"twitchGameId\":\"509658\",\"twitchGameName\":\"Celeste\",\"ccls\":[\"violent-graphic\"],\"applyOnStreamStart\":true,\"applyOnNoGame\":false,\"applyOnStreamEnd\":true}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveNoGameSettings("enimaloc", "509658", "Celeste",
+                java.util.Set.of("violent-graphic"), true, false, true);
+    }
 }
