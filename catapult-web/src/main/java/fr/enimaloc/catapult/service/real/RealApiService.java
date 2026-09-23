@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.SaveBody;
 import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
@@ -162,5 +163,13 @@ public class RealApiService implements ApiService {
     @Override
     public fr.enimaloc.catapult.common.dto.UserSettingsDto channelSettings(String username) {
         return client.get("/api/channels/{username}/settings", fr.enimaloc.catapult.common.dto.UserSettingsDto.class, username);
+    }
+
+    @Override
+    public void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
+                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
+        client.postVoid("/api/channels/{username}/settings/no-game",
+                new NoGameSettingsRequest(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd),
+                username);
     }
 }

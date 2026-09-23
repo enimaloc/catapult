@@ -195,6 +195,32 @@
             </label>
             <mdui-button id="tw-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         </mdui-card>
+
+        <mdui-card th:if="${ch.isOwner()}" id="channel-no-game-settings-form" variant="outlined">
+            <h3 th:text="#{channel.settings.no_game.title}">Aucun jeu détecté</h3>
+            <input type="text" id="no-game-game-input" th:placeholder="#{channel.bindings.edit.game_placeholder}"
+                   th:value="${channelSettings.noGameTwitchGameName()}"/>
+            <input type="hidden" id="no-game-game-id" th:value="${channelSettings.noGameTwitchGameId()}"/>
+            <mdui-list id="no-game-game-results"></mdui-list>
+            <label th:each="ccl : ${channelSettings.availableCcls()}">
+                <input type="checkbox" class="no-game-ccl-checkbox" th:value="${ccl.id()}"
+                       th:checked="${channelSettings.noGameCcls().contains(ccl.id())}"/>
+                <span th:text="${ccl.name()}">ccl name</span>
+            </label>
+            <label>
+                <input type="checkbox" id="no-game-apply-start" th:checked="${channelSettings.applyDefaultOnStreamStart()}"/>
+                <span th:text="#{channel.settings.no_game.apply_start}">Au démarrage du stream</span>
+            </label>
+            <label>
+                <input type="checkbox" id="no-game-apply-no-game" th:checked="${channelSettings.applyDefaultOnNoGame()}"/>
+                <span th:text="#{channel.settings.no_game.apply_no_game}">Quand aucun jeu n'est détecté</span>
+            </label>
+            <label>
+                <input type="checkbox" id="no-game-apply-end" th:checked="${channelSettings.applyDefaultOnStreamEnd()}"/>
+                <span th:text="#{channel.settings.no_game.apply_end}">À la fin du stream</span>
+            </label>
+            <mdui-button id="no-game-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+        </mdui-card>
     </section>
     <script src="/js/channel-status.js"></script>
     <script src="/js/game-search.js"></script>
