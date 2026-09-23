@@ -13,6 +13,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.io.IOException;
 import java.util.List;
@@ -60,8 +61,12 @@ public class IndexController {
     }
 
     @GetMapping("/channel/{username}")
-    String channel(Model model, @PathVariable String username, Locale locale, HttpServletRequest request) throws IOException {
-        filler.channel(model, username);
+    String channel(Model model, @PathVariable String username,
+                    @RequestParam(defaultValue = "0") int page,
+                    @RequestParam(required = false) String status,
+                    @RequestParam(required = false) String source,
+                    Locale locale, HttpServletRequest request) throws IOException {
+        filler.channel(model, username, page, status, source);
         filler.defaultAttr(model, "channel", locale);
         return "index";
     }
@@ -91,8 +96,11 @@ public class IndexController {
         }
 
         @GetMapping("/channel/{username}")
-        String channel(Model model, @PathVariable String username) throws IOException {
-            filler.channel(model, username);
+        String channel(Model model, @PathVariable String username,
+                        @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(required = false) String status,
+                        @RequestParam(required = false) String source) throws IOException {
+            filler.channel(model, username, page, status, source);
             filler.defaultAttr(model, "channel");
             return "pages/channel :: channel";
         }

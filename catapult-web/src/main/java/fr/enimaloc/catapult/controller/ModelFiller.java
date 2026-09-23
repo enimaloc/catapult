@@ -77,9 +77,9 @@ public class ModelFiller {
         model.addAttribute("channels", apiService.channelList().channels());
     }
 
-    public void channel(Model model, String username) {
+    public void channel(Model model, String username, int page, String status, String source) {
         model.addAttribute("username", username);
-        model.addAttribute("channelPage", apiService.channelPage(username, 0, null, null));
+        model.addAttribute("channelPage", apiService.channelPage(username, page, status, source));
     }
 
     public void error(Model model, HttpServletRequest request) {
