@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.LinkStateResponse;
@@ -137,5 +138,11 @@ public class ChannelActionsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void minecraftDisconnect(@PathVariable String username) {
         apiService.minecraftDisconnect(username);
+    }
+
+    @PostMapping("/channel/{username}/settings/ccl")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveCclSettings(@PathVariable String username, @RequestBody CclSettingsRequest body) {
+        apiService.saveCclSettings(username, body.cclEnabled(), body.blockedCcls());
     }
 }
