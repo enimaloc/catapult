@@ -165,9 +165,27 @@
                 </div>
             </mdui-card>
         </div>
+
+        <div class="section-header" th:if="${ch.isOwner()}">
+            <h2 th:text="#{channel.settings.ccl.title}">Filtres de contenu</h2>
+        </div>
+
+        <mdui-card th:if="${ch.isOwner()}" id="channel-ccl-settings-form" variant="outlined">
+            <label>
+                <input type="checkbox" id="ccl-enabled-checkbox" th:checked="${channelSettings.cclFeatureEnabled()}"/>
+                <span th:text="#{channel.settings.ccl.enable}">Activer le filtrage CCL</span>
+            </label>
+            <label th:each="ccl : ${channelSettings.availableCcls()}">
+                <input type="checkbox" class="ccl-block-checkbox" th:value="${ccl.id()}"
+                       th:checked="${channelSettings.blockedCcls().contains(ccl.id())}"/>
+                <span th:text="${ccl.name()}">ccl name</span>
+            </label>
+            <mdui-button id="ccl-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+        </mdui-card>
     </section>
     <script src="/js/channel-status.js"></script>
     <script src="/js/game-search.js"></script>
     <script src="/js/channel-bindings.js"></script>
     <script src="/js/channel-connections.js"></script>
+    <script src="/js/channel-settings.js"></script>
 </mdui-layout-main>

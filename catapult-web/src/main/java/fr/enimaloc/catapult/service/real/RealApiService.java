@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.real;
 
+import fr.enimaloc.catapult.common.dto.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
@@ -143,5 +144,16 @@ public class RealApiService implements ApiService {
     @Override
     public void minecraftDisconnect(String username) {
         client.reqVoid(org.springframework.http.HttpMethod.DELETE, "/api/connect/minecraft", null, null);
+    }
+
+    @Override
+    public void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls) {
+        client.postVoid("/api/channels/{username}/settings/ccl",
+                new CclSettingsRequest(enabled, blockedCcls), username);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.UserSettingsDto channelSettings(String username) {
+        return client.get("/api/channels/{username}/settings", fr.enimaloc.catapult.common.dto.UserSettingsDto.class, username);
     }
 }
