@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.domain.Notification;
+import fr.enimaloc.catapult.common.dto.NotificationDto;
+import fr.enimaloc.catapult.common.dto.Severity;
 import fr.enimaloc.catapult.event.NotificationAllReadEvent;
 import fr.enimaloc.catapult.event.NotificationCreatedEvent;
 import fr.enimaloc.catapult.event.NotificationDeletedEvent;
@@ -28,7 +29,7 @@ class RedisNotificationPusherTest {
         UUID u1 = UUID.randomUUID();
         UUID u2 = UUID.randomUUID();
         NotificationDto dto = new NotificationDto(UUID.randomUUID(), "T", "<p>B</p>",
-                Notification.Severity.INFO, null, null, null, Instant.now(), false);
+                Severity.INFO, null, null, null, Instant.now(), false);
         NotificationCreatedEvent ev = new NotificationCreatedEvent(this, List.of(u1, u2), dto);
 
         pusher.onCommitted(ev);

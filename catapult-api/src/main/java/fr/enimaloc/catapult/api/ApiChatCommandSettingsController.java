@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.ChatCommandSettingUpsertRequest;
+import fr.enimaloc.catapult.common.dto.SettingDto;
 import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
@@ -51,20 +53,14 @@ public class ApiChatCommandSettingsController {
     private final UserAccountRepository userAccountRepository;
     private final ExperimentService experimentService;
 
-    public record SettingDto(String key, String value) {
-        static SettingDto fromEntity(ChatCommandSetting s) {
-            return new SettingDto(s.getKey(), s.getValue());
-        }
-    }
-
-    public record UpsertRequest(String value) {}
-
     @GetMapping
     public List<SettingDto> list(@AuthenticationPrincipal Jwt jwt, Locale locale) {
         UserAccount user = currentUser(jwt);
         gate(user);
         ensureDefaultLanguage(user, locale);
-        return repository.findByUser(user).stream().map(SettingDto::fromEntity).toList();
+        return repository.findByUser(user).stream()
+            .map(s -> new SettingDto(s.getKey(), s.getValue()))
+            .toList();
     }
 
     /** Seeds a default {@code language} setting on first visit from the caller's resolved locale
@@ -83,7 +79,7 @@ public class ApiChatCommandSettingsController {
 
     @PutMapping("/{key}")
     public ResponseEntity<Void> upsert(@AuthenticationPrincipal Jwt jwt, @PathVariable String key,
-                       @RequestBody UpsertRequest body) {
+                       @RequestBody ChatCommandSettingUpsertRequest body) {
         UserAccount user = currentUser(jwt);
         gate(user);
         if (!VALID_KEY.matcher(key).matches()) {

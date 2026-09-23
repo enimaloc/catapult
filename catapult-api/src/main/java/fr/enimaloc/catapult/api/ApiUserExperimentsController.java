@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.VariantResponse;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
@@ -38,6 +39,4 @@ public class ApiUserExperimentsController {
             experimentService.getVariant(user, key).map(v -> v.getKey()).orElse(null)
         );
     }
-
-    public record VariantResponse(String variant) {}
 }

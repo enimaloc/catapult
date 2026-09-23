@@ -1,5 +1,17 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.BindingDto;
+import fr.enimaloc.catapult.common.dto.CclDto;
+import fr.enimaloc.catapult.common.dto.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.ChannelUserDto;
+import fr.enimaloc.catapult.common.dto.DtddMappingCurrentDto;
+import fr.enimaloc.catapult.common.dto.DtddMappingProposalDto;
+import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.GameDto;
+import fr.enimaloc.catapult.common.dto.PagedBindings;
+import fr.enimaloc.catapult.common.dto.StatusData;
+import fr.enimaloc.catapult.common.dto.TwDto;
+import fr.enimaloc.catapult.common.dto.UserSettingsDto;
 import fr.enimaloc.catapult.domain.DtddGameCache;
 import fr.enimaloc.catapult.domain.DtddGameMapping;
 import fr.enimaloc.catapult.domain.DtddMappingProposal;
@@ -458,88 +470,4 @@ public class ApiChannelDataController {
         return new DtddMappingStatusDto(current, pending, canValidate, igdbId);
     }
 
-    public record DtddMappingStatusDto(DtddMappingCurrentDto current, DtddMappingProposalDto myPendingProposal, boolean canValidateDirectly, String igdbId) {}
-    public record DtddMappingCurrentDto(Long dtddId, String name, double confidence, boolean verified) {}
-    public record DtddMappingProposalDto(java.util.UUID id, Long proposedDtddId, String reason) {}
-
-    public record CclDto(String id, String name) {}
-
-    public record ChannelPageData(
-            ChannelUserDto channelUser,
-            String channelUsername,
-            boolean isOwner,
-            boolean isLive,
-            boolean botEnabled,
-            GameDto currentGame,
-            PagedBindings bindings,
-            List<CclDto> availableCcls,
-            Set<String> blockedCcls,
-            List<TwDto> availableTws,
-            Set<String> blockedTws,
-            String filterStatus,
-            String filterSource,
-            boolean hasSteamProvider,
-            boolean hasSteam,
-            boolean hasSteamPersonalToken,
-            boolean steamTokenShared,
-            boolean steamProfilePrivate,
-            boolean steamRateLimited,
-            boolean steamOfflineMode,
-            long steamProfileCacheTtlMinutes,
-            boolean hasXboxProvider,
-            boolean hasXbox,
-            String exampleUuid
-    ) {}
-
-    public record ChannelUserDto(String id, String twitchId, String twitchUsername, String profileImageUrl) {}
-
-    public record GameDto(String sourceName, String sourceType) {}
-
-    public record PagedBindings(int number, int totalPages, long totalElements, List<BindingDto> content) {
-        public boolean first() { return number == 0; }
-        public boolean last() { return number >= totalPages - 1; }
-    }
-
-    public record BindingDto(
-            String id,
-            String status,
-            String sourceType,
-            String sourceName,
-            String twitchGameId,
-            String twitchGameName,
-            boolean ignored,
-            boolean cclEnabled,
-            Set<String> ccls,
-            boolean twEnabled,
-            boolean twOverride,
-            Set<String> tws
-    ) {}
-
-    public record StatusData(
-            String channelUsername,
-            boolean isOwner,
-            boolean botEnabled,
-            boolean isLive,
-            GameDto currentGame
-    ) {}
-
-    public record UserSettingsDto(
-            boolean cclFeatureEnabled,
-            Set<String> blockedCcls,
-            String noGameTwitchGameId,
-            String noGameTwitchGameName,
-            Set<String> noGameCcls,
-            boolean applyDefaultOnStreamStart,
-            boolean applyDefaultOnNoGame,
-            boolean applyDefaultOnStreamEnd,
-            String incompleteFallbackTwitchGameId,
-            String incompleteFallbackTwitchGameName,
-            Set<String> incompleteFallbackCcls,
-            List<CclDto> availableCcls,
-            boolean twFeatureEnabled,
-            Set<String> blockedTws,
-            List<TwDto> availableTws
-    ) {}
-
-    public record TwDto(String id, String label) {}
 }

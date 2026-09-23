@@ -1,5 +1,9 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.SteamAddKeyRequest;
+import fr.enimaloc.catapult.common.dto.SteamDeleteKeyRequest;
+import fr.enimaloc.catapult.common.dto.SteamKeyStatus;
+import fr.enimaloc.catapult.common.dto.SteamKeysPageData;
 import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
@@ -59,7 +63,7 @@ public class ApiAdminSteamKeysController {
         Map<String, Long> blockedUntil = rotator != null ? rotator.getKeyBlockedUntil() : Map.of();
         long now = System.currentTimeMillis();
 
-        List<KeyStatus> keys = new ArrayList<>();
+        List<SteamKeyStatus> keys = new ArrayList<>();
         for (SteamApiKeyEntry entry : entries) {
             String key = entry.getApiKey();
             String masked = mask(key);
@@ -67,7 +71,7 @@ public class ApiAdminSteamKeysController {
             long until = blockedUntil.getOrDefault(key, 0L);
             boolean blocked = until > now;
             long remainingSec = blocked ? TimeUnit.MILLISECONDS.toSeconds(until - now) : 0L;
-            keys.add(new KeyStatus(ApiKeyHasher.id(key), masked, owner, blocked, remainingSec));
+            keys.add(new SteamKeyStatus(ApiKeyHasher.id(key), masked, owner, blocked, remainingSec));
         }
 
         return new SteamKeysPageData(keys, rotator != null);
@@ -75,7 +79,7 @@ public class ApiAdminSteamKeysController {
 
     @PostMapping("/add")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void add(@RequestBody AddKeyRequest body) {
+    public void add(@RequestBody SteamAddKeyRequest body) {
         String trimmed = body.apiKey().trim();
         if (!trimmed.matches("[0-9A-Fa-f]{32}")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid API key format");
@@ -85,14 +89,14 @@ public class ApiAdminSteamKeysController {
             if (rotator != null) rotator.refreshKeys();
             if (events != null) {
                 events.keyAdded(AdminEventPublisher.PROVIDER_STEAM,
-                        new KeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
+                        new SteamKeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
             }
         }
     }
 
     @PostMapping("/delete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@RequestBody DeleteKeyRequest body) {
+    public void delete(@RequestBody SteamDeleteKeyRequest body) {
         Optional<String> raw = repository.findByExclusiveFalse().stream()
             .map(SteamApiKeyEntry::getApiKey)
             .filter(k -> ApiKeyHasher.id(k).equals(body.keyId()))
@@ -112,11 +116,4 @@ public class ApiAdminSteamKeysController {
         if (events != null) events.keysRefreshed(AdminEventPublisher.PROVIDER_STEAM, page().keys());
     }
 
-    public record SteamKeysPageData(List<KeyStatus> keys, boolean steamEnabled) {}
-
-    public record KeyStatus(String id, String masked, String owner, boolean blocked, long blockedForSeconds) {}
-
-    public record AddKeyRequest(String apiKey) {}
-
-    public record DeleteKeyRequest(String keyId) {}
 }

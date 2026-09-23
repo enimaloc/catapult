@@ -1,5 +1,10 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.ConfigResponse;
+import fr.enimaloc.catapult.common.dto.DefaultActionResponse;
+import fr.enimaloc.catapult.common.dto.DefaultPayloadResponse;
+import fr.enimaloc.catapult.common.dto.TwitchatQuickConfig;
+import fr.enimaloc.catapult.common.dto.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
@@ -10,6 +15,8 @@ import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -25,13 +32,10 @@ public class ApiTwitchatWidgetController {
     private final TwitchatActionExecutor actionExecutor;
     private final MessageSource messageSource;
 
-    public record AccessResponse(String ownerId, boolean enabled) {}
-    public record ConfigResponse(String obsHost, Integer obsPort, String obsPassword) {}
-
     @GetMapping("/widget/{uuid}/access")
-    public ResponseEntity<AccessResponse> access(@PathVariable UUID uuid) {
+    public ResponseEntity<TwitchatWidgetAccessResponse> access(@PathVariable UUID uuid) {
         return widgetTokenService.resolve(uuid)
-                .map(user -> ResponseEntity.ok(new AccessResponse(user.getId().toString(),
+                .map(user -> ResponseEntity.ok(new TwitchatWidgetAccessResponse(user.getId().toString(),
                         widgetSettingsRepository.findById(user.getId()).map(TwitchatWidgetSettings::isEnabled).orElse(false))))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -59,11 +63,11 @@ public class ApiTwitchatWidgetController {
 
     @GetMapping("/defaults")
     public Map<String, DefaultPayloadResponse> defaults() {
-        Map<String, DefaultPayloadResponse> result = new java.util.LinkedHashMap<>();
+        Map<String, DefaultPayloadResponse> result = new LinkedHashMap<>();
         String base = stripTrailingSlash(publicWebUrl);
         for (var entry : fr.enimaloc.catapult.service.notification.TwitchatDefaultPayloads.DEFAULTS.entrySet()) {
             var d = entry.getValue();
-            java.util.List<DefaultActionResponse> actions = new java.util.ArrayList<>();
+            List<DefaultActionResponse> actions = new java.util.ArrayList<>();
             d.actions().forEach((type, def) -> actions.add(new DefaultActionResponse(def.label(), "url",
                     base + "/widget/twitchat/action/{{action:" + type.name() + "}}", def.theme())));
             result.put(entry.getKey().name(),
@@ -73,10 +77,10 @@ public class ApiTwitchatWidgetController {
     }
 
     @GetMapping("/quick-configs")
-    public java.util.List<fr.enimaloc.catapult.service.notification.dto.TwitchatQuickConfig> quickConfigs(Locale locale) {
+    public List<TwitchatQuickConfig> quickConfigs(Locale locale) {
         String base = stripTrailingSlash(publicWebUrl);
         return fr.enimaloc.catapult.service.notification.TwitchatQuickConfigs.resolve(messageSource, locale).stream()
-                .map(qc -> new fr.enimaloc.catapult.service.notification.dto.TwitchatQuickConfig(
+                .map(qc -> new TwitchatQuickConfig(
                         qc.key(), qc.label(), qc.description().replace("{{baseUrl}}", base), qc.eventType(),
                         qc.groupKey(), qc.groupLabel(), qc.variant(),
                         qc.parameters(), qc.templateJson().replace("{{baseUrl}}", base)))
@@ -86,8 +90,4 @@ public class ApiTwitchatWidgetController {
     private static String stripTrailingSlash(String url) {
         return url != null && url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
-
-    public record DefaultPayloadResponse(String message, String style, String icon, String authorName,
-                                          java.util.List<DefaultActionResponse> actions) {}
-    public record DefaultActionResponse(String label, String actionType, String url, String theme) {}
 }

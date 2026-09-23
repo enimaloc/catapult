@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.Notification;
+import fr.enimaloc.catapult.common.dto.NotificationDto;
+import fr.enimaloc.catapult.common.dto.Severity;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.service.notification.NotificationDto;
 import fr.enimaloc.catapult.service.notification.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -99,7 +99,7 @@ class ApiNotificationsControllerTest {
         List<NotificationDto> items = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
             items.add(new NotificationDto(UUID.randomUUID(), "Title " + i, "<p>Body</p>",
-                    Notification.Severity.INFO, null, null, null, Instant.now(), i >= 3));
+                    Severity.INFO, null, null, null, Instant.now(), i >= 3));
         }
         when(service.findRecent(eq(userId), eq(10))).thenReturn(items);
         when(service.countUnread(eq(userId))).thenReturn(3L);

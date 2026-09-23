@@ -32,6 +32,8 @@ val commonmarkVersion = "0.22.0"
 val springCloudContextVersion = "5.0.2"
 
 dependencies {
+    implementation(project(":catapult-common"))
+
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")

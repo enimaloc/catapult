@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.Severity;
 import fr.enimaloc.catapult.domain.*;
 import fr.enimaloc.catapult.event.NotificationAllReadEvent;
 import fr.enimaloc.catapult.event.NotificationCreatedEvent;
@@ -57,7 +58,7 @@ class NotificationServiceTest {
         });
 
         NotificationService.CreateRequest req = new NotificationService.CreateRequest(
-                "T", "B", Notification.Severity.INFO, null, null, null, targetId);
+                "T", "B", Severity.INFO, null, null, null, targetId);
 
         service.create(req, admin);
 
@@ -82,7 +83,7 @@ class NotificationServiceTest {
         });
 
         NotificationService.CreateRequest req = new NotificationService.CreateRequest(
-                "T", "B", Notification.Severity.WARNING, null, null, null, null);
+                "T", "B", Severity.WARNING, null, null, null, null);
 
         service.create(req, admin);
 

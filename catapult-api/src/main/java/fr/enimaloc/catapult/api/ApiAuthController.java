@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.AuthCodeStore;
@@ -31,9 +33,9 @@ public class ApiAuthController {
      * the opaque code in /auth/callback. Returns 410 Gone if the code is expired or already used.
      */
     @PostMapping("/exchange")
-    public ResponseEntity<Map<String, String>> exchange(@RequestParam String code) {
+    public ResponseEntity<TokenResponse> exchange(@RequestParam String code) {
         return codeStore.consume(code)
-                .map(jwt -> ResponseEntity.ok(Map.of("token", jwt)))
+                .map(jwt -> ResponseEntity.ok(new TokenResponse(jwt)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.GONE).build());
     }
 
@@ -62,16 +64,6 @@ public class ApiAuthController {
     public UserInfoResponse me(@AuthenticationPrincipal Jwt jwt) {
         return validate(jwt);
     }
-
-    public record UserInfoResponse(
-            UUID id,
-            String twitchId,
-            String username,
-            String profileImageUrl,
-            String status,
-            List<String> roles,
-            String deletionRequestedAt
-    ) {}
 
     public static Map<String, Object> toClaimsMap(UserInfoResponse r) {
         return Map.of(

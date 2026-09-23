@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.FeedbackRequest;
 import fr.enimaloc.catapult.domain.Experiment;
 import fr.enimaloc.catapult.domain.ExperimentAssignment;
 import fr.enimaloc.catapult.domain.ExperimentFeedback;
@@ -61,6 +62,4 @@ public class ApiExperimentFeedbackController {
         feedback.setComment(body.comment() != null && !body.comment().isBlank() ? body.comment().strip() : null);
         feedbackRepository.save(feedback);
     }
-
-    public record FeedbackRequest(UUID experimentId, int npsScore, String comment) {}
 }

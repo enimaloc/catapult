@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.domain.Notification;
+import fr.enimaloc.catapult.common.dto.Severity;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
@@ -37,7 +37,7 @@ class NotificationFlowIT {
         UserAccount other = persistUser("other-it");
 
         NotificationService.CreateRequest req = new NotificationService.CreateRequest(
-                "Hello", "**body**", Notification.Severity.INFO, null, null, null, target.getId());
+                "Hello", "**body**", Severity.INFO, null, null, null, target.getId());
 
         service.create(req, admin);
 

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.SteamStartResponse;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
@@ -169,6 +170,4 @@ public class ApiSteamConnectController {
             return false;
         }
     }
-
-    public record SteamStartResponse(String redirectUrl) {}
 }

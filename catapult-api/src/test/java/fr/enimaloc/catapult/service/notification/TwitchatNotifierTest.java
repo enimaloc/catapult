@@ -1,17 +1,17 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.TwitchatAction;
+import fr.enimaloc.catapult.common.dto.TwitchatActionType;
+import fr.enimaloc.catapult.common.dto.TwitchatNotification;
+import fr.enimaloc.catapult.common.dto.TwitchatPresetPayload;
+import fr.enimaloc.catapult.common.dto.TwitchatRawAction;
 import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.TwitchatActionType;
 import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.GameStateService;
-import fr.enimaloc.catapult.service.notification.dto.TwitchatAction;
-import fr.enimaloc.catapult.service.notification.dto.TwitchatNotification;
-import fr.enimaloc.catapult.service.notification.dto.TwitchatPresetPayload;
-import fr.enimaloc.catapult.service.notification.dto.TwitchatRawAction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
