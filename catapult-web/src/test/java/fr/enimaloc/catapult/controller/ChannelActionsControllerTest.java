@@ -70,4 +70,15 @@ class ChannelActionsControllerTest {
 
         verify(apiService).deleteBinding("enimaloc", "abc-123");
     }
+
+    @Test
+    void updateBinding_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/bindings/abc-123").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"twitchGameId\":\"509658\",\"twitchGameName\":\"Celeste\",\"ccls\":[\"violent-graphic\"]}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).updateBinding("enimaloc", "abc-123", "509658", "Celeste",
+                java.util.Set.of("violent-graphic"));
+    }
 }
