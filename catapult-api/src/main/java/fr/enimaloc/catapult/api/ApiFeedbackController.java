@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.SubmitRequest;
 import fr.enimaloc.catapult.domain.FeedbackSubmission;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.FeedbackSubmissionRepository;
@@ -95,6 +96,4 @@ public class ApiFeedbackController {
         String body = description != null && !description.isBlank() ? description.strip() + "\n\n" : "";
         return body + "---\n*Soumis par @" + user.getTwitchUsername() + " via Catapult*";
     }
-
-    public record SubmitRequest(String type, String title, String description) {}
 }

@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.AddKeyRequest;
+import fr.enimaloc.catapult.common.dto.DeleteKeyRequest;
 import fr.enimaloc.catapult.domain.DtddApiKeyEntry;
 import fr.enimaloc.catapult.getter.DtddApiKeyRotator;
 import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
@@ -33,14 +35,14 @@ class ApiAdminDtddKeysControllerTest {
 
     @Test
     void add_rejectsInvalidFormat() {
-        assertThatThrownBy(() -> controller.add(new ApiAdminDtddKeysController.AddKeyRequest("bad!chars$")))
+        assertThatThrownBy(() -> controller.add(new AddKeyRequest("bad!chars$")))
             .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
     void add_persistsAndRefreshes() {
         when(repository.existsById("ddd_abcdef1234567890ABCD")).thenReturn(false);
-        controller.add(new ApiAdminDtddKeysController.AddKeyRequest("ddd_abcdef1234567890ABCD"));
+        controller.add(new AddKeyRequest("ddd_abcdef1234567890ABCD"));
         verify(repository).save(any(DtddApiKeyEntry.class));
         verify(rotator).refreshKeys();
     }
@@ -67,7 +69,7 @@ class ApiAdminDtddKeysControllerTest {
         ));
         String id = ApiKeyHasher.id("ABCDEFGHIJKLMNOP");
 
-        controller.delete(new ApiAdminDtddKeysController.DeleteKeyRequest(id));
+        controller.delete(new DeleteKeyRequest(id));
 
         verify(repository).deleteById("ABCDEFGHIJKLMNOP");
         verify(rotator).refreshKeys();
@@ -77,7 +79,7 @@ class ApiAdminDtddKeysControllerTest {
     void delete_unknownKeyId_throwsNotFound() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of());
         assertThatThrownBy(() ->
-                controller.delete(new ApiAdminDtddKeysController.DeleteKeyRequest("0000000000000000")))
+                controller.delete(new DeleteKeyRequest("0000000000000000")))
             .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).deleteById(any());
     }

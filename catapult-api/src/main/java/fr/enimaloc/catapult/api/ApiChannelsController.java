@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.ChannelDto;
+import fr.enimaloc.catapult.common.dto.ChannelListResponse;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ChannelAccessService;
@@ -41,17 +43,4 @@ public class ApiChannelsController {
 
         return new ChannelListResponse(viewer.getTwitchId(), channels);
     }
-
-    public record ChannelDto(
-            UUID id,
-            String twitchId,
-            String twitchUsername,
-            String profileImageUrl,
-            boolean live
-    ) {}
-
-    public record ChannelListResponse(
-            String viewerTwitchId,
-            List<ChannelDto> channels
-    ) {}
 }

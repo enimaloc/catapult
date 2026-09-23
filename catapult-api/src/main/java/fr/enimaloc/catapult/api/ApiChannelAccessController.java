@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.ChannelAccessResponse;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ChannelAccessService;
@@ -29,12 +30,10 @@ public class ApiChannelAccessController {
     private final UserAccountRepository userAccountRepository;
     private final ChannelAccessService channelAccessService;
 
-    public record AccessResponse(boolean accessible) {}
-
     @GetMapping("/api/users/{ownerId}/channel-access")
-    public AccessResponse canAccess(@PathVariable String ownerId,
+    public ChannelAccessResponse canAccess(@PathVariable String ownerId,
                                     @AuthenticationPrincipal Jwt jwt) {
-        if (jwt == null) return new AccessResponse(false);
+        if (jwt == null) return new ChannelAccessResponse(false);
 
         UUID viewerUuid;
         UUID ownerUuid;
@@ -42,13 +41,13 @@ public class ApiChannelAccessController {
             viewerUuid = UUID.fromString(jwt.getSubject());
             ownerUuid = UUID.fromString(ownerId);
         } catch (IllegalArgumentException e) {
-            return new AccessResponse(false);
+            return new ChannelAccessResponse(false);
         }
 
         UserAccount viewer = userAccountRepository.findById(viewerUuid).orElse(null);
         UserAccount owner = userAccountRepository.findById(ownerUuid).orElse(null);
-        if (viewer == null || owner == null) return new AccessResponse(false);
+        if (viewer == null || owner == null) return new ChannelAccessResponse(false);
 
-        return new AccessResponse(channelAccessService.canAccess(viewer, owner));
+        return new ChannelAccessResponse(channelAccessService.canAccess(viewer, owner));
     }
 }

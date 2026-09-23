@@ -1,5 +1,11 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.AddToGroupRequest;
+import fr.enimaloc.catapult.common.dto.FlagView;
+import fr.enimaloc.catapult.common.dto.MemberSummary;
+import fr.enimaloc.catapult.common.dto.MemberTargeting;
+import fr.enimaloc.catapult.common.dto.MigrateRequest;
+import fr.enimaloc.catapult.common.dto.SetFlagRequest;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserFlag;
@@ -227,16 +233,4 @@ public class ApiAdminMembersController {
     }
 
     public record MembersPageData(List<UserAccount> members, Map<UUID, Boolean> liveStatus, boolean isMockProfile) {}
-
-    public record MemberSummary(UUID id, String twitchUsername) {}
-
-    public record MigrateRequest(UUID targetId, boolean migrateSettings, boolean migrateGetters, boolean migrateBindings) {}
-
-    public record SetFlagRequest(String key, String value) {}
-
-    public record AddToGroupRequest(String groupKey) {}
-
-    public record FlagView(String key, String value) {}
-
-    public record MemberTargeting(List<FlagView> flags, List<String> groupKeys) {}
 }

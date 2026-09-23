@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.domain;
 
+import fr.enimaloc.catapult.common.dto.Severity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,7 +12,6 @@ import java.util.UUID;
 @Getter
 @Setter
 public class Notification {
-    public enum Severity { INFO, WARNING, ERROR }
     public enum Audience { BROADCAST, TARGETED }
 
     @Id

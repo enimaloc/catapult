@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.SaveMappingsRequest;
 import fr.enimaloc.catapult.domain.IgdbRatingDescriptor;
 import fr.enimaloc.catapult.domain.TwitchCclDefinition;
 import fr.enimaloc.catapult.service.AdminCclService;
@@ -77,6 +78,4 @@ public class ApiAdminCclController {
     }
 
     public record CclPageData(List<TwitchCclDefinition> ccls, List<IgdbRatingDescriptor> igdbDescriptors) {}
-
-    public record SaveMappingsRequest(Set<Long> igdbCategoryIds) {}
 }

@@ -2,6 +2,9 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.chat.DynamicCommandResolver;
 import fr.enimaloc.catapult.chat.TwPlaceholderRegistry;
+import fr.enimaloc.catapult.common.dto.CacheEntryDetailDto;
+import fr.enimaloc.catapult.common.dto.CacheEntryDto;
+import fr.enimaloc.catapult.common.dto.CacheSummaryDto;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.IgdbGameDetailsRepository;
@@ -53,10 +56,6 @@ public class ApiAdminCacheController {
 
     private static final Set<String> IGDB_DETAILS_TTL_CACHES =
         Set.of("igdb-game-cache", "igdb-name-index", "igdb-exe-index");
-
-    public record CacheSummaryDto(String name, int size, boolean deletable) {}
-    public record CacheEntryDto(String key, String value) {}
-    public record CacheEntryDetailDto(String key, Object detail, Long expiresInSeconds) {}
 
     @GetMapping
     public List<CacheSummaryDto> list() {

@@ -1,5 +1,12 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.MappingDto;
+import fr.enimaloc.catapult.common.dto.ProposalDto;
+import fr.enimaloc.catapult.common.dto.ProposeRequest;
+import fr.enimaloc.catapult.common.dto.SearchResponse;
+import fr.enimaloc.catapult.common.dto.SearchResultDto;
+import fr.enimaloc.catapult.common.dto.StatusResponse;
+import fr.enimaloc.catapult.common.dto.ValidateRequest;
 import fr.enimaloc.catapult.domain.*;
 import fr.enimaloc.catapult.domain.DtddMappingProposal.Status;
 import fr.enimaloc.catapult.getter.DtddApiClient;
@@ -115,11 +122,4 @@ public class ApiChannelDtddMappingController {
         return new SearchResponse(new ArrayList<>(dedup.values()));
     }
 
-    public record StatusResponse(MappingDto current, ProposalDto myPendingProposal, boolean canValidateDirectly) {}
-    public record MappingDto(Long dtddId, String name, double confidence, boolean verified) {}
-    public record ProposalDto(UUID id, Long proposedDtddId, String reason) {}
-    public record ValidateRequest(String igdbId) {}
-    public record ProposeRequest(String igdbId, Long dtddId, String reason) {}
-    public record SearchResponse(List<SearchResultDto> results) {}
-    public record SearchResultDto(long dtddId, String name, String mediaType, String posterUrl) {}
 }

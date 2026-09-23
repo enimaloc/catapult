@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.RejectRequest;
 import fr.enimaloc.catapult.domain.*;
 import fr.enimaloc.catapult.domain.DtddMappingProposal.Status;
 import fr.enimaloc.catapult.repository.*;
@@ -85,6 +86,4 @@ public class ApiAdminDtddMappingController {
         proposalRepo.save(p);
         if (events != null) events.dtddProposalResolved(id.toString(), Status.REJECTED.name());
     }
-
-    public record RejectRequest(String reason) {}
 }
