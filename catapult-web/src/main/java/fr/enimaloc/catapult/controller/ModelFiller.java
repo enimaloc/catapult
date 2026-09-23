@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.core.io.ClassPathResource;
@@ -45,10 +47,36 @@ public class ModelFiller {
         model.addAttribute("lastUpdate", lastModified != null ? Instant.parse(lastModified) : Instant.EPOCH);
     }
 
-    public void fill(Model model, String page, Locale locale) throws IOException {
+    public void fill(Model model, String page, Locale locale, HttpServletRequest request) throws IOException {
         switch (page) {
             case "privacy" -> privacy(model, locale);
         }
         defaultAttr(model, page);
+    }
+
+    public void error(Model model, HttpServletRequest request) {
+        Object status = request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
+        error(model, status instanceof Integer ? (Integer) status : 500);
+    }
+
+    public void error(Model model, int code) {
+        model.addAttribute("errorCode", code);
+
+        String prefix = switch (code) {
+            case 400 -> "error.400";
+            case 401 -> "error.401";
+            case 403 -> "error.403";
+            case 404 -> "error.404";
+            case 405 -> "error.405";
+            case 429 -> "error.429";
+            case 500 -> "error.500";
+            case 502 -> "error.502";
+            case 503 -> "error.503";
+            default -> "error.generic";
+        };
+
+        model.addAttribute("errorEyebrow", "error.eyebrow");
+        model.addAttribute("errorTitle", prefix + ".title");
+        model.addAttribute("errorDescription", prefix + ".description");
     }
 }
