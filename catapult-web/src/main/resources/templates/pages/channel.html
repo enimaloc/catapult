@@ -40,6 +40,8 @@
                 <span th:text="${b.twitchGameName() ?: '—'}">Game</span>
                 <mdui-chip th:each="ccl : ${b.ccls()}" th:text="${ccl}">ccl</mdui-chip>
                 <span th:text="${b.status()}">STATUS</span>
+                <mdui-switch th:if="${ch.isOwner()}" class="binding-ccl-toggle" th:checked="${b.cclEnabled()}"></mdui-switch>
+                <mdui-switch th:if="${ch.isOwner()}" class="binding-ignored-toggle" th:checked="${b.ignored()}"></mdui-switch>
             </mdui-list-item>
             <mdui-list-item th:if="${ch.bindings().content().isEmpty()}" th:text="#{channel.bindings.empty}">
                 Aucune association.
@@ -57,4 +59,5 @@
         </div>
     </section>
     <script src="/js/channel-status.js"></script>
+    <script src="/js/channel-bindings.js"></script>
 </mdui-layout-main>

@@ -39,10 +39,14 @@ public class MockData {
                     ONLINE_USER.twitchUsername(), ONLINE_USER.profileImageUrl());
 
     public static fr.enimaloc.catapult.common.dto.ChannelPageData getChannelPage(String username, String status, String source) {
+        var sampleBinding = new fr.enimaloc.catapult.common.dto.BindingDto(
+                "sample-binding-1", "AUTO", "STEAM", "Celeste",
+                "509658", "Celeste", false, true, java.util.Set.of("violent-graphic"),
+                false, false, java.util.Set.of());
         return new fr.enimaloc.catapult.common.dto.ChannelPageData(
                 CHANNEL_USER, username, true, true, true,
                 new fr.enimaloc.catapult.common.dto.GameDto("Celeste", "STEAM"),
-                new fr.enimaloc.catapult.common.dto.PagedBindings(0, 1, 0, List.of()),
+                new fr.enimaloc.catapult.common.dto.PagedBindings(0, 1, 1, List.of(sampleBinding)),
                 List.of(), java.util.Set.of(), List.of(), java.util.Set.of(),
                 status, source, true, true, true, false, false, false, false, 15L,
                 false, false, "00000000-0000-0000-0000-000000000000");

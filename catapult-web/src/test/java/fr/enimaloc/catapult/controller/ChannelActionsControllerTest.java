@@ -42,4 +42,24 @@ class ChannelActionsControllerTest {
         mvc.perform(post("/channel/enimaloc/settings/bot"))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void cclToggle_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/bindings/abc-123/ccl-toggle").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).cclToggle("enimaloc", "abc-123", true);
+    }
+
+    @Test
+    void ignoredToggle_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/bindings/abc-123/ignored-toggle").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"ignored\":true}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).ignoredToggle("enimaloc", "abc-123", true);
+    }
 }
