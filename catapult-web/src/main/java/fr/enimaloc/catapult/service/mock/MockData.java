@@ -51,4 +51,14 @@ public class MockData {
                 status, source, true, true, true, false, false, false, false, 15L,
                 false, false, "00000000-0000-0000-0000-000000000000");
     }
+
+    public static fr.enimaloc.catapult.common.dto.UserSettingsDto getChannelSettings() {
+        return new fr.enimaloc.catapult.common.dto.UserSettingsDto(
+                true, java.util.Set.of("violent-graphic"),
+                null, null, java.util.Set.of(), false, false, false,
+                null, null, java.util.Set.of(),
+                List.of(new fr.enimaloc.catapult.common.dto.CclDto("violent-graphic", "Violence graphique")),
+                false, java.util.Set.of(),
+                List.of(new fr.enimaloc.catapult.common.dto.TwDto("jumpscares", "Jumpscares")));
+    }
 }

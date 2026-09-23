@@ -183,4 +183,14 @@ class ChannelActionsControllerTest {
 
         verify(apiService).minecraftDisconnect("enimaloc");
     }
+
+    @Test
+    void saveCclSettings_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/ccl").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"cclEnabled\":true,\"blockedCcls\":[\"violent-graphic\"]}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveCclSettings("enimaloc", true, java.util.Set.of("violent-graphic"));
+    }
 }
