@@ -26,7 +26,7 @@ public class SteamIADisclosure {
             entry(SteamLanguage.ENGLISH, "AI Generated Content Disclosure"),
             entry(SteamLanguage.SPANISH, "Información sobre contenido generado por IA"),
             entry(SteamLanguage.GREEK, "Γνωστοποίηση περιεχομένου που δημιουργήθηκε από τεχνητή νοημοσύνη (AI)"),
-            entry(SteamLanguage.FRENCH, "Divulgation de contenu généré par IA"),
+            entry(SteamLanguage.FRENCH, "Notification de contenu généré par IA"),
             entry(SteamLanguage.ITALIAN, "Divulgazione dei contenuti generati dall'IA"),
             entry(SteamLanguage.HUNGARIAN, "Nyilatkozat MI generálta tartalomról"),
             entry(SteamLanguage.DUTCH, "Informatie over door AI gegenereerde inhoud"),
@@ -41,7 +41,7 @@ public class SteamIADisclosure {
             entry(SteamLanguage.TURKISH, "Yapay Zekâ İçeriği Açıklaması"),
             entry(SteamLanguage.VIETNAMESE, "Công bố về nội dung tạo bởi AI"),
             entry(SteamLanguage.UKRAINIAN, "Розкриття інформації щодо вмісту, згенерованого ШІ"),
-            entry(SteamLanguage.ARABIC, "الإفصاح عن المحتوى الذي يتم إنشاؤه بواسطة الذكاء الاصطناعي")
+            entry(SteamLanguage.ARABIC, "تنويه بأن هذا محتوى مولد بالذكاء الاصطناعي")
     );
 
     private static Map.Entry<SteamLanguage, Pattern> entry(SteamLanguage language, String literalText) {
