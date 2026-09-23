@@ -8,13 +8,15 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import java.util.Locale;
+
 @Controller
 @RequiredArgsConstructor
 public class ErrorPageController implements ErrorController {
     private final ModelFiller filler;
 
     @RequestMapping("/error")
-    String error(Model model, HttpServletRequest request) {
+    String error(Model model, HttpServletRequest request, Locale locale) {
         filler.error(model, request);
 
         Object forwardedUri = request.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI);
@@ -25,7 +27,7 @@ public class ErrorPageController implements ErrorController {
         }
 
         model.addAttribute("error", true);
-        filler.defaultAttr(model, "");
+        filler.defaultAttr(model, "", locale);
         return "index";
     }
 }
