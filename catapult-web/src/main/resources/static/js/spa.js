@@ -19,17 +19,13 @@ function updateActiveLink(path) {
 
 async function navigate(path, push = true) {
     const route = routes[path];
-
-    if (!route) {
-        window.location.href = path;
-        return;
-    }
+    const templateUrl = route ? route.templateUrl : `/spa/${path}`;
 
     progress.hidden = false;
 
     let response;
     try {
-        response = await fetch(route.templateUrl);
+        response = await fetch(templateUrl);
     } catch {
         // Network failure (offline, timeout, ...): fall back to a full
         // navigation so the browser's own error handling takes over.
@@ -42,16 +38,6 @@ async function navigate(path, push = true) {
     const html = await response.text();
     app.innerHTML = html;
 
-    if (!response.ok) {
-        // Server-side error: the response body is the error fragment
-        // (see ErrorPageController), render it in place instead of
-        // reloading the whole page.
-        return;
-    }
-
-    document.title = config.titles[route.id] ?? document.title;
-    updateActiveLink(path);
-
     if (push) {
         history.pushState(
             {
@@ -63,6 +49,17 @@ async function navigate(path, push = true) {
         );
     }
 
+    if (!response.ok) {
+        // Server-side error (unknown page or fragment failure): the
+        // response body is the error fragment (see ErrorPageController
+        // and IndexController.SPAPages#unknown), render it in place
+        // instead of reloading the whole page.
+        return;
+    }
+
+    document.title = config.titles[route.id] ?? document.title;
+    updateActiveLink(path);
+
     window.scrollTo({
         top: 0,
         behavior: "instant"
@@ -72,25 +69,23 @@ async function navigate(path, push = true) {
 updateActiveLink(config.page);
 
 document.addEventListener("click", event => {
-    const el = event.target.closest("a[data-link]");
-    if (!el) {
+    // composedPath() (rather than event.target) is required here: for a
+    // click inside a web component's shadow DOM (e.g. <mdui-button href>),
+    // event.target is retargeted to the component itself, which isn't an
+    // <a> and wouldn't match a plain `a[data-link]` selector.
+    const el = event.composedPath().find(node => node instanceof Element && node.hasAttribute("data-link"));
+    const href = el?.getAttribute("href");
+    if (!href) {
         return;
     }
 
-    const url = new URL(el.href);
+    const url = new URL(href, window.location.href);
     if (url.origin !== window.location.origin) {
         return;
     }
 
-    const pathname = url.pathname.replace(/^\/+|\/+$/g, "");
-    const route = routes[pathname];
-    if (!route) {
-        console.log("No SPA route for:", pathname);
-        return;
-    }
-
     event.preventDefault();
-    navigate(pathname);
+    navigate(url.pathname.replace(/^\/+|\/+$/g, ""));
 });
 
 window.addEventListener("popstate", () => {
