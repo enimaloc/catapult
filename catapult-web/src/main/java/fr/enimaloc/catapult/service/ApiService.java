@@ -21,4 +21,8 @@ public interface ApiService {
     void steamTokenSharing(String username, boolean shared);
     void deleteSteamToken(String username);
     void refreshSteamProfileCache(String username);
+    fr.enimaloc.catapult.common.dto.LinkStateResponse minecraftStatus(String username);
+    void minecraftEnroll(String username, String name);
+    void minecraftSync(String username);
+    void minecraftDisconnect(String username);
 }
