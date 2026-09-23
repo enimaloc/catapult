@@ -1,7 +1,9 @@
 package fr.enimaloc.catapult.service.real;
 
+import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -50,5 +52,17 @@ public class RealApiService implements ApiService {
     @Override
     public void recheckGame(String username) {
         client.postVoid("/api/channels/{username}/game/recheck", null, username);
+    }
+
+    @Override
+    public void cclToggle(String username, String bindingId, boolean enabled) {
+        client.postVoid("/api/channels/{username}/bindings/{bindingId}/ccl-toggle",
+                new CclToggleRequest(enabled), username, bindingId);
+    }
+
+    @Override
+    public void ignoredToggle(String username, String bindingId, boolean ignored) {
+        client.postVoid("/api/channels/{username}/bindings/{bindingId}/ignored-toggle",
+                new IgnoredToggleRequest(ignored), username, bindingId);
     }
 }
