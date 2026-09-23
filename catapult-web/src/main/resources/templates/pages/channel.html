@@ -57,6 +57,21 @@
                     </label>
                     <mdui-button class="binding-edit-save-btn" th:text="#{channel.bindings.edit.save}">Enregistrer</mdui-button>
                 </div>
+
+                <mdui-button-icon th:if="${ch.isOwner()}" icon="warning" class="binding-tw-btn"></mdui-button-icon>
+                <div th:if="${ch.isOwner()}" class="binding-tw-panel" hidden>
+                    <label>
+                        <input type="checkbox" class="binding-tw-enabled-checkbox" th:checked="${b.twEnabled()}"/>
+                        <span th:text="#{channel.bindings.tw.enabled}">Activer les avertissements</span>
+                    </label>
+                    <label th:each="tw : ${ch.availableTws()}">
+                        <input type="checkbox" class="binding-tw-checkbox" th:value="${tw.id()}"
+                               th:checked="${b.tws().contains(tw.id())}"/>
+                        <span th:text="${tw.label()}">tw label</span>
+                    </label>
+                    <mdui-button class="binding-tw-save-btn" th:text="#{channel.bindings.tw.save}">Enregistrer</mdui-button>
+                    <mdui-button th:if="${b.twOverride()}" class="binding-tw-reset-btn" th:text="#{channel.bindings.tw.reset}">Réinitialiser</mdui-button>
+                </div>
             </mdui-list-item>
             <mdui-list-item th:if="${ch.bindings().content().isEmpty()}" th:text="#{channel.bindings.empty}">
                 Aucune association.

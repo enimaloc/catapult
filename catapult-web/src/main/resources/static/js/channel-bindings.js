@@ -60,4 +60,26 @@
             await refresh();
         });
     });
+
+    list.querySelectorAll(".binding-tw-btn").forEach(btn => {
+        const row = btn.closest("[data-binding-id]");
+        const panel = row.querySelector(".binding-tw-panel");
+        btn.addEventListener("click", () => { panel.hidden = !panel.hidden; });
+
+        panel.querySelector(".binding-tw-save-btn").addEventListener("click", async () => {
+            const enabled = panel.querySelector(".binding-tw-enabled-checkbox").checked;
+            const tws = Array.from(panel.querySelectorAll(".binding-tw-checkbox:checked")).map(cb => cb.value);
+            await CatapultCsrf.postJson(bindingUrl(row, "tw-enabled"), { enabled });
+            await CatapultCsrf.postJson(bindingUrl(row, "tws"), { tws });
+            await refresh();
+        });
+
+        const resetBtn = panel.querySelector(".binding-tw-reset-btn");
+        if (resetBtn) {
+            resetBtn.addEventListener("click", async () => {
+                await CatapultCsrf.postJson(bindingUrl(row, "tws/reset"), {});
+                await refresh();
+            });
+        }
+    });
 })();

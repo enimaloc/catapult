@@ -71,4 +71,19 @@ public class MockApiService implements ApiService {
     public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
         // no-op in mock mode
     }
+
+    @Override
+    public void saveTws(String bindingId, java.util.Set<String> tws) {
+        // no-op in mock mode
+    }
+
+    @Override
+    public void resetTws(String bindingId) {
+        // no-op in mock mode
+    }
+
+    @Override
+    public void toggleTwEnabled(String bindingId, boolean enabled) {
+        // no-op in mock mode
+    }
 }
