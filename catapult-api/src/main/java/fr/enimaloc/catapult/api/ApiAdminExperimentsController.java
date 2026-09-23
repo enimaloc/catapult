@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.AssignRequest;
+import fr.enimaloc.catapult.common.dto.NpsStat;
 import fr.enimaloc.catapult.domain.Experiment;
 import fr.enimaloc.catapult.domain.ExperimentAssignment;
 import fr.enimaloc.catapult.domain.ExperimentAssignmentRule;
@@ -292,10 +294,6 @@ public class ApiAdminExperimentsController {
     ) {}
 
     public record ConversionStat(String eventKey, String variantKey, long conversions, long participants, StatisticsService.ZTestResult significance) {}
-
-    public record NpsStat(String variantKey, int npsScore, Double averageRaw) {}
-
-    public record AssignRequest(String twitchUsername) {}
 
     public record AddRuleRequest(
             ExperimentAssignmentRule.RuleType ruleType,

@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.api.dto.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.BroadcastRequestDto;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;

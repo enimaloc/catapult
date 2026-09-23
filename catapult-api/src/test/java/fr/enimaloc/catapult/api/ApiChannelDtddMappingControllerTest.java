@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.ProposeRequest;
+import fr.enimaloc.catapult.common.dto.ValidateRequest;
 import fr.enimaloc.catapult.domain.*;
 import fr.enimaloc.catapult.domain.DtddMappingProposal.Status;
 import fr.enimaloc.catapult.getter.DtddApiClient;
@@ -70,7 +72,7 @@ class ApiChannelDtddMappingControllerTest {
         when(mappingRepo.findById("100")).thenReturn(Optional.of(mapping));
         when(proposalRepo.countByIgdbIdAndStatus("100", Status.PENDING)).thenReturn(0L);
 
-        controller.validate(new ApiChannelDtddMappingController.ValidateRequest("100"), user);
+        controller.validate(new ValidateRequest("100"), user);
 
         assertThat(mapping.isVerified()).isTrue();
         assertThat(mapping.getConfidence()).isEqualTo(1.0);
@@ -81,13 +83,13 @@ class ApiChannelDtddMappingControllerTest {
     void validate_rejects_whenAlreadyVerified() {
         when(mappingRepo.findById("100")).thenReturn(Optional.of(
             new DtddGameMapping("100", 4521L, 0.92, true, Instant.now())));
-        assertThatThrownBy(() -> controller.validate(new ApiChannelDtddMappingController.ValidateRequest("100"), user))
+        assertThatThrownBy(() -> controller.validate(new ValidateRequest("100"), user))
             .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
     void propose_createsPendingProposal() {
-        controller.propose(new ApiChannelDtddMappingController.ProposeRequest("100", 1287L, "wrong game"), user);
+        controller.propose(new ProposeRequest("100", 1287L, "wrong game"), user);
         verify(proposalRepo).save(any(DtddMappingProposal.class));
     }
 

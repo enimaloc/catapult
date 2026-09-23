@@ -1,2 +1,2 @@
 rootProject.name = "catapult"
-include("catapult-api", "catapult-web", "catapult-web-old")
+include("catapult-common", "catapult-api", "catapult-web", "catapult-web-old")

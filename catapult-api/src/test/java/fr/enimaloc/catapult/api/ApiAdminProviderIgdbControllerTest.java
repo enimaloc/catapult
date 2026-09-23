@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.api.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.common.dto.AdminProviderIgdbQueryRequest;
 import fr.enimaloc.catapult.service.IgdbService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,7 @@ class ApiAdminProviderIgdbControllerTest {
         when(igdbService.getAppToken()).thenReturn("app-token");
         doReturn("[{\"id\":1,\"name\":\"Celeste\"}]").when(responseSpec).body(String.class);
 
-        var result = controller.query(new ApiAdminProviderIgdbController.QueryRequest("games", "fields name; where id=1;"));
+        var result = controller.query(new AdminProviderIgdbQueryRequest("games", "fields name; where id=1;"));
 
         assertThat(result.status()).isEqualTo(200);
         assertThat(result.body()).contains("\"name\" : \"Celeste\"");
@@ -60,7 +61,7 @@ class ApiAdminProviderIgdbControllerTest {
 
     @Test
     void query_invalidEndpoint_throws400() {
-        assertThatThrownBy(() -> controller.query(new ApiAdminProviderIgdbController.QueryRequest("Games!", "fields name;")))
+        assertThatThrownBy(() -> controller.query(new AdminProviderIgdbQueryRequest("Games!", "fields name;")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Invalid endpoint");
     }
@@ -69,7 +70,7 @@ class ApiAdminProviderIgdbControllerTest {
     void query_blankAppToken_returnsErrorWithoutCallingRestClient() {
         when(igdbService.getAppToken()).thenReturn("");
 
-        var result = controller.query(new ApiAdminProviderIgdbController.QueryRequest("games", "fields name;"));
+        var result = controller.query(new AdminProviderIgdbQueryRequest("games", "fields name;"));
 
         assertThat(result.error()).contains("IGDB token not available");
         org.mockito.Mockito.verifyNoInteractions(restClient);

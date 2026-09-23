@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.TwitchatNotification;
+import fr.enimaloc.catapult.common.dto.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
-import fr.enimaloc.catapult.service.notification.dto.TwitchatNotification;
-import fr.enimaloc.catapult.service.notification.dto.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
