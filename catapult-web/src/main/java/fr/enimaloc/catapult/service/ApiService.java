@@ -25,4 +25,6 @@ public interface ApiService {
     void minecraftEnroll(String username, String name);
     void minecraftSync(String username);
     void minecraftDisconnect(String username);
+    void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
+    fr.enimaloc.catapult.common.dto.UserSettingsDto channelSettings(String username);
 }

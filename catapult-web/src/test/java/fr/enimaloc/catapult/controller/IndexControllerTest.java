@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.PagedBindings;
+import fr.enimaloc.catapult.common.dto.UserSettingsDto;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +55,9 @@ class IndexControllerTest {
                 List.of(), java.util.Set.of(), List.of(), java.util.Set.of(),
                 null, null, false, false, false, false, false, false, false, 15L, false, false, "uuid");
         lenient().when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
+        lenient().when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
+                false, java.util.Set.of(), null, null, java.util.Set.of(), false, false, false,
+                null, null, java.util.Set.of(), List.of(), false, java.util.Set.of(), List.of()));
     }
 
     @Test
