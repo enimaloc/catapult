@@ -3,8 +3,10 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.dto.index.FeatureDto;
 import fr.enimaloc.catapult.dto.index.PlatformDto;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -70,6 +72,13 @@ public class IndexController {
         String privacy(Model model, Locale locale) throws IOException {
             filler.privacy(model, locale);
             return "pages/privacy :: privacy";
+        }
+
+        @GetMapping("/{page}")
+        String unknown(Model model, HttpServletResponse response) {
+            response.setStatus(HttpStatus.NOT_FOUND.value());
+            filler.error(model, 404);
+            return "pages/error :: error";
         }
     }
 
