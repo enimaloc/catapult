@@ -108,6 +108,12 @@ mdui-top-app-bar {
             1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* mdui-linear-progress sets display in its own shadow DOM, which
+ * otherwise overrides the [hidden] attribute's UA style. */
+#nav-progress[hidden] {
+    display: none !important;
+}
+
 .brand {
     display: inline-flex;
 
