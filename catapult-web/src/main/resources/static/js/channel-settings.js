@@ -46,4 +46,22 @@
             await refresh();
         });
     }
+
+    const incompleteFallbackForm = document.getElementById("channel-incomplete-fallback-settings-form");
+    if (incompleteFallbackForm) {
+        const gameInput = document.getElementById("incomplete-fallback-game-input");
+        const gameIdInput = document.getElementById("incomplete-fallback-game-id");
+        GameSearch.attach(gameInput, document.getElementById("incomplete-fallback-game-results"),
+                `/channel/${username}/games/search`, game => { gameIdInput.value = game.id; });
+
+        document.getElementById("incomplete-fallback-settings-save-btn").addEventListener("click", async () => {
+            const ccls = Array.from(incompleteFallbackForm.querySelectorAll(".incomplete-fallback-ccl-checkbox:checked")).map(cb => cb.value);
+            await CatapultCsrf.postJson(`${baseUrl}/settings/incomplete-fallback`, {
+                twitchGameId: gameIdInput.value || null,
+                twitchGameName: gameInput.value || null,
+                ccls
+            });
+            await refresh();
+        });
+    }
 })();
