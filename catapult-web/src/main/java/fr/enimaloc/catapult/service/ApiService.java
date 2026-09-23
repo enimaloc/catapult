@@ -14,4 +14,7 @@ public interface ApiService {
     void deleteBinding(String username, String bindingId);
     Object searchGames(String username, String q);
     void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
+    void saveTws(String bindingId, java.util.Set<String> tws);
+    void resetTws(String bindingId);
+    void toggleTwEnabled(String bindingId, boolean enabled);
 }
