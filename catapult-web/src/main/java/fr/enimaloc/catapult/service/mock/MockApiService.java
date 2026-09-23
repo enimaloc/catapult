@@ -148,4 +148,9 @@ public class MockApiService implements ApiService {
                                     boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
         // no-op in mock mode
     }
+
+    @Override
+    public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
+        // no-op in mock mode
+    }
 }

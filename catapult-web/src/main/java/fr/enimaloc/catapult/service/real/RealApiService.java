@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
+import fr.enimaloc.catapult.common.dto.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.SaveBody;
@@ -171,5 +172,11 @@ public class RealApiService implements ApiService {
         client.postVoid("/api/channels/{username}/settings/no-game",
                 new NoGameSettingsRequest(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd),
                 username);
+    }
+
+    @Override
+    public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
+        client.postVoid("/api/channels/{username}/settings/incomplete-fallback",
+                new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls), username);
     }
 }

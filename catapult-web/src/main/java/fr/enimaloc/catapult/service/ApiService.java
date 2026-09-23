@@ -30,4 +30,5 @@ public interface ApiService {
     fr.enimaloc.catapult.common.dto.UserSettingsDto channelSettings(String username);
     void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
                              boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
+    void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
 }
