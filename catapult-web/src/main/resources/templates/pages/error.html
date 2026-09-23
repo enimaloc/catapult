@@ -1,0 +1,22 @@
+<div th:fragment="error">
+    <section class="section error-page">
+        <div class="error-content">
+            <span class="error-code" th:text="${errorCode}">errorCode</span>
+            <span class="eyebrow" th:text="#{${errorEyebrow}}">error.eyebrow</span>
+            <h1 th:text="#{${errorTitle}}">error.title</h1>
+            <p class="error-description" th:text="#{${errorDescription}}">error.description</p>
+
+            <div class="error-actions">
+                <mdui-button href="/" variant="filled">
+                    <mdui-icon slot="icon" name="home"></mdui-icon>
+                    <span th:text="#{error.home}">error.home</span>
+                </mdui-button>
+
+                <mdui-button variant="tonal" onclick="history.back()">
+                    <mdui-icon slot="icon" name="arrow_back"></mdui-icon>
+                    <span th:text="#{error.back}">error.back</span>
+                </mdui-button>
+            </div>
+        </div>
+    </section>
+</div>
