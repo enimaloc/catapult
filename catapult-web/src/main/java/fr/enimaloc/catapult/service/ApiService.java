@@ -28,4 +28,6 @@ public interface ApiService {
     void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
     void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws);
     fr.enimaloc.catapult.common.dto.UserSettingsDto channelSettings(String username);
+    void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
+                             boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
 }

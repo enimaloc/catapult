@@ -142,4 +142,10 @@ public class MockApiService implements ApiService {
     public fr.enimaloc.catapult.common.dto.UserSettingsDto channelSettings(String username) {
         return MockData.getChannelSettings();
     }
+
+    @Override
+    public void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
+                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
+        // no-op in mock mode
+    }
 }
