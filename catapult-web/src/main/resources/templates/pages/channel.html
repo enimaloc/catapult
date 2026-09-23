@@ -221,6 +221,20 @@
             </label>
             <mdui-button id="no-game-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         </mdui-card>
+
+        <mdui-card th:if="${ch.isOwner()}" id="channel-incomplete-fallback-settings-form" variant="outlined">
+            <h3 th:text="#{channel.settings.incomplete_fallback.title}">Jeu incomplet</h3>
+            <input type="text" id="incomplete-fallback-game-input" th:placeholder="#{channel.bindings.edit.game_placeholder}"
+                   th:value="${channelSettings.incompleteFallbackTwitchGameName()}"/>
+            <input type="hidden" id="incomplete-fallback-game-id" th:value="${channelSettings.incompleteFallbackTwitchGameId()}"/>
+            <mdui-list id="incomplete-fallback-game-results"></mdui-list>
+            <label th:each="ccl : ${channelSettings.availableCcls()}">
+                <input type="checkbox" class="incomplete-fallback-ccl-checkbox" th:value="${ccl.id()}"
+                       th:checked="${channelSettings.incompleteFallbackCcls().contains(ccl.id())}"/>
+                <span th:text="${ccl.name()}">ccl name</span>
+            </label>
+            <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+        </mdui-card>
     </section>
     <script src="/js/channel-status.js"></script>
     <script src="/js/game-search.js"></script>
