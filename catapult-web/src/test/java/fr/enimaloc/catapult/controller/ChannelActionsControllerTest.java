@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.LinkStateResponse;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -144,5 +146,41 @@ class ChannelActionsControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(apiService).refreshSteamProfileCache("enimaloc");
+    }
+
+    @Test
+    void minecraftStatus_returnsApiServiceResult() throws Exception {
+        when(apiService.minecraftStatus("enimaloc"))
+                .thenReturn(new LinkStateResponse("ACCEPTED", "Steve", "bot-account-1"));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/channel/enimaloc/minecraft"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status").value("ACCEPTED"));
+    }
+
+    @Test
+    void minecraftEnroll_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/minecraft/enroll").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Steve\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).minecraftEnroll("enimaloc", "Steve");
+    }
+
+    @Test
+    void minecraftSync_callsApiService() throws Exception {
+        mvc.perform(post("/channel/enimaloc/minecraft/sync").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).minecraftSync("enimaloc");
+    }
+
+    @Test
+    void minecraftDisconnect_callsApiService() throws Exception {
+        mvc.perform(post("/channel/enimaloc/minecraft/disconnect").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).minecraftDisconnect("enimaloc");
     }
 }
