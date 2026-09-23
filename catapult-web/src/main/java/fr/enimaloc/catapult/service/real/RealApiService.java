@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
+import fr.enimaloc.catapult.common.dto.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.SaveBody;
 import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
@@ -122,5 +123,25 @@ public class RealApiService implements ApiService {
     @Override
     public void refreshSteamProfileCache(String username) {
         client.postVoid("/api/channels/{username}/steam/refresh-profile-cache", null, username);
+    }
+
+    @Override
+    public LinkStateResponse minecraftStatus(String username) {
+        return client.get("/api/connect/minecraft", LinkStateResponse.class);
+    }
+
+    @Override
+    public void minecraftEnroll(String username, String name) {
+        client.postVoid("/api/connect/minecraft", java.util.Map.of("name", name));
+    }
+
+    @Override
+    public void minecraftSync(String username) {
+        client.postVoid("/api/connect/minecraft/sync", null);
+    }
+
+    @Override
+    public void minecraftDisconnect(String username) {
+        client.reqVoid(org.springframework.http.HttpMethod.DELETE, "/api/connect/minecraft", null, null);
     }
 }

@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
+import fr.enimaloc.catapult.common.dto.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.SaveBody;
 import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
@@ -113,5 +114,28 @@ public class ChannelActionsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void refreshSteamProfileCache(@PathVariable String username) {
         apiService.refreshSteamProfileCache(username);
+    }
+
+    @GetMapping("/channel/{username}/minecraft")
+    public LinkStateResponse minecraftStatus(@PathVariable String username) {
+        return apiService.minecraftStatus(username);
+    }
+
+    @PostMapping("/channel/{username}/minecraft/enroll")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void minecraftEnroll(@PathVariable String username, @RequestBody java.util.Map<String, String> body) {
+        apiService.minecraftEnroll(username, body.get("name"));
+    }
+
+    @PostMapping("/channel/{username}/minecraft/sync")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void minecraftSync(@PathVariable String username) {
+        apiService.minecraftSync(username);
+    }
+
+    @PostMapping("/channel/{username}/minecraft/disconnect")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void minecraftDisconnect(@PathVariable String username) {
+        apiService.minecraftDisconnect(username);
     }
 }

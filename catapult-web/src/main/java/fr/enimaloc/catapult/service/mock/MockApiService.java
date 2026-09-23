@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.mock;
 
 import fr.enimaloc.catapult.common.dto.ChannelDto;
 import fr.enimaloc.catapult.common.dto.ChannelListResponse;
+import fr.enimaloc.catapult.common.dto.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -104,6 +105,26 @@ public class MockApiService implements ApiService {
 
     @Override
     public void refreshSteamProfileCache(String username) {
+        // no-op in mock mode
+    }
+
+    @Override
+    public LinkStateResponse minecraftStatus(String username) {
+        return new LinkStateResponse("NONE", null, null);
+    }
+
+    @Override
+    public void minecraftEnroll(String username, String name) {
+        // no-op in mock mode
+    }
+
+    @Override
+    public void minecraftSync(String username) {
+        // no-op in mock mode
+    }
+
+    @Override
+    public void minecraftDisconnect(String username) {
         // no-op in mock mode
     }
 }
