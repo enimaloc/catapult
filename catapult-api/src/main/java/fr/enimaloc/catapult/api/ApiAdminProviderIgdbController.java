@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.api.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.common.dto.AdminProviderIgdbQueryRequest;
 import fr.enimaloc.catapult.service.IgdbService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,10 +32,8 @@ public class ApiAdminProviderIgdbController {
     private final RestClient restClient;
     private final RawProviderResponseSupport rawSupport;
 
-    public record QueryRequest(String endpoint, String query) {}
-
     @PostMapping("/query")
-    public RawProviderResponseSupport.RawProviderResponse query(@RequestBody QueryRequest body) {
+    public RawProviderResponseSupport.RawProviderResponse query(@RequestBody AdminProviderIgdbQueryRequest body) {
         if (!body.endpoint().matches("[a-z_]+")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid endpoint: " + body.endpoint());
         }

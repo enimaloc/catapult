@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.TwitchatActionType;
 import fr.enimaloc.catapult.domain.TwitchatActionToken;
-import fr.enimaloc.catapult.domain.TwitchatActionType;
 import fr.enimaloc.catapult.repository.TwitchatActionTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

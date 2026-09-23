@@ -1,5 +1,11 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.AdminInvitePageData;
+import fr.enimaloc.catapult.common.dto.AdminInviteQuotaRequest;
+import fr.enimaloc.catapult.common.dto.AdminInviteRedemptionDto;
+import fr.enimaloc.catapult.common.dto.AdminInviteRow;
+import fr.enimaloc.catapult.common.dto.GlobalSettingsRequest;
+import fr.enimaloc.catapult.common.dto.MemberDto;
 import fr.enimaloc.catapult.domain.AlphaInvite;
 import fr.enimaloc.catapult.domain.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.UserAccount;
@@ -17,7 +23,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -39,10 +44,10 @@ public class ApiAdminInviteController {
             .map(inv -> inv.getOwner().getId())
             .collect(Collectors.toSet());
 
-        List<InviteRow> rows = invites.stream().map(inv -> {
+        List<AdminInviteRow> rows = invites.stream().map(inv -> {
             UserAccount owner = inv.getOwner();
             List<AlphaInviteRedemption> redemptions = inviteService.getRedemptions(inv);
-            return new InviteRow(
+            return new AdminInviteRow(
                 inv.getId(),
                 owner.getId(),
                 owner.getTwitchUsername(),
@@ -53,7 +58,7 @@ public class ApiAdminInviteController {
                 inv.getCreatedAt(),
                 inv.getRegeneratedAt(),
                 redemptions.stream()
-                    .map(r -> new RedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
+                    .map(r -> new AdminInviteRedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
                     .toList()
             );
         }).toList();
@@ -84,7 +89,7 @@ public class ApiAdminInviteController {
 
     @PostMapping("/{inviteId}/quota")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateQuota(@PathVariable UUID inviteId, @RequestBody QuotaRequest body) {
+    public void updateQuota(@PathVariable UUID inviteId, @RequestBody AdminInviteQuotaRequest body) {
         inviteService.updateInviteQuota(inviteId, body.maxUses(), body.canReinvite());
     }
 
@@ -95,22 +100,4 @@ public class ApiAdminInviteController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         inviteService.grantInvite(user);
     }
-
-    public record AdminInvitePageData(List<InviteRow> invites, List<MemberDto> membersWithoutInvite,
-                                      Integer globalMaxMembers, Integer defaultMaxUses,
-                                      boolean defaultCanReinvite, boolean globalCapReached) {}
-
-    public record InviteRow(UUID id, UUID ownerId, String ownerUsername, String code,
-                            Integer maxUses, int useCount, Boolean canReinvite,
-                            Instant createdAt, Instant regeneratedAt,
-                            List<RedemptionDto> redemptions) {}
-
-    public record MemberDto(UUID id, String twitchUsername) {}
-
-    public record RedemptionDto(String inviteeTwitchId, Instant redeemedAt) {}
-
-    public record GlobalSettingsRequest(Integer globalMaxMembers, Integer defaultMaxUses,
-                                        boolean defaultCanReinvite) {}
-
-    public record QuotaRequest(Integer maxUses, Boolean canReinvite) {}
 }

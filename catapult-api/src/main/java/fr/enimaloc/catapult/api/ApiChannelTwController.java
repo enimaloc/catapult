@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.SaveBody;
+import fr.enimaloc.catapult.common.dto.TwEnabledBody;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.BindingService;
@@ -34,9 +36,6 @@ public class ApiChannelTwController {
 
     private final BindingService bindingService;
     private final UserAccountRepository userRepo;
-
-    public record SaveBody(Set<String> tws) {}
-    public record TwEnabledBody(boolean enabled) {}
 
     @PostMapping("/tws")
     public ResponseEntity<Void> saveTws(@PathVariable UUID bindingId,

@@ -1,11 +1,12 @@
 package fr.enimaloc.catapult.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.common.dto.NotificationDto;
+import fr.enimaloc.catapult.common.dto.Severity;
 import fr.enimaloc.catapult.domain.Notification;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.NotificationRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.service.notification.NotificationDto;
 import fr.enimaloc.catapult.service.notification.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,7 +53,7 @@ class ApiAdminNotificationsControllerTest {
 
         NotificationDto dto = new NotificationDto(
                 UUID.randomUUID(), "Hi", "<p><strong>hello</strong></p>",
-                Notification.Severity.INFO, null, null, null, Instant.now(), false);
+                Severity.INFO, null, null, null, Instant.now(), false);
         when(service.create(any(), any())).thenReturn(dto);
 
         mvc.perform(post("/api/admin/notifications")

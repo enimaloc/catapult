@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.HelpContent;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.MinecraftGateService;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +64,4 @@ public class ApiHelpController {
             return false;
         }
     }
-
-    public record HelpContent(String title, String body) {}
 }

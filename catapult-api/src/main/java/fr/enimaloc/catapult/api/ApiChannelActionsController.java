@@ -1,5 +1,23 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.CclSettingsRequest;
+import fr.enimaloc.catapult.common.dto.CclToggleRequest;
+import fr.enimaloc.catapult.common.dto.DeleteAccountRequest;
+import fr.enimaloc.catapult.common.dto.DisconnectRequest;
+import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
+import fr.enimaloc.catapult.common.dto.IncompleteFallbackRequest;
+import fr.enimaloc.catapult.common.dto.NoGameSettingsRequest;
+import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
+import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
+import fr.enimaloc.catapult.common.dto.TwSettingsRequest;
+import fr.enimaloc.catapult.common.dto.TwitchatActivePresetBody;
+import fr.enimaloc.catapult.common.dto.TwitchatPresetBody;
+import fr.enimaloc.catapult.common.dto.TwitchatPresetResponse;
+import fr.enimaloc.catapult.common.dto.TwitchatPresetTestBody;
+import fr.enimaloc.catapult.common.dto.TwitchatPresetUpdateBody;
+import fr.enimaloc.catapult.common.dto.TwitchatSettingsBody;
+import fr.enimaloc.catapult.common.dto.TwitchatSettingsResponse;
+import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
 import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
@@ -566,26 +584,4 @@ public class ApiChannelActionsController {
         if (rotator != null) rotator.refreshKeys();
     }
 
-    // ── Request bodies ────────────────────────────────────────────────────────
-
-    public record CclToggleRequest(boolean enabled) {}
-    public record IgnoredToggleRequest(boolean ignored) {}
-    public record UpdateBindingRequest(String twitchGameId, String twitchGameName, Set<String> ccls) {}
-    public record CclSettingsRequest(boolean cclEnabled, Set<String> blockedCcls) {}
-    public record TwSettingsRequest(boolean enabled, Set<String> blockedTws) {}
-    public record NoGameSettingsRequest(
-            String twitchGameId, String twitchGameName, Set<String> ccls,
-            boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {}
-    public record IncompleteFallbackRequest(String twitchGameId, String twitchGameName, Set<String> ccls) {}
-    public record SteamTokenRequest(String token, boolean shared) {}
-    public record SteamTokenSharingRequest(boolean shared) {}
-    public record DeleteAccountRequest(String confirmUsername) {}
-    public record DisconnectRequest(String provider) {}
-    public record TwitchatSettingsBody(boolean enabled, String obsHost, Integer obsPort, String obsPassword) {}
-    public record TwitchatSettingsResponse(boolean enabled, String obsHost, Integer obsPort, boolean hasPassword, String widgetToken) {}
-    record TwitchatPresetResponse(String id, String eventType, String name, String payloadJson) {}
-    record TwitchatPresetBody(String eventType, String name, String payloadJson) {}
-    record TwitchatPresetUpdateBody(String name, String payloadJson) {}
-    record TwitchatActivePresetBody(String presetId) {}
-    record TwitchatPresetTestBody(String eventType, String payloadJson) {}
 }

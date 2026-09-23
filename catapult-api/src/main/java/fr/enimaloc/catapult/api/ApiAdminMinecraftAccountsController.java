@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.AccountDto;
 import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
@@ -36,9 +37,6 @@ public class ApiAdminMinecraftAccountsController {
     private final MinecraftServiceAccountRepository accountRepository;
     private final MinecraftFriendLinkRepository linkRepository;
     private final TokenEncryptionService encryption;
-
-    public record AccountDto(UUID id, String label, String minecraftUsername, int fillOrder,
-                             boolean friendLimitReached, boolean enabled, int linkCount) {}
 
     @GetMapping
     public List<AccountDto> list() {

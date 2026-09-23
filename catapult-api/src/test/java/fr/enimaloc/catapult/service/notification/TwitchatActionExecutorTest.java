@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.TwitchatActionType;
 import fr.enimaloc.catapult.domain.TwitchatActionToken;
-import fr.enimaloc.catapult.domain.TwitchatActionType;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.BindingService;

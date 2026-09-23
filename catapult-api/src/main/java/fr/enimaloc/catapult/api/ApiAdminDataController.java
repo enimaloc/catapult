@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.admindata.AttributeKind;
 import fr.enimaloc.catapult.admindata.DataRegistry;
 import fr.enimaloc.catapult.admindata.IdCodec;
 import fr.enimaloc.catapult.admindata.ValueCoercion;
+import fr.enimaloc.catapult.common.dto.RepoSummaryDto;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import jakarta.persistence.metamodel.Attribute;
@@ -46,8 +47,6 @@ public class ApiAdminDataController {
     private final DataRegistry registry;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
-
-    public record RepoSummaryDto(String name, long size) {}
 
     @GetMapping
     public List<RepoSummaryDto> listRepositories() {

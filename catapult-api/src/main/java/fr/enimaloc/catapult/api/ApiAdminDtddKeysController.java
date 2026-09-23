@@ -1,5 +1,9 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.AddKeyRequest;
+import fr.enimaloc.catapult.common.dto.DeleteKeyRequest;
+import fr.enimaloc.catapult.common.dto.DtddKeysPageData;
+import fr.enimaloc.catapult.common.dto.KeyStatus;
 import fr.enimaloc.catapult.domain.DtddApiKeyEntry;
 import fr.enimaloc.catapult.getter.DtddApiKeyRotator;
 import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
@@ -108,9 +112,4 @@ public class ApiAdminDtddKeysController {
         if (rotator != null) rotator.refreshKeys();
         if (events != null) events.keysRefreshed(AdminEventPublisher.PROVIDER_DTDD, page().keys());
     }
-
-    public record DtddKeysPageData(List<KeyStatus> keys, boolean dtddEnabled) {}
-    public record KeyStatus(String id, String masked, String owner, boolean blocked, long blockedForSeconds) {}
-    public record AddKeyRequest(String apiKey) {}
-    public record DeleteKeyRequest(String keyId) {}
 }

@@ -21,6 +21,8 @@ configurations {
 }
 
 dependencies {
+    implementation(project(":catapult-common"))
+
     implementation("org.mvnpm:mdui:2.1.4")
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")

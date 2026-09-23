@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.InvitePageData;
+import fr.enimaloc.catapult.common.dto.InviteRedemptionDto;
 import fr.enimaloc.catapult.domain.AlphaInvite;
 import fr.enimaloc.catapult.domain.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.UserAccount;
@@ -18,7 +20,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,7 +53,7 @@ public class ApiInviteController {
         String inviteUrl = (webUrl != null && !webUrl.isBlank() ? webUrl : "") + "/join?invite=" + invite.getCode();
         return new InvitePageData(true, invite.getId(), invite.getCode(), inviteUrl,
             invite.getRegeneratedAt(), redemptions.stream()
-                .map(r -> new RedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
+                .map(r -> new InviteRedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
                 .toList());
     }
 
@@ -68,9 +69,4 @@ public class ApiInviteController {
         return userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
-
-    public record InvitePageData(boolean canInvite, UUID inviteId, String code, String inviteUrl,
-                                 Instant regeneratedAt, List<RedemptionDto> redemptions) {}
-
-    public record RedemptionDto(String inviteeTwitchId, Instant redeemedAt) {}
 }

@@ -1,5 +1,10 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.AddRequest;
+import fr.enimaloc.catapult.common.dto.AdminWhitelistQuotaRequest;
+import fr.enimaloc.catapult.common.dto.AdminWhitelistRedemptionDto;
+import fr.enimaloc.catapult.common.dto.InviteSettingsRequest;
+import fr.enimaloc.catapult.common.dto.WhitelistInviteRow;
 import fr.enimaloc.catapult.domain.AlphaInvite;
 import fr.enimaloc.catapult.domain.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.UserAccount;
@@ -19,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -48,9 +52,9 @@ public class ApiAdminWhitelistController {
                 ));
 
         List<AlphaInvite> invites = inviteService.findAll();
-        List<InviteRow> inviteRows = invites.stream().map(inv -> {
+        List<WhitelistInviteRow> inviteRows = invites.stream().map(inv -> {
             List<AlphaInviteRedemption> redemptions = inviteService.getRedemptions(inv);
-            return new InviteRow(
+            return new WhitelistInviteRow(
                 inv.getId(),
                 inv.getOwner().getId(),
                 inv.getOwner().getTwitchUsername(),
@@ -60,7 +64,7 @@ public class ApiAdminWhitelistController {
                 inv.getCanReinvite(),
                 inv.getCreatedAt(),
                 redemptions.stream()
-                    .map(r -> new RedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
+                    .map(r -> new AdminWhitelistRedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
                     .toList()
             );
         }).toList();
@@ -110,25 +114,12 @@ public class ApiAdminWhitelistController {
 
     @PostMapping("/invite/{inviteId}/quota")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateInviteQuota(@PathVariable UUID inviteId, @RequestBody QuotaRequest body) {
+    public void updateInviteQuota(@PathVariable UUID inviteId, @RequestBody AdminWhitelistQuotaRequest body) {
         inviteService.updateInviteQuota(inviteId, body.maxUses(), body.canReinvite());
     }
 
     public record WhitelistPageData(
         List<WhitelistEntry> entries, Map<String, String> resolvedUsernames, boolean whitelistEnabled,
         boolean inviteEnabled, Integer globalMaxMembers, Integer defaultMaxUses,
-        boolean defaultCanReinvite, boolean globalCapReached, List<InviteRow> invites) {}
-
-    public record InviteRow(UUID id, UUID ownerId, String ownerUsername, String code,
-                            Integer maxUses, int useCount, Boolean canReinvite,
-                            Instant createdAt, List<RedemptionDto> redemptions) {}
-
-    public record RedemptionDto(String inviteeTwitchId, Instant redeemedAt) {}
-
-    public record AddRequest(String twitchId) {}
-
-    public record InviteSettingsRequest(Integer globalMaxMembers, Integer defaultMaxUses,
-                                        boolean defaultCanReinvite) {}
-
-    public record QuotaRequest(Integer maxUses, Boolean canReinvite) {}
+        boolean defaultCanReinvite, boolean globalCapReached, List<WhitelistInviteRow> invites) {}
 }

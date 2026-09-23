@@ -6,6 +6,9 @@ import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.common.dto.CatalogDto;
+import fr.enimaloc.catapult.common.dto.ServiceFunctionDto;
+import fr.enimaloc.catapult.common.dto.TwOptionDto;
 import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.TwDefinition;
 import fr.enimaloc.catapult.domain.UserAccount;
@@ -60,15 +63,6 @@ public class ApiChatCommandDslController {
         this.userAccountRepository = userAccountRepository;
         this.twDefinitionRepository = twDefinitionRepository;
     }
-
-    public record ServiceFunctionDto(String namespace, String name, List<String> parameterNames,
-                                      List<String> returnKeys, List<String> optionalParameterNames,
-                                      boolean isAction) {}
-
-    public record TwOptionDto(String id, String label) {}
-
-    public record CatalogDto(List<String> contextPaths, List<ServiceFunctionDto> serviceFunctions,
-                              List<String> settingKeys, List<TwOptionDto> knownTws) {}
 
     /**
      * The settings block's dropdown needs the streamer's own saved keys (unlike context paths,

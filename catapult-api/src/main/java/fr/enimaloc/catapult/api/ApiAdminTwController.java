@@ -1,5 +1,13 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.AdminTwCreateBody;
+import fr.enimaloc.catapult.common.dto.DtddTopicsBody;
+import fr.enimaloc.catapult.common.dto.IgdbDescriptorsBody;
+import fr.enimaloc.catapult.common.dto.SteamIdsBody;
+import fr.enimaloc.catapult.common.dto.SteamKeywordBody;
+import fr.enimaloc.catapult.common.dto.SteamKeywordsBody;
+import fr.enimaloc.catapult.common.dto.SteamSignalTestBody;
+import fr.enimaloc.catapult.common.dto.UpdateBody;
 import fr.enimaloc.catapult.domain.TwDefinition;
 import fr.enimaloc.catapult.service.AdminTwService;
 import fr.enimaloc.catapult.service.TwBackfillService;
@@ -41,15 +49,6 @@ public class ApiAdminTwController {
     @Autowired(required = false)
     private AdminEventPublisher events;
 
-    public record CreateBody(String id, String label, String description, Integer sortOrder) {}
-    public record UpdateBody(String label, String description, Integer sortOrder, Boolean enabled) {}
-    public record DtddTopicsBody(Set<String> topics) {}
-    public record IgdbDescriptorsBody(Set<Long> descriptorIds) {}
-    public record SteamIdsBody(Set<Integer> ids) {}
-    public record SteamKeywordsBody(Set<String> keywords) {}
-    public record SteamKeywordBody(String keyword) {}
-    public record SteamSignalTestBody(String appId, String draftKeyword) {}
-
     @GetMapping
     public List<TwDefinition> list() {
         return service.list();
@@ -61,7 +60,7 @@ public class ApiAdminTwController {
     }
 
     @PostMapping
-    public ResponseEntity<TwDefinition> create(@RequestBody CreateBody b) {
+    public ResponseEntity<TwDefinition> create(@RequestBody AdminTwCreateBody b) {
         TwDefinition d = service.create(b.id(), b.label(), b.description(),
                 b.sortOrder() == null ? 0 : b.sortOrder());
         if (events != null) {

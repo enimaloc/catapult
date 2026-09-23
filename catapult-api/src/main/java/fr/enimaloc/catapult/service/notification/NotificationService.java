@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.NotificationDto;
+import fr.enimaloc.catapult.common.dto.Severity;
 import fr.enimaloc.catapult.domain.*;
 import fr.enimaloc.catapult.event.NotificationAllReadEvent;
 import fr.enimaloc.catapult.event.NotificationCreatedEvent;
@@ -145,7 +147,7 @@ public class NotificationService {
     public record CreateRequest(
             String title,
             String body,
-            Notification.Severity severity,
+            Severity severity,
             String ctaUrl,
             String ctaLabel,
             Instant expiresAt,

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.RejectRequest;
 import fr.enimaloc.catapult.domain.*;
 import fr.enimaloc.catapult.domain.DtddMappingProposal.Status;
 import fr.enimaloc.catapult.repository.*;
@@ -65,7 +66,7 @@ class ApiAdminDtddMappingControllerTest {
         proposal.setStatus(Status.PENDING);
         when(proposalRepo.findById(propId)).thenReturn(Optional.of(proposal));
 
-        controller.reject(propId, new ApiAdminDtddMappingController.RejectRequest("not the right game"), admin);
+        controller.reject(propId, new RejectRequest("not the right game"), admin);
 
         assertThat(proposal.getStatus()).isEqualTo(Status.REJECTED);
         verify(mappingRepo, never()).save(any());

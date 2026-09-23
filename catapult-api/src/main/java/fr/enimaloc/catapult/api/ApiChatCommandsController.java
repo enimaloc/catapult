@@ -10,6 +10,8 @@ import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.common.dto.BotModStatusDto;
+import fr.enimaloc.catapult.common.dto.FallbackDto;
 import fr.enimaloc.catapult.domain.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.ChatCommandFallback;
 import fr.enimaloc.catapult.domain.OAuthToken;
@@ -76,8 +78,6 @@ public class ApiChatCommandsController {
     private final ServiceFunctionRegistry serviceFunctionRegistry;
     private final OAuthTokenRepository oAuthTokenRepository;
 
-    public record FallbackDto(String placeholder, String fallbackText) {}
-
     public record CommandDto(
         UUID id,
         String name,
@@ -97,8 +97,6 @@ public class ApiChatCommandsController {
                 d.getPermission(), d.isEnabled(), d.getPresetKey(), fb, d.getEjectedJs(), List.of());
         }
     }
-
-    public record BotModStatusDto(boolean modded, Instant checkedAt) {}
 
     public record ListResponse(
         List<String> presets,

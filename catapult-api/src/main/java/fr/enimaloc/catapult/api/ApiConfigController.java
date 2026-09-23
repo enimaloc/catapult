@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.AppConfigResponse;
+import fr.enimaloc.catapult.common.dto.ProvidersResponse;
 import fr.enimaloc.catapult.getter.GameGetter;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,10 +55,4 @@ public class ApiConfigController {
         if (rotator != null) return rotator.nextKey().isPresent();
         return !steamApiKey.isBlank();
     }
-
-    public record ProvidersResponse(boolean minecraft, boolean steam, boolean xbox, boolean battlenet) {
-        public boolean hasAny() { return minecraft || steam || xbox || battlenet; }
-    }
-
-    public record AppConfigResponse(String name, int deletionDelayDays, List<String> gettersName) {}
 }

@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.domain.TwitchatActionType;
+import fr.enimaloc.catapult.common.dto.TwitchatActionType;
 import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
 import org.junit.jupiter.api.Test;
 

@@ -1,5 +1,9 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.common.dto.AddMemberRequest;
+import fr.enimaloc.catapult.common.dto.CreateGroupRequest;
+import fr.enimaloc.catapult.common.dto.GroupSummary;
+import fr.enimaloc.catapult.common.dto.RenameRequest;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserGroup;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
@@ -104,9 +108,4 @@ public class ApiAdminGroupsController {
         return groupRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
-
-    public record GroupSummary(UUID id, String key, String name, String description, int memberCount) {}
-    public record CreateGroupRequest(String key, String name, String description) {}
-    public record RenameRequest(String name, String description) {}
-    public record AddMemberRequest(String twitchUsername) {}
 }
