@@ -1,0 +1,28 @@
+<mdui-layout-main th:fragment="channel">
+    <section class="section channel-section" th:with="ch=${channelPage}">
+        <div class="section-header">
+            <span class="eyebrow" th:text="${ch.channelUser().twitchUsername()}">username</span>
+            <h1 th:text="#{channel.status.title}">Statut</h1>
+        </div>
+
+        <mdui-card class="status-card" variant="outlined">
+            <div class="status-row">
+                <mdui-chip th:if="${ch.isLive()}" th:text="#{channel.status.live}">En direct</mdui-chip>
+                <mdui-chip th:unless="${ch.isLive()}" th:text="#{channel.status.offline}">Hors ligne</mdui-chip>
+
+                <span th:if="${ch.currentGame() != null}" th:text="${ch.currentGame().sourceName()}">Game</span>
+                <span th:unless="${ch.currentGame() != null}" th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
+
+                <mdui-button-icon icon="refresh" th:if="${ch.isOwner()}"
+                                   th:attr="data-recheck-url=@{/channel/{u}/game/recheck(u=${ch.channelUsername()})}"
+                                   id="channel-recheck-game"></mdui-button-icon>
+            </div>
+
+            <mdui-switch th:if="${ch.isOwner()}" th:checked="${ch.botEnabled()}"
+                         th:attr="data-toggle-url=@{/channel/{u}/settings/bot(u=${ch.channelUsername()})}"
+                         id="channel-bot-toggle"></mdui-switch>
+            <label th:if="${ch.isOwner()}" for="channel-bot-toggle" th:text="#{channel.status.bot_enabled}">Bot activé</label>
+        </mdui-card>
+    </section>
+    <script src="/js/channel-status.js"></script>
+</mdui-layout-main>

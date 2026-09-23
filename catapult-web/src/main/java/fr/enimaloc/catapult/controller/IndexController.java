@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.ChannelDto;
 import fr.enimaloc.catapult.dto.index.FeatureDto;
 import fr.enimaloc.catapult.dto.index.PlatformDto;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,7 +36,9 @@ public class IndexController {
     );
     public static final List<SPAPage> SPA = List.of(
             new SPAPage("", "pages/landing", "landing", "/spa/landing", "page.title.landing"),
-            new SPAPage("privacy", "pages/privacy", "privacy", "/spa/privacy", "page.title.privacy")
+            new SPAPage("privacy", "pages/privacy", "privacy", "/spa/privacy", "page.title.privacy"),
+            new SPAPage("channels", "pages/channels", "channels", "/spa/channels", "page.title.channels"),
+            new SPAPage("channel", "pages/channel", "channel", "/spa/channel", "page.title.channel", true)
     );
 
     private final ModelFiller filler;
@@ -45,7 +48,7 @@ public class IndexController {
         return index(model, "", locale, request);
     }
 
-    @GetMapping({"/{page}"})
+    @GetMapping("/{page}")
     String index(Model model, @PathVariable String page, Locale locale, HttpServletRequest request) throws IOException {
         boolean unknownPage = SPA.stream().map(SPAPage::getId).noneMatch(page::equals);
         model.addAttribute("error", unknownPage);
@@ -53,6 +56,13 @@ public class IndexController {
             filler.error(model, 404);
         }
         filler.fill(model, page, locale, request);
+        return "index";
+    }
+
+    @GetMapping("/channel/{username}")
+    String channel(Model model, @PathVariable String username, Locale locale, HttpServletRequest request) throws IOException {
+        filler.channel(model, username);
+        filler.defaultAttr(model, "channel", locale);
         return "index";
     }
 
@@ -74,6 +84,19 @@ public class IndexController {
             return "pages/privacy :: privacy";
         }
 
+        @GetMapping("/channels")
+        String channels(Model model) throws IOException {
+            filler.channels(model);
+            return "pages/channels :: channels";
+        }
+
+        @GetMapping("/channel/{username}")
+        String channel(Model model, @PathVariable String username) throws IOException {
+            filler.channel(model, username);
+            filler.defaultAttr(model, "channel");
+            return "pages/channel :: channel";
+        }
+
         @GetMapping("/{page}")
         String unknown(Model model, HttpServletResponse response) {
             response.setStatus(HttpStatus.NOT_FOUND.value());
@@ -89,13 +112,20 @@ public class IndexController {
         private final String fragment;
         private final String templateUrl;
         private final String titleKey;
+        /** True if this page takes one trailing path segment (e.g. /channel/{username}). */
+        private final boolean dynamic;
 
         public SPAPage(String id, String template, String fragment, String templateUrl, String titleKey) {
+            this(id, template, fragment, templateUrl, titleKey, false);
+        }
+
+        public SPAPage(String id, String template, String fragment, String templateUrl, String titleKey, boolean dynamic) {
             this.id = id;
             this.template = template;
             this.fragment = fragment;
             this.templateUrl = templateUrl;
             this.titleKey = titleKey;
+            this.dynamic = dynamic;
         }
     }
 }
