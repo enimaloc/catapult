@@ -81,4 +81,32 @@ class ChannelActionsControllerTest {
         verify(apiService).updateBinding("enimaloc", "abc-123", "509658", "Celeste",
                 java.util.Set.of("violent-graphic"));
     }
+
+    @Test
+    void saveTws_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/bindings/abc-123/tws").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"tws\":[\"jumpscares\"]}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveTws("abc-123", java.util.Set.of("jumpscares"));
+    }
+
+    @Test
+    void resetTws_callsApiService() throws Exception {
+        mvc.perform(post("/channel/enimaloc/bindings/abc-123/tws/reset").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).resetTws("abc-123");
+    }
+
+    @Test
+    void toggleTwEnabled_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/bindings/abc-123/tw-enabled").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).toggleTwEnabled("abc-123", true);
+    }
 }

@@ -4,7 +4,9 @@ import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
+import fr.enimaloc.catapult.common.dto.SaveBody;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -81,5 +83,20 @@ public class RealApiService implements ApiService {
     public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
         client.postVoid("/api/channels/{username}/bindings/{bindingId}",
                 new UpdateBindingRequest(twitchGameId, twitchGameName, ccls), username, bindingId);
+    }
+
+    @Override
+    public void saveTws(String bindingId, java.util.Set<String> tws) {
+        client.postVoid("/api/channel/bindings/{bindingId}/tws", new SaveBody(tws), bindingId);
+    }
+
+    @Override
+    public void resetTws(String bindingId) {
+        client.postVoid("/api/channel/bindings/{bindingId}/tws/reset", null, bindingId);
+    }
+
+    @Override
+    public void toggleTwEnabled(String bindingId, boolean enabled) {
+        client.postVoid("/api/channel/bindings/{bindingId}/tw-enabled", new TwEnabledBody(enabled), bindingId);
     }
 }
