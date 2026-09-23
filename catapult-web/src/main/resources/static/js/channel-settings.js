@@ -25,4 +25,25 @@
             await refresh();
         });
     }
+
+    const noGameForm = document.getElementById("channel-no-game-settings-form");
+    if (noGameForm) {
+        const gameInput = document.getElementById("no-game-game-input");
+        const gameIdInput = document.getElementById("no-game-game-id");
+        GameSearch.attach(gameInput, document.getElementById("no-game-game-results"),
+                `/channel/${username}/games/search`, game => { gameIdInput.value = game.id; });
+
+        document.getElementById("no-game-settings-save-btn").addEventListener("click", async () => {
+            const ccls = Array.from(noGameForm.querySelectorAll(".no-game-ccl-checkbox:checked")).map(cb => cb.value);
+            await CatapultCsrf.postJson(`${baseUrl}/settings/no-game`, {
+                twitchGameId: gameIdInput.value || null,
+                twitchGameName: gameInput.value || null,
+                ccls,
+                applyOnStreamStart: document.getElementById("no-game-apply-start").checked,
+                applyOnNoGame: document.getElementById("no-game-apply-no-game").checked,
+                applyOnStreamEnd: document.getElementById("no-game-apply-end").checked
+            });
+            await refresh();
+        });
+    }
 })();
