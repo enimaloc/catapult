@@ -47,4 +47,10 @@ public class ChannelActionsController {
                                @RequestBody IgnoredToggleRequest body) {
         apiService.ignoredToggle(username, bindingId, body.ignored());
     }
+
+    @PostMapping("/channel/{username}/bindings/{bindingId}/delete")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteBinding(@PathVariable String username, @PathVariable String bindingId) {
+        apiService.deleteBinding(username, bindingId);
+    }
 }

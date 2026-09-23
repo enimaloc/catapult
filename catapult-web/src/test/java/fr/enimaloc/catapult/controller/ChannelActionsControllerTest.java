@@ -62,4 +62,12 @@ class ChannelActionsControllerTest {
 
         verify(apiService).ignoredToggle("enimaloc", "abc-123", true);
     }
+
+    @Test
+    void deleteBinding_callsApiService() throws Exception {
+        mvc.perform(post("/channel/enimaloc/bindings/abc-123/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).deleteBinding("enimaloc", "abc-123");
+    }
 }

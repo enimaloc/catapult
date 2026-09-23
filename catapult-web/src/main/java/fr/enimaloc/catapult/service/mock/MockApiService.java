@@ -56,4 +56,9 @@ public class MockApiService implements ApiService {
     public void ignoredToggle(String username, String bindingId, boolean ignored) {
         // no-op in mock mode
     }
+
+    @Override
+    public void deleteBinding(String username, String bindingId) {
+        // no-op in mock mode
+    }
 }

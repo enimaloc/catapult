@@ -11,4 +11,5 @@ public interface ApiService {
     void recheckGame(String username);
     void cclToggle(String username, String bindingId, boolean enabled);
     void ignoredToggle(String username, String bindingId, boolean ignored);
+    void deleteBinding(String username, String bindingId);
 }
