@@ -87,6 +87,39 @@
                th:href="@{/channel/{u}(u=${ch.channelUsername()},page=${ch.bindings().number()+1},status=${ch.filterStatus()},source=${ch.filterSource()})}"
                th:text="#{channel.bindings.next}">Suivant</a>
         </div>
+
+        <div class="section-header">
+            <h2 th:text="#{channel.connections.title}">Connexions</h2>
+        </div>
+
+        <div id="channel-connections">
+            <mdui-card class="connection-card" variant="outlined">
+                <span th:text="#{channel.connections.twitch}">Twitch</span>
+                <mdui-chip th:text="#{channel.connections.connected}">Connecté</mdui-chip>
+            </mdui-card>
+
+            <mdui-card th:if="${ch.hasSteamProvider()}" class="connection-card" variant="outlined" data-conn="steam">
+                <span th:text="#{channel.connections.steam}">Steam</span>
+                <mdui-chip th:if="${ch.hasSteam()}" th:text="#{channel.connections.connected}">Connecté</mdui-chip>
+                <mdui-chip th:unless="${ch.hasSteam()}" th:text="#{channel.connections.not_connected}">Non connecté</mdui-chip>
+
+                <p th:if="${ch.isOwner() and ch.steamRateLimited()}" th:text="#{channel.connections.steam.rate_limited}">
+                    Steam nous bloque temporairement.
+                </p>
+                <p th:if="${ch.isOwner() and ch.steamOfflineMode()}" th:text="#{channel.connections.steam.offline_mode(${ch.steamProfileCacheTtlMinutes()})}">
+                    Profil hors-ligne, cache de {0} minutes.
+                </p>
+                <p th:if="${ch.isOwner() and ch.steamProfilePrivate()}" th:text="#{channel.connections.steam.private}">
+                    Profil Steam privé.
+                </p>
+            </mdui-card>
+
+            <mdui-card th:if="${ch.hasXboxProvider()}" class="connection-card" variant="outlined" data-conn="xbox">
+                <span th:text="#{channel.connections.xbox}">Xbox</span>
+                <mdui-chip th:if="${ch.hasXbox()}" th:text="#{channel.connections.connected}">Connecté</mdui-chip>
+                <mdui-chip th:unless="${ch.hasXbox()}" th:text="#{channel.connections.not_connected}">Non connecté</mdui-chip>
+            </mdui-card>
+        </div>
     </section>
     <script src="/js/channel-status.js"></script>
     <script src="/js/game-search.js"></script>
