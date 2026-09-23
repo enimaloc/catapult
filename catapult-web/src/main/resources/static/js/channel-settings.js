@@ -15,4 +15,14 @@
             await refresh();
         });
     }
+
+    const twForm = document.getElementById("channel-tw-settings-form");
+    if (twForm) {
+        document.getElementById("tw-settings-save-btn").addEventListener("click", async () => {
+            const enabled = document.getElementById("tw-enabled-checkbox").checked;
+            const blockedTws = Array.from(twForm.querySelectorAll(".tw-block-checkbox:checked")).map(cb => cb.value);
+            await CatapultCsrf.postJson(`${baseUrl}/settings/tws`, { enabled, blockedTws });
+            await refresh();
+        });
+    }
 })();

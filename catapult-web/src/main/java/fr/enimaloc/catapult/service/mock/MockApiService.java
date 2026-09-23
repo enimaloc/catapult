@@ -134,6 +134,11 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws) {
+        // no-op in mock mode
+    }
+
+    @Override
     public fr.enimaloc.catapult.common.dto.UserSettingsDto channelSettings(String username) {
         return MockData.getChannelSettings();
     }

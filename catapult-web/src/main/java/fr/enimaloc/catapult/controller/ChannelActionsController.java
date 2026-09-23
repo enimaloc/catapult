@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.SaveBody;
 import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.TwEnabledBody;
+import fr.enimaloc.catapult.common.dto.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import lombok.RequiredArgsConstructor;
@@ -144,5 +145,11 @@ public class ChannelActionsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveCclSettings(@PathVariable String username, @RequestBody CclSettingsRequest body) {
         apiService.saveCclSettings(username, body.cclEnabled(), body.blockedCcls());
+    }
+
+    @PostMapping("/channel/{username}/settings/tws")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveTwSettings(@PathVariable String username, @RequestBody TwSettingsRequest body) {
+        apiService.saveTwSettings(username, body.enabled(), body.blockedTws());
     }
 }

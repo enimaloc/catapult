@@ -193,4 +193,14 @@ class ChannelActionsControllerTest {
 
         verify(apiService).saveCclSettings("enimaloc", true, java.util.Set.of("violent-graphic"));
     }
+
+    @Test
+    void saveTwSettings_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/tws").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true,\"blockedTws\":[\"jumpscares\"]}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveTwSettings("enimaloc", true, java.util.Set.of("jumpscares"));
+    }
 }

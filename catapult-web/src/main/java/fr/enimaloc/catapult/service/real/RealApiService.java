@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.TwEnabledBody;
+import fr.enimaloc.catapult.common.dto.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -150,6 +151,12 @@ public class RealApiService implements ApiService {
     public void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls) {
         client.postVoid("/api/channels/{username}/settings/ccl",
                 new CclSettingsRequest(enabled, blockedCcls), username);
+    }
+
+    @Override
+    public void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws) {
+        client.postVoid("/api/channels/{username}/settings/tws",
+                new TwSettingsRequest(enabled, blockedTws), username);
     }
 
     @Override
