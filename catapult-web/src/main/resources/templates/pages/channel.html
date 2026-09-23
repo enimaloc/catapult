@@ -112,6 +112,25 @@
                 <p th:if="${ch.isOwner() and ch.steamProfilePrivate()}" th:text="#{channel.connections.steam.private}">
                     Profil Steam privé.
                 </p>
+
+                <div th:if="${ch.isOwner() and ch.hasSteam()}">
+                    <div th:if="${ch.hasSteamPersonalToken()}">
+                        <label>
+                            <input type="checkbox" id="steam-token-shared" th:checked="${ch.steamTokenShared()}"/>
+                            <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
+                        </label>
+                        <mdui-button id="steam-token-delete-btn" th:text="#{channel.connections.steam.token.delete}">Supprimer le token</mdui-button>
+                    </div>
+                    <div th:unless="${ch.hasSteamPersonalToken()}">
+                        <input type="password" id="steam-token-input" th:placeholder="#{channel.connections.steam.token.placeholder}"/>
+                        <label>
+                            <input type="checkbox" id="steam-token-share-new"/>
+                            <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
+                        </label>
+                        <mdui-button id="steam-token-save-btn" th:text="#{channel.connections.steam.token.save}">Enregistrer</mdui-button>
+                    </div>
+                    <mdui-button id="steam-refresh-cache-btn" th:text="#{channel.connections.steam.refresh_cache}">Rafraîchir le cache</mdui-button>
+                </div>
             </mdui-card>
 
             <mdui-card th:if="${ch.hasXboxProvider()}" class="connection-card" variant="outlined" data-conn="xbox">
@@ -124,4 +143,5 @@
     <script src="/js/channel-status.js"></script>
     <script src="/js/game-search.js"></script>
     <script src="/js/channel-bindings.js"></script>
+    <script src="/js/channel-connections.js"></script>
 </mdui-layout-main>

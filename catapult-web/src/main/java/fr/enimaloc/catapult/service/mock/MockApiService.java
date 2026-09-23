@@ -86,4 +86,24 @@ public class MockApiService implements ApiService {
     public void toggleTwEnabled(String bindingId, boolean enabled) {
         // no-op in mock mode
     }
+
+    @Override
+    public void saveSteamToken(String username, String token, boolean shared) {
+        // no-op in mock mode
+    }
+
+    @Override
+    public void steamTokenSharing(String username, boolean shared) {
+        // no-op in mock mode
+    }
+
+    @Override
+    public void deleteSteamToken(String username) {
+        // no-op in mock mode
+    }
+
+    @Override
+    public void refreshSteamProfileCache(String username) {
+        // no-op in mock mode
+    }
 }

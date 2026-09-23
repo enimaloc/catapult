@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.SaveBody;
+import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
+import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
 import fr.enimaloc.catapult.service.ApiService;
@@ -87,5 +89,29 @@ public class ChannelActionsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void toggleTwEnabled(@PathVariable String username, @PathVariable String bindingId, @RequestBody TwEnabledBody body) {
         apiService.toggleTwEnabled(bindingId, body.enabled());
+    }
+
+    @PostMapping("/channel/{username}/settings/steam-personal-token")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveSteamToken(@PathVariable String username, @RequestBody SteamTokenRequest body) {
+        apiService.saveSteamToken(username, body.token(), body.shared());
+    }
+
+    @PostMapping("/channel/{username}/settings/steam-personal-token/sharing")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void steamTokenSharing(@PathVariable String username, @RequestBody SteamTokenSharingRequest body) {
+        apiService.steamTokenSharing(username, body.shared());
+    }
+
+    @PostMapping("/channel/{username}/settings/steam-personal-token/delete")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSteamToken(@PathVariable String username) {
+        apiService.deleteSteamToken(username);
+    }
+
+    @PostMapping("/channel/{username}/steam/refresh-profile-cache")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void refreshSteamProfileCache(@PathVariable String username) {
+        apiService.refreshSteamProfileCache(username);
     }
 }
