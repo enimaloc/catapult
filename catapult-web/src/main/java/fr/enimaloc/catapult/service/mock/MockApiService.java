@@ -61,4 +61,14 @@ public class MockApiService implements ApiService {
     public void deleteBinding(String username, String bindingId) {
         // no-op in mock mode
     }
+
+    @Override
+    public Object searchGames(String username, String q) {
+        return List.of(Map.of("id", "509658", "name", "Celeste"));
+    }
+
+    @Override
+    public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
+        // no-op in mock mode
+    }
 }

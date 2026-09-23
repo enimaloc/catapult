@@ -2,12 +2,15 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
+import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -52,5 +55,17 @@ public class ChannelActionsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteBinding(@PathVariable String username, @PathVariable String bindingId) {
         apiService.deleteBinding(username, bindingId);
+    }
+
+    @GetMapping("/channel/{username}/games/search")
+    public Object searchGames(@PathVariable String username, @RequestParam(defaultValue = "") String q) {
+        return apiService.searchGames(username, q);
+    }
+
+    @PostMapping("/channel/{username}/bindings/{bindingId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateBinding(@PathVariable String username, @PathVariable String bindingId,
+                               @RequestBody UpdateBindingRequest body) {
+        apiService.updateBinding(username, bindingId, body.twitchGameId(), body.twitchGameName(), body.ccls());
     }
 }

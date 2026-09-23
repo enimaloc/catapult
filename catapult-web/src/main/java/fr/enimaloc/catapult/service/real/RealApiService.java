@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -69,5 +70,16 @@ public class RealApiService implements ApiService {
     @Override
     public void deleteBinding(String username, String bindingId) {
         client.postVoid("/api/channels/{username}/bindings/{bindingId}/delete", null, username, bindingId);
+    }
+
+    @Override
+    public Object searchGames(String username, String q) {
+        return client.get("/api/channels/{username}/games/search?q={q}", Object.class, username, q);
+    }
+
+    @Override
+    public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
+        client.postVoid("/api/channels/{username}/bindings/{bindingId}",
+                new UpdateBindingRequest(twitchGameId, twitchGameName, ccls), username, bindingId);
     }
 }

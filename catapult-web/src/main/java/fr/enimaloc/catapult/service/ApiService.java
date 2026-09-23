@@ -12,4 +12,6 @@ public interface ApiService {
     void cclToggle(String username, String bindingId, boolean enabled);
     void ignoredToggle(String username, String bindingId, boolean ignored);
     void deleteBinding(String username, String bindingId);
+    Object searchGames(String username, String q);
+    void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
 }

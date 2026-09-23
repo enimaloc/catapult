@@ -4,7 +4,8 @@
 
     function bindingUrl(row, suffix) {
         const username = location.pathname.split("/")[2];
-        return `/channel/${username}/bindings/${row.dataset.bindingId}/${suffix}`;
+        const base = `/channel/${username}/bindings/${row.dataset.bindingId}`;
+        return suffix ? `${base}/${suffix}` : base;
     }
 
     async function refresh() {
@@ -31,6 +32,31 @@
         btn.addEventListener("click", async () => {
             const row = btn.closest("[data-binding-id]");
             await CatapultCsrf.postJson(bindingUrl(row, "delete"), {});
+            await refresh();
+        });
+    });
+
+    list.querySelectorAll(".binding-edit-btn").forEach(btn => {
+        const row = btn.closest("[data-binding-id]");
+        const panel = row.querySelector(".binding-edit-panel");
+        btn.addEventListener("click", () => { panel.hidden = !panel.hidden; });
+
+        const gameInput = panel.querySelector(".binding-edit-game-input");
+        const gameIdInput = panel.querySelector(".binding-edit-game-id");
+        const results = panel.querySelector(".binding-edit-game-results");
+        const username = location.pathname.split("/")[2];
+        GameSearch.attach(gameInput, results, `/channel/${username}/games/search`, game => {
+            gameIdInput.value = game.id;
+        });
+
+        panel.querySelector(".binding-edit-save-btn").addEventListener("click", async () => {
+            const ccls = Array.from(panel.querySelectorAll(".binding-edit-ccl-checkbox:checked"))
+                .map(cb => cb.value);
+            await CatapultCsrf.postJson(bindingUrl(row, ""), {
+                twitchGameId: gameIdInput.value || null,
+                twitchGameName: gameInput.value || null,
+                ccls
+            });
             await refresh();
         });
     });
