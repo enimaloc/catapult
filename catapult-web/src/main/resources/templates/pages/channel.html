@@ -138,6 +138,32 @@
                 <mdui-chip th:if="${ch.hasXbox()}" th:text="#{channel.connections.connected}">Connecté</mdui-chip>
                 <mdui-chip th:unless="${ch.hasXbox()}" th:text="#{channel.connections.not_connected}">Non connecté</mdui-chip>
             </mdui-card>
+
+            <mdui-card th:if="${minecraftLink != null}" class="connection-card" variant="outlined" data-conn="minecraft">
+                <span th:text="#{channel.connections.minecraft}">Minecraft</span>
+
+                <div th:switch="${minecraftLink.status()}">
+                    <div th:case="'NONE'">
+                        <input type="text" id="minecraft-name-input" th:placeholder="#{channel.connections.minecraft.name_placeholder}"/>
+                        <mdui-button id="minecraft-enroll-btn" th:text="#{channel.connections.minecraft.enroll}">Lier</mdui-button>
+                    </div>
+                    <div th:case="'PENDING'">
+                        <span th:text="#{channel.connections.minecraft.pending}">En attente d'acceptation en jeu…</span>
+                        <mdui-button id="minecraft-check-btn" th:text="#{channel.connections.minecraft.check}">Vérifier</mdui-button>
+                    </div>
+                    <div th:case="'INVITE_REJECTED'">
+                        <span th:text="#{channel.connections.minecraft.rejected}">Invitation refusée, ajout manuel requis.</span>
+                    </div>
+                    <div th:case="'ACCEPTED'">
+                        <mdui-chip th:text="${minecraftLink.minecraftName()}">Steve</mdui-chip>
+                        <mdui-button id="minecraft-disconnect-btn" th:text="#{channel.connections.minecraft.disconnect}">Délier</mdui-button>
+                    </div>
+                    <div th:case="'REMOVED'">
+                        <span th:text="#{channel.connections.minecraft.removed}">Lien supprimé côté serveur.</span>
+                        <mdui-button id="minecraft-check-btn" th:text="#{channel.connections.minecraft.check}">Vérifier</mdui-button>
+                    </div>
+                </div>
+            </mdui-card>
         </div>
     </section>
     <script src="/js/channel-status.js"></script>

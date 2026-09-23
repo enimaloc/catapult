@@ -1,6 +1,5 @@
 (function () {
-    const steamCard = document.querySelector('[data-conn="steam"]');
-    if (!steamCard) return;
+    if (!document.getElementById("channel-connections")) return;
 
     const username = location.pathname.split("/")[2];
     const baseUrl = `/channel/${username}`;
@@ -40,6 +39,31 @@
     if (refreshCacheBtn) {
         refreshCacheBtn.addEventListener("click", async () => {
             await CatapultCsrf.postJson(`${baseUrl}/steam/refresh-profile-cache`, {});
+            await refresh();
+        });
+    }
+
+    const enrollBtn = document.getElementById("minecraft-enroll-btn");
+    if (enrollBtn) {
+        enrollBtn.addEventListener("click", async () => {
+            const name = document.getElementById("minecraft-name-input").value;
+            await CatapultCsrf.postJson(`${baseUrl}/minecraft/enroll`, { name });
+            await refresh();
+        });
+    }
+
+    const checkBtn = document.getElementById("minecraft-check-btn");
+    if (checkBtn) {
+        checkBtn.addEventListener("click", async () => {
+            await CatapultCsrf.postJson(`${baseUrl}/minecraft/sync`, {});
+            await refresh();
+        });
+    }
+
+    const disconnectBtn = document.getElementById("minecraft-disconnect-btn");
+    if (disconnectBtn) {
+        disconnectBtn.addEventListener("click", async () => {
+            await CatapultCsrf.postJson(`${baseUrl}/minecraft/disconnect`, {});
             await refresh();
         });
     }

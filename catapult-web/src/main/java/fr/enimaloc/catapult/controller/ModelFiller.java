@@ -79,7 +79,11 @@ public class ModelFiller {
 
     public void channel(Model model, String username, int page, String status, String source) {
         model.addAttribute("username", username);
-        model.addAttribute("channelPage", apiService.channelPage(username, page, status, source));
+        var channelPage = apiService.channelPage(username, page, status, source);
+        model.addAttribute("channelPage", channelPage);
+        if (channelPage.isOwner()) {
+            model.addAttribute("minecraftLink", apiService.minecraftStatus(username));
+        }
     }
 
     public void error(Model model, HttpServletRequest request) {
