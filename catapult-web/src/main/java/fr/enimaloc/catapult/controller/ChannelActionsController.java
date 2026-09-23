@@ -2,6 +2,8 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
+import fr.enimaloc.catapult.common.dto.SaveBody;
+import fr.enimaloc.catapult.common.dto.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import lombok.RequiredArgsConstructor;
@@ -67,5 +69,23 @@ public class ChannelActionsController {
     public void updateBinding(@PathVariable String username, @PathVariable String bindingId,
                                @RequestBody UpdateBindingRequest body) {
         apiService.updateBinding(username, bindingId, body.twitchGameId(), body.twitchGameName(), body.ccls());
+    }
+
+    @PostMapping("/channel/{username}/bindings/{bindingId}/tws")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveTws(@PathVariable String username, @PathVariable String bindingId, @RequestBody SaveBody body) {
+        apiService.saveTws(bindingId, body.tws());
+    }
+
+    @PostMapping("/channel/{username}/bindings/{bindingId}/tws/reset")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetTws(@PathVariable String username, @PathVariable String bindingId) {
+        apiService.resetTws(bindingId);
+    }
+
+    @PostMapping("/channel/{username}/bindings/{bindingId}/tw-enabled")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void toggleTwEnabled(@PathVariable String username, @PathVariable String bindingId, @RequestBody TwEnabledBody body) {
+        apiService.toggleTwEnabled(bindingId, body.enabled());
     }
 }
