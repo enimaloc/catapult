@@ -182,6 +182,19 @@
             </label>
             <mdui-button id="ccl-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         </mdui-card>
+
+        <mdui-card th:if="${ch.isOwner()}" id="channel-tw-settings-form" variant="outlined">
+            <label>
+                <input type="checkbox" id="tw-enabled-checkbox" th:checked="${channelSettings.twFeatureEnabled()}"/>
+                <span th:text="#{channel.settings.tw.enable}">Activer les avertissements</span>
+            </label>
+            <label th:each="tw : ${channelSettings.availableTws()}">
+                <input type="checkbox" class="tw-block-checkbox" th:value="${tw.id()}"
+                       th:checked="${channelSettings.blockedTws().contains(tw.id())}"/>
+                <span th:text="${tw.label()}">tw label</span>
+            </label>
+            <mdui-button id="tw-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+        </mdui-card>
     </section>
     <script src="/js/channel-status.js"></script>
     <script src="/js/game-search.js"></script>

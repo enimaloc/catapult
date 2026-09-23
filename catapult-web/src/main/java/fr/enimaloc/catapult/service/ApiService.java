@@ -26,5 +26,6 @@ public interface ApiService {
     void minecraftSync(String username);
     void minecraftDisconnect(String username);
     void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
+    void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws);
     fr.enimaloc.catapult.common.dto.UserSettingsDto channelSettings(String username);
 }
