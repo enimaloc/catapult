@@ -9,4 +9,6 @@ public interface ApiService {
     fr.enimaloc.catapult.common.dto.ChannelPageData channelPage(String username, int page, String status, String source);
     void toggleBot(String username);
     void recheckGame(String username);
+    void cclToggle(String username, String bindingId, boolean enabled);
+    void ignoredToggle(String username, String bindingId, boolean ignored);
 }

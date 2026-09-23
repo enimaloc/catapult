@@ -46,4 +46,14 @@ public class MockApiService implements ApiService {
     public void recheckGame(String username) {
         // no-op in mock mode
     }
+
+    @Override
+    public void cclToggle(String username, String bindingId, boolean enabled) {
+        // no-op in mock mode
+    }
+
+    @Override
+    public void ignoredToggle(String username, String bindingId, boolean ignored) {
+        // no-op in mock mode
+    }
 }
