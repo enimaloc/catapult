@@ -26,4 +26,12 @@
             await refresh();
         });
     });
+
+    list.querySelectorAll(".binding-delete-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const row = btn.closest("[data-binding-id]");
+            await CatapultCsrf.postJson(bindingUrl(row, "delete"), {});
+            await refresh();
+        });
+    });
 })();
