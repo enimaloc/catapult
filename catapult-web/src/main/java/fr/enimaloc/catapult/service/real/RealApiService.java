@@ -65,4 +65,9 @@ public class RealApiService implements ApiService {
         client.postVoid("/api/channels/{username}/bindings/{bindingId}/ignored-toggle",
                 new IgnoredToggleRequest(ignored), username, bindingId);
     }
+
+    @Override
+    public void deleteBinding(String username, String bindingId) {
+        client.postVoid("/api/channels/{username}/bindings/{bindingId}/delete", null, username, bindingId);
+    }
 }
