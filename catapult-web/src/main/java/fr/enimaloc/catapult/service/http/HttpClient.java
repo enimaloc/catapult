@@ -102,7 +102,25 @@ public interface HttpClient {
         return req(HttpMethod.DELETE, path, responseType, locale, uriVars);
     }
 
+    default void postVoid(String path, Object body, Object uriVar1, Object uriVar2) {
+        Object[] allVars = new Object[]{uriVar1, uriVar2};
+        reqVoid(HttpMethod.POST, path, body, null, allVars);
+    }
+
+    default void postVoid(String path, Object body, Object uriVar1, Object... moreUriVars) {
+        Object[] allVars = new Object[1 + moreUriVars.length];
+        allVars[0] = uriVar1;
+        System.arraycopy(moreUriVars, 0, allVars, 1, moreUriVars.length);
+        reqVoid(HttpMethod.POST, path, body, null, allVars);
+    }
+
+    default void postVoid(String path, Object... uriVars) {
+        reqVoid(HttpMethod.POST, path, null, null, uriVars);
+    }
+
     <T> T req(HttpMethod method, String path, ResponseType<T> responseType, Locale locale, Object... uriVars);
+
+    void reqVoid(HttpMethod method, String path, Object body, Locale locale, Object... uriVars);
 
     record ResponseType<T>(Class<T> left, ParameterizedTypeReference<T> right) {
         public ResponseType(Class<T> clazz) {

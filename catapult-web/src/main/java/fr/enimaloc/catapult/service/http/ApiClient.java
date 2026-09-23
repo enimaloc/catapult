@@ -55,6 +55,20 @@ public class ApiClient implements HttpClient {
         }
     }
 
+    @Override
+    public void reqVoid(HttpMethod method, String path, Object body, Locale locale, Object... uriVars) {
+        try {
+            RestClient.RequestBodySpec spec = client.method(method).uri(path, uriVars);
+            if (body != null) spec.body(body);
+            if (locale != null) spec.header(HttpHeaders.ACCEPT_LANGUAGE, locale.toLanguageTag());
+            spec.retrieve().toBodilessEntity();
+        } catch (Exception e) {
+            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
+                log.warn("{} {} failed: {}", method, path, e.getMessage());
+            }
+        }
+    }
+
     private static String currentJwt() {
         // WS dispatch threads have no HTTP RequestContext; the WS layer stashes
         // the session JWT in WsAuthContext before invoking handlers/dispatcher.
