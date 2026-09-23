@@ -17,4 +17,8 @@ public interface ApiService {
     void saveTws(String bindingId, java.util.Set<String> tws);
     void resetTws(String bindingId);
     void toggleTwEnabled(String bindingId, boolean enabled);
+    void saveSteamToken(String username, String token, boolean shared);
+    void steamTokenSharing(String username, boolean shared);
+    void deleteSteamToken(String username);
+    void refreshSteamProfileCache(String username);
 }
