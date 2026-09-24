@@ -4,17 +4,21 @@ import fr.enimaloc.catapult.common.dto.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.NoGameSettingsRequest;
+import fr.enimaloc.catapult.common.dto.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.SaveBody;
+import fr.enimaloc.catapult.common.dto.SearchResponse;
 import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
+import fr.enimaloc.catapult.common.dto.ValidateRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -178,5 +182,25 @@ public class RealApiService implements ApiService {
     public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
         client.postVoid("/api/channels/{username}/settings/incomplete-fallback",
                 new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls), username);
+    }
+
+    @Override
+    public DtddMappingStatusDto dtddMappingStatus(String username) {
+        return client.get("/api/channels/{username}/dtdd-mapping", DtddMappingStatusDto.class, username);
+    }
+
+    @Override
+    public SearchResponse dtddSearch(String q) {
+        return client.get("/api/channel/dtdd-mapping/search?q={q}", SearchResponse.class, q);
+    }
+
+    @Override
+    public void dtddValidate(String igdbId) {
+        client.postVoid("/api/channel/dtdd-mapping/validate", new ValidateRequest(igdbId));
+    }
+
+    @Override
+    public void dtddPropose(String igdbId, Long dtddId, String reason) {
+        client.postVoid("/api/channel/dtdd-mapping/propose", new ProposeRequest(igdbId, dtddId, reason));
     }
 }

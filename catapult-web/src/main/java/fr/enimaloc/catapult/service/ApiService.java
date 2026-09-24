@@ -31,4 +31,8 @@ public interface ApiService {
     void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
                              boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
     void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
+    fr.enimaloc.catapult.common.dto.DtddMappingStatusDto dtddMappingStatus(String username);
+    fr.enimaloc.catapult.common.dto.SearchResponse dtddSearch(String q);
+    void dtddValidate(String igdbId);
+    void dtddPropose(String igdbId, Long dtddId, String reason);
 }
