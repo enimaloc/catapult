@@ -1297,6 +1297,13 @@ a[data-link].active {
     border-top: 1px solid var(--catapult-border);
 }
 
+.connection-card > .card-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+
+    margin-top: auto;
+}
+
 .connection-card label {
     display: inline-flex;
     align-items: center;
