@@ -18,10 +18,12 @@
                                    id="channel-recheck-game"></mdui-button-icon>
             </div>
 
-            <mdui-switch th:if="${ch.isOwner()}" th:checked="${ch.botEnabled()}"
-                         th:attr="data-toggle-url=@{/channel/{u}/settings/bot(u=${ch.channelUsername()})}"
-                         id="channel-bot-toggle"></mdui-switch>
-            <label th:if="${ch.isOwner()}" for="channel-bot-toggle" th:text="#{channel.status.bot_enabled}">Bot activé</label>
+            <div class="bot-toggle-row" th:if="${ch.isOwner()}">
+                <mdui-switch th:checked="${ch.botEnabled()}"
+                             th:attr="data-toggle-url=@{/channel/{u}/settings/bot(u=${ch.channelUsername()})}"
+                             id="channel-bot-toggle"></mdui-switch>
+                <label for="channel-bot-toggle" th:text="#{channel.status.bot_enabled}">Bot activé</label>
+            </div>
         </mdui-card>
 
         <div class="section-header">
@@ -92,7 +94,7 @@
             <h2 th:text="#{channel.connections.title}">Connexions</h2>
         </div>
 
-        <div id="channel-connections">
+        <div id="channel-connections" class="connections-grid">
             <mdui-card class="connection-card" variant="outlined">
                 <span th:text="#{channel.connections.twitch}">Twitch</span>
                 <mdui-chip th:text="#{channel.connections.connected}">Connecté</mdui-chip>
@@ -170,7 +172,7 @@
             <h2 th:text="#{channel.settings.ccl.title}">Filtres de contenu</h2>
         </div>
 
-        <mdui-card th:if="${ch.isOwner()}" id="channel-ccl-settings-form" variant="outlined">
+        <mdui-card th:if="${ch.isOwner()}" id="channel-ccl-settings-form" class="settings-card" variant="outlined">
             <label>
                 <input type="checkbox" id="ccl-enabled-checkbox" th:checked="${channelSettings.cclFeatureEnabled()}"/>
                 <span th:text="#{channel.settings.ccl.enable}">Activer le filtrage CCL</span>
@@ -183,7 +185,7 @@
             <mdui-button id="ccl-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         </mdui-card>
 
-        <mdui-card th:if="${ch.isOwner()}" id="channel-tw-settings-form" variant="outlined">
+        <mdui-card th:if="${ch.isOwner()}" id="channel-tw-settings-form" class="settings-card" variant="outlined">
             <label>
                 <input type="checkbox" id="tw-enabled-checkbox" th:checked="${channelSettings.twFeatureEnabled()}"/>
                 <span th:text="#{channel.settings.tw.enable}">Activer les avertissements</span>
@@ -196,7 +198,7 @@
             <mdui-button id="tw-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         </mdui-card>
 
-        <mdui-card th:if="${ch.isOwner()}" id="channel-no-game-settings-form" variant="outlined">
+        <mdui-card th:if="${ch.isOwner()}" id="channel-no-game-settings-form" class="settings-card" variant="outlined">
             <h3 th:text="#{channel.settings.no_game.title}">Aucun jeu détecté</h3>
             <input type="text" id="no-game-game-input" th:placeholder="#{channel.bindings.edit.game_placeholder}"
                    th:value="${channelSettings.noGameTwitchGameName()}"/>
@@ -222,7 +224,7 @@
             <mdui-button id="no-game-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         </mdui-card>
 
-        <mdui-card th:if="${ch.isOwner()}" id="channel-incomplete-fallback-settings-form" variant="outlined">
+        <mdui-card th:if="${ch.isOwner()}" id="channel-incomplete-fallback-settings-form" class="settings-card" variant="outlined">
             <h3 th:text="#{channel.settings.incomplete_fallback.title}">Jeu incomplet</h3>
             <input type="text" id="incomplete-fallback-game-input" th:placeholder="#{channel.bindings.edit.game_placeholder}"
                    th:value="${channelSettings.incompleteFallbackTwitchGameName()}"/>
@@ -236,7 +238,7 @@
             <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         </mdui-card>
 
-        <mdui-card id="channel-dtdd-mapping-card" variant="outlined" th:if="${dtddMapping != null and dtddMapping.igdbId() != null}"
+        <mdui-card id="channel-dtdd-mapping-card" class="settings-card" variant="outlined" th:if="${dtddMapping != null and dtddMapping.igdbId() != null}"
                    th:attr="data-igdb-id=${dtddMapping.igdbId()}">
             <h3 th:text="#{channel.dtdd.title}">Association DTDD</h3>
 
