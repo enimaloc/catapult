@@ -110,4 +110,26 @@ class IndexControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("channelPage", data));
     }
+
+    /**
+     * Regression test for a NullPointerException on non-owner viewers (e.g. a moderator
+     * viewing a channel they don't own): ModelFiller#channel only fetches
+     * channelSettings/minecraftLink/dtddMapping when isOwner() is true, so the template
+     * must not dereference those attributes unconditionally. Deliberately does not stub
+     * channelSettings/minecraftLink/dtddMapping — that's the point being verified.
+     */
+    @Test
+    void channelFullPage_nonOwnerViewer_rendersWithoutError() throws Exception {
+        ChannelPageData data = new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 0, List.of()),
+                List.of(), java.util.Set.of(), List.of(), java.util.Set.of(),
+                null, null, false, false, false, false, false, false, false, 15L, false, false, "uuid");
+        when(apiService.channelPage(org.mockito.ArgumentMatchers.eq("enimaloc"), anyInt(), any(), any()))
+                .thenReturn(data);
+
+        mvc.perform(get("/channel/enimaloc"))
+                .andExpect(status().isOk());
+    }
 }
