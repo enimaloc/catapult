@@ -1,20 +1,17 @@
-(function () {
+document.addEventListener("catapult:render", function () {
     const card = document.getElementById("channel-dtdd-mapping-card");
     if (!card) return;
 
-    const username = location.pathname.split("/")[2];
-    const baseUrl = `/channel/${username}`;
+    // ApiChannelDtddMappingController is globally scoped, not username-scoped, so these
+    // routes don't carry the username (unlike CatapultChannel.baseUrl()).
+    const dtddBaseUrl = "/channel/dtdd-mapping";
     const igdbId = card.dataset.igdbId;
-
-    async function refresh() {
-        navigate(location.pathname.replace(/^\/+/, ""), false);
-    }
 
     const validateBtn = document.getElementById("dtdd-validate-btn");
     if (validateBtn) {
         validateBtn.addEventListener("click", async () => {
-            await CatapultCsrf.postJson(`${baseUrl}/dtdd-mapping/validate`, { igdbId });
-            await refresh();
+            await CatapultChannel.postJson(`${dtddBaseUrl}/validate`, { igdbId });
+            await CatapultChannel.refresh();
         });
     }
 
@@ -33,19 +30,19 @@
             return;
         }
         debounceTimer = setTimeout(async () => {
-            const response = await fetch(`${baseUrl}/dtdd-mapping/search?q=${encodeURIComponent(q)}`);
+            const response = await fetch(`${dtddBaseUrl}/search?q=${encodeURIComponent(q)}`);
             const data = await response.json();
             results.innerHTML = "";
             data.results.forEach(game => {
                 const item = document.createElement("mdui-list-item");
                 item.textContent = game.name;
                 item.addEventListener("click", async () => {
-                    await CatapultCsrf.postJson(`${baseUrl}/dtdd-mapping/propose`,
+                    await CatapultChannel.postJson(`${dtddBaseUrl}/propose`,
                             { igdbId, dtddId: game.dtddId, reason: "correction" });
-                    await refresh();
+                    await CatapultChannel.refresh();
                 });
                 results.appendChild(item);
             });
         }, 300);
     });
-})();
+});

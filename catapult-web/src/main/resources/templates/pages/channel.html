@@ -236,7 +236,7 @@
             <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         </mdui-card>
 
-        <mdui-card id="channel-dtdd-mapping-card" variant="outlined" th:if="${dtddMapping.igdbId() != null}"
+        <mdui-card id="channel-dtdd-mapping-card" variant="outlined" th:if="${dtddMapping != null and dtddMapping.igdbId() != null}"
                    th:attr="data-igdb-id=${dtddMapping.igdbId()}">
             <h3 th:text="#{channel.dtdd.title}">Association DTDD</h3>
 
@@ -260,10 +260,4 @@
             </div>
         </mdui-card>
     </section>
-    <script src="/js/channel-status.js"></script>
-    <script src="/js/game-search.js"></script>
-    <script src="/js/channel-bindings.js"></script>
-    <script src="/js/channel-connections.js"></script>
-    <script src="/js/channel-settings.js"></script>
-    <script src="/js/channel-dtdd.js"></script>
 </mdui-layout-main>

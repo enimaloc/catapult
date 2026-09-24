@@ -6,11 +6,11 @@
 
     <title>Catapult</title>
 
-    <link rel="stylesheet" href="_static/mdui/2.1.4/mdui.css">
+    <link rel="stylesheet" href="/_static/mdui/2.1.4/mdui.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="/css/catapult.css">
 
-    <script src="_static/mdui/2.1.4/mdui.global.js"></script>
+    <script src="/_static/mdui/2.1.4/mdui.global.js"></script>
     <script th:inline="javascript">
         window.Catapult = {
             page: /*[[${page}]]*/,
@@ -67,5 +67,21 @@
 <script src="/js/csrf.js"></script>
 <script src="/js/catapult.js"></script>
 <script src="/js/spa.js"></script>
+
+<!--
+    These scripts back interactive fragments (currently only the /channel/{username}
+    dashboard). They are loaded here, once per full page load, rather than inlined in
+    their fragment templates: a script tag inserted via innerHTML (which is exactly what
+    spa.js's navigate() does to swap #app's content) never executes per the HTML/DOM spec.
+    Each file instead listens for the "catapult:render" event spa.js dispatches on both
+    initial load and every SPA swap, and no-ops via a null-guard when its DOM isn't present.
+-->
+<script src="/js/channel-page.js"></script>
+<script src="/js/channel-status.js"></script>
+<script src="/js/game-search.js"></script>
+<script src="/js/channel-bindings.js"></script>
+<script src="/js/channel-connections.js"></script>
+<script src="/js/channel-settings.js"></script>
+<script src="/js/channel-dtdd.js"></script>
 </body>
 </html>

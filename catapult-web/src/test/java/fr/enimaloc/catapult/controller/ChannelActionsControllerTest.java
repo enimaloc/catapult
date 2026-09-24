@@ -88,7 +88,7 @@ class ChannelActionsControllerTest {
 
     @Test
     void saveTws_callsApiServiceWithParsedBody() throws Exception {
-        mvc.perform(post("/channel/enimaloc/bindings/abc-123/tws").with(csrf())
+        mvc.perform(post("/channel/bindings/abc-123/tws").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"tws\":[\"jumpscares\"]}"))
                 .andExpect(status().isNoContent());
@@ -98,7 +98,7 @@ class ChannelActionsControllerTest {
 
     @Test
     void resetTws_callsApiService() throws Exception {
-        mvc.perform(post("/channel/enimaloc/bindings/abc-123/tws/reset").with(csrf()))
+        mvc.perform(post("/channel/bindings/abc-123/tws/reset").with(csrf()))
                 .andExpect(status().isNoContent());
 
         verify(apiService).resetTws("abc-123");
@@ -106,7 +106,7 @@ class ChannelActionsControllerTest {
 
     @Test
     void toggleTwEnabled_callsApiServiceWithParsedBody() throws Exception {
-        mvc.perform(post("/channel/enimaloc/bindings/abc-123/tw-enabled").with(csrf())
+        mvc.perform(post("/channel/bindings/abc-123/tw-enabled").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"enabled\":true}"))
                 .andExpect(status().isNoContent());
@@ -234,14 +234,14 @@ class ChannelActionsControllerTest {
                 List.of(new fr.enimaloc.catapult.common.dto.SearchResultDto(4521L, "Celeste", "Video Game", null))));
 
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .get("/channel/enimaloc/dtdd-mapping/search").param("q", "celeste"))
+                        .get("/channel/dtdd-mapping/search").param("q", "celeste"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.results[0].name").value("Celeste"));
     }
 
     @Test
     void dtddValidate_callsApiServiceWithParsedBody() throws Exception {
-        mvc.perform(post("/channel/enimaloc/dtdd-mapping/validate").with(csrf())
+        mvc.perform(post("/channel/dtdd-mapping/validate").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"igdbId\":\"100\"}"))
                 .andExpect(status().isNoContent());
@@ -251,7 +251,7 @@ class ChannelActionsControllerTest {
 
     @Test
     void dtddPropose_callsApiServiceWithParsedBody() throws Exception {
-        mvc.perform(post("/channel/enimaloc/dtdd-mapping/propose").with(csrf())
+        mvc.perform(post("/channel/dtdd-mapping/propose").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"igdbId\":\"100\",\"dtddId\":4521,\"reason\":\"wrong game\"}"))
                 .andExpect(status().isNoContent());

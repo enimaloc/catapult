@@ -81,21 +81,24 @@ public class ChannelActionsController {
         apiService.updateBinding(username, bindingId, body.twitchGameId(), body.twitchGameName(), body.ccls());
     }
 
-    @PostMapping("/channel/{username}/bindings/{bindingId}/tws")
+    // Unlike the sibling binding endpoints above, the upstream ApiChannelTwController on
+    // catapult-api is binding-scoped, not username-scoped, so these routes don't take
+    // {username}.
+    @PostMapping("/channel/bindings/{bindingId}/tws")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void saveTws(@PathVariable String username, @PathVariable String bindingId, @RequestBody SaveBody body) {
+    public void saveTws(@PathVariable String bindingId, @RequestBody SaveBody body) {
         apiService.saveTws(bindingId, body.tws());
     }
 
-    @PostMapping("/channel/{username}/bindings/{bindingId}/tws/reset")
+    @PostMapping("/channel/bindings/{bindingId}/tws/reset")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void resetTws(@PathVariable String username, @PathVariable String bindingId) {
+    public void resetTws(@PathVariable String bindingId) {
         apiService.resetTws(bindingId);
     }
 
-    @PostMapping("/channel/{username}/bindings/{bindingId}/tw-enabled")
+    @PostMapping("/channel/bindings/{bindingId}/tw-enabled")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void toggleTwEnabled(@PathVariable String username, @PathVariable String bindingId, @RequestBody TwEnabledBody body) {
+    public void toggleTwEnabled(@PathVariable String bindingId, @RequestBody TwEnabledBody body) {
         apiService.toggleTwEnabled(bindingId, body.enabled());
     }
 
@@ -171,20 +174,23 @@ public class ChannelActionsController {
         apiService.saveIncompleteFallbackSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls());
     }
 
-    @GetMapping("/channel/{username}/dtdd-mapping/search")
-    public SearchResponse dtddSearch(@PathVariable String username, @RequestParam(defaultValue = "") String q) {
+    // Unlike the sibling channel endpoints above, the upstream ApiChannelDtddMappingController
+    // on catapult-api is globally scoped, not username-scoped, so these routes don't take
+    // {username}.
+    @GetMapping("/channel/dtdd-mapping/search")
+    public SearchResponse dtddSearch(@RequestParam(defaultValue = "") String q) {
         return apiService.dtddSearch(q);
     }
 
-    @PostMapping("/channel/{username}/dtdd-mapping/validate")
+    @PostMapping("/channel/dtdd-mapping/validate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void dtddValidate(@PathVariable String username, @RequestBody ValidateRequest body) {
+    public void dtddValidate(@RequestBody ValidateRequest body) {
         apiService.dtddValidate(body.igdbId());
     }
 
-    @PostMapping("/channel/{username}/dtdd-mapping/propose")
+    @PostMapping("/channel/dtdd-mapping/propose")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void dtddPropose(@PathVariable String username, @RequestBody ProposeRequest body) {
+    public void dtddPropose(@RequestBody ProposeRequest body) {
         apiService.dtddPropose(body.igdbId(), body.dtddId(), body.reason());
     }
 }
