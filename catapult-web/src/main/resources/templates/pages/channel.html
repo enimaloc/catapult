@@ -29,18 +29,29 @@
 
         <div class="section-header">
             <h2 th:text="#{channel.bindings.title}">Associations</h2>
-            <div class="bindings-filters">
-                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()})}"
-                   th:text="#{channel.bindings.filter.all}">Toutes</a>
-                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='AUTO')}"
-                   th:text="#{channel.bindings.filter.auto}">Auto</a>
-                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='MANUAL')}"
-                   th:text="#{channel.bindings.filter.manual}">Manuel</a>
-                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='INCOMPLETE')}"
-                   th:text="#{channel.bindings.filter.incomplete}">Incomplet</a>
-                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},source='STEAM')}"
-                   th:text="#{channel.bindings.filter.steam}">Steam</a>
-            </div>
+            <mdui-segmented-button-group class="bindings-filters">
+                <mdui-segmented-button data-link th:href="@{/channel/{u}(u=${ch.channelUsername()})}"
+                                        th:classappend="${ch.filterStatus() == null and ch.filterSource() == null} ? 'filter-active'"
+                                        th:text="#{channel.bindings.filter.all}">Toutes
+                </mdui-segmented-button>
+                <mdui-segmented-button data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='AUTO')}"
+                                        th:classappend="${ch.filterStatus() == 'AUTO'} ? 'filter-active'"
+                                        th:text="#{channel.bindings.filter.auto}">Auto
+                </mdui-segmented-button>
+                <mdui-segmented-button data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='MANUAL')}"
+                                        th:classappend="${ch.filterStatus() == 'MANUAL'} ? 'filter-active'"
+                                        th:text="#{channel.bindings.filter.manual}">Manuel
+                </mdui-segmented-button>
+                <mdui-segmented-button data-link
+                                        th:href="@{/channel/{u}(u=${ch.channelUsername()},status='INCOMPLETE')}"
+                                        th:classappend="${ch.filterStatus() == 'INCOMPLETE'} ? 'filter-active'"
+                                        th:text="#{channel.bindings.filter.incomplete}">Incomplet
+                </mdui-segmented-button>
+                <mdui-segmented-button data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},source='STEAM')}"
+                                        th:classappend="${ch.filterSource() == 'STEAM'} ? 'filter-active'"
+                                        th:text="#{channel.bindings.filter.steam}">Steam
+                </mdui-segmented-button>
+            </mdui-segmented-button-group>
         </div>
 
         <mdui-list id="channel-bindings-list">
@@ -148,19 +159,20 @@
                     </div>
                 </div>
 
-                <div class="card-actions" th:if="${ch.isOwner() and ch.hasSteam()}">
-                    <mdui-button th:if="${ch.hasSteamPersonalToken()}" id="steam-token-delete-btn"
-                                 th:text="#{channel.connections.steam.token.delete}">
+                <mdui-segmented-button-group class="card-actions" th:if="${ch.isOwner() and ch.hasSteam()}">
+                    <mdui-segmented-button th:if="${ch.hasSteamPersonalToken()}" id="steam-token-delete-btn"
+                                            th:text="#{channel.connections.steam.token.delete}">
                         Supprimer le token
-                    </mdui-button>
-                    <mdui-button th:unless="${ch.hasSteamPersonalToken()}" id="steam-token-save-btn"
-                                 th:text="#{channel.connections.steam.token.save}">
+                    </mdui-segmented-button>
+                    <mdui-segmented-button th:unless="${ch.hasSteamPersonalToken()}" id="steam-token-save-btn"
+                                            th:text="#{channel.connections.steam.token.save}">
                         Enregistrer
-                    </mdui-button>
-                    <mdui-button id="steam-refresh-cache-btn" th:text="#{channel.connections.steam.refresh_cache}">
+                    </mdui-segmented-button>
+                    <mdui-segmented-button id="steam-refresh-cache-btn"
+                                            th:text="#{channel.connections.steam.refresh_cache}">
                         Rafraîchir le cache
-                    </mdui-button>
-                </div>
+                    </mdui-segmented-button>
+                </mdui-segmented-button-group>
             </mdui-card>
 
             <mdui-card th:if="${ch.hasXboxProvider()}" class="connection-card" variant="outlined" data-conn="xbox">
@@ -193,20 +205,22 @@
                     </div>
                 </div>
 
-                <div class="card-actions">
-                    <mdui-button th:if="${minecraftLink.status() == 'NONE'}" id="minecraft-enroll-btn"
-                                 th:text="#{channel.connections.minecraft.enroll}">
+                <mdui-segmented-button-group class="card-actions">
+                    <mdui-segmented-button th:if="${minecraftLink.status() == 'NONE'}" id="minecraft-enroll-btn"
+                                            th:text="#{channel.connections.minecraft.enroll}">
                         Lier
-                    </mdui-button>
-                    <mdui-button th:if="${minecraftLink.status() == 'PENDING' or minecraftLink.status() == 'REMOVED'}"
-                                 id="minecraft-check-btn" th:text="#{channel.connections.minecraft.check}">
+                    </mdui-segmented-button>
+                    <mdui-segmented-button
+                            th:if="${minecraftLink.status() == 'PENDING' or minecraftLink.status() == 'REMOVED'}"
+                            id="minecraft-check-btn" th:text="#{channel.connections.minecraft.check}">
                         Vérifier
-                    </mdui-button>
-                    <mdui-button th:if="${minecraftLink.status() == 'ACCEPTED'}" id="minecraft-disconnect-btn"
-                                 th:text="#{channel.connections.minecraft.disconnect}">
+                    </mdui-segmented-button>
+                    <mdui-segmented-button th:if="${minecraftLink.status() == 'ACCEPTED'}"
+                                            id="minecraft-disconnect-btn"
+                                            th:text="#{channel.connections.minecraft.disconnect}">
                         Délier
-                    </mdui-button>
-                </div>
+                    </mdui-segmented-button>
+                </mdui-segmented-button-group>
             </mdui-card>
         </div>
 
