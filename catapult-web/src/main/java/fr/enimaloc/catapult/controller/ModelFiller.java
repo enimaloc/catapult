@@ -84,6 +84,7 @@ public class ModelFiller {
         if (channelPage.isOwner()) {
             model.addAttribute("channelSettings", apiService.channelSettings(username));
             model.addAttribute("minecraftLink", apiService.minecraftStatus(username));
+            model.addAttribute("dtddMapping", apiService.dtddMappingStatus(username));
         }
     }
 

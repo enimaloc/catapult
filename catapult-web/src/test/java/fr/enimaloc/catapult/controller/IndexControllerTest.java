@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.ChannelUserDto;
+import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.PagedBindings;
 import fr.enimaloc.catapult.common.dto.UserSettingsDto;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
@@ -58,6 +59,7 @@ class IndexControllerTest {
         lenient().when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
                 false, java.util.Set.of(), null, null, java.util.Set.of(), false, false, false,
                 null, null, java.util.Set.of(), List.of(), false, java.util.Set.of(), List.of()));
+        lenient().when(apiService.dtddMappingStatus(any())).thenReturn(new DtddMappingStatusDto(null, null, false, null));
     }
 
     @Test

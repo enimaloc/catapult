@@ -153,4 +153,24 @@ public class MockApiService implements ApiService {
     public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
         // no-op in mock mode
     }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.DtddMappingStatusDto dtddMappingStatus(String username) {
+        return new fr.enimaloc.catapult.common.dto.DtddMappingStatusDto(null, null, false, null);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.SearchResponse dtddSearch(String q) {
+        return new fr.enimaloc.catapult.common.dto.SearchResponse(List.of());
+    }
+
+    @Override
+    public void dtddValidate(String igdbId) {
+        // no-op in mock mode
+    }
+
+    @Override
+    public void dtddPropose(String igdbId, Long dtddId, String reason) {
+        // no-op in mock mode
+    }
 }
