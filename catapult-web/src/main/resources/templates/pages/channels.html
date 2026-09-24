@@ -1,0 +1,19 @@
+<mdui-layout-main th:fragment="channels">
+    <section class="section privacy-section">
+        <div class="section-header">
+            <span class="eyebrow" th:text="#{channels.eyebrow}">channels.eyebrow</span>
+            <h1 th:text="#{channels.title}">channels.title</h1>
+            <p th:text="#{channels.description}">channels.description</p>
+        </div>
+
+        <div class="channels-grid">
+            <mdui-card th:href="'/channel/' + ${channel.twitchUsername()}" data-link th:each="channel : ${channels}" variant="outlined" class="channel-card">
+                <div class="channel-icon">
+                    <mdui-avatar th:src="${channel.profileImageUrl()}"></mdui-avatar>
+                </div>
+                <h3 th:text="${channel.twitchUsername()}"></h3>
+                <p th:text="${channel.twitchId()}"></p>
+            </mdui-card>
+        </div>
+    </section>
+</mdui-layout-main>
