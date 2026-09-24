@@ -57,19 +57,19 @@ public class MockApiService implements ApiService {
     @Override
     public void cclToggle(String username, String bindingId, boolean enabled) {
         log.trace("[{}] cclToggle({}, {}, {})", code, username, bindingId, enabled);
-        // no-op in mock mode
+        data.setBindingCclEnabled(bindingId, enabled);
     }
 
     @Override
     public void ignoredToggle(String username, String bindingId, boolean ignored) {
         log.trace("[{}] ignoredToggle({}, {}, {})", code, username, bindingId, ignored);
-        // no-op in mock mode
+        data.setBindingIgnored(bindingId, ignored);
     }
 
     @Override
     public void deleteBinding(String username, String bindingId) {
         log.trace("[{}] deleteBinding({}, {})", code, username, bindingId);
-        // no-op in mock mode
+        data.deleteBinding(bindingId);
     }
 
     @Override
@@ -81,43 +81,43 @@ public class MockApiService implements ApiService {
     @Override
     public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
         log.trace("[{}] updateBinding({}, {}, {}, {}, {})", code, username, bindingId, twitchGameId, twitchGameName, ccls);
-        // no-op in mock mode
+        data.updateBindingGame(bindingId, twitchGameId, twitchGameName, ccls);
     }
 
     @Override
     public void saveTws(String bindingId, java.util.Set<String> tws) {
         log.trace("[{}] saveTws({}, {})", code, bindingId, tws);
-        // no-op in mock mode
+        data.setBindingTws(bindingId, tws);
     }
 
     @Override
     public void resetTws(String bindingId) {
         log.trace("[{}] resetTws({})", code, bindingId);
-        // no-op in mock mode
+        data.resetBindingTws(bindingId);
     }
 
     @Override
     public void toggleTwEnabled(String bindingId, boolean enabled) {
         log.trace("[{}] toggleTwEnabled({}, {})", code, bindingId, enabled);
-        // no-op in mock mode
+        data.setBindingTwEnabled(bindingId, enabled);
     }
 
     @Override
     public void saveSteamToken(String username, String token, boolean shared) {
         log.trace("[{}] saveSteamToken({}, {}, {})", code, username, token, shared);
-        // no-op in mock mode
+        data.saveSteamToken(shared);
     }
 
     @Override
     public void steamTokenSharing(String username, boolean shared) {
         log.trace("[{}] steamTokenSharing({}, {})", code, username, shared);
-        // no-op in mock mode
+        data.setSteamTokenShared(shared);
     }
 
     @Override
     public void deleteSteamToken(String username) {
         log.trace("[{}] deleteSteamToken({})", code, username);
-        // no-op in mock mode
+        data.deleteSteamToken();
     }
 
     @Override
@@ -135,31 +135,31 @@ public class MockApiService implements ApiService {
     @Override
     public void minecraftEnroll(String username, String name) {
         log.trace("[{}] minecraftEnroll({}, {})", code, username, name);
-        // no-op in mock mode
+        data.minecraftEnroll(name);
     }
 
     @Override
     public void minecraftSync(String username) {
         log.trace("[{}] minecraftSync({})", code, username);
-        // no-op in mock mode
+        data.minecraftSync();
     }
 
     @Override
     public void minecraftDisconnect(String username) {
         log.trace("[{}] minecraftDisconnect({})", code, username);
-        // no-op in mock mode
+        data.minecraftDisconnect();
     }
 
     @Override
     public void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls) {
         log.trace("[{}] saveCclSettings({}, {}, {})", code, username, enabled, blockedCcls);
-        // no-op in mock mode
+        data.saveCclSettings(enabled, blockedCcls);
     }
 
     @Override
     public void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws) {
         log.trace("[{}] saveTwSettings({}, {}, {})", code, username, enabled, blockedTws);
-        // no-op in mock mode
+        data.saveTwSettings(enabled, blockedTws);
     }
 
     @Override
@@ -173,13 +173,13 @@ public class MockApiService implements ApiService {
                                     boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
         log.trace("[{}] saveNoGameSettings({}, {}, {}, {}, {}, {}, {})", code, username, twitchGameId, twitchGameName,
                 ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
-        // no-op in mock mode
+        data.saveNoGameSettings(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
     }
 
     @Override
     public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
         log.trace("[{}] saveIncompleteFallbackSettings({}, {}, {}, {})", code, username, twitchGameId, twitchGameName, ccls);
-        // no-op in mock mode
+        data.saveIncompleteFallbackSettings(twitchGameId, twitchGameName, ccls);
     }
 
     @Override
