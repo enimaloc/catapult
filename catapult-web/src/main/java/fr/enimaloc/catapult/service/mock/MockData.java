@@ -70,19 +70,20 @@ public class MockData {
 
     private final ChannelDto channelDto;
     private final GameDto gameDto;
-    private final BindingDto bindingDto;
-    private final UserSettingsDto userSettingsDto;
+    /** Nullable: cleared by {@link #deleteBinding}, matching a real "no binding" state. */
+    private BindingDto binding;
+    private UserSettingsDto userSettingsDto;
     private final List<ChannelDto> channelsList;
     private final boolean hasSteamProvider;
     private final boolean hasSteam;
-    private final boolean hasSteamPersonalToken;
-    private final boolean steamTokenShared;
+    private boolean hasSteamPersonalToken;
+    private boolean steamTokenShared;
     private final boolean steamProfilePrivate;
     private final boolean steamRateLimited;
     private final boolean steamOfflineMode;
     private final boolean hasXboxProvider;
     private final boolean hasXbox;
-    private final LinkStateResponse minecraftLink;
+    private LinkStateResponse minecraftLink;
     @Setter @Getter
     private boolean botEnabled;
 
@@ -155,7 +156,7 @@ public class MockData {
                      LinkStateResponse minecraftLink) {
         this.channelDto = channelDto;
         this.gameDto = gameDto;
-        this.bindingDto = bindingDto;
+        this.binding = bindingDto;
         this.userSettingsDto = userSettingsDto;
         if (!channelsList.contains(channelDto)) {
             channelsList = new ArrayList<>(channelsList);
@@ -180,10 +181,11 @@ public class MockData {
     }
 
     public ChannelPageData getPage(String username, String status, String source) {
+        List<BindingDto> content = binding == null ? List.of() : List.of(binding);
         return new ChannelPageData(
                 getChannelUser(), username, username.equals(channelDto.twitchUsername()),
                 channelDto.live(), botEnabled, gameDto,
-                new PagedBindings(0, 1, 1, List.of(bindingDto)),
+                new PagedBindings(0, content.isEmpty() ? 0 : 1, content.size(), content),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
                 status, source, hasSteamProvider, hasSteam, hasSteamPersonalToken, steamTokenShared,
                 steamProfilePrivate, steamRateLimited, steamOfflineMode, 15L,
@@ -201,6 +203,127 @@ public class MockData {
 
     public LinkStateResponse getMinecraftLink() {
         return minecraftLink;
+    }
+
+    private boolean matchesBinding(String bindingId) {
+        return binding != null && binding.id().equals(bindingId);
+    }
+
+    public void setBindingCclEnabled(String bindingId, boolean enabled) {
+        if (matchesBinding(bindingId)) {
+            binding = new BindingDto(binding.id(), binding.status(), binding.sourceType(), binding.sourceName(),
+                    binding.twitchGameId(), binding.twitchGameName(), binding.ignored(), enabled, binding.ccls(),
+                    binding.twEnabled(), binding.twOverride(), binding.tws());
+        }
+    }
+
+    public void setBindingIgnored(String bindingId, boolean ignored) {
+        if (matchesBinding(bindingId)) {
+            binding = new BindingDto(binding.id(), binding.status(), binding.sourceType(), binding.sourceName(),
+                    binding.twitchGameId(), binding.twitchGameName(), ignored, binding.cclEnabled(), binding.ccls(),
+                    binding.twEnabled(), binding.twOverride(), binding.tws());
+        }
+    }
+
+    public void deleteBinding(String bindingId) {
+        if (matchesBinding(bindingId)) {
+            binding = null;
+        }
+    }
+
+    public void updateBindingGame(String bindingId, String twitchGameId, String twitchGameName, Set<String> ccls) {
+        if (matchesBinding(bindingId)) {
+            binding = new BindingDto(binding.id(), binding.status(), binding.sourceType(), binding.sourceName(),
+                    twitchGameId, twitchGameName, binding.ignored(), binding.cclEnabled(), Set.copyOf(ccls),
+                    binding.twEnabled(), binding.twOverride(), binding.tws());
+        }
+    }
+
+    public void setBindingTws(String bindingId, Set<String> tws) {
+        if (matchesBinding(bindingId)) {
+            binding = new BindingDto(binding.id(), binding.status(), binding.sourceType(), binding.sourceName(),
+                    binding.twitchGameId(), binding.twitchGameName(), binding.ignored(), binding.cclEnabled(),
+                    binding.ccls(), binding.twEnabled(), true, Set.copyOf(tws));
+        }
+    }
+
+    public void resetBindingTws(String bindingId) {
+        if (matchesBinding(bindingId)) {
+            binding = new BindingDto(binding.id(), binding.status(), binding.sourceType(), binding.sourceName(),
+                    binding.twitchGameId(), binding.twitchGameName(), binding.ignored(), binding.cclEnabled(),
+                    binding.ccls(), binding.twEnabled(), false, Set.of());
+        }
+    }
+
+    public void setBindingTwEnabled(String bindingId, boolean enabled) {
+        if (matchesBinding(bindingId)) {
+            binding = new BindingDto(binding.id(), binding.status(), binding.sourceType(), binding.sourceName(),
+                    binding.twitchGameId(), binding.twitchGameName(), binding.ignored(), binding.cclEnabled(),
+                    binding.ccls(), enabled, binding.twOverride(), binding.tws());
+        }
+    }
+
+    public void saveCclSettings(boolean enabled, Set<String> blockedCcls) {
+        userSettingsDto = new UserSettingsDto(enabled, Set.copyOf(blockedCcls),
+                userSettingsDto.noGameTwitchGameId(), userSettingsDto.noGameTwitchGameName(), userSettingsDto.noGameCcls(),
+                userSettingsDto.applyDefaultOnStreamStart(), userSettingsDto.applyDefaultOnNoGame(), userSettingsDto.applyDefaultOnStreamEnd(),
+                userSettingsDto.incompleteFallbackTwitchGameId(), userSettingsDto.incompleteFallbackTwitchGameName(), userSettingsDto.incompleteFallbackCcls(),
+                userSettingsDto.availableCcls(), userSettingsDto.twFeatureEnabled(), userSettingsDto.blockedTws(), userSettingsDto.availableTws());
+    }
+
+    public void saveTwSettings(boolean enabled, Set<String> blockedTws) {
+        userSettingsDto = new UserSettingsDto(userSettingsDto.cclFeatureEnabled(), userSettingsDto.blockedCcls(),
+                userSettingsDto.noGameTwitchGameId(), userSettingsDto.noGameTwitchGameName(), userSettingsDto.noGameCcls(),
+                userSettingsDto.applyDefaultOnStreamStart(), userSettingsDto.applyDefaultOnNoGame(), userSettingsDto.applyDefaultOnStreamEnd(),
+                userSettingsDto.incompleteFallbackTwitchGameId(), userSettingsDto.incompleteFallbackTwitchGameName(), userSettingsDto.incompleteFallbackCcls(),
+                userSettingsDto.availableCcls(), enabled, Set.copyOf(blockedTws), userSettingsDto.availableTws());
+    }
+
+    public void saveNoGameSettings(String twitchGameId, String twitchGameName, Set<String> ccls,
+                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
+        userSettingsDto = new UserSettingsDto(userSettingsDto.cclFeatureEnabled(), userSettingsDto.blockedCcls(),
+                twitchGameId, twitchGameName, Set.copyOf(ccls),
+                applyOnStreamStart, applyOnNoGame, applyOnStreamEnd,
+                userSettingsDto.incompleteFallbackTwitchGameId(), userSettingsDto.incompleteFallbackTwitchGameName(), userSettingsDto.incompleteFallbackCcls(),
+                userSettingsDto.availableCcls(), userSettingsDto.twFeatureEnabled(), userSettingsDto.blockedTws(), userSettingsDto.availableTws());
+    }
+
+    public void saveIncompleteFallbackSettings(String twitchGameId, String twitchGameName, Set<String> ccls) {
+        userSettingsDto = new UserSettingsDto(userSettingsDto.cclFeatureEnabled(), userSettingsDto.blockedCcls(),
+                userSettingsDto.noGameTwitchGameId(), userSettingsDto.noGameTwitchGameName(), userSettingsDto.noGameCcls(),
+                userSettingsDto.applyDefaultOnStreamStart(), userSettingsDto.applyDefaultOnNoGame(), userSettingsDto.applyDefaultOnStreamEnd(),
+                twitchGameId, twitchGameName, Set.copyOf(ccls),
+                userSettingsDto.availableCcls(), userSettingsDto.twFeatureEnabled(), userSettingsDto.blockedTws(), userSettingsDto.availableTws());
+    }
+
+    public void minecraftEnroll(String name) {
+        minecraftLink = new LinkStateResponse("PENDING", name, null);
+    }
+
+    /** Simulates the invite being accepted in-game the moment it's checked — the mock has no game client to poll. */
+    public void minecraftSync() {
+        if (minecraftLink != null
+                && ("PENDING".equals(minecraftLink.status()) || "REMOVED".equals(minecraftLink.status()))) {
+            minecraftLink = new LinkStateResponse("ACCEPTED", minecraftLink.minecraftName(), minecraftLink.serviceAccountUsername());
+        }
+    }
+
+    public void minecraftDisconnect() {
+        minecraftLink = new LinkStateResponse("NONE", null, null);
+    }
+
+    public void saveSteamToken(boolean shared) {
+        hasSteamPersonalToken = true;
+        steamTokenShared = shared;
+    }
+
+    public void setSteamTokenShared(boolean shared) {
+        steamTokenShared = shared;
+    }
+
+    public void deleteSteamToken() {
+        hasSteamPersonalToken = false;
+        steamTokenShared = false;
     }
 
     /** Deserialization target for the mock login form's JSON payload. */
