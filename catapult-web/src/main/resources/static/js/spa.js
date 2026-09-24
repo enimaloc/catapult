@@ -35,7 +35,7 @@ function resolveRoute(path) {
     return { route: undefined, param: null };
 }
 
-async function navigate(path, push = true) {
+async function navigate(path, push = true, search = "") {
     const { route, param } = resolveRoute(path);
     const templateUrl = route
         ? (param ? `${route.templateUrl}/${param}` : route.templateUrl)
@@ -45,11 +45,11 @@ async function navigate(path, push = true) {
 
     let response;
     try {
-        response = await fetch(templateUrl);
+        response = await fetch(templateUrl + search);
     } catch {
         // Network failure (offline, timeout, ...): fall back to a full
         // navigation so the browser's own error handling takes over.
-        window.location.href = path;
+        window.location.href = path + search;
         return;
     } finally {
         progress.hidden = true;
@@ -66,7 +66,7 @@ async function navigate(path, push = true) {
                 path
             },
             "",
-            path === "" ? "/" : `/${path}`
+            (path === "" ? "/" : `/${path}`) + search
         );
     }
 
@@ -106,12 +106,12 @@ document.addEventListener("click", event => {
     }
 
     event.preventDefault();
-    navigate(url.pathname.replace(/^\/+|\/+$/g, ""));
+    navigate(url.pathname.replace(/^\/+|\/+$/g, ""), true, url.search);
 });
 
 window.addEventListener("popstate", () => {
     const pathname = window.location.pathname.replace(/^\/+|\/+$/g, "");
-    navigate(pathname, false);
+    navigate(pathname, false, window.location.search);
 });
 
 // spa.js is loaded without defer/async, before the per-fragment scripts that follow it
