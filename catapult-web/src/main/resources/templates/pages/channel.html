@@ -11,11 +11,12 @@
                 <mdui-chip th:unless="${ch.isLive()}" th:text="#{channel.status.offline}">Hors ligne</mdui-chip>
 
                 <span th:if="${ch.currentGame() != null}" th:text="${ch.currentGame().sourceName()}">Game</span>
-                <span th:unless="${ch.currentGame() != null}" th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
+                <span th:unless="${ch.currentGame() != null}"
+                      th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
 
                 <mdui-button-icon icon="refresh" th:if="${ch.isOwner()}"
-                                   th:attr="data-recheck-url=@{/channel/{u}/game/recheck(u=${ch.channelUsername()})}"
-                                   id="channel-recheck-game"></mdui-button-icon>
+                                  th:attr="data-recheck-url=@{/channel/{u}/game/recheck(u=${ch.channelUsername()})}"
+                                  id="channel-recheck-game"></mdui-button-icon>
             </div>
 
             <div class="bot-toggle-row" th:if="${ch.isOwner()}">
@@ -29,11 +30,16 @@
         <div class="section-header">
             <h2 th:text="#{channel.bindings.title}">Associations</h2>
             <div class="bindings-filters">
-                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()})}" th:text="#{channel.bindings.filter.all}">Toutes</a>
-                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='AUTO')}" th:text="#{channel.bindings.filter.auto}">Auto</a>
-                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='MANUAL')}" th:text="#{channel.bindings.filter.manual}">Manuel</a>
-                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='INCOMPLETE')}" th:text="#{channel.bindings.filter.incomplete}">Incomplet</a>
-                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},source='STEAM')}" th:text="#{channel.bindings.filter.steam}">Steam</a>
+                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()})}"
+                   th:text="#{channel.bindings.filter.all}">Toutes</a>
+                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='AUTO')}"
+                   th:text="#{channel.bindings.filter.auto}">Auto</a>
+                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='MANUAL')}"
+                   th:text="#{channel.bindings.filter.manual}">Manuel</a>
+                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='INCOMPLETE')}"
+                   th:text="#{channel.bindings.filter.incomplete}">Incomplet</a>
+                <a data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},source='STEAM')}"
+                   th:text="#{channel.bindings.filter.steam}">Steam</a>
             </div>
         </div>
 
@@ -42,8 +48,10 @@
                 <span th:text="${b.twitchGameName() ?: '—'}">Game</span>
                 <mdui-chip th:each="ccl : ${b.ccls()}" th:text="${ccl}">ccl</mdui-chip>
                 <span th:text="${b.status()}">STATUS</span>
-                <mdui-switch th:if="${ch.isOwner()}" class="binding-ccl-toggle" th:checked="${b.cclEnabled()}"></mdui-switch>
-                <mdui-switch th:if="${ch.isOwner()}" class="binding-ignored-toggle" th:checked="${b.ignored()}"></mdui-switch>
+                <mdui-switch th:if="${ch.isOwner()}" class="binding-ccl-toggle"
+                             th:checked="${b.cclEnabled()}"></mdui-switch>
+                <mdui-switch th:if="${ch.isOwner()}" class="binding-ignored-toggle"
+                             th:checked="${b.ignored()}"></mdui-switch>
                 <mdui-button-icon th:if="${ch.isOwner()}" icon="edit" class="binding-edit-btn"></mdui-button-icon>
                 <mdui-button-icon th:if="${ch.isOwner()}" icon="delete" class="binding-delete-btn"></mdui-button-icon>
 
@@ -57,7 +65,8 @@
                                th:disabled="${ch.blockedCcls().contains(ccl.id())}"/>
                         <span th:text="${ccl.name()}">ccl name</span>
                     </label>
-                    <mdui-button class="binding-edit-save-btn" th:text="#{channel.bindings.edit.save}">Enregistrer</mdui-button>
+                    <mdui-button class="binding-edit-save-btn" th:text="#{channel.bindings.edit.save}">Enregistrer
+                    </mdui-button>
                 </div>
 
                 <mdui-button-icon th:if="${ch.isOwner()}" icon="warning" class="binding-tw-btn"></mdui-button-icon>
@@ -71,8 +80,11 @@
                                th:checked="${b.tws().contains(tw.id())}"/>
                         <span th:text="${tw.label()}">tw label</span>
                     </label>
-                    <mdui-button class="binding-tw-save-btn" th:text="#{channel.bindings.tw.save}">Enregistrer</mdui-button>
-                    <mdui-button th:if="${b.twOverride()}" class="binding-tw-reset-btn" th:text="#{channel.bindings.tw.reset}">Réinitialiser</mdui-button>
+                    <mdui-button class="binding-tw-save-btn" th:text="#{channel.bindings.tw.save}">Enregistrer
+                    </mdui-button>
+                    <mdui-button th:if="${b.twOverride()}" class="binding-tw-reset-btn"
+                                 th:text="#{channel.bindings.tw.reset}">Réinitialiser
+                    </mdui-button>
                 </div>
             </mdui-list-item>
             <mdui-list-item th:if="${ch.bindings().content().isEmpty()}" th:text="#{channel.bindings.empty}">
@@ -103,15 +115,19 @@
             <mdui-card th:if="${ch.hasSteamProvider()}" class="connection-card" variant="outlined" data-conn="steam">
                 <span th:text="#{channel.connections.steam}">Steam</span>
                 <mdui-chip th:if="${ch.hasSteam()}" th:text="#{channel.connections.connected}">Connecté</mdui-chip>
-                <mdui-chip th:unless="${ch.hasSteam()}" th:text="#{channel.connections.not_connected}">Non connecté</mdui-chip>
+                <mdui-chip th:unless="${ch.hasSteam()}" th:text="#{channel.connections.not_connected}">Non connecté
+                </mdui-chip>
 
-                <p th:if="${ch.isOwner() and ch.steamRateLimited()}" th:text="#{channel.connections.steam.rate_limited}">
+                <p th:if="${ch.isOwner() and ch.steamRateLimited()}"
+                   th:text="#{channel.connections.steam.rate_limited}">
                     Steam nous bloque temporairement.
                 </p>
-                <p th:if="${ch.isOwner() and ch.steamOfflineMode()}" th:text="#{channel.connections.steam.offline_mode(${ch.steamProfileCacheTtlMinutes()})}">
+                <p th:if="${ch.isOwner() and ch.steamOfflineMode()}"
+                   th:text="#{channel.connections.steam.offline_mode(${ch.steamProfileCacheTtlMinutes()})}">
                     Profil hors-ligne, cache de {0} minutes.
                 </p>
-                <p th:if="${ch.isOwner() and ch.steamProfilePrivate()}" th:text="#{channel.connections.steam.private}">
+                <p th:if="${ch.isOwner() and ch.steamProfilePrivate()}"
+                   th:text="#{channel.connections.steam.private}">
                     Profil Steam privé.
                 </p>
 
@@ -121,49 +137,75 @@
                             <input type="checkbox" id="steam-token-shared" th:checked="${ch.steamTokenShared()}"/>
                             <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
                         </label>
-                        <mdui-button id="steam-token-delete-btn" th:text="#{channel.connections.steam.token.delete}">Supprimer le token</mdui-button>
                     </div>
                     <div th:unless="${ch.hasSteamPersonalToken()}">
-                        <input type="password" id="steam-token-input" th:placeholder="#{channel.connections.steam.token.placeholder}"/>
+                        <input type="password" id="steam-token-input"
+                               th:placeholder="#{channel.connections.steam.token.placeholder}"/>
                         <label>
                             <input type="checkbox" id="steam-token-share-new"/>
                             <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
                         </label>
-                        <mdui-button id="steam-token-save-btn" th:text="#{channel.connections.steam.token.save}">Enregistrer</mdui-button>
                     </div>
-                    <mdui-button id="steam-refresh-cache-btn" th:text="#{channel.connections.steam.refresh_cache}">Rafraîchir le cache</mdui-button>
+                </div>
+
+                <div class="card-actions" th:if="${ch.isOwner() and ch.hasSteam()}">
+                    <mdui-button th:if="${ch.hasSteamPersonalToken()}" id="steam-token-delete-btn"
+                                 th:text="#{channel.connections.steam.token.delete}">
+                        Supprimer le token
+                    </mdui-button>
+                    <mdui-button th:unless="${ch.hasSteamPersonalToken()}" id="steam-token-save-btn"
+                                 th:text="#{channel.connections.steam.token.save}">
+                        Enregistrer
+                    </mdui-button>
+                    <mdui-button id="steam-refresh-cache-btn" th:text="#{channel.connections.steam.refresh_cache}">
+                        Rafraîchir le cache
+                    </mdui-button>
                 </div>
             </mdui-card>
 
             <mdui-card th:if="${ch.hasXboxProvider()}" class="connection-card" variant="outlined" data-conn="xbox">
                 <span th:text="#{channel.connections.xbox}">Xbox</span>
                 <mdui-chip th:if="${ch.hasXbox()}" th:text="#{channel.connections.connected}">Connecté</mdui-chip>
-                <mdui-chip th:unless="${ch.hasXbox()}" th:text="#{channel.connections.not_connected}">Non connecté</mdui-chip>
+                <mdui-chip th:unless="${ch.hasXbox()}" th:text="#{channel.connections.not_connected}">Non connecté
+                </mdui-chip>
             </mdui-card>
 
-            <mdui-card th:if="${minecraftLink != null}" class="connection-card" variant="outlined" data-conn="minecraft">
+            <mdui-card th:if="${minecraftLink != null}" class="connection-card" variant="outlined"
+                       data-conn="minecraft">
                 <span th:text="#{channel.connections.minecraft}">Minecraft</span>
 
                 <div th:switch="${minecraftLink.status()}">
                     <div th:case="'NONE'">
-                        <input type="text" id="minecraft-name-input" th:placeholder="#{channel.connections.minecraft.name_placeholder}"/>
-                        <mdui-button id="minecraft-enroll-btn" th:text="#{channel.connections.minecraft.enroll}">Lier</mdui-button>
+                        <input type="text" id="minecraft-name-input"
+                               th:placeholder="#{channel.connections.minecraft.name_placeholder}"/>
                     </div>
                     <div th:case="'PENDING'">
                         <span th:text="#{channel.connections.minecraft.pending}">En attente d'acceptation en jeu…</span>
-                        <mdui-button id="minecraft-check-btn" th:text="#{channel.connections.minecraft.check}">Vérifier</mdui-button>
                     </div>
                     <div th:case="'INVITE_REJECTED'">
                         <span th:text="#{channel.connections.minecraft.rejected}">Invitation refusée, ajout manuel requis.</span>
                     </div>
                     <div th:case="'ACCEPTED'">
                         <mdui-chip th:text="${minecraftLink.minecraftName()}">Steve</mdui-chip>
-                        <mdui-button id="minecraft-disconnect-btn" th:text="#{channel.connections.minecraft.disconnect}">Délier</mdui-button>
                     </div>
                     <div th:case="'REMOVED'">
                         <span th:text="#{channel.connections.minecraft.removed}">Lien supprimé côté serveur.</span>
-                        <mdui-button id="minecraft-check-btn" th:text="#{channel.connections.minecraft.check}">Vérifier</mdui-button>
                     </div>
+                </div>
+
+                <div class="card-actions">
+                    <mdui-button th:if="${minecraftLink.status() == 'NONE'}" id="minecraft-enroll-btn"
+                                 th:text="#{channel.connections.minecraft.enroll}">
+                        Lier
+                    </mdui-button>
+                    <mdui-button th:if="${minecraftLink.status() == 'PENDING' or minecraftLink.status() == 'REMOVED'}"
+                                 id="minecraft-check-btn" th:text="#{channel.connections.minecraft.check}">
+                        Vérifier
+                    </mdui-button>
+                    <mdui-button th:if="${minecraftLink.status() == 'ACCEPTED'}" id="minecraft-disconnect-btn"
+                                 th:text="#{channel.connections.minecraft.disconnect}">
+                        Délier
+                    </mdui-button>
                 </div>
             </mdui-card>
         </div>
@@ -210,48 +252,58 @@
                 <span th:text="${ccl.name()}">ccl name</span>
             </label>
             <label>
-                <input type="checkbox" id="no-game-apply-start" th:checked="${channelSettings.applyDefaultOnStreamStart()}"/>
+                <input type="checkbox" id="no-game-apply-start"
+                       th:checked="${channelSettings.applyDefaultOnStreamStart()}"/>
                 <span th:text="#{channel.settings.no_game.apply_start}">Au démarrage du stream</span>
             </label>
             <label>
-                <input type="checkbox" id="no-game-apply-no-game" th:checked="${channelSettings.applyDefaultOnNoGame()}"/>
+                <input type="checkbox" id="no-game-apply-no-game"
+                       th:checked="${channelSettings.applyDefaultOnNoGame()}"/>
                 <span th:text="#{channel.settings.no_game.apply_no_game}">Quand aucun jeu n'est détecté</span>
             </label>
             <label>
-                <input type="checkbox" id="no-game-apply-end" th:checked="${channelSettings.applyDefaultOnStreamEnd()}"/>
+                <input type="checkbox" id="no-game-apply-end"
+                       th:checked="${channelSettings.applyDefaultOnStreamEnd()}"/>
                 <span th:text="#{channel.settings.no_game.apply_end}">À la fin du stream</span>
             </label>
             <mdui-button id="no-game-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         </mdui-card>
 
-        <mdui-card th:if="${ch.isOwner()}" id="channel-incomplete-fallback-settings-form" class="settings-card" variant="outlined">
+        <mdui-card th:if="${ch.isOwner()}" id="channel-incomplete-fallback-settings-form" class="settings-card"
+                   variant="outlined">
             <h3 th:text="#{channel.settings.incomplete_fallback.title}">Jeu incomplet</h3>
-            <input type="text" id="incomplete-fallback-game-input" th:placeholder="#{channel.bindings.edit.game_placeholder}"
+            <input type="text" id="incomplete-fallback-game-input"
+                   th:placeholder="#{channel.bindings.edit.game_placeholder}"
                    th:value="${channelSettings.incompleteFallbackTwitchGameName()}"/>
-            <input type="hidden" id="incomplete-fallback-game-id" th:value="${channelSettings.incompleteFallbackTwitchGameId()}"/>
+            <input type="hidden" id="incomplete-fallback-game-id"
+                   th:value="${channelSettings.incompleteFallbackTwitchGameId()}"/>
             <mdui-list id="incomplete-fallback-game-results"></mdui-list>
             <label th:each="ccl : ${channelSettings.availableCcls()}">
                 <input type="checkbox" class="incomplete-fallback-ccl-checkbox" th:value="${ccl.id()}"
                        th:checked="${channelSettings.incompleteFallbackCcls().contains(ccl.id())}"/>
                 <span th:text="${ccl.name()}">ccl name</span>
             </label>
-            <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+            <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer
+            </mdui-button>
         </mdui-card>
 
-        <mdui-card id="channel-dtdd-mapping-card" class="settings-card" variant="outlined" th:if="${dtddMapping != null and dtddMapping.igdbId() != null}"
+        <mdui-card id="channel-dtdd-mapping-card" class="settings-card" variant="outlined"
+                   th:if="${dtddMapping != null and dtddMapping.igdbId() != null}"
                    th:attr="data-igdb-id=${dtddMapping.igdbId()}">
             <h3 th:text="#{channel.dtdd.title}">Association DTDD</h3>
 
             <div th:if="${dtddMapping.current() != null}">
                 <span th:text="${dtddMapping.current().name() ?: '—'}">DTDD name</span>
                 <mdui-chip th:text="${dtddMapping.current().confidence() * 100} + '%'">confidence</mdui-chip>
-                <mdui-chip th:if="${dtddMapping.current().verified()}" th:text="#{channel.dtdd.verified}">Vérifié</mdui-chip>
+                <mdui-chip th:if="${dtddMapping.current().verified()}" th:text="#{channel.dtdd.verified}">Vérifié
+                </mdui-chip>
             </div>
             <div th:unless="${dtddMapping.current() != null}" th:text="#{channel.dtdd.no_mapping}">
                 Aucune association DTDD.
             </div>
 
-            <mdui-button th:if="${dtddMapping.canValidateDirectly()}" id="dtdd-validate-btn" th:text="#{channel.dtdd.validate}">
+            <mdui-button th:if="${dtddMapping.canValidateDirectly()}" id="dtdd-validate-btn"
+                         th:text="#{channel.dtdd.validate}">
                 Valider
             </mdui-button>
             <mdui-button id="dtdd-correct-btn" th:text="#{channel.dtdd.correct}">Corriger</mdui-button>
