@@ -1116,31 +1116,18 @@ a[data-link].active {
 /* Bindings filters */
 
 .bindings-filters {
-    display: flex;
-    align-items: center;
-    gap: 6px;
     flex-wrap: wrap;
 }
 
-.bindings-filters a {
-    padding: 7px 14px;
-    border-radius: 999px;
-    color: var(--catapult-text-secondary);
-    text-decoration: none;
-    font-size: 0.85rem;
-    transition:
-            background-color 120ms ease,
-            color 120ms ease;
-}
-
-.bindings-filters a:hover {
+/*
+ * mdui-segmented-button-group resets every child's `selected` state on connect
+ * even without `selects` set, and a segment with `href` is excluded from the
+ * group's own value-tracking entirely — so the "current filter" look is ours to
+ * draw, via a plain class reaching into the shadow-rendered button part.
+ */
+.bindings-filters mdui-segmented-button.filter-active::part(button) {
+    background-color: rgba(139, 92, 246, 0.16);
     color: var(--catapult-text);
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.bindings-filters a.active {
-    color: var(--catapult-text);
-    background: rgba(139, 92, 246, 0.16);
     font-weight: 650;
 }
 
@@ -1297,11 +1284,39 @@ a[data-link].active {
     border-top: 1px solid var(--catapult-border);
 }
 
+/* mdui-segmented-button-group, not a div — lays out its own segments internally,
+ * so only the positioning within the card and the separator above it are ours. */
 .connection-card > .card-actions {
-    flex-direction: row;
-    flex-wrap: wrap;
+    max-width: 100%;
 
     margin-top: auto;
+    padding-top: 8px;
+
+    border-top: 1px solid var(--catapult-border);
+}
+
+/*
+ * The group never wraps to a second row (fixed height, flex-wrap: nowrap
+ * internally) and its segments refuse to shrink by default — on a narrow card,
+ * two or three French labels side by side would overflow past the card's edge.
+ * Let segments shrink and ellipsize instead.
+ */
+.connection-card > .card-actions mdui-segmented-button {
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.connection-card > .card-actions mdui-segmented-button::part(button) {
+    min-width: 0;
+}
+
+.connection-card > .card-actions mdui-segmented-button::part(label) {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .connection-card label {
