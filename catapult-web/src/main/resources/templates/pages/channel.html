@@ -235,10 +235,35 @@
             </label>
             <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         </mdui-card>
+
+        <mdui-card id="channel-dtdd-mapping-card" variant="outlined" th:if="${dtddMapping.igdbId() != null}"
+                   th:attr="data-igdb-id=${dtddMapping.igdbId()}">
+            <h3 th:text="#{channel.dtdd.title}">Association DTDD</h3>
+
+            <div th:if="${dtddMapping.current() != null}">
+                <span th:text="${dtddMapping.current().name() ?: '—'}">DTDD name</span>
+                <mdui-chip th:text="${dtddMapping.current().confidence() * 100} + '%'">confidence</mdui-chip>
+                <mdui-chip th:if="${dtddMapping.current().verified()}" th:text="#{channel.dtdd.verified}">Vérifié</mdui-chip>
+            </div>
+            <div th:unless="${dtddMapping.current() != null}" th:text="#{channel.dtdd.no_mapping}">
+                Aucune association DTDD.
+            </div>
+
+            <mdui-button th:if="${dtddMapping.canValidateDirectly()}" id="dtdd-validate-btn" th:text="#{channel.dtdd.validate}">
+                Valider
+            </mdui-button>
+            <mdui-button id="dtdd-correct-btn" th:text="#{channel.dtdd.correct}">Corriger</mdui-button>
+
+            <div id="dtdd-search-dialog" hidden>
+                <input type="text" id="dtdd-search-input" th:placeholder="#{channel.dtdd.search_placeholder}"/>
+                <mdui-list id="dtdd-search-results"></mdui-list>
+            </div>
+        </mdui-card>
     </section>
     <script src="/js/channel-status.js"></script>
     <script src="/js/game-search.js"></script>
     <script src="/js/channel-bindings.js"></script>
     <script src="/js/channel-connections.js"></script>
     <script src="/js/channel-settings.js"></script>
+    <script src="/js/channel-dtdd.js"></script>
 </mdui-layout-main>

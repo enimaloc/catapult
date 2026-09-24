@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
+
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -224,5 +226,36 @@ class ChannelActionsControllerTest {
 
         verify(apiService).saveIncompleteFallbackSettings("enimaloc", "509658", "Celeste",
                 java.util.Set.of("violent-graphic"));
+    }
+
+    @Test
+    void dtddSearch_returnsApiServiceResult() throws Exception {
+        when(apiService.dtddSearch("celeste")).thenReturn(new fr.enimaloc.catapult.common.dto.SearchResponse(
+                List.of(new fr.enimaloc.catapult.common.dto.SearchResultDto(4521L, "Celeste", "Video Game", null))));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/channel/enimaloc/dtdd-mapping/search").param("q", "celeste"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.results[0].name").value("Celeste"));
+    }
+
+    @Test
+    void dtddValidate_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/dtdd-mapping/validate").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"igdbId\":\"100\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).dtddValidate("100");
+    }
+
+    @Test
+    void dtddPropose_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/dtdd-mapping/propose").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"igdbId\":\"100\",\"dtddId\":4521,\"reason\":\"wrong game\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).dtddPropose("100", 4521L, "wrong game");
     }
 }

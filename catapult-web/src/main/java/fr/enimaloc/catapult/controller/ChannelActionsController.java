@@ -6,12 +6,15 @@ import fr.enimaloc.catapult.common.dto.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.NoGameSettingsRequest;
+import fr.enimaloc.catapult.common.dto.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.SaveBody;
+import fr.enimaloc.catapult.common.dto.SearchResponse;
 import fr.enimaloc.catapult.common.dto.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
+import fr.enimaloc.catapult.common.dto.ValidateRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -166,5 +169,22 @@ public class ChannelActionsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveIncompleteFallbackSettings(@PathVariable String username, @RequestBody IncompleteFallbackRequest body) {
         apiService.saveIncompleteFallbackSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls());
+    }
+
+    @GetMapping("/channel/{username}/dtdd-mapping/search")
+    public SearchResponse dtddSearch(@PathVariable String username, @RequestParam(defaultValue = "") String q) {
+        return apiService.dtddSearch(q);
+    }
+
+    @PostMapping("/channel/{username}/dtdd-mapping/validate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void dtddValidate(@PathVariable String username, @RequestBody ValidateRequest body) {
+        apiService.dtddValidate(body.igdbId());
+    }
+
+    @PostMapping("/channel/{username}/dtdd-mapping/propose")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void dtddPropose(@PathVariable String username, @RequestBody ProposeRequest body) {
+        apiService.dtddPropose(body.igdbId(), body.dtddId(), body.reason());
     }
 }
