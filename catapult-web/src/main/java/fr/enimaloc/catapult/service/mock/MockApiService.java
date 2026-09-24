@@ -22,6 +22,11 @@ public class MockApiService implements ApiService {
     private String code;
     private MockData data;
 
+    /** Exposes the live singleton instance for {@link MockAdminController} to read and mutate. */
+    public MockData getData() {
+        return data;
+    }
+
     @Override
     public TokenResponse exchangeCode(String code) {
         log.trace("exchangeCode({})", code);

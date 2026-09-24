@@ -68,21 +68,34 @@ public class MockData {
         }
     }
 
-    private final ChannelDto channelDto;
-    private final GameDto gameDto;
+    @Getter
+    private ChannelDto channelDto;
+    @Getter
+    private GameDto gameDto;
     /** Nullable: cleared by {@link #deleteBinding}, matching a real "no binding" state. */
+    @Getter
     private BindingDto binding;
     private UserSettingsDto userSettingsDto;
     private final List<ChannelDto> channelsList;
-    private final boolean hasSteamProvider;
-    private final boolean hasSteam;
+    @Getter
+    private boolean hasSteamProvider;
+    @Getter
+    private boolean hasSteam;
     private boolean hasSteamPersonalToken;
     private boolean steamTokenShared;
-    private final boolean steamProfilePrivate;
-    private final boolean steamRateLimited;
-    private final boolean steamOfflineMode;
-    private final boolean hasXboxProvider;
-    private final boolean hasXbox;
+    @Getter
+    private boolean steamProfilePrivate;
+    @Getter
+    private boolean steamRateLimited;
+    @Getter
+    private boolean steamOfflineMode;
+    /** Not reachable from the app's own UI — only {@link MockAdminController} edits this. */
+    @Getter
+    private long steamProfileCacheTtlMinutes = 15L;
+    @Getter
+    private boolean hasXboxProvider;
+    @Getter
+    private boolean hasXbox;
     private LinkStateResponse minecraftLink;
     @Setter @Getter
     private boolean botEnabled;
@@ -188,7 +201,7 @@ public class MockData {
                 new PagedBindings(0, content.isEmpty() ? 0 : 1, content.size(), content),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
                 status, source, hasSteamProvider, hasSteam, hasSteamPersonalToken, steamTokenShared,
-                steamProfilePrivate, steamRateLimited, steamOfflineMode, 15L,
+                steamProfilePrivate, steamRateLimited, steamOfflineMode, steamProfileCacheTtlMinutes,
                 hasXboxProvider, hasXbox, "00000000-0000-0000-0000-000000000000"
         );
     }
@@ -324,6 +337,55 @@ public class MockData {
     public void deleteSteamToken() {
         hasSteamPersonalToken = false;
         steamTokenShared = false;
+    }
+
+    /*
+     * Admin-only mutators — none of these are reachable through the app's own UI, only
+     * through MockAdminController's /mock/admin page.
+     */
+
+    public void setChannelLive(boolean live) {
+        channelDto = new ChannelDto(channelDto.id(), channelDto.twitchId(), channelDto.twitchUsername(),
+                channelDto.profileImageUrl(), live);
+    }
+
+    public void setChannelAvatarUrl(String avatarUrl) {
+        channelDto = new ChannelDto(channelDto.id(), channelDto.twitchId(), channelDto.twitchUsername(),
+                avatarUrl, channelDto.live());
+    }
+
+    /** The game Catapult currently detects running — independent of the binding's Twitch category mapping. */
+    public void setDetectedGame(String sourceType, String sourceName) {
+        gameDto = new GameDto(sourceName, sourceType);
+    }
+
+    public void setProviders(boolean hasSteamProvider, boolean hasSteam, boolean hasXboxProvider, boolean hasXbox) {
+        this.hasSteamProvider = hasSteamProvider;
+        this.hasSteam = hasSteam;
+        this.hasXboxProvider = hasXboxProvider;
+        this.hasXbox = hasXbox;
+    }
+
+    public void setSteamDiagnostics(boolean profilePrivate, boolean rateLimited, boolean offlineMode, long cacheTtlMinutes) {
+        this.steamProfilePrivate = profilePrivate;
+        this.steamRateLimited = rateLimited;
+        this.steamOfflineMode = offlineMode;
+        this.steamProfileCacheTtlMinutes = cacheTtlMinutes;
+    }
+
+    /**
+     * Creates or fully replaces the single binding slot, including {@code status} — which the
+     * app's own binding-edit panel never touches — and works even after {@link #deleteBinding}
+     * cleared it, since the UI has no "add binding" action at all.
+     */
+    public void replaceBinding(String status, String sourceType, String sourceName, String twitchGameId,
+                                String twitchGameName, boolean ignored, boolean cclEnabled, Set<String> ccls,
+                                boolean twEnabled, boolean twOverride, Set<String> tws) {
+        String id = binding != null
+                ? binding.id()
+                : UUID.nameUUIDFromBytes(sourceName.getBytes(StandardCharsets.UTF_8)).toString();
+        binding = new BindingDto(id, status, sourceType, sourceName, twitchGameId, twitchGameName,
+                ignored, cclEnabled, Set.copyOf(ccls), twEnabled, twOverride, Set.copyOf(tws));
     }
 
     /** Deserialization target for the mock login form's JSON payload. */
