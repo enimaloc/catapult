@@ -114,8 +114,11 @@ window.addEventListener("popstate", () => {
     navigate(pathname, false);
 });
 
-// spa.js is loaded without defer/async at the end of <body>, so the DOM (including
-// the server-rendered fragment inside #app) is already parsed by the time this runs.
-// Dispatch the same event the SPA swap uses so per-fragment scripts (channel-status.js
-// and friends) wire themselves up exactly once on a normal full page load too.
-document.dispatchEvent(new CustomEvent("catapult:render"));
+// spa.js is loaded without defer/async, before the per-fragment scripts that follow it
+// in index.html (channel-status.js and friends) — those haven't registered their
+// "catapult:render" listeners yet when this line runs, so the dispatch must wait until
+// the whole document (all script tags included) has finished parsing, not just until
+// spa.js itself has executed. DOMContentLoaded fires after every script tag has run.
+document.addEventListener("DOMContentLoaded", () => {
+    document.dispatchEvent(new CustomEvent("catapult:render"));
+});
