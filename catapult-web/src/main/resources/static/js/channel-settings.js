@@ -1,18 +1,13 @@
-(function () {
-    const username = location.pathname.split("/")[2];
-    const baseUrl = `/channel/${username}`;
-
-    async function refresh() {
-        navigate(location.pathname.replace(/^\/+/, ""), false);
-    }
+document.addEventListener("catapult:render", function () {
+    const baseUrl = CatapultChannel.baseUrl();
 
     const cclForm = document.getElementById("channel-ccl-settings-form");
     if (cclForm) {
         document.getElementById("ccl-settings-save-btn").addEventListener("click", async () => {
             const enabled = document.getElementById("ccl-enabled-checkbox").checked;
             const blockedCcls = Array.from(cclForm.querySelectorAll(".ccl-block-checkbox:checked")).map(cb => cb.value);
-            await CatapultCsrf.postJson(`${baseUrl}/settings/ccl`, { cclEnabled: enabled, blockedCcls });
-            await refresh();
+            await CatapultChannel.postJson(`${baseUrl}/settings/ccl`, { cclEnabled: enabled, blockedCcls });
+            await CatapultChannel.refresh();
         });
     }
 
@@ -21,8 +16,8 @@
         document.getElementById("tw-settings-save-btn").addEventListener("click", async () => {
             const enabled = document.getElementById("tw-enabled-checkbox").checked;
             const blockedTws = Array.from(twForm.querySelectorAll(".tw-block-checkbox:checked")).map(cb => cb.value);
-            await CatapultCsrf.postJson(`${baseUrl}/settings/tws`, { enabled, blockedTws });
-            await refresh();
+            await CatapultChannel.postJson(`${baseUrl}/settings/tws`, { enabled, blockedTws });
+            await CatapultChannel.refresh();
         });
     }
 
@@ -31,11 +26,11 @@
         const gameInput = document.getElementById("no-game-game-input");
         const gameIdInput = document.getElementById("no-game-game-id");
         GameSearch.attach(gameInput, document.getElementById("no-game-game-results"),
-                `/channel/${username}/games/search`, game => { gameIdInput.value = game.id; });
+                `${baseUrl}/games/search`, game => { gameIdInput.value = game.id; });
 
         document.getElementById("no-game-settings-save-btn").addEventListener("click", async () => {
             const ccls = Array.from(noGameForm.querySelectorAll(".no-game-ccl-checkbox:checked")).map(cb => cb.value);
-            await CatapultCsrf.postJson(`${baseUrl}/settings/no-game`, {
+            await CatapultChannel.postJson(`${baseUrl}/settings/no-game`, {
                 twitchGameId: gameIdInput.value || null,
                 twitchGameName: gameInput.value || null,
                 ccls,
@@ -43,7 +38,7 @@
                 applyOnNoGame: document.getElementById("no-game-apply-no-game").checked,
                 applyOnStreamEnd: document.getElementById("no-game-apply-end").checked
             });
-            await refresh();
+            await CatapultChannel.refresh();
         });
     }
 
@@ -52,16 +47,16 @@
         const gameInput = document.getElementById("incomplete-fallback-game-input");
         const gameIdInput = document.getElementById("incomplete-fallback-game-id");
         GameSearch.attach(gameInput, document.getElementById("incomplete-fallback-game-results"),
-                `/channel/${username}/games/search`, game => { gameIdInput.value = game.id; });
+                `${baseUrl}/games/search`, game => { gameIdInput.value = game.id; });
 
         document.getElementById("incomplete-fallback-settings-save-btn").addEventListener("click", async () => {
             const ccls = Array.from(incompleteFallbackForm.querySelectorAll(".incomplete-fallback-ccl-checkbox:checked")).map(cb => cb.value);
-            await CatapultCsrf.postJson(`${baseUrl}/settings/incomplete-fallback`, {
+            await CatapultChannel.postJson(`${baseUrl}/settings/incomplete-fallback`, {
                 twitchGameId: gameIdInput.value || null,
                 twitchGameName: gameInput.value || null,
                 ccls
             });
-            await refresh();
+            await CatapultChannel.refresh();
         });
     }
-})();
+});

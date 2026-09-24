@@ -1,17 +1,17 @@
-(function () {
+document.addEventListener("catapult:render", function () {
     const botToggle = document.getElementById("channel-bot-toggle");
     if (botToggle) {
         botToggle.addEventListener("change", async () => {
-            await CatapultCsrf.postJson(botToggle.dataset.toggleUrl, {});
-            navigate(location.pathname.replace(/^\/+/, ""), false);
+            await CatapultChannel.postJson(botToggle.dataset.toggleUrl, {});
+            await CatapultChannel.refresh();
         });
     }
 
     const recheckButton = document.getElementById("channel-recheck-game");
     if (recheckButton) {
         recheckButton.addEventListener("click", async () => {
-            await CatapultCsrf.postJson(recheckButton.dataset.recheckUrl, {});
-            navigate(location.pathname.replace(/^\/+/, ""), false);
+            await CatapultChannel.postJson(recheckButton.dataset.recheckUrl, {});
+            await CatapultChannel.refresh();
         });
     }
-})();
+});

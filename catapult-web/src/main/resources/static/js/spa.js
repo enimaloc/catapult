@@ -17,9 +17,29 @@ function updateActiveLink(path) {
     });
 }
 
+// Static pages match `path` against a route id exactly. A `dynamic` route (e.g.
+// "channel") additionally matches "<id>/<param>" — the param is appended as its
+// own path segment to templateUrl, mirroring the server's own
+// /spa/<id>/{param} mapping.
+function resolveRoute(path) {
+    if (routes[path]) {
+        return { route: routes[path], param: null };
+    }
+    const segments = path.split("/");
+    if (segments.length === 2) {
+        const base = routes[segments[0]];
+        if (base && base.dynamic && segments[1]) {
+            return { route: base, param: segments[1] };
+        }
+    }
+    return { route: undefined, param: null };
+}
+
 async function navigate(path, push = true) {
-    const route = routes[path];
-    const templateUrl = route ? route.templateUrl : `/spa/${path}`;
+    const { route, param } = resolveRoute(path);
+    const templateUrl = route
+        ? (param ? `${route.templateUrl}/${param}` : route.templateUrl)
+        : `/spa/${path}`;
 
     progress.hidden = false;
 
@@ -37,6 +57,7 @@ async function navigate(path, push = true) {
 
     const html = await response.text();
     app.innerHTML = html;
+    document.dispatchEvent(new CustomEvent("catapult:render"));
 
     if (push) {
         history.pushState(
@@ -92,3 +113,9 @@ window.addEventListener("popstate", () => {
     const pathname = window.location.pathname.replace(/^\/+|\/+$/g, "");
     navigate(pathname, false);
 });
+
+// spa.js is loaded without defer/async at the end of <body>, so the DOM (including
+// the server-rendered fragment inside #app) is already parsed by the time this runs.
+// Dispatch the same event the SPA swap uses so per-fragment scripts (channel-status.js
+// and friends) wire themselves up exactly once on a normal full page load too.
+document.dispatchEvent(new CustomEvent("catapult:render"));
