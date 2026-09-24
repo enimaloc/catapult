@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.mock.MockData;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,11 @@ public class AuthController {
                 new JWT("1", "Online account"),
                 new JWT("2", "Offline account")
         ));
+        model.addAttribute("availableCcls", MockData.AVAILABLE_CCLS);
+        model.addAttribute("availableTws", MockData.AVAILABLE_TWS);
+        model.addAttribute("bindingStatuses", List.of("AUTO", "MANUAL", "INCOMPLETE"));
+        model.addAttribute("sourceTypes", List.of("STEAM", "XBOX", "MINECRAFT"));
+        model.addAttribute("minecraftStatuses", List.of("NONE", "PENDING", "INVITE_REJECTED", "ACCEPTED", "REMOVED"));
 
         return "mock/jwt-select";
     }
