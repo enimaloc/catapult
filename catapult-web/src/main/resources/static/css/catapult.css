@@ -1054,6 +1054,65 @@ a[data-link].active {
 }
 
 /*
+ * Feature cards
+ */
+
+.channels-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 18px;
+}
+
+.channel-card {
+    min-height: 230px;
+    padding: 28px;
+    border-radius: var(--catapult-radius);
+    background: var(--catapult-surface);
+    border: 1px solid var(--catapult-border);
+    color: var(--catapult-text);
+    transition:
+            transform 150ms ease,
+            background-color 150ms ease,
+            border-color 150ms ease;
+}
+
+.channel-card:hover {
+    transform: translateY(-4px);
+    background: var(--catapult-surface-elevated);
+    border-color: var(--catapult-border-hover);
+}
+
+.channel-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 22px;
+    border-radius: 14px;
+    background: rgba(139, 92, 246, 0.13);
+    color: var(--catapult-primary-hover);
+}
+
+.channel-icon mdui-avatar {
+    font-size: 24px;
+}
+
+.channel-card h3 {
+    margin: 0 0 10px;
+    color: var(--catapult-text);
+    font-size: 1.12rem;
+    line-height: 1.3;
+}
+
+.channel-card p {
+    margin: 0;
+    color: var(--catapult-text-secondary);
+    line-height: 1.65;
+}
+
+
+/*
  * Channel dashboard
  */
 
