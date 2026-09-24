@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>[MOCK]</title>
+    <style>
+        body { font-family: sans-serif; max-width: 720px; margin: 2rem auto; }
+        fieldset { margin-bottom: 1rem; }
+        label { display: block; margin: 0.25rem 0; }
+        label.inline { display: inline-block; margin-right: 1rem; }
+        input[type="text"] { width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+<h1>[MOCK] Quick presets</h1>
+<table>
+    <thead>
+        <tr>
+            <th scope="col">JWT</th>
+            <th scope="col">Features</th>
+            <th scope="col">Link</th>
+        </tr>
+    </thead>
+    <tbody>
+    <tr th:each="jwt:${jwts}">
+        <th scope="row" th:text="${jwt.jwt}"></th>
+        <td th:text="${jwt.features}"></td>
+        <td><a th:text="'/auth/callback?code=' + ${jwt.code}" th:href="'/auth/callback?code=' + ${jwt.code}"></a></td>
+    </tr>
+    </tbody>
+</table>
+
+<h1>[MOCK] Custom account</h1>
+<form id="mock-form" method="get" action="/auth/callback">
+    <input type="hidden" name="code" id="code-field"/>
+
+    <fieldset>
+        <legend>Identity</legend>
+        <label>Username <input type="text" id="username" value="enimaloc_stream"/></label>
+        <label>Twitch ID <input type="text" id="twitchId" value="00000001"/></label>
+        <label>Avatar URL <input type="text" id="avatarUrl"
+               value="https://static-cdn.jtvnw.net/jtv_user_pictures/a69d9843-4cd4-4b3a-815d-0101b31e4790-profile_image-70x70.png"/></label>
+        <label class="inline"><input type="checkbox" id="live" checked/> Live</label>
+        <label class="inline"><input type="checkbox" id="botEnabled" checked/> Bot enabled</label>
+    </fieldset>
+
+    <fieldset>
+        <legend>Steam</legend>
+        <label class="inline"><input type="checkbox" id="steamConnected" checked/> Connected</label>
+        <label class="inline"><input type="checkbox" id="steamHasPersonalToken"/> Has personal token</label>
+        <label class="inline"><input type="checkbox" id="steamTokenShared"/> Token shared</label>
+        <label class="inline"><input type="checkbox" id="steamProfilePrivate"/> Profile private</label>
+        <label class="inline"><input type="checkbox" id="steamRateLimited"/> Rate limited</label>
+        <label class="inline"><input type="checkbox" id="steamOfflineMode"/> Offline mode</label>
+    </fieldset>
+
+    <fieldset>
+        <legend>Xbox</legend>
+        <label class="inline"><input type="checkbox" id="xboxConnected"/> Connected</label>
+    </fieldset>
+
+    <fieldset>
+        <legend>Minecraft</legend>
+        <label>Status
+            <select id="minecraftStatus">
+                <option th:each="s : ${minecraftStatuses}" th:value="${s}" th:text="${s}"></option>
+            </select>
+        </label>
+        <label>Minecraft name <input type="text" id="minecraftName"/></label>
+        <label>Service account username <input type="text" id="minecraftServiceAccount"/></label>
+    </fieldset>
+
+    <fieldset>
+        <legend>Binding</legend>
+        <label>Source type
+            <select id="bindingSourceType">
+                <option th:each="s : ${sourceTypes}" th:value="${s}" th:text="${s}" th:selected="${s == 'STEAM'}"></option>
+            </select>
+        </label>
+        <label>Source name <input type="text" id="bindingSourceName" value="STUNTBOOST"/></label>
+        <label>Twitch game ID <input type="text" id="bindingTwitchGameId" value="000001"/></label>
+        <label>Twitch game name <input type="text" id="bindingTwitchGameName" value="Stuntboost"/></label>
+        <label>Status
+            <select id="bindingStatus">
+                <option th:each="s : ${bindingStatuses}" th:value="${s}" th:text="${s}" th:selected="${s == 'AUTO'}"></option>
+            </select>
+        </label>
+        <label class="inline"><input type="checkbox" id="bindingIgnored"/> Ignored</label>
+        <label class="inline"><input type="checkbox" id="bindingCclEnabled" checked/> CCL enabled</label>
+        <label class="inline"><input type="checkbox" id="bindingTwEnabled" checked/> TW enabled</label>
+        <label class="inline"><input type="checkbox" id="bindingTwOverride"/> TW override</label>
+        <p>CCLs on this binding:</p>
+        <label class="inline" th:each="ccl : ${availableCcls}">
+            <input type="checkbox" class="binding-ccl" th:value="${ccl.id()}"/> <span th:text="${ccl.name()}"></span>
+        </label>
+        <p>TWs on this binding:</p>
+        <label class="inline" th:each="tw : ${availableTws}">
+            <input type="checkbox" class="binding-tw" th:value="${tw.id()}"/> <span th:text="${tw.label()}"></span>
+        </label>
+    </fieldset>
+
+    <fieldset>
+        <legend>Settings</legend>
+        <label class="inline"><input type="checkbox" id="cclFeatureEnabled" checked/> CCL filtering enabled</label>
+        <label class="inline"><input type="checkbox" id="twFeatureEnabled"/> TW filtering enabled</label>
+        <p>Blocked CCLs:</p>
+        <label class="inline" th:each="ccl : ${availableCcls}">
+            <input type="checkbox" class="blocked-ccl" th:value="${ccl.id()}" th:checked="${ccl.id() == 'violent-graphic'}"/> <span th:text="${ccl.name()}"></span>
+        </label>
+        <p>Blocked TWs:</p>
+        <label class="inline" th:each="tw : ${availableTws}">
+            <input type="checkbox" class="blocked-tw" th:value="${tw.id()}"/> <span th:text="${tw.label()}"></span>
+        </label>
+    </fieldset>
+
+    <button type="submit">Log in as this account</button>
+</form>
+
+<script>
+    document.getElementById("mock-form").addEventListener("submit", function () {
+        function checked(selector) {
+            return Array.from(document.querySelectorAll(selector)).filter(cb => cb.checked).map(cb => cb.value);
+        }
+
+        const config = {
+            username: document.getElementById("username").value,
+            twitchId: document.getElementById("twitchId").value,
+            avatarUrl: document.getElementById("avatarUrl").value,
+            live: document.getElementById("live").checked,
+            botEnabled: document.getElementById("botEnabled").checked,
+            steam: {
+                connected: document.getElementById("steamConnected").checked,
+                hasPersonalToken: document.getElementById("steamHasPersonalToken").checked,
+                tokenShared: document.getElementById("steamTokenShared").checked,
+                profilePrivate: document.getElementById("steamProfilePrivate").checked,
+                rateLimited: document.getElementById("steamRateLimited").checked,
+                offlineMode: document.getElementById("steamOfflineMode").checked
+            },
+            xbox: {
+                connected: document.getElementById("xboxConnected").checked
+            },
+            minecraft: {
+                status: document.getElementById("minecraftStatus").value,
+                minecraftName: document.getElementById("minecraftName").value || null,
+                serviceAccountUsername: document.getElementById("minecraftServiceAccount").value || null
+            },
+            binding: {
+                sourceType: document.getElementById("bindingSourceType").value,
+                sourceName: document.getElementById("bindingSourceName").value,
+                twitchGameId: document.getElementById("bindingTwitchGameId").value,
+                twitchGameName: document.getElementById("bindingTwitchGameName").value,
+                status: document.getElementById("bindingStatus").value,
+                ignored: document.getElementById("bindingIgnored").checked,
+                cclEnabled: document.getElementById("bindingCclEnabled").checked,
+                twEnabled: document.getElementById("bindingTwEnabled").checked,
+                twOverride: document.getElementById("bindingTwOverride").checked,
+                ccls: checked(".binding-ccl"),
+                tws: checked(".binding-tw")
+            },
+            settings: {
+                cclFeatureEnabled: document.getElementById("cclFeatureEnabled").checked,
+                twFeatureEnabled: document.getElementById("twFeatureEnabled").checked,
+                blockedCcls: checked(".blocked-ccl"),
+                blockedTws: checked(".blocked-tw")
+            }
+        };
+
+        document.getElementById("code-field").value = JSON.stringify(config);
+    });
+</script>
+</body>
+</html>
