@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.ws;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -15,11 +16,13 @@ import java.util.concurrent.CopyOnWriteArraySet;
 /**
  * Fans out change notifications to every browser tab with a live connection on a given
  * channel's dashboard. Handshakes at {@code /ws/channel/{username}} (username extracted by
- * {@link ChannelWebSocketConfig}'s interceptor) join the session under that username; a
- * {@link #broadcast(String, String)} call then pushes {@code {"scope": "..."}} to each of
+ * {@link ChannelWebSocketConfig}'s interceptor) join the session under that username;
+ * publishing a {@link ChannelUpdatedEvent} then pushes {@code {"scope": "..."}} to each of
  * them. The payload never carries rendered content — the client re-fetches
  * {@code /spa/channel/{username}} and patches only the DOM subtree the scope names, so this
- * handler stays free of any page-rendering concern.
+ * handler stays free of any page-rendering concern. Listening for the event rather than being
+ * called directly keeps this handler decoupled from whatever publishes the change — today
+ * MockApiService/MockAdminController, later the real backend.
  */
 @Slf4j
 @Component
@@ -52,20 +55,22 @@ public class ChannelWebSocketHandler extends TextWebSocketHandler {
         log.trace("[{}] channel WS disconnected ({})", username, session.getId());
     }
 
-    /** Notifies every connected session for {@code username} that {@code scope} changed. */
-    public void broadcast(String username, String scope) {
+    /** Notifies every connected session for the event's username that its scope changed. */
+    @EventListener
+    public void onChannelUpdated(ChannelUpdatedEvent event) {
+        String username = event.username();
         Set<WebSocketSession> sessions = sessionsByUsername.get(username);
         if (sessions == null || sessions.isEmpty()) {
             return;
         }
-        TextMessage message = new TextMessage("{\"scope\":\"" + scope + "\"}");
+        TextMessage message = new TextMessage("{\"scope\":\"" + event.scope() + "\"}");
         for (WebSocketSession session : sessions) {
             try {
                 if (session.isOpen()) {
                     session.sendMessage(message);
                 }
             } catch (IOException e) {
-                log.debug("[{}] failed to push '{}' to session {}", username, scope, session.getId(), e);
+                log.debug("[{}] failed to push '{}' to session {}", username, event.scope(), session.getId(), e);
             }
         }
     }
