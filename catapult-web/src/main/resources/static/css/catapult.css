@@ -1053,6 +1053,7 @@ a[data-link].active {
 
 }
 
+
 /*
  * Feature cards
  */
@@ -1174,7 +1175,15 @@ a[data-link].active {
 
 /* Bindings filters */
 
+/*
+ * mdui's own light-theme --mdui-color-on-surface (near-black) never gets
+ * replaced by a dark-theme value here, so segment labels render almost
+ * invisible on this dark background. Same bare "R G B" triplet convention as
+ * --catapult-text, consumed internally via rgb(var(--mdui-color-on-surface)).
+ */
 .bindings-filters {
+    --mdui-color-on-surface: 244 246 251;
+
     flex-wrap: wrap;
 }
 
@@ -1346,6 +1355,9 @@ a[data-link].active {
 /* mdui-segmented-button-group, not a div — lays out its own segments internally,
  * so only the positioning within the card and the separator above it are ours. */
 .connection-card > .card-actions {
+    /* See .bindings-filters — same near-invisible label fix. */
+    --mdui-color-on-surface: 244 246 251;
+
     max-width: 100%;
 
     margin-top: auto;
@@ -1376,6 +1388,16 @@ a[data-link].active {
     white-space: nowrap;
     min-width: 0;
     max-width: 100%;
+}
+
+/*
+ * With a single segment (e.g. the Minecraft card's one action button), the
+ * group applies BOTH "-first" and "-last" classes to it — its own stylesheet
+ * declares "-last" after "-first", so that rule wins the cascade and rounds
+ * only the right two corners instead of all four. Full pill, explicitly.
+ */
+.connection-card > .card-actions mdui-segmented-button:only-child {
+    border-radius: var(--shape-corner);
 }
 
 .connection-card label {
