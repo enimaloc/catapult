@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.service.mock.MockApiService;
 import fr.enimaloc.catapult.service.mock.MockData;
+import fr.enimaloc.catapult.ws.ChannelWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Controller;
@@ -24,6 +25,7 @@ import java.util.Set;
 @Profile("mock")
 public class MockAdminController {
     private final MockApiService mockApiService;
+    private final ChannelWebSocketHandler channelWebSocketHandler;
 
     @GetMapping("/mock/admin")
     public String edit(Model model) {
@@ -90,6 +92,11 @@ public class MockAdminController {
         data.replaceBinding(bindingStatus, bindingSourceType, bindingSourceName, bindingTwitchGameId, bindingTwitchGameName,
                 bindingIgnored, bindingCclEnabled, bindingCcls == null ? Set.of() : bindingCcls,
                 bindingTwEnabled, bindingTwOverride, bindingTws == null ? Set.of() : bindingTws);
+
+        String username = data.getChannelDto().twitchUsername();
+        channelWebSocketHandler.broadcast(username, "status");
+        channelWebSocketHandler.broadcast(username, "bindings");
+        channelWebSocketHandler.broadcast(username, "connections");
 
         return "redirect:/mock/admin";
     }
