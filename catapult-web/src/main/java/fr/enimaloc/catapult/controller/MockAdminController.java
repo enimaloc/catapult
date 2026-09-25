@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.service.mock.MockApiService;
 import fr.enimaloc.catapult.service.mock.MockData;
-import fr.enimaloc.catapult.ws.ChannelUpdatedEvent;
+import fr.enimaloc.catapult.ws.event.ChannelUpdatedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
@@ -94,10 +94,7 @@ public class MockAdminController {
                 bindingIgnored, bindingCclEnabled, bindingCcls == null ? Set.of() : bindingCcls,
                 bindingTwEnabled, bindingTwOverride, bindingTws == null ? Set.of() : bindingTws);
 
-        String username = data.getChannelDto().twitchUsername();
-        eventPublisher.publishEvent(new ChannelUpdatedEvent(username, "status"));
-        eventPublisher.publishEvent(new ChannelUpdatedEvent(username, "bindings"));
-        eventPublisher.publishEvent(new ChannelUpdatedEvent(username, "connections"));
+        eventPublisher.publishEvent(new ChannelUpdatedEvent(data.getChannelDto().twitchUsername()));
 
         return "redirect:/mock/admin";
     }
