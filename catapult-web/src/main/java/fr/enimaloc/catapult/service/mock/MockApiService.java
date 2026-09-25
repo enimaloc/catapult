@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.service.mock;
 import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
-import fr.enimaloc.catapult.ws.ChannelUpdatedEvent;
+import fr.enimaloc.catapult.ws.event.ChannelUpdatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -31,10 +31,10 @@ public class MockApiService implements ApiService {
         return data;
     }
 
-    /** Publishes a {@link ChannelUpdatedEvent} ("status"/"bindings"/"connections") for any live /channel/{username} tab. */
-    void broadcast(String scope) {
+    /** Publishes a {@link ChannelUpdatedEvent} for any live /channel/{username} tab. */
+    void broadcast() {
         if (data != null) {
-            eventPublisher.publishEvent(new ChannelUpdatedEvent(data.getChannelDto().twitchUsername(), scope));
+            eventPublisher.publishEvent(new ChannelUpdatedEvent(data.getChannelDto().twitchUsername()));
         }
     }
 
@@ -62,7 +62,7 @@ public class MockApiService implements ApiService {
     public void toggleBot(String username) {
         log.trace("[{}] toggleBot({})", code, username);
         data.setBotEnabled(!data.isBotEnabled());
-        broadcast("status");
+        broadcast();
     }
 
     @Override
@@ -75,21 +75,21 @@ public class MockApiService implements ApiService {
     public void cclToggle(String username, String bindingId, boolean enabled) {
         log.trace("[{}] cclToggle({}, {}, {})", code, username, bindingId, enabled);
         data.setBindingCclEnabled(bindingId, enabled);
-        broadcast("bindings");
+        broadcast();
     }
 
     @Override
     public void ignoredToggle(String username, String bindingId, boolean ignored) {
         log.trace("[{}] ignoredToggle({}, {}, {})", code, username, bindingId, ignored);
         data.setBindingIgnored(bindingId, ignored);
-        broadcast("bindings");
+        broadcast();
     }
 
     @Override
     public void deleteBinding(String username, String bindingId) {
         log.trace("[{}] deleteBinding({}, {})", code, username, bindingId);
         data.deleteBinding(bindingId);
-        broadcast("bindings");
+        broadcast();
     }
 
     @Override
@@ -102,49 +102,49 @@ public class MockApiService implements ApiService {
     public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
         log.trace("[{}] updateBinding({}, {}, {}, {}, {})", code, username, bindingId, twitchGameId, twitchGameName, ccls);
         data.updateBindingGame(bindingId, twitchGameId, twitchGameName, ccls);
-        broadcast("bindings");
+        broadcast();
     }
 
     @Override
     public void saveTws(String bindingId, java.util.Set<String> tws) {
         log.trace("[{}] saveTws({}, {})", code, bindingId, tws);
         data.setBindingTws(bindingId, tws);
-        broadcast("bindings");
+        broadcast();
     }
 
     @Override
     public void resetTws(String bindingId) {
         log.trace("[{}] resetTws({})", code, bindingId);
         data.resetBindingTws(bindingId);
-        broadcast("bindings");
+        broadcast();
     }
 
     @Override
     public void toggleTwEnabled(String bindingId, boolean enabled) {
         log.trace("[{}] toggleTwEnabled({}, {})", code, bindingId, enabled);
         data.setBindingTwEnabled(bindingId, enabled);
-        broadcast("bindings");
+        broadcast();
     }
 
     @Override
     public void saveSteamToken(String username, String token, boolean shared) {
         log.trace("[{}] saveSteamToken({}, {}, {})", code, username, token, shared);
         data.saveSteamToken(shared);
-        broadcast("connections");
+        broadcast();
     }
 
     @Override
     public void steamTokenSharing(String username, boolean shared) {
         log.trace("[{}] steamTokenSharing({}, {})", code, username, shared);
         data.setSteamTokenShared(shared);
-        broadcast("connections");
+        broadcast();
     }
 
     @Override
     public void deleteSteamToken(String username) {
         log.trace("[{}] deleteSteamToken({})", code, username);
         data.deleteSteamToken();
-        broadcast("connections");
+        broadcast();
     }
 
     @Override
@@ -163,21 +163,21 @@ public class MockApiService implements ApiService {
     public void minecraftEnroll(String username, String name) {
         log.trace("[{}] minecraftEnroll({}, {})", code, username, name);
         data.minecraftEnroll(name);
-        broadcast("connections");
+        broadcast();
     }
 
     @Override
     public void minecraftSync(String username) {
         log.trace("[{}] minecraftSync({})", code, username);
         data.minecraftSync();
-        broadcast("connections");
+        broadcast();
     }
 
     @Override
     public void minecraftDisconnect(String username) {
         log.trace("[{}] minecraftDisconnect({})", code, username);
         data.minecraftDisconnect();
-        broadcast("connections");
+        broadcast();
     }
 
     @Override
