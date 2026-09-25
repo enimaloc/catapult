@@ -3,9 +3,10 @@ package fr.enimaloc.catapult.service.mock;
 import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
-import fr.enimaloc.catapult.ws.ChannelWebSocketHandler;
+import fr.enimaloc.catapult.ws.ChannelUpdatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Profile("mock")
 public class MockApiService implements ApiService {
-    private final ChannelWebSocketHandler channelWebSocketHandler;
+    private final ApplicationEventPublisher eventPublisher;
 
     private String code;
     private MockData data;
@@ -30,10 +31,10 @@ public class MockApiService implements ApiService {
         return data;
     }
 
-    /** Pushes {@code scope} ("status"/"bindings"/"connections") to any live /channel/{username} tab. */
+    /** Publishes a {@link ChannelUpdatedEvent} ("status"/"bindings"/"connections") for any live /channel/{username} tab. */
     void broadcast(String scope) {
         if (data != null) {
-            channelWebSocketHandler.broadcast(data.getChannelDto().twitchUsername(), scope);
+            eventPublisher.publishEvent(new ChannelUpdatedEvent(data.getChannelDto().twitchUsername(), scope));
         }
     }
 
