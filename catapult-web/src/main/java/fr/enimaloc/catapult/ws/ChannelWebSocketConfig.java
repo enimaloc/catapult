@@ -24,9 +24,12 @@ public class ChannelWebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        // No setAllowedOrigins("*") here: this push channel has no per-viewer auth to hide
+        // behind, so an open origin policy would let any external site open a socket here
+        // (cross-site WebSocket hijacking) and receive its "something changed" pushes.
+        // Omitting the call keeps Spring's default same-origin restriction.
         registry.addHandler(channelWebSocketHandler, "/ws/channel/*")
-                .addInterceptors(new UsernameHandshakeInterceptor())
-                .setAllowedOrigins("*");
+                .addInterceptors(new UsernameHandshakeInterceptor());
     }
 
     /**
