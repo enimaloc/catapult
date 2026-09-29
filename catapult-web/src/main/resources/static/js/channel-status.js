@@ -3,7 +3,6 @@ document.addEventListener("catapult:render", function () {
     if (botToggle) {
         botToggle.addEventListener("change", async () => {
             await CatapultChannel.postJson(botToggle.dataset.toggleUrl, {});
-            await CatapultChannel.refresh();
         });
     }
 
