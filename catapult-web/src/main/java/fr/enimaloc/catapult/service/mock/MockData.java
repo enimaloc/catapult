@@ -7,10 +7,7 @@ import lombok.Setter;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public class MockData {
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -187,6 +184,35 @@ public class MockData {
         this.hasXbox = hasXbox;
         this.minecraftLink = minecraftLink;
         this.botEnabled = true;
+    }
+
+    private static final String[] RANDOM_NAME_PARTS = {
+            "nova", "pixel", "comet", "ember", "quartz", "raven", "glitch", "vortex", "cinder", "haze"
+    };
+    private static final java.util.Random RANDOM = new Random();
+
+    /**
+     * Builds a fresh, randomly-populated channel — used for every mock connection that
+     * doesn't hand a full JSON config to {@link #fromJwt}, so opening several mock sessions
+     * at once (several browser tabs, or the digit quick-launch links) gets distinct-looking
+     * data instead of colliding on the same fixed preset.
+     */
+    public static MockData random() {
+        String username = RANDOM_NAME_PARTS[RANDOM.nextInt(RANDOM_NAME_PARTS.length)]
+                + "_" + Integer.toHexString(RANDOM.nextInt(0x10000));
+        ChannelDto channel = new ChannelDto(
+                UUID.randomUUID(),
+                String.valueOf(10_000_000 + RANDOM.nextInt(90_000_000)),
+                username,
+                CHANNEL_DTOS[0].profileImageUrl(),
+                RANDOM.nextBoolean());
+
+        MockData data = new MockData(channel, GAME_DTOS[0], BINDING_DTOS[0], SETTINGS_DTOS[0], List.of(),
+                true, RANDOM.nextBoolean(), false, false, false, false, false,
+                true, RANDOM.nextBoolean(),
+                new LinkStateResponse("NONE", null, null));
+        data.setBotEnabled(true);
+        return data;
     }
 
     public ChannelListResponse getChannelList() {
