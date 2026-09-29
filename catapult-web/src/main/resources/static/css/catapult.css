@@ -610,7 +610,6 @@ a[data-link].active {
 /*
  * Responsive
  */
-
 @media (max-width: 900px) {
 
     .features-grid {
@@ -689,7 +688,6 @@ a[data-link].active {
 /*
  * Privacy
  */
-
 .privacy-page {
     width: 100%;
 }
@@ -716,11 +714,9 @@ a[data-link].active {
     letter-spacing: -0.05em;
 }
 
-
 /*
  * Privacy card
  */
-
 .privacy-card {
     display: block;
 
@@ -758,11 +754,9 @@ a[data-link].active {
             var(--catapult-border-hover);
 }
 
-
 /*
  * Privacy content
  */
-
 .privacy-content {
     width: 100%;
 }
@@ -782,11 +776,9 @@ a[data-link].active {
             1px solid var(--catapult-border);
 }
 
-
 /*
  * Headings
  */
-
 .privacy-content h2 {
     margin: 0 0 12px;
 
@@ -800,11 +792,9 @@ a[data-link].active {
     letter-spacing: -0.02em;
 }
 
-
 /*
  * Text
  */
-
 .privacy-content p {
     margin: 0;
 
@@ -816,11 +806,9 @@ a[data-link].active {
     line-height: 1.7;
 }
 
-
 /*
  * Lists
  */
-
 .privacy-content ul {
     margin: 0;
 
@@ -841,11 +829,9 @@ a[data-link].active {
     margin-top: 6px;
 }
 
-
 /*
  * Links
  */
-
 .privacy-content a {
     color:
             var(--catapult-primary-hover);
@@ -861,11 +847,9 @@ a[data-link].active {
             var(--catapult-text);
 }
 
-
 /*
  * Last update
  */
-
 .privacy-last-update {
     margin: 24px 0 0;
 
@@ -882,24 +866,20 @@ a[data-link].active {
     line-height: 1.5;
 }
 
-
 /*
  * Mdui
  *
  * On garde les couleurs Catapult pour éviter que le thème
  * Mdui clair ne réintroduise une surface blanche.
  */
-
 .privacy-card mdui-divider {
     --mdui-color-divider:
             var(--catapult-border);
 }
 
-
 /*
  * Responsive
  */
-
 @media (max-width: 650px) {
 
     .privacy-section {
@@ -944,11 +924,9 @@ a[data-link].active {
     margin: 0 auto;
 }
 
-
 /*
  * Error code
  */
-
 .error-code {
     display: block;
 
@@ -971,11 +949,9 @@ a[data-link].active {
     letter-spacing: -0.08em;
 }
 
-
 /*
  * Title
  */
-
 .error-content h1 {
     margin: 12px 0 16px;
 
@@ -989,11 +965,9 @@ a[data-link].active {
     letter-spacing: -0.05em;
 }
 
-
 /*
  * Description
  */
-
 .error-description {
     max-width: 600px;
 
@@ -1006,11 +980,9 @@ a[data-link].active {
     line-height: 1.7;
 }
 
-
 /*
  * Actions
  */
-
 .error-actions {
     display: flex;
 
@@ -1024,11 +996,9 @@ a[data-link].active {
     flex-wrap: wrap;
 }
 
-
 /*
  * Responsive
  */
-
 @media (max-width: 650px) {
 
     .error-page {
@@ -1529,4 +1499,8 @@ input[type="checkbox"] {
         font-size: 0.85rem;
     }
 
+}
+
+.hidden {
+    display: none;
 }

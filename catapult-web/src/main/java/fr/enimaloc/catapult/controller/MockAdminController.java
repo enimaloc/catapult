@@ -2,7 +2,9 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.service.mock.MockApiService;
 import fr.enimaloc.catapult.service.mock.MockData;
+import fr.enimaloc.catapult.ws.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.ws.event.ChannelUpdatedEvent;
+import fr.enimaloc.catapult.ws.event.GameChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
@@ -85,16 +87,21 @@ public class MockAdminController {
             return "redirect:/oauth2/authorization/twitch";
         }
 
-        data.setChannelLive(live);
+        String username = data.getChannelDto().twitchUsername();
+        if (data.getChannelDto().live() != live) {
+            data.setChannelLive(live);
+            eventPublisher.publishEvent(new ChannelLiveStateEvent(username, live));
+        }
         data.setChannelAvatarUrl(avatarUrl);
-        data.setDetectedGame(detectedSourceType, detectedSourceName);
+        if (!data.getGameDto().sourceName().equals(detectedSourceName) || !data.getGameDto().sourceType().equals(detectedSourceType)) {
+            data.setDetectedGame(detectedSourceType, detectedSourceName);
+            eventPublisher.publishEvent(new GameChangedEvent(username, detectedSourceType, detectedSourceName));
+        }
         data.setProviders(hasSteamProvider, hasSteam, hasXboxProvider, hasXbox);
         data.setSteamDiagnostics(steamProfilePrivate, steamRateLimited, steamOfflineMode, steamProfileCacheTtlMinutes);
         data.replaceBinding(bindingStatus, bindingSourceType, bindingSourceName, bindingTwitchGameId, bindingTwitchGameName,
                 bindingIgnored, bindingCclEnabled, bindingCcls == null ? Set.of() : bindingCcls,
                 bindingTwEnabled, bindingTwOverride, bindingTws == null ? Set.of() : bindingTws);
-
-        eventPublisher.publishEvent(new ChannelUpdatedEvent(data.getChannelDto().twitchUsername()));
 
         return "redirect:/mock/admin";
     }

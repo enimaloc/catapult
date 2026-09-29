@@ -2,19 +2,15 @@ package fr.enimaloc.catapult.service.mock;
 
 import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.service.ApiService;
-import fr.enimaloc.catapult.service.http.ApiClient;
-import fr.enimaloc.catapult.ws.event.ChannelUpdatedEvent;
+import fr.enimaloc.catapult.ws.event.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -29,13 +25,6 @@ public class MockApiService implements ApiService {
     /** Exposes the live singleton instance for {@link MockAdminController} to read and mutate. */
     public MockData getData() {
         return data;
-    }
-
-    /** Publishes a {@link ChannelUpdatedEvent} for any live /channel/{username} tab. */
-    void broadcast() {
-        if (data != null) {
-            eventPublisher.publishEvent(new ChannelUpdatedEvent(data.getChannelDto().twitchUsername()));
-        }
     }
 
     @Override
@@ -62,7 +51,7 @@ public class MockApiService implements ApiService {
     public void toggleBot(String username) {
         log.trace("[{}] toggleBot({})", code, username);
         data.setBotEnabled(!data.isBotEnabled());
-        broadcast();
+        eventPublisher.publishEvent(new BotStateChangedEvent(username, data.isBotEnabled()));
     }
 
     @Override
@@ -75,21 +64,21 @@ public class MockApiService implements ApiService {
     public void cclToggle(String username, String bindingId, boolean enabled) {
         log.trace("[{}] cclToggle({}, {}, {})", code, username, bindingId, enabled);
         data.setBindingCclEnabled(bindingId, enabled);
-        broadcast();
+        eventPublisher.publishEvent(new CclStateEvent(username, bindingId, enabled));
     }
 
     @Override
     public void ignoredToggle(String username, String bindingId, boolean ignored) {
         log.trace("[{}] ignoredToggle({}, {}, {})", code, username, bindingId, ignored);
         data.setBindingIgnored(bindingId, ignored);
-        broadcast();
+        eventPublisher.publishEvent(new BindingIgnoredStateEvent(username, bindingId, ignored));
     }
 
     @Override
     public void deleteBinding(String username, String bindingId) {
         log.trace("[{}] deleteBinding({}, {})", code, username, bindingId);
         data.deleteBinding(bindingId);
-        broadcast();
+        eventPublisher.publishEvent(new BindingDeletedEvent(username, bindingId));
     }
 
     @Override
@@ -102,49 +91,49 @@ public class MockApiService implements ApiService {
     public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
         log.trace("[{}] updateBinding({}, {}, {}, {}, {})", code, username, bindingId, twitchGameId, twitchGameName, ccls);
         data.updateBindingGame(bindingId, twitchGameId, twitchGameName, ccls);
-        broadcast();
+        eventPublisher.publishEvent(new BindingUpdatedEvent(username, bindingId, twitchGameId, twitchGameName, ccls));
     }
 
     @Override
     public void saveTws(String bindingId, java.util.Set<String> tws) {
         log.trace("[{}] saveTws({}, {})", code, bindingId, tws);
         data.setBindingTws(bindingId, tws);
-        broadcast();
+        eventPublisher.publishEvent(new TwUpdatedEvent(data.getChannelDto().twitchUsername(), bindingId, tws));
     }
 
     @Override
     public void resetTws(String bindingId) {
         log.trace("[{}] resetTws({})", code, bindingId);
         data.resetBindingTws(bindingId);
-        broadcast();
+        eventPublisher.publishEvent(new TwResetEvent(data.getChannelDto().twitchUsername(), bindingId));
     }
 
     @Override
     public void toggleTwEnabled(String bindingId, boolean enabled) {
         log.trace("[{}] toggleTwEnabled({}, {})", code, bindingId, enabled);
         data.setBindingTwEnabled(bindingId, enabled);
-        broadcast();
+        eventPublisher.publishEvent(new TwEnabledStateEvent(data.getChannelDto().twitchUsername(), bindingId, enabled));
     }
 
     @Override
     public void saveSteamToken(String username, String token, boolean shared) {
         log.trace("[{}] saveSteamToken({}, {}, {})", code, username, token, shared);
         data.saveSteamToken(shared);
-        broadcast();
+        eventPublisher.publishEvent(new SteamTokenSavedEvent(username, shared));
     }
 
     @Override
     public void steamTokenSharing(String username, boolean shared) {
         log.trace("[{}] steamTokenSharing({}, {})", code, username, shared);
         data.setSteamTokenShared(shared);
-        broadcast();
+        eventPublisher.publishEvent(new SteamTokenSharedStateEvent(username, shared));
     }
 
     @Override
     public void deleteSteamToken(String username) {
         log.trace("[{}] deleteSteamToken({})", code, username);
         data.deleteSteamToken();
-        broadcast();
+        eventPublisher.publishEvent(new SteamTokenDeletedEvent(username));
     }
 
     @Override
@@ -163,21 +152,23 @@ public class MockApiService implements ApiService {
     public void minecraftEnroll(String username, String name) {
         log.trace("[{}] minecraftEnroll({}, {})", code, username, name);
         data.minecraftEnroll(name);
-        broadcast();
+        LinkStateResponse link = data.getMinecraftLink();
+        eventPublisher.publishEvent(new MinecraftEnrollEvent(username, link.status(), link.minecraftName()));
     }
 
     @Override
     public void minecraftSync(String username) {
         log.trace("[{}] minecraftSync({})", code, username);
         data.minecraftSync();
-        broadcast();
+        LinkStateResponse link = data.getMinecraftLink();
+        eventPublisher.publishEvent(new MinecraftSyncEvent(username, link.status(), link.minecraftName()));
     }
 
     @Override
     public void minecraftDisconnect(String username) {
         log.trace("[{}] minecraftDisconnect({})", code, username);
         data.minecraftDisconnect();
-        broadcast();
+        eventPublisher.publishEvent(new MinecraftDisconnectedEvent(username));
     }
 
     @Override

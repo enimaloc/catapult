@@ -2,14 +2,17 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.ws.event.ChannelUpdatedEvent;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,17 +42,17 @@ public class ChannelEventStreamController {
 
     @EventListener
     public void onChannelUpdated(ChannelUpdatedEvent event) {
-        List<SseEmitter> emitters = emittersByUsername.getOrDefault(event.getUsername(), List.of());
+        List<SseEmitter> emitters = emittersByUsername.getOrDefault(event.username(), List.of());
         List<SseEmitter> dead = new CopyOnWriteArrayList<>();
         for (SseEmitter emitter : emitters) {
             try {
-                emitter.send(SseEmitter.event().name("update").data(""));
+                emitter.send(SseEmitter.event().name(event.getClass().getSimpleName()).data(event));
             } catch (IOException e) {
                 dead.add(emitter);
             }
         }
         if (!dead.isEmpty()) {
-            emittersByUsername.getOrDefault(event.getUsername(), new CopyOnWriteArrayList<>()).removeAll(dead);
+            emittersByUsername.getOrDefault(event.username(), new CopyOnWriteArrayList<>()).removeAll(dead);
         }
     }
 
@@ -58,5 +61,13 @@ public class ChannelEventStreamController {
         if (list != null) {
             list.remove(emitter);
         }
+    }
+
+    @EventListener
+    public void onContextClosed(ContextClosedEvent event) {
+        emittersByUsername.values()
+                .stream()
+                .flatMap(Collection::stream)
+                .forEach(ResponseBodyEmitter::complete);
     }
 }
