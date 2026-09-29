@@ -1,12 +1,11 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.common.dto.ChannelListResponse;
-import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.*;
 
 public interface ApiService {
     TokenResponse exchangeCode(String code);
     ChannelListResponse channelList();
-    fr.enimaloc.catapult.common.dto.ChannelPageData channelPage(String username, int page, String status, String source);
+    ChannelPageData channelPage(String username, int page, String status, String source);
     void toggleBot(String username);
     void recheckGame(String username);
     void cclToggle(String username, String bindingId, boolean enabled);
@@ -21,18 +20,18 @@ public interface ApiService {
     void steamTokenSharing(String username, boolean shared);
     void deleteSteamToken(String username);
     void refreshSteamProfileCache(String username);
-    fr.enimaloc.catapult.common.dto.LinkStateResponse minecraftStatus(String username);
+    LinkStateResponse minecraftStatus(String username);
     void minecraftEnroll(String username, String name);
     void minecraftSync(String username);
     void minecraftDisconnect(String username);
     void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
     void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws);
-    fr.enimaloc.catapult.common.dto.UserSettingsDto channelSettings(String username);
+    UserSettingsDto channelSettings(String username);
     void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
                              boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
     void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
-    fr.enimaloc.catapult.common.dto.DtddMappingStatusDto dtddMappingStatus(String username);
-    fr.enimaloc.catapult.common.dto.SearchResponse dtddSearch(String q);
+    DtddMappingStatusDto dtddMappingStatus(String username);
+    SearchResponse dtddSearch(String q);
     void dtddValidate(String igdbId);
     void dtddPropose(String igdbId, Long dtddId, String reason);
 }
