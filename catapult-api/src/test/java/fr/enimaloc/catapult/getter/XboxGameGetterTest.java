@@ -132,6 +132,35 @@ class XboxGameGetterTest {
     }
 
     @Test
+    void getCurrentGame_onlyOnlineTitle_returnsEmpty() {
+        Map<String, Object> response = Map.of("devices", List.of(
+            Map.of("titles", List.of(
+                Map.of("id", "9NJBMZPGPVSS", "name", "Online", "state", "Active")
+            ))
+        ));
+        doReturn(response).when(responseSpec).body(Map.class);
+
+        assertThat(getter.getCurrentGame(user)).isEmpty();
+    }
+
+    @Test
+    void getCurrentGame_onlineTitle_skipsAndReturnsNextTitle() {
+        Map<String, Object> response = Map.of("devices", List.of(
+            Map.of("titles", List.of(
+                Map.of("id", "9NJBMZPGPVSS", "name", "Online", "state", "Active"),
+                Map.of("id", "1234", "name", "Halo Infinite", "state", "Active")
+            ))
+        ));
+        doReturn(response).when(responseSpec).body(Map.class);
+
+        Optional<DetectedGame> result = getter.getCurrentGame(user);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getSourceId()).isEqualTo("1234");
+        assertThat(result.get().getSourceName()).isEqualTo("Halo Infinite");
+    }
+
+    @Test
     void getCurrentGame_inactiveTitle_returnsEmpty() {
         Map<String, Object> response = Map.of("devices", List.of(
             Map.of("titles", List.of(
