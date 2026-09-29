@@ -15,29 +15,21 @@ document.addEventListener("catapult:render", function () {
         return `/channel/bindings/${row.dataset.bindingId}/${suffix}`;
     }
 
-    list.querySelectorAll(".binding-ccl-toggle").forEach(toggle => {
-        toggle.addEventListener("change", async () => {
-            const row = toggle.closest("[data-binding-id]");
-            await CatapultChannel.postJson(bindingUrl(row, "ccl-toggle"), { enabled: toggle.checked });
-            await CatapultChannel.refresh();
-        });
-    });
+    list.querySelectorAll("mdui-switch[data-post]").forEach(el => {
+        el.addEventListener("change", async () => {
+            const row = el.closest("[data-binding-id]");
+            let body = {};
+            body[el.dataset.key] = el.checked;
+            await CatapultChannel.postJson(bindingUrl(row, el.dataset.post), body);
+        })
+    })
 
-    list.querySelectorAll(".binding-ignored-toggle").forEach(toggle => {
-        toggle.addEventListener("change", async () => {
-            const row = toggle.closest("[data-binding-id]");
-            await CatapultChannel.postJson(bindingUrl(row, "ignored-toggle"), { ignored: toggle.checked });
-            await CatapultChannel.refresh();
-        });
-    });
-
-    list.querySelectorAll(".binding-delete-btn").forEach(btn => {
-        btn.addEventListener("click", async () => {
-            const row = btn.closest("[data-binding-id]");
-            await CatapultChannel.postJson(bindingUrl(row, "delete"), {});
-            await CatapultChannel.refresh();
-        });
-    });
+    list.querySelectorAll("mdui-button-icon[data-post]").forEach(el => {
+        el.addEventListener("click", async () => {
+            const row = el.closest("[data-binding-id]");
+            await CatapultChannel.postJson(bindingUrl(row, el.dataset.post), {});
+        })
+    })
 
     list.querySelectorAll(".binding-edit-btn").forEach(btn => {
         const row = btn.closest("[data-binding-id]");
@@ -59,7 +51,6 @@ document.addEventListener("catapult:render", function () {
                 twitchGameName: gameInput.value || null,
                 ccls
             });
-            await CatapultChannel.refresh();
         });
     });
 
@@ -73,15 +64,10 @@ document.addEventListener("catapult:render", function () {
             const tws = Array.from(panel.querySelectorAll(".binding-tw-checkbox:checked")).map(cb => cb.value);
             await CatapultChannel.postJson(twUrl(row, "tw-enabled"), { enabled });
             await CatapultChannel.postJson(twUrl(row, "tws"), { tws });
-            await CatapultChannel.refresh();
         });
 
-        const resetBtn = panel.querySelector(".binding-tw-reset-btn");
-        if (resetBtn) {
-            resetBtn.addEventListener("click", async () => {
-                await CatapultChannel.postJson(twUrl(row, "tws/reset"), {});
-                await CatapultChannel.refresh();
-            });
-        }
+        panel.querySelector(".binding-tw-reset-btn").addEventListener("click", async () => {
+            await CatapultChannel.postJson(twUrl(row, "tws/reset"), {});
+        });
     });
 });

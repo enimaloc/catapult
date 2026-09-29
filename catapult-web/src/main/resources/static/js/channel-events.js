@@ -1,12 +1,13 @@
 /**
- * Live updates for /channel/{username}: a Server-Sent Events stream that reacts to a push by
- * calling the exact same CatapultChannel.refresh() every mutation on this page already calls
- * on success — so a change made in one tab (or, later, by the real backend) shows up in every
- * other tab watching the same channel without the viewer doing anything.
+ * Live updates for /channel/{username}: a Server-Sent Events stream that reacts to each
+ * ChannelUpdatedEvent subtype published server-side (see ws/event/*.java) by patching just
+ * the affected part of the DOM — the same patch a successful mutation in this tab would
+ * apply to itself, now driven by the server instead of the client's own postJson() call.
+ * That's why the mutation handlers across channel-*.js no longer call CatapultChannel.refresh()
+ * after most actions: the SSE echo (including for the tab that triggered the mutation) is
+ * the single source of truth for what changed.
  *
- * EventSource reconnects on its own (no manual retry logic needed here), and the stream
- * carries a bare "update" event with no payload — the server never sends rendered content,
- * the client just re-fetches and patches via refresh().
+ * EventSource reconnects on its own (no manual retry logic needed here).
  */
 (function () {
     let source = null;
@@ -33,9 +34,31 @@
         sourceUsername = username;
 
         source = new EventSource(`/events/channel/${username}`);
-        source.addEventListener("update", () => {
-            CatapultChannel.refresh();
-        });
+
+        function on(eventName, handler) {
+            source.addEventListener(eventName, event => handler(JSON.parse(event.data)));
+        }
+
+        on("ChannelLiveStateEvent", data => CatapultChannel.setStreamState(data.state));
+        on("BotStateChangedEvent", data => CatapultChannel.setBotState(data.state));
+        on("GameChangedEvent", data => CatapultChannel.setCurrentGame(data.sourceName));
+
+        on("BindingIgnoredStateEvent", data => CatapultChannel.setBindingIgnored(data.bindingId, data.ignored));
+        on("CclStateEvent", data => CatapultChannel.setCclEnabled(data.bindingId, data.enabled));
+        on("BindingDeletedEvent", data => CatapultChannel.removeBinding(data.bindingId));
+        on("BindingUpdatedEvent", data => CatapultChannel.updateBindingGame(data.bindingId, data.twitchGameName, data.ccls));
+
+        on("TwEnabledStateEvent", data => CatapultChannel.setTwEnabled(data.bindingId, data.enabled));
+        on("TwUpdatedEvent", data => CatapultChannel.setBindingTws(data.bindingId, data.tws));
+        on("TwResetEvent", data => CatapultChannel.resetBindingTws(data.bindingId));
+
+        on("MinecraftEnrollEvent", data => CatapultChannel.setMinecraftStatus(data.status, data.minecraftName));
+        on("MinecraftSyncEvent", data => CatapultChannel.setMinecraftStatus(data.status, data.minecraftName));
+        on("MinecraftDisconnectedEvent", () => CatapultChannel.setMinecraftStatus("NONE", null));
+
+        on("SteamTokenSavedEvent", data => CatapultChannel.setSteamTokenSaved(data.shared));
+        on("SteamTokenSharedStateEvent", data => CatapultChannel.setSteamTokenShared(data.shared));
+        on("SteamTokenDeletedEvent", () => CatapultChannel.setSteamTokenDeleted());
     }
 
     document.addEventListener("catapult:render", () => {
