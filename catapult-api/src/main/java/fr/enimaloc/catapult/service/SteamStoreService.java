@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.springframework.web.util.HtmlUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 
@@ -59,6 +60,18 @@ public interface SteamStoreService {
             @JsonAlias("content_descriptors") ContentDescriptors contentDescriptors, Ratings ratings) {
 
         public SteamStorePage {
+            // Steam HTML-entity-encodes even its plain-text fields (e.g. "&amp;" for "&"),
+            // unlike detailedDescription/aboutTheGame which are genuine HTML meant to stay as-is.
+            name = name != null ? HtmlUtils.htmlUnescape(name) : null;
+            shortDescription = shortDescription != null ? HtmlUtils.htmlUnescape(shortDescription) : null;
+            legalNotice = legalNotice != null ? HtmlUtils.htmlUnescape(legalNotice) : null;
+            if (developers != null) {
+                developers = Arrays.stream(developers).map(HtmlUtils::htmlUnescape).toArray(String[]::new);
+            }
+            if (publishers != null) {
+                publishers = Arrays.stream(publishers).map(HtmlUtils::htmlUnescape).toArray(String[]::new);
+            }
+
             JsonNode node = pcRequirementsRaw;
             if (node != null && node.isObject()) {
                 pcRequirements = new Requirement(
