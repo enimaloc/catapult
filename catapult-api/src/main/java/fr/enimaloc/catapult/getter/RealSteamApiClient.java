@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.HtmlUtils;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -74,7 +75,7 @@ public class RealSteamApiClient implements SteamApiClient {
                 Object gameId   = player.get("gameid");
                 Object gameName = player.get("gameextrainfo");
                 if (gameId == null || gameName == null) return Optional.empty();
-                return Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName),
+                return Optional.of(new PlayerSummary(String.valueOf(gameId), gameName(gameName),
                     displayName(player), onlineStatus(player.get("personastate"))));
             }),
             steamExecutor
@@ -89,7 +90,7 @@ public class RealSteamApiClient implements SteamApiClient {
                 Object gameName = player.get("gameextrainfo");
                 return new PlayerSummary(
                     gameId != null ? String.valueOf(gameId) : null,
-                    gameName != null ? String.valueOf(gameName) : null,
+                    gameName(gameName),
                     displayName(player), onlineStatus(player.get("personastate")));
             }),
             steamExecutor
@@ -98,7 +99,12 @@ public class RealSteamApiClient implements SteamApiClient {
 
     private static String displayName(Map<String, Object> player) {
         Object name = player.get("personaname");
-        return name != null ? String.valueOf(name) : null;
+        return name != null ? HtmlUtils.htmlUnescape(String.valueOf(name)) : null;
+    }
+
+    /** Steam returns personaname/gameextrainfo HTML-entity-encoded (e.g. "&amp;"), even in JSON. */
+    private static String gameName(Object gameName) {
+        return gameName != null ? HtmlUtils.htmlUnescape(String.valueOf(gameName)) : null;
     }
 
     /** Maps Steam's numeric personastate to the small fixed vocabulary chat commands read. */
@@ -201,7 +207,7 @@ public class RealSteamApiClient implements SteamApiClient {
                     Object gameName = player.get("gameextrainfo");
                     result.put(id,
                         (gameId != null && gameName != null)
-                            ? Optional.of(new PlayerSummary(String.valueOf(gameId), String.valueOf(gameName),
+                            ? Optional.of(new PlayerSummary(String.valueOf(gameId), gameName(gameName),
                                 displayName(player), onlineStatus(player.get("personastate"))))
                             : Optional.empty());
                 }
