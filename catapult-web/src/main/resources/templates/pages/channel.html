@@ -1,4 +1,5 @@
 <mdui-layout-main th:fragment="channel">
+    <!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.ChannelPageData"*/-->
     <section class="section channel-section" th:with="ch=${channelPage}">
         <div class="section-header">
             <span class="eyebrow" th:text="${ch.channelUser().twitchUsername()}">username</span>
@@ -7,10 +8,15 @@
 
         <mdui-card class="status-card" variant="outlined">
             <div class="status-row">
-                <mdui-chip id="channel-state-live" th:class="${!ch.isLive() ? 'hidden' : ''}" th:text="#{channel.status.live}">channel.status.live</mdui-chip>
-                <mdui-chip id="channel-state-offline" th:class="${ch.isLive() ? 'hidden' : ''}" th:text="#{channel.status.offline}">channel.status.offline</mdui-chip>
+                <mdui-chip id="channel-state-live" th:class="${!ch.isLive() ? 'hidden' : ''}"
+                           th:text="#{channel.status.live}">channel.status.live
+                </mdui-chip>
+                <mdui-chip id="channel-state-offline" th:class="${ch.isLive() ? 'hidden' : ''}"
+                           th:text="#{channel.status.offline}">channel.status.offline
+                </mdui-chip>
 
-                <span id="channel-current-game" th:if="${ch.currentGame() != null}" th:text="${ch.currentGame().sourceName()}">Game</span>
+                <span id="channel-current-game" th:if="${ch.currentGame() != null}"
+                      th:text="${ch.currentGame().sourceName()}">Game</span>
                 <span id="channel-current-game" th:unless="${ch.currentGame() != null}"
                       th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
 
@@ -31,75 +37,92 @@
             <h2 th:text="#{channel.bindings.title}">Associations</h2>
             <mdui-segmented-button-group class="bindings-filters">
                 <mdui-segmented-button data-link th:href="@{/channel/{u}(u=${ch.channelUsername()})}"
-                                        th:classappend="${ch.filterStatus() == null and ch.filterSource() == null} ? 'filter-active'"
-                                        th:text="#{channel.bindings.filter.all}">Toutes
+                                       th:classappend="${ch.filterStatus() == null and ch.filterSource() == null} ? 'filter-active'"
+                                       th:text="#{channel.bindings.filter.all}">Toutes
                 </mdui-segmented-button>
                 <mdui-segmented-button data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='AUTO')}"
-                                        th:classappend="${ch.filterStatus() == 'AUTO'} ? 'filter-active'"
-                                        th:text="#{channel.bindings.filter.auto}">Auto
+                                       th:classappend="${ch.filterStatus() == 'AUTO'} ? 'filter-active'"
+                                       th:text="#{channel.bindings.filter.auto}">Auto
                 </mdui-segmented-button>
                 <mdui-segmented-button data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},status='MANUAL')}"
-                                        th:classappend="${ch.filterStatus() == 'MANUAL'} ? 'filter-active'"
-                                        th:text="#{channel.bindings.filter.manual}">Manuel
+                                       th:classappend="${ch.filterStatus() == 'MANUAL'} ? 'filter-active'"
+                                       th:text="#{channel.bindings.filter.manual}">Manuel
                 </mdui-segmented-button>
                 <mdui-segmented-button data-link
-                                        th:href="@{/channel/{u}(u=${ch.channelUsername()},status='INCOMPLETE')}"
-                                        th:classappend="${ch.filterStatus() == 'INCOMPLETE'} ? 'filter-active'"
-                                        th:text="#{channel.bindings.filter.incomplete}">Incomplet
+                                       th:href="@{/channel/{u}(u=${ch.channelUsername()},status='INCOMPLETE')}"
+                                       th:classappend="${ch.filterStatus() == 'INCOMPLETE'} ? 'filter-active'"
+                                       th:text="#{channel.bindings.filter.incomplete}">Incomplet
                 </mdui-segmented-button>
                 <mdui-segmented-button data-link th:href="@{/channel/{u}(u=${ch.channelUsername()},source='STEAM')}"
-                                        th:classappend="${ch.filterSource() == 'STEAM'} ? 'filter-active'"
-                                        th:text="#{channel.bindings.filter.steam}">Steam
+                                       th:classappend="${ch.filterSource() == 'STEAM'} ? 'filter-active'"
+                                       th:text="#{channel.bindings.filter.steam}">Steam
                 </mdui-segmented-button>
             </mdui-segmented-button-group>
         </div>
 
         <mdui-list id="channel-bindings-list" th:attr="data-empty-text=#{channel.bindings.empty}">
-            <mdui-list-item th:each="b : ${ch.bindings().content()}" th:attr="data-binding-id=${b.id()}">
-                <span class="binding-game-name" th:text="${b.twitchGameName() ?: '—'}">Game</span>
-                <span class="binding-ccl-chips">
-                    <mdui-chip th:each="ccl : ${b.ccls()}" th:text="${ccl}">ccl</mdui-chip>
-                </span>
-                <span th:text="${b.status()}">STATUS</span>
-                <mdui-switch th:if="${ch.isOwner()}" class="binding-ccl-toggle" data-post="ccl-toggle" data-key="enabled"
-                             th:checked="${b.cclEnabled()}"></mdui-switch>
-                <mdui-switch th:if="${ch.isOwner()}" class="binding-ignored-toggle" data-post="ignored-toggle" data-key="ignored"
-                             th:checked="${b.ignored()}"></mdui-switch>
-                <mdui-button-icon th:if="${ch.isOwner()}" icon="edit" class="binding-edit-btn"></mdui-button-icon>
-                <mdui-button-icon th:if="${ch.isOwner()}" icon="delete"  data-post="delete" class="binding-delete-btn"></mdui-button-icon>
+            <mdui-collapse accordion th:if="${!ch.bindings().content().isEmpty()}"
+                           th:value="${ch.currentGame()?.bindingId()}">
+                <mdui-collapse-item th:each="b : ${ch.bindings().content()}"
+                                    th:attr="data-binding-id=${b.id()},disabled=${!ch.isOwner()} ? 'disabled'"
+                                    th:value="${b.id()}"
+                                    th:class="${ch.currentGame()?.bindingId() == b.id() ? 'is-open' : ''}">
+                    <mdui-list-item slot="header">
+                        <span class="binding-game-name" th:text="${b.sourceName() ?: b.twitchGameName() ?: '—'}"></span>
+                        <span class="binding-platform-chips" th:text="${b.sourceType()}"></span>
+                        <span th:text="${b.status()}"></span>
+                    </mdui-list-item>
+                    <mdui-list-item>
+                        <div class="binding-toggle" th:if="${ch.isOwner()}">
+                            <mdui-switch th:id="'binding-ignored-toggle-' + ${b.id()}" class="binding-ignored-toggle"
+                                         data-post="ignored-toggle" data-key="ignored"
+                                         th:checked="${b.ignored()}"></mdui-switch>
+                            <label th:for="'binding-ignored-toggle-' + ${b.id()}"
+                                   th:text="#{channel.bindings.ignored}">Ignoré</label>
+                        </div>
+                        <mdui-button-icon th:if="${ch.isOwner()}" icon="delete" data-post="delete"
+                                          class="binding-delete-btn"></mdui-button-icon>
 
-                <div th:if="${ch.isOwner()}" class="binding-edit-panel" hidden>
-                    <input type="text" class="binding-edit-game-input" placeholder="Rechercher un jeu…"/>
-                    <input type="hidden" class="binding-edit-game-id"/>
-                    <mdui-list class="binding-edit-game-results"></mdui-list>
-                    <label th:each="ccl : ${ch.availableCcls()}">
-                        <input type="checkbox" class="binding-edit-ccl-checkbox" th:value="${ccl.id()}"
-                               th:checked="${b.ccls().contains(ccl.id())}"
-                               th:disabled="${ch.blockedCcls().contains(ccl.id())}"/>
-                        <span th:text="${ccl.name()}">ccl name</span>
-                    </label>
-                    <mdui-button class="binding-edit-save-btn" th:text="#{channel.bindings.edit.save}">Enregistrer
-                    </mdui-button>
-                </div>
+                        <div th:if="${ch.isOwner()}" class="binding-edit-panel">
+                            <input type="text" class="binding-edit-game-input" placeholder="Rechercher un jeu…"
+                                   th:value="${b.twitchGameName()}"/>
+                            <input type="hidden" class="binding-edit-game-id" th:value="${b.twitchGameId()}"/>
+                            <mdui-list class="binding-edit-game-results"></mdui-list>
+                        </div>
 
-                <mdui-button-icon th:if="${ch.isOwner()}" icon="warning" class="binding-tw-btn"></mdui-button-icon>
-                <div th:if="${ch.isOwner()}" class="binding-tw-panel" hidden>
-                    <label>
-                        <input type="checkbox" class="binding-tw-enabled-checkbox" th:checked="${b.twEnabled()}"/>
-                        <span th:text="#{channel.bindings.tw.enabled}">Activer les avertissements</span>
-                    </label>
-                    <label th:each="tw : ${ch.availableTws()}">
-                        <input type="checkbox" class="binding-tw-checkbox" th:value="${tw.id()}"
-                               th:checked="${b.tws().contains(tw.id())}"/>
-                        <span th:text="${tw.label()}">tw label</span>
-                    </label>
-                    <mdui-button class="binding-tw-save-btn" th:text="#{channel.bindings.tw.save}">Enregistrer
-                    </mdui-button>
-                    <mdui-button th:classappend="${!b.twOverride()} ? 'hidden'" class="binding-tw-reset-btn"
-                                 th:text="#{channel.bindings.tw.reset}">Réinitialiser
-                    </mdui-button>
-                </div>
-            </mdui-list-item>
+                        <div th:if="${ch.isOwner()}" class="binding-ccl-panel">
+                            <label class="binding-toggle">
+                                <mdui-switch class="binding-ccl-enabled" th:id="'binding-ccl-toggle-' + ${b.id()}"
+                                             th:checked="${b.cclEnabled()}"
+                                             data-post="ccl-toggle" data-key="enabled"></mdui-switch>
+                                <span th:text="#{channel.bindings.ccl.enabled}">Activer les CCL</span>
+                            </label>
+                            <label th:each="ccl : ${ch.availableCcls()}">
+                                <mdui-switch class="binding-edit-ccl-checkbox" th:value="${ccl.id()}"
+                                             th:checked="${b.ccls().contains(ccl.id())}"
+                                             th:disabled="${ch.blockedCcls().contains(ccl.id())}"></mdui-switch>
+                                <span th:text="${ccl.name()}">ccl name</span>
+                            </label>
+                        </div>
+
+                        <div th:if="${ch.isOwner()}" class="binding-tw-panel">
+                            <label>
+                                <mdui-switch class="binding-tw-enabled-checkbox"
+                                             th:checked="${b.twEnabled()}"></mdui-switch>
+                                <span th:text="#{channel.bindings.tw.enabled}">Activer les avertissements</span>
+                            </label>
+                            <label th:each="tw : ${ch.availableTws()}">
+                                <mdui-switch class="binding-tw-checkbox" th:value="${tw.id()}"
+                                             th:checked="${b.tws().contains(tw.id())}"></mdui-switch>
+                                <span th:text="${tw.label()}">tw label</span>
+                            </label>
+                            <mdui-button sp:visible-when="hasOverride:${b.twOverride()}" class="binding-tw-reset-btn"
+                                         th:text="#{channel.bindings.tw.reset}">Réinitialiser
+                            </mdui-button>
+                        </div>
+                    </mdui-list-item>
+                </mdui-collapse-item>
+            </mdui-collapse>
             <mdui-list-item th:if="${ch.bindings().content().isEmpty()}" th:text="#{channel.bindings.empty}">
                 Aucune association.
             </mdui-list-item>
@@ -127,54 +150,67 @@
 
             <mdui-card th:if="${ch.hasSteamProvider()}" class="connection-card" variant="outlined" data-conn="steam">
                 <span th:text="#{channel.connections.steam}">Steam</span>
-                <mdui-chip th:if="${ch.hasSteam()}" th:text="#{channel.connections.connected}">Connecté</mdui-chip>
-                <mdui-chip th:unless="${ch.hasSteam()}" th:text="#{channel.connections.not_connected}">Non connecté
+                <mdui-chip class="steam-connected-chip" sp:visible-when="connected:${ch.hasSteam()}"
+                           th:text="#{channel.connections.connected}">Connecté
+                </mdui-chip>
+                <mdui-chip class="steam-not-connected-chip" sp:visible-when="notConnected:${!ch.hasSteam()}"
+                           th:text="#{channel.connections.not_connected}">Non connecté
                 </mdui-chip>
 
-                <p th:if="${ch.isOwner() and ch.steamRateLimited()}"
+                <!--
+                  Every state below (diagnostics, has-token/no-token sub-view, save/delete
+                  buttons) is always rendered for owners and toggled with the `hidden` class
+                  from JS, instead of being created/destroyed on each
+                  SteamConnectionStateEvent/SteamTokenSavedEvent/SteamTokenDeletedEvent —
+                  see channel-page.js.
+                -->
+                <p class="steam-diag-rate-limited" th:if="${ch.isOwner()}"
+                   sp:visible-when="connected:${ch.hasSteam()},rateLimited:${ch.steamRateLimited()}"
                    th:text="#{channel.connections.steam.rate_limited}">
                     Steam nous bloque temporairement.
                 </p>
-                <p th:if="${ch.isOwner() and ch.steamOfflineMode()}"
+                <p class="steam-diag-offline" th:if="${ch.isOwner()}"
+                   sp:visible-when="connected:${ch.hasSteam()},offline:${ch.steamOfflineMode()}"
                    th:text="#{channel.connections.steam.offline_mode(${ch.steamProfileCacheTtlMinutes()})}">
                     Profil hors-ligne, cache de {0} minutes.
                 </p>
-                <p th:if="${ch.isOwner() and ch.steamProfilePrivate()}"
+                <p class="steam-diag-private" th:if="${ch.isOwner()}"
+                   sp:visible-when="connected:${ch.hasSteam()},privateProfile:${ch.steamProfilePrivate()}"
                    th:text="#{channel.connections.steam.private}">
                     Profil Steam privé.
                 </p>
 
-                <div id="steam-token-body" th:if="${ch.isOwner() and ch.hasSteam()}"
-                     th:attr="data-shared-label=#{channel.connections.steam.token.shared}">
-                    <div th:if="${ch.hasSteamPersonalToken()}">
+                <div id="steam-token-body" th:if="${ch.isOwner()}" sp:visible-when="connected:${ch.hasSteam()}">
+                    <div class="steam-token-has" sp:visible-when="hasToken:${ch.hasSteamPersonalToken()}">
                         <label>
-                            <input type="checkbox" id="steam-token-shared" th:checked="${ch.steamTokenShared()}"/>
+                            <mdui-switch id="steam-token-shared" th:checked="${ch.steamTokenShared()}"></mdui-switch>
                             <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
                         </label>
                     </div>
-                    <div th:unless="${ch.hasSteamPersonalToken()}">
+                    <div class="steam-token-none" sp:visible-when="noToken:${!ch.hasSteamPersonalToken()}">
                         <input type="password" id="steam-token-input"
                                th:placeholder="#{channel.connections.steam.token.placeholder}"/>
                         <label>
-                            <input type="checkbox" id="steam-token-share-new"/>
+                            <mdui-switch id="steam-token-share-new"></mdui-switch>
                             <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
                         </label>
                     </div>
                 </div>
 
                 <mdui-segmented-button-group id="steam-token-actions" class="card-actions"
-                                              th:if="${ch.isOwner() and ch.hasSteam()}"
-                                              th:attr="data-delete-label=#{channel.connections.steam.token.delete},data-save-label=#{channel.connections.steam.token.save}">
-                    <mdui-segmented-button th:if="${ch.hasSteamPersonalToken()}" id="steam-token-delete-btn"
-                                            th:text="#{channel.connections.steam.token.delete}">
+                                             th:if="${ch.isOwner()}" sp:visible-when="connected:${ch.hasSteam()}">
+                    <mdui-segmented-button id="steam-token-delete-btn"
+                                           sp:visible-when="hasToken:${ch.hasSteamPersonalToken()}"
+                                           th:text="#{channel.connections.steam.token.delete}">
                         Supprimer le token
                     </mdui-segmented-button>
-                    <mdui-segmented-button th:unless="${ch.hasSteamPersonalToken()}" id="steam-token-save-btn"
-                                            th:text="#{channel.connections.steam.token.save}">
+                    <mdui-segmented-button id="steam-token-save-btn"
+                                           sp:visible-when="noToken:${!ch.hasSteamPersonalToken()}"
+                                           th:text="#{channel.connections.steam.token.save}">
                         Enregistrer
                     </mdui-segmented-button>
                     <mdui-segmented-button id="steam-refresh-cache-btn"
-                                            th:text="#{channel.connections.steam.refresh_cache}">
+                                           th:text="#{channel.connections.steam.refresh_cache}">
                         Rafraîchir le cache
                     </mdui-segmented-button>
                 </mdui-segmented-button-group>
@@ -219,7 +255,7 @@
 
                 <mdui-segmented-button-group id="minecraft-status-actions" class="card-actions">
                     <mdui-segmented-button th:if="${minecraftLink.status() == 'NONE'}" id="minecraft-enroll-btn"
-                                            th:text="#{channel.connections.minecraft.enroll}">
+                                           th:text="#{channel.connections.minecraft.enroll}">
                         Lier
                     </mdui-segmented-button>
                     <mdui-segmented-button
@@ -228,8 +264,8 @@
                         Vérifier
                     </mdui-segmented-button>
                     <mdui-segmented-button th:if="${minecraftLink.status() == 'ACCEPTED'}"
-                                            id="minecraft-disconnect-btn"
-                                            th:text="#{channel.connections.minecraft.disconnect}">
+                                           id="minecraft-disconnect-btn"
+                                           th:text="#{channel.connections.minecraft.disconnect}">
                         Délier
                     </mdui-segmented-button>
                 </mdui-segmented-button-group>
@@ -245,6 +281,7 @@
                 <input type="checkbox" id="ccl-enabled-checkbox" th:checked="${channelSettings.cclFeatureEnabled()}"/>
                 <span th:text="#{channel.settings.ccl.enable}">Activer le filtrage CCL</span>
             </label>
+            <span class="eyebrow" th:text="#{channel.settings.ccl.select_disable}"></span>
             <label th:each="ccl : ${channelSettings.availableCcls()}">
                 <input type="checkbox" class="ccl-block-checkbox" th:value="${ccl.id()}"
                        th:checked="${channelSettings.blockedCcls().contains(ccl.id())}"/>
@@ -258,6 +295,7 @@
                 <input type="checkbox" id="tw-enabled-checkbox" th:checked="${channelSettings.twFeatureEnabled()}"/>
                 <span th:text="#{channel.settings.tw.enable}">Activer les avertissements</span>
             </label>
+            <span class="eyebrow" th:text="#{channel.settings.tw.select_disable}"></span>
             <label th:each="tw : ${channelSettings.availableTws()}">
                 <input type="checkbox" class="tw-block-checkbox" th:value="${tw.id()}"
                        th:checked="${channelSettings.blockedTws().contains(tw.id())}"/>
