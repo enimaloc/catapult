@@ -31,39 +31,51 @@ document.addEventListener("catapult:render", function () {
         })
     })
 
-    list.querySelectorAll(".binding-edit-btn").forEach(btn => {
-        const row = btn.closest("[data-binding-id]");
-        const panel = row.querySelector(".binding-edit-panel");
-        btn.addEventListener("click", () => { panel.hidden = !panel.hidden; });
-
+    // updateBinding replaces twitchGameId/twitchGameName/ccls wholesale, so every save —
+    // whether triggered by picking a game or ticking a ccl — must resend all three.
+    list.querySelectorAll(".binding-edit-panel").forEach(panel => {
+        const row = panel.closest("[data-binding-id]");
         const gameInput = panel.querySelector(".binding-edit-game-input");
         const gameIdInput = panel.querySelector(".binding-edit-game-id");
         const results = panel.querySelector(".binding-edit-game-results");
+
+        function saveBinding(gameId, gameName) {
+            const ccls = Array.from(panel.querySelectorAll(".binding-edit-ccl-checkbox"))
+                .filter(sw => sw.checked)
+                .map(sw => sw.value);
+            return CatapultChannel.postJson(bindingUrl(row, ""), {
+                twitchGameId: gameId || null,
+                twitchGameName: gameName || null,
+                ccls
+            });
+        }
+
         GameSearch.attach(gameInput, results, `${CatapultChannel.baseUrl()}/games/search`, game => {
             gameIdInput.value = game.id;
+            saveBinding(game.id, game.name);
         });
 
-        panel.querySelector(".binding-edit-save-btn").addEventListener("click", async () => {
-            const ccls = Array.from(panel.querySelectorAll(".binding-edit-ccl-checkbox:checked"))
-                .map(cb => cb.value);
-            await CatapultChannel.postJson(bindingUrl(row, ""), {
-                twitchGameId: gameIdInput.value || null,
-                twitchGameName: gameInput.value || null,
-                ccls
+        panel.querySelectorAll(".binding-edit-ccl-checkbox").forEach(sw => {
+            sw.addEventListener("change", () => {
+                saveBinding(gameIdInput.value, gameInput.value);
             });
         });
     });
 
-    list.querySelectorAll(".binding-tw-btn").forEach(btn => {
-        const row = btn.closest("[data-binding-id]");
-        const panel = row.querySelector(".binding-tw-panel");
-        btn.addEventListener("click", () => { panel.hidden = !panel.hidden; });
+    list.querySelectorAll(".binding-tw-panel").forEach(panel => {
+        const row = panel.closest("[data-binding-id]");
 
-        panel.querySelector(".binding-tw-save-btn").addEventListener("click", async () => {
-            const enabled = panel.querySelector(".binding-tw-enabled-checkbox").checked;
-            const tws = Array.from(panel.querySelectorAll(".binding-tw-checkbox:checked")).map(cb => cb.value);
-            await CatapultChannel.postJson(twUrl(row, "tw-enabled"), { enabled });
-            await CatapultChannel.postJson(twUrl(row, "tws"), { tws });
+        panel.querySelector(".binding-tw-enabled-checkbox").addEventListener("change", async (event) => {
+            await CatapultChannel.postJson(twUrl(row, "tw-enabled"), { enabled: event.target.checked });
+        });
+
+        panel.querySelectorAll(".binding-tw-checkbox").forEach(sw => {
+            sw.addEventListener("change", async () => {
+                const tws = Array.from(panel.querySelectorAll(".binding-tw-checkbox"))
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value);
+                await CatapultChannel.postJson(twUrl(row, "tws"), { tws });
+            });
         });
 
         panel.querySelector(".binding-tw-reset-btn").addEventListener("click", async () => {
