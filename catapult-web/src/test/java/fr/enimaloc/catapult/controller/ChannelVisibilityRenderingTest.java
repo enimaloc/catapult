@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.BindingDto;
 import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.GameDto;
 import fr.enimaloc.catapult.common.dto.PagedBindings;
 import fr.enimaloc.catapult.common.dto.UserSettingsDto;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
@@ -134,5 +135,45 @@ class ChannelVisibilityRenderingTest {
         String offlineTag = openingTagForId(html, "channel-state-offline");
         assertThat(liveTag).contains("data-if=\"live\"").contains("hidden");
         assertThat(offlineTag).contains("data-if=\"offline\"").doesNotContain("hidden");
+    }
+
+    private ChannelPageData channelPageDataWithGame(GameDto currentGame) {
+        return new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, currentGame,
+                new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, false, false, false, false, false, false, false, 15L, false, false, "uuid");
+    }
+
+    @Test
+    void currentGame_gameDetected_showsGameHidesNoGameMessage() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any()))
+                .thenReturn(channelPageDataWithGame(new GameDto("binding-1", "Jusant", "STEAM")));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String gameTag = openingTagForId(html, "channel-current-game");
+        String noGameTag = openingTagForId(html, "channel-no-game");
+        assertThat(gameTag).contains("data-if=\"hasGame\"").doesNotContain("hidden");
+        assertThat(noGameTag).contains("data-if=\"noGame\"").contains("hidden");
+        assertThat(html).contains(">Jusant<");
+    }
+
+    @Test
+    void currentGame_noGameDetected_showsNoGameMessageHidesGame() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any()))
+                .thenReturn(channelPageDataWithGame(null));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String gameTag = openingTagForId(html, "channel-current-game");
+        String noGameTag = openingTagForId(html, "channel-no-game");
+        assertThat(gameTag).contains("data-if=\"hasGame\"").contains("hidden");
+        assertThat(noGameTag).contains("data-if=\"noGame\"").doesNotContain("hidden");
     }
 }

@@ -15,9 +15,9 @@
                            th:text="#{channel.status.offline}">channel.status.offline
                 </mdui-chip>
 
-                <span id="channel-current-game" th:if="${ch.currentGame() != null}"
-                      th:text="${ch.currentGame().sourceName()}">Game</span>
-                <span id="channel-current-game" th:unless="${ch.currentGame() != null}"
+                <span id="channel-current-game" spa:if="hasGame:${ch.currentGame() != null}"
+                      th:text="${ch.currentGame() != null ? ch.currentGame().sourceName() : ''}">Game</span>
+                <span id="channel-no-game" spa:if="noGame:${ch.currentGame() == null}"
                       th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
 
                 <mdui-button-icon icon="refresh" th:if="${ch.isOwner()}"

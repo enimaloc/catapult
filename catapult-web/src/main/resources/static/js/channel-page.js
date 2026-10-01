@@ -54,6 +54,11 @@ window.CatapultChannel = (function () {
     function setCurrentGame(bindingId, sourceName) {
         const el = document.getElementById("channel-current-game");
         if (el) el.textContent = sourceName;
+        // GameChangedEvent only ever reports a detected game, never that one was cleared
+        // (no such event exists yet), so hasGame/noGame only ever move in this one direction
+        // here — see channel-no-game's own spa:if for the other half of the state.
+        const row = document.querySelector(".status-row");
+        if (row) Visibility.apply(row, { hasGame: true, noGame: false });
         const bindingList = document.getElementById("channel-bindings-list").children[0];
         if (bindingList) bindingList.value = bindingId;
     }
