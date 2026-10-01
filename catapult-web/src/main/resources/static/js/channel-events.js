@@ -41,7 +41,7 @@
 
         on("ChannelLiveStateEvent", data => CatapultChannel.setStreamState(data.state));
         on("BotStateChangedEvent", data => CatapultChannel.setBotState(data.state));
-        on("GameChangedEvent", data => CatapultChannel.setCurrentGame(data.sourceName));
+        on("GameChangedEvent", data => CatapultChannel.setCurrentGame(data.bindingId, data.sourceName));
 
         on("BindingIgnoredStateEvent", data => CatapultChannel.setBindingIgnored(data.bindingId, data.ignored));
         on("CclStateEvent", data => CatapultChannel.setCclEnabled(data.bindingId, data.enabled));
@@ -56,6 +56,7 @@
         on("MinecraftSyncEvent", data => CatapultChannel.setMinecraftStatus(data.status, data.minecraftName));
         on("MinecraftDisconnectedEvent", () => CatapultChannel.setMinecraftStatus("NONE", null));
 
+        on("SteamConnectionStateEvent", data => CatapultChannel.setSteamConnectedState(data.connected, data.rateLimited, data.offline, data.privateProfile));
         on("SteamTokenSavedEvent", data => CatapultChannel.setSteamTokenSaved(data.shared));
         on("SteamTokenSharedStateEvent", data => CatapultChannel.setSteamTokenShared(data.shared));
         on("SteamTokenDeletedEvent", () => CatapultChannel.setSteamTokenDeleted());

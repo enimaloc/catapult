@@ -1,10 +1,9 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.BindingDto;
 import fr.enimaloc.catapult.service.mock.MockApiService;
 import fr.enimaloc.catapult.service.mock.MockData;
-import fr.enimaloc.catapult.ws.event.ChannelLiveStateEvent;
-import fr.enimaloc.catapult.ws.event.ChannelUpdatedEvent;
-import fr.enimaloc.catapult.ws.event.GameChangedEvent;
+import fr.enimaloc.catapult.ws.event.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
@@ -39,7 +38,7 @@ public class MockAdminController {
 
         model.addAttribute("channel", data.getChannelDto());
         model.addAttribute("game", data.getGameDto());
-        model.addAttribute("binding", data.getBinding());
+        model.addAttribute("binding", data.getPrimaryBinding());
         model.addAttribute("hasSteamProvider", data.isHasSteamProvider());
         model.addAttribute("hasSteam", data.isHasSteam());
         model.addAttribute("hasXboxProvider", data.isHasXboxProvider());
@@ -94,11 +93,25 @@ public class MockAdminController {
         }
         data.setChannelAvatarUrl(avatarUrl);
         if (!data.getGameDto().sourceName().equals(detectedSourceName) || !data.getGameDto().sourceType().equals(detectedSourceType)) {
+            BindingDto bindingDto = data.getBinding()
+                        .stream()
+                        .filter(b -> b.sourceName().equalsIgnoreCase(detectedSourceName)
+                                && b.sourceType().equalsIgnoreCase(detectedSourceType))
+                        .findFirst()
+                        .orElse(new BindingDto(null, null, null, null,
+                                null, null, false, false, Set.of(),
+                                false, false, Set.of()));
             data.setDetectedGame(detectedSourceType, detectedSourceName);
-            eventPublisher.publishEvent(new GameChangedEvent(username, detectedSourceType, detectedSourceName));
+            eventPublisher.publishEvent(new GameChangedEvent(username, bindingDto.id(), bindingDto.sourceType(), bindingDto.sourceName()));
+        }
+        if (data.isHasSteam() != hasSteam
+                || data.isSteamRateLimited() != steamRateLimited
+                || data.isSteamOfflineMode() != steamOfflineMode
+                || data.isSteamProfilePrivate() != steamProfilePrivate) {
+            eventPublisher.publishEvent(new SteamConnectionStateEvent(username, hasSteam, steamRateLimited, steamOfflineMode, steamProfilePrivate));
+            data.setSteamDiagnostics(steamProfilePrivate, steamRateLimited, steamOfflineMode, steamProfileCacheTtlMinutes);
         }
         data.setProviders(hasSteamProvider, hasSteam, hasXboxProvider, hasXbox);
-        data.setSteamDiagnostics(steamProfilePrivate, steamRateLimited, steamOfflineMode, steamProfileCacheTtlMinutes);
         data.replaceBinding(bindingStatus, bindingSourceType, bindingSourceName, bindingTwitchGameId, bindingTwitchGameName,
                 bindingIgnored, bindingCclEnabled, bindingCcls == null ? Set.of() : bindingCcls,
                 bindingTwEnabled, bindingTwOverride, bindingTws == null ? Set.of() : bindingTws);

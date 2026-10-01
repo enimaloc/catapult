@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,12 +34,20 @@ public class MockApiService implements ApiService {
      */
     private final Map<String, MockData> data = new ConcurrentHashMap<>();
 
-    /** Resolves the calling session's data the same way {@link ApiClient} resolves its JWT. */
+    /**
+     * Resolves the calling session's data the same way {@link ApiClient} resolves its JWT.
+     * The token is a random UUID minted in {@link #exchangeCode}, not a JWT, so it can't be
+     * fed to {@link MockData#fromJwt} — if the entry is missing (e.g. the server restarted and
+     * lost its in-memory state while the browser session cookie survived), data is regenerated
+     * deterministically from the token via {@link MockData#randomFrom} so it stays the same
+     * across repeated requests instead of reshuffling every time it's rebuilt.
+     */
     private MockData currentData() {
         ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attrs == null) return null;
         HttpSession session = attrs.getRequest().getSession(false);
         String token = session != null ? (String) session.getAttribute(ApiClient.SESSION_JWT_KEY) : null;
+        if (token != null && !data.containsKey(token)) data.put(token, MockData.randomFrom(token));
         return token != null ? data.get(token) : null;
     }
 
@@ -109,7 +118,11 @@ public class MockApiService implements ApiService {
     @Override
     public Object searchGames(String username, String q) {
         log.trace("searchGames({}, {})", username, q);
-        return List.of(Map.of("id", "509658", "name", "Celeste"));
+        return Arrays.stream(MockData.CATEGORIES_DTO)
+                .filter(dto -> dto.name().toLowerCase().contains(q.toLowerCase()))
+                .map(dto -> Map.of("id", dto.id(), "name", dto.name()))
+                .limit(10)
+                .toList();
     }
 
     @Override

@@ -124,6 +124,14 @@ public class ApiChannelDataController {
         return channelUser;
     }
 
+    private GameDto toGameDto(UserAccount channelUser, DetectedGame game) {
+        String bindingId = gameBindingRepository
+                .findByUserAndSourceIdAndSourceType(channelUser, game.getSourceId(), game.getSourceType())
+                .map(binding -> binding.getId().toString())
+                .orElse(null);
+        return new GameDto(bindingId, game.getSourceName(), game.getSourceType().name());
+    }
+
     @GetMapping
     public ChannelPageData channelPage(
             @PathVariable String username,
@@ -146,7 +154,7 @@ public class ApiChannelDataController {
         boolean isOwner = viewer.getId().equals(channelUser.getId());
 
         Optional<DetectedGame> currentGame = gameStateService.getLastKnownGame(channelUser);
-        GameDto currentGameDto = currentGame.map(g -> new GameDto(g.getSourceName(), g.getSourceType().name())).orElse(null);
+        GameDto currentGameDto = currentGame.map(g -> toGameDto(channelUser, g)).orElse(null);
         String exampleUuid = resolveExampleUuid(channelUser, currentGame);
 
         PageRequest pageRequest = PageRequest.of(page, 20);
@@ -341,7 +349,7 @@ public class ApiChannelDataController {
 
         boolean isOwner = viewer.getId().equals(channelUser.getId());
         Optional<DetectedGame> currentGame = gameStateService.getLastKnownGame(channelUser);
-        GameDto currentGameDto = currentGame.map(g -> new GameDto(g.getSourceName(), g.getSourceType().name())).orElse(null);
+        GameDto currentGameDto = currentGame.map(g -> toGameDto(channelUser, g)).orElse(null);
 
         return new StatusData(
                 username,
