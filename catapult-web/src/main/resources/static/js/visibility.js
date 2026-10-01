@@ -11,7 +11,10 @@ window.Visibility = {
     apply(root, state) {
         root.querySelectorAll("[data-visible-when]").forEach(el => {
             const names = el.dataset.visibleWhen.split(",");
-            const allKnown = names.every(n => Object.prototype.hasOwnProperty.call(state, n));
+            // `undefined` (not just a missing key) means unknown too: a setter that merges
+            // a partial SSE payload via Object.assign creates the key regardless of whether
+            // the event carried it, so hasOwnProperty alone would treat that as "known false".
+            const allKnown = names.every(n => state[n] !== undefined);
             if (!allKnown) {
                 return;
             }
