@@ -18,6 +18,6 @@ public class SPADialect extends AbstractProcessorDialect {
 
     @Override
     public Set<IProcessor> getProcessors(String dialectPrefix) {
-        return Set.of(new IfAttributeProcessor(dialectPrefix));
+        return Set.of(new IfAttributeProcessor(dialectPrefix), new OnAttributeProcessor(dialectPrefix));
     }
 }
