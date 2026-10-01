@@ -8,10 +8,10 @@
 
         <mdui-card class="status-card" variant="outlined">
             <div class="status-row">
-                <mdui-chip id="channel-state-live" th:class="${!ch.isLive() ? 'hidden' : ''}"
+                <mdui-chip id="channel-state-live" spa:if="live:${ch.isLive()}"
                            th:text="#{channel.status.live}">channel.status.live
                 </mdui-chip>
-                <mdui-chip id="channel-state-offline" th:class="${ch.isLive() ? 'hidden' : ''}"
+                <mdui-chip id="channel-state-offline" spa:if="offline:${!ch.isLive()}"
                            th:text="#{channel.status.offline}">channel.status.offline
                 </mdui-chip>
 
