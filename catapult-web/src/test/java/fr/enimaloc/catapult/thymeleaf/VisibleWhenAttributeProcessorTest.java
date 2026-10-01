@@ -84,4 +84,34 @@ class VisibleWhenAttributeProcessorTest {
                         "<p sp:visible-when=\"flag:${ch.connected()}\">x</p>", null))
                 .isInstanceOf(org.thymeleaf.exceptions.TemplateProcessingException.class);
     }
+
+    record TestChannelWithName(String displayName) {}
+
+    @Test
+    void nonBooleanTruthyExpression_isTreatedAsVisible() {
+        // A non-empty String is truthy by Thymeleaf's own evaluation rules (same as
+        // th:if="${ch.displayName()}" would treat it) — sp:visible-when must agree,
+        // not silently hide the element because the result isn't a literal Boolean.TRUE.
+        String html = render(
+                "<p sp:visible-when=\"hasName:${ch.displayName()}\">x</p>",
+                new TestChannelWithName("enimaloc"));
+
+        assertThat(html).doesNotContain("hidden");
+    }
+
+    @Test
+    void malformedAttributeValue_throwsDescriptiveExceptionNotAnIndexException() {
+        // Thymeleaf always wraps processor exceptions with a generic message that echoes
+        // the raw template text, so asserting on the outer exception alone would pass even
+        // for a bare StringIndexOutOfBoundsException (sep == -1 from a missing ':'). The
+        // real assertion is on the root cause: it must be a deliberate, descriptive error
+        // naming the bad value, not an unchecked index exception with no context.
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> render(
+                        "<p sp:visible-when=\"noColonHere\">x</p>",
+                        new TestChannel(true, true)))
+                .rootCause()
+                .isNotInstanceOf(StringIndexOutOfBoundsException.class)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("noColonHere");
+    }
 }
