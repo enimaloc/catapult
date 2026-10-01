@@ -1,6 +1,6 @@
 /**
- * Generic client-side counterpart to the server's sp:visible-when Thymeleaf attribute
- * (see VisibleWhenAttributeProcessor): that attribute leaves a data-visible-when="name,..."
+ * Generic client-side counterpart to the server's spa:if Thymeleaf attribute
+ * (see IfAttributeProcessor): that attribute leaves a data-if="name,..."
  * breadcrumb in the rendered HTML instead of a JS-specific toggle, so the same named flags
  * SSE handlers already receive can drive the same elements without re-deriving each
  * condition by hand. A flag missing from `state` is left alone rather than treated as
@@ -9,8 +9,8 @@
  */
 window.Visibility = {
     apply(root, state) {
-        root.querySelectorAll("[data-visible-when]").forEach(el => {
-            const names = el.dataset.visibleWhen.split(",");
+        root.querySelectorAll("[data-if]").forEach(el => {
+            const names = el.dataset.if.split(",");
             // `undefined` (not just a missing key) means unknown too: a setter that merges
             // a partial SSE payload via Object.assign creates the key regardless of whether
             // the event carried it, so hasOwnProperty alone would treat that as "known false".

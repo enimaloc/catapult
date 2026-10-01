@@ -116,7 +116,7 @@
                                              th:checked="${b.tws().contains(tw.id())}"></mdui-switch>
                                 <span th:text="${tw.label()}">tw label</span>
                             </label>
-                            <mdui-button sp:visible-when="hasOverride:${b.twOverride()}" class="binding-tw-reset-btn"
+                            <mdui-button spa:if="hasOverride:${b.twOverride()}" class="binding-tw-reset-btn"
                                          th:text="#{channel.bindings.tw.reset}">Réinitialiser
                             </mdui-button>
                         </div>
@@ -150,10 +150,10 @@
 
             <mdui-card th:if="${ch.hasSteamProvider()}" class="connection-card" variant="outlined" data-conn="steam">
                 <span th:text="#{channel.connections.steam}">Steam</span>
-                <mdui-chip class="steam-connected-chip" sp:visible-when="connected:${ch.hasSteam()}"
+                <mdui-chip class="steam-connected-chip" spa:if="connected:${ch.hasSteam()}"
                            th:text="#{channel.connections.connected}">Connecté
                 </mdui-chip>
-                <mdui-chip class="steam-not-connected-chip" sp:visible-when="notConnected:${!ch.hasSteam()}"
+                <mdui-chip class="steam-not-connected-chip" spa:if="notConnected:${!ch.hasSteam()}"
                            th:text="#{channel.connections.not_connected}">Non connecté
                 </mdui-chip>
 
@@ -165,29 +165,29 @@
                   see channel-page.js.
                 -->
                 <p class="steam-diag-rate-limited" th:if="${ch.isOwner()}"
-                   sp:visible-when="connected:${ch.hasSteam()},rateLimited:${ch.steamRateLimited()}"
+                   spa:if="connected:${ch.hasSteam()},rateLimited:${ch.steamRateLimited()}"
                    th:text="#{channel.connections.steam.rate_limited}">
                     Steam nous bloque temporairement.
                 </p>
                 <p class="steam-diag-offline" th:if="${ch.isOwner()}"
-                   sp:visible-when="connected:${ch.hasSteam()},offline:${ch.steamOfflineMode()}"
+                   spa:if="connected:${ch.hasSteam()},offline:${ch.steamOfflineMode()}"
                    th:text="#{channel.connections.steam.offline_mode(${ch.steamProfileCacheTtlMinutes()})}">
                     Profil hors-ligne, cache de {0} minutes.
                 </p>
                 <p class="steam-diag-private" th:if="${ch.isOwner()}"
-                   sp:visible-when="connected:${ch.hasSteam()},privateProfile:${ch.steamProfilePrivate()}"
+                   spa:if="connected:${ch.hasSteam()},privateProfile:${ch.steamProfilePrivate()}"
                    th:text="#{channel.connections.steam.private}">
                     Profil Steam privé.
                 </p>
 
-                <div id="steam-token-body" th:if="${ch.isOwner()}" sp:visible-when="connected:${ch.hasSteam()}">
-                    <div class="steam-token-has" sp:visible-when="hasToken:${ch.hasSteamPersonalToken()}">
+                <div id="steam-token-body" th:if="${ch.isOwner()}" spa:if="connected:${ch.hasSteam()}">
+                    <div class="steam-token-has" spa:if="hasToken:${ch.hasSteamPersonalToken()}">
                         <label>
                             <mdui-switch id="steam-token-shared" th:checked="${ch.steamTokenShared()}"></mdui-switch>
                             <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
                         </label>
                     </div>
-                    <div class="steam-token-none" sp:visible-when="noToken:${!ch.hasSteamPersonalToken()}">
+                    <div class="steam-token-none" spa:if="noToken:${!ch.hasSteamPersonalToken()}">
                         <input type="password" id="steam-token-input"
                                th:placeholder="#{channel.connections.steam.token.placeholder}"/>
                         <label>
@@ -198,14 +198,14 @@
                 </div>
 
                 <mdui-segmented-button-group id="steam-token-actions" class="card-actions"
-                                             th:if="${ch.isOwner()}" sp:visible-when="connected:${ch.hasSteam()}">
+                                             th:if="${ch.isOwner()}" spa:if="connected:${ch.hasSteam()}">
                     <mdui-segmented-button id="steam-token-delete-btn"
-                                           sp:visible-when="hasToken:${ch.hasSteamPersonalToken()}"
+                                           spa:if="hasToken:${ch.hasSteamPersonalToken()}"
                                            th:text="#{channel.connections.steam.token.delete}">
                         Supprimer le token
                     </mdui-segmented-button>
                     <mdui-segmented-button id="steam-token-save-btn"
-                                           sp:visible-when="noToken:${!ch.hasSteamPersonalToken()}"
+                                           spa:if="noToken:${!ch.hasSteamPersonalToken()}"
                                            th:text="#{channel.connections.steam.token.save}">
                         Enregistrer
                     </mdui-segmented-button>

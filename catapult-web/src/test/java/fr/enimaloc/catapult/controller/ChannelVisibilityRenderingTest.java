@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Pins the per-row correctness of .binding-tw-reset-btn's sp:visible-when: each binding
+ * Pins the per-row correctness of .binding-tw-reset-btn's spa:if: each binding
  * row must carry its own hasOverride state independently of the others, since
  * Visibility.apply on the client is scoped per-row precisely to avoid one binding's
  * update leaking into another's reset button.
@@ -83,11 +83,12 @@ class ChannelVisibilityRenderingTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        // Both rows must carry the data-visible-when breadcrumb, but only the
+        // Both rows must carry the data-if breadcrumb, but only the
         // non-overridden row's button should also have picked up the 'hidden' class —
         // a shared/collapsed state between rows would make these counts diverge.
-        assertThat(countOccurrences(html, "data-visible-when=\"hasOverride\"")).isEqualTo(2);
+        assertThat(countOccurrences(html, "data-if=\"hasOverride\"")).isEqualTo(2);
         assertThat(countOccurrences(html, "binding-tw-reset-btn hidden")).isEqualTo(1);
         assertThat(countOccurrences(html, "binding-tw-reset-btn")).isEqualTo(2);
     }
+
 }

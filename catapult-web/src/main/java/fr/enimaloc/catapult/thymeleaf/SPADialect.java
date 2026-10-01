@@ -7,17 +7,17 @@ import org.thymeleaf.processor.IProcessor;
 import java.util.Set;
 
 @Component
-public class VisibilityDialect extends AbstractProcessorDialect {
+public class SPADialect extends AbstractProcessorDialect {
 
-    public static final String PREFIX = "sp";
+    public static final String PREFIX = "spa";
     private static final int PROCESSOR_PRECEDENCE = 1000;
 
-    public VisibilityDialect() {
-        super("Visibility", PREFIX, PROCESSOR_PRECEDENCE);
+    public SPADialect() {
+        super("SPA", PREFIX, PROCESSOR_PRECEDENCE);
     }
 
     @Override
     public Set<IProcessor> getProcessors(String dialectPrefix) {
-        return Set.of(new VisibleWhenAttributeProcessor(dialectPrefix));
+        return Set.of(new IfAttributeProcessor(dialectPrefix));
     }
 }
