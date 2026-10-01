@@ -90,6 +90,9 @@ class ChannelVisibilityRenderingTest {
         assertThat(countOccurrences(html, "data-if=\"hasOverride\"")).isEqualTo(2);
         assertThat(countOccurrences(html, "binding-tw-reset-btn hidden")).isEqualTo(1);
         assertThat(countOccurrences(html, "binding-tw-reset-btn")).isEqualTo(2);
+        // Each row also needs its own data-on breadcrumb for the generic SSE dispatcher
+        // (Visibility.dispatch) to re-evaluate hasOverride per row without any JS change.
+        assertThat(countOccurrences(html, "data-on=\"hasOverride:TwUpdatedEvent.tws,hasOverride:!TwResetEvent\"")).isEqualTo(2);
     }
 
     private ChannelPageData channelPageData(boolean isLive) {
@@ -119,8 +122,8 @@ class ChannelVisibilityRenderingTest {
 
         String liveTag = openingTagForId(html, "channel-state-live");
         String offlineTag = openingTagForId(html, "channel-state-offline");
-        assertThat(liveTag).contains("data-if=\"live\"").doesNotContain("hidden");
-        assertThat(offlineTag).contains("data-if=\"offline\"").contains("hidden");
+        assertThat(liveTag).contains("data-if=\"live\"").contains("data-on=\"live:ChannelLiveStateEvent.state\"").doesNotContain("hidden");
+        assertThat(offlineTag).contains("data-if=\"offline\"").contains("data-on=\"offline:ChannelLiveStateEvent.!state\"").contains("hidden");
     }
 
     @Test
