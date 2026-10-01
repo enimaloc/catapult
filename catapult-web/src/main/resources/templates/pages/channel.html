@@ -9,14 +9,19 @@
         <mdui-card class="status-card" variant="outlined">
             <div class="status-row">
                 <mdui-chip id="channel-state-live" spa:if="live:${ch.isLive()}"
+                           spa:on="live:ChannelLiveStateEvent.state"
                            th:text="#{channel.status.live}">channel.status.live
                 </mdui-chip>
                 <mdui-chip id="channel-state-offline" spa:if="offline:${!ch.isLive()}"
+                           spa:on="offline:ChannelLiveStateEvent.!state"
                            th:text="#{channel.status.offline}">channel.status.offline
                 </mdui-chip>
 
                 <span id="channel-current-game" spa:if="hasGame:${ch.currentGame() != null}"
+                      spa:on="hasGame:GameChangedEvent"
                       th:text="${ch.currentGame() != null ? ch.currentGame().sourceName() : ''}">Game</span>
+                <!-- noGame has no spa:on: no event signals a detected game being cleared yet
+                     (only GameChangedEvent exists) — known gap, see git history. -->
                 <span id="channel-no-game" spa:if="noGame:${ch.currentGame() == null}"
                       th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
 
@@ -117,6 +122,7 @@
                                 <span th:text="${tw.label()}">tw label</span>
                             </label>
                             <mdui-button spa:if="hasOverride:${b.twOverride()}" class="binding-tw-reset-btn"
+                                         spa:on="hasOverride:TwUpdatedEvent.tws,hasOverride:!TwResetEvent"
                                          th:text="#{channel.bindings.tw.reset}">Réinitialiser
                             </mdui-button>
                         </div>
@@ -151,43 +157,50 @@
             <mdui-card th:if="${ch.hasSteamProvider()}" class="connection-card" variant="outlined" data-conn="steam">
                 <span th:text="#{channel.connections.steam}">Steam</span>
                 <mdui-chip class="steam-connected-chip" spa:if="connected:${ch.hasSteam()}"
+                           spa:on="connected:SteamConnectionStateEvent.connected"
                            th:text="#{channel.connections.connected}">Connecté
                 </mdui-chip>
                 <mdui-chip class="steam-not-connected-chip" spa:if="notConnected:${!ch.hasSteam()}"
+                           spa:on="notConnected:SteamConnectionStateEvent.!connected"
                            th:text="#{channel.connections.not_connected}">Non connecté
                 </mdui-chip>
 
                 <!--
                   Every state below (diagnostics, has-token/no-token sub-view, save/delete
                   buttons) is always rendered for owners and toggled with the `hidden` class
-                  from JS, instead of being created/destroyed on each
-                  SteamConnectionStateEvent/SteamTokenSavedEvent/SteamTokenDeletedEvent —
-                  see channel-page.js.
+                  via spa:if/spa:on, instead of being created/destroyed on each
+                  SteamConnectionStateEvent/SteamTokenSavedEvent/SteamTokenDeletedEvent.
                 -->
                 <p class="steam-diag-rate-limited" th:if="${ch.isOwner()}"
                    spa:if="connected:${ch.hasSteam()},rateLimited:${ch.steamRateLimited()}"
+                   spa:on="connected:SteamConnectionStateEvent.connected,rateLimited:SteamConnectionStateEvent.rateLimited"
                    th:text="#{channel.connections.steam.rate_limited}">
                     Steam nous bloque temporairement.
                 </p>
                 <p class="steam-diag-offline" th:if="${ch.isOwner()}"
                    spa:if="connected:${ch.hasSteam()},offline:${ch.steamOfflineMode()}"
+                   spa:on="connected:SteamConnectionStateEvent.connected,offline:SteamConnectionStateEvent.offline"
                    th:text="#{channel.connections.steam.offline_mode(${ch.steamProfileCacheTtlMinutes()})}">
                     Profil hors-ligne, cache de {0} minutes.
                 </p>
                 <p class="steam-diag-private" th:if="${ch.isOwner()}"
                    spa:if="connected:${ch.hasSteam()},privateProfile:${ch.steamProfilePrivate()}"
+                   spa:on="connected:SteamConnectionStateEvent.connected,privateProfile:SteamConnectionStateEvent.privateProfile"
                    th:text="#{channel.connections.steam.private}">
                     Profil Steam privé.
                 </p>
 
-                <div id="steam-token-body" th:if="${ch.isOwner()}" spa:if="connected:${ch.hasSteam()}">
-                    <div class="steam-token-has" spa:if="hasToken:${ch.hasSteamPersonalToken()}">
+                <div id="steam-token-body" th:if="${ch.isOwner()}" spa:if="connected:${ch.hasSteam()}"
+                     spa:on="connected:SteamConnectionStateEvent.connected">
+                    <div class="steam-token-has" spa:if="hasToken:${ch.hasSteamPersonalToken()}"
+                         spa:on="hasToken:SteamTokenSavedEvent,hasToken:!SteamTokenDeletedEvent">
                         <label>
                             <mdui-switch id="steam-token-shared" th:checked="${ch.steamTokenShared()}"></mdui-switch>
                             <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
                         </label>
                     </div>
-                    <div class="steam-token-none" spa:if="noToken:${!ch.hasSteamPersonalToken()}">
+                    <div class="steam-token-none" spa:if="noToken:${!ch.hasSteamPersonalToken()}"
+                         spa:on="noToken:SteamTokenDeletedEvent,noToken:!SteamTokenSavedEvent">
                         <input type="password" id="steam-token-input"
                                th:placeholder="#{channel.connections.steam.token.placeholder}"/>
                         <label>
@@ -198,14 +211,17 @@
                 </div>
 
                 <mdui-segmented-button-group id="steam-token-actions" class="card-actions"
-                                             th:if="${ch.isOwner()}" spa:if="connected:${ch.hasSteam()}">
+                                             th:if="${ch.isOwner()}" spa:if="connected:${ch.hasSteam()}"
+                                             spa:on="connected:SteamConnectionStateEvent.connected">
                     <mdui-segmented-button id="steam-token-delete-btn"
                                            spa:if="hasToken:${ch.hasSteamPersonalToken()}"
+                                           spa:on="hasToken:SteamTokenSavedEvent,hasToken:!SteamTokenDeletedEvent"
                                            th:text="#{channel.connections.steam.token.delete}">
                         Supprimer le token
                     </mdui-segmented-button>
                     <mdui-segmented-button id="steam-token-save-btn"
                                            spa:if="noToken:${!ch.hasSteamPersonalToken()}"
+                                           spa:on="noToken:SteamTokenDeletedEvent,noToken:!SteamTokenSavedEvent"
                                            th:text="#{channel.connections.steam.token.save}">
                         Enregistrer
                     </mdui-segmented-button>
