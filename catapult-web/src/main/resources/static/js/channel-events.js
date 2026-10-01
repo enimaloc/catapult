@@ -35,11 +35,19 @@
 
         source = new EventSource(`/events/channel/${username}`);
 
+        // Every event also runs through Visibility.dispatch, which reads whatever
+        // data-on="name:ThisEventName.field" breadcrumbs the current DOM happens to carry
+        // (see visibility.js) — a new spa:on in the template is enough to wire a fresh
+        // SSE-driven visibility rule; no new line is ever needed here for that part.
         function on(eventName, handler) {
-            source.addEventListener(eventName, event => handler(JSON.parse(event.data)));
+            source.addEventListener(eventName, event => {
+                const data = JSON.parse(event.data);
+                Visibility.dispatch(eventName, data);
+                if (handler) handler(data);
+            });
         }
 
-        on("ChannelLiveStateEvent", data => CatapultChannel.setStreamState(data.state));
+        on("ChannelLiveStateEvent");
         on("BotStateChangedEvent", data => CatapultChannel.setBotState(data.state));
         on("GameChangedEvent", data => CatapultChannel.setCurrentGame(data.bindingId, data.sourceName));
 
@@ -56,10 +64,10 @@
         on("MinecraftSyncEvent", data => CatapultChannel.setMinecraftStatus(data.status, data.minecraftName));
         on("MinecraftDisconnectedEvent", () => CatapultChannel.setMinecraftStatus("NONE", null));
 
-        on("SteamConnectionStateEvent", data => CatapultChannel.setSteamConnectedState(data.connected, data.rateLimited, data.offline, data.privateProfile));
+        on("SteamConnectionStateEvent");
         on("SteamTokenSavedEvent", data => CatapultChannel.setSteamTokenSaved(data.shared));
         on("SteamTokenSharedStateEvent", data => CatapultChannel.setSteamTokenShared(data.shared));
-        on("SteamTokenDeletedEvent", () => CatapultChannel.setSteamTokenDeleted());
+        on("SteamTokenDeletedEvent");
     }
 
     document.addEventListener("catapult:render", () => {
