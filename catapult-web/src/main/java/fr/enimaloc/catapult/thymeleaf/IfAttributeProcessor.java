@@ -15,10 +15,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Processes {@code sp:visible-when="name:${expr},name2:${expr2}"}: evaluates each
+ * Processes {@code spa:if="name:${expr},name2:${expr2}"}: evaluates each
  * expression against the current template context (same engine {@code th:classappend}
  * uses), appends {@code hidden} to {@code class} unless every expression is true, and
- * always emits {@code data-visible-when="name,name2"} so visibility.js can re-evaluate
+ * always emits {@code data-if="name,name2"} so visibility.js can re-evaluate
  * the same named flags client-side from SSE data without re-deriving the condition.
  *
  * <p>The {@code name:expr} pairs are split on a bare {@code ,}, so an expression that
@@ -27,16 +27,16 @@ import java.util.List;
  * reference it as a single no-comma expression.
  *
  * <p>Runs at the same precedence as {@code th:class} ({@value #PRECEDENCE}); combining
- * {@code sp:visible-when} with {@code th:class} on the same element has unspecified
+ * {@code spa:if} with {@code th:class} on the same element has unspecified
  * write-order and can silently drop {@code hidden}. No template does this today — use
  * {@code th:classappend} (precedence 1100) instead if that combination is ever needed.
  */
-public class VisibleWhenAttributeProcessor extends AbstractAttributeTagProcessor {
+public class IfAttributeProcessor extends AbstractAttributeTagProcessor {
 
-    private static final String ATTR_NAME = "visible-when";
+    private static final String ATTR_NAME = "if";
     private static final int PRECEDENCE = 1000;
 
-    public VisibleWhenAttributeProcessor(String dialectPrefix) {
+    public IfAttributeProcessor(String dialectPrefix) {
         super(TemplateMode.HTML, dialectPrefix, null, false, ATTR_NAME, true, PRECEDENCE, true);
     }
 
@@ -52,7 +52,7 @@ public class VisibleWhenAttributeProcessor extends AbstractAttributeTagProcessor
             int sep = pair.indexOf(':');
             if (sep <= 0) {
                 throw new IllegalArgumentException(
-                        "Invalid sp:visible-when entry \"" + pair + "\": expected \"name:${expression}\" (full attribute value: \"" + attributeValue + "\")");
+                        "Invalid spa:if entry \"" + pair + "\": expected \"name:${expression}\" (full attribute value: \"" + attributeValue + "\")");
             }
             String name = pair.substring(0, sep).trim();
             String expr = pair.substring(sep + 1).trim();
@@ -76,6 +76,6 @@ public class VisibleWhenAttributeProcessor extends AbstractAttributeTagProcessor
             structureHandler.setAttribute("class", newClass);
         }
 
-        structureHandler.setAttribute("data-visible-when", String.join(",", names));
+        structureHandler.setAttribute("data-if", String.join(",", names));
     }
 }
