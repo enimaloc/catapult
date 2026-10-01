@@ -43,8 +43,8 @@ window.CatapultChannel = (function () {
     }
 
     function setStreamState(live) {
-        document.getElementById("channel-state-live").className = live ? "" : "hidden";
-        document.getElementById("channel-state-offline").className = !live ? "" : "hidden";
+        const row = document.querySelector(".status-row");
+        if (row) Visibility.apply(row, { live, offline: !live });
     }
 
     function setBotState(state) {
