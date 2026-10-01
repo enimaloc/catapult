@@ -51,13 +51,15 @@ window.CatapultChannel = (function () {
         document.getElementById("channel-bot-toggle").checked = state;
     }
 
-    function setCurrentGame(sourceName) {
+    function setCurrentGame(bindingId, sourceName) {
         const el = document.getElementById("channel-current-game");
         if (el) el.textContent = sourceName;
+        const bindingList = document.getElementById("channel-bindings-list").children[0];
+        if (bindingList) bindingList.value = bindingId;
     }
 
     function getBindingsElements() {
-        return Array.from(document.getElementById("channel-bindings-list").children);
+        return Array.from(document.getElementById("channel-bindings-list").querySelectorAll("[data-binding-id]"));
     }
 
     function getBindingElement(id) {
@@ -79,7 +81,8 @@ window.CatapultChannel = (function () {
         if (!row) return;
         const list = document.getElementById("channel-bindings-list");
         row.remove();
-        if (list.children.length === 0) {
+        if (getBindingsElements().length === 0) {
+            list.querySelector("mdui-collapse")?.remove();
             const empty = document.createElement("mdui-list-item");
             empty.textContent = list.dataset.emptyText;
             list.appendChild(empty);
@@ -90,14 +93,6 @@ window.CatapultChannel = (function () {
         const row = getBindingElement(id);
         if (!row) return;
         row.querySelector(".binding-game-name").textContent = twitchGameName || "—";
-        const chips = row.querySelector(".binding-ccl-chips");
-        chips.innerHTML = "";
-        ccls.forEach(ccl => {
-            const chip = document.createElement("mdui-chip");
-            chip.textContent = ccl;
-            chips.appendChild(chip);
-        });
-        row.querySelector(".binding-edit-panel").hidden = true;
     }
 
     function setTwEnabled(id, enabled) {
@@ -109,7 +104,7 @@ window.CatapultChannel = (function () {
         const row = getBindingElement(id);
         if (!row) return;
         row.querySelectorAll(".binding-tw-checkbox").forEach(cb => { cb.checked = tws.includes(cb.value); });
-        row.querySelector(".binding-tw-reset-btn").classList.toggle("hidden", tws.length === 0);
+        Visibility.apply(row, { hasOverride: tws.length > 0 });
     }
 
     function resetBindingTws(id) {
@@ -154,34 +149,39 @@ window.CatapultChannel = (function () {
         CatapultConnections.attachMinecraftHandlers();
     }
 
-    function steamSharedLabel(labelText, checked, checkboxId) {
-        const div = document.createElement("div");
-        const label = document.createElement("label");
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.id = checkboxId;
-        checkbox.checked = checked;
-        const span = document.createElement("span");
-        span.textContent = labelText;
-        label.append(checkbox, span);
-        div.append(label);
-        return div;
+    // The Steam card always renders every sub-view (connected/not-connected chip,
+    // has-token/no-token body, save/delete buttons) for the owner; these setters just
+    // toggle the `hidden` class between them instead of creating/destroying elements,
+    // so the listeners channel-connections.js attaches once at initial render stay valid.
+    //
+    // Accumulated flags for the Steam card: SSE events only ever carry a subset
+    // (e.g. SteamTokenSavedEvent only knows `shared`), so each handler merges into
+    // this object before calling Visibility.apply — a flag Visibility.apply doesn't
+    // see yet is left alone rather than guessed, see visibility.js.
+    let steamState = {};
+
+    function applySteamVisibility() {
+        const card = document.querySelector('[data-conn="steam"]');
+        if (card) Visibility.apply(card, steamState);
+    }
+
+    function setSteamConnectedState(connected, rateLimited, offline, privateProfile) {
+        Object.assign(steamState, {
+            connected, notConnected: !connected,
+            rateLimited, offline, privateProfile,
+        });
+        if (connected) {
+            // A fresh connection never has a personal token yet.
+            Object.assign(steamState, { hasToken: false, noToken: true });
+        }
+        applySteamVisibility();
     }
 
     function setSteamTokenSaved(shared) {
-        const body = document.getElementById("steam-token-body");
-        const actions = document.getElementById("steam-token-actions");
-        if (!body || !actions) return;
-
-        body.replaceChildren(steamSharedLabel(body.dataset.sharedLabel, shared, "steam-token-shared"));
-
-        const deleteBtn = document.createElement("mdui-segmented-button");
-        deleteBtn.id = "steam-token-delete-btn";
-        deleteBtn.textContent = actions.dataset.deleteLabel;
-        const saveBtn = actions.querySelector("#steam-token-save-btn");
-        if (saveBtn) saveBtn.replaceWith(deleteBtn);
-        else actions.prepend(deleteBtn);
-        CatapultConnections.attachSteamHandlers();
+        const shareToggle = document.getElementById("steam-token-shared");
+        if (shareToggle) shareToggle.checked = shared;
+        Object.assign(steamState, { hasToken: true, noToken: false });
+        applySteamVisibility();
     }
 
     function setSteamTokenShared(shared) {
@@ -190,25 +190,16 @@ window.CatapultChannel = (function () {
     }
 
     function setSteamTokenDeleted() {
-        const body = document.getElementById("steam-token-body");
-        const actions = document.getElementById("steam-token-actions");
-        if (!body || !actions) return;
-
-        const div = document.createElement("div");
-        const tokenInput = document.createElement("input");
-        tokenInput.type = "password";
-        tokenInput.id = "steam-token-input";
-        div.append(tokenInput, steamSharedLabel(body.dataset.sharedLabel, false, "steam-token-share-new").firstChild);
-        body.replaceChildren(div);
-
-        const saveBtn = document.createElement("mdui-segmented-button");
-        saveBtn.id = "steam-token-save-btn";
-        saveBtn.textContent = actions.dataset.saveLabel;
-        const deleteBtn = actions.querySelector("#steam-token-delete-btn");
-        if (deleteBtn) deleteBtn.replaceWith(saveBtn);
-        else actions.prepend(saveBtn);
-        CatapultConnections.attachSteamHandlers();
+        Object.assign(steamState, { hasToken: false, noToken: true });
+        applySteamVisibility();
     }
+
+    // A full SPA navigation re-renders the fragment with fresh server-computed initial
+    // `hidden` classes; steamState must not carry stale flags from a previous page view
+    // into that fresh DOM.
+    document.addEventListener("catapult:render", () => {
+        steamState = {};
+    });
 
     return {
         username, baseUrl, refresh, postJson, showError,
@@ -218,5 +209,6 @@ window.CatapultChannel = (function () {
         setTwEnabled, setBindingTws, resetBindingTws,
         setMinecraftStatus,
         setSteamTokenSaved, setSteamTokenShared, setSteamTokenDeleted,
+        setSteamConnectedState
     };
 })();
