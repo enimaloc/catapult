@@ -1202,13 +1202,26 @@ a[data-link].active {
     border-color: var(--catapult-border-hover);
 }
 
-#channel-bindings-list > mdui-list-item > span:first-child {
+/*
+ * mdui-list-item renders its light-DOM children inside an internal
+ * ::part(container) div that, by default, only shrinks to fit its content
+ * (it isn't a flex-grow item of anything we control). Our own `display: flex`
+ * on the host above doesn't reach through the shadow boundary, so without
+ * this the container — and everything slotted into it, including the
+ * edit/tw grids below — stays only as wide as its content instead of filling
+ * the card.
+ */
+#channel-bindings-list mdui-list-item::part(container) {
+    width: 100%;
+}
+
+#channel-bindings-list mdui-list-item > span:first-child {
     color: var(--catapult-text);
     font-weight: 600;
     margin-right: auto;
 }
 
-#channel-bindings-list > mdui-list-item > span:not(:first-child) {
+#channel-bindings-list mdui-list-item > span:not(:first-child) {
     padding: 3px 10px;
 
     border-radius: 999px;
@@ -1223,11 +1236,11 @@ a[data-link].active {
 }
 
 .binding-edit-panel:not([hidden]),
+.binding-ccl-panel:not([hidden]),
 .binding-tw-panel:not([hidden]) {
-    flex-basis: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
 
     margin-top: 12px;
     padding-top: 16px;
@@ -1236,11 +1249,31 @@ a[data-link].active {
 }
 
 .binding-edit-panel label,
+.binding-ccl-panel label,
 .binding-tw-panel label {
     display: inline-flex;
     align-items: center;
     gap: 8px;
 
+    color: var(--catapult-text-secondary);
+    font-size: 0.9rem;
+}
+
+.binding-edit-panel .binding-edit-game-input,
+.binding-edit-panel .binding-edit-game-results,
+.binding-ccl-panel > label:first-child,
+.binding-tw-panel > label:first-child,
+.binding-tw-panel .binding-tw-reset-btn {
+    grid-column: 1 / -1;
+}
+
+.binding-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.binding-toggle label {
     color: var(--catapult-text-secondary);
     font-size: 0.9rem;
 }
@@ -1433,10 +1466,10 @@ a[data-link].active {
 
 /* Form controls */
 
-:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, #dtdd-search-dialog)
+:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, .binding-ccl-panel, #dtdd-search-dialog)
 input[type="text"],
-:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, #dtdd-search-dialog)
-input[type="password"] {
+:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, .binding-ccl-panel, #dtdd-search-dialog)
+input[type="password"], [part="input"] {
     width: 100%;
     padding: 10px 14px;
 
@@ -1452,20 +1485,20 @@ input[type="password"] {
     transition: border-color 120ms ease;
 }
 
-:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, #dtdd-search-dialog)
+:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, .binding-ccl-panel, #dtdd-search-dialog)
 input[type="text"]:focus,
-:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, #dtdd-search-dialog)
+:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, .binding-ccl-panel, #dtdd-search-dialog)
 input[type="password"]:focus {
     outline: none;
     border-color: var(--catapult-primary-hover);
 }
 
-:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, #dtdd-search-dialog)
+:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, .binding-ccl-panel, #dtdd-search-dialog)
 input::placeholder {
     color: var(--catapult-text-muted);
 }
 
-:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel)
+:is(.status-card, .connection-card, .settings-card, .binding-edit-panel, .binding-tw-panel, .binding-ccl-panel)
 input[type="checkbox"] {
     width: 16px;
     height: 16px;
