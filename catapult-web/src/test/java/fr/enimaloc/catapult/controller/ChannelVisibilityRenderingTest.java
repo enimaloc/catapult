@@ -91,4 +91,48 @@ class ChannelVisibilityRenderingTest {
         assertThat(countOccurrences(html, "binding-tw-reset-btn")).isEqualTo(2);
     }
 
+    private ChannelPageData channelPageData(boolean isLive) {
+        return new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, isLive, true, null,
+                new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, false, false, false, false, false, false, false, 15L, false, false, "uuid");
+    }
+
+    /** Extracts the opening tag text for the first element with the given id. */
+    private static String openingTagForId(String html, String id) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("<[a-zA-Z0-9-]+[^>]*\\bid=\"" + id + "\"[^>]*>")
+                .matcher(html);
+        return m.find() ? m.group() : null;
+    }
+
+    @Test
+    void streamStateChips_live_showsLiveHidesOffline() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String liveTag = openingTagForId(html, "channel-state-live");
+        String offlineTag = openingTagForId(html, "channel-state-offline");
+        assertThat(liveTag).contains("data-if=\"live\"").doesNotContain("hidden");
+        assertThat(offlineTag).contains("data-if=\"offline\"").contains("hidden");
+    }
+
+    @Test
+    void streamStateChips_offline_showsOfflineHidesLive() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(false));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String liveTag = openingTagForId(html, "channel-state-live");
+        String offlineTag = openingTagForId(html, "channel-state-offline");
+        assertThat(liveTag).contains("data-if=\"live\"").contains("hidden");
+        assertThat(offlineTag).contains("data-if=\"offline\"").doesNotContain("hidden");
+    }
 }
