@@ -73,7 +73,7 @@ window.CatapultChannel = (function () {
 
     function setCclEnabled(id, enabled) {
         const row = getBindingElement(id);
-        if (row) row.querySelector(".binding-ccl-toggle").checked = enabled;
+        if (row) row.querySelector(".binding-ccl-enabled").checked = enabled;
     }
 
     function removeBinding(id) {
