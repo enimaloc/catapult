@@ -1,0 +1,9 @@
+mdui-collapse-item.is-open > mdui-list-item[slot="header"] {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+mdui-collapse-item.is-open > mdui-list-item:not([slot="header"]) {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+}
