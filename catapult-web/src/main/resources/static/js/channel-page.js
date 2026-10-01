@@ -42,11 +42,6 @@ window.CatapultChannel = (function () {
         return response;
     }
 
-    function setStreamState(live) {
-        const row = document.querySelector(".status-row");
-        if (row) Visibility.apply(row, { live, offline: !live });
-    }
-
     function setBotState(state) {
         document.getElementById("channel-bot-toggle").checked = state;
     }
@@ -54,11 +49,9 @@ window.CatapultChannel = (function () {
     function setCurrentGame(bindingId, sourceName) {
         const el = document.getElementById("channel-current-game");
         if (el) el.textContent = sourceName;
-        // GameChangedEvent only ever reports a detected game, never that one was cleared
-        // (no such event exists yet), so hasGame/noGame only ever move in this one direction
-        // here — see channel-no-game's own spa:if for the other half of the state.
-        const row = document.querySelector(".status-row");
-        if (row) Visibility.apply(row, { hasGame: true, noGame: false });
+        // hasGame's visibility is now driven generically by GameChangedEvent's own
+        // spa:on (see channel.html) — nothing left to do here but the text/value sync
+        // Visibility.dispatch doesn't know how to do.
         const bindingList = document.getElementById("channel-bindings-list").children[0];
         if (bindingList) bindingList.value = bindingId;
     }
@@ -109,7 +102,8 @@ window.CatapultChannel = (function () {
         const row = getBindingElement(id);
         if (!row) return;
         row.querySelectorAll(".binding-tw-checkbox").forEach(cb => { cb.checked = tws.includes(cb.value); });
-        Visibility.apply(row, { hasOverride: tws.length > 0 });
+        // hasOverride's visibility is driven generically by TwUpdatedEvent/TwResetEvent's
+        // own spa:on, scoped automatically to this row via the event's bindingId.
     }
 
     function resetBindingTws(id) {
@@ -155,38 +149,14 @@ window.CatapultChannel = (function () {
     }
 
     // The Steam card always renders every sub-view (connected/not-connected chip,
-    // has-token/no-token body, save/delete buttons) for the owner; these setters just
-    // toggle the `hidden` class between them instead of creating/destroying elements,
-    // so the listeners channel-connections.js attaches once at initial render stay valid.
-    //
-    // Accumulated flags for the Steam card: SSE events only ever carry a subset
-    // (e.g. SteamTokenSavedEvent only knows `shared`), so each handler merges into
-    // this object before calling Visibility.apply — a flag Visibility.apply doesn't
-    // see yet is left alone rather than guessed, see visibility.js.
-    let steamState = {};
-
-    function applySteamVisibility() {
-        const card = document.querySelector('[data-conn="steam"]');
-        if (card) Visibility.apply(card, steamState);
-    }
-
-    function setSteamConnectedState(connected, rateLimited, offline, privateProfile) {
-        Object.assign(steamState, {
-            connected, notConnected: !connected,
-            rateLimited, offline, privateProfile,
-        });
-        if (connected) {
-            // A fresh connection never has a personal token yet.
-            Object.assign(steamState, { hasToken: false, noToken: true });
-        }
-        applySteamVisibility();
-    }
+    // has-token/no-token body, save/delete buttons) for the owner; visibility between
+    // them is driven generically by each element's own spa:on (see channel.html) —
+    // SteamConnectionStateEvent/SteamTokenSavedEvent/SteamTokenDeletedEvent need no
+    // handler here anymore. Only the checkbox sync below is left to do by hand.
 
     function setSteamTokenSaved(shared) {
         const shareToggle = document.getElementById("steam-token-shared");
         if (shareToggle) shareToggle.checked = shared;
-        Object.assign(steamState, { hasToken: true, noToken: false });
-        applySteamVisibility();
     }
 
     function setSteamTokenShared(shared) {
@@ -194,26 +164,13 @@ window.CatapultChannel = (function () {
         if (el) el.checked = shared;
     }
 
-    function setSteamTokenDeleted() {
-        Object.assign(steamState, { hasToken: false, noToken: true });
-        applySteamVisibility();
-    }
-
-    // A full SPA navigation re-renders the fragment with fresh server-computed initial
-    // `hidden` classes; steamState must not carry stale flags from a previous page view
-    // into that fresh DOM.
-    document.addEventListener("catapult:render", () => {
-        steamState = {};
-    });
-
     return {
         username, baseUrl, refresh, postJson, showError,
         getBindingsElements, getBindingElement,
-        setStreamState, setBotState, setCurrentGame,
+        setBotState, setCurrentGame,
         setBindingIgnored, setCclEnabled, removeBinding, updateBindingGame,
         setTwEnabled, setBindingTws, resetBindingTws,
         setMinecraftStatus,
-        setSteamTokenSaved, setSteamTokenShared, setSteamTokenDeleted,
-        setSteamConnectedState
+        setSteamTokenSaved, setSteamTokenShared
     };
 })();
