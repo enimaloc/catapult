@@ -1,0 +1,93 @@
+package fr.enimaloc.catapult.controller;
+
+import fr.enimaloc.catapult.common.dto.BindingDto;
+import fr.enimaloc.catapult.common.dto.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.ChannelUserDto;
+import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.PagedBindings;
+import fr.enimaloc.catapult.common.dto.UserSettingsDto;
+import fr.enimaloc.catapult.security.WebSecurityConfig;
+import fr.enimaloc.catapult.service.ApiService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * Pins the per-row correctness of .binding-tw-reset-btn's sp:visible-when: each binding
+ * row must carry its own hasOverride state independently of the others, since
+ * Visibility.apply on the client is scoped per-row precisely to avoid one binding's
+ * update leaking into another's reset button.
+ */
+@WebMvcTest(controllers = {IndexController.class, IndexController.SPAPages.class})
+@Import({ModelFiller.class, WebSecurityConfig.class})
+class ChannelVisibilityRenderingTest {
+
+    @Autowired MockMvc mvc;
+    @MockitoBean ApiService apiService;
+
+    /**
+     * The channel template dereferences channelSettings unconditionally once isOwner()
+     * is true (see IndexControllerTest), so every owner-rendering test needs this stubbed.
+     */
+    @BeforeEach
+    void stubOwnerOnlyAttributes() {
+        lenient().when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
+                false, Set.of(), null, null, Set.of(), false, false, false,
+                null, null, Set.of(), List.of(), false, Set.of(), List.of()));
+        lenient().when(apiService.dtddMappingStatus(any())).thenReturn(new DtddMappingStatusDto(null, null, false, null));
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        int idx = 0;
+        while ((idx = haystack.indexOf(needle, idx)) != -1) {
+            count++;
+            idx += needle.length();
+        }
+        return count;
+    }
+
+    @Test
+    void bindingTwResetButton_carriesIndependentVisibilityPerRow() throws Exception {
+        BindingDto overridden = new BindingDto(
+                "binding-1", "AUTO", "STEAM", "Game A", null, "Game A",
+                false, false, Set.of(), true, true, Set.of("spoiler"));
+        BindingDto notOverridden = new BindingDto(
+                "binding-2", "AUTO", "STEAM", "Game B", null, "Game B",
+                false, false, Set.of(), true, false, Set.of());
+
+        ChannelPageData data = new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null,
+                new PagedBindings(0, 1, 2, List.of(overridden, notOverridden)),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, false, false, false, false, false, false, false, 15L, false, false, "uuid");
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Both rows must carry the data-visible-when breadcrumb, but only the
+        // non-overridden row's button should also have picked up the 'hidden' class —
+        // a shared/collapsed state between rows would make these counts diverge.
+        assertThat(countOccurrences(html, "data-visible-when=\"hasOverride\"")).isEqualTo(2);
+        assertThat(countOccurrences(html, "binding-tw-reset-btn hidden")).isEqualTo(1);
+        assertThat(countOccurrences(html, "binding-tw-reset-btn")).isEqualTo(2);
+    }
+}
