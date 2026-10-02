@@ -22,7 +22,8 @@
                       spa:value="textContent:GameChangedEvent.sourceName"
                       th:text="${ch.currentGame() != null ? ch.currentGame().sourceName() : ''}">Game</span>
                 <!-- noGame has no spa:on: no event signals a detected game being cleared yet
-                     (only GameChangedEvent exists) — known gap, see git history. -->
+                     (only GameChangedEvent exists), so this direction only ever updates on
+                     the next full render — known gap, not something spa:on can fix alone. -->
                 <span id="channel-no-game" spa:if="noGame:${ch.currentGame() == null}"
                       th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
 
@@ -200,7 +201,8 @@
                     <div class="steam-token-has" spa:if="hasToken:${ch.hasSteamPersonalToken()}"
                          spa:on="hasToken:SteamTokenSavedEvent,hasToken:!SteamTokenDeletedEvent">
                         <label>
-                            <mdui-switch id="steam-token-shared" th:checked="${ch.steamTokenShared()}"></mdui-switch>
+                            <mdui-switch id="steam-token-shared" th:checked="${ch.steamTokenShared()}"
+                                         spa:value="checked:SteamTokenSavedEvent.shared,checked:SteamTokenSharedStateEvent.shared"></mdui-switch>
                             <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
                         </label>
                     </div>
