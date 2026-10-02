@@ -130,20 +130,10 @@ window.CatapultChannel = (function () {
     }
 
     // The Steam card always renders every sub-view (connected/not-connected chip,
-    // has-token/no-token body, save/delete buttons) for the owner; visibility between
-    // them is driven generically by each element's own spa:on (see channel.html) —
-    // SteamConnectionStateEvent/SteamTokenSavedEvent/SteamTokenDeletedEvent need no
-    // handler here anymore. Only the checkbox sync below is left to do by hand.
-
-    function setSteamTokenSaved(shared) {
-        const shareToggle = document.getElementById("steam-token-shared");
-        if (shareToggle) shareToggle.checked = shared;
-    }
-
-    function setSteamTokenShared(shared) {
-        const el = document.getElementById("steam-token-shared");
-        if (el) el.checked = shared;
-    }
+    // has-token/no-token body, save/delete buttons, shared-token checkbox) for the
+    // owner; all of it — visibility and property sync alike — is driven generically by
+    // each element's own spa:on/spa:value (see channel.html). No handler is needed here
+    // for any Steam event.
 
     return {
         username, baseUrl, refresh, postJson, showError,
@@ -151,7 +141,6 @@ window.CatapultChannel = (function () {
         setCurrentGame,
         removeBinding, updateBindingGame,
         setBindingTws, resetBindingTws,
-        setMinecraftStatus,
-        setSteamTokenSaved, setSteamTokenShared
+        setMinecraftStatus
     };
 })();

@@ -65,8 +65,8 @@
         on("MinecraftDisconnectedEvent", () => CatapultChannel.setMinecraftStatus("NONE", null));
 
         on("SteamConnectionStateEvent");
-        on("SteamTokenSavedEvent", data => CatapultChannel.setSteamTokenSaved(data.shared));
-        on("SteamTokenSharedStateEvent", data => CatapultChannel.setSteamTokenShared(data.shared));
+        on("SteamTokenSavedEvent");
+        on("SteamTokenSharedStateEvent");
         on("SteamTokenDeletedEvent");
     }
 
