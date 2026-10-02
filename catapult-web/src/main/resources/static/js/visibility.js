@@ -1,11 +1,13 @@
 /**
- * Generic client-side counterpart to the server's spa:if/spa:on Thymeleaf attributes
- * (see IfAttributeProcessor/OnAttributeProcessor): spa:if leaves a data-if="name,..."
- * breadcrumb in the rendered HTML instead of a JS-specific toggle, and spa:on leaves a
- * data-on="name:EventName.field,..." breadcrumb declaring which SSE event (and field)
- * feeds each flag. Visibility.dispatch(eventName, data), called from channel-events.js's
- * generic `on()` wrapper for every SSE event, reads data-on and calls Visibility.apply
- * itself — a new SSE-driven visibility rule is added entirely in the template, never here.
+ * Generic client-side counterpart to the server's spa:if/spa:on/spa:value Thymeleaf
+ * attributes (see IfAttributeProcessor/OnAttributeProcessor/ValueAttributeProcessor):
+ * spa:if leaves a data-if="name,..." breadcrumb instead of a JS-specific toggle, and
+ * spa:on/spa:value leave data-on="name:EventName.field,..." / data-value="property:
+ * EventName.field,..." breadcrumbs declaring which SSE event (and field) feeds each
+ * flag or DOM property. Visibility.dispatch(eventName, data), called from
+ * channel-events.js's generic `on()` wrapper for every SSE event, reads both and drives
+ * Visibility.apply / direct property assignment itself — a new SSE-driven visibility
+ * rule or property sync is added entirely in the template, never here.
  */
 window.Visibility = {
     apply(root, state) {
@@ -32,55 +34,90 @@ window.Visibility = {
         return Array.isArray(value) ? value.length > 0 : !!value;
     },
 
+    // Resolves one spec ("EventName.field" / "EventName.!field" / "EventName" /
+    // "!EventName") against an event payload. A bare event name (no field) resolves to
+    // whether the event fired in that (non-)negated form; a field resolves to its raw
+    // value, boolean-negated when the field itself is prefixed with "!" — negating a
+    // field only makes sense as a boolean, so that direction always returns a boolean,
+    // but a plain (non-negated) field is returned verbatim (string, number, ...) so
+    // spa:value can assign it to a DOM property as-is.
+    _resolve(data, spec) {
+        const negatedEvent = spec.startsWith("!");
+        const eventPart = negatedEvent ? spec.slice(1) : spec;
+        const dot = eventPart.indexOf(".");
+        if (dot === -1) {
+            return !negatedEvent;
+        }
+        let field = eventPart.slice(dot + 1);
+        const negatedField = field.startsWith("!");
+        if (negatedField) {
+            field = field.slice(1);
+        }
+        const value = data ? data[field] : undefined;
+        return negatedField ? !Visibility._truthy(value) : value;
+    },
+
+    // Entries of `el`'s data-${attr} whose spec names this event.
+    _entriesFor(el, attr, eventName) {
+        return el.dataset[attr].split(",")
+            .map(entry => {
+                const sep = entry.indexOf(":");
+                return [entry.slice(0, sep), entry.slice(sep + 1)];
+            })
+            .filter(([, spec]) => {
+                const eventPart = spec.startsWith("!") ? spec.slice(1) : spec;
+                const dot = eventPart.indexOf(".");
+                const specEventName = dot === -1 ? eventPart : eventPart.slice(0, dot);
+                return specEventName === eventName;
+            });
+    },
+
+    // Whether this element should react to this event payload at all: an element with no
+    // [data-binding-id] ancestor is page-level and always included (e.g. #channel-current-
+    // game, even though GameChangedEvent's bindingId exists for the binding row's own
+    // highlight, not for it); an element inside a binding row only reacts when that row's
+    // id matches the payload's bindingId, so one row's event never updates another's.
+    _included(el, data) {
+        const row = el.closest("[data-binding-id]");
+        if (!row) {
+            return true;
+        }
+        return !!data && row.dataset.bindingId === data.bindingId;
+    },
+
     dispatch(eventName, data) {
+        const scopedStates = new Map();
         document.querySelectorAll("[data-on]").forEach(el => {
-            const entries = el.dataset.on.split(",")
-                .map(entry => {
-                    const sep = entry.indexOf(":");
-                    return [entry.slice(0, sep), entry.slice(sep + 1)];
-                })
-                .filter(([, spec]) => {
-                    const eventPart = spec.startsWith("!") ? spec.slice(1) : spec;
-                    const dot = eventPart.indexOf(".");
-                    const specEventName = dot === -1 ? eventPart : eventPart.slice(0, dot);
-                    return specEventName === eventName;
-                });
+            if (!Visibility._included(el, data)) {
+                return;
+            }
+            const entries = Visibility._entriesFor(el, "on", eventName);
             if (entries.length === 0) {
                 return;
             }
+            const scope = el.closest("[data-binding-id]") || document;
+            let state = scopedStates.get(scope);
+            if (!state) {
+                state = Visibility._state.get(scope);
+                if (!state) {
+                    state = {};
+                    Visibility._state.set(scope, state);
+                }
+                scopedStates.set(scope, state);
+            }
+            for (const [name, spec] of entries) {
+                state[name] = Visibility._truthy(Visibility._resolve(data, spec));
+            }
+        });
+        scopedStates.forEach((state, scope) => Visibility.apply(scope, state));
 
-            const scope = (data && data.bindingId)
-                ? document.querySelector('[data-binding-id="' + data.bindingId + '"]')
-                : document;
-            if (!scope) {
+        document.querySelectorAll("[data-value]").forEach(el => {
+            if (!Visibility._included(el, data)) {
                 return;
             }
-
-            let state = Visibility._state.get(scope);
-            if (!state) {
-                state = {};
-                Visibility._state.set(scope, state);
-            }
-
-            for (const [name, spec] of entries) {
-                const negatedEvent = spec.startsWith("!");
-                const eventPart = negatedEvent ? spec.slice(1) : spec;
-                const dot = eventPart.indexOf(".");
-                if (dot === -1) {
-                    // Bare event name: its occurrence alone is the signal (no field to read).
-                    state[name] = !negatedEvent;
-                    continue;
-                }
-                let field = eventPart.slice(dot + 1);
-                const negatedField = field.startsWith("!");
-                if (negatedField) {
-                    field = field.slice(1);
-                }
-                const truthy = Visibility._truthy(data ? data[field] : undefined);
-                state[name] = negatedField ? !truthy : truthy;
-            }
-
-            Visibility.apply(scope, state);
+            Visibility._entriesFor(el, "value", eventName).forEach(([property, spec]) => {
+                el[property] = Visibility._resolve(data, spec);
+            });
         });
     }
 };
