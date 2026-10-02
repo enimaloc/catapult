@@ -35,26 +35,37 @@ window.Visibility = {
     },
 
     // Resolves one spec ("EventName.field" / "EventName.!field" / "EventName" /
-    // "!EventName") against an event payload. A bare event name (no field) resolves to
-    // whether the event fired in that (non-)negated form; a field resolves to its raw
-    // value, boolean-negated when the field itself is prefixed with "!" — negating a
-    // field only makes sense as a boolean, so that direction always returns a boolean,
-    // but a plain (non-negated) field is returned verbatim (string, number, ...) so
-    // spa:value can assign it to a DOM property as-is.
+    // "!EventName", each optionally suffixed with "|default") against an event payload.
+    // A bare event name (no field) resolves to whether the event fired in that
+    // (non-)negated form; a field resolves to its raw value, boolean-negated when the
+    // field itself is prefixed with "!" — negating a field only makes sense as a
+    // boolean, so that direction always returns a boolean, but a plain (non-negated)
+    // field is returned verbatim (string, number, ...) so spa:value can assign it to a
+    // DOM property as-is. A trailing "|default" substitutes that literal string whenever
+    // the resolved value is falsy (matching the `value || "default"` fallback every
+    // plain JS setter already used for an absent/empty field).
     _resolve(data, spec) {
-        const negatedEvent = spec.startsWith("!");
-        const eventPart = negatedEvent ? spec.slice(1) : spec;
+        const pipe = spec.indexOf("|");
+        const hasDefault = pipe !== -1;
+        const defaultValue = hasDefault ? spec.slice(pipe + 1) : undefined;
+        const core = hasDefault ? spec.slice(0, pipe) : spec;
+
+        const negatedEvent = core.startsWith("!");
+        const eventPart = negatedEvent ? core.slice(1) : core;
         const dot = eventPart.indexOf(".");
+        let resolved;
         if (dot === -1) {
-            return !negatedEvent;
+            resolved = !negatedEvent;
+        } else {
+            let field = eventPart.slice(dot + 1);
+            const negatedField = field.startsWith("!");
+            if (negatedField) {
+                field = field.slice(1);
+            }
+            const value = data ? data[field] : undefined;
+            resolved = negatedField ? !Visibility._truthy(value) : value;
         }
-        let field = eventPart.slice(dot + 1);
-        const negatedField = field.startsWith("!");
-        if (negatedField) {
-            field = field.slice(1);
-        }
-        const value = data ? data[field] : undefined;
-        return negatedField ? !Visibility._truthy(value) : value;
+        return (hasDefault && !resolved) ? defaultValue : resolved;
     },
 
     // Entries of `el`'s data-${attr} whose spec names this event.
