@@ -179,4 +179,22 @@ class ChannelVisibilityRenderingTest {
         assertThat(gameTag).contains("data-if=\"hasGame\"").contains("hidden");
         assertThat(noGameTag).contains("data-if=\"noGame\"").doesNotContain("hidden");
     }
+
+    @Test
+    void spaValue_rendersDataValueForPropertySyncs() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Pins the two spa:value cases that have no spa:if of their own to anchor on —
+        // a page-level checkbox sync (#channel-bot-toggle) and a text sync
+        // (#channel-current-game), both resolved purely from data-value.
+        String botToggleTag = openingTagForId(html, "channel-bot-toggle");
+        assertThat(botToggleTag).contains("data-value=\"checked:BotStateChangedEvent.state\"");
+
+        String gameTag = openingTagForId(html, "channel-current-game");
+        assertThat(gameTag).contains("data-value=\"textContent:GameChangedEvent.sourceName\"");
+    }
 }

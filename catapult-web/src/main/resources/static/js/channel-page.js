@@ -42,16 +42,12 @@ window.CatapultChannel = (function () {
         return response;
     }
 
-    function setBotState(state) {
-        document.getElementById("channel-bot-toggle").checked = state;
-    }
-
-    function setCurrentGame(bindingId, sourceName) {
-        const el = document.getElementById("channel-current-game");
-        if (el) el.textContent = sourceName;
-        // hasGame's visibility is now driven generically by GameChangedEvent's own
-        // spa:on (see channel.html) — nothing left to do here but the text/value sync
-        // Visibility.dispatch doesn't know how to do.
+    // GameChangedEvent's visibility (hasGame) and text (#channel-current-game's
+    // textContent) are both driven generically now by spa:on/spa:value (see
+    // channel.html). Only the accordion's own selected-item binding is left to do by
+    // hand, since mdui-collapse's `value` isn't a plain element property Visibility
+    // could target with a stable selector (it's the list's first, unlabelled child).
+    function setCurrentGame(bindingId) {
         const bindingList = document.getElementById("channel-bindings-list").children[0];
         if (bindingList) bindingList.value = bindingId;
     }
@@ -62,16 +58,6 @@ window.CatapultChannel = (function () {
 
     function getBindingElement(id) {
         return getBindingsElements().filter(el => el.dataset.bindingId === id).at(0);
-    }
-
-    function setBindingIgnored(id, enabled) {
-        const row = getBindingElement(id);
-        if (row) row.querySelector(".binding-ignored-toggle").checked = enabled;
-    }
-
-    function setCclEnabled(id, enabled) {
-        const row = getBindingElement(id);
-        if (row) row.querySelector(".binding-ccl-enabled").checked = enabled;
     }
 
     function removeBinding(id) {
@@ -91,11 +77,6 @@ window.CatapultChannel = (function () {
         const row = getBindingElement(id);
         if (!row) return;
         row.querySelector(".binding-game-name").textContent = twitchGameName || "—";
-    }
-
-    function setTwEnabled(id, enabled) {
-        const row = getBindingElement(id);
-        if (row) row.querySelector(".binding-tw-enabled-checkbox").checked = enabled;
     }
 
     function setBindingTws(id, tws) {
@@ -167,9 +148,9 @@ window.CatapultChannel = (function () {
     return {
         username, baseUrl, refresh, postJson, showError,
         getBindingsElements, getBindingElement,
-        setBotState, setCurrentGame,
-        setBindingIgnored, setCclEnabled, removeBinding, updateBindingGame,
-        setTwEnabled, setBindingTws, resetBindingTws,
+        setCurrentGame,
+        removeBinding, updateBindingGame,
+        setBindingTws, resetBindingTws,
         setMinecraftStatus,
         setSteamTokenSaved, setSteamTokenShared
     };
