@@ -48,15 +48,15 @@
         }
 
         on("ChannelLiveStateEvent");
-        on("BotStateChangedEvent", data => CatapultChannel.setBotState(data.state));
-        on("GameChangedEvent", data => CatapultChannel.setCurrentGame(data.bindingId, data.sourceName));
+        on("BotStateChangedEvent");
+        on("GameChangedEvent", data => CatapultChannel.setCurrentGame(data.bindingId));
 
-        on("BindingIgnoredStateEvent", data => CatapultChannel.setBindingIgnored(data.bindingId, data.ignored));
-        on("CclStateEvent", data => CatapultChannel.setCclEnabled(data.bindingId, data.enabled));
+        on("BindingIgnoredStateEvent");
+        on("CclStateEvent");
         on("BindingDeletedEvent", data => CatapultChannel.removeBinding(data.bindingId));
         on("BindingUpdatedEvent", data => CatapultChannel.updateBindingGame(data.bindingId, data.twitchGameName, data.ccls));
 
-        on("TwEnabledStateEvent", data => CatapultChannel.setTwEnabled(data.bindingId, data.enabled));
+        on("TwEnabledStateEvent");
         on("TwUpdatedEvent", data => CatapultChannel.setBindingTws(data.bindingId, data.tws));
         on("TwResetEvent", data => CatapultChannel.resetBindingTws(data.bindingId));
 

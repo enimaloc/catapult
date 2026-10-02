@@ -1,4 +1,4 @@
-<mdui-layout-main th:fragment="channel">
+<mdui-layout-main th:fragment="channel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
     <!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.ChannelPageData"*/-->
     <section class="section channel-section" th:with="ch=${channelPage}">
         <div class="section-header">
@@ -19,6 +19,7 @@
 
                 <span id="channel-current-game" spa:if="hasGame:${ch.currentGame() != null}"
                       spa:on="hasGame:GameChangedEvent"
+                      spa:value="textContent:GameChangedEvent.sourceName"
                       th:text="${ch.currentGame() != null ? ch.currentGame().sourceName() : ''}">Game</span>
                 <!-- noGame has no spa:on: no event signals a detected game being cleared yet
                      (only GameChangedEvent exists) — known gap, see git history. -->
@@ -33,6 +34,7 @@
             <div class="bot-toggle-row" th:if="${ch.isOwner()}">
                 <mdui-switch th:checked="${ch.botEnabled()}"
                              th:attr="data-toggle-url=@{/channel/{u}/settings/bot(u=${ch.channelUsername()})}"
+                             spa:value="checked:BotStateChangedEvent.state"
                              id="channel-bot-toggle"></mdui-switch>
                 <label for="channel-bot-toggle" th:text="#{channel.status.bot_enabled}">Bot activé</label>
             </div>
@@ -81,6 +83,7 @@
                         <div class="binding-toggle" th:if="${ch.isOwner()}">
                             <mdui-switch th:id="'binding-ignored-toggle-' + ${b.id()}" class="binding-ignored-toggle"
                                          data-post="ignored-toggle" data-key="ignored"
+                                         spa:value="checked:BindingIgnoredStateEvent.ignored"
                                          th:checked="${b.ignored()}"></mdui-switch>
                             <label th:for="'binding-ignored-toggle-' + ${b.id()}"
                                    th:text="#{channel.bindings.ignored}">Ignoré</label>
@@ -99,6 +102,7 @@
                             <label class="binding-toggle">
                                 <mdui-switch class="binding-ccl-enabled" th:id="'binding-ccl-toggle-' + ${b.id()}"
                                              th:checked="${b.cclEnabled()}"
+                                             spa:value="checked:CclStateEvent.enabled"
                                              data-post="ccl-toggle" data-key="enabled"></mdui-switch>
                                 <span th:text="#{channel.bindings.ccl.enabled}">Activer les CCL</span>
                             </label>
@@ -113,6 +117,7 @@
                         <div th:if="${ch.isOwner()}" class="binding-tw-panel">
                             <label>
                                 <mdui-switch class="binding-tw-enabled-checkbox"
+                                             spa:value="checked:TwEnabledStateEvent.enabled"
                                              th:checked="${b.twEnabled()}"></mdui-switch>
                                 <span th:text="#{channel.bindings.tw.enabled}">Activer les avertissements</span>
                             </label>
