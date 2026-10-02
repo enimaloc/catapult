@@ -73,12 +73,6 @@ window.CatapultChannel = (function () {
         }
     }
 
-    function updateBindingGame(id, twitchGameName, ccls) {
-        const row = getBindingElement(id);
-        if (!row) return;
-        row.querySelector(".binding-game-name").textContent = twitchGameName || "—";
-    }
-
     function setBindingTws(id, tws) {
         const row = getBindingElement(id);
         if (!row) return;
@@ -139,7 +133,7 @@ window.CatapultChannel = (function () {
         username, baseUrl, refresh, postJson, showError,
         getBindingsElements, getBindingElement,
         setCurrentGame,
-        removeBinding, updateBindingGame,
+        removeBinding,
         setBindingTws, resetBindingTws,
         setMinecraftStatus
     };

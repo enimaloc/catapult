@@ -54,7 +54,7 @@
         on("BindingIgnoredStateEvent");
         on("CclStateEvent");
         on("BindingDeletedEvent", data => CatapultChannel.removeBinding(data.bindingId));
-        on("BindingUpdatedEvent", data => CatapultChannel.updateBindingGame(data.bindingId, data.twitchGameName, data.ccls));
+        on("BindingUpdatedEvent");
 
         on("TwEnabledStateEvent");
         on("TwUpdatedEvent", data => CatapultChannel.setBindingTws(data.bindingId, data.tws));
