@@ -76,7 +76,13 @@
                                     th:value="${b.id()}"
                                     th:class="${ch.currentGame()?.bindingId() == b.id() ? 'is-open' : ''}">
                     <mdui-list-item slot="header">
-                        <span class="binding-game-name" th:text="${b.sourceName() ?: b.twitchGameName() ?: '—'}"></span>
+                        <!-- spa:value only mirrors the twitchGameName branch: BindingUpdatedEvent
+                             never carries sourceName (ApiChannelActionsController's update action
+                             only ever touches twitchGameName/ccls), so there's nothing to keep a
+                             sourceName-primary live update in sync with — same limitation the
+                             hand-written updateBindingGame() already had. -->
+                        <span class="binding-game-name" spa:value="textContent:BindingUpdatedEvent.twitchGameName|—"
+                              th:text="${b.sourceName() ?: b.twitchGameName() ?: '—'}"></span>
                         <span class="binding-platform-chips" th:text="${b.sourceType()}"></span>
                         <span th:text="${b.status()}"></span>
                     </mdui-list-item>
