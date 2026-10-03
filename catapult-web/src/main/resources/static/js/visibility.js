@@ -1,13 +1,15 @@
 /**
- * Generic client-side counterpart to the server's spa:if/spa:on/spa:value Thymeleaf
- * attributes (see IfAttributeProcessor/OnAttributeProcessor/ValueAttributeProcessor):
- * spa:if leaves a data-if="name,..." breadcrumb instead of a JS-specific toggle, and
- * spa:on/spa:value leave data-on="name:EventName.field,..." / data-value="property:
- * EventName.field,..." breadcrumbs declaring which SSE event (and field) feeds each
- * flag or DOM property. Visibility.dispatch(eventName, data), called from
- * channel-events.js's generic `on()` wrapper for every SSE event, reads both and drives
- * Visibility.apply / direct property assignment itself — a new SSE-driven visibility
- * rule or property sync is added entirely in the template, never here.
+ * Generic client-side counterpart to the server's spa:if/spa:on/spa:value/spa:in
+ * Thymeleaf attributes (see IfAttributeProcessor/OnAttributeProcessor/
+ * ValueAttributeProcessor/InAttributeProcessor): spa:if leaves a data-if="name,..."
+ * breadcrumb instead of a JS-specific toggle, and spa:on/spa:value/spa:in leave
+ * data-on="name:EventName.field,..." / data-value="property:EventName.field,..." /
+ * data-in="property:EventName.arrayField,..." breadcrumbs declaring which SSE event
+ * (and field) feeds each flag or DOM property. Visibility.dispatch(eventName, data),
+ * called from channel-events.js's generic `on()` wrapper for every SSE event, reads all
+ * three and drives Visibility.apply / direct property assignment / array-membership
+ * checks itself — a new SSE-driven visibility rule or property sync is added entirely
+ * in the template, never here.
  */
 window.Visibility = {
     apply(root, state) {
@@ -128,6 +130,18 @@ window.Visibility = {
             }
             Visibility._entriesFor(el, "value", eventName).forEach(([property, spec]) => {
                 el[property] = Visibility._resolve(data, spec);
+            });
+        });
+
+        document.querySelectorAll("[data-in]").forEach(el => {
+            if (!Visibility._included(el, data)) {
+                return;
+            }
+            Visibility._entriesFor(el, "in", eventName).forEach(([property, spec]) => {
+                const dot = spec.indexOf(".");
+                const field = dot === -1 ? null : spec.slice(dot + 1);
+                const array = field && data ? data[field] : undefined;
+                el[property] = Array.isArray(array) && array.includes(el.value);
             });
         });
     }
