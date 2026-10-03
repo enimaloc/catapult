@@ -43,9 +43,12 @@ window.Visibility = {
     // field itself is prefixed with "!" — negating a field only makes sense as a
     // boolean, so that direction always returns a boolean, but a plain (non-negated)
     // field is returned verbatim (string, number, ...) so spa:value can assign it to a
-    // DOM property as-is. A trailing "|default" substitutes that literal string whenever
-    // the resolved value is falsy (matching the `value || "default"` fallback every
-    // plain JS setter already used for an absent/empty field).
+    // DOM property as-is. A field can also carry "=value" or "=value1/value2/..." (spa:
+    // switch's case matching): resolves to whether the field's raw value equals any of
+    // the listed literals, negatable the same way as a plain field. A trailing
+    // "|default" substitutes that literal string whenever the resolved value is falsy
+    // (matching the `value || "default"` fallback every plain JS setter already used for
+    // an absent/empty field).
     _resolve(data, spec) {
         const pipe = spec.indexOf("|");
         const hasDefault = pipe !== -1;
@@ -64,8 +67,17 @@ window.Visibility = {
             if (negatedField) {
                 field = field.slice(1);
             }
-            const value = data ? data[field] : undefined;
-            resolved = negatedField ? !Visibility._truthy(value) : value;
+            const eq = field.indexOf("=");
+            if (eq !== -1) {
+                const expected = field.slice(eq + 1).split("/");
+                field = field.slice(0, eq);
+                const value = data ? data[field] : undefined;
+                const matches = expected.includes(value);
+                resolved = negatedField ? !matches : matches;
+            } else {
+                const value = data ? data[field] : undefined;
+                resolved = negatedField ? !Visibility._truthy(value) : value;
+            }
         }
         return (hasDefault && !resolved) ? defaultValue : resolved;
     },
