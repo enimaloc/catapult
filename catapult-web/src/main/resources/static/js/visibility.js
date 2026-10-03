@@ -1,15 +1,15 @@
 /**
- * Generic client-side counterpart to the server's spa:if/spa:on/spa:value/spa:in
- * Thymeleaf attributes (see IfAttributeProcessor/OnAttributeProcessor/
- * ValueAttributeProcessor/InAttributeProcessor): spa:if leaves a data-if="name,..."
- * breadcrumb instead of a JS-specific toggle, and spa:on/spa:value/spa:in leave
- * data-on="name:EventName.field,..." / data-value="property:EventName.field,..." /
- * data-in="property:EventName.arrayField,..." breadcrumbs declaring which SSE event
- * (and field) feeds each flag or DOM property. Visibility.dispatch(eventName, data),
- * called from channel-events.js's generic `on()` wrapper for every SSE event, reads all
- * three and drives Visibility.apply / direct property assignment / array-membership
- * checks itself — a new SSE-driven visibility rule or property sync is added entirely
- * in the template, never here.
+ * Generic client-side counterpart to the server's spa:if/spa:on/spa:value/spa:in/
+ * spa:switch Thymeleaf attributes (see IfAttributeProcessor/OnAttributeProcessor/
+ * ValueAttributeProcessor/InAttributeProcessor/SwitchAttributeProcessor): spa:if leaves
+ * a data-if="name,..." breadcrumb instead of a JS-specific toggle; spa:on/spa:switch
+ * leave data-on/data-switch="name:EventName.field,..." breadcrumbs that feed
+ * Visibility.apply the same way (spa:switch's fields may carry "=value" for enum-style
+ * matching); spa:value/spa:in leave data-value/data-in="property:EventName.field,..."
+ * breadcrumbs that assign or array-test a DOM property directly. Visibility.dispatch
+ * (eventName, data), called from channel-events.js's generic `on()` wrapper for every
+ * SSE event, reads all of them — a new SSE-driven visibility rule or property sync is
+ * added entirely in the template, never here.
  */
 window.Visibility = {
     apply(root, state) {
@@ -110,13 +110,16 @@ window.Visibility = {
         return !!data && row.dataset.bindingId === data.bindingId;
     },
 
-    dispatch(eventName, data) {
-        const scopedStates = new Map();
-        document.querySelectorAll("[data-on]").forEach(el => {
+    // Merges every [data-${attr}] entry naming this event into its scope's persistent
+    // flag state — shared by data-on and data-switch, which differ only in spec grammar
+    // (switch's fields may carry "=value"), never in how the resulting flag feeds
+    // Visibility.apply.
+    _mergeFlags(attr, eventName, data, scopedStates) {
+        document.querySelectorAll(`[data-${attr}]`).forEach(el => {
             if (!Visibility._included(el, data)) {
                 return;
             }
-            const entries = Visibility._entriesFor(el, "on", eventName);
+            const entries = Visibility._entriesFor(el, attr, eventName);
             if (entries.length === 0) {
                 return;
             }
@@ -134,6 +137,12 @@ window.Visibility = {
                 state[name] = Visibility._truthy(Visibility._resolve(data, spec));
             }
         });
+    },
+
+    dispatch(eventName, data) {
+        const scopedStates = new Map();
+        Visibility._mergeFlags("on", eventName, data, scopedStates);
+        Visibility._mergeFlags("switch", eventName, data, scopedStates);
         scopedStates.forEach((state, scope) => Visibility.apply(scope, state));
 
         document.querySelectorAll("[data-value]").forEach(el => {
