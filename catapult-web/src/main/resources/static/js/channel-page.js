@@ -73,55 +73,17 @@ window.CatapultChannel = (function () {
         }
     }
 
-    function setMinecraftStatus(status, minecraftName) {
-        const card = document.querySelector('[data-conn="minecraft"]');
-        if (!card) return;
-        const body = document.getElementById("minecraft-status-body");
-        const actions = document.getElementById("minecraft-status-actions");
-
-        function el(tag, id, text) {
-            const e = document.createElement(tag);
-            if (id) e.id = id;
-            if (text !== undefined) e.textContent = text;
-            return e;
-        }
-
-        const bodyByStatus = {
-            NONE: () => {
-                const input = el("input", "minecraft-name-input");
-                input.type = "text";
-                input.placeholder = card.dataset.namePlaceholder;
-                return input;
-            },
-            PENDING: () => el("span", null, card.dataset.pendingLabel),
-            INVITE_REJECTED: () => el("span", null, card.dataset.rejectedLabel),
-            ACCEPTED: () => el("mdui-chip", null, minecraftName),
-            REMOVED: () => el("span", null, card.dataset.removedLabel),
-        };
-        const actionsByStatus = {
-            NONE: () => el("mdui-segmented-button", "minecraft-enroll-btn", card.dataset.enrollLabel),
-            PENDING: () => el("mdui-segmented-button", "minecraft-check-btn", card.dataset.checkLabel),
-            INVITE_REJECTED: () => null,
-            ACCEPTED: () => el("mdui-segmented-button", "minecraft-disconnect-btn", card.dataset.disconnectLabel),
-            REMOVED: () => el("mdui-segmented-button", "minecraft-check-btn", card.dataset.checkLabel),
-        };
-
-        body.replaceChildren(...[bodyByStatus[status]?.()].filter(Boolean));
-        actions.replaceChildren(...[actionsByStatus[status]?.()].filter(Boolean));
-        CatapultConnections.attachMinecraftHandlers();
-    }
-
     // The Steam card always renders every sub-view (connected/not-connected chip,
     // has-token/no-token body, save/delete buttons, shared-token checkbox) for the
-    // owner; all of it — visibility and property sync alike — is driven generically by
-    // each element's own spa:on/spa:value (see channel.html). No handler is needed here
-    // for any Steam event.
+    // owner, and the Minecraft card every status sub-view (NONE/PENDING/INVITE_REJECTED/
+    // ACCEPTED/REMOVED), all toggled generically by each element's own spa:on/spa:
+    // switch/spa:value (see channel.html) instead of being created/destroyed per event.
+    // No handler is needed here for any Steam or Minecraft event.
 
     return {
         username, baseUrl, refresh, postJson, showError,
         getBindingsElements, getBindingElement,
         setCurrentGame,
-        removeBinding,
-        setMinecraftStatus
+        removeBinding
     };
 })();
