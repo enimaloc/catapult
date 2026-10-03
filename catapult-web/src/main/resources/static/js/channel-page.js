@@ -63,13 +63,12 @@ window.CatapultChannel = (function () {
     function removeBinding(id) {
         const row = getBindingElement(id);
         if (!row) return;
-        const list = document.getElementById("channel-bindings-list");
         row.remove();
         if (getBindingsElements().length === 0) {
-            list.querySelector("mdui-collapse")?.remove();
-            const empty = document.createElement("mdui-list-item");
-            empty.textContent = list.dataset.emptyText;
-            list.appendChild(empty);
+            // #channel-bindings-empty is already server-rendered (hidden) with the right
+            // translation; nothing left to build or translate by hand here.
+            document.getElementById("channel-bindings-list").querySelector("mdui-collapse")?.remove();
+            document.getElementById("channel-bindings-empty")?.classList.remove("hidden");
         }
     }
 

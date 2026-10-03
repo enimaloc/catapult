@@ -68,7 +68,7 @@
             </mdui-segmented-button-group>
         </div>
 
-        <mdui-list id="channel-bindings-list" th:attr="data-empty-text=#{channel.bindings.empty}">
+        <mdui-list id="channel-bindings-list">
             <mdui-collapse accordion th:if="${!ch.bindings().content().isEmpty()}"
                            th:value="${ch.currentGame()?.bindingId()}">
                 <mdui-collapse-item th:each="b : ${ch.bindings().content()}"
@@ -146,7 +146,12 @@
                     </mdui-list-item>
                 </mdui-collapse-item>
             </mdui-collapse>
-            <mdui-list-item th:if="${ch.bindings().content().isEmpty()}" th:text="#{channel.bindings.empty}">
+            <!-- Always rendered (instead of created on demand) so removeBinding() only ever
+                 reveals an already-translated element — no translated label needs stashing
+                 in a data-* attribute for JS to read, unlike the old data-empty-text. -->
+            <mdui-list-item id="channel-bindings-empty"
+                            th:class="${!ch.bindings().content().isEmpty()} ? 'hidden' : ''"
+                            th:text="#{channel.bindings.empty}">
                 Aucune association.
             </mdui-list-item>
         </mdui-list>
