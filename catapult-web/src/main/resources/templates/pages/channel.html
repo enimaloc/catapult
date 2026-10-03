@@ -115,6 +115,7 @@
                             </label>
                             <label th:each="ccl : ${ch.availableCcls()}">
                                 <mdui-switch class="binding-edit-ccl-checkbox" th:value="${ccl.id()}"
+                                             spa:in="checked:BindingUpdatedEvent.ccls"
                                              th:checked="${b.ccls().contains(ccl.id())}"
                                              th:disabled="${ch.blockedCcls().contains(ccl.id())}"></mdui-switch>
                                 <span th:text="${ccl.name()}">ccl name</span>
@@ -129,7 +130,11 @@
                                 <span th:text="#{channel.bindings.tw.enabled}">Activer les avertissements</span>
                             </label>
                             <label th:each="tw : ${ch.availableTws()}">
+                                <!-- TwResetEvent carries no `tws` field at all; looking it up as the
+                                     array source still works here because an absent field resolves
+                                     to "not a member" (false) — exactly what a reset should do. -->
                                 <mdui-switch class="binding-tw-checkbox" th:value="${tw.id()}"
+                                             spa:in="checked:TwUpdatedEvent.tws,checked:TwResetEvent.tws"
                                              th:checked="${b.tws().contains(tw.id())}"></mdui-switch>
                                 <span th:text="${tw.label()}">tw label</span>
                             </label>
