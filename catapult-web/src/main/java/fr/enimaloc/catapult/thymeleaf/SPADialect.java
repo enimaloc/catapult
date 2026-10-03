@@ -21,6 +21,7 @@ public class SPADialect extends AbstractProcessorDialect {
         return Set.of(
                 new IfAttributeProcessor(dialectPrefix),
                 new OnAttributeProcessor(dialectPrefix),
-                new ValueAttributeProcessor(dialectPrefix));
+                new ValueAttributeProcessor(dialectPrefix),
+                new InAttributeProcessor(dialectPrefix));
     }
 }
