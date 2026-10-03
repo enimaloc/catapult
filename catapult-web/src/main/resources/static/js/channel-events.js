@@ -36,10 +36,10 @@
         source = new EventSource(`/events/channel/${username}`);
 
         // Every event also runs through Visibility.dispatch, which reads whatever
-        // data-on/data-value/data-in breadcrumbs the current DOM happens to carry for
-        // this event name (see visibility.js) — a new spa:on/spa:value/spa:in in the
-        // template is enough to wire a fresh SSE-driven rule; no new line is ever
-        // needed here for that part.
+        // data-on/data-switch/data-value/data-in breadcrumbs the current DOM happens to
+        // carry for this event name (see visibility.js) — a new spa:on/spa:switch/spa:
+        // value/spa:in in the template is enough to wire a fresh SSE-driven rule; no new
+        // line is ever needed here for that part.
         function on(eventName, handler) {
             source.addEventListener(eventName, event => {
                 const data = JSON.parse(event.data);
@@ -61,9 +61,9 @@
         on("TwUpdatedEvent");
         on("TwResetEvent");
 
-        on("MinecraftEnrollEvent", data => CatapultChannel.setMinecraftStatus(data.status, data.minecraftName));
-        on("MinecraftSyncEvent", data => CatapultChannel.setMinecraftStatus(data.status, data.minecraftName));
-        on("MinecraftDisconnectedEvent", () => CatapultChannel.setMinecraftStatus("NONE", null));
+        on("MinecraftEnrollEvent");
+        on("MinecraftSyncEvent");
+        on("MinecraftDisconnectedEvent");
 
         on("SteamConnectionStateEvent");
         on("SteamTokenSavedEvent");
