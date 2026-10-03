@@ -12,6 +12,19 @@
 (function () {
     let source = null;
     let sourceUsername = null;
+    let registeredEvents = new Set();
+
+    // The handful of events that need more than Visibility.dispatch's generic handling —
+    // BindingDeletedEvent actually removes a row (not a class toggle or property sync, so
+    // no spa:* attribute names it at all) and GameChangedEvent also drives the accordion's
+    // own `value` property (see setCurrentGame). Every other SSE-driven template rule is
+    // added purely via spa:on/spa:switch/spa:value/spa:in; this map — and this map alone —
+    // is what a genuinely new concern (not just a new use of an already-wired event) would
+    // ever need a line added to.
+    const customHandlers = {
+        GameChangedEvent: data => CatapultChannel.setCurrentGame(data.bindingId),
+        BindingDeletedEvent: data => CatapultChannel.removeBinding(data.bindingId),
+    };
 
     function currentChannelUsername() {
         const segments = location.pathname.split("/");
@@ -24,51 +37,40 @@
             source = null;
         }
         sourceUsername = null;
+        registeredEvents = new Set();
+    }
+
+    function registerEvent(eventName) {
+        if (registeredEvents.has(eventName)) {
+            return;
+        }
+        registeredEvents.add(eventName);
+        source.addEventListener(eventName, event => {
+            const data = JSON.parse(event.data);
+            Visibility.dispatch(eventName, data);
+            const handler = customHandlers[eventName];
+            if (handler) {
+                handler(data);
+            }
+        });
+    }
+
+    // Subscribes to every event name the current DOM's spa:on/spa:switch/spa:value/
+    // spa:in attributes reference, plus the few with a customHandlers entry — called on
+    // every catapult:render (not just on a fresh connect) so a re-render that reveals a
+    // previously-absent element (e.g. an owner-only section) still gets subscribed.
+    function registerDiscoveredEvents() {
+        Visibility.discoverEventNames(document).forEach(registerEvent);
+        Object.keys(customHandlers).forEach(registerEvent);
     }
 
     function connect(username) {
-        if (source && sourceUsername === username) {
-            return;
+        if (!source || sourceUsername !== username) {
+            closeSource();
+            sourceUsername = username;
+            source = new EventSource(`/events/channel/${username}`);
         }
-        closeSource();
-        sourceUsername = username;
-
-        source = new EventSource(`/events/channel/${username}`);
-
-        // Every event also runs through Visibility.dispatch, which reads whatever
-        // data-on/data-switch/data-value/data-in breadcrumbs the current DOM happens to
-        // carry for this event name (see visibility.js) — a new spa:on/spa:switch/spa:
-        // value/spa:in in the template is enough to wire a fresh SSE-driven rule; no new
-        // line is ever needed here for that part.
-        function on(eventName, handler) {
-            source.addEventListener(eventName, event => {
-                const data = JSON.parse(event.data);
-                Visibility.dispatch(eventName, data);
-                if (handler) handler(data);
-            });
-        }
-
-        on("ChannelLiveStateEvent");
-        on("BotStateChangedEvent");
-        on("GameChangedEvent", data => CatapultChannel.setCurrentGame(data.bindingId));
-
-        on("BindingIgnoredStateEvent");
-        on("CclStateEvent");
-        on("BindingDeletedEvent", data => CatapultChannel.removeBinding(data.bindingId));
-        on("BindingUpdatedEvent");
-
-        on("TwEnabledStateEvent");
-        on("TwUpdatedEvent");
-        on("TwResetEvent");
-
-        on("MinecraftEnrollEvent");
-        on("MinecraftSyncEvent");
-        on("MinecraftDisconnectedEvent");
-
-        on("SteamConnectionStateEvent");
-        on("SteamTokenSavedEvent");
-        on("SteamTokenSharedStateEvent");
-        on("SteamTokenDeletedEvent");
+        registerDiscoveredEvents();
     }
 
     document.addEventListener("catapult:render", () => {
