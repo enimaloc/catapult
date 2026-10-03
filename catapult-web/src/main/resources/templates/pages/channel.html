@@ -258,47 +258,62 @@
             </mdui-card>
 
             <mdui-card th:if="${minecraftLink != null}" class="connection-card" variant="outlined"
-                       data-conn="minecraft"
-                       th:attr="data-name-placeholder=#{channel.connections.minecraft.name_placeholder},
-                                data-pending-label=#{channel.connections.minecraft.pending},
-                                data-rejected-label=#{channel.connections.minecraft.rejected},
-                                data-removed-label=#{channel.connections.minecraft.removed},
-                                data-enroll-label=#{channel.connections.minecraft.enroll},
-                                data-check-label=#{channel.connections.minecraft.check},
-                                data-disconnect-label=#{channel.connections.minecraft.disconnect}">
+                       data-conn="minecraft">
                 <span th:text="#{channel.connections.minecraft}">Minecraft</span>
 
-                <div id="minecraft-status-body" th:switch="${minecraftLink.status()}">
-                    <div th:case="'NONE'">
+                <!--
+                  Every status sub-view is always rendered (instead of created/destroyed
+                  via th:switch + replaceChildren) and toggled via spa:if/spa:switch, same
+                  pattern as the Steam card. MinecraftEnrollEvent/MinecraftSyncEvent carry
+                  a `status` field to match against; MinecraftDisconnectedEvent carries
+                  none at all (its mere occurrence always means NONE), handled with a bare
+                  event name on caseNone and a negated bare event everywhere else.
+                -->
+                <div id="minecraft-status-body">
+                    <div spa:if="caseNone:${minecraftLink.status() == 'NONE'}"
+                         spa:switch="caseNone:MinecraftEnrollEvent.status=NONE,caseNone:MinecraftSyncEvent.status=NONE,caseNone:MinecraftDisconnectedEvent">
                         <input type="text" id="minecraft-name-input"
                                th:placeholder="#{channel.connections.minecraft.name_placeholder}"/>
                     </div>
-                    <div th:case="'PENDING'">
+                    <div spa:if="casePending:${minecraftLink.status() == 'PENDING'}"
+                         spa:switch="casePending:MinecraftEnrollEvent.status=PENDING,casePending:MinecraftSyncEvent.status=PENDING,casePending:!MinecraftDisconnectedEvent">
                         <span th:text="#{channel.connections.minecraft.pending}">En attente d'acceptation en jeu…</span>
                     </div>
-                    <div th:case="'INVITE_REJECTED'">
+                    <div spa:if="caseRejected:${minecraftLink.status() == 'INVITE_REJECTED'}"
+                         spa:switch="caseRejected:MinecraftEnrollEvent.status=INVITE_REJECTED,caseRejected:MinecraftSyncEvent.status=INVITE_REJECTED,caseRejected:!MinecraftDisconnectedEvent">
                         <span th:text="#{channel.connections.minecraft.rejected}">Invitation refusée, ajout manuel requis.</span>
                     </div>
-                    <div th:case="'ACCEPTED'">
-                        <mdui-chip th:text="${minecraftLink.minecraftName()}">Steve</mdui-chip>
+                    <div spa:if="caseAccepted:${minecraftLink.status() == 'ACCEPTED'}"
+                         spa:switch="caseAccepted:MinecraftEnrollEvent.status=ACCEPTED,caseAccepted:MinecraftSyncEvent.status=ACCEPTED,caseAccepted:!MinecraftDisconnectedEvent">
+                        <mdui-chip spa:value="textContent:MinecraftEnrollEvent.minecraftName,textContent:MinecraftSyncEvent.minecraftName"
+                                   th:text="${minecraftLink.minecraftName()}">Steve</mdui-chip>
                     </div>
-                    <div th:case="'REMOVED'">
+                    <div spa:if="caseRemoved:${minecraftLink.status() == 'REMOVED'}"
+                         spa:switch="caseRemoved:MinecraftEnrollEvent.status=REMOVED,caseRemoved:MinecraftSyncEvent.status=REMOVED,caseRemoved:!MinecraftDisconnectedEvent">
                         <span th:text="#{channel.connections.minecraft.removed}">Lien supprimé côté serveur.</span>
                     </div>
                 </div>
 
                 <mdui-segmented-button-group id="minecraft-status-actions" class="card-actions">
-                    <mdui-segmented-button th:if="${minecraftLink.status() == 'NONE'}" id="minecraft-enroll-btn"
+                    <!-- Each button needs its own flag name even though they're all page-level
+                         (not row-scoped): Visibility.apply looks elements up by data-if name
+                         alone, so three buttons sharing one name would all move in lockstep,
+                         each overwriting the shared flag in turn instead of staying independent. -->
+                    <mdui-segmented-button id="minecraft-enroll-btn"
+                                           spa:if="showEnroll:${minecraftLink.status() == 'NONE'}"
+                                           spa:switch="showEnroll:MinecraftEnrollEvent.status=NONE,showEnroll:MinecraftSyncEvent.status=NONE,showEnroll:MinecraftDisconnectedEvent"
                                            th:text="#{channel.connections.minecraft.enroll}">
                         Lier
                     </mdui-segmented-button>
-                    <mdui-segmented-button
-                            th:if="${minecraftLink.status() == 'PENDING' or minecraftLink.status() == 'REMOVED'}"
-                            id="minecraft-check-btn" th:text="#{channel.connections.minecraft.check}">
+                    <mdui-segmented-button id="minecraft-check-btn"
+                                           spa:if="showCheck:${minecraftLink.status() == 'PENDING' or minecraftLink.status() == 'REMOVED'}"
+                                           spa:switch="showCheck:MinecraftEnrollEvent.status=PENDING/REMOVED,showCheck:MinecraftSyncEvent.status=PENDING/REMOVED,showCheck:!MinecraftDisconnectedEvent"
+                                           th:text="#{channel.connections.minecraft.check}">
                         Vérifier
                     </mdui-segmented-button>
-                    <mdui-segmented-button th:if="${minecraftLink.status() == 'ACCEPTED'}"
-                                           id="minecraft-disconnect-btn"
+                    <mdui-segmented-button id="minecraft-disconnect-btn"
+                                           spa:if="showDisconnect:${minecraftLink.status() == 'ACCEPTED'}"
+                                           spa:switch="showDisconnect:MinecraftEnrollEvent.status=ACCEPTED,showDisconnect:MinecraftSyncEvent.status=ACCEPTED,showDisconnect:!MinecraftDisconnectedEvent"
                                            th:text="#{channel.connections.minecraft.disconnect}">
                         Délier
                     </mdui-segmented-button>

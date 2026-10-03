@@ -1,11 +1,8 @@
 /**
- * Handlers for the Steam/Minecraft connection cards. Split into small attach*
- * functions (rather than one big listener block) because the SSE-driven event
- * handlers in channel-page.js rebuild the Minecraft status body from scratch
- * when its state changes server-side, and need to re-attach listeners to the
- * fresh elements afterwards. The Steam card's elements are all pre-rendered
- * and only toggled via the `hidden` class, so attachSteamHandlers() only
- * needs to run once, at initial render.
+ * Handlers for the Steam/Minecraft connection cards. Both cards' elements are all
+ * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
+ * channel.html) instead of being created/destroyed per SSE event, so each attach*
+ * function only needs to run once, at initial render.
  */
 window.CatapultConnections = (function () {
     function attachSteamHandlers() {
