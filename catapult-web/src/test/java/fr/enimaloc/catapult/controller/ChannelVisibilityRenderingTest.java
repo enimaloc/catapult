@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.GameDto;
+import fr.enimaloc.catapult.common.dto.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.PagedBindings;
 import fr.enimaloc.catapult.common.dto.UserSettingsDto;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
@@ -196,5 +197,24 @@ class ChannelVisibilityRenderingTest {
 
         String gameTag = openingTagForId(html, "channel-current-game");
         assertThat(gameTag).contains("data-value=\"textContent:GameChangedEvent.sourceName\"");
+    }
+
+    @Test
+    void minecraftStatusPending_showsPendingCaseAndCheckButtonOnly() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+        when(apiService.minecraftStatus(any())).thenReturn(new LinkStateResponse("PENDING", "Steve123", null));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Only the PENDING case div and the check button should render visible; every
+        // other status div/button carries its own unique flag name (not a shared one —
+        // see the ledger/commit for the bug that caused when they weren't) and ends up
+        // hidden.
+        assertThat(countOccurrences(html, "data-if=\"casePending\"")).isEqualTo(1);
+        assertThat(openingTagForId(html, "minecraft-enroll-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "minecraft-check-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "minecraft-disconnect-btn")).contains("hidden");
     }
 }
