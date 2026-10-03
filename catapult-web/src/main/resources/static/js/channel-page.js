@@ -73,18 +73,6 @@ window.CatapultChannel = (function () {
         }
     }
 
-    function setBindingTws(id, tws) {
-        const row = getBindingElement(id);
-        if (!row) return;
-        row.querySelectorAll(".binding-tw-checkbox").forEach(cb => { cb.checked = tws.includes(cb.value); });
-        // hasOverride's visibility is driven generically by TwUpdatedEvent/TwResetEvent's
-        // own spa:on, scoped automatically to this row via the event's bindingId.
-    }
-
-    function resetBindingTws(id) {
-        setBindingTws(id, []);
-    }
-
     function setMinecraftStatus(status, minecraftName) {
         const card = document.querySelector('[data-conn="minecraft"]');
         if (!card) return;
@@ -134,7 +122,6 @@ window.CatapultChannel = (function () {
         getBindingsElements, getBindingElement,
         setCurrentGame,
         removeBinding,
-        setBindingTws, resetBindingTws,
         setMinecraftStatus
     };
 })();
