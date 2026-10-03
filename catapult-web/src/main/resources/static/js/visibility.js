@@ -8,8 +8,10 @@
  * matching); spa:value/spa:in leave data-value/data-in="property:EventName.field,..."
  * breadcrumbs that assign or array-test a DOM property directly. Visibility.dispatch
  * (eventName, data), called from channel-events.js's generic `on()` wrapper for every
- * SSE event, reads all of them — a new SSE-driven visibility rule or property sync is
- * added entirely in the template, never here.
+ * SSE event, reads all of them, and Visibility.discoverEventNames(root) tells
+ * channel-events.js which event names to even subscribe the EventSource to — a new
+ * SSE-driven visibility rule or property sync, even one naming an event never used
+ * before on this page, is added entirely in the template, never here.
  */
 window.Visibility = {
     apply(root, state) {
@@ -82,6 +84,15 @@ window.Visibility = {
         return (hasDefault && !resolved) ? defaultValue : resolved;
     },
 
+    // The event name a spec names, stripping a leading "!" and anything from the first
+    // "." onward (field/equality/default) — shared by _entriesFor's filter and
+    // discoverEventNames' collection so both agree on exactly the same grammar.
+    _eventNameOf(spec) {
+        const eventPart = spec.startsWith("!") ? spec.slice(1) : spec;
+        const dot = eventPart.indexOf(".");
+        return dot === -1 ? eventPart : eventPart.slice(0, dot);
+    },
+
     // Entries of `el`'s data-${attr} whose spec names this event.
     _entriesFor(el, attr, eventName) {
         return el.dataset[attr].split(",")
@@ -89,12 +100,25 @@ window.Visibility = {
                 const sep = entry.indexOf(":");
                 return [entry.slice(0, sep), entry.slice(sep + 1)];
             })
-            .filter(([, spec]) => {
-                const eventPart = spec.startsWith("!") ? spec.slice(1) : spec;
-                const dot = eventPart.indexOf(".");
-                const specEventName = dot === -1 ? eventPart : eventPart.slice(0, dot);
-                return specEventName === eventName;
+            .filter(([, spec]) => Visibility._eventNameOf(spec) === eventName);
+    },
+
+    // Every distinct SSE event name referenced by any spa:on/spa:switch/spa:value/spa:in
+    // in `root` — lets channel-events.js subscribe its EventSource to exactly what the
+    // current template needs without ever naming an event itself. Called once per
+    // catapult:render, so a brand-new event type referenced by a brand-new spa:* in the
+    // template is enough; no line is ever added here either.
+    discoverEventNames(root) {
+        const names = new Set();
+        ["on", "switch", "value", "in"].forEach(attr => {
+            root.querySelectorAll(`[data-${attr}]`).forEach(el => {
+                el.dataset[attr].split(",").forEach(entry => {
+                    const sep = entry.indexOf(":");
+                    names.add(Visibility._eventNameOf(entry.slice(sep + 1)));
+                });
             });
+        });
+        return names;
     },
 
     // Whether this element should react to this event payload at all: an element with no
