@@ -12,8 +12,6 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.InviteService;
 import fr.enimaloc.catapult.service.WhitelistService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
@@ -32,8 +30,6 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.Map;
@@ -180,7 +176,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         boolean isOwner = !ownerId.isBlank() && ownerId.equals(twitchId);
         boolean grantInviteAfterCreate = false;
         if (whitelistService.isEnabled() && !isOwner && !whitelistService.contains(twitchId)) {
-            Optional<String> pendingInvite = getPendingInviteCode();
+            Optional<String> pendingInvite = InviteCodeRelayFilter.pendingCode();
             log.info("Whitelist check — id={}, whitelistEnabled={}, inWhitelist={}, inviteCode={}",
                 twitchId, whitelistService.isEnabled(), whitelistService.contains(twitchId),
                 pendingInvite.orElse("(none)"));
@@ -190,7 +186,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             }
             // Invite code valid — adds user to whitelist, then fall through to normal account creation
             grantInviteAfterCreate = inviteService.redeem(pendingInvite.get(), twitchId);
-            clearPendingInviteCode();
+            InviteCodeRelayFilter.clearPendingCode();
         }
 
         Optional<UserAccount> existing = userAccountRepository.findByTwitchId(twitchId);
@@ -289,54 +285,5 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         }
 
         oAuthTokenRepository.save(token);
-    }
-
-    private Optional<String> getPendingInviteCode() {
-        try {
-            ServletRequestAttributes attrs =
-                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
-            HttpServletRequest request = attrs.getRequest();
-            HttpSession session = request.getSession(false);
-            String fromSession = session != null
-                ? (String) session.getAttribute(InviteCodeRelayFilter.SESSION_KEY)
-                : null;
-            String fromCookie = readCookie(request, InviteCodeRelayFilter.COOKIE_NAME);
-            log.info("getPendingInviteCode — sessionId={}, fromSession={}, fromCookie={}",
-                session != null ? session.getId() : "null", fromSession, fromCookie);
-            return Optional.ofNullable(fromSession != null ? fromSession : fromCookie);
-        } catch (IllegalStateException e) {
-            log.warn("getPendingInviteCode — no request context: {}", e.getMessage());
-        }
-        return Optional.empty();
-    }
-
-    private void clearPendingInviteCode() {
-        try {
-            ServletRequestAttributes attrs =
-                (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
-            HttpServletRequest request = attrs.getRequest();
-            HttpSession session = request.getSession(false);
-            if (session != null) {
-                session.removeAttribute(InviteCodeRelayFilter.SESSION_KEY);
-            }
-            org.springframework.http.ResponseCookie expired = org.springframework.http.ResponseCookie
-                .from(InviteCodeRelayFilter.COOKIE_NAME, "")
-                .httpOnly(true)
-                .secure(request.isSecure())
-                .path("/")
-                .maxAge(0)
-                .sameSite("Lax")
-                .build();
-            attrs.getResponse().addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, expired.toString());
-        } catch (IllegalStateException ignored) {}
-    }
-
-    private static String readCookie(HttpServletRequest request, String name) {
-        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
-        if (cookies == null) return null;
-        for (jakarta.servlet.http.Cookie c : cookies) {
-            if (name.equals(c.getName())) return c.getValue();
-        }
-        return null;
     }
 }
