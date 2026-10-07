@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.BindingDto;
 import fr.enimaloc.catapult.common.dto.GameDto;
 import fr.enimaloc.catapult.service.mock.MockApiService;
 import fr.enimaloc.catapult.service.mock.MockData;
+import fr.enimaloc.catapult.service.mock.MockPresets;
 import fr.enimaloc.catapult.event.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -47,10 +48,10 @@ public class MockAdminController {
         model.addAttribute("steamRateLimited", data.isSteamRateLimited());
         model.addAttribute("steamOfflineMode", data.isSteamOfflineMode());
         model.addAttribute("steamProfileCacheTtlMinutes", data.getSteamProfileCacheTtlMinutes());
-        model.addAttribute("sourceTypes", MockData.SOURCE_TYPES);
-        model.addAttribute("bindingStatuses", MockData.BINDING_STATUSES);
-        model.addAttribute("availableCcls", MockData.AVAILABLE_CCLS);
-        model.addAttribute("availableTws", MockData.AVAILABLE_TWS);
+        model.addAttribute("sourceTypes", MockPresets.SOURCE_TYPES);
+        model.addAttribute("bindingStatuses", MockPresets.BINDING_STATUSES);
+        model.addAttribute("availableCcls", MockPresets.AVAILABLE_CCLS);
+        model.addAttribute("availableTws", MockPresets.AVAILABLE_TWS);
 
         return "mock/admin";
     }
