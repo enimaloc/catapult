@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.service.mock;
 import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
-import fr.enimaloc.catapult.ws.event.*;
+import fr.enimaloc.catapult.event.*;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
