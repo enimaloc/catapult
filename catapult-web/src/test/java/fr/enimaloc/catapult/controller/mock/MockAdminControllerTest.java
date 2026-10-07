@@ -2,8 +2,8 @@ package fr.enimaloc.catapult.controller.mock;
 
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
-import fr.enimaloc.catapult.event.GameChangedEvent;
-import fr.enimaloc.catapult.event.SteamConnectionStateEvent;
+import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.mock.MockApiService;
 import fr.enimaloc.catapult.service.mock.MockData;

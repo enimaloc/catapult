@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
-import fr.enimaloc.catapult.event.GameChangedEvent;
+import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

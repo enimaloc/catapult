@@ -1,4 +1,6 @@
-package fr.enimaloc.catapult.event;
+package fr.enimaloc.catapult.event.binding;
+
+import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
 
 import org.springframework.context.ApplicationEvent;
 
