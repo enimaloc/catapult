@@ -38,9 +38,11 @@ document.addEventListener("catapult:render", function () {
         const gameInput = panel.querySelector(".binding-edit-game-input");
         const gameIdInput = panel.querySelector(".binding-edit-game-id");
         const results = panel.querySelector(".binding-edit-game-results");
+        // The ccl switches live in the sibling .binding-ccl-panel, within the same row.
+        const cclRoot = panel.parentElement;
 
         function saveBinding(gameId, gameName) {
-            const ccls = Array.from(panel.querySelectorAll(".binding-edit-ccl-checkbox"))
+            const ccls = Array.from(cclRoot.querySelectorAll(".binding-edit-ccl-checkbox"))
                 .filter(sw => sw.checked)
                 .map(sw => sw.value);
             return CatapultChannel.postJson(bindingUrl(row, ""), {
@@ -55,7 +57,7 @@ document.addEventListener("catapult:render", function () {
             saveBinding(game.id, game.name);
         });
 
-        panel.querySelectorAll(".binding-edit-ccl-checkbox").forEach(sw => {
+        cclRoot.querySelectorAll(".binding-edit-ccl-checkbox").forEach(sw => {
             sw.addEventListener("change", () => {
                 saveBinding(gameIdInput.value, gameInput.value);
             });
