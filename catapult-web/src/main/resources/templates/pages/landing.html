@@ -33,7 +33,7 @@
         </div>
 
         <div class="features-grid">
-            <mdui-card th:each="feature : ${features}" variant="outlined" class="feature-card">
+            <mdui-card th:each="feature : ${app.features}" variant="outlined" class="feature-card">
                 <div class="feature-icon">
                     <mdui-icon th:name="${feature.icon()}"></mdui-icon>
                 </div>
@@ -53,7 +53,7 @@
         </div>
 
         <div class="platforms">
-            <mdui-card th:each="plaftorm : ${platforms}" variant="outlined" class="platform-card">
+            <mdui-card th:each="plaftorm : ${app.platforms}" variant="outlined" class="platform-card">
                 <div th:if="${plaftorm.iconType().equals(T(fr.enimaloc.catapult.dto.index.PlatformDto.IconType).TEXT)}"
                      th:text="${plaftorm.icon()}" class="platform-icon"></div>
                 <div th:if="${plaftorm.iconType().equals(T(fr.enimaloc.catapult.dto.index.PlatformDto.IconType).MDUI_ICON)}"
