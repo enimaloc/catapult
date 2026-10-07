@@ -1,5 +1,6 @@
 <mdui-layout-main th:fragment="channel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
     <!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.ChannelPageData"*/-->
+    <!--/*@thymesVar id="app" type="fr.enimaloc.catapult.controller.ModelFiller$AppModel"*/-->
     <section class="section channel-section" th:with="ch=${channelPage}">
         <div class="section-header channel-header">
             <mdui-avatar class="channel-header-avatar" th:src="${ch.channelUser().profileImageUrl()}"></mdui-avatar>
@@ -109,9 +110,10 @@
                                                th:text="#{channel.bindings.filter.incomplete}">Incomplet
                         </mdui-segmented-button>
                         <mdui-segmented-button data-link
-                                               th:href="@{/channel/{u}(u=${ch.channelUsername()},source='STEAM')}"
-                                               th:classappend="${ch.filterSource() == 'STEAM'} ? 'filter-active'"
-                                               th:text="#{channel.bindings.filter.steam}">Steam
+                                               th:each="platform : ${app.platforms}"
+                                               th:href="@{/channel/{u}(u=${ch.channelUsername()},source=${platform.id().toUpperCase()})}"
+                                               th:classappend="${ch.filterSource() == platform.id().toUpperCase()} ? 'filter-active'"
+                                               th:text="#{${platform.titleKey()}}">platform
                         </mdui-segmented-button>
                     </mdui-segmented-button-group>
                 </div>
