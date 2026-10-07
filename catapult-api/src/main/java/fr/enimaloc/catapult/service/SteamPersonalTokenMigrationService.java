@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
+import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
-import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

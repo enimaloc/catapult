@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.enimaloc.catapult.domain.MinecraftFriendLink;
-import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.MinecraftFriendLinkRepository;
-import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,7 +37,7 @@ class MinecraftFriendServiceTest {
     @Mock private MinecraftServiceAccountRepository accountRepository;
     @Mock private MinecraftFriendLinkRepository linkRepository;
     @Mock private MinecraftAccountLimitMarker limitMarker;
-    @Mock private fr.enimaloc.catapult.repository.GetterConfigRepository getterConfigRepository;
+    @Mock private fr.enimaloc.catapult.repository.binding.GetterConfigRepository getterConfigRepository;
 
     @InjectMocks private MinecraftFriendService service;
 
@@ -255,17 +255,17 @@ class MinecraftFriendServiceTest {
         service.enroll(user, "jeb_");
 
         verify(getterConfigRepository).save(org.mockito.ArgumentMatchers.argThat(config ->
-                config.getProvider() == fr.enimaloc.catapult.domain.GetterConfig.Provider.MINECRAFT
+                config.getProvider() == fr.enimaloc.catapult.domain.binding.GetterConfig.Provider.MINECRAFT
                         && config.isEnabled()
                         && config.getPriority() == 1));
     }
 
     @Test
     void unenroll_disablesMinecraftGetterConfig() {
-        var config = new fr.enimaloc.catapult.domain.GetterConfig();
-        config.setProvider(fr.enimaloc.catapult.domain.GetterConfig.Provider.MINECRAFT);
+        var config = new fr.enimaloc.catapult.domain.binding.GetterConfig();
+        config.setProvider(fr.enimaloc.catapult.domain.binding.GetterConfig.Provider.MINECRAFT);
         config.setEnabled(true);
-        when(getterConfigRepository.findByUserAndProvider(user, fr.enimaloc.catapult.domain.GetterConfig.Provider.MINECRAFT))
+        when(getterConfigRepository.findByUserAndProvider(user, fr.enimaloc.catapult.domain.binding.GetterConfig.Provider.MINECRAFT))
                 .thenReturn(Optional.of(config));
 
         service.unenroll(user);

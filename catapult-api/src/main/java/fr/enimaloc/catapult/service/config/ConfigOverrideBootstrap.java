@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.service.config;
 
 import fr.enimaloc.catapult.config.DatabaseOverridePropertySource;
-import fr.enimaloc.catapult.domain.ConfigOverride;
-import fr.enimaloc.catapult.repository.ConfigOverrideRepository;
+import fr.enimaloc.catapult.domain.config.ConfigOverride;
+import fr.enimaloc.catapult.repository.config.ConfigOverrideRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;

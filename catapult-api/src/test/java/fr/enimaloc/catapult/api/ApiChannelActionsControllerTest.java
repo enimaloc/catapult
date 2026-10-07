@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.OAuthToken;
-import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.domain.UserSettings;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;

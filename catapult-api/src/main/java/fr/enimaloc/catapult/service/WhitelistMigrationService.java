@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.WhitelistEntry;
-import fr.enimaloc.catapult.repository.WhitelistEntryRepository;
+import fr.enimaloc.catapult.domain.access.WhitelistEntry;
+import fr.enimaloc.catapult.repository.access.WhitelistEntryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;

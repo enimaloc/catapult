@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.FeedbackSubmission;
-import fr.enimaloc.catapult.repository.FeedbackSubmissionRepository;
+import fr.enimaloc.catapult.domain.feedback.FeedbackSubmission;
+import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.event;
 
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.domain.UserSettings;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.BindingService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.service.TwitchService;

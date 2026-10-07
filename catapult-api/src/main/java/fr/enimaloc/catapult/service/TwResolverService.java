@@ -1,6 +1,9 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.repository.*;
+import fr.enimaloc.catapult.repository.tw.TwDtddTopicMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwIgdbDescriptorMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwSteamContentIdMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwSteamKeywordRepository;
 import fr.enimaloc.catapult.service.SteamStoreService.SteamTwSignals;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

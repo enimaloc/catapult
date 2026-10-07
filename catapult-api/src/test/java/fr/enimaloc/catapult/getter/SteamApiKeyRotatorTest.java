@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
-import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
+import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
+import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

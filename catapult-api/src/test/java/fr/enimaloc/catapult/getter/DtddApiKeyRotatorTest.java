@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.DtddApiKeyEntry;
-import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
+import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
+import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

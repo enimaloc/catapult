@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.chat.command.registry.tw;
 
 import fr.enimaloc.catapult.chat.GameContext;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.GameContextService;
 import org.junit.jupiter.api.Test;
 

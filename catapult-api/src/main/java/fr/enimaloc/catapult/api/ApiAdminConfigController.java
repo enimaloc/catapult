@@ -2,11 +2,11 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.ApplyRequest;
 import fr.enimaloc.catapult.common.dto.ModuleOverrideDto;
-import fr.enimaloc.catapult.domain.ConfigAudit;
-import fr.enimaloc.catapult.domain.ConfigOverride;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ConfigAuditRepository;
-import fr.enimaloc.catapult.repository.ConfigOverrideRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.config.ConfigAudit;
+import fr.enimaloc.catapult.domain.config.ConfigOverride;
+import fr.enimaloc.catapult.repository.config.ConfigAuditRepository;
+import fr.enimaloc.catapult.repository.config.ConfigOverrideRepository;
 import fr.enimaloc.catapult.service.config.ConfigCatalogService;
 import fr.enimaloc.catapult.service.config.ConfigEntry;
 import fr.enimaloc.catapult.service.config.ConfigOverrideService;

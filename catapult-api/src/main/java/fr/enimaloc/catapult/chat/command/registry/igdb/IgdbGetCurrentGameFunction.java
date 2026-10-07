@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.chat.command.registry.igdb;
 import fr.enimaloc.catapult.chat.GameContext;
 import fr.enimaloc.catapult.chat.command.registry.DtoMapper;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.GameContextService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

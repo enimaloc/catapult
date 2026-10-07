@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;

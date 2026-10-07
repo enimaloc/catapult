@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.domain.UserGroup;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.repository.UserGroupRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserGroup;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserGroupRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;

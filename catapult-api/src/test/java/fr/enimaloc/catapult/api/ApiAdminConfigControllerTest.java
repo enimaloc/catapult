@@ -1,16 +1,16 @@
 package fr.enimaloc.catapult.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.enimaloc.catapult.domain.ConfigAudit;
-import fr.enimaloc.catapult.domain.ConfigOverride;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ConfigAuditRepository;
-import fr.enimaloc.catapult.repository.ConfigOverrideRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.config.ConfigAudit;
+import fr.enimaloc.catapult.domain.config.ConfigOverride;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.config.ConfigAuditRepository;
+import fr.enimaloc.catapult.repository.config.ConfigOverrideRepository;
+import fr.enimaloc.catapult.service.ChannelAccessService;
 import fr.enimaloc.catapult.service.config.ConfigCatalogService;
 import fr.enimaloc.catapult.service.config.ConfigEntry;
 import fr.enimaloc.catapult.service.config.ConfigOverrideService;
-import fr.enimaloc.catapult.service.ChannelAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;

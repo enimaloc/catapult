@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

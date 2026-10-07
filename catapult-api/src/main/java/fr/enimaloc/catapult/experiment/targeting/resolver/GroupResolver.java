@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.experiment.targeting.resolver;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.domain.UserGroup;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserGroup;
 import fr.enimaloc.catapult.experiment.targeting.AttributeResolver;
 import fr.enimaloc.catapult.experiment.targeting.AttributeValue;
-import fr.enimaloc.catapult.repository.UserGroupRepository;
+import fr.enimaloc.catapult.repository.account.UserGroupRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

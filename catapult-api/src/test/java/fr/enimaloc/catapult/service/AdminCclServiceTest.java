@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.IgdbRatingDescriptor;
-import fr.enimaloc.catapult.domain.TwitchCclDefinition;
-import fr.enimaloc.catapult.repository.IgdbRatingDescriptorRepository;
-import fr.enimaloc.catapult.repository.TwitchCclDefinitionRepository;
+import fr.enimaloc.catapult.domain.igdb.IgdbRatingDescriptor;
+import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
+import fr.enimaloc.catapult.repository.igdb.IgdbRatingDescriptorRepository;
+import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

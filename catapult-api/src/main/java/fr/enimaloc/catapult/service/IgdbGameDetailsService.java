@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.IgdbGameDetails;
-import fr.enimaloc.catapult.repository.IgdbGameDetailsRepository;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
+import fr.enimaloc.catapult.repository.igdb.IgdbGameDetailsRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;

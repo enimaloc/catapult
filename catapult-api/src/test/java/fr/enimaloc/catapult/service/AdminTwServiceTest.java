@@ -1,10 +1,15 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.TwDefinition;
-import fr.enimaloc.catapult.domain.TwSteamContentIdMapping;
-import fr.enimaloc.catapult.domain.TwSteamKeyword;
+import fr.enimaloc.catapult.domain.tw.TwDefinition;
+import fr.enimaloc.catapult.domain.tw.TwSteamContentIdMapping;
+import fr.enimaloc.catapult.domain.tw.TwSteamKeyword;
 import fr.enimaloc.catapult.event.TwDefinitionsChangedEvent;
-import fr.enimaloc.catapult.repository.*;
+import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
+import fr.enimaloc.catapult.repository.tw.TwDtddTopicMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwIgdbDescriptorMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwSteamContentIdMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwSteamKeywordRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 

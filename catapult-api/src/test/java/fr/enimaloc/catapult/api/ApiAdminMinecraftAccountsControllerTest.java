@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
-import fr.enimaloc.catapult.repository.MinecraftFriendLinkRepository;
-import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.MinecraftService;
 import fr.enimaloc.catapult.service.MinecraftTokenService;
@@ -78,7 +78,7 @@ class ApiAdminMinecraftAccountsControllerTest {
         var account = new MinecraftServiceAccount();
         account.setId(UUID.randomUUID());
         when(accountRepository.findById(account.getId())).thenReturn(Optional.of(account));
-        when(linkRepository.findByServiceAccount(account)).thenReturn(java.util.List.of(new fr.enimaloc.catapult.domain.MinecraftFriendLink()));
+        when(linkRepository.findByServiceAccount(account)).thenReturn(java.util.List.of(new fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink()));
 
         ResponseEntity<?> response = controller.delete(account.getId());
 
