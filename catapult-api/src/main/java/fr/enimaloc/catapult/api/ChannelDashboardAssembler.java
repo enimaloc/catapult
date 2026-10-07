@@ -28,7 +28,6 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.SteamApiClient;
-import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.DtddGameCacheRepository;
 import fr.enimaloc.catapult.repository.DtddGameMappingRepository;
 import fr.enimaloc.catapult.repository.DtddMappingProposalRepository;
@@ -42,6 +41,8 @@ import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.IgdbService;
 import fr.enimaloc.catapult.service.MinecraftFriendService;
 import fr.enimaloc.catapult.service.StreamStateService;
+import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
+import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,7 +54,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Builds what the channel dashboard shows (status, bindings page, settings, DTDD mapping) for
@@ -66,8 +66,6 @@ public class ChannelDashboardAssembler {
     /** Source types {@link DevBackdoorResolver} can encode into a "try it out" uuid. */
     private static final Set<GameBinding.SourceType> BACKDOOR_ENCODABLE =
             Set.of(GameBinding.SourceType.STEAM, GameBinding.SourceType.XBOX);
-    private static final SteamApiClient.SteamProfileStatus PROFILE_UNREACHABLE =
-            new SteamApiClient.SteamProfileStatus(false, false);
 
     private final GameBindingRepository gameBindingRepository;
     private final UserSettingsRepository userSettingsRepository;
@@ -76,8 +74,8 @@ public class ChannelDashboardAssembler {
     private final AdminCclService adminCclService;
     private final TwDefinitionRepository twDefinitionRepository;
     private final TokenEncryptionService tokenEncryptionService;
-    private final SteamApiKeyRotator steamApiKeyRotator;
     private final Optional<SteamApiClient> steamApiClient;
+    private final SteamProfileDiagnostics steamDiagnostics;
     private final IgdbService igdbService;
     private final DtddGameMappingRepository dtddMappingRepo;
     private final DtddGameCacheRepository dtddGameCacheRepo;
@@ -160,48 +158,14 @@ public class ChannelDashboardAssembler {
                 binding.getTws());
     }
 
-    /**
-     * Steam state, or null without a Steam client. Only the owner gets the live profile
-     * diagnostics: a private profile seen while every API key is rate-limited is reported as
-     * rate-limiting, since Steam answers both the same way.
-     */
+    /** Steam state, null without Steam; only the owner's profile is probed live. */
     private SteamData steamData(UserAccount channel, boolean owner) {
-        if (steamApiClient.isEmpty()) {
+        if (!steamDiagnostics.available()) {
             return null;
         }
-        SteamApiClient client = steamApiClient.get();
-        boolean connected = channel.getSteamId() != null;
-        boolean hasPersonalToken = channel.getSteamPersonalToken() != null;
-        boolean profilePrivate = false;
-        boolean rateLimited = false;
-        boolean offlineMode = false;
-
-        if (connected && owner) {
-            String personalToken = hasPersonalToken
-                    ? tokenEncryptionService.decrypt(channel.getSteamPersonalToken()) : null;
-            SteamApiClient.SteamProfileStatus profile = profileStatus(client, channel.getSteamId(), personalToken);
-            profilePrivate = !profile.profilePublic();
-            offlineMode = profile.offlineMode();
-            if (profilePrivate && (client.isRateLimited() || steamApiKeyRotator.isAllKeysBlocked())) {
-                rateLimited = true;
-                profilePrivate = false;
-            }
-        }
-        return new SteamData(connected, hasPersonalToken, channel.isSteamTokenShared(), profilePrivate, rateLimited,
-                offlineMode, client.getProfileCacheTtl().toMinutes());
-    }
-
-    /** The profile's visibility, giving up after 2 seconds (then reported unreachable, as private). */
-    private static SteamApiClient.SteamProfileStatus profileStatus(SteamApiClient client, String steamId,
-                                                                   String personalToken) {
-        try {
-            return client.getProfileStatus(steamId, personalToken)
-                    .orTimeout(2, TimeUnit.SECONDS)
-                    .exceptionally(e -> PROFILE_UNREACHABLE)
-                    .join();
-        } catch (Exception e) {
-            return PROFILE_UNREACHABLE;
-        }
+        SteamProfileDto steam = steamDiagnostics.snapshot(channel, owner);
+        return new SteamData(steam.hasSteam(), steam.hasPersonalToken(), steam.tokenShared(), steam.profilePrivate(),
+                steam.rateLimited(), steam.offlineMode(), steam.ttlMinutes());
     }
 
     private boolean hasXboxToken(UserAccount channel) {
