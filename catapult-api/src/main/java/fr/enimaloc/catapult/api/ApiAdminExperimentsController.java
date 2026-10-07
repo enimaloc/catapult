@@ -77,44 +77,58 @@ public class ApiAdminExperimentsController {
     public ExperimentDetailData detail(@PathVariable UUID id) {
         Experiment exp = findOrThrow(id);
         List<String> eventKeys = eventRepository.findDistinctEventKeysByExperiment(exp);
-
-        List<ConversionStat> conversionStats = new ArrayList<>();
-        if (exp.getVariants().size() >= 2) {
-            ExperimentVariant control = exp.getVariants().stream()
-                    .filter(ExperimentVariant::isControl).findFirst()
-                    .orElse(exp.getVariants().get(0));
-            long controlN = assignmentRepository.countByExperimentAndVariant(exp, control);
-
-            for (String eventKey : eventKeys) {
-                long controlConversions = eventRepository.countByExperimentAndVariantAndEventKey(exp, control, eventKey);
-                for (ExperimentVariant variant : exp.getVariants()) {
-                    if (variant.equals(control)) continue;
-                    long variantN = assignmentRepository.countByExperimentAndVariant(exp, variant);
-                    long variantConversions = eventRepository.countByExperimentAndVariantAndEventKey(exp, variant, eventKey);
-                    StatisticsService.ZTestResult sig = statisticsService.twoProportionZTest(
-                            controlConversions, controlN, variantConversions, variantN);
-                    conversionStats.add(new ConversionStat(eventKey, variant.getKey(), variantConversions, variantN, sig));
-                }
-            }
-        }
-
-        List<NpsStat> npsStats = exp.getVariants().stream().map(v -> {
-            List<ExperimentFeedback> feedbacks = feedbackRepository.findByExperimentAndVariant(exp, v);
-            int[] scores = feedbacks.stream().mapToInt(ExperimentFeedback::getNpsScore).toArray();
-            Double avg = feedbackRepository.findAverageNpsByExperimentAndVariant(exp, v);
-            return new NpsStat(v.getKey(), statisticsService.npsScore(scores), avg);
-        }).toList();
-
         boolean hasManualRule = exp.getRules().stream()
                 .anyMatch(r -> r.getRuleType() == ExperimentAssignmentRule.RuleType.MANUAL);
 
         return new ExperimentDetailData(
-                exp, eventKeys, conversionStats, npsStats,
+                exp, eventKeys, conversionStats(exp, eventKeys), npsStats(exp),
                 feedbackRepository.findByExperiment(exp, PageRequest.of(0, 20)).getContent(),
                 hasManualRule,
                 assignmentRepository.findByExperiment(exp, PageRequest.of(0, 20)).getContent(),
                 overrideRepository.findByExperimentOrderByPriorityAsc(exp)
         );
+    }
+
+    /**
+     * For each tracked event, how every non-control variant converts compared to the control
+     * (two-proportion z-test). Needs at least two variants.
+     */
+    private List<ConversionStat> conversionStats(Experiment exp, List<String> eventKeys) {
+        List<ConversionStat> stats = new ArrayList<>();
+        if (exp.getVariants().size() < 2) {
+            return stats;
+        }
+        ExperimentVariant control = controlVariant(exp);
+        long controlN = assignmentRepository.countByExperimentAndVariant(exp, control);
+        for (String eventKey : eventKeys) {
+            long controlConversions = eventRepository.countByExperimentAndVariantAndEventKey(exp, control, eventKey);
+            for (ExperimentVariant variant : exp.getVariants()) {
+                if (variant.equals(control)) continue;
+                long variantN = assignmentRepository.countByExperimentAndVariant(exp, variant);
+                long variantConversions = eventRepository.countByExperimentAndVariantAndEventKey(exp, variant, eventKey);
+                StatisticsService.ZTestResult significance = statisticsService.twoProportionZTest(
+                        controlConversions, controlN, variantConversions, variantN);
+                stats.add(new ConversionStat(eventKey, variant.getKey(), variantConversions, variantN, significance));
+            }
+        }
+        return stats;
+    }
+
+    /** Each variant's NPS (from its feedback scores) and average score. */
+    private List<NpsStat> npsStats(Experiment exp) {
+        return exp.getVariants().stream().map(variant -> {
+            int[] scores = feedbackRepository.findByExperimentAndVariant(exp, variant).stream()
+                    .mapToInt(ExperimentFeedback::getNpsScore).toArray();
+            Double average = feedbackRepository.findAverageNpsByExperimentAndVariant(exp, variant);
+            return new NpsStat(variant.getKey(), statisticsService.npsScore(scores), average);
+        }).toList();
+    }
+
+    /** The variant flagged as control, else the first one. */
+    private static ExperimentVariant controlVariant(Experiment exp) {
+        return exp.getVariants().stream()
+                .filter(ExperimentVariant::isControl).findFirst()
+                .orElse(exp.getVariants().get(0));
     }
 
     @PostMapping("/{id}/activate")
@@ -166,12 +180,9 @@ public class ApiAdminExperimentsController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "User already assigned");
         }
         if (!exp.getVariants().isEmpty()) {
-            ExperimentVariant controlVariant = exp.getVariants().stream()
-                    .filter(ExperimentVariant::isControl).findFirst()
-                    .orElse(exp.getVariants().get(0));
             ExperimentAssignment assignment = new ExperimentAssignment();
             assignment.setExperiment(exp);
-            assignment.setVariant(controlVariant);
+            assignment.setVariant(controlVariant(exp));
             assignment.setUser(user);
             assignmentRepository.save(assignment);
         }
