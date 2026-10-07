@@ -8,8 +8,10 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.NotificationRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.notification.NotificationService;
+import fr.enimaloc.catapult.service.ChannelAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
@@ -37,7 +39,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiAdminNotificationsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
+@Import(ApiUserResolver.class)
 class ApiAdminNotificationsControllerTest {
+    @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
     final ObjectMapper om = new ObjectMapper();

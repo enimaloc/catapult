@@ -4,7 +4,6 @@ import fr.enimaloc.catapult.common.dto.SubmitRequest;
 import fr.enimaloc.catapult.domain.FeedbackSubmission;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.FeedbackSubmissionRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.GitLabClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,12 +29,12 @@ import java.util.UUID;
 public class ApiFeedbackController {
 
     private final FeedbackSubmissionRepository repository;
-    private final UserAccountRepository userAccountRepository;
+    private final ApiUserResolver userResolver;
     private final GitLabClient gitLabClient;
 
     @GetMapping
     public List<FeedbackSubmission> list(@AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = resolveUser(jwt);
+        UserAccount user = userResolver.viewer(jwt);
         return repository.findByUserOrderByCreatedAtDesc(user);
     }
 
@@ -53,7 +52,7 @@ public class ApiFeedbackController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid type");
         }
 
-        UserAccount user = resolveUser(jwt);
+        UserAccount user = userResolver.viewer(jwt);
         String label = feedbackType == FeedbackSubmission.Type.BUG ? "bug" : "enhancement";
         String issueBody = buildIssueBody(user, body.description());
 
@@ -78,18 +77,12 @@ public class ApiFeedbackController {
     public void unsubscribe(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         FeedbackSubmission submission = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        UserAccount user = resolveUser(jwt);
+        UserAccount user = userResolver.viewer(jwt);
         if (!submission.getUser().getId().equals(user.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         submission.setSubscribed(false);
         repository.save(submission);
-    }
-
-    private UserAccount resolveUser(Jwt jwt) {
-        UUID userId = UUID.fromString(jwt.getSubject());
-        return userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     private String buildIssueBody(UserAccount user, String description) {

@@ -6,8 +6,10 @@ import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.service.ChannelAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -32,7 +34,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ApiChatCommandSettingsController.class)
+@Import(ApiUserResolver.class)
 class ApiChatCommandSettingsControllerTest {
+    @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
     @MockitoBean UserAccountRepository userAccountRepository;

@@ -34,13 +34,13 @@ import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.BindingService;
-import fr.enimaloc.catapult.service.ChannelAccessService;
 import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import fr.enimaloc.catapult.service.BotToggleService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.SchedulerService;
 import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
 import fr.enimaloc.catapult.service.notification.TwitchatPayloadPresetService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
@@ -78,7 +78,7 @@ public class ApiChannelActionsController {
 
     private final UserAccountRepository userAccountRepository;
     private final UserSettingsRepository userSettingsRepository;
-    private final ChannelAccessService channelAccessService;
+    private final ApiUserResolver userResolver;
     private final BindingService bindingService;
     private final BotToggleService botToggleService;
     private final TwitchService twitchService;
@@ -87,7 +87,7 @@ public class ApiChannelActionsController {
     private final SchedulerService schedulerService;
     private final TokenEncryptionService tokenEncryptionService;
     private final SteamApiKeyRepository steamApiKeyRepository;
-    private final fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
+    private final ChannelEventPublisher channelEventPublisher;
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     private final TwitchatPayloadPresetService twitchatPayloadPresetService;
     private final TwitchatNotifier twitchatNotifier;
@@ -108,8 +108,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody CclToggleRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         bindingService.toggleCclEnabled(channelUser, id, body.enabled());
         bindingService.findBinding(channelUser, id)
                 .map(BindingDto::from)
@@ -124,8 +123,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody IgnoredToggleRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         bindingService.toggleIgnored(channelUser, id, body.ignored());
         bindingService.findBinding(channelUser, id)
                 .map(BindingDto::from)
@@ -139,8 +137,7 @@ public class ApiChannelActionsController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         bindingService.deleteBinding(channelUser, id);
         channelEventPublisher.bindingDeleted(channelUser.getId(), id);
     }
@@ -153,8 +150,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody UpdateBindingRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         Set<String> ccls = body.ccls() != null ? body.ccls() : Set.of();
         bindingService.updateBinding(channelUser, id, body.twitchGameId(), body.twitchGameName(), ccls, false);
         bindingService.findBinding(channelUser, id)
@@ -170,9 +166,7 @@ public class ApiChannelActionsController {
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount user = resolveChannel(username, viewer);
-        requireOwner(viewer, user);
+        UserAccount user = userResolver.ownChannel(username, jwt);
         botToggleService.setBotEnabled(user, !user.isBotEnabled());
     }
 
@@ -181,9 +175,7 @@ public class ApiChannelActionsController {
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         var settings = twitchatWidgetSettingsService.getOrCreate(channelUser);
         return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
                 settings.getObsPasswordEncrypted() != null, channelUser.getWidgetToken().toString());
@@ -196,9 +188,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody TwitchatSettingsBody body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         twitchatWidgetSettingsService.updateSettings(channelUser, body.enabled(), body.obsHost(), body.obsPort(), body.obsPassword());
     }
 
@@ -207,9 +197,7 @@ public class ApiChannelActionsController {
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         var settings = twitchatWidgetSettingsService.regenerateToken(channelUser);
         return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
                 settings.getObsPasswordEncrypted() != null, channelUser.getWidgetToken().toString());
@@ -218,9 +206,7 @@ public class ApiChannelActionsController {
     @GetMapping("/twitchat/presets")
     public List<TwitchatPresetResponse> listTwitchatPresets(
             @PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         return twitchatPayloadPresetService.listPresets(channelUser).stream()
                 .map(ApiChannelActionsController::toPresetResponse)
                 .toList();
@@ -231,9 +217,7 @@ public class ApiChannelActionsController {
     public TwitchatPresetResponse createTwitchatPreset(
             @PathVariable String username, @AuthenticationPrincipal Jwt jwt,
             @RequestBody TwitchatPresetBody body) {
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         TwitchatPayloadPreset preset = twitchatPayloadPresetService.createPreset(channelUser,
                 parseEventType(body.eventType()), body.name(), body.payloadJson());
         return toPresetResponse(preset);
@@ -243,9 +227,7 @@ public class ApiChannelActionsController {
     public TwitchatPresetResponse updateTwitchatPreset(
             @PathVariable String username, @PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
             @RequestBody TwitchatPresetUpdateBody body) {
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         TwitchatPayloadPreset preset = twitchatPayloadPresetService.updatePreset(channelUser, id,
                 body.name(), body.payloadJson());
         return toPresetResponse(preset);
@@ -255,18 +237,14 @@ public class ApiChannelActionsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteTwitchatPreset(
             @PathVariable String username, @PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         twitchatPayloadPresetService.deletePreset(channelUser, id);
     }
 
     @GetMapping("/twitchat/active-presets")
     public Map<String, String> getActiveTwitchatPresets(
             @PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         Map<String, String> result = new LinkedHashMap<>();
         twitchatPayloadPresetService.getActivePresets(channelUser)
                 .forEach((eventType, presetId) -> result.put(eventType.name(), presetId.toString()));
@@ -278,9 +256,7 @@ public class ApiChannelActionsController {
     public void setActiveTwitchatPreset(
             @PathVariable String username, @PathVariable String eventType, @AuthenticationPrincipal Jwt jwt,
             @RequestBody TwitchatActivePresetBody body) {
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         UUID presetId = body.presetId() == null || body.presetId().isBlank() ? null : UUID.fromString(body.presetId());
         twitchatPayloadPresetService.setActivePreset(channelUser, parseEventType(eventType), presetId);
     }
@@ -290,9 +266,7 @@ public class ApiChannelActionsController {
     public void testTwitchatPreset(
             @PathVariable String username, @AuthenticationPrincipal Jwt jwt,
             @RequestBody TwitchatPresetTestBody body) {
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         twitchatNotifier.sendTestNotification(channelUser, parseEventType(body.eventType()), body.payloadJson());
     }
 
@@ -317,9 +291,7 @@ public class ApiChannelActionsController {
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount user = resolveChannel(username, viewer);
-        requireOwner(viewer, user);
+        UserAccount user = userResolver.ownChannel(username, jwt);
         if (user.getStatus() != UserAccount.Status.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Account is not active");
         }
@@ -333,8 +305,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody CclSettingsRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         UserSettings settings = getOrCreateSettings(channelUser);
         settings.setCclFeatureEnabled(body.cclEnabled());
         settings.getBlockedCcls().clear();
@@ -350,8 +321,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody TwSettingsRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         UserSettings settings = getOrCreateSettings(channelUser);
         settings.setTwFeatureEnabled(body.enabled());
         settings.getBlockedTws().clear();
@@ -367,8 +337,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody NoGameSettingsRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         UserSettings settings = getOrCreateSettings(channelUser);
         settings.setNoGameTwitchGameId(body.twitchGameId());
         settings.setNoGameTwitchGameName(body.twitchGameName());
@@ -391,8 +360,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody IncompleteFallbackRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         UserSettings settings = getOrCreateSettings(channelUser);
         settings.setIncompleteFallbackTwitchGameId(body.twitchGameId());
         settings.setIncompleteFallbackTwitchGameName(body.twitchGameName());
@@ -409,9 +377,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody SteamTokenRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         if (body.token() == null || body.token().isBlank()) return;
         String trimmed = body.token().trim();
         channelUser.setSteamPersonalToken(tokenEncryptionService.encrypt(trimmed));
@@ -428,9 +394,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody SteamTokenSharingRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         if (channelUser.getSteamPersonalToken() == null) return;
         channelUser.setSteamTokenShared(body.shared());
         userAccountRepository.save(channelUser);
@@ -446,9 +410,7 @@ public class ApiChannelActionsController {
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         channelUser.setSteamPersonalToken(null);
         channelUser.setSteamTokenShared(false);
         userAccountRepository.save(channelUser);
@@ -464,9 +426,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody DeleteAccountRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         if (channelUser.getTwitchUsername().equalsIgnoreCase(body.confirmUsername())) {
             accountService.initiateAccountDeletion(channelUser);
         }
@@ -478,9 +438,7 @@ public class ApiChannelActionsController {
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         accountService.cancelAccountDeletion(channelUser);
     }
 
@@ -491,9 +449,7 @@ public class ApiChannelActionsController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody DisconnectRequest body) {
 
-        UserAccount viewer = resolveViewer(jwt);
-        UserAccount channelUser = resolveChannel(username, viewer);
-        requireOwner(viewer, channelUser);
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         OAuthToken.Provider provider = OAuthToken.Provider.valueOf(body.provider().toUpperCase());
         accountService.disconnectProvider(channelUser, provider);
         channelEventPublisher.connectionChanged(channelUser.getId(),
@@ -542,27 +498,6 @@ public class ApiChannelActionsController {
 
         return new SteamProfileDto(hasSteam, profilePrivate, offlineMode, rateLimited,
                 ttlMinutes, hasPersonalToken, tokenShared);
-    }
-
-    private UserAccount resolveViewer(Jwt jwt) {
-        UUID viewerId = UUID.fromString(jwt.getSubject());
-        return userAccountRepository.findById(viewerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-    }
-
-    private UserAccount resolveChannel(String username, UserAccount viewer) {
-        UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!channelAccessService.canAccess(viewer, channelUser)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
-        return channelUser;
-    }
-
-    private void requireOwner(UserAccount viewer, UserAccount channel) {
-        if (!viewer.getId().equals(channel.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
     }
 
     private UserSettings getOrCreateSettings(UserAccount user) {
