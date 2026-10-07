@@ -78,7 +78,7 @@ async function navigate(path, push = true, search = "") {
         return;
     }
 
-    document.title = config.titles[route.id] ?? document.title;
+    document.title = config.titles[route?.id] ?? document.title;
     updateActiveLink(path);
 
     window.scrollTo({
@@ -86,6 +86,9 @@ async function navigate(path, push = true, search = "") {
         behavior: "instant"
     });
 }
+
+// The router's public surface, for the per-fragment scripts (channel-page.js's refresh()).
+window.CatapultSpa = { navigate, resolveRoute };
 
 updateActiveLink(config.page);
 
