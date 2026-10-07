@@ -13,12 +13,10 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -26,6 +24,8 @@ import java.io.*;
 import java.net.Socket;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.concurrent.*;
 
 @Slf4j
@@ -36,27 +36,15 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     private static final String IRC_HOST = "irc.chat.twitch.tv";
     private static final int IRC_PORT = 6697;
-    private static final String HELIX_BANS_URL = "https://api.twitch.tv/helix/moderation/bans";
-    private static final String HELIX_USERS_URL = "https://api.twitch.tv/helix/users";
-    private static final String HELIX_STREAMS_URL = "https://api.twitch.tv/helix/streams";
-    private static final String HELIX_FOLLOWERS_URL = "https://api.twitch.tv/helix/channels/followers";
-    private static final String HELIX_SHOUTOUTS_URL = "https://api.twitch.tv/helix/chat/shoutouts";
     private static final long MAX_RETRY_SECONDS = 60L;
-
-    public static final String CLIENT_ID = "Client-Id";
-    public static final String AUTHORIZATION = "Authorization";
-    public static final String AUTHORIZATION_BEARER = "Bearer ";
 
     private final OAuthTokenRepository oAuthTokenRepository;
     private final UserAccountRepository userAccountRepository;
     private final TokenEncryptionService tokenEncryptionService;
     private final ApplicationEventPublisher eventPublisher;
-    private final RestClient restClient;
+    private final TwitchHelixChannelClient helix;
     private final MeterRegistry meterRegistry;
     private final TwitchChatRateLimiter chatRateLimiter;
-
-    @Value("${twitch.client-id:}")
-    private String twitchClientId;
 
     private final Map<UUID, PrintWriter> writers = new ConcurrentHashMap<>();
     private final Map<UUID, Socket> sockets = new ConcurrentHashMap<>();
@@ -250,190 +238,53 @@ public class IrcTwitchChatService implements TwitchChatService {
     @Override
     public void timeout(UserAccount user, String targetLogin, int durationSeconds, String reason) {
         if (durationSeconds <= 0) return;
-        moderate(user, targetLogin, durationSeconds, reason);
+        withAccessToken(user, accessToken -> helix.moderate(user, accessToken, targetLogin, durationSeconds, reason));
     }
 
     @Override
     public void ban(UserAccount user, String targetLogin, String reason) {
-        moderate(user, targetLogin, 0, reason);
+        withAccessToken(user, accessToken -> helix.moderate(user, accessToken, targetLogin, 0, reason));
     }
 
     @Override
     public void unban(UserAccount user, String targetLogin) {
-        oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .ifPresent(token -> {
-                String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
-                String targetId = resolveUserId(accessToken, targetLogin);
-                if (targetId == null) return;
-                try {
-                    restClient.delete()
-                        .uri(HELIX_BANS_URL + "?broadcaster_id=" + user.getTwitchId()
-                            + "&moderator_id=" + user.getTwitchId()
-                            + "&user_id=" + targetId)
-                            .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                            .header(CLIENT_ID, twitchClientId)
-                        .retrieve()
-                        .toBodilessEntity();
-                    log.info("[IRC] Unbanned {} for user {}", targetLogin, user.getId());
-                } catch (Exception e) {
-                    log.warn("[IRC] Failed to unban {} for user {}: {}",
-                        targetLogin, user.getId(), e.getMessage());
-                }
-            });
-    }
-
-    private void moderate(UserAccount user, String targetLogin, int durationSeconds, String reason) {
-        oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .ifPresent(token -> {
-                String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
-                String targetId = resolveUserId(accessToken, targetLogin);
-                if (targetId == null) return;
-
-                Map<String, Object> data = new LinkedHashMap<>();
-                data.put("user_id", targetId);
-                if (durationSeconds > 0) data.put("duration", durationSeconds);
-                if (reason != null && !reason.isBlank()) data.put("reason", reason);
-
-                try {
-                    restClient.post()
-                        .uri(HELIX_BANS_URL + "?broadcaster_id=" + user.getTwitchId()
-                            + "&moderator_id=" + user.getTwitchId())
-                            .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                            .header(CLIENT_ID, twitchClientId)
-                        .body(Map.of("data", data))
-                        .retrieve()
-                        .toBodilessEntity();
-                    log.info("[IRC] Moderated {} ({}s) for user {}", targetLogin, durationSeconds, user.getId());
-                } catch (Exception e) {
-                    log.warn("[IRC] Moderation failed for {} on user {}: {}",
-                        targetLogin, user.getId(), e.getMessage());
-                }
-            });
-    }
-
-    @SuppressWarnings("unchecked")
-    private String resolveUserId(String accessToken, String login) {
-        Map<String, Object> user = resolveUserJson(accessToken, login);
-        return user == null ? null : (String) user.get("id");
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> resolveUserJson(String accessToken, String login) {
-        try {
-            Map<String, Object> response = restClient.get()
-                .uri(HELIX_USERS_URL + "?login=" + java.net.URLEncoder.encode(login, java.nio.charset.StandardCharsets.UTF_8))
-                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                    .header(CLIENT_ID, twitchClientId)
-                .retrieve()
-                .body(Map.class);
-            if (response == null) return null;
-            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-            if (data == null || data.isEmpty()) return null;
-            return data.get(0);
-        } catch (Exception e) {
-            log.warn("[IRC] Failed to resolve user for '{}': {}", login, e.getMessage());
-            return null;
-        }
+        withAccessToken(user, accessToken -> helix.unban(user, accessToken, targetLogin));
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Optional<TwitchStreamInfo> getStreamInfo(UserAccount user) {
-        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
-            String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
-            try {
-                Map<String, Object> response = restClient.get()
-                    .uri(HELIX_STREAMS_URL + "?user_id=" + user.getTwitchId())
-                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                    .header(CLIENT_ID, twitchClientId)
-                    .retrieve()
-                    .body(Map.class);
-                if (response == null) return Optional.empty();
-                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                if (data == null || data.isEmpty()) return Optional.empty();
-                Map<String, Object> stream = data.get(0);
-                Instant startedAt = Instant.parse((String) stream.get("started_at"));
-                return Optional.of(new TwitchStreamInfo(
-                    (String) stream.get("title"), (String) stream.get("game_name"),
-                    ((Number) stream.get("viewer_count")).intValue(), startedAt));
-            } catch (Exception e) {
-                log.warn("[IRC] Failed to fetch stream info for user {}: {}", user.getId(), e.getMessage());
-                return Optional.empty();
-            }
-        });
+        return mapAccessToken(user, accessToken -> helix.streamInfo(user, accessToken));
     }
 
     @Override
     public Optional<TwitchUserProfile> getUserProfile(UserAccount user, String login) {
-        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
-            String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
-            Map<String, Object> profile = resolveUserJson(accessToken, login);
-            if (profile == null) return Optional.empty();
-            String createdAtRaw = (String) profile.get("created_at");
-            Instant createdAt = createdAtRaw == null ? null : Instant.parse(createdAtRaw);
-            return Optional.of(new TwitchUserProfile((String) profile.get("display_name"), createdAt));
-        });
+        return mapAccessToken(user, accessToken -> helix.userProfile(accessToken, login));
     }
 
     @Override
     public Optional<Instant> getFollowedAt(UserAccount user, String targetLogin) {
-        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
-            String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
-            String targetId = resolveUserId(accessToken, targetLogin);
-            if (targetId == null) return Optional.empty();
-            return fetchFollowedAt(user, accessToken, targetId, targetLogin);
-        });
+        return mapAccessToken(user, accessToken -> helix.followedAt(user, accessToken, targetLogin));
     }
 
     @Override
     public Optional<Instant> getFollowedAtById(UserAccount user, String targetTwitchId) {
-        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).flatMap(token -> {
-            String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
-            return fetchFollowedAt(user, accessToken, targetTwitchId, targetTwitchId);
-        });
-    }
-
-    @SuppressWarnings("unchecked")
-    private Optional<Instant> fetchFollowedAt(UserAccount user, String accessToken, String targetId, String logLabel) {
-        try {
-            Map<String, Object> response = restClient.get()
-                .uri(HELIX_FOLLOWERS_URL + "?broadcaster_id=" + user.getTwitchId()
-                    + "&moderator_id=" + user.getTwitchId() + "&user_id=" + targetId)
-                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                .header(CLIENT_ID, twitchClientId)
-                .retrieve()
-                .body(Map.class);
-            if (response == null) return Optional.empty();
-            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-            if (data == null || data.isEmpty()) return Optional.empty();
-            return Optional.of(Instant.parse((String) data.get(0).get("followed_at")));
-        } catch (Exception e) {
-            log.warn("[IRC] Failed to fetch follow date for '{}' on user {}: {}",
-                logLabel, user.getId(), e.getMessage());
-            return Optional.empty();
-        }
+        return mapAccessToken(user, accessToken -> helix.followedAtById(user, accessToken, targetTwitchId));
     }
 
     @Override
     public void shoutout(UserAccount user, String targetLogin) {
+        withAccessToken(user, accessToken -> helix.shoutout(user, accessToken, targetLogin));
+    }
+
+    /** Runs {@code call} with the streamer's access token; does nothing without a Twitch token. */
+    private void withAccessToken(UserAccount user, Consumer<String> call) {
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-            .ifPresent(token -> {
-                String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
-                String targetId = resolveUserId(accessToken, targetLogin);
-                if (targetId == null) return;
-                try {
-                    restClient.post()
-                        .uri(HELIX_SHOUTOUTS_URL + "?from_broadcaster_id=" + user.getTwitchId()
-                            + "&to_broadcaster_id=" + targetId + "&moderator_id=" + user.getTwitchId())
-                        .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                        .header(CLIENT_ID, twitchClientId)
-                        .retrieve()
-                        .toBodilessEntity();
-                    log.info("[IRC] Shouted out {} for user {}", targetLogin, user.getId());
-                } catch (Exception e) {
-                    log.warn("[IRC] Shoutout failed for {} on user {}: {}",
-                        targetLogin, user.getId(), e.getMessage());
-                }
-            });
+            .ifPresent(token -> call.accept(tokenEncryptionService.decrypt(token.getAccessToken())));
+    }
+
+    /** {@code call}'s result with the streamer's access token; empty without a Twitch token. */
+    private <T> Optional<T> mapAccessToken(UserAccount user, Function<String, Optional<T>> call) {
+        return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+            .flatMap(token -> call.apply(tokenEncryptionService.decrypt(token.getAccessToken())));
     }
 }

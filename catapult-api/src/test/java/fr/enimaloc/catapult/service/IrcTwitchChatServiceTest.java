@@ -14,6 +14,7 @@ import org.springframework.web.client.RestClient;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -131,88 +132,58 @@ class IrcTwitchChatServiceTest {
         verify(publisher, never()).publishEvent(any());
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
     @Test
-    void unban_executesDeleteRequest_whenTokenAndUserExist() {
+    void helixCalls_runWithTheStreamersDecryptedToken() {
         OAuthTokenRepository tokenRepo = mock(OAuthTokenRepository.class);
         TokenEncryptionService encSvc = mock(TokenEncryptionService.class);
-        RestClient restClient = mock(RestClient.class);
-
-        RestClient.RequestHeadersUriSpec getSpec = mock(RestClient.RequestHeadersUriSpec.class);
-        RestClient.ResponseSpec getResponseSpec = mock(RestClient.ResponseSpec.class);
-        when(restClient.get()).thenReturn(getSpec);
-        doReturn(getSpec).when(getSpec).uri(anyString());
-        doReturn(getSpec).when(getSpec).header(anyString(), anyString());
-        doReturn(getResponseSpec).when(getSpec).retrieve();
-        doReturn(Map.of("data", List.of(Map.of("id", "target-id")))).when(getResponseSpec).body(Map.class);
-
-        RestClient.RequestHeadersUriSpec deleteSpec = mock(RestClient.RequestHeadersUriSpec.class);
-        RestClient.ResponseSpec deleteResponseSpec = mock(RestClient.ResponseSpec.class);
-        when(restClient.delete()).thenReturn(deleteSpec);
-        doReturn(deleteSpec).when(deleteSpec).uri(anyString());
-        doReturn(deleteSpec).when(deleteSpec).header(anyString(), anyString());
-        doReturn(deleteResponseSpec).when(deleteSpec).retrieve();
-
+        TwitchHelixChannelClient helix = mock(TwitchHelixChannelClient.class);
         IrcTwitchChatService service = new IrcTwitchChatService(
-            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), restClient, METER_REGISTRY,
-            newRateLimiter());
-        ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
-
+            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), helix, METER_REGISTRY, newRateLimiter());
         UserAccount user = new UserAccount();
         user.setId(UUID.randomUUID());
-        user.setTwitchId("bcast-id");
         OAuthToken token = new OAuthToken();
         token.setAccessToken("enc-token");
-        when(tokenRepo.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
-            .thenReturn(Optional.of(token));
+        when(tokenRepo.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.of(token));
         when(encSvc.decrypt("enc-token")).thenReturn("raw-token");
+        Instant followedAt = Instant.parse("2024-01-01T00:00:00Z");
+        when(helix.followedAt(user, "raw-token", "fan")).thenReturn(Optional.of(followedAt));
+        when(helix.followedAtById(user, "raw-token", "42")).thenReturn(Optional.of(followedAt));
+        TwitchStreamInfo live = new TwitchStreamInfo("t", "g", 1, followedAt);
+        when(helix.streamInfo(user, "raw-token")).thenReturn(Optional.of(live));
+        TwitchUserProfile profile = new TwitchUserProfile("Fan", followedAt);
+        when(helix.userProfile("raw-token", "fan")).thenReturn(Optional.of(profile));
 
-        service.unban(user, "targetLogin");
+        service.ban(user, "troll", "spam");
+        service.timeout(user, "troll", 60, null);
+        service.timeout(user, "troll", 0, null);
+        service.unban(user, "troll");
+        service.shoutout(user, "friend");
 
-        verify(restClient).delete();
+        verify(helix).moderate(user, "raw-token", "troll", 0, "spam");
+        verify(helix).moderate(user, "raw-token", "troll", 60, null);
+        verify(helix).unban(user, "raw-token", "troll");
+        verify(helix).shoutout(user, "raw-token", "friend");
+        assertThat(service.getFollowedAt(user, "fan")).contains(followedAt);
+        assertThat(service.getFollowedAtById(user, "42")).contains(followedAt);
+        assertThat(service.getStreamInfo(user)).contains(live);
+        assertThat(service.getUserProfile(user, "fan")).contains(profile);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
     @Test
-    void ban_executesPostRequest_whenTokenAndUserExist() {
+    void helixCalls_needATwitchToken() {
         OAuthTokenRepository tokenRepo = mock(OAuthTokenRepository.class);
-        TokenEncryptionService encSvc = mock(TokenEncryptionService.class);
-        RestClient restClient = mock(RestClient.class);
-
-        RestClient.RequestHeadersUriSpec getSpec = mock(RestClient.RequestHeadersUriSpec.class);
-        RestClient.ResponseSpec getResponseSpec = mock(RestClient.ResponseSpec.class);
-        when(restClient.get()).thenReturn(getSpec);
-        doReturn(getSpec).when(getSpec).uri(anyString());
-        doReturn(getSpec).when(getSpec).header(anyString(), anyString());
-        doReturn(getResponseSpec).when(getSpec).retrieve();
-        doReturn(Map.of("data", List.of(Map.of("id", "target-id")))).when(getResponseSpec).body(Map.class);
-
-        RestClient.RequestBodyUriSpec postSpec = mock(RestClient.RequestBodyUriSpec.class);
-        RestClient.RequestBodySpec postBodySpec = mock(RestClient.RequestBodySpec.class);
-        RestClient.ResponseSpec postResponseSpec = mock(RestClient.ResponseSpec.class);
-        when(restClient.post()).thenReturn(postSpec);
-        doReturn(postBodySpec).when(postSpec).uri(anyString());
-        doReturn(postBodySpec).when(postBodySpec).header(anyString(), anyString());
-        doReturn(postBodySpec).when(postBodySpec).body(any());
-        doReturn(postResponseSpec).when(postBodySpec).retrieve();
-
+        TwitchHelixChannelClient helix = mock(TwitchHelixChannelClient.class);
         IrcTwitchChatService service = new IrcTwitchChatService(
-            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), restClient, METER_REGISTRY,
-            newRateLimiter());
-        ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
-
+            tokenRepo, null, null, mock(ApplicationEventPublisher.class), helix, METER_REGISTRY, newRateLimiter());
         UserAccount user = new UserAccount();
-        user.setId(UUID.randomUUID());
-        user.setTwitchId("bcast-id");
-        OAuthToken token = new OAuthToken();
-        token.setAccessToken("enc-token");
-        when(tokenRepo.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
-            .thenReturn(Optional.of(token));
-        when(encSvc.decrypt("enc-token")).thenReturn("raw-token");
+        when(tokenRepo.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.empty());
 
-        service.ban(user, "targetLogin", "spam");
+        service.ban(user, "troll", "spam");
+        service.unban(user, "troll");
 
-        verify(restClient).post();
+        assertThat(service.getStreamInfo(user)).isEmpty();
+        assertThat(service.getFollowedAt(user, "fan")).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(helix);
     }
 
     @Test

@@ -45,6 +45,7 @@ class EventSubTwitchChatServiceTest {
     @Mock private TwitchTokenService twitchTokenService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RestClient restClient;
+    @Mock private TwitchHelixChannelClient helix;
     @Mock private SystemTwitchAccountService systemTwitchAccountService;
     @Mock private ExternalApiObservations apiObservations;
     @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
@@ -224,5 +225,31 @@ class EventSubTwitchChatServiceTest {
         staleListener.onClose(staleWs, WebSocket.NORMAL_CLOSURE, "replaced");
 
         assertThat(connections).containsEntry(user.getId(), freshWs);
+    }
+
+    @Test
+    void helixCalls_runWithTheResolvedStreamerToken() {
+        java.time.Instant at = java.time.Instant.parse("2024-01-01T00:00:00Z");
+        when(helix.followedAt(user, "fresh-token", "fan")).thenReturn(Optional.of(at));
+        when(helix.followedAtById(user, "fresh-token", "42")).thenReturn(Optional.of(at));
+        TwitchStreamInfo live = new TwitchStreamInfo("t", "g", 1, at);
+        when(helix.streamInfo(user, "fresh-token")).thenReturn(Optional.of(live));
+        TwitchUserProfile profile = new TwitchUserProfile("Fan", at);
+        when(helix.userProfile("fresh-token", "fan")).thenReturn(Optional.of(profile));
+
+        service.ban(user, "troll", "spam");
+        service.timeout(user, "troll", 30, "calm down");
+        service.timeout(user, "troll", -1, null);
+        service.unban(user, "troll");
+        service.shoutout(user, "friend");
+
+        verify(helix).moderate(user, "fresh-token", "troll", 0, "spam");
+        verify(helix).moderate(user, "fresh-token", "troll", 30, "calm down");
+        verify(helix).unban(user, "fresh-token", "troll");
+        verify(helix).shoutout(user, "fresh-token", "friend");
+        assertThat(service.getFollowedAt(user, "fan")).contains(at);
+        assertThat(service.getFollowedAtById(user, "42")).contains(at);
+        assertThat(service.getStreamInfo(user)).contains(live);
+        assertThat(service.getUserProfile(user, "fan")).contains(profile);
     }
 }
