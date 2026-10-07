@@ -1,12 +1,6 @@
 /**
- * Catapult frontend.
- *
- * This file intentionally contains only application logic.
- * Web Components provided by mdui are loaded separately.
- */
-
-/*
- * Theme
+ * Global bootstrap, run once per full page load: the mdui theme.
+ * (Web Components themselves come from mdui.global.js, loaded in <head>.)
  */
 
 const savedTheme = localStorage.getItem("catapult-theme");
@@ -16,35 +10,3 @@ const savedTheme = localStorage.getItem("catapult-theme");
 // color — Catapult's primary, so mdui components share the site's palette.
 mdui.setTheme(savedTheme === "light" ? "light" : "dark");
 mdui.setColorScheme("#8b5cf6");
-
-
-/*
- * Smooth navigation
- */
-
-document
-    .querySelectorAll('a[href^="#"]')
-    .forEach(link => {
-
-        link.addEventListener("click", event => {
-
-            const targetId =
-                link.getAttribute("href");
-
-            const target =
-                document.querySelector(targetId);
-
-            if (!target) {
-                return;
-            }
-
-            event.preventDefault();
-
-            target.scrollIntoView({
-                behavior: "smooth",
-                block: "start"
-            });
-
-        });
-
-    });
