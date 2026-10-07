@@ -248,8 +248,11 @@ public class ApiChannelDataController {
         boolean hasXbox = hasXboxProvider
                 && oAuthTokenRepository.findByUserAndProvider(channelUser, OAuthToken.Provider.XBOX).isPresent();
 
+        // Owner-only, like the Minecraft connect endpoints: a moderator viewing the
+        // channel must not see the owner's Minecraft name or our service account.
         // getLink() fetches the service account too, so its username is readable here (OSIV is off).
-        MinecraftFriendLink minecraftLink = minecraftFriendService
+        boolean showMinecraft = isOwner && minecraftFriendService.isPresent();
+        MinecraftFriendLink minecraftLink = !showMinecraft ? null : minecraftFriendService
                 .flatMap(service -> service.getLink(channelUser))
                 .orElse(null);
 
@@ -295,7 +298,7 @@ public class ApiChannelDataController {
                 !hasXboxProvider ? null : new XboxData(
                         hasXbox
                 ),
-                minecraftFriendService.isEmpty() ? null : new MinecraftData(
+                !showMinecraft ? null : new MinecraftData(
                         // "NONE" when unlinked, same as ApiMinecraftConnectController's status.
                         minecraftLink == null ? "NONE" : minecraftLink.getStatus().name(),
                         minecraftLink == null ? null : minecraftLink.getMinecraftName(),
