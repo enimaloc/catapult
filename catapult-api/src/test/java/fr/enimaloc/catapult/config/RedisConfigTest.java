@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.config;
 
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
-import fr.enimaloc.catapult.service.AdminCclService;
+import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

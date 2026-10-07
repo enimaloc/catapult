@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.chat;
 
-import fr.enimaloc.catapult.service.ExperimentService;
+import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

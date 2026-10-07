@@ -12,7 +12,7 @@ import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionReposito
 import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameDetailsRepository;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
-import fr.enimaloc.catapult.service.IgdbService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;

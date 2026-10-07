@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.chat.command.js;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.service.IgdbClient;
-import fr.enimaloc.catapult.service.IgdbService;
-import fr.enimaloc.catapult.service.SteamStoreService;
+import fr.enimaloc.catapult.service.igdb.IgdbClient;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -194,7 +194,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
 
     // Merges websites (official site, wikipedia, ...) and external_games (Steam/Xbox/... store
     // links) into one lowercased-source -> id/url map — mirrors
-    // fr.enimaloc.catapult.service.IgdbGameDetailsService#extractWebsites; not extracted to a
+    // fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService#extractWebsites; not extracted to a
     // shared helper since that one persists to a JPA entity and this one feeds the sandbox.
     private static Map<String, String> extractExternalPlatforms(Game game) {
         Map<String, String> map = new HashMap<>();
@@ -245,7 +245,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
                     .body(Map.class);
                 if (body == null) return Optional.empty();
                 // Steam appdetails unwrapping (body.get(appId) -> success -> data -> field) mirrors
-                // fr.enimaloc.catapult.service.SteamStoreServiceImpl; not extracted to a shared helper here.
+                // fr.enimaloc.catapult.service.steam.SteamStoreServiceImpl; not extracted to a shared helper here.
                 Map<?, ?> appEntry = (Map<?, ?>) body.get(appId);
                 if (appEntry == null || !Boolean.TRUE.equals(appEntry.get("success"))) return Optional.empty();
                 Map<?, ?> data = (Map<?, ?>) appEntry.get("data");
@@ -276,7 +276,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
                         .body(Map.class);
                 if (body == null) return Optional.empty();
                 // Steam appdetails unwrapping (body.get(appId) -> success -> data -> field) mirrors
-                // fr.enimaloc.catapult.service.SteamStoreServiceImpl; not extracted to a shared helper here.
+                // fr.enimaloc.catapult.service.steam.SteamStoreServiceImpl; not extracted to a shared helper here.
                 Map<?, ?> appEntry = (Map<?, ?>) body.get(effectiveAppId);
                 if (appEntry == null || !Boolean.TRUE.equals(appEntry.get("success"))) return Optional.empty();
                 Map<?, ?> data = (Map<?, ?>) appEntry.get("data");

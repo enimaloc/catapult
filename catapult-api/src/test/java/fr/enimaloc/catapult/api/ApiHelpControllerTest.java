@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.MinecraftGateService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

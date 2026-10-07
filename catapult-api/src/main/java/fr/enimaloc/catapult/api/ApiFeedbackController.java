@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.common.dto.SubmitRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.feedback.FeedbackSubmission;
 import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
-import fr.enimaloc.catapult.service.GitLabClient;
+import fr.enimaloc.catapult.service.feedback.GitLabClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

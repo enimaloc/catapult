@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.ChannelAccessService;
+import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
