@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.common.dto.BindingDto;
 import fr.enimaloc.catapult.common.dto.GameDto;
 import fr.enimaloc.catapult.service.mock.MockApiService;
 import fr.enimaloc.catapult.service.mock.MockData;
-import fr.enimaloc.catapult.ws.event.*;
+import fr.enimaloc.catapult.event.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
