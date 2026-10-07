@@ -1,97 +1,53 @@
 <!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.ChannelPageData"*/-->
-<mdui-tab-panel slot="panel" value="settings" th:with="ch=${channelPage}" th:if="${channelPage.isOwner()}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
+<!--/*@thymesVar id="channelSettings" type="fr.enimaloc.catapult.common.dto.UserSettingsDto"*/-->
+<mdui-tab-panel slot="panel" value="settings" th:with="settings=${channelSettings}" th:if="${channelPage.isOwner()}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
     <div class="section-header">
         <h2 th:text="#{channel.settings.title}">Paramètres</h2>
     </div>
 
     <mdui-card id="channel-ccl-settings-form" class="settings-card" variant="outlined">
         <h3 th:text="#{channel.settings.ccl.title}">Filtres de contenu</h3>
-        <label class="settings-master-toggle">
-            <mdui-switch id="ccl-enabled-checkbox"
-                         th:checked="${channelSettings.cclFeatureEnabled()}"></mdui-switch>
-            <span th:text="#{channel.settings.ccl.enable}">Activer le filtrage CCL</span>
-        </label>
+        <label th:replace="~{fragments/controls :: labelledSwitch('ccl-enabled-checkbox',
+                ${settings.cclFeatureEnabled()}, 'channel.settings.ccl.enable', 'settings-master-toggle')}"></label>
         <span class="eyebrow" th:text="#{channel.settings.ccl.select_disable}"></span>
-        <div class="settings-switch-grid">
-            <label th:each="ccl : ${channelSettings.availableCcls()}">
-                <mdui-switch class="ccl-block-checkbox" th:value="${ccl.id()}"
-                             th:checked="${channelSettings.blockedCcls().contains(ccl.id())}"></mdui-switch>
-                <span th:text="${ccl.name()}">ccl name</span>
-            </label>
-        </div>
+        <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()}, 'ccl-block-checkbox',
+                ${settings.blockedCcls()}, 'name')}"></div>
         <mdui-button id="ccl-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
     </mdui-card>
 
     <mdui-card id="channel-tw-settings-form" class="settings-card" variant="outlined">
         <h3 th:text="#{channel.settings.tw.title}">Avertissements</h3>
-        <label class="settings-master-toggle">
-            <mdui-switch id="tw-enabled-checkbox"
-                         th:checked="${channelSettings.twFeatureEnabled()}"></mdui-switch>
-            <span th:text="#{channel.settings.tw.enable}">Activer les avertissements</span>
-        </label>
+        <label th:replace="~{fragments/controls :: labelledSwitch('tw-enabled-checkbox',
+                ${settings.twFeatureEnabled()}, 'channel.settings.tw.enable', 'settings-master-toggle')}"></label>
         <span class="eyebrow" th:text="#{channel.settings.tw.select_disable}"></span>
-        <div class="settings-switch-grid">
-            <label th:each="tw : ${channelSettings.availableTws()}">
-                <mdui-switch class="tw-block-checkbox" th:value="${tw.id()}"
-                             th:checked="${channelSettings.blockedTws().contains(tw.id())}"></mdui-switch>
-                <span th:text="${tw.label()}">tw label</span>
-            </label>
-        </div>
+        <div th:replace="~{fragments/controls :: switchGrid(${settings.availableTws()}, 'tw-block-checkbox',
+                ${settings.blockedTws()}, 'label')}"></div>
         <mdui-button id="tw-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
     </mdui-card>
 
     <mdui-card id="channel-no-game-settings-form" class="settings-card" variant="outlined">
         <h3 th:text="#{channel.settings.no_game.title}">Aucun jeu détecté</h3>
-        <input type="text" id="no-game-game-input"
-               th:placeholder="#{channel.bindings.edit.game_placeholder}"
-               th:value="${channelSettings.noGameTwitchGameName()}"/>
-        <input type="hidden" id="no-game-game-id" th:value="${channelSettings.noGameTwitchGameId()}"/>
-        <mdui-list id="no-game-game-results"></mdui-list>
-        <div class="settings-switch-grid">
-            <label th:each="ccl : ${channelSettings.availableCcls()}">
-                <mdui-switch class="no-game-ccl-checkbox" th:value="${ccl.id()}"
-                             th:checked="${channelSettings.noGameCcls().contains(ccl.id())}"></mdui-switch>
-                <span th:text="${ccl.name()}">ccl name</span>
-            </label>
-        </div>
+        <th:block th:replace="~{fragments/controls :: gamePicker('no-game',
+                ${settings.noGameTwitchGameId()}, ${settings.noGameTwitchGameName()})}"></th:block>
+        <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()}, 'no-game-ccl-checkbox',
+                ${settings.noGameCcls()}, 'name')}"></div>
         <div class="settings-switch-grid settings-switch-group">
-            <label>
-                <mdui-switch id="no-game-apply-start"
-                             th:checked="${channelSettings.applyDefaultOnStreamStart()}"></mdui-switch>
-                <span th:text="#{channel.settings.no_game.apply_start}">Au démarrage du stream</span>
-            </label>
-            <label>
-                <mdui-switch id="no-game-apply-no-game"
-                             th:checked="${channelSettings.applyDefaultOnNoGame()}"></mdui-switch>
-                <span th:text="#{channel.settings.no_game.apply_no_game}">Quand aucun jeu n'est détecté</span>
-            </label>
-            <label>
-                <mdui-switch id="no-game-apply-end"
-                             th:checked="${channelSettings.applyDefaultOnStreamEnd()}"></mdui-switch>
-                <span th:text="#{channel.settings.no_game.apply_end}">À la fin du stream</span>
-            </label>
+            <label th:replace="~{fragments/controls :: labelledSwitch('no-game-apply-start',
+                    ${settings.applyDefaultOnStreamStart()}, 'channel.settings.no_game.apply_start', null)}"></label>
+            <label th:replace="~{fragments/controls :: labelledSwitch('no-game-apply-no-game',
+                    ${settings.applyDefaultOnNoGame()}, 'channel.settings.no_game.apply_no_game', null)}"></label>
+            <label th:replace="~{fragments/controls :: labelledSwitch('no-game-apply-end',
+                    ${settings.applyDefaultOnStreamEnd()}, 'channel.settings.no_game.apply_end', null)}"></label>
         </div>
-        <mdui-button id="no-game-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer
-        </mdui-button>
+        <mdui-button id="no-game-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
     </mdui-card>
 
     <mdui-card id="channel-incomplete-fallback-settings-form" class="settings-card" variant="outlined">
         <h3 th:text="#{channel.settings.incomplete_fallback.title}">Jeu incomplet</h3>
-        <input type="text" id="incomplete-fallback-game-input"
-               th:placeholder="#{channel.bindings.edit.game_placeholder}"
-               th:value="${channelSettings.incompleteFallbackTwitchGameName()}"/>
-        <input type="hidden" id="incomplete-fallback-game-id"
-               th:value="${channelSettings.incompleteFallbackTwitchGameId()}"/>
-        <mdui-list id="incomplete-fallback-game-results"></mdui-list>
-        <div class="settings-switch-grid">
-            <label th:each="ccl : ${channelSettings.availableCcls()}">
-                <mdui-switch class="incomplete-fallback-ccl-checkbox" th:value="${ccl.id()}"
-                             th:checked="${channelSettings.incompleteFallbackCcls().contains(ccl.id())}"></mdui-switch>
-                <span th:text="${ccl.name()}">ccl name</span>
-            </label>
-        </div>
-        <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">
-            Enregistrer
-        </mdui-button>
+        <th:block th:replace="~{fragments/controls :: gamePicker('incomplete-fallback',
+                ${settings.incompleteFallbackTwitchGameId()}, ${settings.incompleteFallbackTwitchGameName()})}"></th:block>
+        <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()},
+                'incomplete-fallback-ccl-checkbox', ${settings.incompleteFallbackCcls()}, 'name')}"></div>
+        <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
     </mdui-card>
 </mdui-tab-panel>
