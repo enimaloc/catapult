@@ -53,7 +53,7 @@ public class AdminTwService {
         d.setSortOrder(sortOrder);
         d.setEnabled(true);
         TwDefinition saved = defRepo.save(d);
-        events.publishEvent(new TwDefinitionsChangedEvent(this));
+        definitionsChanged();
         return saved;
     }
 
@@ -65,7 +65,7 @@ public class AdminTwService {
         if (sortOrder != null)   d.setSortOrder(sortOrder);
         if (enabled != null)     d.setEnabled(enabled);
         defRepo.save(d);
-        events.publishEvent(new TwDefinitionsChangedEvent(this));
+        definitionsChanged();
         return d;
     }
 
@@ -74,7 +74,7 @@ public class AdminTwService {
         if (bindingRepo.existsByTwsContaining(id))
             throw new IllegalStateException("TW still in use; soft-disable via enabled=false instead.");
         defRepo.deleteById(id);
-        events.publishEvent(new TwDefinitionsChangedEvent(this));
+        definitionsChanged();
     }
 
     @Transactional
@@ -89,7 +89,7 @@ public class AdminTwService {
             m.setDtddTopicName(trimmed);
             dtddRepo.save(m);
         }
-        events.publishEvent(new TwDefinitionsChangedEvent(this));
+        definitionsChanged();
     }
 
     @Transactional
@@ -102,7 +102,7 @@ public class AdminTwService {
             m.setDescriptorId(id);
             igdbRepo.save(m);
         }
-        events.publishEvent(new TwDefinitionsChangedEvent(this));
+        definitionsChanged();
     }
 
     @Transactional
@@ -116,7 +116,7 @@ public class AdminTwService {
             m.setSteamContentId(id);
             steamIdRepo.save(m);
         }
-        events.publishEvent(new TwDefinitionsChangedEvent(this));
+        definitionsChanged();
     }
 
     @Transactional
@@ -127,12 +127,9 @@ public class AdminTwService {
         for (String k : keywords) {
             String norm = normalizeKeyword(k);
             if (norm == null || !seen.add(norm)) continue;
-            TwSteamKeyword m = new TwSteamKeyword();
-            m.setTwId(twId);
-            m.setKeyword(norm);
-            steamKwRepo.save(m);
+            saveKeyword(twId, norm);
         }
-        events.publishEvent(new TwDefinitionsChangedEvent(this));
+        definitionsChanged();
     }
 
     public List<String> listSteamKeywords(String twId) {
@@ -152,11 +149,8 @@ public class AdminTwService {
         boolean exists = steamKwRepo.findAllByTwId(twId).stream()
             .anyMatch(k -> k.getKeyword().equals(norm));
         if (exists) return;
-        TwSteamKeyword m = new TwSteamKeyword();
-        m.setTwId(twId);
-        m.setKeyword(norm);
-        steamKwRepo.save(m);
-        events.publishEvent(new TwDefinitionsChangedEvent(this));
+        saveKeyword(twId, norm);
+        definitionsChanged();
     }
 
     @Transactional
@@ -167,7 +161,7 @@ public class AdminTwService {
         steamKwRepo.findAllByTwId(twId).stream()
             .filter(k -> k.getKeyword().equals(norm))
             .forEach(steamKwRepo::delete);
-        events.publishEvent(new TwDefinitionsChangedEvent(this));
+        definitionsChanged();
     }
 
     /** Preview which of a TW's saved Steam signals match a given Steam app's store page. */
@@ -198,6 +192,19 @@ public class AdminTwService {
         return new SteamSignalTestResult(notes, matchedKeywords, draftMatch, matchedContentIds);
     }
 
+    private void saveKeyword(String twId, String normalizedKeyword) {
+        TwSteamKeyword m = new TwSteamKeyword();
+        m.setTwId(twId);
+        m.setKeyword(normalizedKeyword);
+        steamKwRepo.save(m);
+    }
+
+    /** Makes {@link fr.enimaloc.catapult.chat.TwPlaceholderRegistry} reload the definitions. */
+    private void definitionsChanged() {
+        events.publishEvent(new TwDefinitionsChangedEvent(this));
+    }
+
+    /** Lower-cased and trimmed, or null when outside 2..{@value #KEYWORD_MAX} chars. */
     private String normalizeKeyword(String k) {
         String norm = k == null ? null : k.toLowerCase(Locale.ROOT).trim();
         if (norm == null || norm.length() < 2 || norm.length() > KEYWORD_MAX) return null;
