@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.dto.index.FeatureDto;
 import fr.enimaloc.catapult.dto.index.PlatformDto;
+import fr.enimaloc.catapult.dto.index.SpaPage;
 import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,10 +31,10 @@ public class ModelFiller {
     private final ApiService apiService;
 
     /** Static, page-independent data every template can read as ${app.*}. */
-    public record AppModel(List<FeatureDto> features, List<PlatformDto> platforms, List<IndexController.SPAPage> spa) {}
+    public record AppModel(List<FeatureDto> features, List<PlatformDto> platforms, List<SpaPage> spa) {}
 
     private static final AppModel APP_MODEL =
-            new AppModel(IndexController.FEATURES, IndexController.PLATFORMS, IndexController.SPA);
+            new AppModel(SiteCatalog.FEATURES, SiteCatalog.PLATFORMS, SiteCatalog.PAGES);
 
     public void defaultAttr(Model model, String page) {
         model.addAttribute("app", APP_MODEL);
@@ -46,8 +47,8 @@ public class ModelFiller {
     }
 
     private Map<String, String> titles(Locale locale) {
-        return IndexController.SPA.stream().collect(Collectors.toMap(
-                IndexController.SPAPage::getId,
+        return SiteCatalog.PAGES.stream().collect(Collectors.toMap(
+                SpaPage::getId,
                 spaPage -> messageSource.getMessage(spaPage.getTitleKey(), null, spaPage.getTitleKey(), locale)
         ));
     }
@@ -72,7 +73,7 @@ public class ModelFiller {
         model.addAttribute("lastUpdate", lastModified != null ? Instant.parse(lastModified) : Instant.EPOCH);
     }
 
-    public void fill(Model model, String page, Locale locale, HttpServletRequest request) throws IOException {
+    public void fill(Model model, String page, Locale locale) throws IOException {
         switch (page) {
             case "privacy" -> privacy(model, locale);
             case "channels" -> channels(model);
