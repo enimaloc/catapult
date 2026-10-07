@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.dto.index.FeatureDto;
+import fr.enimaloc.catapult.dto.index.PlatformDto;
 import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,6 +16,7 @@ import org.springframework.ui.Model;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -26,11 +29,15 @@ public class ModelFiller {
     private final MessageSource messageSource;
     private final ApiService apiService;
 
+    /** Static, page-independent data every template can read as ${app.*}. */
+    public record AppModel(List<FeatureDto> features, List<PlatformDto> platforms, List<IndexController.SPAPage> spa) {}
+
+    private static final AppModel APP_MODEL =
+            new AppModel(IndexController.FEATURES, IndexController.PLATFORMS, IndexController.SPA);
+
     public void defaultAttr(Model model, String page) {
-        model.addAttribute("features", IndexController.FEATURES);
-        model.addAttribute("platforms", IndexController.PLATFORMS);
+        model.addAttribute("app", APP_MODEL);
         model.addAttribute("page", page == null ? "" : page);
-        model.addAttribute("spa", IndexController.SPA);
     }
 
     public void defaultAttr(Model model, String page, Locale locale) {
