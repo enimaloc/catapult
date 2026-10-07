@@ -2,10 +2,8 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.VariantResponse;
 import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,9 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/experiments/me")
@@ -23,7 +19,7 @@ import java.util.UUID;
 public class ApiUserExperimentsController {
 
     private final ExperimentService experimentService;
-    private final UserAccountRepository userAccountRepository;
+    private final ApiUserResolver userResolver;
 
     /**
      * Returns the variant key assigned to the current user for the given experiment.
@@ -33,8 +29,7 @@ public class ApiUserExperimentsController {
     @Transactional
     @GetMapping("/variant/{key}")
     public VariantResponse getVariant(@PathVariable String key, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        UserAccount user = userResolver.viewer(jwt);
         return new VariantResponse(
             experimentService.getVariant(user, key).map(v -> v.getKey()).orElse(null)
         );

@@ -14,7 +14,6 @@ import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -56,7 +55,7 @@ public class ApiChatCommandTestController {
     private static final ObjectMapper MOCK_MAPPER = JsonMapper.builder().build();
 
     private final ChatCommandDefinitionRepository repository;
-    private final UserAccountRepository userAccountRepository;
+    private final ApiUserResolver userResolver;
     private final ExperimentService experimentService;
     private final JsCompiler jsCompiler;
     private final SandboxExecutor sandboxExecutor;
@@ -67,7 +66,7 @@ public class ApiChatCommandTestController {
     @PostMapping("/api/chat-commands/{id}/test")
     public Map<String, Object> test(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                      @RequestBody Map<String, Object> body) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         ChatCommandDefinition definition = repository.findById(id)
             .filter(d -> d.getUser().getId().equals(user.getId()))
@@ -173,12 +172,6 @@ public class ApiChatCommandTestController {
             }
         });
         return parsed;
-    }
-
-    private UserAccount currentUser(Jwt jwt) {
-        String twitchId = jwt.getClaimAsString("twitchId");
-        return userAccountRepository.findByTwitchId(twitchId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     private void gate(UserAccount user) {

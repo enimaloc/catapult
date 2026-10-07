@@ -7,7 +7,6 @@ import fr.enimaloc.catapult.domain.ConfigOverride;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ConfigAuditRepository;
 import fr.enimaloc.catapult.repository.ConfigOverrideRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.config.ConfigCatalogService;
 import fr.enimaloc.catapult.service.config.ConfigEntry;
 import fr.enimaloc.catapult.service.config.ConfigOverrideService;
@@ -25,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -37,7 +35,7 @@ public class ApiAdminConfigController {
 
     private final ConfigCatalogService catalogService;
     private final ConfigOverrideService overrideService;
-    private final UserAccountRepository userRepo;
+    private final ApiUserResolver userResolver;
     private final ConfigAuditRepository auditRepo;
     private final ConfigOverrideRepository overrideRepo;
 
@@ -49,13 +47,13 @@ public class ApiAdminConfigController {
     @PutMapping("/{key}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void apply(@PathVariable String key, @RequestBody ApplyRequest body, @AuthenticationPrincipal Jwt jwt) {
-        overrideService.apply(key, body.value(), currentUser(jwt));
+        overrideService.apply(key, body.value(), userResolver.viewerByTwitchId(jwt));
     }
 
     @DeleteMapping("/{key}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void clear(@PathVariable String key, @AuthenticationPrincipal Jwt jwt) {
-        overrideService.clear(key, currentUser(jwt));
+        overrideService.clear(key, userResolver.viewerByTwitchId(jwt));
     }
 
     @GetMapping("/audit")
@@ -81,7 +79,7 @@ public class ApiAdminConfigController {
                                @PathVariable String key,
                                @RequestBody ApplyRequest body,
                                @AuthenticationPrincipal Jwt jwt) {
-        overrideService.apply(module, key, body.value(), currentUser(jwt));
+        overrideService.apply(module, key, body.value(), userResolver.viewerByTwitchId(jwt));
     }
 
     @DeleteMapping("/module/{module}/{key}")
@@ -89,18 +87,12 @@ public class ApiAdminConfigController {
     public void clearForModule(@PathVariable String module,
                                @PathVariable String key,
                                @AuthenticationPrincipal Jwt jwt) {
-        overrideService.clear(module, key, currentUser(jwt));
+        overrideService.clear(module, key, userResolver.viewerByTwitchId(jwt));
     }
 
     @GetMapping("/module/{module}/audit")
     public List<ConfigAudit> moduleAudit(@PathVariable String module, @RequestParam String key) {
         return auditRepo.findByModuleAndKeyOrderByChangedAtDesc(module, key);
-    }
-
-    private UserAccount currentUser(Jwt jwt) {
-        String twitchId = jwt.getClaimAsString("twitchId");
-        return userRepo.findByTwitchId(twitchId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
 }
