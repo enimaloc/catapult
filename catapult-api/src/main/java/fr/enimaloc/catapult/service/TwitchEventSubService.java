@@ -100,6 +100,7 @@ public class TwitchEventSubService implements EventSubService {
 
     public void connect(UserAccount user) {
         disconnect(user);
+        connections.allowReconnect(user);
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
             .ifPresentOrElse(
                 token -> connections.open(user, token),
@@ -108,6 +109,8 @@ public class TwitchEventSubService implements EventSubService {
     }
 
     public void disconnect(UserAccount user) {
+        // Also cancels a reconnect already scheduled for a dropped socket
+        connections.forbidReconnect(user);
         connections.close(user, "bot disabled");
         channelStates.remove(user.getId());
         channelStateWarnedUsers.remove(user.getId());
