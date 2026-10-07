@@ -59,9 +59,7 @@ public class InviteService {
     }
 
     public boolean isInviteEnabled() {
-        return systemSettingRepository.findById(KEY_INVITE_ENABLED)
-            .map(s -> Boolean.parseBoolean(s.getValue()))
-            .orElse(false);
+        return booleanSetting(KEY_INVITE_ENABLED);
     }
 
     @Transactional
@@ -139,19 +137,15 @@ public class InviteService {
     // ── Admin ────────────────────────────────────────────────────────────────
 
     public Optional<Integer> getGlobalMaxMembers() {
-        return systemSettingRepository.findById(KEY_GLOBAL_MAX_MEMBERS)
-            .map(s -> parseIntOrNull(s.getValue()));
+        return intSetting(KEY_GLOBAL_MAX_MEMBERS);
     }
 
     public Optional<Integer> getDefaultMaxUses() {
-        return systemSettingRepository.findById(KEY_DEFAULT_MAX_USES)
-            .map(s -> parseIntOrNull(s.getValue()));
+        return intSetting(KEY_DEFAULT_MAX_USES);
     }
 
     public boolean getDefaultCanReinvite() {
-        return systemSettingRepository.findById(KEY_DEFAULT_CAN_REINVITE)
-            .map(s -> Boolean.parseBoolean(s.getValue()))
-            .orElse(false);
+        return booleanSetting(KEY_DEFAULT_CAN_REINVITE);
     }
 
     @Transactional
@@ -224,6 +218,18 @@ public class InviteService {
             sb.append(CODE_CHARS.charAt(RANDOM.nextInt(CODE_CHARS.length())));
         }
         return sb.toString();
+    }
+
+    /** A boolean system setting; false when unset. */
+    private boolean booleanSetting(String key) {
+        return systemSettingRepository.findById(key)
+            .map(s -> Boolean.parseBoolean(s.getValue()))
+            .orElse(false);
+    }
+
+    /** An integer system setting; empty when unset or not a number. */
+    private Optional<Integer> intSetting(String key) {
+        return systemSettingRepository.findById(key).map(s -> parseIntOrNull(s.getValue()));
     }
 
     private void saveSetting(String key, String value) {
