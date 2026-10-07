@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

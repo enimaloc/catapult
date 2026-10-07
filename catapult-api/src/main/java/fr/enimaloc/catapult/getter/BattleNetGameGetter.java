@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 

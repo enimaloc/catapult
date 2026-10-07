@@ -1,13 +1,13 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.AlphaInvite;
-import fr.enimaloc.catapult.domain.AlphaInviteRedemption;
-import fr.enimaloc.catapult.domain.SystemSetting;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.AlphaInviteRedemptionRepository;
-import fr.enimaloc.catapult.repository.AlphaInviteRepository;
-import fr.enimaloc.catapult.repository.SystemSettingRepository;
-import fr.enimaloc.catapult.repository.WhitelistEntryRepository;
+import fr.enimaloc.catapult.domain.access.AlphaInvite;
+import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.config.SystemSetting;
+import fr.enimaloc.catapult.repository.access.AlphaInviteRedemptionRepository;
+import fr.enimaloc.catapult.repository.access.AlphaInviteRepository;
+import fr.enimaloc.catapult.repository.access.WhitelistEntryRepository;
+import fr.enimaloc.catapult.repository.config.SystemSettingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

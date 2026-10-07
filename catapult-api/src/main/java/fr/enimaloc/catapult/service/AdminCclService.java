@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.IgdbRatingDescriptor;
-import fr.enimaloc.catapult.domain.TwitchCclDefinition;
-import fr.enimaloc.catapult.repository.IgdbRatingDescriptorRepository;
-import fr.enimaloc.catapult.repository.TwitchCclDefinitionRepository;
+import fr.enimaloc.catapult.domain.igdb.IgdbRatingDescriptor;
+import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
+import fr.enimaloc.catapult.repository.igdb.IgdbRatingDescriptorRepository;
+import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

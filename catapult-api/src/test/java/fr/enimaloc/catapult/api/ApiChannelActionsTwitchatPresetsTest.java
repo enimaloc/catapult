@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
-import fr.enimaloc.catapult.domain.TwitchatPayloadPreset;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatPayloadPreset;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 

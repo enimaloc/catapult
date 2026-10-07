@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.experiment;
 
-import fr.enimaloc.catapult.domain.ExperimentAssignmentRule.RuleType;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule.RuleType;
 
 /**
  * Gate de la feature Minecraft (liaison de compte + détection de présence).

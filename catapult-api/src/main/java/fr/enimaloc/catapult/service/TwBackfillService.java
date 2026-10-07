@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.AppState;
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.repository.AppStateRepository;
-import fr.enimaloc.catapult.repository.GameBindingRepository;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.config.AppState;
+import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.config.AppStateRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;

@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.service;
 
 import com.google.protobuf.Timestamp;
-import fr.enimaloc.catapult.domain.IgdbGameDetails;
-import fr.enimaloc.catapult.repository.IgdbGameDetailsRepository;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
+import fr.enimaloc.catapult.repository.igdb.IgdbGameDetailsRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;

@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

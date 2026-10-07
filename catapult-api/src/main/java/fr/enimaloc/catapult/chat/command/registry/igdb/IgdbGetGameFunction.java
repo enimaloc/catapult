@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.chat.command.registry.igdb;
 
+import fr.enimaloc.catapult.chat.command.js.ChatCommandServiceGateway;
 import fr.enimaloc.catapult.chat.command.registry.DtoMapper;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
-import fr.enimaloc.catapult.chat.command.js.ChatCommandServiceGateway;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

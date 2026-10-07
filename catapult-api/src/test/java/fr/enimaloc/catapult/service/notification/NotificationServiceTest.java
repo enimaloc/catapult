@@ -1,14 +1,17 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.common.dto.Severity;
-import fr.enimaloc.catapult.domain.*;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.notification.Notification;
+import fr.enimaloc.catapult.domain.notification.NotificationRecipient;
+import fr.enimaloc.catapult.domain.notification.NotificationRecipientId;
 import fr.enimaloc.catapult.event.NotificationAllReadEvent;
 import fr.enimaloc.catapult.event.NotificationCreatedEvent;
 import fr.enimaloc.catapult.event.NotificationDeletedEvent;
 import fr.enimaloc.catapult.event.NotificationReadEvent;
-import fr.enimaloc.catapult.repository.NotificationRecipientRepository;
-import fr.enimaloc.catapult.repository.NotificationRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.notification.NotificationRecipientRepository;
+import fr.enimaloc.catapult.repository.notification.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

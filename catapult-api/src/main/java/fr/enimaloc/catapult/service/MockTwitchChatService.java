@@ -1,7 +1,7 @@
 // src/main/java/fr/enimaloc/catapult/service/MockTwitchChatService.java
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;

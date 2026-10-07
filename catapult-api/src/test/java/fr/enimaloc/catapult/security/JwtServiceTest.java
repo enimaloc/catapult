@@ -7,7 +7,7 @@ import javax.crypto.SecretKey;
 import java.util.List;
 import java.util.UUID;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

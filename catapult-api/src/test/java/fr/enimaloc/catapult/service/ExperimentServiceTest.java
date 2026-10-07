@@ -1,7 +1,17 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.*;
-import fr.enimaloc.catapult.repository.*;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule;
+import fr.enimaloc.catapult.domain.experiment.ExperimentEvent;
+import fr.enimaloc.catapult.domain.experiment.ExperimentOverride;
+import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
+import fr.enimaloc.catapult.repository.account.UserGroupRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentEventRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

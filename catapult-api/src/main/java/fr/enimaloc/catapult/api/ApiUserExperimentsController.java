@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.VariantResponse;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

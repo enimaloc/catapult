@@ -1,12 +1,12 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.ChatCommandSetting;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.service.ChannelAccessService;
 import fr.enimaloc.catapult.service.ExperimentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.enimaloc.catapult.service.ChannelAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;

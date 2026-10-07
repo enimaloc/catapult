@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.security;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.user.OAuth2User;
