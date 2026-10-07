@@ -27,7 +27,7 @@ import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
 import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.getter.SteamApiClient;
+import fr.enimaloc.catapult.getter.steam.SteamApiClient;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;

@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
-import fr.enimaloc.catapult.getter.DtddApiClient;
+import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
 
 import java.util.List;
 
