@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service.dtdd;
 
 import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
-import fr.enimaloc.catapult.getter.DtddApiKeyRotator;
+import fr.enimaloc.catapult.getter.dtdd.DtddApiKeyRotator;
 import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
