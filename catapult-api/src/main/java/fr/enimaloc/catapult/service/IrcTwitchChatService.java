@@ -18,7 +18,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
-import javax.net.ssl.SSLSocket;
+import javax.net.SocketFactory;
 import javax.net.ssl.SSLSocketFactory;
 import java.io.*;
 import java.net.Socket;
@@ -50,6 +50,8 @@ public class IrcTwitchChatService implements TwitchChatService {
     private final Map<UUID, Socket> sockets = new ConcurrentHashMap<>();
     private final Set<UUID> intentionallyDisconnected = ConcurrentHashMap.newKeySet();
     private final ExecutorService executor = Executors.newCachedThreadPool();
+    /** Opens the TLS connection to Twitch IRC (tests point it at a local server instead). */
+    SocketFactory socketFactory = SSLSocketFactory.getDefault();
 
     public int connectionCount() {
         return sockets.size();
@@ -105,8 +107,7 @@ public class IrcTwitchChatService implements TwitchChatService {
     private void openConnection(UserAccount user, OAuthToken token, long retryDelaySeconds) {
         executor.submit(() -> {
             try {
-                SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault()
-                    .createSocket(IRC_HOST, IRC_PORT);
+                Socket socket = socketFactory.createSocket(IRC_HOST, IRC_PORT);
                 sockets.put(user.getId(), socket);
 
                 String accessToken = tokenEncryptionService.decrypt(token.getAccessToken());
