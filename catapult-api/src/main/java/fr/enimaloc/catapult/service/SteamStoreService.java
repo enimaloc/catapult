@@ -75,7 +75,7 @@ public interface SteamStoreService {
             }
             node = linuxRequirementsRaw;
             if (node != null && node.isObject()) {
-                pcRequirements = new Requirement(
+                linuxRequirements = new Requirement(
                         node.has("minimum") ? node.get("minimum").asString() : null,
                         node.has("recommended") ? node.get("recommended").asString() : null
                 );
@@ -84,7 +84,8 @@ public interface SteamStoreService {
             node = achievementsRaw;
             if (node != null && node.isObject()) {
                 List<Achievement.Highlighted> highlighteds = new ArrayList<>();
-                Optional<ArrayNode> highlighted = node.get("highlighted").asArrayOpt();
+                Optional<ArrayNode> highlighted = node.has("highlighted")
+                        ? node.get("highlighted").asArrayOpt() : Optional.empty();
                 if (highlighted.isPresent()) {
                     for (JsonNode sub : highlighted.get()) {
                         highlighteds.add(new Achievement.Highlighted(
