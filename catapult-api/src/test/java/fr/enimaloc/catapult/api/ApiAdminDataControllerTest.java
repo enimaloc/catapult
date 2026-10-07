@@ -1,14 +1,14 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
-import fr.enimaloc.catapult.domain.ChatCommandDefinition;
-import fr.enimaloc.catapult.domain.TwDefinition;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.domain.UserGroup;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
-import fr.enimaloc.catapult.repository.TwDefinitionRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.repository.UserGroupRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserGroup;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
+import fr.enimaloc.catapult.domain.tw.TwDefinition;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserGroupRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

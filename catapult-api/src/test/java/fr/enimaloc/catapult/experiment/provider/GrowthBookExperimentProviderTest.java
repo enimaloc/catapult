@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.experiment.provider;
 
 import fr.enimaloc.catapult.config.ExperimentProviderProperties;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -51,7 +51,7 @@ class GrowthBookExperimentProviderTest {
         UserAccount user = new UserAccount();
         user.setId(UUID.randomUUID());
 
-        Optional<fr.enimaloc.catapult.domain.ExperimentVariant> result = provider.getVariant(user, "missing-exp");
+        Optional<fr.enimaloc.catapult.domain.experiment.ExperimentVariant> result = provider.getVariant(user, "missing-exp");
         assertThat(result).isEmpty();
     }
 }

@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.GetterConfig;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.GetterConfigRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;

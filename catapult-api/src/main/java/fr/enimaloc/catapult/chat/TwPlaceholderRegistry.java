@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.chat;
 
 import fr.enimaloc.catapult.event.TwDefinitionsChangedEvent;
-import fr.enimaloc.catapult.repository.TwDefinitionRepository;
+import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;

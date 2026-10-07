@@ -1,10 +1,13 @@
 package fr.enimaloc.catapult.service;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import fr.enimaloc.catapult.domain.*;
-import fr.enimaloc.catapult.repository.OAuthTokenRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import lombok.RequiredArgsConstructor;

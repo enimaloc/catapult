@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.chat.command;
 
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
-import fr.enimaloc.catapult.domain.ChatCommandDefinition;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;

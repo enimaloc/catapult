@@ -1,12 +1,12 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.common.dto.TwitchatPresetPayload;
-import fr.enimaloc.catapult.domain.TwitchatActivePreset;
-import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
-import fr.enimaloc.catapult.domain.TwitchatPayloadPreset;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.TwitchatActivePresetRepository;
-import fr.enimaloc.catapult.repository.TwitchatPayloadPresetRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatActivePreset;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatPayloadPreset;
+import fr.enimaloc.catapult.repository.twitchat.TwitchatActivePresetRepository;
+import fr.enimaloc.catapult.repository.twitchat.TwitchatPayloadPresetRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

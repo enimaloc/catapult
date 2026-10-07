@@ -2,8 +2,8 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.ChannelDto;
 import fr.enimaloc.catapult.common.dto.ChannelListResponse;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.ChannelAccessService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import lombok.RequiredArgsConstructor;

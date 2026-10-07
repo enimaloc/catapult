@@ -1,7 +1,9 @@
 package fr.enimaloc.catapult.chat.command.dsl;
 
 import fr.enimaloc.catapult.chat.command.ast.ArgGetExpr;
+import fr.enimaloc.catapult.chat.command.ast.AssignStatement;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
+import fr.enimaloc.catapult.chat.command.ast.ConcatStatement;
 import fr.enimaloc.catapult.chat.command.ast.ContextGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
@@ -11,8 +13,6 @@ import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
 import fr.enimaloc.catapult.chat.command.ast.ValueType;
 import fr.enimaloc.catapult.chat.command.ast.VarDeclStatement;
 import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
-import fr.enimaloc.catapult.chat.command.ast.AssignStatement;
-import fr.enimaloc.catapult.chat.command.ast.ConcatStatement;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;

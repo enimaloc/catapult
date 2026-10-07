@@ -1,12 +1,12 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.IgdbGameCacheEntry;
-import fr.enimaloc.catapult.domain.IgdbGameCcl;
-import fr.enimaloc.catapult.repository.IgdbGameCacheRepository;
-import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
-import fr.enimaloc.catapult.repository.IgdbGameExternalIdRepository;
-import fr.enimaloc.catapult.repository.TwitchCclDefinitionRepository;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameCacheEntry;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameCcl;
+import fr.enimaloc.catapult.repository.igdb.IgdbGameCacheRepository;
+import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
+import fr.enimaloc.catapult.repository.igdb.IgdbGameExternalIdRepository;
+import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;

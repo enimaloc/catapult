@@ -1,14 +1,14 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.chat.GameContext;
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.IgdbGameDetails;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.domain.UserSettings;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.repository.GameBindingRepository;
-import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
-import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

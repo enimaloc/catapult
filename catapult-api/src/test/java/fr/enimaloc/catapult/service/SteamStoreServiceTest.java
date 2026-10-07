@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.SteamAppParentEntry;
+import fr.enimaloc.catapult.domain.steam.SteamAppParentEntry;
 import fr.enimaloc.catapult.getter.SteamPlaytestRedirectResolver;
-import fr.enimaloc.catapult.repository.SteamAppParentRepository;
+import fr.enimaloc.catapult.repository.steam.SteamAppParentRepository;
 import fr.enimaloc.catapult.service.SteamStoreService.ResolvedParentApp;
 import fr.enimaloc.catapult.service.SteamStoreService.SteamTwSignals;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;

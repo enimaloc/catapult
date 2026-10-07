@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.api.provider.RawProviderResponseSupport;
-import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
-import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.MinecraftService;
 import fr.enimaloc.catapult.service.MinecraftTokenService;
 import lombok.RequiredArgsConstructor;

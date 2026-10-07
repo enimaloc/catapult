@@ -1,12 +1,13 @@
 package fr.enimaloc.catapult.experiment;
 
 import fr.enimaloc.catapult.config.ExperimentProviderProperties;
-import fr.enimaloc.catapult.domain.*;
+import fr.enimaloc.catapult.domain.config.SystemSetting;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.experiment.provider.ActiveProviderHolder;
 import fr.enimaloc.catapult.experiment.provider.ExperimentProvider;
 import fr.enimaloc.catapult.experiment.provider.ExperimentSummary;
-import fr.enimaloc.catapult.repository.ExperimentRepository;
-import fr.enimaloc.catapult.repository.SystemSettingRepository;
+import fr.enimaloc.catapult.repository.config.SystemSettingRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.DtddApiKeyEntry;
-import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
+import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
+import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;

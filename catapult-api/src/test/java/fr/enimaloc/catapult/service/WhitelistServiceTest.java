@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.SystemSetting;
-import fr.enimaloc.catapult.domain.WhitelistEntry;
-import fr.enimaloc.catapult.repository.SystemSettingRepository;
-import fr.enimaloc.catapult.repository.WhitelistEntryRepository;
+import fr.enimaloc.catapult.domain.access.WhitelistEntry;
+import fr.enimaloc.catapult.domain.config.SystemSetting;
+import fr.enimaloc.catapult.repository.access.WhitelistEntryRepository;
+import fr.enimaloc.catapult.repository.config.SystemSettingRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

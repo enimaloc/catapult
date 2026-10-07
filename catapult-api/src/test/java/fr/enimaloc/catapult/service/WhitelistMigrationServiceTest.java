@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.repository.WhitelistEntryRepository;
+import fr.enimaloc.catapult.repository.access.WhitelistEntryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,8 +29,8 @@ class WhitelistMigrationServiceTest {
 
         migrationService.run(applicationArguments);
 
-        ArgumentCaptor<fr.enimaloc.catapult.domain.WhitelistEntry> captor =
-            ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.WhitelistEntry.class);
+        ArgumentCaptor<fr.enimaloc.catapult.domain.access.WhitelistEntry> captor =
+            ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.access.WhitelistEntry.class);
         verify(whitelistEntryRepository, times(2)).save(captor.capture());
         assertThat(captor.getAllValues()).extracting("twitchId")
             .containsExactlyInAnyOrder("111", "222");
@@ -44,8 +44,8 @@ class WhitelistMigrationServiceTest {
 
         migrationService.run(applicationArguments);
 
-        ArgumentCaptor<fr.enimaloc.catapult.domain.WhitelistEntry> captor =
-            ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.WhitelistEntry.class);
+        ArgumentCaptor<fr.enimaloc.catapult.domain.access.WhitelistEntry> captor =
+            ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.access.WhitelistEntry.class);
         verify(whitelistEntryRepository, times(1)).save(captor.capture());
         assertThat(captor.getValue().getTwitchId()).isEqualTo("222");
     }

@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.domain.Notification;
-import fr.enimaloc.catapult.repository.NotificationRepository;
+import fr.enimaloc.catapult.domain.notification.Notification;
+import fr.enimaloc.catapult.repository.notification.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

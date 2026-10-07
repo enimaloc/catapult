@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.chat.command.registry.twitch;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.TwitchChatService;
 import org.junit.jupiter.api.Test;
 

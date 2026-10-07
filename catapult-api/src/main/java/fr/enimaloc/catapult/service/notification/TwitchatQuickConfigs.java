@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.common.dto.TwitchatQuickConfig;
 import fr.enimaloc.catapult.common.dto.TwitchatQuickConfigParam;
-import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import org.springframework.context.MessageSource;
 
 import java.util.List;

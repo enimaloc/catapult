@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
-import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
+import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
+import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;

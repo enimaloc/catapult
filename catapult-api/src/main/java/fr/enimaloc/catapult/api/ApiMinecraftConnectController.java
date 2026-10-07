@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.LinkStateResponse;
-import fr.enimaloc.catapult.domain.MinecraftFriendLink;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.MinecraftFriendService;
 import fr.enimaloc.catapult.service.MinecraftGateService;
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
-import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 
 import java.time.Instant;
 import java.util.Set;

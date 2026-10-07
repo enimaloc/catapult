@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.chat.command.js;
 
 import com.google.protobuf.Timestamp;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.IgdbClient;
 import fr.enimaloc.catapult.service.IgdbService;
 import fr.enimaloc.catapult.service.SteamStoreService;

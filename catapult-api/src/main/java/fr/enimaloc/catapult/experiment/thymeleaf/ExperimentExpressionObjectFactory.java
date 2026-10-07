@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.experiment.thymeleaf;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
 import fr.enimaloc.catapult.service.ExperimentService;
 import org.springframework.security.core.Authentication;

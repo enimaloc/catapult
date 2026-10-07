@@ -1,8 +1,17 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.*;
+import fr.enimaloc.catapult.domain.tw.TwDefinition;
+import fr.enimaloc.catapult.domain.tw.TwDtddTopicMapping;
+import fr.enimaloc.catapult.domain.tw.TwIgdbDescriptorMapping;
+import fr.enimaloc.catapult.domain.tw.TwSteamContentIdMapping;
+import fr.enimaloc.catapult.domain.tw.TwSteamKeyword;
 import fr.enimaloc.catapult.event.TwDefinitionsChangedEvent;
-import fr.enimaloc.catapult.repository.*;
+import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
+import fr.enimaloc.catapult.repository.tw.TwDtddTopicMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwIgdbDescriptorMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwSteamContentIdMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwSteamKeywordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

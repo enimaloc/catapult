@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.experiment;
 
-import fr.enimaloc.catapult.domain.ExperimentAssignmentRule.RuleType;
-import fr.enimaloc.catapult.domain.ExperimentOverride;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule.RuleType;
+import fr.enimaloc.catapult.domain.experiment.ExperimentOverride;
 import org.springframework.context.annotation.Profile;
 
 @Profile("mock-web")

@@ -2,9 +2,9 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.AddKeyRequest;
 import fr.enimaloc.catapult.common.dto.DeleteKeyRequest;
-import fr.enimaloc.catapult.domain.DtddApiKeyEntry;
+import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
 import fr.enimaloc.catapult.getter.DtddApiKeyRotator;
-import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.SubmitRequest;
-import fr.enimaloc.catapult.domain.FeedbackSubmission;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.FeedbackSubmissionRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.feedback.FeedbackSubmission;
+import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
 import fr.enimaloc.catapult.service.GitLabClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

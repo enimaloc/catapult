@@ -2,9 +2,9 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.ChatCommandSettingUpsertRequest;
 import fr.enimaloc.catapult.common.dto.SettingDto;
-import fr.enimaloc.catapult.domain.ChatCommandSetting;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

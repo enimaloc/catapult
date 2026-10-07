@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.chat.command.registry.steam;
 
 import fr.enimaloc.catapult.chat.command.js.ChatCommandServiceGateway;
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.GameStateService;
 import org.junit.jupiter.api.Test;

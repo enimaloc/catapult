@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 

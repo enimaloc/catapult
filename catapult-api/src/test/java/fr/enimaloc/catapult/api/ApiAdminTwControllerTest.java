@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.enimaloc.catapult.domain.TwDefinition;
+import fr.enimaloc.catapult.domain.tw.TwDefinition;
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
 import fr.enimaloc.catapult.service.AdminCclService;
 import fr.enimaloc.catapult.service.AdminTwService;

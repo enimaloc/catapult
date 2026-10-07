@@ -2,9 +2,9 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.InviteRedemptionDto;
-import fr.enimaloc.catapult.domain.AlphaInvite;
-import fr.enimaloc.catapult.domain.AlphaInviteRedemption;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.access.AlphaInvite;
+import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.InviteService;
 import lombok.RequiredArgsConstructor;

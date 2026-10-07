@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;

@@ -1,16 +1,16 @@
 package fr.enimaloc.catapult;
 
-import fr.enimaloc.catapult.domain.Experiment;
-import fr.enimaloc.catapult.domain.ExperimentAssignmentRule;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.domain.UserSettings;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule;
 import fr.enimaloc.catapult.event.ExperimentActivatedEvent;
 import fr.enimaloc.catapult.experiment.ExperimentSynchronizer;
 import fr.enimaloc.catapult.getter.MockSteamApiClient;
-import fr.enimaloc.catapult.repository.ExperimentAssignmentRuleRepository;
-import fr.enimaloc.catapult.repository.ExperimentRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRuleRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

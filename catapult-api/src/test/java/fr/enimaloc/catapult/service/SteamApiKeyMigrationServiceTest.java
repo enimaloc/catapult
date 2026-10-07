@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
-import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
+import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -31,8 +31,8 @@ class SteamApiKeyMigrationServiceTest {
 
         service.run(applicationArguments);
 
-        ArgumentCaptor<fr.enimaloc.catapult.domain.SteamApiKeyEntry> captor =
-            ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.SteamApiKeyEntry.class);
+        ArgumentCaptor<fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry> captor =
+            ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry.class);
         verify(repository, times(2)).save(captor.capture());
         assertThat(captor.getAllValues()).extracting("apiKey")
             .containsExactlyInAnyOrder("KEY1", "KEY2");
@@ -45,8 +45,8 @@ class SteamApiKeyMigrationServiceTest {
 
         service.run(applicationArguments);
 
-        ArgumentCaptor<fr.enimaloc.catapult.domain.SteamApiKeyEntry> captor =
-            ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.SteamApiKeyEntry.class);
+        ArgumentCaptor<fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry> captor =
+            ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry.class);
         verify(repository, times(1)).save(captor.capture());
         assertThat(captor.getValue().getApiKey()).isEqualTo("LEGACY_KEY");
     }
@@ -59,8 +59,8 @@ class SteamApiKeyMigrationServiceTest {
 
         service.run(applicationArguments);
 
-        ArgumentCaptor<fr.enimaloc.catapult.domain.SteamApiKeyEntry> captor =
-            ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.SteamApiKeyEntry.class);
+        ArgumentCaptor<fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry> captor =
+            ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry.class);
         verify(repository, times(2)).save(captor.capture());
         assertThat(captor.getAllValues()).extracting("apiKey")
             .containsExactlyInAnyOrder("KEY1", "LEGACY_KEY");

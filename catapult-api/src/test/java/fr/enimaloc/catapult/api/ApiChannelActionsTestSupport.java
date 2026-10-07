@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.repository.UserSettingsRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.BindingService;

@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.monitoring;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
-import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
-import fr.enimaloc.catapult.repository.OAuthTokenRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.EventSubTwitchChatService;
 import fr.enimaloc.catapult.service.IgdbService;
 import fr.enimaloc.catapult.service.IrcTwitchChatService;

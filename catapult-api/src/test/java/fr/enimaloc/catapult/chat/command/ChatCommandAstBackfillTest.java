@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.chat.command;
 
-import fr.enimaloc.catapult.domain.ChatCommandDefinition;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
