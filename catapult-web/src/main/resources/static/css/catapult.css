@@ -1087,16 +1087,78 @@ a[data-link].active {
  * Channel dashboard
  */
 
+.channel-section {
+    padding-top: 80px;
+}
+
 .channel-section .section-header {
     margin-bottom: 28px;
 }
 
-.channel-section .section-header + .status-card {
-    margin-bottom: 56px;
+/* Header: same eyebrow + display title as the privacy/channels pages, with the avatar. */
+
+.channel-section .channel-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 36px;
+}
+
+.channel-header-avatar {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    border: 1px solid var(--catapult-border);
+}
+
+.channel-header h1 {
+    margin: 6px 0 0;
+    color: var(--catapult-text);
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+    line-height: 1.05;
+    letter-spacing: -0.05em;
+}
+
+/* Tabs */
+
+/*
+ * Same light-theme leak as .bindings-filters below: mdui's tab labels, divider
+ * and indicator read --mdui-color-on-surface(-variant), -surface-variant and
+ * -primary, which never get dark values here. Bare "R G B" triplets, as mdui
+ * expects.
+ */
+.channel-tabs {
+    --mdui-color-on-surface: 244 246 251;
+    --mdui-color-on-surface-variant: 174 180 192;
+    --mdui-color-surface-variant: 41 46 58;
+    --mdui-color-primary: 167 139 250;
+}
+
+/* The tab strip paints its own rgb(--mdui-color-surface) background (white here). */
+.channel-tabs::part(container) {
+    background-color: transparent;
+}
+
+.channel-tabs mdui-tab-panel {
+    padding-top: 36px;
+}
+
+/* Each tab panel stacks its own section headers: space them like the old single page. */
+.channel-tabs mdui-tab-panel > * + .section-header {
+    margin-top: 56px;
+}
+
+/* Non-owners only get the overview: a strip holding one lone tab is just noise. */
+.channel-tabs-single::part(container) {
+    display: none;
+}
+
+.channel-tabs-single mdui-tab-panel {
+    padding-top: 0;
 }
 
 .channel-section h2 {
-    margin: 0;
+    margin: 0 0 14px;
     color: var(--catapult-text);
     font-size: 1.5rem;
     letter-spacing: -0.02em;
@@ -1113,6 +1175,7 @@ a[data-link].active {
     background: var(--catapult-surface);
     border: 1px solid var(--catapult-border);
     color: var(--catapult-text);
+    margin-bottom: 24px;
 }
 
 .status-row {
@@ -1338,6 +1401,10 @@ a[data-link].active {
     font-weight: 650;
 }
 
+.connection-card > mdui-chip {
+    align-self: flex-start;
+}
+
 .connection-card p {
     margin: 0;
     color: var(--catapult-text-muted);
@@ -1449,6 +1516,23 @@ a[data-link].active {
     align-self: flex-start;
 }
 
+.settings-card .settings-master-toggle {
+    color: var(--catapult-text);
+    font-weight: 600;
+}
+
+/* Same two-column switch layout as the binding ccl/tw panels. */
+.settings-switch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px 16px;
+}
+
+.settings-switch-group {
+    padding-top: 14px;
+    border-top: 1px solid var(--catapult-border);
+}
+
 .settings-card mdui-chip {
     margin-right: 6px;
 }
@@ -1516,6 +1600,20 @@ input[type="checkbox"] {
     .connection-card,
     .settings-card {
         padding: 20px;
+    }
+
+    .channel-section {
+        padding-top: 50px;
+    }
+
+    .channel-header-avatar {
+        width: 52px;
+        height: 52px;
+        flex-basis: 52px;
+    }
+
+    .channel-tabs mdui-tab-panel {
+        padding-top: 24px;
     }
 
     #channel-bindings-list mdui-list-item {
