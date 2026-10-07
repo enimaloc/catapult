@@ -1,0 +1,166 @@
+<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.ChannelPageData"*/-->
+<mdui-tab-panel slot="panel" value="integrations" th:with="ch=${channelPage}" th:if="${channelPage.isOwner()}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
+    <div class="section-header">
+        <h2 th:text="#{channel.connections.title}">Connexions</h2>
+    </div>
+
+    <div id="channel-connections">
+        <mdui-card class="connection-card" variant="outlined">
+            <span th:text="#{channel.connections.twitch}">Twitch</span>
+            <mdui-chip th:text="#{channel.connections.connected}">Connecté</mdui-chip>
+        </mdui-card>
+
+        <mdui-card th:if="${ch.hasSteamProvider()}" class="connection-card" variant="outlined"
+                   data-conn="steam">
+            <span th:text="#{channel.connections.steam}">Steam</span>
+            <mdui-chip class="steam-connected-chip" spa:if="connected:${ch.hasSteam()}"
+                       spa:on="connected:SteamConnectionStateEvent.connected"
+                       th:text="#{channel.connections.connected}">Connecté
+            </mdui-chip>
+            <mdui-chip class="steam-not-connected-chip" spa:if="notConnected:${!ch.hasSteam()}"
+                       spa:on="notConnected:SteamConnectionStateEvent.!connected"
+                       th:text="#{channel.connections.not_connected}">Non connecté
+            </mdui-chip>
+
+            <!--
+              Every state below (diagnostics, has-token/no-token sub-view, save/delete
+              buttons) is always rendered for owners and toggled with the `hidden` class
+              via spa:if/spa:on, instead of being created/destroyed on each
+              SteamConnectionStateEvent/SteamTokenSavedEvent/SteamTokenDeletedEvent.
+            -->
+            <p class="steam-diag-rate-limited" th:if="${ch.isOwner()}"
+               spa:if="connected:${ch.hasSteam()},rateLimited:${ch.steamRateLimited()}"
+               spa:on="connected:SteamConnectionStateEvent.connected,rateLimited:SteamConnectionStateEvent.rateLimited"
+               th:text="#{channel.connections.steam.rate_limited}">
+                Steam nous bloque temporairement.
+            </p>
+            <p class="steam-diag-offline" th:if="${ch.isOwner()}"
+               spa:if="connected:${ch.hasSteam()},offline:${ch.steamOfflineMode()}"
+               spa:on="connected:SteamConnectionStateEvent.connected,offline:SteamConnectionStateEvent.offline"
+               th:text="#{channel.connections.steam.offline_mode(${ch.steamProfileCacheTtlMinutes()})}">
+                Profil hors-ligne, cache de {0} minutes.
+            </p>
+            <p class="steam-diag-private" th:if="${ch.isOwner()}"
+               spa:if="connected:${ch.hasSteam()},privateProfile:${ch.steamProfilePrivate()}"
+               spa:on="connected:SteamConnectionStateEvent.connected,privateProfile:SteamConnectionStateEvent.privateProfile"
+               th:text="#{channel.connections.steam.private}">
+                Profil Steam privé.
+            </p>
+
+            <div id="steam-token-body" th:if="${ch.isOwner()}" spa:if="connected:${ch.hasSteam()}"
+                 spa:on="connected:SteamConnectionStateEvent.connected">
+                <div class="steam-token-has" spa:if="hasToken:${ch.hasSteamPersonalToken()}"
+                     spa:on="hasToken:SteamTokenSavedEvent,hasToken:!SteamTokenDeletedEvent">
+                    <label>
+                        <mdui-switch id="steam-token-shared" th:checked="${ch.steamTokenShared()}"
+                                     spa:value="checked:SteamTokenSavedEvent.shared,checked:SteamTokenSharedStateEvent.shared"></mdui-switch>
+                        <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
+                    </label>
+                </div>
+                <div class="steam-token-none" spa:if="noToken:${!ch.hasSteamPersonalToken()}"
+                     spa:on="noToken:SteamTokenDeletedEvent,noToken:!SteamTokenSavedEvent">
+                    <input type="password" id="steam-token-input"
+                           th:placeholder="#{channel.connections.steam.token.placeholder}"/>
+                    <label>
+                        <mdui-switch id="steam-token-share-new"></mdui-switch>
+                        <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
+                    </label>
+                </div>
+            </div>
+
+            <mdui-segmented-button-group id="steam-token-actions" class="card-actions"
+                                         th:if="${ch.isOwner()}" spa:if="connected:${ch.hasSteam()}"
+                                         spa:on="connected:SteamConnectionStateEvent.connected">
+                <mdui-segmented-button id="steam-token-delete-btn"
+                                       spa:if="hasToken:${ch.hasSteamPersonalToken()}"
+                                       spa:on="hasToken:SteamTokenSavedEvent,hasToken:!SteamTokenDeletedEvent"
+                                       th:text="#{channel.connections.steam.token.delete}">
+                    Supprimer le token
+                </mdui-segmented-button>
+                <mdui-segmented-button id="steam-token-save-btn"
+                                       spa:if="noToken:${!ch.hasSteamPersonalToken()}"
+                                       spa:on="noToken:SteamTokenDeletedEvent,noToken:!SteamTokenSavedEvent"
+                                       th:text="#{channel.connections.steam.token.save}">
+                    Enregistrer
+                </mdui-segmented-button>
+                <mdui-segmented-button id="steam-refresh-cache-btn"
+                                       th:text="#{channel.connections.steam.refresh_cache}">
+                    Rafraîchir le cache
+                </mdui-segmented-button>
+            </mdui-segmented-button-group>
+        </mdui-card>
+        <mdui-card th:if="${ch.hasXboxProvider()}" class="connection-card" variant="outlined"
+                   data-conn="xbox">
+            <span th:text="#{channel.connections.xbox}">Xbox</span>
+            <mdui-chip th:if="${ch.hasXbox()}" th:text="#{channel.connections.connected}">Connecté
+            </mdui-chip>
+            <mdui-chip th:unless="${ch.hasXbox()}" th:text="#{channel.connections.not_connected}">Non
+                connecté
+            </mdui-chip>
+        </mdui-card>
+        <mdui-card th:if="${minecraftLink != null}" class="connection-card" variant="outlined"
+                   data-conn="minecraft">
+            <span th:text="#{channel.connections.minecraft}">Minecraft</span>
+
+            <!--
+              Every status sub-view is always rendered (instead of created/destroyed
+              via th:switch + replaceChildren) and toggled via spa:if/spa:switch, same
+              pattern as the Steam card. MinecraftEnrollEvent/MinecraftSyncEvent carry
+              a `status` field to match against; MinecraftDisconnectedEvent carries
+              none at all (its mere occurrence always means NONE), handled with a bare
+              event name on caseNone and a negated bare event everywhere else.
+            -->
+            <div id="minecraft-status-body">
+                <div spa:if="caseNone:${minecraftLink.status() == 'NONE'}"
+                     spa:switch="caseNone:MinecraftEnrollEvent.status=NONE,caseNone:MinecraftSyncEvent.status=NONE,caseNone:MinecraftDisconnectedEvent">
+                    <input type="text" id="minecraft-name-input"
+                           th:placeholder="#{channel.connections.minecraft.name_placeholder}"/>
+                </div>
+                <div spa:if="casePending:${minecraftLink.status() == 'PENDING'}"
+                     spa:switch="casePending:MinecraftEnrollEvent.status=PENDING,casePending:MinecraftSyncEvent.status=PENDING,casePending:!MinecraftDisconnectedEvent">
+                    <span th:text="#{channel.connections.minecraft.pending}">En attente d'acceptation en jeu…</span>
+                </div>
+                <div spa:if="caseRejected:${minecraftLink.status() == 'INVITE_REJECTED'}"
+                     spa:switch="caseRejected:MinecraftEnrollEvent.status=INVITE_REJECTED,caseRejected:MinecraftSyncEvent.status=INVITE_REJECTED,caseRejected:!MinecraftDisconnectedEvent">
+                    <span th:text="#{channel.connections.minecraft.rejected}">Invitation refusée, ajout manuel requis.</span>
+                </div>
+                <div spa:if="caseAccepted:${minecraftLink.status() == 'ACCEPTED'}"
+                     spa:switch="caseAccepted:MinecraftEnrollEvent.status=ACCEPTED,caseAccepted:MinecraftSyncEvent.status=ACCEPTED,caseAccepted:!MinecraftDisconnectedEvent">
+                    <mdui-chip
+                            spa:value="textContent:MinecraftEnrollEvent.minecraftName,textContent:MinecraftSyncEvent.minecraftName"
+                            th:text="${minecraftLink.minecraftName()}">Steve
+                    </mdui-chip>
+                </div>
+                <div spa:if="caseRemoved:${minecraftLink.status() == 'REMOVED'}"
+                     spa:switch="caseRemoved:MinecraftEnrollEvent.status=REMOVED,caseRemoved:MinecraftSyncEvent.status=REMOVED,caseRemoved:!MinecraftDisconnectedEvent">
+                    <span th:text="#{channel.connections.minecraft.removed}">Lien supprimé côté serveur.</span>
+                </div>
+            </div>
+
+            <mdui-segmented-button-group id="minecraft-status-actions" class="card-actions">
+                <!-- Each button needs its own flag name even though they're all page-level
+                     (not row-scoped): Visibility.apply looks elements up by data-if name
+                     alone, so three buttons sharing one name would all move in lockstep,
+                     each overwriting the shared flag in turn instead of staying independent. -->
+                <mdui-segmented-button id="minecraft-enroll-btn"
+                                       spa:if="showEnroll:${minecraftLink.status() == 'NONE'}"
+                                       spa:switch="showEnroll:MinecraftEnrollEvent.status=NONE,showEnroll:MinecraftSyncEvent.status=NONE,showEnroll:MinecraftDisconnectedEvent"
+                                       th:text="#{channel.connections.minecraft.enroll}">
+                    Lier
+                </mdui-segmented-button>
+                <mdui-segmented-button id="minecraft-check-btn"
+                                       spa:if="showCheck:${minecraftLink.status() == 'PENDING' or minecraftLink.status() == 'REMOVED'}"
+                                       spa:switch="showCheck:MinecraftEnrollEvent.status=PENDING/REMOVED,showCheck:MinecraftSyncEvent.status=PENDING/REMOVED,showCheck:!MinecraftDisconnectedEvent"
+                                       th:text="#{channel.connections.minecraft.check}">
+                    Vérifier
+                </mdui-segmented-button>
+                <mdui-segmented-button id="minecraft-disconnect-btn"
+                                       spa:if="showDisconnect:${minecraftLink.status() == 'ACCEPTED'}"
+                                       spa:switch="showDisconnect:MinecraftEnrollEvent.status=ACCEPTED,showDisconnect:MinecraftSyncEvent.status=ACCEPTED,showDisconnect:!MinecraftDisconnectedEvent"
+                                       th:text="#{channel.connections.minecraft.disconnect}">
+                    Délier
+                </mdui-segmented-button>
+            </mdui-segmented-button-group>
+        </mdui-card>
+    </div>
+</mdui-tab-panel>
