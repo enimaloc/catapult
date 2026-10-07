@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.common.dto.SettingDto;
 import fr.enimaloc.catapult.domain.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -50,12 +49,12 @@ public class ApiChatCommandSettingsController {
     private static final String LANGUAGE_KEY = "language";
 
     private final ChatCommandSettingRepository repository;
-    private final UserAccountRepository userAccountRepository;
+    private final ApiUserResolver userResolver;
     private final ExperimentService experimentService;
 
     @GetMapping
     public List<SettingDto> list(@AuthenticationPrincipal Jwt jwt, Locale locale) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         ensureDefaultLanguage(user, locale);
         return repository.findByUser(user).stream()
@@ -80,7 +79,7 @@ public class ApiChatCommandSettingsController {
     @PutMapping("/{key}")
     public ResponseEntity<Void> upsert(@AuthenticationPrincipal Jwt jwt, @PathVariable String key,
                        @RequestBody ChatCommandSettingUpsertRequest body) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         if (!VALID_KEY.matcher(key).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -102,16 +101,10 @@ public class ApiChatCommandSettingsController {
 
     @DeleteMapping("/{key}")
     public ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable String key) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         repository.deleteByUserAndKey(user, key);
         return ResponseEntity.noContent().build();
-    }
-
-    private UserAccount currentUser(Jwt jwt) {
-        String twitchId = jwt.getClaimAsString("twitchId");
-        return userAccountRepository.findByTwitchId(twitchId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     private void gate(UserAccount user) {

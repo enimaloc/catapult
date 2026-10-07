@@ -19,7 +19,6 @@ import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.SystemTwitchAccountService;
 import jakarta.validation.Valid;
@@ -72,7 +71,7 @@ public class ApiChatCommandsController {
     private final PlaceholderResolver placeholderResolver;
     private final ExperimentService experimentService;
     private final SystemTwitchAccountService systemAccount;
-    private final UserAccountRepository userRepo;
+    private final ApiUserResolver userResolver;
     private final ApplicationEventPublisher eventPublisher;
     private final JsCompiler jsCompiler;
     private final ServiceFunctionRegistry serviceFunctionRegistry;
@@ -128,7 +127,7 @@ public class ApiChatCommandsController {
     @GetMapping
     @Transactional
     public ListResponse list(@AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         // Built-ins (e.g. !setgame) are always ensured — they evolve as new
         // Java ChatCommand beans get registered, and their deletion is not
@@ -157,7 +156,7 @@ public class ApiChatCommandsController {
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable String presetKey
     ) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         try {
             ChatCommandDefinition def = catalog.instantiate(user, presetKey, Locale.FRANCE);
@@ -176,7 +175,7 @@ public class ApiChatCommandsController {
         @AuthenticationPrincipal Jwt jwt,
         @Valid @RequestBody UpsertRequest req
     ) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         validateTemplate(effectiveTemplate(req));
         if (isReservedName(req.name())) {
@@ -200,7 +199,7 @@ public class ApiChatCommandsController {
         @PathVariable UUID id,
         @Valid @RequestBody UpsertRequest req
     ) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         validateTemplate(effectiveTemplate(req));
         ChatCommandDefinition def = repository.findById(id)
@@ -218,7 +217,7 @@ public class ApiChatCommandsController {
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable UUID id
     ) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         ChatCommandDefinition def = repository.findById(id)
             .filter(d -> d.getUser().getId().equals(user.getId()))
@@ -229,12 +228,6 @@ public class ApiChatCommandsController {
         repository.delete(def);
         publishChanged(user);
         return ResponseEntity.noContent().build();
-    }
-
-    private UserAccount currentUser(Jwt jwt) {
-        String twitchId = jwt.getClaimAsString("twitchId");
-        return userRepo.findByTwitchId(twitchId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     private void gate(UserAccount user) {

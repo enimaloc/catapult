@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.service.notification.BroadcastRateLimiter;
 import fr.enimaloc.catapult.service.notification.BroadcastValidator;
 import fr.enimaloc.catapult.service.notification.RedisEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
+import fr.enimaloc.catapult.service.ChannelAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -39,8 +40,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiAdminBroadcastController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({BroadcastValidator.class, BroadcastRateLimiter.class})
+@Import({BroadcastValidator.class, BroadcastRateLimiter.class, ApiUserResolver.class})
 class ApiAdminBroadcastControllerTest {
+    @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
     final ObjectMapper om = new ObjectMapper();

@@ -3,10 +3,8 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.common.dto.SaveBody;
 import fr.enimaloc.catapult.common.dto.TwEnabledBody;
 import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.BindingService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -16,7 +14,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 import java.util.Set;
@@ -35,13 +32,13 @@ import java.util.UUID;
 public class ApiChannelTwController {
 
     private final BindingService bindingService;
-    private final UserAccountRepository userRepo;
+    private final ApiUserResolver userResolver;
 
     @PostMapping("/tws")
     public ResponseEntity<Void> saveTws(@PathVariable UUID bindingId,
                                         @AuthenticationPrincipal Jwt jwt,
                                         @RequestBody SaveBody body) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         bindingService.setTwsForBinding(user, bindingId,
                 body.tws() == null ? Set.of() : body.tws());
         return ResponseEntity.noContent().build();
@@ -50,7 +47,7 @@ public class ApiChannelTwController {
     @PostMapping("/tws/reset")
     public ResponseEntity<Void> resetTws(@PathVariable UUID bindingId,
                                          @AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         bindingService.resetTws(user, bindingId);
         return ResponseEntity.noContent().build();
     }
@@ -59,7 +56,7 @@ public class ApiChannelTwController {
     public ResponseEntity<Void> toggleTwEnabled(@PathVariable UUID bindingId,
                                                 @AuthenticationPrincipal Jwt jwt,
                                                 @RequestBody TwEnabledBody body) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         bindingService.toggleTwEnabled(user, bindingId, body.enabled());
         return ResponseEntity.noContent().build();
     }
@@ -67,13 +64,8 @@ public class ApiChannelTwController {
     @GetMapping("/tws/suggest")
     public Map<String, Set<String>> suggestTws(@PathVariable UUID bindingId,
                                                @AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
         return Map.of("preview", bindingService.previewTws(user, bindingId));
     }
 
-    private UserAccount currentUser(Jwt jwt) {
-        String twitchId = jwt.getClaimAsString("twitchId");
-        return userRepo.findByTwitchId(twitchId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-    }
 }

@@ -2,7 +2,6 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.BroadcastRequestDto;
 import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.metrics.CatapultApiMetrics;
 import fr.enimaloc.catapult.service.notification.BroadcastRateLimiter;
@@ -55,7 +54,7 @@ public class ApiAdminBroadcastController {
     private final BroadcastValidator validator;
     private final BroadcastRateLimiter rateLimiter;
     private final ActivityLogService activityLog;
-    private final UserAccountRepository userRepo;
+    private final ApiUserResolver userResolver;
 
     @Autowired(required = false)
     private CatapultApiMetrics apiMetrics;
@@ -64,7 +63,7 @@ public class ApiAdminBroadcastController {
     public ResponseEntity<Void> broadcast(@Valid @RequestBody BroadcastRequestDto body,
                                           @AuthenticationPrincipal Jwt jwt,
                                           HttpServletRequest httpRequest) {
-        UserAccount admin = currentUser(jwt);
+        UserAccount admin = userResolver.viewerByTwitchId(jwt);
 
         // Belt-and-suspenders : Jackson already filters unknown discriminators
         // to a 400, but the validator catches the lifecycle-only name + size cap.
@@ -125,9 +124,4 @@ public class ApiAdminBroadcastController {
         return req.getRemoteAddr();
     }
 
-    private UserAccount currentUser(Jwt jwt) {
-        String twitchId = jwt.getClaimAsString("twitchId");
-        return userRepo.findByTwitchId(twitchId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-    }
 }

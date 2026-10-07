@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.ExperimentService;
 import fr.enimaloc.catapult.service.SystemTwitchAccountService;
 import fr.enimaloc.catapult.service.TwitchChatService;
+import fr.enimaloc.catapult.service.ChannelAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -57,8 +58,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiChatCommandsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({JsCompiler.class, ServiceFunctionRegistry.class, TwitchShoutoutFunction.class})
+@Import({JsCompiler.class, ServiceFunctionRegistry.class, TwitchShoutoutFunction.class, ApiUserResolver.class})
 class ApiChatCommandsControllerTest {
+    @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
     final ObjectMapper om = new ObjectMapper();

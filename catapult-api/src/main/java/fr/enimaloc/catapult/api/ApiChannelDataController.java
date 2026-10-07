@@ -34,12 +34,10 @@ import fr.enimaloc.catapult.repository.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.GameBindingRepository;
 import fr.enimaloc.catapult.repository.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.TwDefinitionRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.repository.UserSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.AdminCclService;
-import fr.enimaloc.catapult.service.ChannelAccessService;
 import fr.enimaloc.catapult.service.ConnectionEventService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
@@ -54,7 +52,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -65,7 +62,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
@@ -80,10 +76,9 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class ApiChannelDataController {
 
-    private final UserAccountRepository userAccountRepository;
     private final GameBindingRepository gameBindingRepository;
     private final UserSettingsRepository userSettingsRepository;
-    private final ChannelAccessService channelAccessService;
+    private final ApiUserResolver userResolver;
     private final StreamStateService streamStateService;
     private final GameStateService gameStateService;
     private final AdminCclService adminCclService;
@@ -112,26 +107,14 @@ public class ApiChannelDataController {
 
     @GetMapping(value = "/logs", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter logs(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount channelUser = resolveAndCheckAccess(username, jwt);
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         return activityLogService.subscribe(channelUser.getId());
     }
 
     @GetMapping(value = "/connections", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter connections(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount channelUser = resolveAndCheckAccess(username, jwt);
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         return connectionEventService.subscribe(channelUser.getId());
-    }
-
-    private UserAccount resolveAndCheckAccess(String username, Jwt jwt) {
-        UUID viewerId = UUID.fromString(jwt.getSubject());
-        UserAccount viewer = userAccountRepository.findById(viewerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!channelAccessService.canAccess(viewer, channelUser)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
-        return channelUser;
     }
 
     private GameDto toGameDto(UserAccount channelUser, DetectedGame game) {
@@ -150,16 +133,8 @@ public class ApiChannelDataController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String source) {
 
-        UUID viewerId = UUID.fromString(jwt.getSubject());
-        UserAccount viewer = userAccountRepository.findById(viewerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-
-        UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-
-        if (!channelAccessService.canAccess(viewer, channelUser)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
+        UserAccount viewer = userResolver.viewer(jwt);
+        UserAccount channelUser = userResolver.accessibleChannel(username, viewer);
 
         boolean isOwner = viewer.getId().equals(channelUser.getId());
 
@@ -351,14 +326,7 @@ public class ApiChannelDataController {
     public ResponseEntity<Void> refreshProfileCache(
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt) {
-        UUID viewerId = UUID.fromString(jwt.getSubject());
-        UserAccount viewer = userAccountRepository.findById(viewerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!viewer.getId().equals(channelUser.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
         if (channelUser.getSteamId() != null) {
             String personalToken = channelUser.getSteamPersonalToken() != null
                     ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
@@ -373,14 +341,8 @@ public class ApiChannelDataController {
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt) {
 
-        UUID viewerId = UUID.fromString(jwt.getSubject());
-        UserAccount viewer = userAccountRepository.findById(viewerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!channelAccessService.canAccess(viewer, channelUser)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
+        UserAccount viewer = userResolver.viewer(jwt);
+        UserAccount channelUser = userResolver.accessibleChannel(username, viewer);
 
         boolean isOwner = viewer.getId().equals(channelUser.getId());
         Optional<DetectedGame> currentGame = gameStateService.getLastKnownGame(channelUser);
@@ -400,14 +362,8 @@ public class ApiChannelDataController {
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt) {
 
-        UUID viewerId = UUID.fromString(jwt.getSubject());
-        UserAccount viewer = userAccountRepository.findById(viewerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!channelAccessService.canAccess(viewer, channelUser)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
+        UserAccount viewer = userResolver.viewer(jwt);
+        UserAccount channelUser = userResolver.accessibleChannel(username, viewer);
 
         UserSettings settings = userSettingsRepository.findById(channelUser.getId())
                 .orElseGet(() -> {
@@ -449,14 +405,8 @@ public class ApiChannelDataController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "") String q) {
 
-        UUID viewerId = UUID.fromString(jwt.getSubject());
-        UserAccount viewer = userAccountRepository.findById(viewerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!channelAccessService.canAccess(viewer, channelUser)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
+        UserAccount viewer = userResolver.viewer(jwt);
+        UserAccount channelUser = userResolver.accessibleChannel(username, viewer);
         if (q.isBlank()) return List.of();
         return twitchService.searchCategories(viewer, q);
     }
@@ -466,14 +416,8 @@ public class ApiChannelDataController {
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt) {
 
-        UUID viewerId = UUID.fromString(jwt.getSubject());
-        UserAccount viewer = userAccountRepository.findById(viewerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        UserAccount channelUser = userAccountRepository.findByTwitchUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!channelAccessService.canAccess(viewer, channelUser)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
+        UserAccount viewer = userResolver.viewer(jwt);
+        UserAccount channelUser = userResolver.accessibleChannel(username, viewer);
 
         Optional<DetectedGame> currentGame = gameStateService.getLastKnownGame(channelUser);
         if (currentGame.isEmpty()) {
