@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.chat.command.registry.DtoMapper;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.service.GameStateService;
+import fr.enimaloc.catapult.service.binding.GameStateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

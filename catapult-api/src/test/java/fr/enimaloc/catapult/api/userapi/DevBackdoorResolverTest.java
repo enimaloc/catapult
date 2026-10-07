@@ -2,8 +2,8 @@ package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.service.SteamStoreService;
-import fr.enimaloc.catapult.service.XboxStoreService;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;

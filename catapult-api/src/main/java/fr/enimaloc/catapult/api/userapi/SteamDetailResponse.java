@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
-import fr.enimaloc.catapult.service.SteamStoreService;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
 
 import java.time.Instant;
 import java.util.Arrays;

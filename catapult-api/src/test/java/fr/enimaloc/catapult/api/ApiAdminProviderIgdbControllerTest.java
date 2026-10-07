@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.api.provider.RawProviderResponseSupport;
 import fr.enimaloc.catapult.common.dto.AdminProviderIgdbQueryRequest;
-import fr.enimaloc.catapult.service.IgdbService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

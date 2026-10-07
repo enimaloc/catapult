@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.chat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
-import fr.enimaloc.catapult.service.TwitchChatService;
+import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

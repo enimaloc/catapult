@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.chat.command.registry.DtoMapper;
 import fr.enimaloc.catapult.chat.command.registry.DurationFormatter;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.service.TwitchChatService;
+import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

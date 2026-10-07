@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.chat.command.registry.tw;
 
 import fr.enimaloc.catapult.chat.GameContext;
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.service.GameContextService;
+import fr.enimaloc.catapult.service.binding.GameContextService;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;

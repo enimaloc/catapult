@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
-import fr.enimaloc.catapult.service.ChannelAccessService;
+import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.notification.BroadcastRateLimiter;
 import fr.enimaloc.catapult.service.notification.BroadcastValidator;
 import fr.enimaloc.catapult.service.notification.RedisEventPublisher;

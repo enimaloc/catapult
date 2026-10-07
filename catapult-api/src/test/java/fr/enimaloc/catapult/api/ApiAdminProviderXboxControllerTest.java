@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.api.provider.RawProviderResponseSupport;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.XboxUserTokenService;
+import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

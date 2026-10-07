@@ -4,9 +4,9 @@ import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.service.GameStateService;
-import fr.enimaloc.catapult.service.IgdbService;
-import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -28,7 +28,7 @@ import java.util.Set;
  * igdbId}, when given, maps to a Twitch id via {@link IgdbService#findTwitchGameId}; either way
  * (or as a fallback when that mapping is missing) it falls back to a live Twitch category name
  * search ({@link TwitchService#findCategoryIdByName}) — the same two-step resolution {@link
- * fr.enimaloc.catapult.service.BindingService#updateWithIgdbResolution} already uses for
+ * fr.enimaloc.catapult.service.binding.BindingService#updateWithIgdbResolution} already uses for
  * auto-detected games, which a MANUAL binding built this way never went through before.
  *
  * <p>The optional {@code igdbId} also lets the streamer pin the exact IGDB game instead of

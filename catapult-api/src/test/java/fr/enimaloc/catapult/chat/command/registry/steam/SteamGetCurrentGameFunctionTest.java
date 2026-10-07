@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.chat.command.js.ChatCommandServiceGateway;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.service.GameStateService;
+import fr.enimaloc.catapult.service.binding.GameStateService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;

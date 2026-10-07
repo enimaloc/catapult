@@ -9,9 +9,9 @@ import fr.enimaloc.catapult.common.dto.SteamKeywordsBody;
 import fr.enimaloc.catapult.common.dto.SteamSignalTestBody;
 import fr.enimaloc.catapult.common.dto.UpdateBody;
 import fr.enimaloc.catapult.domain.tw.TwDefinition;
-import fr.enimaloc.catapult.service.AdminTwService;
-import fr.enimaloc.catapult.service.TwBackfillService;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
+import fr.enimaloc.catapult.service.tw.AdminTwService;
+import fr.enimaloc.catapult.service.tw.TwBackfillService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 

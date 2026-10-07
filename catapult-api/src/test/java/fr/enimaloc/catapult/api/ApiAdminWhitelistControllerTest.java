@@ -9,8 +9,8 @@ import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.access.WhitelistEntry;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.InviteService;
-import fr.enimaloc.catapult.service.WhitelistService;
+import fr.enimaloc.catapult.service.access.InviteService;
+import fr.enimaloc.catapult.service.access.WhitelistService;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;

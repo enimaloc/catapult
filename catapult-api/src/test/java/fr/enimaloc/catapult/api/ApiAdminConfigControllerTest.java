@@ -7,7 +7,7 @@ import fr.enimaloc.catapult.domain.config.ConfigOverride;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.config.ConfigAuditRepository;
 import fr.enimaloc.catapult.repository.config.ConfigOverrideRepository;
-import fr.enimaloc.catapult.service.ChannelAccessService;
+import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.config.ConfigCatalogService;
 import fr.enimaloc.catapult.service.config.ConfigEntry;
 import fr.enimaloc.catapult.service.config.ConfigOverrideService;
