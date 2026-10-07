@@ -5,7 +5,7 @@ import fr.enimaloc.catapult.common.dto.SettingDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.service.ExperimentService;
+import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

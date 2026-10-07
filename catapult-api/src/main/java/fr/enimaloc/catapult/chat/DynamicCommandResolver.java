@@ -8,7 +8,7 @@ import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
 import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.service.GameContextService;
+import fr.enimaloc.catapult.service.binding.GameContextService;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;

@@ -8,7 +8,7 @@ import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.service.GameContextService;
+import fr.enimaloc.catapult.service.binding.GameContextService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

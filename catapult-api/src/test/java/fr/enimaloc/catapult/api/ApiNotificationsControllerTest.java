@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.common.dto.NotificationDto;
 import fr.enimaloc.catapult.common.dto.Severity;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.ChannelAccessService;
+import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.notification.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

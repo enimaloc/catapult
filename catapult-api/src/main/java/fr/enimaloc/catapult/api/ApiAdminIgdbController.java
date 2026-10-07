@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.service.IgdbService;
-import fr.enimaloc.catapult.service.IgdbService.IgdbGame;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.igdb.IgdbService.IgdbGame;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;

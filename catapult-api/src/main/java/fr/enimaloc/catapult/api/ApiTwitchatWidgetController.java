@@ -8,7 +8,7 @@ import fr.enimaloc.catapult.common.dto.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
-import fr.enimaloc.catapult.service.WidgetTokenService;
+import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;

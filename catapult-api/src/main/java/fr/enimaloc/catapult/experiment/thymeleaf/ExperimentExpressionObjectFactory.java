@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.experiment.thymeleaf;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.security.CatapultOAuth2User;
-import fr.enimaloc.catapult.service.ExperimentService;
+import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.thymeleaf.context.IExpressionContext;

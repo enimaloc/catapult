@@ -11,7 +11,7 @@ import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionReposito
 import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameDetailsRepository;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
-import fr.enimaloc.catapult.service.IgdbService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;

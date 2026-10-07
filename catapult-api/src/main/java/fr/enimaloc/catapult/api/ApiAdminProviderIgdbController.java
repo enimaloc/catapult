@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.api.provider.RawProviderResponseSupport;
 import fr.enimaloc.catapult.common.dto.AdminProviderIgdbQueryRequest;
-import fr.enimaloc.catapult.service.IgdbService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

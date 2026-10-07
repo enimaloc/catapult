@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.common.dto.DevIgdbQueryRequest;
 import fr.enimaloc.catapult.common.dto.ExplorerData;
 import fr.enimaloc.catapult.common.dto.QueryResult;
-import fr.enimaloc.catapult.service.IgdbService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

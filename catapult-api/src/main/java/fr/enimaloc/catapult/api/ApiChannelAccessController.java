@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.common.dto.ChannelAccessResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.ChannelAccessService;
+import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;

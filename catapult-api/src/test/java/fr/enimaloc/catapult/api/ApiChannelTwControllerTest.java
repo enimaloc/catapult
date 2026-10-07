@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
-import fr.enimaloc.catapult.service.BindingService;
+import fr.enimaloc.catapult.service.binding.BindingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.api.provider.RawProviderResponseSupport;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
-import fr.enimaloc.catapult.service.MinecraftTokenService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -147,7 +147,7 @@ class ApiAdminProviderMinecraftControllerTest {
         assertThat(result.status()).isEqualTo(200);
         org.mockito.ArgumentCaptor<Object> bodyCaptor = org.mockito.ArgumentCaptor.forClass(Object.class);
         org.mockito.Mockito.verify(postBodySpec).body(bodyCaptor.capture());
-        var sentBody = (fr.enimaloc.catapult.service.MinecraftService.PresenceUpdate) bodyCaptor.getValue();
+        var sentBody = (fr.enimaloc.catapult.service.minecraft.MinecraftService.PresenceUpdate) bodyCaptor.getValue();
         assertThat(sentBody.joinInfo().value()).isEqualTo("party-42");
     }
 }

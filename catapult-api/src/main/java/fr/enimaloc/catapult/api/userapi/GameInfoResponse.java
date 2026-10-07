@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.api.userapi;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonView;
-import fr.enimaloc.catapult.service.SteamStoreService;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
 
 import java.time.Instant;
 import java.util.*;

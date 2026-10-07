@@ -10,7 +10,7 @@ import fr.enimaloc.catapult.domain.access.AlphaInvite;
 import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.InviteService;
+import fr.enimaloc.catapult.service.access.InviteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;

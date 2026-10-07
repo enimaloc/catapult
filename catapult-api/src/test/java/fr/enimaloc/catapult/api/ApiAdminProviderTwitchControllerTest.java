@@ -5,7 +5,7 @@ import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.TwitchTokenService;
+import fr.enimaloc.catapult.service.twitch.TwitchTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

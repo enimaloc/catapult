@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.getter;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
-import fr.enimaloc.catapult.service.SteamStoreService;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
