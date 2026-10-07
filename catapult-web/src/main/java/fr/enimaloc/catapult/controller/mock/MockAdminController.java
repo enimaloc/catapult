@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.controller;
+package fr.enimaloc.catapult.controller.mock;
 
 import fr.enimaloc.catapult.common.dto.BindingDto;
 import fr.enimaloc.catapult.common.dto.GameDto;
@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -48,8 +47,8 @@ public class MockAdminController {
         model.addAttribute("steamRateLimited", data.isSteamRateLimited());
         model.addAttribute("steamOfflineMode", data.isSteamOfflineMode());
         model.addAttribute("steamProfileCacheTtlMinutes", data.getSteamProfileCacheTtlMinutes());
-        model.addAttribute("sourceTypes", List.of("STEAM", "XBOX", "MINECRAFT"));
-        model.addAttribute("bindingStatuses", List.of("AUTO", "MANUAL", "INCOMPLETE"));
+        model.addAttribute("sourceTypes", MockData.SOURCE_TYPES);
+        model.addAttribute("bindingStatuses", MockData.BINDING_STATUSES);
         model.addAttribute("availableCcls", MockData.AVAILABLE_CCLS);
         model.addAttribute("availableTws", MockData.AVAILABLE_TWS);
 
