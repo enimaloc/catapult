@@ -286,10 +286,14 @@ public class MockData {
     }
 
     public ChannelPageData getPage(String username, String status, String source) {
+        List<BindingDto> bindingDtos = binding.stream().filter(b ->
+                (status == null || status.equalsIgnoreCase(b.status()))
+                && (source == null || source.equalsIgnoreCase(b.sourceType()))
+        ).toList();
         return new ChannelPageData(
                 getChannelUser(), username, username.equals(channelDto.twitchUsername()),
                 channelDto.live(), botEnabled, gameDto,
-                new PagedBindings(0, binding.isEmpty() ? 0 : 1, binding.size(), binding),
+                new PagedBindings(0, bindingDtos.isEmpty() ? 0 : 1, bindingDtos.size(), bindingDtos),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
                 status, source, hasSteamProvider, hasSteam, hasSteamPersonalToken, steamTokenShared,
                 steamProfilePrivate, steamRateLimited, steamOfflineMode, steamProfileCacheTtlMinutes,
