@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.service.real;
 
-import fr.enimaloc.catapult.common.dto.ChannelListResponse;
-import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
-import fr.enimaloc.catapult.common.dto.LinkStateResponse;
-import fr.enimaloc.catapult.common.dto.SearchResponse;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
-import fr.enimaloc.catapult.common.dto.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

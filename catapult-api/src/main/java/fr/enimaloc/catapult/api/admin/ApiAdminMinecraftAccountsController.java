@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;

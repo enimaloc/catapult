@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.common.dto.ChatCommandSettingUpsertRequest;
-import fr.enimaloc.catapult.common.dto.SettingDto;
+import fr.enimaloc.catapult.common.dto.chatcommand.ChatCommandSettingUpsertRequest;
+import fr.enimaloc.catapult.common.dto.chatcommand.SettingDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;

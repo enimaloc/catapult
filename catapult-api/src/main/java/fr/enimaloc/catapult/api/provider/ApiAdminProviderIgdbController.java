@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api.provider;
 
-import fr.enimaloc.catapult.common.dto.AdminProviderIgdbQueryRequest;
+import fr.enimaloc.catapult.common.dto.admin.AdminProviderIgdbQueryRequest;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

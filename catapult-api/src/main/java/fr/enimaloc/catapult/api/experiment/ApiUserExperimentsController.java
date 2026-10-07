@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.experiment;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.common.dto.VariantResponse;
+import fr.enimaloc.catapult.common.dto.experiment.VariantResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import lombok.RequiredArgsConstructor;

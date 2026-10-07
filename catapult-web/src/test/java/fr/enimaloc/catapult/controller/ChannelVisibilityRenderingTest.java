@@ -1,13 +1,13 @@
 package fr.enimaloc.catapult.controller;
 
-import fr.enimaloc.catapult.common.dto.BindingDto;
-import fr.enimaloc.catapult.common.dto.ChannelPageData;
-import fr.enimaloc.catapult.common.dto.ChannelUserDto;
-import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
-import fr.enimaloc.catapult.common.dto.GameDto;
-import fr.enimaloc.catapult.common.dto.MinecraftData;
-import fr.enimaloc.catapult.common.dto.PagedBindings;
-import fr.enimaloc.catapult.common.dto.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
+import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
+import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.BeforeEach;

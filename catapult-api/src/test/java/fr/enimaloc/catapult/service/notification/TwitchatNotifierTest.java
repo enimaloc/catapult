@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.TwitchatAction;
-import fr.enimaloc.catapult.common.dto.TwitchatActionType;
-import fr.enimaloc.catapult.common.dto.TwitchatNotification;
-import fr.enimaloc.catapult.common.dto.TwitchatPresetPayload;
-import fr.enimaloc.catapult.common.dto.TwitchatRawAction;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatAction;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatNotification;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPresetPayload;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatRawAction;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;

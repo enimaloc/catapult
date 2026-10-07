@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.common.dto.ChannelPageData;
-import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
-import fr.enimaloc.catapult.common.dto.StatusData;
-import fr.enimaloc.catapult.common.dto.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.StatusData;
+import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.connections.ConnectionEventService;

@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;

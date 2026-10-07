@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.common.dto.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.metrics.CatapultApiMetrics;

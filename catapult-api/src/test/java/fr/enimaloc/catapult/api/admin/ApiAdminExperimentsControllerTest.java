@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.AssignRequest;
-import fr.enimaloc.catapult.common.dto.NpsStat;
+import fr.enimaloc.catapult.common.dto.admin.AssignRequest;
+import fr.enimaloc.catapult.common.dto.admin.NpsStat;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;

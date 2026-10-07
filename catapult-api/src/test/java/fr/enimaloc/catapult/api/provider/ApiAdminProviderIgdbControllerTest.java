@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api.provider;
 
-import fr.enimaloc.catapult.common.dto.AdminProviderIgdbQueryRequest;
+import fr.enimaloc.catapult.common.dto.admin.AdminProviderIgdbQueryRequest;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
