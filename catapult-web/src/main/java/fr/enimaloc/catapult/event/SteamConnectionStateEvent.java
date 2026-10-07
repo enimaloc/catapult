@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.ws.event;
+package fr.enimaloc.catapult.event;
 
 public record SteamConnectionStateEvent(String username, boolean connected, boolean rateLimited, boolean offline, boolean privateProfile) implements ChannelUpdatedEvent {
 }
