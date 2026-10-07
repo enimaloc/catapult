@@ -1,13 +1,13 @@
 package fr.enimaloc.catapult.controller.mock;
 
-import fr.enimaloc.catapult.common.dto.BindingDto;
-import fr.enimaloc.catapult.common.dto.GameDto;
-import fr.enimaloc.catapult.service.mock.MockApiService;
-import fr.enimaloc.catapult.service.mock.MockData;
-import fr.enimaloc.catapult.service.mock.MockPresets;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.GameChangedEvent;
 import fr.enimaloc.catapult.event.SteamConnectionStateEvent;
+import fr.enimaloc.catapult.service.mock.MockApiService;
+import fr.enimaloc.catapult.service.mock.MockData;
+import fr.enimaloc.catapult.service.mock.MockPresets;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;

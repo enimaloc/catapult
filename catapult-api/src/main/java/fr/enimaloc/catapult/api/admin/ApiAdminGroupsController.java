@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.AddMemberRequest;
-import fr.enimaloc.catapult.common.dto.CreateGroupRequest;
-import fr.enimaloc.catapult.common.dto.GroupSummary;
-import fr.enimaloc.catapult.common.dto.RenameRequest;
+import fr.enimaloc.catapult.common.dto.admin.AddMemberRequest;
+import fr.enimaloc.catapult.common.dto.admin.CreateGroupRequest;
+import fr.enimaloc.catapult.common.dto.admin.GroupSummary;
+import fr.enimaloc.catapult.common.dto.admin.RenameRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserGroup;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;

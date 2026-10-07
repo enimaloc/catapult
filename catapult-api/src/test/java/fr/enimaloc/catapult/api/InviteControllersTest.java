@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.api.admin.ApiAdminInviteController;
-import fr.enimaloc.catapult.common.dto.AdminInviteQuotaRequest;
-import fr.enimaloc.catapult.common.dto.GlobalSettingsRequest;
-import fr.enimaloc.catapult.common.dto.MemberDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminInviteQuotaRequest;
+import fr.enimaloc.catapult.common.dto.admin.GlobalSettingsRequest;
+import fr.enimaloc.catapult.common.dto.admin.MemberDto;
 import fr.enimaloc.catapult.domain.access.AlphaInvite;
 import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.account.UserAccount;

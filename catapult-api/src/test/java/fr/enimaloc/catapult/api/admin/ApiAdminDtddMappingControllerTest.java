@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.RejectRequest;
+import fr.enimaloc.catapult.common.dto.admin.RejectRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
 import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;

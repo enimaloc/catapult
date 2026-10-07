@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.SaveMappingsRequest;
+import fr.enimaloc.catapult.common.dto.admin.SaveMappingsRequest;
 import fr.enimaloc.catapult.domain.igdb.IgdbRatingDescriptor;
 import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;

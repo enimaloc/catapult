@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api.connect;
 
-import fr.enimaloc.catapult.common.dto.SteamStartResponse;
+import fr.enimaloc.catapult.common.dto.connect.SteamStartResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;

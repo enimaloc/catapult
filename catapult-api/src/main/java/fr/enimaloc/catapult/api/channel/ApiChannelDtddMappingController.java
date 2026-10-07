@@ -1,12 +1,12 @@
 package fr.enimaloc.catapult.api.channel;
 
-import fr.enimaloc.catapult.common.dto.MappingDto;
-import fr.enimaloc.catapult.common.dto.ProposalDto;
-import fr.enimaloc.catapult.common.dto.ProposeRequest;
-import fr.enimaloc.catapult.common.dto.SearchResponse;
-import fr.enimaloc.catapult.common.dto.SearchResultDto;
-import fr.enimaloc.catapult.common.dto.StatusResponse;
-import fr.enimaloc.catapult.common.dto.ValidateRequest;
+import fr.enimaloc.catapult.common.dto.channel.MappingDto;
+import fr.enimaloc.catapult.common.dto.channel.ProposalDto;
+import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
+import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.SearchResultDto;
+import fr.enimaloc.catapult.common.dto.channel.StatusResponse;
+import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;

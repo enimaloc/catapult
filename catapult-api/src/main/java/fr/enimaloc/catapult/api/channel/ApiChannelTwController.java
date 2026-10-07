@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.common.dto.SaveBody;
-import fr.enimaloc.catapult.common.dto.TwEnabledBody;
+import fr.enimaloc.catapult.common.dto.channel.SaveBody;
+import fr.enimaloc.catapult.common.dto.channel.TwEnabledBody;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import lombok.RequiredArgsConstructor;

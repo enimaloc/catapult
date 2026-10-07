@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.common.dto.ApplyRequest;
-import fr.enimaloc.catapult.common.dto.ModuleOverrideDto;
+import fr.enimaloc.catapult.common.dto.admin.ApplyRequest;
+import fr.enimaloc.catapult.common.dto.admin.ModuleOverrideDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.config.ConfigAudit;
 import fr.enimaloc.catapult.domain.config.ConfigOverride;

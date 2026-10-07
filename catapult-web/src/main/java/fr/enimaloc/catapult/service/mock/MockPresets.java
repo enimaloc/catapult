@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.service.mock;
 
-import fr.enimaloc.catapult.common.dto.BindingDto;
-import fr.enimaloc.catapult.common.dto.CclDto;
-import fr.enimaloc.catapult.common.dto.ChannelDto;
-import fr.enimaloc.catapult.common.dto.TwDto;
-import fr.enimaloc.catapult.common.dto.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.CclDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import fr.enimaloc.catapult.common.dto.channel.TwDto;
+import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;

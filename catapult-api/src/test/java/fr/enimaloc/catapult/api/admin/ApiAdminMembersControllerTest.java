@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.AddToGroupRequest;
-import fr.enimaloc.catapult.common.dto.FlagView;
-import fr.enimaloc.catapult.common.dto.MemberSummary;
-import fr.enimaloc.catapult.common.dto.MigrateRequest;
-import fr.enimaloc.catapult.common.dto.SetFlagRequest;
+import fr.enimaloc.catapult.common.dto.admin.AddToGroupRequest;
+import fr.enimaloc.catapult.common.dto.admin.FlagView;
+import fr.enimaloc.catapult.common.dto.admin.MemberSummary;
+import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
+import fr.enimaloc.catapult.common.dto.admin.SetFlagRequest;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserFlag;

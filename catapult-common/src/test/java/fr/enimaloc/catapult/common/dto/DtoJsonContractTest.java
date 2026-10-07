@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.common.dto;
 
+
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.ObjectMapper;
@@ -27,7 +28,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Every record in this package crosses the api/web boundary as JSON. Builds one fully populated
+ * Every record in this package (and its sub-packages) crosses the api/web boundary as JSON. Builds one fully populated
  * instance of each through its canonical constructor and checks that Jackson 3 (what both
  * modules use) writes it and reads back an equal value — catching records that can't be
  * deserialized, or whose JSON shape silently loses a field.
@@ -39,14 +40,16 @@ class DtoJsonContractTest {
     private final ObjectMapper json = JsonMapper.builder().build();
 
     static Stream<Class<?>> records() throws IOException, URISyntaxException {
-        URL root = BindingDto.class.getResource("BindingDto.class");
+        URL root = AppConfigResponse.class.getResource("AppConfigResponse.class");
         Path dir = Path.of(root.toURI()).getParent();
         List<Class<?>> records = new ArrayList<>();
-        try (Stream<Path> files = Files.list(dir)) {
+        try (Stream<Path> files = Files.walk(dir)) {
             for (Path file : (Iterable<Path>) files::iterator) {
-                String name = file.getFileName().toString();
-                if (!name.endsWith(".class")) continue;
-                Class<?> type = load(PACKAGE + "." + name.substring(0, name.length() - ".class".length()));
+                String relative = dir.relativize(file).toString();
+                if (!relative.endsWith(".class")) continue;
+                String simpleName = relative.substring(0, relative.length() - ".class".length())
+                    .replace(file.getFileSystem().getSeparator(), ".");
+                Class<?> type = load(PACKAGE + "." + simpleName);
                 if (type.isRecord()) records.add(type);
             }
         }

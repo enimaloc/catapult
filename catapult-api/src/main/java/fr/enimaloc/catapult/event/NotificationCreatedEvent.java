@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.event;
 
-import fr.enimaloc.catapult.common.dto.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 

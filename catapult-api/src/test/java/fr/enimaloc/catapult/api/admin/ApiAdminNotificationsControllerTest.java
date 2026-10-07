@@ -2,8 +2,8 @@ package fr.enimaloc.catapult.api.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.common.dto.NotificationDto;
-import fr.enimaloc.catapult.common.dto.Severity;
+import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.notification.Notification;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;

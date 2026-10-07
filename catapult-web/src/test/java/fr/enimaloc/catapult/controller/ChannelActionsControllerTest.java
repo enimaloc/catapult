@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
-import fr.enimaloc.catapult.common.dto.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.Test;
@@ -230,8 +230,8 @@ class ChannelActionsControllerTest {
 
     @Test
     void dtddSearch_returnsApiServiceResult() throws Exception {
-        when(apiService.dtddSearch("celeste")).thenReturn(new fr.enimaloc.catapult.common.dto.SearchResponse(
-                List.of(new fr.enimaloc.catapult.common.dto.SearchResultDto(4521L, "Celeste", "Video Game", null))));
+        when(apiService.dtddSearch("celeste")).thenReturn(new fr.enimaloc.catapult.common.dto.channel.SearchResponse(
+                List.of(new fr.enimaloc.catapult.common.dto.channel.SearchResultDto(4521L, "Celeste", "Video Game", null))));
 
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .get("/channel/dtdd-mapping/search").param("q", "celeste"))

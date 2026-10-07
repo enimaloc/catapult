@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.channel;
 
-import fr.enimaloc.catapult.common.dto.ChannelDto;
-import fr.enimaloc.catapult.common.dto.ChannelListResponse;
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;

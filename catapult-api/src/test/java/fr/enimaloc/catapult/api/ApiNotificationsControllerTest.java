@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.common.dto.NotificationDto;
-import fr.enimaloc.catapult.common.dto.Severity;
+import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;

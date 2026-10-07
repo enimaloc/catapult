@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.NotificationDto;
-import fr.enimaloc.catapult.common.dto.Severity;
+import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.event.NotificationAllReadEvent;
 import fr.enimaloc.catapult.event.NotificationCreatedEvent;
 import fr.enimaloc.catapult.event.NotificationDeletedEvent;

@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.ImpersonateRequest;
-import fr.enimaloc.catapult.common.dto.ImpersonateResponse;
+import fr.enimaloc.catapult.common.dto.admin.ImpersonateRequest;
+import fr.enimaloc.catapult.common.dto.admin.ImpersonateResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.JwtService;

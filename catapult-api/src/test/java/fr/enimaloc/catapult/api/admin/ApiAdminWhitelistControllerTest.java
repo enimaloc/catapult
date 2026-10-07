@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.AddRequest;
-import fr.enimaloc.catapult.common.dto.AdminWhitelistQuotaRequest;
-import fr.enimaloc.catapult.common.dto.AdminWhitelistRedemptionDto;
-import fr.enimaloc.catapult.common.dto.InviteSettingsRequest;
+import fr.enimaloc.catapult.common.dto.admin.AddRequest;
+import fr.enimaloc.catapult.common.dto.admin.AdminWhitelistQuotaRequest;
+import fr.enimaloc.catapult.common.dto.admin.AdminWhitelistRedemptionDto;
+import fr.enimaloc.catapult.common.dto.admin.InviteSettingsRequest;
 import fr.enimaloc.catapult.domain.access.AlphaInvite;
 import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.access.WhitelistEntry;

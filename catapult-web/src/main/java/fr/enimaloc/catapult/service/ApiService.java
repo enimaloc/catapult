@@ -1,6 +1,12 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.common.dto.*;
+import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
+import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 
 public interface ApiService {
     TokenResponse exchangeCode(String code);
