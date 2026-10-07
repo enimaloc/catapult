@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -40,11 +41,7 @@ public class ApiAdminMinecraftAccountsController {
 
     @GetMapping
     public List<AccountDto> list() {
-        return accountRepository.findAll().stream()
-                .map(a -> new AccountDto(a.getId(), a.getLabel(), a.getMinecraftUsername(),
-                        a.getFillOrder(), a.isFriendLimitReached(), a.isEnabled(),
-                        (int) linkRepository.countByServiceAccount(a)))
-                .toList();
+        return accountRepository.findAll().stream().map(this::toDto).toList();
     }
 
     @PostMapping("/device-code")
@@ -63,15 +60,11 @@ public class ApiAdminMinecraftAccountsController {
     /** 202 tant que l'admin n'a pas validé le code sur microsoft.com/link ; 200 + compte créé ensuite. */
     @PostMapping
     public ResponseEntity<?> create(@RequestBody Map<String, String> body) {
-        String deviceCode = body.get("deviceCode");
+        String deviceCode = requireDeviceCode(body);
         String label = body.getOrDefault("label", "Compte Minecraft");
-        if (deviceCode == null || deviceCode.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deviceCode requis");
-        }
-
         return msaAuthClient.pollDeviceCode(deviceCode)
                 .<ResponseEntity<?>>map(tokens -> ResponseEntity.ok(finalizeAccount(tokens, label)))
-                .orElseGet(() -> ResponseEntity.accepted().body(Map.of("status", "PENDING")));
+                .orElseGet(ApiAdminMinecraftAccountsController::pending);
     }
 
     private AccountDto finalizeAccount(MsaAuthClient.MsaTokens tokens, String label) {
@@ -86,8 +79,7 @@ public class ApiAdminMinecraftAccountsController {
         account.setUpdatedAt(Instant.now());
         MinecraftServiceAccount saved = accountRepository.save(account);
         log.info("Compte de service Minecraft enrôlé: {} ({})", saved.getLabel(), profile.minecraftUsername());
-        return new AccountDto(saved.getId(), saved.getLabel(), profile.minecraftUsername(), saved.getFillOrder(),
-                saved.isFriendLimitReached(), saved.isEnabled(), 0);
+        return toDto(saved, 0);
     }
 
     /**
@@ -98,16 +90,11 @@ public class ApiAdminMinecraftAccountsController {
      */
     @PostMapping("/{id}/reauth")
     public ResponseEntity<?> reauth(@PathVariable UUID id, @RequestBody Map<String, String> body) {
-        MinecraftServiceAccount account = accountRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compte inconnu"));
-        String deviceCode = body.get("deviceCode");
-        if (deviceCode == null || deviceCode.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deviceCode requis");
-        }
-
+        MinecraftServiceAccount account = findOrThrow(id);
+        String deviceCode = requireDeviceCode(body);
         return msaAuthClient.pollDeviceCode(deviceCode)
                 .<ResponseEntity<?>>map(tokens -> ResponseEntity.ok(reauthenticateAccount(account, tokens)))
-                .orElseGet(() -> ResponseEntity.accepted().body(Map.of("status", "PENDING")));
+                .orElseGet(ApiAdminMinecraftAccountsController::pending);
     }
 
     private AccountDto reauthenticateAccount(MinecraftServiceAccount account, MsaAuthClient.MsaTokens tokens) {
@@ -121,9 +108,7 @@ public class ApiAdminMinecraftAccountsController {
         tokenService.evict(account.getId());
         MinecraftServiceAccount saved = accountRepository.save(account);
         log.info("Compte de service Minecraft ré-authentifié: {} ({})", saved.getLabel(), profile.minecraftUsername());
-        return new AccountDto(saved.getId(), saved.getLabel(), profile.minecraftUsername(), saved.getFillOrder(),
-                saved.isFriendLimitReached(), saved.isEnabled(),
-                (int) linkRepository.countByServiceAccount(saved));
+        return toDto(saved);
     }
 
     private record ValidatedProfile(String rotatedRefreshTokenEncrypted, String minecraftUsername) {}
@@ -142,7 +127,7 @@ public class ApiAdminMinecraftAccountsController {
                 rotated = chain.get().rotatedRefreshTokenEncrypted();
                 username = minecraftService.getMinecraftProfileName(chain.get().minecraftToken());
             }
-        } catch (org.springframework.web.client.RestClientException e) {
+        } catch (RestClientException e) {
             log.warn("Validation du compte de service Minecraft en échec: {}", e.getMessage());
         }
         if (username == null) {
@@ -154,34 +139,23 @@ public class ApiAdminMinecraftAccountsController {
 
     @PatchMapping("/{id}")
     public AccountDto update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
-        MinecraftServiceAccount account = accountRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compte inconnu"));
+        MinecraftServiceAccount account = findOrThrow(id);
         if (body.containsKey("enabled")) {
-            if (!(body.get("enabled") instanceof Boolean))
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Type invalide pour enabled");
-            account.setEnabled((Boolean) body.get("enabled"));
+            account.setEnabled(field(body, "enabled", Boolean.class));
         }
         if (body.containsKey("friendLimitReached")) {
-            if (!(body.get("friendLimitReached") instanceof Boolean))
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Type invalide pour friendLimitReached");
-            account.setFriendLimitReached((Boolean) body.get("friendLimitReached"));
+            account.setFriendLimitReached(field(body, "friendLimitReached", Boolean.class));
         }
         if (body.containsKey("fillOrder")) {
-            if (!(body.get("fillOrder") instanceof Number))
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Type invalide pour fillOrder");
-            account.setFillOrder(((Number) body.get("fillOrder")).intValue());
+            account.setFillOrder(field(body, "fillOrder", Number.class).intValue());
         }
         account.setUpdatedAt(Instant.now());
-        MinecraftServiceAccount saved = accountRepository.save(account);
-        return new AccountDto(saved.getId(), saved.getLabel(), saved.getMinecraftUsername(),
-                saved.getFillOrder(), saved.isFriendLimitReached(), saved.isEnabled(),
-                (int) linkRepository.countByServiceAccount(saved));
+        return toDto(accountRepository.save(account));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
-        MinecraftServiceAccount account = accountRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compte inconnu"));
+        MinecraftServiceAccount account = findOrThrow(id);
         if (!linkRepository.findByServiceAccount(account).isEmpty()) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("error", "Des utilisateurs sont liés à ce compte"));
@@ -189,5 +163,41 @@ public class ApiAdminMinecraftAccountsController {
         tokenService.evict(account.getId());
         accountRepository.delete(account);
         return ResponseEntity.noContent().build();
+    }
+
+    private MinecraftServiceAccount findOrThrow(UUID id) {
+        return accountRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compte inconnu"));
+    }
+
+    private static String requireDeviceCode(Map<String, String> body) {
+        String deviceCode = body.get("deviceCode");
+        if (deviceCode == null || deviceCode.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deviceCode requis");
+        }
+        return deviceCode;
+    }
+
+    /** 202: the admin hasn't confirmed the device code on microsoft.com/link yet. */
+    private static ResponseEntity<?> pending() {
+        return ResponseEntity.accepted().body(Map.of("status", "PENDING"));
+    }
+
+    /** A PATCH field of the expected JSON type, 400 otherwise. */
+    private static <T> T field(Map<String, Object> body, String name, Class<T> type) {
+        Object value = body.get(name);
+        if (!type.isInstance(value)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Type invalide pour " + name);
+        }
+        return type.cast(value);
+    }
+
+    private AccountDto toDto(MinecraftServiceAccount account) {
+        return toDto(account, (int) linkRepository.countByServiceAccount(account));
+    }
+
+    private static AccountDto toDto(MinecraftServiceAccount account, int linkCount) {
+        return new AccountDto(account.getId(), account.getLabel(), account.getMinecraftUsername(),
+                account.getFillOrder(), account.isFriendLimitReached(), account.isEnabled(), linkCount);
     }
 }
