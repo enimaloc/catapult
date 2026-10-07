@@ -24,6 +24,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -135,7 +136,7 @@ public class ApiAdminMembersController {
      */
     @PostMapping("/{id}/promote-to-system")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public void promoteToSystem(@PathVariable UUID id) {
         UserAccount target = findOrThrow(id);
         if (target.isSystemAccount()) {
@@ -168,8 +169,7 @@ public class ApiAdminMembersController {
     @PostMapping("/{id}/flags")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void setFlag(@PathVariable UUID id, @RequestBody SetFlagRequest body) {
-        UserAccount user = userAccountRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        UserAccount user = findOrThrow(id);
         if (body.key() == null || body.key().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing key");
         }
@@ -187,17 +187,15 @@ public class ApiAdminMembersController {
     @PostMapping("/{id}/flags/{key}/delete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteFlag(@PathVariable UUID id, @PathVariable String key) {
-        UserAccount user = userAccountRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        UserAccount user = findOrThrow(id);
         userFlagRepository.findByUserAndFlagKey(user, key).ifPresent(userFlagRepository::delete);
     }
 
     @PostMapping("/{id}/groups")
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void addToGroup(@PathVariable UUID id, @RequestBody AddToGroupRequest body) {
-        UserAccount user = userAccountRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        UserAccount user = findOrThrow(id);
         UserGroup group = userGroupRepository.findByKey(body.groupKey())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
         group.getMembers().add(user);
@@ -205,7 +203,7 @@ public class ApiAdminMembersController {
     }
 
     @PostMapping("/{id}/groups/{groupId}/delete")
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeFromGroup(@PathVariable UUID id, @PathVariable UUID groupId) {
         UserGroup group = userGroupRepository.findById(groupId)
@@ -215,10 +213,9 @@ public class ApiAdminMembersController {
     }
 
     @GetMapping("/{id}/targeting")
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public MemberTargeting targeting(@PathVariable UUID id) {
-        UserAccount user = userAccountRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        UserAccount user = findOrThrow(id);
         List<FlagView> flags = userFlagRepository.findByUser(user).stream()
                 .map(f -> new FlagView(f.getFlagKey(), f.getFlagValue())).toList();
         List<String> groups = userGroupRepository.findAll().stream()
