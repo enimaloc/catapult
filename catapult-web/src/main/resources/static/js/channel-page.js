@@ -86,3 +86,23 @@ window.CatapultChannel = (function () {
         removeBinding
     };
 })();
+
+// Keeps the active #channel-tabs tab in location.hash. refresh() re-renders the whole
+// fragment without pushing a history entry, so the hash survives it and the restore
+// below lands back on the tab the user was on (e.g. after saving a settings card)
+// instead of resetting to the overview. Also makes each tab directly linkable.
+document.addEventListener("catapult:render", function () {
+    const tabs = document.getElementById("channel-tabs");
+    if (!tabs) return;
+
+    const wanted = location.hash.slice(1);
+    // Non-owners only get the overview tab: ignore a hash naming one they don't have.
+    if (wanted && tabs.querySelector(`mdui-tab[value="${CSS.escape(wanted)}"]`)) {
+        tabs.value = wanted;
+    }
+
+    tabs.addEventListener("change", () => {
+        const hash = tabs.value === "overview" ? "" : `#${tabs.value}`;
+        history.replaceState(history.state, "", location.pathname + location.search + hash);
+    });
+});
