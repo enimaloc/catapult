@@ -19,9 +19,23 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Thin wrapper over the IGDB SDK's singleton client. Every call runs under a lock on that
+ * singleton (its credentials are global state) and, apart from {@link #findSourcesByName},
+ * turns an IGDB failure into an empty result instead of an exception.
+ */
 @Slf4j
 @Component
 public class IgdbClient {
+
+    private static final String GAME_DETAILS_FIELDS = "id,name,slug,summary,first_release_date,websites.url,websites.category,external_games.uid,external_games.external_game_source.name"
+            + ",rating,aggregated_rating,platforms.name,dlcs.name,similar_games.name,genres.name"
+            + ",cover.url,screenshots.url,videos.video_id,game_modes.name,themes.name,player_perspectives.name"
+            + ",involved_companies.company.name,involved_companies.developer,involved_companies.publisher"
+            + ",involved_companies.supporting,involved_companies.porting"
+            + ",age_ratings.organization.name,age_ratings.rating,franchises.name,keywords.name";
+    private static final String GAME_PAGE_FIELDS =
+            "id,name,external_games.uid,external_games.external_game_source,age_ratings.id,age_ratings.category,age_ratings.rating";
 
     @Value("${app.igdb.client-id:}")
     private String clientId;
@@ -31,6 +45,12 @@ public class IgdbClient {
     @Autowired
     private ExternalApiObservations apiObservations;
 
+    /** One IGDB SDK endpoint call. */
+    @FunctionalInterface
+    interface IgdbCall<T> {
+        List<T> fetch(APICalypse query) throws RequestException;
+    }
+
     /**
      * Résout les sources externes par nom (ex: "Steam").
      * Propage RequestException — l'appelant gère l'erreur.
@@ -39,14 +59,10 @@ public class IgdbClient {
         long start = System.nanoTime();
         try {
             APICalypse query = new APICalypse().fields("id,name").where("name = \"" + name + "\"").limit(1);
-            log.debug("[IGDB] /external_game_sources — query: {}", query.buildQuery());
-            synchronized (IGDBWrapper.INSTANCE) {
-                setCredentialsIfChanged(token);
-                List<ExternalGameSource> results = ProtoRequestKt.externalGameSources(IGDBWrapper.INSTANCE, query);
-                log.debug("[IGDB] /external_game_sources — {} result(s)", results.size());
-                apiObservations.record("igdb", "find_sources_by_name", "success", "none", System.nanoTime() - start);
-                return results;
-            }
+            List<ExternalGameSource> results = fetch(token, "/external_game_sources", "", query,
+                    q -> ProtoRequestKt.externalGameSources(IGDBWrapper.INSTANCE, q));
+            apiObservations.record("igdb", "find_sources_by_name", "success", "none", System.nanoTime() - start);
+            return results;
         } catch (RequestException e) {
             apiObservations.record("igdb", "find_sources_by_name", "error", e.getClass().getSimpleName(), System.nanoTime() - start);
             throw e;
@@ -59,22 +75,10 @@ public class IgdbClient {
      */
     public List<ExternalGame> findExternalGameByUid(String uid, long sourceId, String token) {
         return apiObservations.observe("igdb", "find_external_game_by_uid", () -> {
-            String where = sourceId >= 0
-                ? "external_game_source=" + sourceId + " & uid=\"" + uid + "\""
-                : "uid=\"" + uid + "\"";
-            APICalypse query = new APICalypse().fields("uid,game.id,game.name").where(where).limit(1);
-            log.debug("[IGDB] /external_games uid={} — query: {}", uid, query.buildQuery());
-            try {
-                synchronized (IGDBWrapper.INSTANCE) {
-                    setCredentialsIfChanged(token);
-                    List<ExternalGame> results = ProtoRequestKt.externalGames(IGDBWrapper.INSTANCE, query);
-                    log.debug("[IGDB] /external_games uid={} — {} result(s)", uid, results.size());
-                    return results;
-                }
-            } catch (RequestException e) {
-                log.error("[IGDB] /external_games uid={} failed: {}", uid, e.getMessage());
-                return List.of();
-            }
+            APICalypse query = new APICalypse().fields("uid,game.id,game.name")
+                    .where(sourceFilter(sourceId) + "uid=\"" + uid + "\"").limit(1);
+            return fetchOrEmpty(token, "/external_games", "uid=" + uid, query,
+                    q -> ProtoRequestKt.externalGames(IGDBWrapper.INSTANCE, q));
         });
     }
 
@@ -85,25 +89,11 @@ public class IgdbClient {
     public List<ExternalGame> findExternalGamesByUids(List<String> uids, long sourceId, String token) {
         if (uids.isEmpty()) return List.of();
         return apiObservations.observe("igdb", "find_external_games_by_uids", () -> {
-            String uidList = uids.stream()
-                .map(u -> "\"" + u + "\"")
-                .collect(Collectors.joining(",", "(", ")"));
-            String where = sourceId >= 0
-                ? "external_game_source=" + sourceId + " & uid=" + uidList
-                : "uid=" + uidList;
-            APICalypse query = new APICalypse().fields("uid,game.id,game.name").where(where).limit(uids.size());
-            log.debug("[IGDB] /external_games batch ({}) — query: {}", uids.size(), query.buildQuery());
-            try {
-                synchronized (IGDBWrapper.INSTANCE) {
-                    setCredentialsIfChanged(token);
-                    List<ExternalGame> results = ProtoRequestKt.externalGames(IGDBWrapper.INSTANCE, query);
-                    log.debug("[IGDB] /external_games batch — {} result(s)", results.size());
-                    return results;
-                }
-            } catch (RequestException e) {
-                log.error("[IGDB] /external_games batch failed: {}", e.getMessage());
-                return List.of();
-            }
+            String uidList = uids.stream().map(u -> "\"" + u + "\"").collect(Collectors.joining(",", "(", ")"));
+            APICalypse query = new APICalypse().fields("uid,game.id,game.name")
+                    .where(sourceFilter(sourceId) + "uid=" + uidList).limit(uids.size());
+            return fetchOrEmpty(token, "/external_games", "batch (" + uids.size() + ")", query,
+                    q -> ProtoRequestKt.externalGames(IGDBWrapper.INSTANCE, q));
         });
     }
 
@@ -114,21 +104,11 @@ public class IgdbClient {
         return apiObservations.observe("igdb", "find_by_windows_executable", () -> {
             String name = exeName.replaceAll("(?i)\\.exe$", "").replace("_", " ").replace("-", " ").trim();
             APICalypse query = new APICalypse()
-                .fields("name,game.id,game.name")
-                .where("name ~ \"" + name.replace("\"", "\\\"") + "\"")
-                .limit(1);
-            log.debug("[IGDB] /alternative_names exe={} — query: {}", exeName, query.buildQuery());
-            try {
-                synchronized (IGDBWrapper.INSTANCE) {
-                    setCredentialsIfChanged(token);
-                    List<AlternativeName> results = ProtoRequestKt.alternativeNames(IGDBWrapper.INSTANCE, query);
-                    log.debug("[IGDB] /alternative_names exe={} — {} result(s)", exeName, results.size());
-                    return results;
-                }
-            } catch (RequestException e) {
-                log.error("[IGDB] /alternative_names exe={} failed: {}", exeName, e.getMessage());
-                return List.of();
-            }
+                    .fields("name,game.id,game.name")
+                    .where("name ~ \"" + name.replace("\"", "\\\"") + "\"")
+                    .limit(1);
+            return fetchOrEmpty(token, "/alternative_names", "exe=" + exeName, query,
+                    q -> ProtoRequestKt.alternativeNames(IGDBWrapper.INSTANCE, q));
         });
     }
 
@@ -138,18 +118,7 @@ public class IgdbClient {
     public List<Game> searchByName(String name, String token) {
         return apiObservations.observe("igdb", "search_by_name", () -> {
             APICalypse query = new APICalypse().search(name).fields("id,name").limit(5);
-            log.debug("[IGDB] /games search — query: {}", query.buildQuery());
-            try {
-                synchronized (IGDBWrapper.INSTANCE) {
-                    setCredentialsIfChanged(token);
-                    List<Game> results = ProtoRequestKt.games(IGDBWrapper.INSTANCE, query);
-                    log.debug("[IGDB] /games search — {} result(s)", results.size());
-                    return results;
-                }
-            } catch (RequestException e) {
-                log.error("[IGDB] /games search failed for '{}': {}", name, e.getMessage());
-                return List.of();
-            }
+            return fetchOrEmpty(token, "/games", "search '" + name + "'", query, IgdbClient::games);
         });
     }
 
@@ -161,18 +130,7 @@ public class IgdbClient {
         return apiObservations.observe("igdb", "fetch_games_by_ids", () -> {
             String idList = igdbIds.stream().collect(Collectors.joining(",", "(", ")"));
             APICalypse query = new APICalypse().fields(fields).where("id=" + idList).limit(igdbIds.size());
-            log.debug("[IGDB] /games batch ({}) — query: {}", igdbIds.size(), query.buildQuery());
-            try {
-                synchronized (IGDBWrapper.INSTANCE) {
-                    setCredentialsIfChanged(token);
-                    List<Game> results = ProtoRequestKt.games(IGDBWrapper.INSTANCE, query);
-                    log.debug("[IGDB] /games batch — {} result(s)", results.size());
-                    return results;
-                }
-            } catch (RequestException e) {
-                log.error("[IGDB] /games batch failed: {}", e.getMessage());
-                return List.of();
-            }
+            return fetchOrEmpty(token, "/games", "batch (" + igdbIds.size() + ")", query, IgdbClient::games);
         });
     }
 
@@ -182,18 +140,7 @@ public class IgdbClient {
     public List<Game> fetchGameById(String igdbId, String fields, String token) {
         return apiObservations.observe("igdb", "fetch_game_by_id", () -> {
             APICalypse query = new APICalypse().fields(fields).where("id=" + Long.parseLong(igdbId)).limit(1);
-            log.debug("[IGDB] /games by id — query: {}", query.buildQuery());
-            try {
-                synchronized (IGDBWrapper.INSTANCE) {
-                    setCredentialsIfChanged(token);
-                    List<Game> results = ProtoRequestKt.games(IGDBWrapper.INSTANCE, query);
-                    log.debug("[IGDB] /games by id — {} result(s)", results.size());
-                    return results;
-                }
-            } catch (RequestException e) {
-                log.error("[IGDB] /games by id failed for {}: {}", igdbId, e.getMessage());
-                return List.of();
-            }
+            return fetchOrEmpty(token, "/games", "id=" + igdbId, query, IgdbClient::games);
         });
     }
 
@@ -203,25 +150,9 @@ public class IgdbClient {
      */
     public Optional<Game> fetchGameDetails(String igdbId, String token) {
         return apiObservations.observe("igdb", "fetch_game_details", () -> {
-            String fields = "id,name,slug,summary,first_release_date,websites.url,websites.category,external_games.uid,external_games.external_game_source.name"
-                + ",rating,aggregated_rating,platforms.name,dlcs.name,similar_games.name,genres.name"
-                + ",cover.url,screenshots.url,videos.video_id,game_modes.name,themes.name,player_perspectives.name"
-                + ",involved_companies.company.name,involved_companies.developer,involved_companies.publisher"
-                + ",involved_companies.supporting,involved_companies.porting"
-                + ",age_ratings.organization.name,age_ratings.rating,franchises.name,keywords.name";
-            APICalypse query = new APICalypse().fields(fields).where("id = " + Long.parseLong(igdbId)).limit(1);
-            log.debug("[IGDB] /games details id={} — query: {}", igdbId, query.buildQuery());
-            try {
-                synchronized (IGDBWrapper.INSTANCE) {
-                    setCredentialsIfChanged(token);
-                    List<Game> results = ProtoRequestKt.games(IGDBWrapper.INSTANCE, query);
-                    log.debug("[IGDB] /games details id={} — {} result(s)", igdbId, results.size());
-                    return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
-                }
-            } catch (RequestException e) {
-                log.error("[IGDB] /games details failed for {}: {}", igdbId, e.getMessage());
-                return Optional.empty();
-            }
+            APICalypse query = new APICalypse().fields(GAME_DETAILS_FIELDS).where("id = " + Long.parseLong(igdbId)).limit(1);
+            return fetchOrEmpty(token, "/games", "details id=" + igdbId, query, IgdbClient::games)
+                    .stream().findFirst();
         });
     }
 
@@ -231,23 +162,44 @@ public class IgdbClient {
     public List<Game> fetchGamePage(int limit, int offset, String token) {
         return apiObservations.observe("igdb", "fetch_game_page", () -> {
             APICalypse query = new APICalypse()
-                .fields("id,name,external_games.uid,external_games.external_game_source,age_ratings.id,age_ratings.category,age_ratings.rating")
-                .sort("aggregated_rating", Sort.DESCENDING)
-                .limit(limit)
-                .offset(offset);
-            log.debug("[IGDB] /games page — query: {}", query.buildQuery());
-            try {
-                synchronized (IGDBWrapper.INSTANCE) {
-                    setCredentialsIfChanged(token);
-                    List<Game> results = ProtoRequestKt.games(IGDBWrapper.INSTANCE, query);
-                    log.debug("[IGDB] /games page — {} result(s)", results.size());
-                    return results;
-                }
-            } catch (RequestException e) {
-                log.error("[IGDB] /games page failed (limit={}, offset={}): {}", limit, offset, e.getMessage());
-                return List.of();
-            }
+                    .fields(GAME_PAGE_FIELDS)
+                    .sort("aggregated_rating", Sort.DESCENDING)
+                    .limit(limit)
+                    .offset(offset);
+            return fetchOrEmpty(token, "/games", "page (limit=" + limit + ", offset=" + offset + ")", query,
+                    IgdbClient::games);
         });
+    }
+
+    private static List<Game> games(APICalypse query) throws RequestException {
+        return ProtoRequestKt.games(IGDBWrapper.INSTANCE, query);
+    }
+
+    /** {@code "external_game_source=<id> & "} when filtering by source, nothing otherwise. */
+    private static String sourceFilter(long sourceId) {
+        return sourceId >= 0 ? "external_game_source=" + sourceId + " & " : "";
+    }
+
+    /** Runs {@code call} on the shared SDK client, logged; propagates IGDB failures. */
+    private <T> List<T> fetch(String token, String endpoint, String context, APICalypse query, IgdbCall<T> call)
+            throws RequestException {
+        log.debug("[IGDB] {} {} — query: {}", endpoint, context, query.buildQuery());
+        synchronized (IGDBWrapper.INSTANCE) {
+            setCredentialsIfChanged(token);
+            List<T> results = call.fetch(query);
+            log.debug("[IGDB] {} {} — {} result(s)", endpoint, context, results.size());
+            return results;
+        }
+    }
+
+    /** {@link #fetch}, logging an IGDB failure and returning no results instead. */
+    private <T> List<T> fetchOrEmpty(String token, String endpoint, String context, APICalypse query, IgdbCall<T> call) {
+        try {
+            return fetch(token, endpoint, context, query, call);
+        } catch (RequestException e) {
+            log.error("[IGDB] {} {} failed: {}", endpoint, context, e.getMessage());
+            return List.of();
+        }
     }
 
     /** Appelé à l'intérieur d'un bloc synchronized(IGDBWrapper.INSTANCE). */
