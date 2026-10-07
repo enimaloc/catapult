@@ -76,6 +76,15 @@ public sealed interface BroadcastRequestDto
     @JsonIgnore
     Map<String, Object> data();
 
+    /** Ordered {@code data()} map from alternating keys and values; values may be null. */
+    private static Map<String, Object> orderedData(Object... keysAndValues) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        for (int i = 0; i < keysAndValues.length; i += 2) {
+            data.put((String) keysAndValues[i], keysAndValues[i + 1]);
+        }
+        return data;
+    }
+
     // ── Subtypes ─────────────────────────────────────────────────────────────
 
     record MaintenanceScheduled(
@@ -85,11 +94,7 @@ public sealed interface BroadcastRequestDto
     ) implements BroadcastRequestDto {
         @Override public String name() { return "maintenance.scheduled"; }
         @Override public Map<String, Object> data() {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("startsAt", startsAt);
-            m.put("durationMinutes", durationMinutes);
-            m.put("message", message);
-            return m;
+            return BroadcastRequestDto.orderedData("startsAt", startsAt, "durationMinutes", durationMinutes, "message", message);
         }
     }
 
@@ -99,10 +104,7 @@ public sealed interface BroadcastRequestDto
     ) implements BroadcastRequestDto {
         @Override public String name() { return "maintenance.cancelled"; }
         @Override public Map<String, Object> data() {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("originalStartsAt", originalStartsAt);
-            m.put("reason", reason);
-            return m;
+            return BroadcastRequestDto.orderedData("originalStartsAt", originalStartsAt, "reason", reason);
         }
     }
 
@@ -112,10 +114,7 @@ public sealed interface BroadcastRequestDto
     ) implements BroadcastRequestDto {
         @Override public String name() { return "version.deployed"; }
         @Override public Map<String, Object> data() {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("version", version);
-            m.put("promptReload", promptReload);
-            return m;
+            return BroadcastRequestDto.orderedData("version", version, "promptReload", promptReload);
         }
     }
 
@@ -126,11 +125,7 @@ public sealed interface BroadcastRequestDto
     ) implements BroadcastRequestDto {
         @Override public String name() { return "alert.info"; }
         @Override public Map<String, Object> data() {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("title", title);
-            m.put("body", body);
-            m.put("ttlSeconds", ttlSeconds);
-            return m;
+            return BroadcastRequestDto.orderedData("title", title, "body", body, "ttlSeconds", ttlSeconds);
         }
     }
 
@@ -141,11 +136,7 @@ public sealed interface BroadcastRequestDto
     ) implements BroadcastRequestDto {
         @Override public String name() { return "alert.warning"; }
         @Override public Map<String, Object> data() {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("title", title);
-            m.put("body", body);
-            m.put("ttlSeconds", ttlSeconds);
-            return m;
+            return BroadcastRequestDto.orderedData("title", title, "body", body, "ttlSeconds", ttlSeconds);
         }
     }
 }
