@@ -101,3 +101,28 @@ springBoot {
         }
     }
 }
+
+/*
+ * Browser-script unit tests (Vitest + jsdom, see vitest.config.js), part of `check`.
+ */
+val npmInstall by tasks.registering(Exec::class) {
+    description = "Installs the JS test toolchain from package-lock.json."
+    inputs.file("package-lock.json")
+    outputs.dir("node_modules")
+    commandLine("npm", "ci", "--no-fund", "--no-audit")
+}
+
+val jsTest by tasks.registering(Exec::class) {
+    description = "Runs the browser-script unit tests with coverage."
+    group = "verification"
+    dependsOn(npmInstall)
+    inputs.files("vitest.config.js", "package-lock.json")
+    inputs.dir("src/main/resources/static/js")
+    inputs.dir("src/test/js")
+    outputs.dir(layout.buildDirectory.dir("reports/js-coverage"))
+    commandLine("npx", "vitest", "run", "--coverage")
+}
+
+tasks.named("check") {
+    dependsOn(jsTest)
+}
