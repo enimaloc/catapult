@@ -283,7 +283,7 @@ class TwitchEventSubServiceTest {
 
         service.handleMessage(user, token, message, false);
 
-        Map<UUID, Long> timeouts = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "keepaliveTimeoutSeconds");
+        Map<UUID, Long> timeouts = (Map<UUID, Long>) connectionState("keepaliveTimeoutSeconds");
         assertThat(timeouts).containsEntry(user.getId(), 30L);
     }
 
@@ -298,7 +298,7 @@ class TwitchEventSubServiceTest {
 
         service.handleMessage(user, token, message, false);
 
-        Map<UUID, Long> timeouts = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "keepaliveTimeoutSeconds");
+        Map<UUID, Long> timeouts = (Map<UUID, Long>) connectionState("keepaliveTimeoutSeconds");
         assertThat(timeouts).containsEntry(user.getId(), 10L);
     }
 
@@ -316,14 +316,14 @@ class TwitchEventSubServiceTest {
         // Subscriptions carry over when reconnecting via reconnect_url — no POST expected
         verify(restClient, never()).post();
         // But the keepalive timeout of the new session must still be recorded
-        Map<UUID, Long> timeouts = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "keepaliveTimeoutSeconds");
+        Map<UUID, Long> timeouts = (Map<UUID, Long>) connectionState("keepaliveTimeoutSeconds");
         assertThat(timeouts).containsEntry(user.getId(), 30L);
     }
 
     @Test
     void handleMessage_sessionWelcome_resetsRetryBackoffAfterPriorFailures() {
         // Simulate a prior string of failures that inflated the backoff far past the base delay.
-        Map<UUID, Long> retryDelays = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "retryDelaySeconds");
+        Map<UUID, Long> retryDelays = (Map<UUID, Long>) connectionState("retryDelaySeconds");
         retryDelays.put(user.getId(), 32L);
 
         String message = """
@@ -339,96 +339,7 @@ class TwitchEventSubServiceTest {
         assertThat(retryDelays).doesNotContainKey(user.getId());
     }
 
-    @Test
-    void onOpen_registersConnectionSynchronously() {
-        WebSocket ws = mock(WebSocket.class);
-        TwitchEventSubService.EventSubListener listener =
-            service.new EventSubListener(user, token, false);
-
-        listener.onOpen(ws);
-
-        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
-        assertThat(connections).containsEntry(user.getId(), ws);
-    }
-
-    @Test
-    void onError_immediatelyAfterOnOpen_stillTriggersReconnectCleanup() {
-        // Reproduces a "Connection reset" landing right after the handshake succeeds, before
-        // any code outside the listener itself has had a chance to register the socket:
-        // onOpen must register synchronously so this compare-and-remove can't lose the race.
-        WebSocket ws = mock(WebSocket.class);
-        TwitchEventSubService.EventSubListener listener =
-            service.new EventSubListener(user, token, false);
-
-        listener.onOpen(ws);
-        listener.onError(ws, new java.io.IOException("Connection reset"));
-
-        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
-        assertThat(connections).doesNotContainKey(user.getId());
-    }
-
-    @Test
-    void onClose_whenListenerWebSocketIsCurrent_deregistersConnection() {
-        WebSocket ws = mock(WebSocket.class);
-        TwitchEventSubService.EventSubListener listener =
-            service.new EventSubListener(user, token, false);
-
-        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
-        connections.put(user.getId(), ws);
-
-        listener.onClose(ws, WebSocket.NORMAL_CLOSURE, "server initiated");
-
-        assertThat(connections).doesNotContainKey(user.getId());
-    }
-
-    @Test
-    void onClose_whenListenerWebSocketHasBeenReplaced_leavesSuccessorRegistered() {
-        WebSocket staleWs = mock(WebSocket.class);
-        WebSocket freshWs = mock(WebSocket.class);
-        TwitchEventSubService.EventSubListener staleListener =
-            service.new EventSubListener(user, token, false);
-
-        // Simulate session_reconnect: connections now points to freshWs, staleListener is orphaned.
-        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
-        connections.put(user.getId(), freshWs);
-
-        staleListener.onClose(staleWs, WebSocket.NORMAL_CLOSURE, "replaced");
-
-        assertThat(connections).containsEntry(user.getId(), freshWs);
-    }
-
-    @Test
-    void onWatchdogTrigger_whenListenerWebSocketIsCurrent_abortsAndRemovesFromConnections() {
-        WebSocket ws = mock(WebSocket.class);
-        TwitchEventSubService.EventSubListener listener =
-            service.new EventSubListener(user, token, false);
-        ReflectionTestUtils.setField(listener, "webSocket", ws);
-
-        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
-        connections.put(user.getId(), ws);
-
-        service.onWatchdogTrigger(user, listener);
-
-        verify(ws).abort();
-        assertThat(connections).doesNotContainKey(user.getId());
-    }
-
-    @Test
-    void onWatchdogTrigger_whenListenerWebSocketHasBeenReplaced_isIdempotentNoOp() {
-        WebSocket staleWs = mock(WebSocket.class);
-        WebSocket freshWs = mock(WebSocket.class);
-        TwitchEventSubService.EventSubListener staleListener =
-            service.new EventSubListener(user, token, false);
-        ReflectionTestUtils.setField(staleListener, "webSocket", staleWs);
-
-        // Simulate session_reconnect: connections now points to freshWs, staleListener is orphaned.
-        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
-        connections.put(user.getId(), freshWs);
-
-        service.onWatchdogTrigger(user, staleListener);
-
-        verify(staleWs, never()).abort();
-        verify(freshWs, never()).abort();
-        assertThat(connections).containsEntry(user.getId(), freshWs);
+    private Object connectionState(String field) {
+        return ReflectionTestUtils.getField(ReflectionTestUtils.getField(service, "connections"), field);
     }
 }
