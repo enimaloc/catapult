@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -118,7 +117,7 @@ public class MockApiService implements ApiService {
     @Override
     public Object searchGames(String username, String q) {
         log.trace("searchGames({}, {})", username, q);
-        return Arrays.stream(MockData.CATEGORIES_DTO)
+        return MockPresets.CATEGORIES.stream()
                 .filter(dto -> dto.name().toLowerCase().contains(q.toLowerCase()))
                 .map(dto -> Map.of("id", dto.id(), "name", dto.name()))
                 .limit(10)
