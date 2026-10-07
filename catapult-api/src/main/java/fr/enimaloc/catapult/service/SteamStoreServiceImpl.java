@@ -37,6 +37,9 @@ public class SteamStoreServiceImpl implements SteamStoreService {
 
     private static final java.time.Duration PARENT_CACHE_TTL = java.time.Duration.ofDays(30);
 
+    /** One app's entry in an {@code appdetails} response, keyed by appId. */
+    record AppDetailsEntry(boolean success, SteamStorePage data) {}
+
     @Override
     public Map<String, Set<String>> fetchCcls(Collection<String> appIds) {
         if (appIds.isEmpty()) return Map.of();
@@ -44,10 +47,12 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             try {
                 Map<String, Set<String>> result = new HashMap<>();
                 for (String appId : appIds) {
-                    Optional<SteamStorePage> pageOpt = fetchData(appId, Locale.ENGLISH);
-                    if (pageOpt.isEmpty()) return Map.of();
-                    SteamStorePage page = pageOpt.get();
-                    result.put(appId, extractCcls(page));
+                    // An app Steam doesn't resolve is skipped, not fatal for the others;
+                    // apps without any matching descriptor get no entry at all.
+                    fetchData(appId, Locale.ENGLISH)
+                            .map(SteamStoreServiceImpl::extractCcls)
+                            .filter(ccls -> !ccls.isEmpty())
+                            .ifPresent(ccls -> result.put(appId, ccls));
                 }
                 log.debug("Steam store fetch for {} appIds: {} had rating data", appIds.size(), result.size());
                 return result;
@@ -59,18 +64,19 @@ public class SteamStoreServiceImpl implements SteamStoreService {
         });
     }
 
-    @SuppressWarnings("unchecked")
-    private Set<String> extractCcls(SteamStorePage data) {
+    private static Set<String> extractCcls(SteamStorePage data) {
         Set<String> ccls = new HashSet<>();
         SteamStorePage.Ratings ratings = data.ratings();
-
         if (ratings == null) return ccls;
+
         for (SteamStorePage.Ratings.Rating entry : ratings.entries()) {
-            KEYWORDS.forEach((id, keyword) -> {
-                if (keyword.stream().anyMatch(entry.descriptors()::contains)) ccls.add(id);
+            // Steam writes descriptors in title case ("Blood and Gore"); keywords are lowercase.
+            String descriptors = Objects.requireNonNullElse(entry.descriptors(), "").toLowerCase(Locale.ROOT);
+            if (descriptors.isBlank()) continue;
+            KEYWORDS.forEach((id, keywords) -> {
+                if (keywords.stream().anyMatch(descriptors::contains)) ccls.add(id);
             });
         }
-
         return ccls;
     }
 
@@ -81,10 +87,8 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             try {
                 Map<String, SteamTwSignals> result = new HashMap<>();
                 for (String appId : appIds) {
-                    Optional<SteamStorePage> pageOpt = fetchData(appId, Locale.ENGLISH);
-                    if (pageOpt.isEmpty()) return Map.of();
-                    SteamStorePage page = pageOpt.get();
-                    result.put(appId, extractTwSignals(page));
+                    fetchData(appId, Locale.ENGLISH)
+                            .ifPresent(page -> result.put(appId, extractTwSignals(page)));
                 }
                 return result;
 
@@ -96,18 +100,18 @@ public class SteamStoreServiceImpl implements SteamStoreService {
     }
 
     /** Package-private for unit testing. */
-    @SuppressWarnings("unchecked")
     static SteamTwSignals extractTwSignals(SteamStorePage data) {
         SteamStorePage.ContentDescriptors cd = data.contentDescriptors();
         if (cd == null) return SteamTwSignals.empty();
         Set<Integer> ids = new HashSet<>();
-        for (int id : cd.ids()) ids.add(id);
+        if (cd.ids() != null) {
+            for (int id : cd.ids()) ids.add(id);
+        }
         String notes = (cd.note() != null ? cd.note() : "").toLowerCase(Locale.ROOT);
         return new SteamTwSignals(ids, notes);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Optional<ResolvedParentApp> resolveEffectiveApp(String appId) {
         return apiObservations.observe("steam_store", "resolve_effective_app", () -> {
             Optional<SteamAppParentEntry> fresh = findCached(appId)
@@ -153,7 +157,6 @@ public class SteamStoreServiceImpl implements SteamStoreService {
         });
     }
 
-    @SuppressWarnings("unchecked")
     private Optional<ResolvedParentApp> extractFullGame(SteamStorePage data) {
         SteamStorePage.FullGame fullgame = data.fullgame();
         if (fullgame == null || fullgame.appid() == null) return Optional.empty();
@@ -181,7 +184,6 @@ public class SteamStoreServiceImpl implements SteamStoreService {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Optional<String> fetchDescription(String appId, Locale locale) {
         return apiObservations.observe("steam_store", "fetch_description", () -> {
             String effectiveAppId = resolveEffectiveApp(appId)
@@ -207,14 +209,14 @@ public class SteamStoreServiceImpl implements SteamStoreService {
                     .map(ResolvedParentApp::appId)
                     .orElse(appId) : appId;
             SteamLanguage lang = SteamLanguage.fromLocale(locale);
-            record ResponseData(boolean success, SteamStorePage data) {}
             try {
-                Map<String, ResponseData> response = restClient.get()
+                Map<String, AppDetailsEntry> response = restClient.get()
                         .uri(APP_DETAILS_URL + "?appids=" + effectiveAppId + "&l=" + lang)
                         .retrieve()
                         .body(new ParameterizedTypeReference<>() {});
-                if (response == null || !response.get(effectiveAppId).success()) return Optional.empty();
-                return Optional.ofNullable(response.get(effectiveAppId).data());
+                AppDetailsEntry entry = response == null ? null : response.get(effectiveAppId);
+                if (entry == null || !entry.success()) return Optional.empty();
+                return Optional.ofNullable(entry.data());
             } catch (Exception e) {
                 log.warn("Steam fetchData failed for appId={}: {}", appId, e.getMessage(), e);
                 return Optional.empty();
