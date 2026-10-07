@@ -159,7 +159,7 @@ public interface SteamStoreService {
         @JsonIgnoreProperties(ignoreUnknown = true)
         public record SupportInfo(String url, String email) {}
         @JsonIgnoreProperties(ignoreUnknown = true)
-        public record ContentDescriptors(int[] ids, String note) {}
+        public record ContentDescriptors(int[] ids, @JsonAlias("notes") String note) {}
         @JsonIgnoreProperties(ignoreUnknown = true)
         public record Ratings(
                 Rating esrb, Rating pegi, Rating bbfc, Rating usk, Rating cero, Rating kggrb, Rating fpb, Rating csrr,
