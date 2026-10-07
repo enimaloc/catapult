@@ -144,6 +144,10 @@ public class MockData {
     @Getter
     private boolean hasMinecraftProvider;
     private LinkStateResponse minecraftLink;
+    @Getter
+    private boolean hasObsProvider;
+    @Getter
+    private ObsData obsData;
     @Setter
     @Getter
     private boolean botEnabled;
@@ -172,7 +176,8 @@ public class MockData {
                 id == 0 ? List.of(CHANNEL_DTOS) : List.of(),
                 true, true, true, false, false, false, false,
                 false, false, true,
-                new LinkStateResponse("NONE", null, null));
+                new LinkStateResponse("NONE", null, null),
+                true, new ObsData(true, "127.0.0.1", 4455, true));
     }
 
     private static MockData fromConfig(MockConfig c) {
@@ -203,7 +208,8 @@ public class MockData {
         MockData data = new MockData(channel, bindings, settings, List.of(),
                 true, c.steam.connected, c.steam.hasPersonalToken, c.steam.tokenShared,
                 c.steam.profilePrivate, c.steam.rateLimited, c.steam.offlineMode,
-                true, c.xbox.connected, true, minecraft);
+                true, c.xbox.connected, true, minecraft, true,
+                new ObsData(true, "127.0.0.1", 4455, true));
         data.setBotEnabled(c.botEnabled);
         return data;
     }
@@ -213,7 +219,7 @@ public class MockData {
                     boolean hasSteamProvider, boolean hasSteam, boolean hasSteamPersonalToken,
                     boolean steamTokenShared, boolean steamProfilePrivate, boolean steamRateLimited,
                     boolean steamOfflineMode, boolean hasXboxProvider, boolean hasXbox, boolean hasMinecraftProvider,
-                    LinkStateResponse minecraftLink) {
+                    LinkStateResponse minecraftLink, boolean hasObsProvider, ObsData obsData) {
         this.channelDto = channelDto;
         this.gameDto = new GameDto(bindingDto.getFirst().id(), bindingDto.getFirst().sourceName(), bindingDto.getFirst().sourceType());
         this.binding = bindingDto;
@@ -234,6 +240,8 @@ public class MockData {
         this.hasXbox = hasXbox;
         this.minecraftLink = minecraftLink;
         this.hasMinecraftProvider = hasMinecraftProvider;
+        this.hasObsProvider = hasObsProvider;
+        this.obsData = obsData;
         this.botEnabled = true;
     }
 
@@ -280,7 +288,8 @@ public class MockData {
                 hasSteam && random.nextBoolean(), hasSteam && random.nextBoolean(),
                 true, random.nextBoolean(),
                 true,
-                new LinkStateResponse("NONE", null, null));
+                new LinkStateResponse("NONE", null, null),
+                true, new ObsData(true, "127.0.0.1", 4455, true));
         data.setBotEnabled(true);
         return data;
     }
@@ -304,7 +313,7 @@ public class MockData {
                 steamOfflineMode, steamProfileCacheTtlMinutes) : null, hasXboxProvider ?
                 new XboxData(hasXbox) : null, hasMinecraftProvider ?
                 new MinecraftData(minecraftLink.status(), minecraftLink.minecraftName(),
-                        minecraftLink.serviceAccountUsername()) : null,
+                        minecraftLink.serviceAccountUsername()) : null, hasObsProvider ? obsData : null,
                 "00000000-0000-0000-0000-000000000000"
         );
     }
