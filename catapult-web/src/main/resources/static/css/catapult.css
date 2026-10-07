@@ -108,12 +108,6 @@ mdui-top-app-bar {
             1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* mdui-linear-progress sets display in its own shadow DOM, which
- * otherwise overrides the [hidden] attribute's UA style. */
-#nav-progress[hidden] {
-    display: none !important;
-}
-
 .brand {
     display: inline-flex;
 
@@ -1608,6 +1602,13 @@ input[type="checkbox"] {
 
 }
 
+/*
+ * .hidden is toggled by spa:if (visibility.js), [hidden] by plain JS. !important so
+ * both win over any component's own `display` rule whatever its specificity — mdui
+ * components and flex/grid containers here would otherwise override the UA's
+ * [hidden] style or a same-specificity class.
+ */
+[hidden],
 .hidden {
-    display: none;
+    display: none !important;
 }
