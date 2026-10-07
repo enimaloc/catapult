@@ -5,7 +5,7 @@ import fr.enimaloc.catapult.admindata.AttributeKind;
 import fr.enimaloc.catapult.admindata.DataRegistry;
 import fr.enimaloc.catapult.admindata.IdCodec;
 import fr.enimaloc.catapult.admindata.ValueCoercion;
-import fr.enimaloc.catapult.common.dto.RepoSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;

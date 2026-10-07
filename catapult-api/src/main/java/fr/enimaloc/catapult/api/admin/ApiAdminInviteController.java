@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.AdminInvitePageData;
-import fr.enimaloc.catapult.common.dto.AdminInviteQuotaRequest;
-import fr.enimaloc.catapult.common.dto.AdminInviteRedemptionDto;
-import fr.enimaloc.catapult.common.dto.AdminInviteRow;
-import fr.enimaloc.catapult.common.dto.GlobalSettingsRequest;
-import fr.enimaloc.catapult.common.dto.MemberDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminInvitePageData;
+import fr.enimaloc.catapult.common.dto.admin.AdminInviteQuotaRequest;
+import fr.enimaloc.catapult.common.dto.admin.AdminInviteRedemptionDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminInviteRow;
+import fr.enimaloc.catapult.common.dto.admin.GlobalSettingsRequest;
+import fr.enimaloc.catapult.common.dto.admin.MemberDto;
 import fr.enimaloc.catapult.domain.access.AlphaInvite;
 import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.account.UserAccount;

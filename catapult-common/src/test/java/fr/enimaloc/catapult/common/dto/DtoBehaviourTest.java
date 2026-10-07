@@ -1,5 +1,11 @@
 package fr.enimaloc.catapult.common.dto;
 
+import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
+import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatAction;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatNotification;
+
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

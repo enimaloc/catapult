@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.service.mock;
 
-import fr.enimaloc.catapult.common.dto.BindingDto;
-import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
-import fr.enimaloc.catapult.common.dto.LinkStateResponse;
-import fr.enimaloc.catapult.common.dto.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.event.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.BindingIgnoredStateEvent;
 import fr.enimaloc.catapult.event.BindingUpdatedEvent;

@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.service.mock;
 
-import fr.enimaloc.catapult.common.dto.BindingDto;
-import fr.enimaloc.catapult.common.dto.ChannelDto;
-import fr.enimaloc.catapult.common.dto.ChannelPageData;
-import fr.enimaloc.catapult.common.dto.LinkStateResponse;
-import fr.enimaloc.catapult.common.dto.ObsData;
-import fr.enimaloc.catapult.common.dto.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 

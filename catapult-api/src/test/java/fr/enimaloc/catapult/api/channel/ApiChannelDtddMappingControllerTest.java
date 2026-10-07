@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.channel;
 
-import fr.enimaloc.catapult.common.dto.ProposeRequest;
-import fr.enimaloc.catapult.common.dto.ValidateRequest;
+import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
+import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;

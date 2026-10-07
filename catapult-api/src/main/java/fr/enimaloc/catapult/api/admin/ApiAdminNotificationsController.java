@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.common.dto.AdminNotificationCreateBody;
-import fr.enimaloc.catapult.common.dto.NotificationDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
+import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.notification.Notification;
 import fr.enimaloc.catapult.repository.notification.NotificationRepository;

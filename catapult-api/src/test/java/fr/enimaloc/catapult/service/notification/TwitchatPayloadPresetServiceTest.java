@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.TwitchatPresetPayload;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPresetPayload;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatActivePreset;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;

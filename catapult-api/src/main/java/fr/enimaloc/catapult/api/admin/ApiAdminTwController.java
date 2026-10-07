@@ -1,13 +1,13 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.AdminTwCreateBody;
-import fr.enimaloc.catapult.common.dto.DtddTopicsBody;
-import fr.enimaloc.catapult.common.dto.IgdbDescriptorsBody;
-import fr.enimaloc.catapult.common.dto.SteamIdsBody;
-import fr.enimaloc.catapult.common.dto.SteamKeywordBody;
-import fr.enimaloc.catapult.common.dto.SteamKeywordsBody;
-import fr.enimaloc.catapult.common.dto.SteamSignalTestBody;
-import fr.enimaloc.catapult.common.dto.UpdateBody;
+import fr.enimaloc.catapult.common.dto.admin.AdminTwCreateBody;
+import fr.enimaloc.catapult.common.dto.admin.DtddTopicsBody;
+import fr.enimaloc.catapult.common.dto.admin.IgdbDescriptorsBody;
+import fr.enimaloc.catapult.common.dto.admin.SteamIdsBody;
+import fr.enimaloc.catapult.common.dto.admin.SteamKeywordBody;
+import fr.enimaloc.catapult.common.dto.admin.SteamKeywordsBody;
+import fr.enimaloc.catapult.common.dto.admin.SteamSignalTestBody;
+import fr.enimaloc.catapult.common.dto.admin.UpdateBody;
 import fr.enimaloc.catapult.domain.tw.TwDefinition;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import fr.enimaloc.catapult.service.tw.AdminTwService;

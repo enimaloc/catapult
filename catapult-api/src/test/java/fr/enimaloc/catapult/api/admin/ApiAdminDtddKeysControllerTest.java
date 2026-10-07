@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.AddKeyRequest;
-import fr.enimaloc.catapult.common.dto.DeleteKeyRequest;
+import fr.enimaloc.catapult.common.dto.admin.AddKeyRequest;
+import fr.enimaloc.catapult.common.dto.admin.DeleteKeyRequest;
 import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiKeyRotator;
 import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;

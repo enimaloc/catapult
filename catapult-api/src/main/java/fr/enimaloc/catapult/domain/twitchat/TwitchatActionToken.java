@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.domain.twitchat;
 
-import fr.enimaloc.catapult.common.dto.TwitchatActionType;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
