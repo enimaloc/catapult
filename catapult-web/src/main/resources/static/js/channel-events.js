@@ -26,11 +26,6 @@
         BindingDeletedEvent: data => CatapultChannel.removeBinding(data.bindingId),
     };
 
-    function currentChannelUsername() {
-        const segments = location.pathname.split("/");
-        return segments[1] === "channel" && segments[2] ? segments[2] : null;
-    }
-
     function closeSource() {
         if (source) {
             source.close();
@@ -74,7 +69,7 @@
     }
 
     document.addEventListener("catapult:render", () => {
-        const username = currentChannelUsername();
+        const username = CatapultChannel.username();
         if (username) {
             connect(username);
         } else {

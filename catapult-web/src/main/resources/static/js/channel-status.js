@@ -1,16 +1,7 @@
 document.addEventListener("catapult:render", function () {
-    const botToggle = document.getElementById("channel-bot-toggle");
-    if (botToggle) {
-        botToggle.addEventListener("change", async () => {
-            await CatapultChannel.postJson(botToggle.dataset.toggleUrl, {});
-        });
-    }
+    CatapultChannel.on("channel-bot-toggle", "change", event =>
+        CatapultChannel.postJson(event.currentTarget.dataset.toggleUrl, {}));
 
-    const recheckButton = document.getElementById("channel-recheck-game");
-    if (recheckButton) {
-        recheckButton.addEventListener("click", async () => {
-            await CatapultChannel.postJson(recheckButton.dataset.recheckUrl, {});
-            await CatapultChannel.refresh();
-        });
-    }
+    CatapultChannel.on("channel-recheck-game", "click", event =>
+        CatapultChannel.postAndRefresh(event.currentTarget.dataset.recheckUrl, {}));
 });
