@@ -38,6 +38,7 @@ public class IgdbService {
     private static final String KEY_NAME_PREFIX  = "name:";
     private static final String KEY_EXE_PREFIX   = "exe:";
     private static final String KEY_XBOX_PREFIX  = "xbox:";
+    private static final int IGDB_BATCH_SIZE = 500;
 
     private final IgdbClient igdbClient;
     private final IgdbGameCacheRepository cacheRepository;
@@ -146,80 +147,46 @@ public class IgdbService {
         String effectiveAppId = steamStoreService.resolveEffectiveApp(appId)
             .map(SteamStoreService.ResolvedParentApp::appId)
             .orElse(appId);
-
-        // Check external ID table populated during preload
-        if (steamSourceId >= 0) {
-            Optional<IgdbGameExternalId> extId = externalIdRepository.findBySourceIdAndUid(steamSourceId, effectiveAppId);
-            if (extId.isPresent()) {
-                String igdbId = extId.get().getIgdbId();
-                String name = igdbGameCache.get(igdbId);
-                if (name != null) {
-                    log.debug("IGDB external ID cache hit for Steam appId={}", effectiveAppId);
-                    meterRegistry.counter("catapult.igdb.cache.lookup", "method", "steam", "result", "hit").increment();
-                    return Optional.of(new IgdbGame(igdbId, name));
-                }
-            }
-        }
-
-        // Legacy steam: key lookup in igdb_game_cache
-        String key = KEY_STEAM_PREFIX + effectiveAppId;
-        Optional<IgdbGame> fromDb = lookupInDb(key);
-        if (fromDb.isPresent()) {
-            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "steam", "result", "db_hit").increment();
-            return fromDb;
-        }
-
-        String token = getOrRefreshAppToken();
-        if (token.isBlank()) return Optional.empty();
-
-        List<proto.ExternalGame> results = igdbClient.findExternalGameByUid(effectiveAppId, steamSourceId, token);
-        meterRegistry.counter("catapult.igdb.cache.lookup", "method", "steam", "result", "miss").increment();
-        if (results.isEmpty()) return Optional.empty();
-
-        Game game = results.get(0).getGame();
-        IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
-        igdbGameCache.put(resolved.id(), resolved.name());
-        igdbNameIndex.put(normalise(resolved.name()), resolved);
-        saveToDb(key, resolved);
-        return Optional.of(resolved);
+        return findByExternalUid("steam", steamSourceId, effectiveAppId, KEY_STEAM_PREFIX);
     }
 
     public Optional<IgdbGame> findByXboxAppId(String appId) {
         if (clientId.isBlank()) return Optional.empty();
+        return findByExternalUid("xbox", xboxSourceId, appId, KEY_XBOX_PREFIX);
+    }
 
-        // Check external ID table populated during preload
-        if (xboxSourceId >= 0) {
-            Optional<IgdbGameExternalId> extId = externalIdRepository.findBySourceIdAndUid(xboxSourceId, appId);
-            if (extId.isPresent()) {
-                String igdbId = extId.get().getIgdbId();
-                String name = igdbGameCache.get(igdbId);
-                if (name != null) {
-                    log.debug("IGDB external ID cache hit for Xbox appId={}", appId);
-                    meterRegistry.counter("catapult.igdb.cache.lookup", "method", "xbox", "result", "hit").increment();
-                    return Optional.of(new IgdbGame(igdbId, name));
-                }
+    /**
+     * Resolves a store uid through the external-id table populated by the preload (only when the
+     * game's name is already in memory), then the {@code <keyPrefix><uid>} DB cache entry, then IGDB.
+     */
+    private Optional<IgdbGame> findByExternalUid(String method, long sourceId, String uid, String keyPrefix) {
+        if (sourceId >= 0) {
+            Optional<IgdbGame> known = externalIdRepository.findBySourceIdAndUid(sourceId, uid)
+                .map(IgdbGameExternalId::getIgdbId)
+                .flatMap(igdbId -> Optional.ofNullable(igdbGameCache.get(igdbId)).map(name -> new IgdbGame(igdbId, name)));
+            if (known.isPresent()) {
+                log.debug("IGDB external ID cache hit for {} appId={}", method, uid);
+                countLookup(method, "hit");
+                return known;
             }
         }
 
-        // Legacy steam: key lookup in igdb_game_cache
-        String key = KEY_XBOX_PREFIX + appId;
+        String key = keyPrefix + uid;
         Optional<IgdbGame> fromDb = lookupInDb(key);
         if (fromDb.isPresent()) {
-            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "xbox", "result", "db_hit").increment();
+            countLookup(method, "db_hit");
             return fromDb;
         }
 
         String token = getOrRefreshAppToken();
         if (token.isBlank()) return Optional.empty();
 
-        List<proto.ExternalGame> results = igdbClient.findExternalGameByUid(appId, xboxSourceId, token);
-        meterRegistry.counter("catapult.igdb.cache.lookup", "method", "xbox", "result", "miss").increment();
+        List<proto.ExternalGame> results = igdbClient.findExternalGameByUid(uid, sourceId, token);
+        countLookup(method, "miss");
         if (results.isEmpty()) return Optional.empty();
 
-        Game game = results.getFirst().getGame();
-        IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
-        igdbGameCache.put(resolved.id(), resolved.name());
-        igdbNameIndex.put(normalise(resolved.name()), resolved);
+        IgdbGame resolved = toIgdbGame(results.getFirst().getGame());
+        remember(resolved);
         saveToDb(key, resolved);
         return Optional.of(resolved);
     }
@@ -245,16 +212,11 @@ public class IgdbService {
         String token = getOrRefreshAppToken();
         if (token.isBlank()) return;
 
-        int batchSize = 500;
         int resolved = 0;
-        for (int i = 0; i < uncached.size(); i += batchSize) {
-            List<String> chunk = uncached.subList(i, Math.min(i + batchSize, uncached.size()));
-            List<proto.ExternalGame> results = igdbClient.findExternalGamesByUids(chunk, steamSourceId, token);
-            for (proto.ExternalGame ext : results) {
-                Game game = ext.getGame();
-                IgdbGame igdbGame = new IgdbGame(String.valueOf(game.getId()), game.getName());
-                igdbGameCache.put(igdbGame.id(), igdbGame.name());
-                igdbNameIndex.put(normalise(igdbGame.name()), igdbGame);
+        for (List<String> chunk : batches(uncached)) {
+            for (proto.ExternalGame ext : igdbClient.findExternalGamesByUids(chunk, steamSourceId, token)) {
+                IgdbGame igdbGame = toIgdbGame(ext.getGame());
+                remember(igdbGame);
                 saveToDb(KEY_STEAM_PREFIX + ext.getUid(), igdbGame);
                 resolved++;
             }
@@ -270,14 +232,14 @@ public class IgdbService {
         IgdbGame cached = igdbNameIndex.get(normalized);
         if (cached != null) {
             log.debug("IGDB in-memory cache hit for '{}'", gameName);
-            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "name", "result", "hit").increment();
+            countLookup("name", "hit");
             return Optional.of(cached);
         }
 
         String key = KEY_NAME_PREFIX + normalized;
         Optional<IgdbGame> fromDb = lookupInDb(key);
         if (fromDb.isPresent()) {
-            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "name", "result", "db_hit").increment();
+            countLookup("name", "db_hit");
             igdbNameIndex.put(normalized, fromDb.get());
             return fromDb;
         }
@@ -286,11 +248,10 @@ public class IgdbService {
         if (token.isBlank()) return Optional.empty();
 
         List<Game> results = igdbClient.searchByName(gameName, token);
-        meterRegistry.counter("catapult.igdb.cache.lookup", "method", "name", "result", "miss").increment();
+        countLookup("name", "miss");
         if (results.isEmpty()) return Optional.empty();
 
-        Game game = results.get(0);
-        IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
+        IgdbGame resolved = toIgdbGame(results.getFirst());
         igdbNameIndex.put(normalized, resolved);
         saveToDb(key, resolved);
         return Optional.of(resolved);
@@ -307,14 +268,14 @@ public class IgdbService {
         IgdbGame cached = exeNameIndex.get(exeName);
         if (cached != null) {
             log.debug("IGDB exe L1 cache hit for '{}'", exeName);
-            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "exe", "result", "hit").increment();
+            countLookup("exe", "hit");
             return Optional.of(cached);
         }
 
         String key = KEY_EXE_PREFIX + exeName;
         Optional<IgdbGame> fromDb = lookupInDb(key);
         if (fromDb.isPresent()) {
-            meterRegistry.counter("catapult.igdb.cache.lookup", "method", "exe", "result", "db_hit").increment();
+            countLookup("exe", "db_hit");
             exeNameIndex.put(exeName, fromDb.get());
             return fromDb;
         }
@@ -323,14 +284,12 @@ public class IgdbService {
         if (token.isBlank()) return Optional.empty();
 
         List<AlternativeName> results = igdbClient.findByWindowsExecutable(exeName, token);
-        meterRegistry.counter("catapult.igdb.cache.lookup", "method", "exe", "result", "miss").increment();
+        countLookup("exe", "miss");
         if (results.isEmpty()) return Optional.empty();
 
-        proto.Game game = results.get(0).getGame();
-        IgdbGame resolved = new IgdbGame(String.valueOf(game.getId()), game.getName());
+        IgdbGame resolved = toIgdbGame(results.getFirst().getGame());
         exeNameIndex.put(exeName, resolved);
-        igdbGameCache.put(resolved.id(), resolved.name());
-        igdbNameIndex.put(normalise(resolved.name()), resolved);
+        remember(resolved);
         saveToDb(key, resolved);
         return Optional.of(resolved);
     }
@@ -341,7 +300,7 @@ public class IgdbService {
         String token = getOrRefreshAppToken();
         if (token.isBlank()) return List.of();
         return igdbClient.searchByName(trimmed, token).stream()
-            .map(g -> new IgdbGame(String.valueOf(g.getId()), g.getName()))
+            .map(IgdbService::toIgdbGame)
             .toList();
     }
 
@@ -352,8 +311,7 @@ public class IgdbService {
     public void prewarmCclCache() {
         if (clientId.isBlank()) return;
 
-        Instant since = Instant.now().minusSeconds(cacheTtlHours * 3600L);
-        Set<String> knownIds = cacheRepository.findByCachedAtAfter(since).stream()
+        Set<String> knownIds = cacheRepository.findByCachedAtAfter(cacheCutoff()).stream()
             .map(IgdbGameCacheEntry::getIgdbId)
             .collect(Collectors.toSet());
         if (knownIds.isEmpty()) return;
@@ -381,11 +339,8 @@ public class IgdbService {
         log.info("CCL prewarm: loading {} / {} games ({} with Steam data)",
             toLoad.size(), knownIds.size(), igdbToSteam.size());
 
-        int batchSize = 500;
         int resolved = 0;
-        for (int i = 0; i < toLoad.size(); i += batchSize) {
-            List<String> chunk = toLoad.subList(i, Math.min(i + batchSize, toLoad.size()));
-
+        for (List<String> chunk : batches(toLoad)) {
             // Batch IGDB fetch
             List<Game> games = igdbClient.fetchGamesByIds(chunk, CCL_FIELDS, token);
 
@@ -446,7 +401,7 @@ public class IgdbService {
             }
         }
 
-        return storeCcls(igdbGameId, results.get(0), steamCcls);
+        return storeCcls(igdbGameId, results.getFirst(), steamCcls);
     }
 
     // -------------------------------------------------------------------------
@@ -458,12 +413,7 @@ public class IgdbService {
         suggested.addAll(steamCcls);
         String ageRatingsLabel = extractAgeRatingsLabel(game);
 
-        Set<Long> descriptorIds = game.getAgeRatingsList().stream()
-            .map(AgeRating::getRatingContentDescriptionsList)
-            .flatMap(Collection::stream)
-            .map(AgeRatingContentDescriptionV2::getId)
-            .filter(id -> id > 0)
-            .collect(Collectors.toSet());
+        Set<Long> descriptorIds = descriptorIds(game);
 
         log.debug("IGDB+Steam CCL for {}: ratings={}, suggested={}, descriptorIds={}",
             igdbGameId, ageRatingsLabel, suggested, descriptorIds);
@@ -503,12 +453,7 @@ public class IgdbService {
         try {
             List<Game> results = igdbClient.fetchGameById(igdbGameId, CCL_FIELDS, token);
             if (results.isEmpty()) return Set.of();
-            return results.get(0).getAgeRatingsList().stream()
-                .map(AgeRating::getRatingContentDescriptionsList)
-                .flatMap(Collection::stream)
-                .map(AgeRatingContentDescriptionV2::getId)
-                .filter(id -> id > 0)
-                .collect(Collectors.toSet());
+            return descriptorIds(results.getFirst());
         } catch (Exception e) {
             log.warn("fetchDescriptorIds failed for igdbId={}: {}", igdbGameId, e.getMessage());
             return Set.of();
@@ -529,14 +474,7 @@ public class IgdbService {
     }
 
     private Set<String> extractCcls(Game game) {
-        // Collect all descriptor IDs present on this game's age ratings
-        Set<Long> descriptorIds = game.getAgeRatingsList()
-            .stream()
-            .map(AgeRating::getRatingContentDescriptionsList)
-            .flatMap(Collection::stream)
-            .map(AgeRatingContentDescriptionV2::getId)
-            .filter(id -> id > 0)
-            .collect(Collectors.toSet());
+        Set<Long> descriptorIds = descriptorIds(game);
 
         if (descriptorIds.isEmpty()) return Set.of();
 
@@ -560,6 +498,16 @@ public class IgdbService {
         }
 
         return suggested;
+    }
+
+    /** The (positive) IGDB content-descriptor ids across all of the game's age ratings. */
+    private static Set<Long> descriptorIds(Game game) {
+        return game.getAgeRatingsList().stream()
+            .map(AgeRating::getRatingContentDescriptionsList)
+            .flatMap(Collection::stream)
+            .map(AgeRatingContentDescriptionV2::getId)
+            .filter(id -> id > 0)
+            .collect(Collectors.toSet());
     }
 
     private String extractAgeRatingsLabel(Game game) {
@@ -587,7 +535,7 @@ public class IgdbService {
         try {
             List<ExternalGameSource> sources = igdbClient.findSourcesByName(name, token);
             if (!sources.isEmpty()) {
-                long id = sources.get(0).getId();
+                long id = sources.getFirst().getId();
                 log.info("{} ExternalGameSource ID resolved: {}", name, id);
                 return id;
             } else {
@@ -600,8 +548,7 @@ public class IgdbService {
     }
 
     private void warmInMemoryCacheFromDb() {
-        Instant since = Instant.now().minusSeconds(cacheTtlHours * 3600L);
-        List<IgdbGameCacheEntry> entries = cacheRepository.findByCachedAtAfter(since);
+        List<IgdbGameCacheEntry> entries = cacheRepository.findByCachedAtAfter(cacheCutoff());
         for (IgdbGameCacheEntry entry : entries) {
             IgdbGame game = new IgdbGame(entry.getIgdbId(), entry.getName());
             if (entry.getLookupKey().startsWith(KEY_NAME_PREFIX)) {
@@ -615,8 +562,13 @@ public class IgdbService {
 
     private Optional<IgdbGame> lookupInDb(String key) {
         return cacheRepository.findById(key)
-            .filter(e -> e.getCachedAt().isAfter(Instant.now().minusSeconds(cacheTtlHours * 3600L)))
+            .filter(e -> e.getCachedAt().isAfter(cacheCutoff()))
             .map(e -> new IgdbGame(e.getIgdbId(), e.getName()));
+    }
+
+    /** DB cache entries written before this instant have expired. */
+    private Instant cacheCutoff() {
+        return Instant.now().minusSeconds(cacheTtlHours * 3600L);
     }
 
     private void saveToDb(String key, IgdbGame game) {
@@ -660,6 +612,29 @@ public class IgdbService {
 
     public long getTwitchSourceId() {
         return twitchSourceId;
+    }
+
+    /** Records a resolved game in the id → name cache and the name index. */
+    private void remember(IgdbGame game) {
+        igdbGameCache.put(game.id(), game.name());
+        igdbNameIndex.put(normalise(game.name()), game);
+    }
+
+    private void countLookup(String method, String result) {
+        meterRegistry.counter("catapult.igdb.cache.lookup", "method", method, "result", result).increment();
+    }
+
+    private static IgdbGame toIgdbGame(Game game) {
+        return new IgdbGame(String.valueOf(game.getId()), game.getName());
+    }
+
+    /** {@code ids} in slices of {@value #IGDB_BATCH_SIZE}, IGDB's per-request limit. */
+    private static List<List<String>> batches(List<String> ids) {
+        List<List<String>> batches = new ArrayList<>();
+        for (int i = 0; i < ids.size(); i += IGDB_BATCH_SIZE) {
+            batches.add(ids.subList(i, Math.min(i + IGDB_BATCH_SIZE, ids.size())));
+        }
+        return batches;
     }
 
     private static String normalise(String name) {
