@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.common.dto.AdminWhitelistRedemptionDto;
 import fr.enimaloc.catapult.common.dto.InviteSettingsRequest;
 import fr.enimaloc.catapult.common.dto.WhitelistInviteRow;
 import fr.enimaloc.catapult.domain.AlphaInvite;
-import fr.enimaloc.catapult.domain.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.WhitelistEntry;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
@@ -51,23 +50,7 @@ public class ApiAdminWhitelistController {
                                 .orElse("—")
                 ));
 
-        List<AlphaInvite> invites = inviteService.findAll();
-        List<WhitelistInviteRow> inviteRows = invites.stream().map(inv -> {
-            List<AlphaInviteRedemption> redemptions = inviteService.getRedemptions(inv);
-            return new WhitelistInviteRow(
-                inv.getId(),
-                inv.getOwner().getId(),
-                inv.getOwner().getTwitchUsername(),
-                inv.getCode(),
-                inv.getMaxUses(),
-                inv.getUseCount(),
-                inv.getCanReinvite(),
-                inv.getCreatedAt(),
-                redemptions.stream()
-                    .map(r -> new AdminWhitelistRedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
-                    .toList()
-            );
-        }).toList();
+        List<WhitelistInviteRow> inviteRows = inviteService.findAll().stream().map(this::toRow).toList();
 
         return new WhitelistPageData(
             entries, resolvedUsernames, whitelistService.isEnabled(),
@@ -116,6 +99,23 @@ public class ApiAdminWhitelistController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateInviteQuota(@PathVariable UUID inviteId, @RequestBody AdminWhitelistQuotaRequest body) {
         inviteService.updateInviteQuota(inviteId, body.maxUses(), body.canReinvite());
+    }
+
+    /** An invite with its owner and every redemption so far. */
+    private WhitelistInviteRow toRow(AlphaInvite invite) {
+        List<AdminWhitelistRedemptionDto> redemptions = inviteService.getRedemptions(invite).stream()
+            .map(r -> new AdminWhitelistRedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
+            .toList();
+        return new WhitelistInviteRow(
+            invite.getId(),
+            invite.getOwner().getId(),
+            invite.getOwner().getTwitchUsername(),
+            invite.getCode(),
+            invite.getMaxUses(),
+            invite.getUseCount(),
+            invite.getCanReinvite(),
+            invite.getCreatedAt(),
+            redemptions);
     }
 
     public record WhitelistPageData(
