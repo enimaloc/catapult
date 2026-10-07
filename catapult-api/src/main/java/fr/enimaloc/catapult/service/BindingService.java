@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Slf4j
 @Service
@@ -32,6 +33,32 @@ public class BindingService {
                 .map(active -> active.getSourceType() == binding.getSourceType()
                         && active.getSourceId().equals(binding.getSourceId()))
                 .orElse(false);
+    }
+
+    /**
+     * Applies {@code change} to the user's binding (if it exists), saves it, and pushes it to
+     * Twitch right away when it is the game currently being played.
+     */
+    private void editBinding(UserAccount user, UUID bindingId, Consumer<GameBinding> change) {
+        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
+            change.accept(binding);
+            gameBindingRepository.save(binding);
+            if (isActiveBinding(user, binding)) {
+                twitchService.updateChannel(user, binding);
+            }
+        });
+    }
+
+    /** The TWs suggested for a game from its IGDB descriptors, Steam signals (Steam games only) and name. */
+    private Set<String> suggestTws(String igdbId, DetectedGame game) {
+        Set<Long> descriptorIds = igdbService.fetchDescriptorIds(igdbId);
+        String steamAppId = game.getSourceType() == GameBinding.SourceType.STEAM ? game.getSourceId() : null;
+        return twResolverService.suggest(new TwResolverService.SuggestInput(
+                igdbId, descriptorIds, steamAppId, game.getSourceName()));
+    }
+
+    private static DetectedGame detectedOf(GameBinding binding) {
+        return new DetectedGame(binding.getSourceId(), binding.getSourceType(), binding.getSourceName());
     }
 
     @Transactional
@@ -57,10 +84,7 @@ public class BindingService {
         log.info("Refreshing {} INCOMPLETE binding(s)", incomplete.size());
         int resolved = 0;
         for (GameBinding binding : incomplete) {
-            DetectedGame detected = new DetectedGame(
-                    binding.getSourceId(), binding.getSourceType(), binding.getSourceName()
-            );
-            GameBinding updated = updateWithIgdbResolution(binding.getUser(), detected, binding);
+            GameBinding updated = updateWithIgdbResolution(binding.getUser(), detectedOf(binding), binding);
             if (updated.getStatus() != GameBinding.Status.INCOMPLETE) resolved++;
         }
         log.info("INCOMPLETE binding refresh complete: {}/{} resolved", resolved, incomplete.size());
@@ -99,11 +123,7 @@ public class BindingService {
             binding.getCcls().addAll(ccls);
 
             if (!binding.isTwOverride()) {
-                Set<Long> descriptorIds = igdbService.fetchDescriptorIds(igdbId);
-                String steamAppId = detectedGame.getSourceType() == GameBinding.SourceType.STEAM
-                        ? detectedGame.getSourceId() : null;
-                Set<String> tws = twResolverService.suggest(new TwResolverService.SuggestInput(
-                        igdbId, descriptorIds, steamAppId, detectedGame.getSourceName()));
+                Set<String> tws = suggestTws(igdbId, detectedGame);
                 log.debug("[TW] mapping for user {} game '{}' (igdb={}): {}",
                         user.getId(), detectedGame.getSourceName(), igdbId, tws);
                 binding.getTws().clear();
@@ -143,7 +163,7 @@ public class BindingService {
     @Transactional
     public void updateBinding(UserAccount user, UUID bindingId, String twitchGameId,
                               String twitchGameName, Set<String> ccls, Set<String> tws, boolean ignored) {
-        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
+        editBinding(user, bindingId, binding -> {
             binding.setTwitchGameId(twitchGameId);
             binding.setTwitchGameName(twitchGameName);
             binding.getCcls().clear();
@@ -155,93 +175,55 @@ public class BindingService {
             if (twitchGameId != null && !twitchGameId.isBlank()) {
                 binding.setStatus(GameBinding.Status.MANUAL);
             }
-            gameBindingRepository.save(binding);
-            if (isActiveBinding(user, binding)) {
-                twitchService.updateChannel(user, binding);
-            }
         });
     }
 
     @Transactional
     public void setTwitchGame(UserAccount user, UUID bindingId, String twitchGameId, String twitchGameName) {
-        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
+        editBinding(user, bindingId, binding -> {
             binding.setTwitchGameId(twitchGameId);
             binding.setTwitchGameName(twitchGameName);
             binding.setStatus(GameBinding.Status.MANUAL);
-            gameBindingRepository.save(binding);
-            if (isActiveBinding(user, binding)) {
-                twitchService.updateChannel(user, binding);
-            }
         });
     }
 
     @Transactional
     public void toggleCclEnabled(UserAccount user, UUID bindingId, boolean enabled) {
-        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
-            binding.setCclEnabled(enabled);
-            gameBindingRepository.save(binding);
-            if (isActiveBinding(user, binding)) {
-                twitchService.updateChannel(user, binding);
-            }
-        });
+        editBinding(user, bindingId, binding -> binding.setCclEnabled(enabled));
     }
 
     @Transactional
     public void toggleTwEnabled(UserAccount user, UUID bindingId, boolean enabled) {
-        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
-            binding.setTwEnabled(enabled);
-            gameBindingRepository.save(binding);
-            if (isActiveBinding(user, binding)) {
-                twitchService.updateChannel(user, binding);
-            }
-        });
+        editBinding(user, bindingId, binding -> binding.setTwEnabled(enabled));
     }
 
     @Transactional
     public void resetTws(UserAccount user, UUID bindingId) {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             binding.setTwOverride(false);
-            DetectedGame detected = new DetectedGame(
-                    binding.getSourceId(), binding.getSourceType(), binding.getSourceName());
-            updateWithIgdbResolution(user, detected, binding);
+            updateWithIgdbResolution(user, detectedOf(binding), binding);
         });
     }
 
     @Transactional
     public void setTwsForBinding(UserAccount user, UUID bindingId, Set<String> tws) {
-        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
+        editBinding(user, bindingId, binding -> {
             binding.getTws().clear();
             binding.getTws().addAll(tws);
             binding.setTwOverride(true);
-            gameBindingRepository.save(binding);
-            if (isActiveBinding(user, binding)) {
-                twitchService.updateChannel(user, binding);
-            }
         });
     }
 
     public Set<String> previewTws(UserAccount user, UUID bindingId) {
         return gameBindingRepository.findByIdAndUser(bindingId, user)
                 .flatMap(binding -> igdbService.resolveIgdbIdForBinding(binding)
-                        .map(igdbId -> {
-                            Set<Long> descriptorIds = igdbService.fetchDescriptorIds(igdbId);
-                            String steamAppId = binding.getSourceType() == GameBinding.SourceType.STEAM
-                                    ? binding.getSourceId() : null;
-                            return twResolverService.suggest(new TwResolverService.SuggestInput(
-                                    igdbId, descriptorIds, steamAppId, binding.getSourceName()));
-                        }))
+                        .map(igdbId -> suggestTws(igdbId, detectedOf(binding))))
                 .orElse(Set.of());
     }
 
     @Transactional
     public void toggleIgnored(UserAccount user, UUID bindingId, boolean ignored) {
-        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
-            binding.setIgnored(ignored);
-            gameBindingRepository.save(binding);
-            if (isActiveBinding(user, binding)) {
-                twitchService.updateChannel(user, binding);
-            }
-        });
+        editBinding(user, bindingId, binding -> binding.setIgnored(ignored));
     }
 
     @Transactional
