@@ -38,6 +38,7 @@ import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.service.IgdbService;
 import fr.enimaloc.catapult.service.MinecraftFriendService;
 import fr.enimaloc.catapult.service.StreamStateService;
+import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -88,8 +89,9 @@ class ChannelDashboardAssemblerTest {
     private ChannelDashboardAssembler assembler(Optional<SteamApiClient> steamClient,
                                                 Optional<MinecraftFriendService> minecraftService,
                                                 boolean xboxEnabled) {
+        SteamProfileDiagnostics diagnostics = new SteamProfileDiagnostics(steamClient, Optional.of(keyRotator), encryption);
         ChannelDashboardAssembler assembler = new ChannelDashboardAssembler(bindings, settingsRepository, streamState,
-                gameState, ccls, tws, encryption, keyRotator, steamClient, igdb, dtddMappings, dtddCache,
+                gameState, ccls, tws, encryption, steamClient, diagnostics, igdb, dtddMappings, dtddCache,
                 dtddProposals, oauthTokens, backdoor, minecraftService, twitchat);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
