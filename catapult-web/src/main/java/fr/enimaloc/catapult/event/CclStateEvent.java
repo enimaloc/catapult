@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.ws.event;
+package fr.enimaloc.catapult.event;
 
 import org.springframework.context.ApplicationEvent;
 
