@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.getter;
+package fr.enimaloc.catapult.getter.dtdd;
 
 import org.jetbrains.annotations.Nullable;
 

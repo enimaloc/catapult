@@ -1,7 +1,9 @@
-package fr.enimaloc.catapult.getter;
+package fr.enimaloc.catapult.getter.steam;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.getter.GameGetter;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import lombok.RequiredArgsConstructor;

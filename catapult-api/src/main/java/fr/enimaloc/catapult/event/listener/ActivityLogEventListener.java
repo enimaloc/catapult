@@ -1,5 +1,7 @@
-package fr.enimaloc.catapult.event;
+package fr.enimaloc.catapult.event.listener;
 
+import fr.enimaloc.catapult.event.GameDetectedEvent;
+import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;

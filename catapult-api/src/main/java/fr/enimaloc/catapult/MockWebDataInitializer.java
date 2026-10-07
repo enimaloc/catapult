@@ -6,7 +6,7 @@ import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule;
 import fr.enimaloc.catapult.event.ExperimentActivatedEvent;
 import fr.enimaloc.catapult.experiment.ExperimentSynchronizer;
-import fr.enimaloc.catapult.getter.MockSteamApiClient;
+import fr.enimaloc.catapult.getter.steam.MockSteamApiClient;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRuleRepository;

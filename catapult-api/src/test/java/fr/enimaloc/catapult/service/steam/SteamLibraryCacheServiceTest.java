@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.service.steam;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
-import fr.enimaloc.catapult.getter.SteamApiClient;
+import fr.enimaloc.catapult.getter.steam.SteamApiClient;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
