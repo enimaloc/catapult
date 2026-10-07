@@ -19,7 +19,7 @@ subprojects {
  * module's line coverage drops below its floor, so new code can't silently lower it.
  */
 val coverageFloors = mapOf(
-    "catapult-common" to 0.10,
+    "catapult-common" to 0.95,
     "catapult-api" to 0.64,
     "catapult-web" to 0.21,
 )
