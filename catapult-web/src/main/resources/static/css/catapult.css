@@ -848,11 +848,17 @@ a[data-link].active {
     gap: 14px;
 }
 
+/*
+ * One row per connection: name on the left, status chip on the right, then any
+ * details (diagnostics, token form, Minecraft status) and the actions below,
+ * across the full width.
+ */
 .connection-card {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 22px 24px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px 16px;
+    padding: 20px 24px;
 }
 
 /* Inline "switch + text" rows, wherever they appear on the dashboard. */
@@ -866,8 +872,8 @@ a[data-link].active {
 }
 
 /* Every content block inside a card is separated from the previous one by a rule. */
-:is(.bot-toggle-row, .settings-switch-group, .connection-card > div, .connection-card > .card-actions,
-    #dtdd-search-dialog, .binding-edit-panel, .binding-ccl-panel, .binding-tw-panel) {
+:is(.bot-toggle-row, .settings-switch-group, .connection-card > div, #dtdd-search-dialog,
+    .binding-edit-panel, .binding-ccl-panel, .binding-tw-panel) {
     border-top: 1px solid var(--catapult-border);
 }
 
@@ -1028,10 +1034,10 @@ a[data-link].active {
 
 /* Connections */
 
-.connections-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 18px;
+#channel-connections {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     margin-bottom: 56px;
 }
 
@@ -1039,8 +1045,14 @@ a[data-link].active {
     font-weight: 650;
 }
 
+/* Both Steam chips (connected / not connected) share the slot; one is always hidden. */
 .connection-card > mdui-chip {
-    align-self: flex-start;
+    grid-row: 1;
+    grid-column: 2;
+}
+
+.connection-card > :not(span:first-child, mdui-chip) {
+    grid-column: 1 / -1;
 }
 
 .connection-card p {
@@ -1054,15 +1066,19 @@ a[data-link].active {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding-top: 8px;
+    padding-top: 12px;
+}
+
+/* Inputs don't need the full row on a wide screen. */
+.connection-card > div :is(input, label) {
+    max-width: 480px;
 }
 
 /* mdui-segmented-button-group, not a div — lays out its own segments internally,
- * so only the positioning within the card and the separator above it are ours. */
+ * so only its placement in the row is ours: right-aligned, under the details. */
 .connection-card > .card-actions {
+    justify-self: end;
     max-width: 100%;
-    margin-top: auto;
-    padding-top: 8px;
 }
 
 /*
@@ -1198,8 +1214,8 @@ a[data-link].active {
         padding: 14px 16px;
     }
 
-    .connections-grid {
-        grid-template-columns: 1fr;
+    .connection-card > .card-actions {
+        justify-self: stretch;
     }
 
     .bindings-pagination {
