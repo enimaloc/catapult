@@ -21,7 +21,7 @@ subprojects {
 val coverageFloors = mapOf(
     "catapult-common" to 0.95,
     "catapult-api" to 0.64,
-    "catapult-web" to 0.21,
+    "catapult-web" to 0.95,
 )
 
 configure(subprojects.filter { it.name in coverageFloors }) {
