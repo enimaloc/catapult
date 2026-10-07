@@ -1,4 +1,6 @@
-package fr.enimaloc.catapult.event;
+package fr.enimaloc.catapult.event.tw;
+
+import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
 
 import java.util.Set;
 
