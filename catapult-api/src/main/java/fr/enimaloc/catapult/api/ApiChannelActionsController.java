@@ -24,9 +24,9 @@ import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.domain.TwitchatPayloadPreset;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
-import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
+import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.repository.SteamApiKeyRepository;
 import fr.enimaloc.catapult.repository.UserAccountRepository;
@@ -48,7 +48,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import java.util.concurrent.TimeUnit;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -91,12 +90,11 @@ public class ApiChannelActionsController {
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     private final TwitchatPayloadPresetService twitchatPayloadPresetService;
     private final TwitchatNotifier twitchatNotifier;
+    private final SteamProfileDiagnostics steamDiagnostics;
 
     @Autowired(required = false)
     private SteamApiKeyRotator rotator;
 
-    @Autowired(required = false)
-    private SteamApiClient steamApiClient;
 
     // ── Binding actions ───────────────────────────────────────────────────────
 
@@ -458,46 +456,8 @@ public class ApiChannelActionsController {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /**
-     * Builds a {@link SteamProfileDto} snapshot from the given channel user.
-     * Calls the Steam API to determine profile visibility and offline mode,
-     * mirroring the logic in {@code ApiChannelDataController}.
-     */
     private SteamProfileDto buildSteamProfile(UserAccount channelUser) {
-        boolean hasSteam = steamApiClient != null && channelUser.getSteamId() != null;
-        boolean hasPersonalToken = channelUser.getSteamPersonalToken() != null;
-        boolean tokenShared = channelUser.isSteamTokenShared();
-        long ttlMinutes = steamApiClient != null
-                ? steamApiClient.getProfileCacheTtl().toMinutes() : 15L;
-
-        boolean profilePrivate = false;
-        boolean offlineMode = false;
-        boolean rateLimited = false;
-
-        if (hasSteam && steamApiClient != null) {
-            String decryptedToken = hasPersonalToken
-                    ? tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken())
-                    : null;
-            try {
-                SteamApiClient.SteamProfileStatus status = steamApiClient
-                        .getProfileStatus(channelUser.getSteamId(), decryptedToken)
-                        .orTimeout(2, TimeUnit.SECONDS)
-                        .exceptionally(e -> new SteamApiClient.SteamProfileStatus(false, false))
-                        .join();
-                profilePrivate = !status.profilePublic();
-                offlineMode = status.offlineMode();
-            } catch (Exception ignored) {
-            }
-            boolean isRateLimited = steamApiClient.isRateLimited()
-                    || (rotator != null && rotator.isAllKeysBlocked());
-            if (profilePrivate && isRateLimited) {
-                rateLimited = true;
-                profilePrivate = false;
-            }
-        }
-
-        return new SteamProfileDto(hasSteam, profilePrivate, offlineMode, rateLimited,
-                ttlMinutes, hasPersonalToken, tokenShared);
+        return steamDiagnostics.diagnose(channelUser);
     }
 
     private UserSettings getOrCreateSettings(UserAccount user) {
