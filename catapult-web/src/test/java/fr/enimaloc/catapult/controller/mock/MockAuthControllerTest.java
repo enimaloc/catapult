@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.controller.mock;
 
 import fr.enimaloc.catapult.security.WebSecurityConfig;
-import fr.enimaloc.catapult.service.mock.MockData;
+import fr.enimaloc.catapult.service.mock.MockPresets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -29,11 +29,11 @@ class MockAuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("mock/jwt-select"))
                 .andExpect(model().attribute("jwts", MockAuthController.QUICK_LOGINS))
-                .andExpect(model().attribute("availableCcls", MockData.AVAILABLE_CCLS))
-                .andExpect(model().attribute("availableTws", MockData.AVAILABLE_TWS))
-                .andExpect(model().attribute("bindingStatuses", MockData.BINDING_STATUSES))
-                .andExpect(model().attribute("sourceTypes", MockData.SOURCE_TYPES))
-                .andExpect(model().attribute("minecraftStatuses", MockData.MINECRAFT_STATUSES))
+                .andExpect(model().attribute("availableCcls", MockPresets.AVAILABLE_CCLS))
+                .andExpect(model().attribute("availableTws", MockPresets.AVAILABLE_TWS))
+                .andExpect(model().attribute("bindingStatuses", MockPresets.BINDING_STATUSES))
+                .andExpect(model().attribute("sourceTypes", MockPresets.SOURCE_TYPES))
+                .andExpect(model().attribute("minecraftStatuses", MockPresets.MINECRAFT_STATUSES))
                 .andExpect(content().string(containsString("/auth/callback?code=1")))
                 .andExpect(content().string(containsString("Offline account")));
     }

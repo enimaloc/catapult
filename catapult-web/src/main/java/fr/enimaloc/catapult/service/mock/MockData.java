@@ -1,126 +1,57 @@
 package fr.enimaloc.catapult.service.mock;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import fr.enimaloc.catapult.common.dto.*;
+import fr.enimaloc.catapult.common.dto.BindingDto;
+import fr.enimaloc.catapult.common.dto.ChannelDto;
+import fr.enimaloc.catapult.common.dto.ChannelListResponse;
+import fr.enimaloc.catapult.common.dto.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.ChannelUserDto;
+import fr.enimaloc.catapult.common.dto.GameDto;
+import fr.enimaloc.catapult.common.dto.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.MinecraftData;
+import fr.enimaloc.catapult.common.dto.ObsData;
+import fr.enimaloc.catapult.common.dto.PagedBindings;
+import fr.enimaloc.catapult.common.dto.SteamData;
+import fr.enimaloc.catapult.common.dto.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.XboxData;
 import lombok.Getter;
 import lombok.Setter;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
+import static fr.enimaloc.catapult.service.mock.MockPresets.AVAILABLE_CCLS;
+import static fr.enimaloc.catapult.service.mock.MockPresets.AVAILABLE_TWS;
+
+/**
+ * One mock session's state: what the real catapult-api would hold for the logged-in channel.
+ * Built by the mock login flow ({@link #fromJwt}, {@link #random}) and mutated by
+ * {@link MockApiService} as the dashboard sends actions, or by the mock admin page.
+ */
 public class MockData {
     private static final JsonMapper JSON = JsonMapper.builder().build();
-
-    /**
-     * Fixed catalog the mock login form picks blocked entries from — not itself customizable.
-     */
-    public static final List<CclDto> AVAILABLE_CCLS = List.of(
-            new CclDto("DrugsIntoxication", "Drogue"),
-            new CclDto("ProfanityVulgarity", "Vulgarité"),
-            new CclDto("SexualThemes", "Thèmes sexuels")
-    );
-    public static final List<TwDto> AVAILABLE_TWS = List.of(
-            new TwDto("mature_content", "Mature Content"),
-            new TwDto("death_animal", "Animal death"),
-            new TwDto("supernatural", "Supernatural"),
-            new TwDto("sensory_motion", "Motion sickness"),
-            new TwDto("graphic_violence", "Graphic violence"),
-            new TwDto("phobia_snakes", "Snake phobia"),
-            new TwDto("violence", "Violence"),
-            new TwDto("phobia_water", "Water phobia"),
-            new TwDto("animal_abuse", "Animal abuse"),
-            new TwDto("gross_out", "Gross out"),
-            new TwDto("phobia_insects", "Insect phobia"),
-            new TwDto("death_human", "Human death"),
-            new TwDto("asphyxiation", "Asphyxiation"),
-            new TwDto("social_issue", "Social Issue")
-    );
-
-    /** Value sets the mock login and admin forms offer. */
-    public static final List<String> BINDING_STATUSES = List.of("AUTO", "MANUAL", "INCOMPLETE");
-    public static final List<String> SOURCE_TYPES = List.of("STEAM", "XBOX", "MINECRAFT");
-    public static final List<String> MINECRAFT_STATUSES = List.of("NONE", "PENDING", "INVITE_REJECTED", "ACCEPTED", "REMOVED");
-
-    public static final ChannelDto[] CHANNEL_DTOS = {
-            new ChannelDto(
-                    UUID.nameUUIDFromBytes("online".getBytes(StandardCharsets.UTF_8)),
-                    "00000001",
-                    "enimaloc_stream",
-                    "https://static-cdn.jtvnw.net/jtv_user_pictures/a69d9843-4cd4-4b3a-815d-0101b31e4790-profile_image-70x70.png",
-                    true
-            ),
-            new ChannelDto(
-                    UUID.nameUUIDFromBytes("offline".getBytes(StandardCharsets.UTF_8)),
-                    "00000002",
-                    "enimaloc",
-                    "https://static-cdn.jtvnw.net/jtv_user_pictures/a69d9843-4cd4-4b3a-815d-0101b31e4790-profile_image-70x70.png",
-                    false
-            )
+    private static final Random RANDOM = new Random();
+    private static final String[] RANDOM_NAME_PARTS = {
+            "nova", "pixel", "comet", "ember", "quartz", "raven", "glitch", "vortex", "cinder", "haze"
     };
-    public static final BindingDto[] BINDING_DTOS = {
-            new BindingDto(
-                    UUID.nameUUIDFromBytes("STUNTBOOST".getBytes(StandardCharsets.UTF_8)).toString(),
-                    "AUTO", "STEAM", "STUNTBOOST", "000001",
-                    "Stuntboost", false, true, Set.of(), true,
-                    false, Set.of()),
-            new BindingDto(
-                    UUID.nameUUIDFromBytes("CONTROL Resonant".getBytes(StandardCharsets.UTF_8)).toString(),
-                    "AUTO", "STEAM", "CONTROL Resonant", "1338428218",
-                    "Control Resonant", false, true, Set.of("ProfanityVulgarity", "ViolentGraphic", "SexualThemes"),
-                    true, false, Set.of("mature_content", "graphic_violence")
-            ),
-            new BindingDto(
-                    UUID.nameUUIDFromBytes("Valheim".getBytes(StandardCharsets.UTF_8)).toString(),
-                    "AUTO", "STEAM", "Valheim", "508455",
-                    "Valheim", false, true, Set.of("DrugsIntoxication", "ProfanityVulgarity", "ViolentGraphic"),
-                    true, false, Set.of("death_animal", "supernatural", "sensory_motion",
-                    "graphic_violence", "phobia_snakes", "violence", "phobia_water", "animal_abuse", "gross_out",
-                    "phobia_insects", "death_human", "asphyxiation", "social_issue")
-            ),
-            new BindingDto(
-                    UUID.nameUUIDFromBytes("Jusant".getBytes(StandardCharsets.UTF_8)).toString(),
-                    "AUTO", "STEAM", "Jusant", "524807049",
-                    "Jusant", false, true, Set.of(),
-                    true, false, Set.of()
-            ),
-            new BindingDto(
-                    UUID.nameUUIDFromBytes("MainFrames".getBytes(StandardCharsets.UTF_8)).toString(),
-                    "AUTO", "STEAM", "MainFrames", "656286460",
-                    "MainFrames", false, true, Set.of("DrugsIntoxication"),
-                    true, false, Set.of()
-            )
-    };
-    public static final GameDto[] GAME_DTOS = new GameDto[BINDING_DTOS.length];
-    public static final TwitchCategoryDto[] CATEGORIES_DTO = new TwitchCategoryDto[BINDING_DTOS.length];
-    public static final UserSettingsDto[] SETTINGS_DTOS = {
-            new UserSettingsDto(
-                    true, Set.of("violent-graphic"),
-                    null, null, Set.of(), false,
-                    false, false, null,
-                    null, Set.of(),
-                    AVAILABLE_CCLS,
-                    false, Set.of(),
-                    AVAILABLE_TWS)
-    };
+    private static final String EXAMPLE_UUID = "00000000-0000-0000-0000-000000000000";
+    private static final ObsData DEFAULT_OBS = new ObsData(true, "127.0.0.1", 4455, true);
+    private static final LinkStateResponse MINECRAFT_UNLINKED = new LinkStateResponse("NONE", null, null);
 
-    record TwitchCategoryDto(String id, String name) {}
-
-    static {
-        for (int i = 0; i < BINDING_DTOS.length; i++) {
-            GAME_DTOS[i] = new GameDto(BINDING_DTOS[i].id(), BINDING_DTOS[i].sourceName(), BINDING_DTOS[i].sourceType());
-            CATEGORIES_DTO[i] = new TwitchCategoryDto(BINDING_DTOS[i].twitchGameId(), BINDING_DTOS[i].twitchGameName());
-        }
-    }
+    /** A session's initial Steam state. */
+    record SteamState(boolean connected, boolean personalToken, boolean tokenShared,
+                      boolean profilePrivate, boolean rateLimited, boolean offlineMode) {}
 
     @Getter
     private ChannelDto channelDto;
+    /** Nullable: no detected game while the session has no binding. */
     @Getter
     private GameDto gameDto;
-    /**
-     * Nullable: cleared by {@link #deleteBinding}, matching a real "no binding" state.
-     */
     @Getter
     private List<BindingDto> binding;
     private UserSettingsDto userSettingsDto;
@@ -137,131 +68,106 @@ public class MockData {
     private boolean steamRateLimited;
     @Getter
     private boolean steamOfflineMode;
-    /**
-     * Not reachable from the app's own UI — only {@link fr.enimaloc.catapult.controller.mock.MockAdminController} edits this.
-     */
+    /** Not reachable from the app's own UI — only the mock admin page edits this. */
     @Getter
     private long steamProfileCacheTtlMinutes = 15L;
     @Getter
     private boolean hasXboxProvider;
     @Getter
     private boolean hasXbox;
-    @Getter
-    private boolean hasMinecraftProvider;
+    private final boolean hasMinecraftProvider;
     private LinkStateResponse minecraftLink;
-    @Getter
-    private boolean hasObsProvider;
-    @Getter
-    private ObsData obsData;
+    private final ObsData obsData;
     @Setter
     @Getter
-    private boolean botEnabled;
+    private boolean botEnabled = true;
 
     /**
-     * Parses {@code jwt} as either a full custom config — a JSON object built by the mock
-     * login form ({@code jwt-select.html}'s inline script serializes every field into
-     * {@code code} before submitting) — or, for the 3 quick-launch links, a legacy single-digit
-     * index into the preset arrays above.
+     * @param steam     null when Steam isn't available to the channel
+     * @param minecraft null when Minecraft isn't available to the channel
+     * @param obs       null when OBS isn't available to the channel
+     */
+    MockData(ChannelDto channel, List<BindingDto> bindings, UserSettingsDto settings, List<ChannelDto> channels,
+             SteamState steam, boolean hasXboxProvider, boolean hasXbox, LinkStateResponse minecraft, ObsData obs) {
+        this.channelDto = channel;
+        this.binding = bindings;
+        // No binding (e.g. a random session that drew none) means no detected game either.
+        this.gameDto = bindings.isEmpty() ? null : detectedGameOf(bindings.getFirst());
+        this.userSettingsDto = settings;
+        this.channelsList = channels.contains(channel) ? channels : withFirst(channel, channels);
+        this.hasSteamProvider = steam != null;
+        if (steam != null) {
+            this.hasSteam = steam.connected();
+            this.hasSteamPersonalToken = steam.personalToken();
+            this.steamTokenShared = steam.tokenShared();
+            this.steamProfilePrivate = steam.profilePrivate();
+            this.steamRateLimited = steam.rateLimited();
+            this.steamOfflineMode = steam.offlineMode();
+        }
+        this.hasXboxProvider = hasXboxProvider;
+        this.hasXbox = hasXbox;
+        this.hasMinecraftProvider = minecraft != null;
+        this.minecraftLink = minecraft;
+        this.obsData = obs;
+    }
+
+    // --- factories -----------------------------------------------------------------------------
+
+    /**
+     * Parses {@code jwt} as either a full custom config — a JSON object built by the mock login
+     * form — or, for the quick-launch links, a single-digit index into {@link MockPresets}.
+     * A malformed config falls back to preset "0" rather than failing the login.
      */
     public static MockData fromJwt(String jwt) {
         if (jwt != null && jwt.startsWith("{")) {
             try {
                 return fromConfig(JSON.readValue(jwt, MockConfig.class));
             } catch (Exception e) {
-                // Malformed config (e.g. hand-edited URL) — fall back to the default preset
-                // rather than 500ing the mock login flow.
                 return fromJwt("0");
             }
         }
         int id = Integer.parseInt(jwt);
+        List<ChannelDto> channels = MockPresets.CHANNELS;
+        List<BindingDto> bindings = MockPresets.BINDINGS;
         return new MockData(
-                CHANNEL_DTOS[Integer.min(id, CHANNEL_DTOS.length - 1)],
-                Collections.singletonList(BINDING_DTOS[Integer.min(id, BINDING_DTOS.length - 1)]),
-                SETTINGS_DTOS[Integer.min(id, SETTINGS_DTOS.length - 1)],
-                id == 0 ? List.of(CHANNEL_DTOS) : List.of(),
-                true, true, true, false, false, false, false,
-                false, false, true,
-                new LinkStateResponse("NONE", null, null),
-                true, new ObsData(true, "127.0.0.1", 4455, true));
+                channels.get(Math.min(id, channels.size() - 1)),
+                List.of(bindings.get(Math.min(id, bindings.size() - 1))),
+                MockPresets.DEFAULT_SETTINGS,
+                id == 0 ? channels : List.of(),
+                new SteamState(true, true, false, false, false, false),
+                false, false, MINECRAFT_UNLINKED, DEFAULT_OBS);
     }
 
-    private static MockData fromConfig(MockConfig c) {
-        ChannelDto channel = new ChannelDto(
-                UUID.nameUUIDFromBytes(c.username.getBytes(StandardCharsets.UTF_8)),
-                c.twitchId, c.username, c.avatarUrl, c.live);
+    private static MockData fromConfig(MockConfig config) {
+        ChannelDto channel = new ChannelDto(MockPresets.uuidOf(config.username), config.twitchId, config.username,
+                config.avatarUrl, config.live);
 
-        BindingDto binding = new BindingDto(
-                UUID.nameUUIDFromBytes(c.binding.sourceName.getBytes(StandardCharsets.UTF_8)).toString(),
-                c.binding.status, c.binding.sourceType, c.binding.sourceName,
-                c.binding.twitchGameId, c.binding.twitchGameName,
-                c.binding.ignored, c.binding.cclEnabled, Set.copyOf(c.binding.ccls),
-                c.binding.twEnabled, c.binding.twOverride, Set.copyOf(c.binding.tws));
-
-        List<BindingDto> bindings = List.of(binding);
+        MockConfig.Binding b = config.binding;
+        BindingDto binding = new BindingDto(MockPresets.uuidOf(b.sourceName).toString(), b.status, b.sourceType,
+                b.sourceName, b.twitchGameId, b.twitchGameName, b.ignored, b.cclEnabled, Set.copyOf(b.ccls),
+                b.twEnabled, b.twOverride, Set.copyOf(b.tws));
 
         UserSettingsDto settings = new UserSettingsDto(
-                c.settings.cclFeatureEnabled, Set.copyOf(c.settings.blockedCcls),
+                config.settings.cclFeatureEnabled, Set.copyOf(config.settings.blockedCcls),
                 null, null, Set.of(), false, false, false,
                 null, null, Set.of(),
-                AVAILABLE_CCLS,
-                c.settings.twFeatureEnabled, Set.copyOf(c.settings.blockedTws),
-                AVAILABLE_TWS);
+                AVAILABLE_CCLS, config.settings.twFeatureEnabled, Set.copyOf(config.settings.blockedTws), AVAILABLE_TWS);
 
-        LinkStateResponse minecraft = new LinkStateResponse(
-                c.minecraft.status, c.minecraft.minecraftName, c.minecraft.serviceAccountUsername);
-
-        MockData data = new MockData(channel, bindings, settings, List.of(),
-                true, c.steam.connected, c.steam.hasPersonalToken, c.steam.tokenShared,
-                c.steam.profilePrivate, c.steam.rateLimited, c.steam.offlineMode,
-                true, c.xbox.connected, true, minecraft, true,
-                new ObsData(true, "127.0.0.1", 4455, true));
-        data.setBotEnabled(c.botEnabled);
+        MockConfig.Steam steam = config.steam;
+        MockData data = new MockData(channel, List.of(binding), settings, List.of(),
+                new SteamState(steam.connected, steam.hasPersonalToken, steam.tokenShared,
+                        steam.profilePrivate, steam.rateLimited, steam.offlineMode),
+                true, config.xbox.connected,
+                new LinkStateResponse(config.minecraft.status, config.minecraft.minecraftName,
+                        config.minecraft.serviceAccountUsername),
+                DEFAULT_OBS);
+        data.setBotEnabled(config.botEnabled);
         return data;
     }
 
-    public MockData(ChannelDto channelDto, List<BindingDto> bindingDto, UserSettingsDto userSettingsDto,
-                    List<ChannelDto> channelsList,
-                    boolean hasSteamProvider, boolean hasSteam, boolean hasSteamPersonalToken,
-                    boolean steamTokenShared, boolean steamProfilePrivate, boolean steamRateLimited,
-                    boolean steamOfflineMode, boolean hasXboxProvider, boolean hasXbox, boolean hasMinecraftProvider,
-                    LinkStateResponse minecraftLink, boolean hasObsProvider, ObsData obsData) {
-        this.channelDto = channelDto;
-        // No binding (e.g. a random session that drew none) means no detected game either.
-        this.gameDto = bindingDto.isEmpty() ? null
-                : new GameDto(bindingDto.getFirst().id(), bindingDto.getFirst().sourceName(), bindingDto.getFirst().sourceType());
-        this.binding = bindingDto;
-        this.userSettingsDto = userSettingsDto;
-        if (!channelsList.contains(channelDto)) {
-            channelsList = new ArrayList<>(channelsList);
-            channelsList.addFirst(channelDto);
-        }
-        this.channelsList = channelsList;
-        this.hasSteamProvider = hasSteamProvider;
-        this.hasSteam = hasSteam;
-        this.hasSteamPersonalToken = hasSteamPersonalToken;
-        this.steamTokenShared = steamTokenShared;
-        this.steamProfilePrivate = steamProfilePrivate;
-        this.steamRateLimited = steamRateLimited;
-        this.steamOfflineMode = steamOfflineMode;
-        this.hasXboxProvider = hasXboxProvider;
-        this.hasXbox = hasXbox;
-        this.minecraftLink = minecraftLink;
-        this.hasMinecraftProvider = hasMinecraftProvider;
-        this.hasObsProvider = hasObsProvider;
-        this.obsData = obsData;
-        this.botEnabled = true;
-    }
-
-    private static final String[] RANDOM_NAME_PARTS = {
-            "nova", "pixel", "comet", "ember", "quartz", "raven", "glitch", "vortex", "cinder", "haze"
-    };
-    private static final java.util.Random RANDOM = new Random();
-
     /**
-     * Builds a fresh, randomly-populated channel — used for every mock connection that
-     * doesn't hand a full JSON config to {@link #fromJwt}, so opening several mock sessions
-     * at once (several browser tabs, or the digit quick-launch links) gets distinct-looking
-     * data instead of colliding on the same fixed preset.
+     * A fresh, randomly-populated channel — for every mock login without a full JSON config, so
+     * several mock sessions at once get distinct-looking data instead of the same preset.
      */
     public static MockData random() {
         return random(RANDOM);
@@ -269,9 +175,7 @@ public class MockData {
 
     /**
      * Same as {@link #random()}, but seeded from {@code seed} so the same session token always
-     * regenerates the same channel — used when a session's entry is missing (e.g. the server
-     * restarted) so the reconstructed data looks stable across requests instead of reshuffling
-     * on every call.
+     * regenerates the same channel (e.g. after a restart lost the in-memory sessions).
      */
     public static MockData randomFrom(String seed) {
         return random(new Random(seed.hashCode()));
@@ -280,53 +184,59 @@ public class MockData {
     private static MockData random(Random random) {
         String username = RANDOM_NAME_PARTS[random.nextInt(RANDOM_NAME_PARTS.length)]
                 + "_" + Integer.toHexString(random.nextInt(0x10000));
-        ChannelDto channel = new ChannelDto(
-                new UUID(random.nextLong(), random.nextLong()),
-                String.valueOf(10_000_000 + random.nextInt(90_000_000)),
-                username,
-                CHANNEL_DTOS[0].profileImageUrl(),
+        ChannelDto channel = new ChannelDto(new UUID(random.nextLong(), random.nextLong()),
+                String.valueOf(10_000_000 + random.nextInt(90_000_000)), username, MockPresets.AVATAR_URL,
                 random.nextBoolean());
 
         boolean hasSteam = random.nextBoolean();
         boolean hasSteamPersonalToken = hasSteam && random.nextBoolean();
-        MockData data = new MockData(channel, Arrays.stream(BINDING_DTOS).filter(unused -> random.nextBoolean()).toList(), SETTINGS_DTOS[0], List.of(),
-                true, hasSteam, hasSteamPersonalToken,
-                hasSteamPersonalToken && random.nextBoolean(), hasSteam && random.nextBoolean(),
-                hasSteam && random.nextBoolean(), hasSteam && random.nextBoolean(),
-                true, random.nextBoolean(),
-                true,
-                new LinkStateResponse("NONE", null, null),
-                true, new ObsData(true, "127.0.0.1", 4455, true));
-        data.setBotEnabled(true);
-        return data;
+        // Draw order matters: randomFrom must keep regenerating the same session for a seed.
+        List<BindingDto> bindings = MockPresets.BINDINGS.stream().filter(unused -> random.nextBoolean()).toList();
+        boolean tokenShared = hasSteamPersonalToken && random.nextBoolean();
+        boolean profilePrivate = hasSteam && random.nextBoolean();
+        boolean rateLimited = hasSteam && random.nextBoolean();
+        boolean offlineMode = hasSteam && random.nextBoolean();
+        boolean hasXbox = random.nextBoolean();
+
+        return new MockData(channel, bindings, MockPresets.DEFAULT_SETTINGS, List.of(),
+                new SteamState(hasSteam, hasSteamPersonalToken, tokenShared, profilePrivate, rateLimited, offlineMode),
+                true, hasXbox, MINECRAFT_UNLINKED, DEFAULT_OBS);
     }
+
+    // --- reads ---------------------------------------------------------------------------------
 
     public ChannelListResponse getChannelList() {
         return new ChannelListResponse(channelDto.twitchId(), channelsList);
     }
 
+    /** The dashboard as {@code username} sees it, bindings filtered by status and/or source. */
     public ChannelPageData getPage(String username, String status, String source) {
-        List<BindingDto> bindingDtos = binding.stream().filter(b ->
-                (status == null || status.equalsIgnoreCase(b.status()))
-                && (source == null || source.equalsIgnoreCase(b.sourceType()))
-        ).toList();
+        List<BindingDto> bindings = binding.stream()
+                .filter(b -> status == null || status.equalsIgnoreCase(b.status()))
+                .filter(b -> source == null || source.equalsIgnoreCase(b.sourceType()))
+                .toList();
         return new ChannelPageData(
                 getChannelUser(), username, username.equals(channelDto.twitchUsername()),
                 channelDto.live(), botEnabled, gameDto,
-                new PagedBindings(0, bindingDtos.isEmpty() ? 0 : 1, bindingDtos.size(), bindingDtos),
+                new PagedBindings(0, bindings.isEmpty() ? 0 : 1, bindings.size(), bindings),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
-                status, source, hasSteamProvider ? new SteamData(hasSteam,
-                hasSteamPersonalToken, steamTokenShared, steamProfilePrivate, steamRateLimited,
-                steamOfflineMode, steamProfileCacheTtlMinutes) : null, hasXboxProvider ?
-                new XboxData(hasXbox) : null, hasMinecraftProvider ?
-                new MinecraftData(minecraftLink.status(), minecraftLink.minecraftName(),
-                        minecraftLink.serviceAccountUsername()) : null, hasObsProvider ? obsData : null,
-                "00000000-0000-0000-0000-000000000000"
-        );
+                status, source, steamData(), hasXboxProvider ? new XboxData(hasXbox) : null, minecraftData(), obsData,
+                EXAMPLE_UUID);
+    }
+
+    private SteamData steamData() {
+        return !hasSteamProvider ? null : new SteamData(hasSteam, hasSteamPersonalToken, steamTokenShared,
+                steamProfilePrivate, steamRateLimited, steamOfflineMode, steamProfileCacheTtlMinutes);
+    }
+
+    private MinecraftData minecraftData() {
+        return !hasMinecraftProvider ? null : new MinecraftData(minecraftLink.status(), minecraftLink.minecraftName(),
+                minecraftLink.serviceAccountUsername());
     }
 
     public ChannelUserDto getChannelUser() {
-        return new ChannelUserDto(channelDto.id().toString(), channelDto.twitchId(), channelDto.twitchUsername(), channelDto.profileImageUrl());
+        return new ChannelUserDto(channelDto.id().toString(), channelDto.twitchId(), channelDto.twitchUsername(),
+                channelDto.profileImageUrl());
     }
 
     public UserSettingsDto getUserSettings() {
@@ -337,25 +247,14 @@ public class MockData {
         return minecraftLink;
     }
 
-    /**
-     * Applies {@code mapper} to the binding matching {@code bindingId}, leaving the rest of the list untouched.
-     */
-    private void updateBinding(String bindingId, java.util.function.UnaryOperator<BindingDto> mapper) {
-        binding = binding.stream()
-                .map(b -> b.id().equals(bindingId) ? mapper.apply(b) : b)
-                .toList();
-    }
+    // --- binding mutations ---------------------------------------------------------------------
 
     public void setBindingCclEnabled(String bindingId, boolean enabled) {
-        updateBinding(bindingId, b -> new BindingDto(b.id(), b.status(), b.sourceType(), b.sourceName(),
-                b.twitchGameId(), b.twitchGameName(), b.ignored(), enabled, b.ccls(),
-                b.twEnabled(), b.twOverride(), b.tws()));
+        updateBinding(bindingId, b -> BindingCopy.of(b).cclEnabled(enabled).build());
     }
 
     public void setBindingIgnored(String bindingId, boolean ignored) {
-        updateBinding(bindingId, b -> new BindingDto(b.id(), b.status(), b.sourceType(), b.sourceName(),
-                b.twitchGameId(), b.twitchGameName(), ignored, b.cclEnabled(), b.ccls(),
-                b.twEnabled(), b.twOverride(), b.tws()));
+        updateBinding(bindingId, b -> BindingCopy.of(b).ignored(ignored).build());
     }
 
     public void deleteBinding(String bindingId) {
@@ -363,78 +262,67 @@ public class MockData {
     }
 
     public void updateBindingGame(String bindingId, String twitchGameId, String twitchGameName, Set<String> ccls) {
-        updateBinding(bindingId, b -> new BindingDto(b.id(), b.status(), b.sourceType(), b.sourceName(),
-                twitchGameId, twitchGameName, b.ignored(), b.cclEnabled(), Set.copyOf(ccls),
-                b.twEnabled(), b.twOverride(), b.tws()));
+        updateBinding(bindingId, b -> BindingCopy.of(b)
+                .twitchGame(twitchGameId, twitchGameName).ccls(Set.copyOf(ccls)).build());
     }
 
+    /** Custom trigger warnings override the channel-wide ones. */
     public void setBindingTws(String bindingId, Set<String> tws) {
-        updateBinding(bindingId, b -> new BindingDto(b.id(), b.status(), b.sourceType(), b.sourceName(),
-                b.twitchGameId(), b.twitchGameName(), b.ignored(), b.cclEnabled(),
-                b.ccls(), b.twEnabled(), true, Set.copyOf(tws)));
+        updateBinding(bindingId, b -> BindingCopy.of(b).tws(true, Set.copyOf(tws)).build());
     }
 
     public void resetBindingTws(String bindingId) {
-        updateBinding(bindingId, b -> new BindingDto(b.id(), b.status(), b.sourceType(), b.sourceName(),
-                b.twitchGameId(), b.twitchGameName(), b.ignored(), b.cclEnabled(),
-                b.ccls(), b.twEnabled(), false, Set.of()));
+        updateBinding(bindingId, b -> BindingCopy.of(b).tws(false, Set.of()).build());
     }
 
     public void setBindingTwEnabled(String bindingId, boolean enabled) {
-        updateBinding(bindingId, b -> new BindingDto(b.id(), b.status(), b.sourceType(), b.sourceName(),
-                b.twitchGameId(), b.twitchGameName(), b.ignored(), b.cclEnabled(),
-                b.ccls(), enabled, b.twOverride(), b.tws()));
+        updateBinding(bindingId, b -> BindingCopy.of(b).twEnabled(enabled).build());
     }
 
+    /** Applies {@code mapper} to the binding matching {@code bindingId}, leaving the others untouched. */
+    private void updateBinding(String bindingId, UnaryOperator<BindingDto> mapper) {
+        binding = binding.stream().map(b -> b.id().equals(bindingId) ? mapper.apply(b) : b).toList();
+    }
+
+    // --- settings mutations --------------------------------------------------------------------
+
     public void saveCclSettings(boolean enabled, Set<String> blockedCcls) {
-        userSettingsDto = new UserSettingsDto(enabled, Set.copyOf(blockedCcls),
-                userSettingsDto.noGameTwitchGameId(), userSettingsDto.noGameTwitchGameName(), userSettingsDto.noGameCcls(),
-                userSettingsDto.applyDefaultOnStreamStart(), userSettingsDto.applyDefaultOnNoGame(), userSettingsDto.applyDefaultOnStreamEnd(),
-                userSettingsDto.incompleteFallbackTwitchGameId(), userSettingsDto.incompleteFallbackTwitchGameName(), userSettingsDto.incompleteFallbackCcls(),
-                userSettingsDto.availableCcls(), userSettingsDto.twFeatureEnabled(), userSettingsDto.blockedTws(), userSettingsDto.availableTws());
+        userSettingsDto = SettingsCopy.of(userSettingsDto).ccl(enabled, Set.copyOf(blockedCcls)).build();
     }
 
     public void saveTwSettings(boolean enabled, Set<String> blockedTws) {
-        userSettingsDto = new UserSettingsDto(userSettingsDto.cclFeatureEnabled(), userSettingsDto.blockedCcls(),
-                userSettingsDto.noGameTwitchGameId(), userSettingsDto.noGameTwitchGameName(), userSettingsDto.noGameCcls(),
-                userSettingsDto.applyDefaultOnStreamStart(), userSettingsDto.applyDefaultOnNoGame(), userSettingsDto.applyDefaultOnStreamEnd(),
-                userSettingsDto.incompleteFallbackTwitchGameId(), userSettingsDto.incompleteFallbackTwitchGameName(), userSettingsDto.incompleteFallbackCcls(),
-                userSettingsDto.availableCcls(), enabled, Set.copyOf(blockedTws), userSettingsDto.availableTws());
+        userSettingsDto = SettingsCopy.of(userSettingsDto).tw(enabled, Set.copyOf(blockedTws)).build();
     }
 
     public void saveNoGameSettings(String twitchGameId, String twitchGameName, Set<String> ccls,
                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
-        userSettingsDto = new UserSettingsDto(userSettingsDto.cclFeatureEnabled(), userSettingsDto.blockedCcls(),
-                twitchGameId, twitchGameName, Set.copyOf(ccls),
-                applyOnStreamStart, applyOnNoGame, applyOnStreamEnd,
-                userSettingsDto.incompleteFallbackTwitchGameId(), userSettingsDto.incompleteFallbackTwitchGameName(), userSettingsDto.incompleteFallbackCcls(),
-                userSettingsDto.availableCcls(), userSettingsDto.twFeatureEnabled(), userSettingsDto.blockedTws(), userSettingsDto.availableTws());
+        userSettingsDto = SettingsCopy.of(userSettingsDto)
+                .noGame(twitchGameId, twitchGameName, Set.copyOf(ccls), applyOnStreamStart, applyOnNoGame, applyOnStreamEnd)
+                .build();
     }
 
     public void saveIncompleteFallbackSettings(String twitchGameId, String twitchGameName, Set<String> ccls) {
-        userSettingsDto = new UserSettingsDto(userSettingsDto.cclFeatureEnabled(), userSettingsDto.blockedCcls(),
-                userSettingsDto.noGameTwitchGameId(), userSettingsDto.noGameTwitchGameName(), userSettingsDto.noGameCcls(),
-                userSettingsDto.applyDefaultOnStreamStart(), userSettingsDto.applyDefaultOnNoGame(), userSettingsDto.applyDefaultOnStreamEnd(),
-                twitchGameId, twitchGameName, Set.copyOf(ccls),
-                userSettingsDto.availableCcls(), userSettingsDto.twFeatureEnabled(), userSettingsDto.blockedTws(), userSettingsDto.availableTws());
+        userSettingsDto = SettingsCopy.of(userSettingsDto)
+                .incompleteFallback(twitchGameId, twitchGameName, Set.copyOf(ccls)).build();
     }
+
+    // --- connections ---------------------------------------------------------------------------
 
     public void minecraftEnroll(String name) {
         minecraftLink = new LinkStateResponse("PENDING", name, null);
     }
 
-    /**
-     * Simulates the invite being accepted in-game the moment it's checked — the mock has no game client to poll.
-     */
+    /** Simulates the invite being accepted in-game the moment it's checked — the mock has no game client to poll. */
     public void minecraftSync() {
         if (minecraftLink != null
                 && ("PENDING".equals(minecraftLink.status()) || "REMOVED".equals(minecraftLink.status()))) {
-            minecraftLink = new LinkStateResponse("ACCEPTED", minecraftLink.minecraftName(), minecraftLink.serviceAccountUsername());
+            minecraftLink = new LinkStateResponse("ACCEPTED", minecraftLink.minecraftName(),
+                    minecraftLink.serviceAccountUsername());
         }
     }
 
     public void minecraftDisconnect() {
-        minecraftLink = new LinkStateResponse("NONE", null, null);
+        minecraftLink = MINECRAFT_UNLINKED;
     }
 
     public void saveSteamToken(boolean shared) {
@@ -451,10 +339,7 @@ public class MockData {
         steamTokenShared = false;
     }
 
-    /*
-     * Admin-only mutators — none of these are reachable through the app's own UI, only
-     * through MockAdminController's /mock/admin page.
-     */
+    // --- admin-only mutators: no UI path reaches these, only the mock admin page ----------------
 
     public void setChannelLive(boolean live) {
         channelDto = new ChannelDto(channelDto.id(), channelDto.twitchId(), channelDto.twitchUsername(),
@@ -466,9 +351,7 @@ public class MockData {
                 avatarUrl, channelDto.live());
     }
 
-    /**
-     * The game Catapult currently detects running — independent of the binding's Twitch category mapping.
-     */
+    /** The game Catapult currently detects running — independent of the binding's Twitch category mapping. */
     public void setDetectedGame(String sourceType, String sourceName) {
         gameDto = new GameDto(gameDto == null ? null : gameDto.bindingId(), sourceName, sourceType);
     }
@@ -487,91 +370,177 @@ public class MockData {
         this.steamProfileCacheTtlMinutes = cacheTtlMinutes;
     }
 
-    /**
-     * The binding the admin page's single-slot form edits — the first entry, or {@code null} once the list is empty.
-     */
+    /** The binding the admin page's single-slot form edits — the first one, or null when there's none. */
     public BindingDto getPrimaryBinding() {
         return binding.isEmpty() ? null : binding.getFirst();
     }
 
     /**
      * Creates or fully replaces the admin page's binding slot (the first entry), including
-     * {@code status} — which the app's own binding-edit panel never touches — and works even
-     * after that entry has been deleted, since the UI has no "add binding" action at all. Any
-     * other bindings in the list are left untouched.
+     * {@code status} — which the dashboard never touches — and works even after that entry was
+     * deleted, since the UI has no "add binding" action. Other bindings are left untouched.
      */
     public void replaceBinding(String status, String sourceType, String sourceName, String twitchGameId,
                                String twitchGameName, boolean ignored, boolean cclEnabled, Set<String> ccls,
                                boolean twEnabled, boolean twOverride, Set<String> tws) {
         BindingDto primary = getPrimaryBinding();
-        String id = primary != null
-                ? primary.id()
-                : UUID.nameUUIDFromBytes(sourceName.getBytes(StandardCharsets.UTF_8)).toString();
+        String id = primary != null ? primary.id() : MockPresets.uuidOf(sourceName).toString();
         BindingDto replaced = new BindingDto(id, status, sourceType, sourceName, twitchGameId, twitchGameName,
                 ignored, cclEnabled, Set.copyOf(ccls), twEnabled, twOverride, Set.copyOf(tws));
         List<BindingDto> rest = primary != null ? binding.subList(1, binding.size()) : binding;
         binding = Stream.concat(Stream.of(replaced), rest.stream()).toList();
     }
 
-    /**
-     * Deserialization target for the mock login form's JSON payload.
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class MockConfig {
-        public String username = "enimaloc_stream";
-        public String twitchId = "00000001";
-        public String avatarUrl = "https://static-cdn.jtvnw.net/jtv_user_pictures/a69d9843-4cd4-4b3a-815d-0101b31e4790-profile_image-70x70.png";
-        public boolean live = true;
-        public boolean botEnabled = true;
-        public SteamConfig steam = new SteamConfig();
-        public XboxConfig xbox = new XboxConfig();
-        public MinecraftConfig minecraft = new MinecraftConfig();
-        public BindingConfig binding = new BindingConfig();
-        public SettingsConfig settings = new SettingsConfig();
+    // --- helpers -------------------------------------------------------------------------------
+
+    private static GameDto detectedGameOf(BindingDto binding) {
+        return new GameDto(binding.id(), binding.sourceName(), binding.sourceType());
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class SteamConfig {
-        public boolean connected = true;
-        public boolean hasPersonalToken = false;
-        public boolean tokenShared = false;
-        public boolean profilePrivate = false;
-        public boolean rateLimited = false;
-        public boolean offlineMode = false;
+    private static List<ChannelDto> withFirst(ChannelDto first, List<ChannelDto> others) {
+        List<ChannelDto> channels = new ArrayList<>(others);
+        channels.addFirst(first);
+        return channels;
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class XboxConfig {
-        public boolean connected = false;
+    /** Copy-and-modify for the immutable BindingDto. */
+    private static final class BindingCopy {
+        private final BindingDto from;
+        private String twitchGameId;
+        private String twitchGameName;
+        private boolean ignored;
+        private boolean cclEnabled;
+        private Set<String> ccls;
+        private boolean twEnabled;
+        private boolean twOverride;
+        private Set<String> tws;
+
+        private BindingCopy(BindingDto from) {
+            this.from = from;
+            this.twitchGameId = from.twitchGameId();
+            this.twitchGameName = from.twitchGameName();
+            this.ignored = from.ignored();
+            this.cclEnabled = from.cclEnabled();
+            this.ccls = from.ccls();
+            this.twEnabled = from.twEnabled();
+            this.twOverride = from.twOverride();
+            this.tws = from.tws();
+        }
+
+        static BindingCopy of(BindingDto from) {
+            return new BindingCopy(from);
+        }
+
+        BindingCopy twitchGame(String id, String name) {
+            this.twitchGameId = id;
+            this.twitchGameName = name;
+            return this;
+        }
+
+        BindingCopy ignored(boolean ignored) {
+            this.ignored = ignored;
+            return this;
+        }
+
+        BindingCopy cclEnabled(boolean cclEnabled) {
+            this.cclEnabled = cclEnabled;
+            return this;
+        }
+
+        BindingCopy ccls(Set<String> ccls) {
+            this.ccls = ccls;
+            return this;
+        }
+
+        BindingCopy twEnabled(boolean twEnabled) {
+            this.twEnabled = twEnabled;
+            return this;
+        }
+
+        BindingCopy tws(boolean override, Set<String> tws) {
+            this.twOverride = override;
+            this.tws = tws;
+            return this;
+        }
+
+        BindingDto build() {
+            return new BindingDto(from.id(), from.status(), from.sourceType(), from.sourceName(), twitchGameId,
+                    twitchGameName, ignored, cclEnabled, ccls, twEnabled, twOverride, tws);
+        }
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class MinecraftConfig {
-        public String status = "NONE";
-        public String minecraftName = null;
-        public String serviceAccountUsername = null;
-    }
+    /** Copy-and-modify for the immutable UserSettingsDto, one settings card at a time. */
+    private static final class SettingsCopy {
+        private final UserSettingsDto from;
+        private boolean cclEnabled;
+        private Set<String> blockedCcls;
+        private String noGameId;
+        private String noGameName;
+        private Set<String> noGameCcls;
+        private boolean applyOnStreamStart;
+        private boolean applyOnNoGame;
+        private boolean applyOnStreamEnd;
+        private String fallbackId;
+        private String fallbackName;
+        private Set<String> fallbackCcls;
+        private boolean twEnabled;
+        private Set<String> blockedTws;
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class BindingConfig {
-        public String sourceType = "STEAM";
-        public String sourceName = "STUNTBOOST";
-        public String twitchGameId = "000001";
-        public String twitchGameName = "Stuntboost";
-        public String status = "AUTO";
-        public boolean ignored = false;
-        public boolean cclEnabled = true;
-        public boolean twEnabled = true;
-        public boolean twOverride = false;
-        public List<String> ccls = List.of();
-        public List<String> tws = List.of();
-    }
+        private SettingsCopy(UserSettingsDto from) {
+            this.from = from;
+            this.cclEnabled = from.cclFeatureEnabled();
+            this.blockedCcls = from.blockedCcls();
+            this.noGameId = from.noGameTwitchGameId();
+            this.noGameName = from.noGameTwitchGameName();
+            this.noGameCcls = from.noGameCcls();
+            this.applyOnStreamStart = from.applyDefaultOnStreamStart();
+            this.applyOnNoGame = from.applyDefaultOnNoGame();
+            this.applyOnStreamEnd = from.applyDefaultOnStreamEnd();
+            this.fallbackId = from.incompleteFallbackTwitchGameId();
+            this.fallbackName = from.incompleteFallbackTwitchGameName();
+            this.fallbackCcls = from.incompleteFallbackCcls();
+            this.twEnabled = from.twFeatureEnabled();
+            this.blockedTws = from.blockedTws();
+        }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class SettingsConfig {
-        public boolean cclFeatureEnabled = true;
-        public boolean twFeatureEnabled = false;
-        public List<String> blockedCcls = List.of();
-        public List<String> blockedTws = List.of();
+        static SettingsCopy of(UserSettingsDto from) {
+            return new SettingsCopy(from);
+        }
+
+        SettingsCopy ccl(boolean enabled, Set<String> blocked) {
+            this.cclEnabled = enabled;
+            this.blockedCcls = blocked;
+            return this;
+        }
+
+        SettingsCopy tw(boolean enabled, Set<String> blocked) {
+            this.twEnabled = enabled;
+            this.blockedTws = blocked;
+            return this;
+        }
+
+        SettingsCopy noGame(String id, String name, Set<String> ccls,
+                            boolean onStreamStart, boolean onNoGame, boolean onStreamEnd) {
+            this.noGameId = id;
+            this.noGameName = name;
+            this.noGameCcls = ccls;
+            this.applyOnStreamStart = onStreamStart;
+            this.applyOnNoGame = onNoGame;
+            this.applyOnStreamEnd = onStreamEnd;
+            return this;
+        }
+
+        SettingsCopy incompleteFallback(String id, String name, Set<String> ccls) {
+            this.fallbackId = id;
+            this.fallbackName = name;
+            this.fallbackCcls = ccls;
+            return this;
+        }
+
+        UserSettingsDto build() {
+            return new UserSettingsDto(cclEnabled, blockedCcls, noGameId, noGameName, noGameCcls,
+                    applyOnStreamStart, applyOnNoGame, applyOnStreamEnd, fallbackId, fallbackName, fallbackCcls,
+                    from.availableCcls(), twEnabled, blockedTws, from.availableTws());
+        }
     }
 }
