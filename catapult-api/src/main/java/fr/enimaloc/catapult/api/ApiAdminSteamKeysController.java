@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,21 +33,27 @@ public class ApiAdminSteamKeysController {
     private final SteamApiKeyRotator rotator;
     private final AdminEventPublisher events;
 
-    public ApiAdminSteamKeysController(SteamApiKeyRepository repository) {
-        this(repository, null, null);
-    }
-
-    public ApiAdminSteamKeysController(SteamApiKeyRepository repository, SteamApiKeyRotator rotator) {
-        this(repository, rotator, null);
-    }
-
-    @Autowired
+    /** The rotator and the admin event stream only exist when Steam (resp. SSE notifications) are enabled. */
     public ApiAdminSteamKeysController(SteamApiKeyRepository repository,
                                        @Autowired(required = false) SteamApiKeyRotator rotator,
                                        @Autowired(required = false) AdminEventPublisher events) {
         this.repository = repository;
         this.rotator = rotator;
         this.events = events;
+    }
+
+    /** A shared key's id, masked value, owner and remaining rate-limit block. */
+    private static SteamKeyStatus status(SteamApiKeyEntry entry, Map<String, Long> blockedUntil, long now) {
+        String key = entry.getApiKey();
+        String owner = entry.getOwner() != null ? entry.getOwner().getTwitchUsername() : null;
+        long until = blockedUntil.getOrDefault(key, 0L);
+        boolean blocked = until > now;
+        long remainingSec = blocked ? TimeUnit.MILLISECONDS.toSeconds(until - now) : 0L;
+        return new SteamKeyStatus(ApiKeyHasher.id(key), mask(key), owner, blocked, remainingSec);
+    }
+
+    private void refreshRotator() {
+        if (rotator != null) rotator.refreshKeys();
     }
 
     private static String mask(String key) {
@@ -63,17 +68,7 @@ public class ApiAdminSteamKeysController {
         Map<String, Long> blockedUntil = rotator != null ? rotator.getKeyBlockedUntil() : Map.of();
         long now = System.currentTimeMillis();
 
-        List<SteamKeyStatus> keys = new ArrayList<>();
-        for (SteamApiKeyEntry entry : entries) {
-            String key = entry.getApiKey();
-            String masked = mask(key);
-            String owner = entry.getOwner() != null ? entry.getOwner().getTwitchUsername() : null;
-            long until = blockedUntil.getOrDefault(key, 0L);
-            boolean blocked = until > now;
-            long remainingSec = blocked ? TimeUnit.MILLISECONDS.toSeconds(until - now) : 0L;
-            keys.add(new SteamKeyStatus(ApiKeyHasher.id(key), masked, owner, blocked, remainingSec));
-        }
-
+        List<SteamKeyStatus> keys = entries.stream().map(entry -> status(entry, blockedUntil, now)).toList();
         return new SteamKeysPageData(keys, rotator != null);
     }
 
@@ -86,7 +81,7 @@ public class ApiAdminSteamKeysController {
         }
         if (!repository.existsById(trimmed)) {
             repository.save(new SteamApiKeyEntry(trimmed));
-            if (rotator != null) rotator.refreshKeys();
+            refreshRotator();
             if (events != null) {
                 events.keyAdded(AdminEventPublisher.PROVIDER_STEAM,
                         new SteamKeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
@@ -105,14 +100,14 @@ public class ApiAdminSteamKeysController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown keyId");
         }
         repository.deleteById(raw.get());
-        if (rotator != null) rotator.refreshKeys();
+        refreshRotator();
         if (events != null) events.keyDeleted(AdminEventPublisher.PROVIDER_STEAM, body.keyId());
     }
 
     @PostMapping("/refresh")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void refresh() {
-        if (rotator != null) rotator.refreshKeys();
+        refreshRotator();
         if (events != null) events.keysRefreshed(AdminEventPublisher.PROVIDER_STEAM, page().keys());
     }
 
