@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.experiment;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.common.dto.FeedbackRequest;
+import fr.enimaloc.catapult.common.dto.experiment.FeedbackRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;

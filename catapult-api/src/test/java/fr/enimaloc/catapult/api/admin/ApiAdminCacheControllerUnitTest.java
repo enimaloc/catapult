@@ -2,8 +2,8 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.chat.DynamicCommandResolver;
 import fr.enimaloc.catapult.chat.TwPlaceholderRegistry;
-import fr.enimaloc.catapult.common.dto.CacheEntryDto;
-import fr.enimaloc.catapult.common.dto.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;

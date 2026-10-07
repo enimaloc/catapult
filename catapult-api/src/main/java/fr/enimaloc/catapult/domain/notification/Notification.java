@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.domain.notification;
 
-import fr.enimaloc.catapult.common.dto.Severity;
+import fr.enimaloc.catapult.common.dto.notification.Severity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;

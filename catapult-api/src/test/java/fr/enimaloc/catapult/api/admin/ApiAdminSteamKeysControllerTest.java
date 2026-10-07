@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.SteamAddKeyRequest;
-import fr.enimaloc.catapult.common.dto.SteamDeleteKeyRequest;
-import fr.enimaloc.catapult.common.dto.SteamKeyStatus;
+import fr.enimaloc.catapult.common.dto.admin.SteamAddKeyRequest;
+import fr.enimaloc.catapult.common.dto.admin.SteamDeleteKeyRequest;
+import fr.enimaloc.catapult.common.dto.admin.SteamKeyStatus;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
