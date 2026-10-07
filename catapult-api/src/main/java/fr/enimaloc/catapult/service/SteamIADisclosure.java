@@ -4,7 +4,6 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -48,12 +47,9 @@ public class SteamIADisclosure {
         return Map.entry(language, Pattern.compile(Pattern.quote(literalText)));
     }
 
+    /** Whether {@code html} carries the AI-content disclosure heading, in any language Steam uses. */
     public static boolean hasDisclosure(String html) {
-        return Arrays.stream(SteamLanguage.values())
-                .map(l -> hasDisclosure(html, l))
-                .filter(b -> b)
-                .findFirst()
-                .orElse(false);
+        return PATTERNS.values().stream().anyMatch(pattern -> pattern.matcher(html).find());
     }
 
     public static boolean hasDisclosure(String html, Locale locale) {
