@@ -14,7 +14,7 @@
     <script th:inline="javascript">
         window.Catapult = {
             page: /*[[${page}]]*/,
-            spa: /*[[${spa}]]*/,
+            spa: /*[[${app.spa}]]*/,
             titles: /*[[${titles}]]*/
         };
     </script>
@@ -44,7 +44,7 @@
 
     <div id="app">
         <th:block th:if="${error}"><div th:replace="~{pages/error::error}"></div></th:block>
-        <th:block th:unless="${error}" th:each="spaPage : ${spa}" th:if="${page == spaPage.getId()}">
+        <th:block th:unless="${error}" th:each="spaPage : ${app.spa}" th:if="${page == spaPage.getId()}">
             <div th:replace="~{${spaPage.getTemplate()} :: ${spaPage.getFragment()}}"></div>
         </th:block>
     </div>
