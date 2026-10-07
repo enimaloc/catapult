@@ -3,139 +3,104 @@ package fr.enimaloc.catapult.service;
 import fr.enimaloc.catapult.domain.SteamAppParentEntry;
 import fr.enimaloc.catapult.getter.SteamPlaytestRedirectResolver;
 import fr.enimaloc.catapult.repository.SteamAppParentRepository;
-import fr.enimaloc.catapult.service.SteamStoreServiceImpl;
+import fr.enimaloc.catapult.service.SteamStoreService.ResolvedParentApp;
+import fr.enimaloc.catapult.service.SteamStoreService.SteamTwSignals;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.client.ExpectedCount.manyTimes;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-@SuppressWarnings({"unchecked", "rawtypes"})
+/**
+ * Drives the service against Steam-shaped JSON through a real RestClient, so the tests cover
+ * the {@code appdetails} deserialization too, not just the logic on top of it.
+ */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class SteamStoreServiceTest {
 
-    @Mock private RestClient restClient;
-    @Mock private RestClient.RequestHeadersUriSpec getSpec;
-    @Mock private RestClient.RequestHeadersSpec headersSpec;
-    @Mock private RestClient.ResponseSpec responseSpec;
+    private static final String APP_DETAILS = "https://store.steampowered.com/api/appdetails";
+
     @Mock private SteamAppParentRepository steamAppParentRepository;
     @Mock private SteamPlaytestRedirectResolver redirectResolver;
 
-    @Spy
-    private ExternalApiObservations apiObservations = new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry());
-
-    @InjectMocks private SteamStoreServiceImpl service;
+    private MockRestServiceServer steam;
+    private SteamStoreServiceImpl service;
 
     @BeforeEach
-    void setupRestClientChain() {
-        doReturn(getSpec).when(restClient).get();
-        doReturn(headersSpec).when(getSpec).uri(anyString());
-        doReturn(responseSpec).when(headersSpec).retrieve();
+    void setUp() {
+        RestClient.Builder builder = RestClient.builder();
+        steam = MockRestServiceServer.bindTo(builder).ignoreExpectOrder(true).build();
+        ExternalApiObservations observations =
+                new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry());
+        service = new SteamStoreServiceImpl(builder.build(), observations, steamAppParentRepository, redirectResolver);
+        doReturn(Optional.empty()).when(steamAppParentRepository).findById(any());
     }
 
-    private void givenSteamResponse(Map<String, Object> response) {
-        doReturn(response).when(responseSpec).body(Map.class);
+    // --- fixtures -----------------------------------------------------------------------------
+
+    private void givenAppDetails(String appId, String language, String json) {
+        steam.expect(manyTimes(), requestTo(APP_DETAILS + "?appids=" + appId + "&l=" + language))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
     }
 
-    private Map<String, Object> steamEntry(String org, String rating, String descriptors) {
-        return Map.of("success", true, "data", Map.of(
-            "ratings", Map.of(org, Map.of("rating", rating, "descriptors", descriptors))
-        ));
+    private void givenAppDetails(String appId, String json) {
+        givenAppDetails(appId, "english", json);
     }
 
-    @Test
-    void fetchCcls_esrbM_noDescriptors_returnsNoEntry() {
-        givenSteamResponse(Map.of("100", steamEntry("esrb", "m", "")));
-
-        // MatureGame is handled automatically by Twitch, not suggested by this service
-        assertThat(service.fetchCcls(List.of("100"))).doesNotContainKey("100");
+    /**
+     * Wraps {@code dataJson}'s fields in a successful entry. Real Steam responses always carry
+     * steam_appid, required_age and is_free; Jackson 3 refuses to map a missing primitive, so
+     * leaving them out would make every fixture fail to deserialize.
+     */
+    private static String success(String appId, String dataJson) {
+        String body = dataJson.strip();
+        String fields = body.substring(1, body.length() - 1).strip();
+        String always = "\"steam_appid\": %s, \"required_age\": 0, \"is_free\": false".formatted(appId);
+        return "{\"%s\": {\"success\": true, \"data\": {%s%s}}}"
+                .formatted(appId, always, fields.isEmpty() ? "" : ", " + fields);
     }
 
-    @Test
-    void fetchCcls_bloodDescriptor_addsViolentGraphic() {
-        givenSteamResponse(Map.of("100", steamEntry("esrb", "t", "Blood and Gore")));
-
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("ViolentGraphic");
+    private static String failure(String appId) {
+        return "{\"%s\": {\"success\": false}}".formatted(appId);
     }
 
-    @Test
-    void fetchCcls_nudityDescriptor_addsSexualThemes() {
-        givenSteamResponse(Map.of("100", steamEntry("esrb", "t", "Nudity")));
-
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("SexualThemes");
+    private static String rated(String appId, String descriptors) {
+        return success(appId, """
+                {"type": "game", "name": "Some Game",
+                 "ratings": {"esrb": {"rating": "t", "descriptors": "%s"}}}""".formatted(descriptors));
     }
 
-    @Test
-    void fetchCcls_drugDescriptor_addsDrugsIntoxication() {
-        givenSteamResponse(Map.of("100", steamEntry("esrb", "t", "Drug Reference")));
-
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("DrugsIntoxication");
-    }
-
-    @Test
-    void fetchCcls_gamblingDescriptor_addsGambling() {
-        givenSteamResponse(Map.of("100", steamEntry("esrb", "t", "Simulated Gambling")));
-
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("Gambling");
-    }
-
-    @Test
-    void fetchCcls_profanityDescriptor_addsProfanityVulgarity() {
-        givenSteamResponse(Map.of("100", steamEntry("esrb", "t", "Strong Language")));
-
-        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("ProfanityVulgarity");
-    }
-
-    @Test
-    void fetchCcls_multipleDescriptors_addsMultipleCcls() {
-        givenSteamResponse(Map.of("100", steamEntry("esrb", "m", "Blood and Gore\nDrug Reference")));
-
-        Set<String> ccls = service.fetchCcls(List.of("100")).get("100");
-        assertThat(ccls).contains("ViolentGraphic", "DrugsIntoxication");
-    }
-
-    @Test
-    void fetchCcls_noRatings_returnsEmpty() {
-        givenSteamResponse(Map.of("100", Map.of("success", true, "data", Map.of())));
-
-        assertThat(service.fetchCcls(List.of("100"))).isEmpty();
-    }
-
-    @Test
-    void fetchCcls_successFalse_skipsEntry() {
-        givenSteamResponse(Map.of("100", Map.of("success", false)));
-
-        assertThat(service.fetchCcls(List.of("100"))).isEmpty();
-    }
-
-    @Test
-    void fetchCcls_nullResponse_returnsEmpty() {
-        doReturn(null).when(responseSpec).body(Map.class);
-
-        assertThat(service.fetchCcls(List.of("100"))).isEmpty();
-    }
+    // --- fetchCcls ----------------------------------------------------------------------------
 
     @Test
     void fetchCcls_emptyAppIds_returnsImmediately() {
@@ -143,156 +108,324 @@ class SteamStoreServiceTest {
     }
 
     @Test
-    void resolveEffectiveApp_freshCacheHit_skipsNetworkCall() {
-        SteamAppParentEntry cached = new SteamAppParentEntry("4519120", "4009490", "Arctic Drive");
-        doReturn(java.util.Optional.of(cached)).when(steamAppParentRepository).findById("4519120");
+    void fetchCcls_ratingWithoutDescriptors_returnsNoEntry() {
+        // MatureGame is handled automatically by Twitch, not suggested by this service
+        givenAppDetails("100", rated("100", ""));
 
-        assertThat(service.resolveEffectiveApp("4519120"))
-            .contains(new SteamStoreService.ResolvedParentApp("4009490", "Arctic Drive"));
-        verifyNoInteractions(restClient);
+        assertThat(service.fetchCcls(List.of("100"))).doesNotContainKey("100");
+    }
+
+    @Test
+    void fetchCcls_bloodDescriptor_addsViolentGraphic() {
+        givenAppDetails("100", rated("100", "Blood and Gore"));
+
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("ViolentGraphic");
+    }
+
+    @Test
+    void fetchCcls_nudityDescriptor_addsSexualThemes() {
+        givenAppDetails("100", rated("100", "Nudity"));
+
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("SexualThemes");
+    }
+
+    @Test
+    void fetchCcls_drugDescriptor_addsDrugsIntoxication() {
+        givenAppDetails("100", rated("100", "Drug Reference"));
+
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("DrugsIntoxication");
+    }
+
+    @Test
+    void fetchCcls_gamblingDescriptor_addsGambling() {
+        givenAppDetails("100", rated("100", "Simulated Gambling"));
+
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("Gambling");
+    }
+
+    @Test
+    void fetchCcls_profanityDescriptor_addsProfanityVulgarity() {
+        givenAppDetails("100", rated("100", "Strong Language"));
+
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("ProfanityVulgarity");
+    }
+
+    @Test
+    void fetchCcls_multipleDescriptors_addsMultipleCcls() {
+        givenAppDetails("100", rated("100", "Blood and Gore\\nDrug Reference"));
+
+        assertThat(service.fetchCcls(List.of("100")).get("100")).contains("ViolentGraphic", "DrugsIntoxication");
+    }
+
+    @Test
+    void fetchCcls_descriptorsMatchedAcrossEveryRatingBoard() {
+        givenAppDetails("100", success("100", """
+                {"ratings": {"esrb": {"descriptors": "Blood"}, "pegi": {"descriptors": "Gambling"}}}"""));
+
+        assertThat(service.fetchCcls(List.of("100")).get("100")).containsExactlyInAnyOrder("ViolentGraphic", "Gambling");
+    }
+
+    @Test
+    void fetchCcls_ratingMissingDescriptorsField_isSkipped() {
+        givenAppDetails("100", success("100", """
+                {"ratings": {"esrb": {"rating": "m"}, "pegi": {"descriptors": "Violence"}}}"""));
+
+        assertThat(service.fetchCcls(List.of("100")).get("100")).containsExactly("ViolentGraphic");
+    }
+
+    @Test
+    void fetchCcls_noRatings_returnsEmpty() {
+        givenAppDetails("100", success("100", "{}"));
+
+        assertThat(service.fetchCcls(List.of("100"))).isEmpty();
+    }
+
+    @Test
+    void fetchCcls_successFalse_skipsEntry() {
+        givenAppDetails("100", failure("100"));
+
+        assertThat(service.fetchCcls(List.of("100"))).isEmpty();
+    }
+
+    @Test
+    void fetchCcls_oneUnresolvedApp_doesNotDropTheOthers() {
+        givenAppDetails("100", failure("100"));
+        givenAppDetails("200", rated("200", "Blood"));
+
+        assertThat(service.fetchCcls(List.of("100", "200")))
+                .containsOnlyKeys("200")
+                .containsEntry("200", Set.of("ViolentGraphic"));
+    }
+
+    @Test
+    void fetchCcls_steamError_returnsEmpty() {
+        steam.expect(manyTimes(), requestTo(APP_DETAILS + "?appids=100&l=english"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThat(service.fetchCcls(List.of("100"))).isEmpty();
+    }
+
+    // --- fetchTwSignals -----------------------------------------------------------------------
+
+    @Test
+    void fetchTwSignals_emptyAppIds_returnsImmediately() {
+        assertThat(service.fetchTwSignals(List.of())).isEmpty();
+    }
+
+    @Test
+    void fetchTwSignals_readsDescriptorIdsAndLowercasedNotes() {
+        givenAppDetails("100", success("100", """
+                {"content_descriptors": {"ids": [2, 5], "notes": "Contains Blood and GORE"}}"""));
+
+        assertThat(service.fetchTwSignals(List.of("100")))
+                .containsEntry("100", new SteamTwSignals(Set.of(2, 5), "contains blood and gore"));
+    }
+
+    @Test
+    void fetchTwSignals_noContentDescriptors_returnsEmptySignals() {
+        givenAppDetails("100", success("100", "{}"));
+
+        assertThat(service.fetchTwSignals(List.of("100"))).containsEntry("100", SteamTwSignals.empty());
+    }
+
+    @Test
+    void fetchTwSignals_unresolvedApp_isSkipped() {
+        givenAppDetails("100", failure("100"));
+        givenAppDetails("200", success("200", "{\"content_descriptors\": {\"ids\": [1]}}"));
+
+        assertThat(service.fetchTwSignals(List.of("100", "200"))).containsOnlyKeys("200");
+    }
+
+    // --- resolveEffectiveApp ------------------------------------------------------------------
+
+    @Test
+    void resolveEffectiveApp_freshCacheHit_skipsNetworkCall() {
+        doReturn(Optional.of(new SteamAppParentEntry("4519120", "4009490", "Arctic Drive")))
+                .when(steamAppParentRepository).findById("4519120");
+
+        assertThat(service.resolveEffectiveApp("4519120")).contains(new ResolvedParentApp("4009490", "Arctic Drive"));
+        steam.verify();
         verifyNoInteractions(redirectResolver);
     }
 
     @Test
     void resolveEffectiveApp_freshNegativeCacheHit_skipsNetworkCall() {
-        SteamAppParentEntry cached = new SteamAppParentEntry("730", null, null);
-        doReturn(java.util.Optional.of(cached)).when(steamAppParentRepository).findById("730");
+        doReturn(Optional.of(new SteamAppParentEntry("730", null, null)))
+                .when(steamAppParentRepository).findById("730");
 
         assertThat(service.resolveEffectiveApp("730")).isEmpty();
-        verifyNoInteractions(restClient);
+        steam.verify();
         verifyNoInteractions(redirectResolver);
     }
 
     @Test
     void resolveEffectiveApp_fullgamePresent_returnsParentFromSameCall() {
-        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("100");
-        Map<String, Object> body = Map.of("100", Map.of(
-            "success", true,
-            "data", Map.of("type", "demo", "name", "Some Demo",
-                "fullgame", Map.of("appid", "200", "name", "Some Game"))
-        ));
-        givenSteamResponse(body);
+        givenAppDetails("100", success("100", """
+                {"type": "demo", "name": "Some Demo", "fullgame": {"appid": "200", "name": "Some Game"}}"""));
 
-        assertThat(service.resolveEffectiveApp("100"))
-            .contains(new SteamStoreService.ResolvedParentApp("200", "Some Game"));
+        assertThat(service.resolveEffectiveApp("100")).contains(new ResolvedParentApp("200", "Some Game"));
         verifyNoInteractions(redirectResolver);
         verify(steamAppParentRepository).save(argThat(e ->
-            "100".equals(e.getAppId()) && "200".equals(e.getParentAppId()) && "Some Game".equals(e.getParentName())));
+                "100".equals(e.getAppId()) && "200".equals(e.getParentAppId()) && "Some Game".equals(e.getParentName())));
+    }
+
+    @Test
+    void resolveEffectiveApp_fullgameWithoutName_usesItsAppIdAsName() {
+        givenAppDetails("100", success("100", "{\"type\": \"demo\", \"fullgame\": {\"appid\": 200}}"));
+
+        assertThat(service.resolveEffectiveApp("100")).contains(new ResolvedParentApp("200", "200"));
     }
 
     @Test
     void resolveEffectiveApp_playtestName_redirectResolved_returnsParent() {
-        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("4519120");
-        Map<String, Object> playtestBody = Map.of("4519120", Map.of(
-            "success", true, "data", Map.of("type", "game", "name", "Arctic Drive Playtest")));
-        Map<String, Object> parentBody = Map.of("4009490", Map.of(
-            "success", true, "data", Map.of("type", "game", "name", "Arctic Drive")));
-        doReturn(playtestBody).doReturn(parentBody).when(responseSpec).body(Map.class);
-        doReturn(java.util.Optional.of("4009490")).when(redirectResolver).resolveParentAppId("4519120");
+        givenAppDetails("4519120", success("4519120", "{\"type\": \"game\", \"name\": \"Arctic Drive Playtest\"}"));
+        givenAppDetails("4009490", success("4009490", "{\"type\": \"game\", \"name\": \"Arctic Drive\"}"));
+        doReturn(Optional.of("4009490")).when(redirectResolver).resolveParentAppId("4519120");
 
-        assertThat(service.resolveEffectiveApp("4519120"))
-            .contains(new SteamStoreService.ResolvedParentApp("4009490", "Arctic Drive"));
+        assertThat(service.resolveEffectiveApp("4519120")).contains(new ResolvedParentApp("4009490", "Arctic Drive"));
         verify(steamAppParentRepository).save(argThat(e ->
-            "4519120".equals(e.getAppId()) && "4009490".equals(e.getParentAppId()) && "Arctic Drive".equals(e.getParentName())));
+                "4519120".equals(e.getAppId()) && "4009490".equals(e.getParentAppId())
+                        && "Arctic Drive".equals(e.getParentName())));
     }
 
     @Test
     void resolveEffectiveApp_playtestName_parentDetailsFetchFails_returnsIdFallbackWithoutCaching() {
-        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("4519120");
-        Map<String, Object> playtestBody = Map.of("4519120", Map.of(
-            "success", true, "data", Map.of("type", "game", "name", "Arctic Drive Playtest")));
-        Map<String, Object> failedParentBody = Map.of("4009490", Map.of("success", false));
-        doReturn(playtestBody).doReturn(failedParentBody).when(responseSpec).body(Map.class);
-        doReturn(java.util.Optional.of("4009490")).when(redirectResolver).resolveParentAppId("4519120");
+        givenAppDetails("4519120", success("4519120", "{\"type\": \"game\", \"name\": \"Arctic Drive Playtest\"}"));
+        givenAppDetails("4009490", failure("4009490"));
+        doReturn(Optional.of("4009490")).when(redirectResolver).resolveParentAppId("4519120");
 
-        assertThat(service.resolveEffectiveApp("4519120"))
-            .contains(new SteamStoreService.ResolvedParentApp("4009490", "4009490"));
-        verify(steamAppParentRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
+        assertThat(service.resolveEffectiveApp("4519120")).contains(new ResolvedParentApp("4009490", "4009490"));
+        verify(steamAppParentRepository, never()).save(any());
     }
 
     @Test
     void resolveEffectiveApp_playtestName_redirectFails_returnsEmptyWithoutCaching() {
-        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("4519120");
-        Map<String, Object> playtestBody = Map.of("4519120", Map.of(
-            "success", true, "data", Map.of("type", "game", "name", "Arctic Drive Playtest")));
-        givenSteamResponse(playtestBody);
-        doReturn(java.util.Optional.empty()).when(redirectResolver).resolveParentAppId("4519120");
+        givenAppDetails("4519120", success("4519120", "{\"type\": \"game\", \"name\": \"Arctic Drive Playtest\"}"));
+        doReturn(Optional.empty()).when(redirectResolver).resolveParentAppId("4519120");
 
         assertThat(service.resolveEffectiveApp("4519120")).isEmpty();
-        verify(steamAppParentRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
+        verify(steamAppParentRepository, never()).save(any());
     }
 
     @Test
     void resolveEffectiveApp_regularGame_cachesNoParent() {
-        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("730");
-        Map<String, Object> body = Map.of("730", Map.of(
-            "success", true, "data", Map.of("type", "game", "name", "Counter-Strike 2")));
-        givenSteamResponse(body);
+        givenAppDetails("730", success("730", "{\"type\": \"game\", \"name\": \"Counter-Strike 2\"}"));
 
         assertThat(service.resolveEffectiveApp("730")).isEmpty();
         verifyNoInteractions(redirectResolver);
-        verify(steamAppParentRepository).save(argThat(e ->
-            "730".equals(e.getAppId()) && e.getParentAppId() == null));
+        verify(steamAppParentRepository).save(argThat(e -> "730".equals(e.getAppId()) && e.getParentAppId() == null));
+    }
+
+    @Test
+    void resolveEffectiveApp_unknownApp_returnsEmptyWithoutCaching() {
+        givenAppDetails("100", failure("100"));
+
+        assertThat(service.resolveEffectiveApp("100")).isEmpty();
+        verify(steamAppParentRepository, never()).save(any());
     }
 
     @Test
     void resolveEffectiveApp_cacheLookupThrows_fallsBackToLiveResolution() {
-        org.mockito.Mockito.doThrow(new RuntimeException("db down")).when(steamAppParentRepository).findById("100");
-        Map<String, Object> body = Map.of("100", Map.of(
-            "success", true,
-            "data", Map.of("type", "demo", "name", "Some Demo",
-                "fullgame", Map.of("appid", "200", "name", "Some Game"))
-        ));
-        givenSteamResponse(body);
+        doThrow(new RuntimeException("db down")).when(steamAppParentRepository).findById("100");
+        givenAppDetails("100", success("100", """
+                {"type": "demo", "name": "Some Demo", "fullgame": {"appid": "200", "name": "Some Game"}}"""));
 
-        assertThat(service.resolveEffectiveApp("100"))
-            .contains(new SteamStoreService.ResolvedParentApp("200", "Some Game"));
+        assertThat(service.resolveEffectiveApp("100")).contains(new ResolvedParentApp("200", "Some Game"));
+    }
+
+    @Test
+    void resolveEffectiveApp_cacheSaveThrows_stillReturnsResolution() {
+        doThrow(new RuntimeException("db down")).when(steamAppParentRepository).save(any());
+        givenAppDetails("100", success("100", """
+                {"type": "demo", "fullgame": {"appid": "200", "name": "Some Game"}}"""));
+
+        assertThat(service.resolveEffectiveApp("100")).contains(new ResolvedParentApp("200", "Some Game"));
     }
 
     @Test
     void resolveEffectiveApp_staleCache_reResolves() {
         SteamAppParentEntry stale = new SteamAppParentEntry("4519120", "4009490", "Arctic Drive");
         stale.setResolvedAt(Instant.now().minus(31, ChronoUnit.DAYS));
-        doReturn(java.util.Optional.of(stale)).when(steamAppParentRepository).findById("4519120");
-        Map<String, Object> playtestBody = Map.of("4519120", Map.of(
-            "success", true, "data", Map.of("type", "game", "name", "Arctic Drive Playtest")));
-        givenSteamResponse(playtestBody);
-        doReturn(java.util.Optional.empty()).when(redirectResolver).resolveParentAppId("4519120");
+        doReturn(Optional.of(stale)).when(steamAppParentRepository).findById("4519120");
+        givenAppDetails("4519120", success("4519120", "{\"type\": \"game\", \"name\": \"Arctic Drive Playtest\"}"));
+        doReturn(Optional.empty()).when(redirectResolver).resolveParentAppId("4519120");
 
         assertThat(service.resolveEffectiveApp("4519120")).isEmpty();
-        org.mockito.Mockito.verify(restClient, org.mockito.Mockito.atLeastOnce()).get();
+        verify(redirectResolver).resolveParentAppId("4519120");
     }
 
-    @Test
-    void fetchDescription_present_returnsShortDescription() {
-        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("100");
-        Map<String, Object> body = Map.of("100", Map.of(
-            "success", true,
-            "data", Map.of("type", "game", "name", "Some Game",
-                "short_description", "Une description en français.")
-        ));
-        givenSteamResponse(body);
+    // --- fetchDescription / fetchData ---------------------------------------------------------
 
-        assertThat(service.fetchDescription("100", java.util.Locale.FRENCH))
-            .contains("Une description en français.");
+    @Test
+    void fetchDescription_present_returnsShortDescriptionInTheRequestedLanguage() {
+        givenAppDetails("100", success("100", "{\"type\": \"game\", \"name\": \"Some Game\"}"));
+        givenAppDetails("100", "french", success("100", """
+                {"type": "game", "name": "Some Game", "short_description": "Une description en français."}"""));
+
+        assertThat(service.fetchDescription("100", Locale.FRENCH)).contains("Une description en français.");
     }
 
     @Test
     void fetchDescription_blank_returnsEmpty() {
-        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("100");
-        Map<String, Object> body = Map.of("100", Map.of(
-            "success", true, "data", Map.of("type", "game", "name", "Some Game", "short_description", "")
-        ));
-        givenSteamResponse(body);
+        givenAppDetails("100", success("100", "{\"type\": \"game\", \"name\": \"Some Game\", \"short_description\": \"\"}"));
 
-        assertThat(service.fetchDescription("100", java.util.Locale.ENGLISH)).isEmpty();
+        assertThat(service.fetchDescription("100", Locale.ENGLISH)).isEmpty();
     }
 
     @Test
     void fetchDescription_unknownApp_returnsEmpty() {
-        doReturn(java.util.Optional.empty()).when(steamAppParentRepository).findById("100");
-        givenSteamResponse(Map.of("100", Map.of("success", false)));
+        givenAppDetails("100", failure("100"));
 
-        assertThat(service.fetchDescription("100", java.util.Locale.ENGLISH)).isEmpty();
+        assertThat(service.fetchDescription("100", Locale.ENGLISH)).isEmpty();
+    }
+
+    @Test
+    void fetchDescription_demo_readsTheFullGamesDescription() {
+        givenAppDetails("100", success("100", """
+                {"type": "demo", "fullgame": {"appid": "200", "name": "Some Game"}}"""));
+        givenAppDetails("200", success("200", "{\"type\": \"game\", \"short_description\": \"Full game.\"}"));
+
+        assertThat(service.fetchDescription("100", Locale.ENGLISH)).contains("Full game.");
+    }
+
+    @Test
+    void fetchData_appMissingFromResponse_returnsEmpty() {
+        givenAppDetails("100", "{}");
+
+        assertThat(service.fetchData("100", Locale.ENGLISH, false)).isEmpty();
+    }
+
+    @Test
+    void fetchData_mapsStorePageFields() {
+        givenAppDetails("100", success("100", """
+                {"type": "game", "name": "Some Game",
+                 "developers": ["Studio"], "release_date": {"coming_soon": false, "date": "1 Jan, 2024"}}"""));
+
+        SteamStoreService.SteamStorePage page = service.fetchData("100", Locale.ENGLISH, false).orElseThrow();
+        assertThat(page.name()).isEqualTo("Some Game");
+        assertThat(page.steamAppId()).isEqualTo(100);
+        assertThat(page.isFree()).isFalse();
+        assertThat(page.developers()).containsExactly("Studio");
+        assertThat(page.releaseDate().date()).isEqualTo("1 Jan, 2024");
+    }
+
+    // --- fetchIADisclosure --------------------------------------------------------------------
+
+    @Test
+    void fetchIADisclosure_returnsTheStorePageHtml() {
+        givenAppDetails("100", success("100", "{\"type\": \"game\"}"));
+        steam.expect(manyTimes(), requestTo("https://store.steampowered.com/app/100?l=french"))
+                .andRespond(withSuccess("<html>page</html>", MediaType.TEXT_HTML));
+
+        assertThat(service.fetchIADisclosure("100", Locale.FRENCH)).contains("<html>page</html>");
+    }
+
+    @Test
+    void fetchIADisclosure_storeError_returnsEmpty() {
+        givenAppDetails("100", success("100", "{\"type\": \"game\"}"));
+        steam.expect(manyTimes(), requestTo("https://store.steampowered.com/app/100?l=english"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        assertThat(service.fetchIADisclosure("100", Locale.ENGLISH)).isEmpty();
     }
 }
