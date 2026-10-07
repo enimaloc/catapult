@@ -22,6 +22,9 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
@@ -46,6 +49,8 @@ public class SchedulerService {
      * one overwrite or clear the other's cache mid-read.
      */
     private final ReentrantLock cycleLock = new ReentrantLock();
+
+    private static final long PREFETCH_TIMEOUT_SECONDS = 5;
 
     @Scheduled(fixedRateString = "${app.polling.interval-seconds:60}000")
     public void poll() {
@@ -90,35 +95,23 @@ public class SchedulerService {
     }
 
     private void prefetch(List<UserAccount> users) {
-        steamGameGetter.ifPresent(getter -> {
-            CompletableFuture<Void> prefetch = getter.prefetchBatch(
-                users.stream().filter(u -> u.getSteamId() != null).toList()
-            );
-            try {
-                prefetch.get(5, java.util.concurrent.TimeUnit.SECONDS);
-            } catch (java.util.concurrent.TimeoutException e) {
-                prefetch.cancel(false);
-                log.warn("Steam prefetch timed out after 5s — proceeding with partial results");
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } catch (java.util.concurrent.ExecutionException e) {
-                log.warn("Steam prefetch failed: {}", e.getCause().getMessage());
-            }
-        });
+        steamGameGetter.ifPresent(getter -> awaitPrefetch("Steam",
+            getter.prefetchBatch(users.stream().filter(u -> u.getSteamId() != null).toList())));
+        minecraftPresenceGetter.ifPresent(getter -> awaitPrefetch("Minecraft", getter.prefetchBatch()));
+    }
 
-        minecraftPresenceGetter.ifPresent(getter -> {
-            CompletableFuture<Void> prefetch = getter.prefetchBatch();
-            try {
-                prefetch.get(5, java.util.concurrent.TimeUnit.SECONDS);
-            } catch (java.util.concurrent.TimeoutException e) {
-                prefetch.cancel(false);
-                log.warn("Minecraft prefetch timed out after 5s — proceeding with partial results");
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } catch (java.util.concurrent.ExecutionException e) {
-                log.warn("Minecraft prefetch failed: {}", e.getCause().getMessage());
-            }
-        });
+    /** Waits up to 5s for a getter's batch prefetch; on timeout or failure the cycle goes on with what it has. */
+    private static void awaitPrefetch(String source, CompletableFuture<Void> prefetch) {
+        try {
+            prefetch.get(PREFETCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            prefetch.cancel(false);
+            log.warn("{} prefetch timed out after {}s — proceeding with partial results", source, PREFETCH_TIMEOUT_SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException e) {
+            log.warn("{} prefetch failed: {}", source, e.getCause().getMessage());
+        }
     }
 
     private void clearPrefetchCaches() {
