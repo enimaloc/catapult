@@ -50,6 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import(ApiUserResolver.class)
 class ApiChannelActionsTwitchatPresetsTest {
+    @MockitoBean fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics steamProfileDiagnostics;
 
     @Autowired MockMvc mvc;
 
