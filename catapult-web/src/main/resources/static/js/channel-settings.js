@@ -1,68 +1,44 @@
-// These are mdui-switch elements, not native checkboxes: the :checked pseudo-class
-// never matches them, so the checked state has to be read off the property.
-function checkedValues(root, selector) {
-    return Array.from(root.querySelectorAll(selector)).filter(sw => sw.checked).map(sw => sw.value);
-}
-
+/**
+ * Settings tab. No SSE event covers channel settings yet, so every save re-renders
+ * (postAndRefresh); the active tab survives it through location.hash (channel-page.js).
+ */
 document.addEventListener("catapult:render", function () {
+    if (!document.getElementById("channel-ccl-settings-form")) return;
+
+    const { on, checkedValues, postAndRefresh } = CatapultChannel;
     const baseUrl = CatapultChannel.baseUrl();
+    const byId = id => document.getElementById(id);
 
-    const cclForm = document.getElementById("channel-ccl-settings-form");
-    if (cclForm) {
-        document.getElementById("ccl-settings-save-btn").addEventListener("click", async () => {
-            const enabled = document.getElementById("ccl-enabled-checkbox").checked;
-            const blockedCcls = checkedValues(cclForm, ".ccl-block-checkbox");
-            await CatapultChannel.postJson(`${baseUrl}/settings/ccl`, { cclEnabled: enabled, blockedCcls });
-            await CatapultChannel.refresh();
-        });
+    on("ccl-settings-save-btn", "click", () => postAndRefresh(`${baseUrl}/settings/ccl`, {
+        cclEnabled: byId("ccl-enabled-checkbox").checked,
+        blockedCcls: checkedValues(byId("channel-ccl-settings-form"), ".ccl-block-checkbox")
+    }));
+
+    on("tw-settings-save-btn", "click", () => postAndRefresh(`${baseUrl}/settings/tws`, {
+        enabled: byId("tw-enabled-checkbox").checked,
+        blockedTws: checkedValues(byId("channel-tw-settings-form"), ".tw-block-checkbox")
+    }));
+
+    // The "no game" and "incomplete game" cards share the same game picker + ccl
+    // switches shape; only their id prefix, endpoint and extra fields differ.
+    function attachDefaultGameCard(prefix, endpoint, extraFields = () => ({})) {
+        const gameInput = byId(`${prefix}-game-input`);
+        const gameIdInput = byId(`${prefix}-game-id`);
+        GameSearch.attach(gameInput, byId(`${prefix}-game-results`), `${baseUrl}/games/search`,
+            game => { gameIdInput.value = game.id; });
+
+        on(`${prefix}-settings-save-btn`, "click", () => postAndRefresh(`${baseUrl}/settings/${endpoint}`, {
+            twitchGameId: gameIdInput.value || null,
+            twitchGameName: gameInput.value || null,
+            ccls: checkedValues(byId(`channel-${prefix}-settings-form`), `.${prefix}-ccl-checkbox`),
+            ...extraFields()
+        }));
     }
 
-    const twForm = document.getElementById("channel-tw-settings-form");
-    if (twForm) {
-        document.getElementById("tw-settings-save-btn").addEventListener("click", async () => {
-            const enabled = document.getElementById("tw-enabled-checkbox").checked;
-            const blockedTws = checkedValues(twForm, ".tw-block-checkbox");
-            await CatapultChannel.postJson(`${baseUrl}/settings/tws`, { enabled, blockedTws });
-            await CatapultChannel.refresh();
-        });
-    }
-
-    const noGameForm = document.getElementById("channel-no-game-settings-form");
-    if (noGameForm) {
-        const gameInput = document.getElementById("no-game-game-input");
-        const gameIdInput = document.getElementById("no-game-game-id");
-        GameSearch.attach(gameInput, document.getElementById("no-game-game-results"),
-                `${baseUrl}/games/search`, game => { gameIdInput.value = game.id; });
-
-        document.getElementById("no-game-settings-save-btn").addEventListener("click", async () => {
-            const ccls = checkedValues(noGameForm, ".no-game-ccl-checkbox");
-            await CatapultChannel.postJson(`${baseUrl}/settings/no-game`, {
-                twitchGameId: gameIdInput.value || null,
-                twitchGameName: gameInput.value || null,
-                ccls,
-                applyOnStreamStart: document.getElementById("no-game-apply-start").checked,
-                applyOnNoGame: document.getElementById("no-game-apply-no-game").checked,
-                applyOnStreamEnd: document.getElementById("no-game-apply-end").checked
-            });
-            await CatapultChannel.refresh();
-        });
-    }
-
-    const incompleteFallbackForm = document.getElementById("channel-incomplete-fallback-settings-form");
-    if (incompleteFallbackForm) {
-        const gameInput = document.getElementById("incomplete-fallback-game-input");
-        const gameIdInput = document.getElementById("incomplete-fallback-game-id");
-        GameSearch.attach(gameInput, document.getElementById("incomplete-fallback-game-results"),
-                `${baseUrl}/games/search`, game => { gameIdInput.value = game.id; });
-
-        document.getElementById("incomplete-fallback-settings-save-btn").addEventListener("click", async () => {
-            const ccls = checkedValues(incompleteFallbackForm, ".incomplete-fallback-ccl-checkbox");
-            await CatapultChannel.postJson(`${baseUrl}/settings/incomplete-fallback`, {
-                twitchGameId: gameIdInput.value || null,
-                twitchGameName: gameInput.value || null,
-                ccls
-            });
-            await CatapultChannel.refresh();
-        });
-    }
+    attachDefaultGameCard("no-game", "no-game", () => ({
+        applyOnStreamStart: byId("no-game-apply-start").checked,
+        applyOnNoGame: byId("no-game-apply-no-game").checked,
+        applyOnStreamEnd: byId("no-game-apply-end").checked
+    }));
+    attachDefaultGameCard("incomplete-fallback", "incomplete-fallback");
 });

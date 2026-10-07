@@ -7,15 +7,21 @@
  *
  * - username()/baseUrl(): a single place deriving the channel username from the
  *   URL, instead of every file re-deriving `location.pathname.split("/")[2]`.
+ *   username() is null outside /channel/{username}.
  * - refresh(): re-renders the current fragment through the SPA router, preserving
  *   the query string (page/status/source filters) instead of dropping it. Only
  *   used where no SSE event yet covers the mutation (see channel-settings.js).
  * - postJson(): wraps CatapultCsrf.postJson and surfaces a visible error when the
  *   mutation didn't succeed, instead of silently re-rendering as if it had.
+ *   postAndRefresh() chains it with refresh().
+ * - on(): the null-guarded addEventListener every optional control needs (owner-only
+ *   and provider-dependent elements simply aren't rendered for everyone).
+ * - checkedValues(): values of the checked switches under a root.
  */
 window.CatapultChannel = (function () {
     function username() {
-        return location.pathname.split("/")[2];
+        const segments = location.pathname.split("/");
+        return segments[1] === "channel" && segments[2] ? segments[2] : null;
     }
 
     function baseUrl() {
@@ -40,6 +46,23 @@ window.CatapultChannel = (function () {
             showError(`Action failed (${response.status})`);
         }
         return response;
+    }
+
+    async function postAndRefresh(url, body) {
+        await postJson(url, body);
+        await refresh();
+    }
+
+    function on(id, type, handler) {
+        const el = document.getElementById(id);
+        el?.addEventListener(type, handler);
+        return el;
+    }
+
+    // These are mdui-switch elements, not native checkboxes: the :checked pseudo-class
+    // never matches them, so the checked state has to be read off the property.
+    function checkedValues(root, selector) {
+        return Array.from(root.querySelectorAll(selector)).filter(sw => sw.checked).map(sw => sw.value);
     }
 
     // GameChangedEvent's visibility (hasGame) and text (#channel-current-game's
@@ -80,7 +103,8 @@ window.CatapultChannel = (function () {
     // No handler is needed here for any Steam or Minecraft event.
 
     return {
-        username, baseUrl, refresh, postJson, showError,
+        username, baseUrl, refresh, postJson, postAndRefresh, showError,
+        on, checkedValues,
         getBindingsElements, getBindingElement,
         setCurrentGame,
         removeBinding
