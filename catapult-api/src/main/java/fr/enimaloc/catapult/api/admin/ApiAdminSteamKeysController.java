@@ -5,7 +5,7 @@ import fr.enimaloc.catapult.common.dto.SteamDeleteKeyRequest;
 import fr.enimaloc.catapult.common.dto.SteamKeyStatus;
 import fr.enimaloc.catapult.common.dto.SteamKeysPageData;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
-import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
+import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import org.springframework.beans.factory.annotation.Autowired;

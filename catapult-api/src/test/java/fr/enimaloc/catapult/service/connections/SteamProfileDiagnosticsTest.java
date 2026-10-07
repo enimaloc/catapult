@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.service.connections;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.getter.SteamApiClient;
-import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
+import fr.enimaloc.catapult.getter.steam.SteamApiClient;
+import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,7 +1,11 @@
-package fr.enimaloc.catapult.event;
+package fr.enimaloc.catapult.event.listener;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.event.GameDetectedEvent;
+import fr.enimaloc.catapult.event.NoGameDetectedEvent;
+import fr.enimaloc.catapult.event.StreamOfflineEvent;
+import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.binding.BindingService;

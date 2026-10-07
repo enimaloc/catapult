@@ -1,4 +1,14 @@
-package fr.enimaloc.catapult.event;
+package fr.enimaloc.catapult.event.listener;
+
+import fr.enimaloc.catapult.event.AccountCreatedEvent;
+import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
+import fr.enimaloc.catapult.event.ChannelCclChangedEvent;
+import fr.enimaloc.catapult.event.ExperimentActivatedEvent;
+import fr.enimaloc.catapult.event.GameDetectedEvent;
+import fr.enimaloc.catapult.event.NoGameDetectedEvent;
+import fr.enimaloc.catapult.event.StreamOfflineEvent;
+import fr.enimaloc.catapult.event.StreamOnlineEvent;
+import fr.enimaloc.catapult.event.TwitchLoginEvent;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;

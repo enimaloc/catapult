@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.getter;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.MeterRegistry;

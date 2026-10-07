@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.getter;
+package fr.enimaloc.catapult.getter.steam;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;

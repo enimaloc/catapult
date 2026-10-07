@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.dtdd;
 
-import fr.enimaloc.catapult.getter.DtddApiClient.DtddTopics;
+import fr.enimaloc.catapult.getter.dtdd.DtddApiClient.DtddTopics;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

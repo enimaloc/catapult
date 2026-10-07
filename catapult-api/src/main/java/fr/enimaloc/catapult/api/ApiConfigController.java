@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.common.dto.AppConfigResponse;
 import fr.enimaloc.catapult.common.dto.ProvidersResponse;
 import fr.enimaloc.catapult.getter.GameGetter;
-import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
+import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;

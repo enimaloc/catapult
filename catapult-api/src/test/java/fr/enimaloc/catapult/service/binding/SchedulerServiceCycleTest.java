@@ -7,7 +7,7 @@ import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.GameGetterChain;
 import fr.enimaloc.catapult.getter.MinecraftPresenceGetter;
-import fr.enimaloc.catapult.getter.SteamGameGetter;
+import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;

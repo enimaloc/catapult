@@ -6,7 +6,7 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.getter.DtddApiClient;
+import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.tw.TwDtddTopicMappingRepository;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;

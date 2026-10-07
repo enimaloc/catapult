@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.getter;
+package fr.enimaloc.catapult.getter.dtdd;
 
 import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
 import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;

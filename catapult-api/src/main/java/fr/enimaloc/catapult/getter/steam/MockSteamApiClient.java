@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.getter;
+package fr.enimaloc.catapult.getter.steam;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;

@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.getter;
+package fr.enimaloc.catapult.getter.steam;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

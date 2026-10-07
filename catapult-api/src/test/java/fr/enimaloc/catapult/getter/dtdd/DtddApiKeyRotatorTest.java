@@ -1,7 +1,8 @@
-package fr.enimaloc.catapult.getter;
+package fr.enimaloc.catapult.getter.dtdd;
 
-import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
-import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
+import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
+import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,20 +12,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class SteamApiKeyRotatorTest {
+class DtddApiKeyRotatorTest {
 
-    @Mock SteamApiKeyRepository repository;
-    @Mock SteamRateLimiter rateLimiter;
-
-    SteamApiKeyRotator rotator;
+    @Mock DtddApiKeyRepository repository;
+    DtddApiKeyRotator rotator;
 
     @BeforeEach
     void setUp() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of());
-        rotator = new SteamApiKeyRotator(repository, rateLimiter, false);
+        rotator = new DtddApiKeyRotator(repository, new SimpleMeterRegistry());
     }
 
     @Test
@@ -35,8 +34,8 @@ class SteamApiKeyRotatorTest {
     @Test
     void nextKey_rotatesRoundRobin() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of(
-            new SteamApiKeyEntry("KEY_A"),
-            new SteamApiKeyEntry("KEY_B")
+            new DtddApiKeyEntry("KEY_A"),
+            new DtddApiKeyEntry("KEY_B")
         ));
         rotator.refreshKeys();
 
@@ -51,8 +50,8 @@ class SteamApiKeyRotatorTest {
     @Test
     void nextKey_skipsBlockedKey() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of(
-            new SteamApiKeyEntry("KEY_A"),
-            new SteamApiKeyEntry("KEY_B")
+            new DtddApiKeyEntry("KEY_A"),
+            new DtddApiKeyEntry("KEY_B")
         ));
         rotator.refreshKeys();
 
@@ -64,9 +63,9 @@ class SteamApiKeyRotatorTest {
     }
 
     @Test
-    void nextKey_returnsFallback_whenAllBlocked() {
+    void nextKey_returnsLeastBlocked_whenAllBlocked() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of(
-            new SteamApiKeyEntry("KEY_A")
+            new DtddApiKeyEntry("KEY_A")
         ));
         rotator.refreshKeys();
 
@@ -76,15 +75,23 @@ class SteamApiKeyRotatorTest {
     }
 
     @Test
-    void onKeyRateLimited_pausesRateLimiter_whenConservative() {
-        rotator = new SteamApiKeyRotator(repository, rateLimiter, true);
-        rotator.onKeyRateLimited("KEY_A", 30);
-        verify(rateLimiter).blockAll(30);
+    void isAllKeysBlocked_falseWhenSomeAvailable() {
+        when(repository.findByExclusiveFalse()).thenReturn(List.of(
+            new DtddApiKeyEntry("KEY_A"),
+            new DtddApiKeyEntry("KEY_B")
+        ));
+        rotator.refreshKeys();
+        rotator.onKeyRateLimited("KEY_A", 60);
+        assertThat(rotator.isAllKeysBlocked()).isFalse();
     }
 
     @Test
-    void onKeyRateLimited_doesNotPauseRateLimiter_whenNotConservative() {
-        rotator.onKeyRateLimited("KEY_A", 30);
-        verify(rateLimiter, never()).blockAll(anyInt());
+    void isAllKeysBlocked_trueWhenAllBlocked() {
+        when(repository.findByExclusiveFalse()).thenReturn(List.of(
+            new DtddApiKeyEntry("KEY_A")
+        ));
+        rotator.refreshKeys();
+        rotator.onKeyRateLimited("KEY_A", 60);
+        assertThat(rotator.isAllKeysBlocked()).isTrue();
     }
 }

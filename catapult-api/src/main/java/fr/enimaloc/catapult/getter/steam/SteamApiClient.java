@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.getter;
+package fr.enimaloc.catapult.getter.steam;
 
 import java.time.Duration;
 import java.util.Collection;

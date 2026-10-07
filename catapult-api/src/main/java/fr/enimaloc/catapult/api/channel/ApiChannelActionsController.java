@@ -26,7 +26,7 @@ import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatPayloadPreset;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
-import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
+import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
