@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.api.admin.ApiAdminInviteController;
 import fr.enimaloc.catapult.common.dto.AdminInviteQuotaRequest;
 import fr.enimaloc.catapult.common.dto.GlobalSettingsRequest;
 import fr.enimaloc.catapult.common.dto.MemberDto;
