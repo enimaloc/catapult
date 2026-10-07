@@ -1,139 +1,49 @@
 package fr.enimaloc.catapult.controller;
 
-import fr.enimaloc.catapult.common.dto.ChannelDto;
-import fr.enimaloc.catapult.dto.index.FeatureDto;
-import fr.enimaloc.catapult.dto.index.PlatformDto;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Locale;
 
+/**
+ * Full-page loads: the index shell with the requested page already rendered in #app (see
+ * {@link SpaFragmentController} for the fragments served on client-side navigation).
+ */
 @Controller
 @RequiredArgsConstructor
 public class IndexController {
-    public static final List<FeatureDto> FEATURES = List.of(
-            new FeatureDto("bolt", "features.detection"),
-            new FeatureDto("link", "features.associations"),
-            new FeatureDto("smart_toy", "features.realtime"),
-            new FeatureDto("sell", "features.labels"),
-            new FeatureDto("my_location", "features.default")
-//            new FeatureDto("bolt", "features.simple")
-    );
-    public static final List<PlatformDto> PLATFORMS = List.of(
-            new PlatformDto(PlatformDto.IconType.TEXT, "⛏", "platforms.minecraft"),
-            new PlatformDto("sports_esports", "platforms.steam"),
-            new PlatformDto("sports_esports", "platforms.xbox")
-    );
-    public static final List<SPAPage> SPA = List.of(
-            new SPAPage("", "pages/landing", "landing", "/spa/landing", "page.title.landing"),
-            new SPAPage("privacy", "pages/privacy", "privacy", "/spa/privacy", "page.title.privacy"),
-            new SPAPage("channels", "pages/channels", "channels", "/spa/channels", "page.title.channels"),
-            new SPAPage("channel", "pages/channel", "channel", "/spa/channel", "page.title.channel", true)
-    );
-
     private final ModelFiller filler;
 
     @GetMapping
-    String index(Model model, Locale locale, HttpServletRequest request) throws IOException {
-        return index(model, "", locale, request);
+    String index(Model model, Locale locale) throws IOException {
+        return index(model, "", locale);
     }
 
     @GetMapping("/{page}")
-    String index(Model model, @PathVariable String page, Locale locale, HttpServletRequest request) throws IOException {
-        boolean unknownPage = SPA.stream().map(SPAPage::getId).noneMatch(page::equals);
+    String index(Model model, @PathVariable String page, Locale locale) throws IOException {
+        boolean unknownPage = !SiteCatalog.isPage(page);
         model.addAttribute("error", unknownPage);
         if (unknownPage) {
-            filler.error(model, 404);
+            filler.error(model, HttpStatus.NOT_FOUND.value());
         }
-        filler.fill(model, page, locale, request);
+        filler.fill(model, page, locale);
         return "index";
     }
 
     @GetMapping("/channel/{username}")
     String channel(Model model, @PathVariable String username,
-                    @RequestParam(defaultValue = "0") int page,
-                    @RequestParam(required = false) String status,
-                    @RequestParam(required = false) String source,
-                    Locale locale, HttpServletRequest request) throws IOException {
+                   @RequestParam(defaultValue = "0") int page,
+                   @RequestParam(required = false) String status,
+                   @RequestParam(required = false) String source,
+                   Locale locale) {
         filler.channel(model, username, page, status, source);
         filler.defaultAttr(model, "channel", locale);
         return "index";
-    }
-
-    @Controller
-    @RequestMapping("/spa")
-    @RequiredArgsConstructor
-    static class SPAPages {
-        private final ModelFiller filler;
-
-        @GetMapping("/landing")
-        String landing(Model model) {
-            filler.defaultAttr(model, "");
-            return "pages/landing :: landing";
-        }
-
-        @GetMapping("/privacy")
-        String privacy(Model model, Locale locale) throws IOException {
-            filler.privacy(model, locale);
-            return "pages/privacy :: privacy";
-        }
-
-        @GetMapping("/channels")
-        String channels(Model model) throws IOException {
-            filler.channels(model);
-            return "pages/channels :: channels";
-        }
-
-        @GetMapping("/channel/{username}")
-        String channel(Model model, @PathVariable String username,
-                        @RequestParam(defaultValue = "0") int page,
-                        @RequestParam(required = false) String status,
-                        @RequestParam(required = false) String source) throws IOException {
-            filler.channel(model, username, page, status, source);
-            filler.defaultAttr(model, "channel");
-            return "pages/channel :: channel";
-        }
-
-        @GetMapping("/{page}")
-        String unknown(Model model, HttpServletResponse response) {
-            response.setStatus(HttpStatus.NOT_FOUND.value());
-            filler.error(model, 404);
-            return "pages/error :: error";
-        }
-    }
-
-    @Data
-    public static class SPAPage {
-        private final String id;
-        private final String template;
-        private final String fragment;
-        private final String templateUrl;
-        private final String titleKey;
-        /** True if this page takes one trailing path segment (e.g. /channel/{username}). */
-        private final boolean dynamic;
-
-        public SPAPage(String id, String template, String fragment, String templateUrl, String titleKey) {
-            this(id, template, fragment, templateUrl, titleKey, false);
-        }
-
-        public SPAPage(String id, String template, String fragment, String templateUrl, String titleKey, boolean dynamic) {
-            this.id = id;
-            this.template = template;
-            this.fragment = fragment;
-            this.templateUrl = templateUrl;
-            this.titleKey = titleKey;
-            this.dynamic = dynamic;
-        }
     }
 }

@@ -73,7 +73,7 @@ async function navigate(path, push = true, search = "") {
     if (!response.ok) {
         // Server-side error (unknown page or fragment failure): the
         // response body is the error fragment (see ErrorPageController
-        // and IndexController.SPAPages#unknown), render it in place
+        // and SpaFragmentController#unknown), render it in place
         // instead of reloading the whole page.
         return;
     }

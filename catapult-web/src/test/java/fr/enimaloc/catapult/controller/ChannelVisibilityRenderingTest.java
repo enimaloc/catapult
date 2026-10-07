@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Visibility.apply on the client is scoped per-row precisely to avoid one binding's
  * update leaking into another's reset button.
  */
-@WebMvcTest(controllers = {IndexController.class, IndexController.SPAPages.class})
+@WebMvcTest(controllers = {IndexController.class, SpaFragmentController.class})
 @Import({ModelFiller.class, WebSecurityConfig.class})
 class ChannelVisibilityRenderingTest {
 

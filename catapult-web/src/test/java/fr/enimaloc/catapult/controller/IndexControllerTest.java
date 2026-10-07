@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * doesn't throw on a zero-match selection), and the username path variable was discarded
  * entirely instead of being threaded into the model.
  */
-@WebMvcTest(controllers = {IndexController.class, IndexController.SPAPages.class})
+@WebMvcTest(controllers = {IndexController.class, SpaFragmentController.class})
 @Import({ModelFiller.class, WebSecurityConfig.class})
 class IndexControllerTest {
 
@@ -131,5 +131,23 @@ class IndexControllerTest {
 
         mvc.perform(get("/channel/enimaloc"))
                 .andExpect(status().isOk());
+    }
+
+    /**
+     * spa.js builds its router from this inline JSON: every SpaPage must keep the property
+     * names it reads (id, templateUrl, dynamic, titleKey) whatever serializer Thymeleaf picks.
+     */
+    @Test
+    void indexPage_inlinesTheSpaRoutesAsJsonForTheRouter() throws Exception {
+        String html = mvc.perform(get("/privacy"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String spa = html.substring(html.indexOf("spa: ") + 5, html.indexOf("titles: "));
+        org.assertj.core.api.Assertions.assertThat(spa)
+                .contains("\"id\":\"privacy\"")
+                .contains("\"templateUrl\":\"/spa/channel\"")
+                .contains("\"dynamic\":true")
+                .contains("\"titleKey\":\"page.title.landing\"");
     }
 }
