@@ -1,9 +1,28 @@
 package fr.enimaloc.catapult.service.mock;
 
-import fr.enimaloc.catapult.common.dto.*;
+import fr.enimaloc.catapult.common.dto.ChannelListResponse;
+import fr.enimaloc.catapult.common.dto.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.SearchResponse;
+import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.UserSettingsDto;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
-import fr.enimaloc.catapult.event.*;
+import fr.enimaloc.catapult.event.BindingDeletedEvent;
+import fr.enimaloc.catapult.event.BindingIgnoredStateEvent;
+import fr.enimaloc.catapult.event.BindingUpdatedEvent;
+import fr.enimaloc.catapult.event.BotStateChangedEvent;
+import fr.enimaloc.catapult.event.CclStateEvent;
+import fr.enimaloc.catapult.event.MinecraftDisconnectedEvent;
+import fr.enimaloc.catapult.event.MinecraftEnrollEvent;
+import fr.enimaloc.catapult.event.MinecraftSyncEvent;
+import fr.enimaloc.catapult.event.SteamTokenDeletedEvent;
+import fr.enimaloc.catapult.event.SteamTokenSavedEvent;
+import fr.enimaloc.catapult.event.SteamTokenSharedStateEvent;
+import fr.enimaloc.catapult.event.TwEnabledStateEvent;
+import fr.enimaloc.catapult.event.TwResetEvent;
+import fr.enimaloc.catapult.event.TwUpdatedEvent;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +34,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -125,14 +145,14 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
+    public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, Set<String> ccls) {
         log.trace("updateBinding({}, {}, {}, {}, {})", username, bindingId, twitchGameId, twitchGameName, ccls);
         currentData().updateBindingGame(bindingId, twitchGameId, twitchGameName, ccls);
         eventPublisher.publishEvent(new BindingUpdatedEvent(username, bindingId, twitchGameId, twitchGameName, ccls));
     }
 
     @Override
-    public void saveTws(String bindingId, java.util.Set<String> tws) {
+    public void saveTws(String bindingId, Set<String> tws) {
         log.trace("saveTws({}, {})", bindingId, tws);
         MockData data = currentData();
         data.setBindingTws(bindingId, tws);
@@ -214,13 +234,13 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls) {
+    public void saveCclSettings(String username, boolean enabled, Set<String> blockedCcls) {
         log.trace("saveCclSettings({}, {}, {})", username, enabled, blockedCcls);
         currentData().saveCclSettings(enabled, blockedCcls);
     }
 
     @Override
-    public void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws) {
+    public void saveTwSettings(String username, boolean enabled, Set<String> blockedTws) {
         log.trace("saveTwSettings({}, {}, {})", username, enabled, blockedTws);
         currentData().saveTwSettings(enabled, blockedTws);
     }
@@ -232,7 +252,7 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
+    public void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
                                     boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
         log.trace("saveNoGameSettings({}, {}, {}, {}, {}, {}, {})", username, twitchGameId, twitchGameName,
                 ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
@@ -240,21 +260,21 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
+    public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
         log.trace("saveIncompleteFallbackSettings({}, {}, {}, {})", username, twitchGameId, twitchGameName, ccls);
         currentData().saveIncompleteFallbackSettings(twitchGameId, twitchGameName, ccls);
     }
 
     @Override
-    public fr.enimaloc.catapult.common.dto.DtddMappingStatusDto dtddMappingStatus(String username) {
+    public DtddMappingStatusDto dtddMappingStatus(String username) {
         log.trace("dtddMappingStatus({})", username);
-        return new fr.enimaloc.catapult.common.dto.DtddMappingStatusDto(null, null, false, null);
+        return new DtddMappingStatusDto(null, null, false, null);
     }
 
     @Override
-    public fr.enimaloc.catapult.common.dto.SearchResponse dtddSearch(String q) {
+    public SearchResponse dtddSearch(String q) {
         log.trace("dtddSearch({})", q);
-        return new fr.enimaloc.catapult.common.dto.SearchResponse(List.of());
+        return new SearchResponse(List.of());
     }
 
     @Override
