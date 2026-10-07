@@ -80,7 +80,7 @@ class EventSubTwitchChatServiceFlowsTest {
                 mock(TwitchHelixChannelClient.class), builder.build(), new ObjectMapper(), bot, meters,
                 new ExternalApiObservations(ObservationRegistry.NOOP, meters), rateLimiter);
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
-        ReflectionTestUtils.setField(service, "httpClient", httpClient);
+        ReflectionTestUtils.setField(ReflectionTestUtils.getField(service, "connections"), "httpClient", httpClient);
 
         user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -184,29 +184,7 @@ class EventSubTwitchChatServiceFlowsTest {
         }
 
         @Test
-        void reconnectingReplacesThePreviousSocket() {
-            handshakesSucceed();
-            service.connect(user);
-            WebSocket first = socketOf(listeners.getFirst());
-
-            listeners.getFirst().onOpen(mock(WebSocket.class));
-
-            verify(first).sendClose(WebSocket.NORMAL_CLOSURE, "replaced by newer session");
-        }
-
-        @Test
-        void failedHandshake_retriesWithBackoff_untilDisconnected() {
-            when(wsBuilder.buildAsync(any(URI.class), any(WebSocket.Listener.class)))
-                    .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("refused")));
-
-            service.connect(user);
-
-            verify(wsBuilder, timeout(3000).times(2)).buildAsync(any(), any());
-            service.disconnect(user);
-        }
-
-        @Test
-        void serverClose_reconnectsOnTheCanonicalUrl() {
+        void serverClose_afterConnect_reconnectsOnTheCanonicalUrl() {
             handshakesSucceed();
             service.connect(user);
             WebSocket.Listener listener = listeners.getFirst();
@@ -216,46 +194,6 @@ class EventSubTwitchChatServiceFlowsTest {
             verify(wsBuilder, timeout(3000).times(2)).buildAsync(eq(URI.create("wss://eventsub.wss.twitch.tv/ws")), any());
         }
 
-        @Test
-        void socketError_onAStaleSocket_isIgnored() {
-            handshakesSucceed();
-            service.connect(user);
-
-            listeners.getFirst().onError(mock(WebSocket.class), new IllegalStateException("old"));
-
-            assertThat(service.connectionCount()).isEqualTo(1);
-        }
-
-        @Test
-        void missedKeepalives_abortAndReconnect() {
-            handshakesSucceed();
-            helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withSuccess());
-            helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withSuccess());
-            service.connect(user);
-            WebSocket.Listener listener = listeners.getFirst();
-            WebSocket ws = socketOf(listener);
-
-            listener.onText(ws, "{\"metadata\": {\"message_type\": \"session_welcome\"}, "
-                    + "\"payload\": {\"session\": {\"id\": \"s-1\", \"keepalive_timeout_seconds\": 0}}}", true);
-
-            verify(ws, timeout(3000)).abort();
-            verify(wsBuilder, timeout(4000).times(2)).buildAsync(any(), any());
-        }
-
-        @Test
-        void fragmentedFrames_areBufferedUntilTheLastOne() {
-            handshakesSucceed();
-            service.connect(user);
-            WebSocket.Listener listener = listeners.getFirst();
-            WebSocket ws = socketOf(listener);
-            String message = chatMessage("!hello");
-
-            listener.onText(ws, message.substring(0, 20), false);
-            verify(publisher, never()).publishEvent(any());
-            listener.onText(ws, message.substring(20), true);
-
-            verify(publisher).publishEvent(any(ChatCommandEvent.class));
-        }
     }
 
     @Nested

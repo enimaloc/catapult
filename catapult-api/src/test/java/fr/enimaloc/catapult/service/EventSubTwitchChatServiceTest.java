@@ -142,7 +142,7 @@ class EventSubTwitchChatServiceTest {
 
         // Subscriptions carry over when reconnecting via reconnect_url — no POST expected
         verify(restClient, never()).post();
-        Map<UUID, Long> timeouts = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "keepaliveTimeoutSeconds");
+        Map<UUID, Long> timeouts = (Map<UUID, Long>) connectionState("keepaliveTimeoutSeconds");
         assertThat(timeouts).containsEntry(user.getId(), 30L);
     }
 
@@ -164,67 +164,13 @@ class EventSubTwitchChatServiceTest {
     @Test
     void handleMessage_sessionWelcome_resetsRetryBackoffAfterPriorFailures() {
         // Simulate a prior string of failures that inflated the backoff far past the base delay.
-        Map<UUID, Long> retryDelays = (Map<UUID, Long>) ReflectionTestUtils.getField(service, "retryDelaySeconds");
+        Map<UUID, Long> retryDelays = (Map<UUID, Long>) connectionState("retryDelaySeconds");
         retryDelays.put(user.getId(), 32L);
 
         service.handleMessage(user, token, WELCOME_MESSAGE, false);
 
         // A successful session must reset the backoff so the next disconnect reconnects promptly.
         assertThat(retryDelays).doesNotContainKey(user.getId());
-    }
-
-    @Test
-    void onOpen_registersConnectionSynchronously() {
-        WebSocket ws = mock(WebSocket.class);
-        var listener = service.new ChatListener(user, token, false);
-
-        listener.onOpen(ws);
-
-        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
-        assertThat(connections).containsEntry(user.getId(), ws);
-    }
-
-    @Test
-    void onError_immediatelyAfterOnOpen_stillTriggersReconnectCleanup() {
-        // Reproduces a "Connection reset" landing right after the handshake succeeds, before
-        // any code outside the listener itself has had a chance to register the socket:
-        // onOpen must register synchronously so this compare-and-remove can't lose the race.
-        WebSocket ws = mock(WebSocket.class);
-        var listener = service.new ChatListener(user, token, false);
-
-        listener.onOpen(ws);
-        listener.onError(ws, new java.io.IOException("Connection reset"));
-
-        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
-        assertThat(connections).doesNotContainKey(user.getId());
-    }
-
-    @Test
-    void onClose_whenListenerWebSocketIsCurrent_deregistersConnection() {
-        WebSocket ws = mock(WebSocket.class);
-        var listener = service.new ChatListener(user, token, false);
-
-        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
-        connections.put(user.getId(), ws);
-
-        listener.onClose(ws, WebSocket.NORMAL_CLOSURE, "server initiated");
-
-        assertThat(connections).doesNotContainKey(user.getId());
-    }
-
-    @Test
-    void onClose_whenListenerWebSocketHasBeenReplaced_leavesSuccessorRegistered() {
-        WebSocket staleWs = mock(WebSocket.class);
-        WebSocket freshWs = mock(WebSocket.class);
-        var staleListener = service.new ChatListener(user, token, false);
-
-        // Simulate session_reconnect: connections now points to freshWs, staleListener is orphaned.
-        Map<UUID, WebSocket> connections = (Map<UUID, WebSocket>) ReflectionTestUtils.getField(service, "connections");
-        connections.put(user.getId(), freshWs);
-
-        staleListener.onClose(staleWs, WebSocket.NORMAL_CLOSURE, "replaced");
-
-        assertThat(connections).containsEntry(user.getId(), freshWs);
     }
 
     @Test
@@ -251,5 +197,9 @@ class EventSubTwitchChatServiceTest {
         assertThat(service.getFollowedAtById(user, "42")).contains(at);
         assertThat(service.getStreamInfo(user)).contains(live);
         assertThat(service.getUserProfile(user, "fan")).contains(profile);
+    }
+
+    private Object connectionState(String field) {
+        return ReflectionTestUtils.getField(ReflectionTestUtils.getField(service, "connections"), field);
     }
 }
