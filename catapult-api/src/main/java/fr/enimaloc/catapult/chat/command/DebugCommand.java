@@ -15,7 +15,7 @@ import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.service.GameContextService;
+import fr.enimaloc.catapult.service.binding.GameContextService;
 import lombok.RequiredArgsConstructor;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;

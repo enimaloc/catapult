@@ -3,9 +3,9 @@ package fr.enimaloc.catapult.chat.command.registry.catapult;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.service.GameStateService;
-import fr.enimaloc.catapult.service.IgdbService;
-import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
