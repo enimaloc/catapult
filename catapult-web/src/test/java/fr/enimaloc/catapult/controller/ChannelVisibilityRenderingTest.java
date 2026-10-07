@@ -5,7 +5,7 @@ import fr.enimaloc.catapult.common.dto.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.GameDto;
-import fr.enimaloc.catapult.common.dto.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.MinecraftData;
 import fr.enimaloc.catapult.common.dto.PagedBindings;
 import fr.enimaloc.catapult.common.dto.UserSettingsDto;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
@@ -78,7 +78,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", true, true, true, null,
                 new PagedBindings(0, 1, 2, List.of(overridden, notOverridden)),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, false, false, false, false, false, false, false, 15L, false, false, "uuid");
+                null, null, null, null, null, "uuid");
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
 
         String html = mvc.perform(get("/spa/channel/enimaloc"))
@@ -97,12 +97,16 @@ class ChannelVisibilityRenderingTest {
     }
 
     private ChannelPageData channelPageData(boolean isLive) {
+        return channelPageData(isLive, null);
+    }
+
+    private ChannelPageData channelPageData(boolean isLive, MinecraftData minecraft) {
         return new ChannelPageData(
                 new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
                 "enimaloc", true, isLive, true, null,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, false, false, false, false, false, false, false, 15L, false, false, "uuid");
+                null, null, null, null, minecraft, "uuid");
     }
 
     /** Extracts the opening tag text for the first element with the given id. */
@@ -147,7 +151,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", true, true, true, currentGame,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, false, false, false, false, false, false, false, 15L, false, false, "uuid");
+                null, null, null, null, null, "uuid");
     }
 
     @Test
@@ -201,8 +205,8 @@ class ChannelVisibilityRenderingTest {
 
     @Test
     void minecraftStatusPending_showsPendingCaseAndCheckButtonOnly() throws Exception {
-        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
-        when(apiService.minecraftStatus(any())).thenReturn(new LinkStateResponse("PENDING", "Steve123", null));
+        when(apiService.channelPage(any(), anyInt(), any(), any()))
+                .thenReturn(channelPageData(true, new MinecraftData("PENDING", "Steve123", null)));
 
         String html = mvc.perform(get("/spa/channel/enimaloc"))
                 .andExpect(status().isOk())

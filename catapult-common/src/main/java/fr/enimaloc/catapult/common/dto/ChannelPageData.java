@@ -17,15 +17,8 @@ public record ChannelPageData(
         Set<String> blockedTws,
         String filterStatus,
         String filterSource,
-        boolean hasSteamProvider,
-        boolean hasSteam,
-        boolean hasSteamPersonalToken,
-        boolean steamTokenShared,
-        boolean steamProfilePrivate,
-        boolean steamRateLimited,
-        boolean steamOfflineMode,
-        long steamProfileCacheTtlMinutes,
-        boolean hasXboxProvider,
-        boolean hasXbox,
+        SteamData steam,
+        XboxData xbox,
+        MinecraftData minecraft,
         String exampleUuid
 ) {}
