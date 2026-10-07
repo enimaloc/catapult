@@ -31,8 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * The bot is linked to a Twitch identity via the admin OAuth flow
  * ({@code /admin/members/{id}/bot/link-twitch} → {@code /oauth2/start-bot-link}
  * → {@code /oauth2/authorization/twitch}); the resulting token is stored in
- * {@code oauth_token(user=systemAccount, provider=TWITCH)} by
- * {@link fr.enimaloc.catapult.security.CatapultOAuth2UserService#handleBotLink}.
+ * {@code oauth_token(user=systemAccount, provider=TWITCH)}.
  * <p>
  * The service is a no-op until that link is performed.
  */
@@ -183,19 +182,23 @@ public class SystemTwitchAccountService {
 
     /** Expiration du token du bot système, empty si le bot n'est pas lié. */
     public Optional<Instant> tokenExpiry() {
-        return userAccountRepository.findBySystemAccountTrue()
-            .filter(a -> a.getTwitchId() != null)
-            .flatMap(a -> tokenRepo.findByUserAndProvider(a, OAuthToken.Provider.TWITCH))
-            .map(t -> t.getExpiresAt() != null ? t.getExpiresAt() : Instant.EPOCH);
+        return linkedBotToken().map(SystemTwitchAccountService::expiryOf);
     }
 
     private Optional<TokenView> loadCurrentToken() {
+        return linkedBotToken().map(t -> new TokenView(encryption.decrypt(t.getAccessToken()), expiryOf(t)));
+    }
+
+    /** The bot's Twitch token, once the system account is linked to a Twitch identity. */
+    private Optional<OAuthToken> linkedBotToken() {
         return userAccountRepository.findBySystemAccountTrue()
             .filter(a -> a.getTwitchId() != null)
-            .flatMap(a -> tokenRepo.findByUserAndProvider(a, OAuthToken.Provider.TWITCH))
-            .map(t -> new TokenView(
-                encryption.decrypt(t.getAccessToken()),
-                t.getExpiresAt() != null ? t.getExpiresAt() : Instant.EPOCH));
+            .flatMap(a -> tokenRepo.findByUserAndProvider(a, OAuthToken.Provider.TWITCH));
+    }
+
+    /** A token without a known expiry counts as already expired. */
+    private static Instant expiryOf(OAuthToken token) {
+        return token.getExpiresAt() != null ? token.getExpiresAt() : Instant.EPOCH;
     }
 
     private record TokenView(String accessToken, Instant expiresAt) {}
