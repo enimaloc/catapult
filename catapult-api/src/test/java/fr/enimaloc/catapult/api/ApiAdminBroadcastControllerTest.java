@@ -1,14 +1,14 @@
 package fr.enimaloc.catapult.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
+import fr.enimaloc.catapult.service.ChannelAccessService;
 import fr.enimaloc.catapult.service.notification.BroadcastRateLimiter;
 import fr.enimaloc.catapult.service.notification.BroadcastValidator;
 import fr.enimaloc.catapult.service.notification.RedisEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
-import fr.enimaloc.catapult.service.ChannelAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;

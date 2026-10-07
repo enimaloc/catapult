@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.IgdbGameExternalId;
-import fr.enimaloc.catapult.domain.TwitchCategoryCache;
-import fr.enimaloc.catapult.repository.IgdbGameExternalIdRepository;
-import fr.enimaloc.catapult.repository.TwitchCategoryCacheRepository;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameExternalId;
+import fr.enimaloc.catapult.domain.twitch.TwitchCategoryCache;
+import fr.enimaloc.catapult.repository.igdb.IgdbGameExternalIdRepository;
+import fr.enimaloc.catapult.repository.twitch.TwitchCategoryCacheRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

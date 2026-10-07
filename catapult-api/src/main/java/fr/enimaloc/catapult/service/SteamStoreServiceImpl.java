@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.SteamAppParentEntry;
+import fr.enimaloc.catapult.domain.steam.SteamAppParentEntry;
 import fr.enimaloc.catapult.getter.SteamPlaytestRedirectResolver;
-import fr.enimaloc.catapult.repository.SteamAppParentRepository;
+import fr.enimaloc.catapult.repository.steam.SteamAppParentRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

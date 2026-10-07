@@ -2,9 +2,9 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.NotificationDto;
-import fr.enimaloc.catapult.domain.Notification;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.NotificationRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.notification.Notification;
+import fr.enimaloc.catapult.repository.notification.NotificationRepository;
 import fr.enimaloc.catapult.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

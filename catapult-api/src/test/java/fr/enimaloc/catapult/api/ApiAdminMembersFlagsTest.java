@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.domain.UserFlag;
-import fr.enimaloc.catapult.domain.UserGroup;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.repository.UserFlagRepository;
-import fr.enimaloc.catapult.repository.UserGroupRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserFlag;
+import fr.enimaloc.catapult.domain.account.UserGroup;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserFlagRepository;
+import fr.enimaloc.catapult.repository.account.UserGroupRepository;
 import fr.enimaloc.catapult.service.AccountService;
 import fr.enimaloc.catapult.service.AdminMigrationService;
 import fr.enimaloc.catapult.service.BotToggleService;

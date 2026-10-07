@@ -1,13 +1,13 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.DtddGameCache;
-import fr.enimaloc.catapult.domain.DtddGameMapping;
-import fr.enimaloc.catapult.domain.DtddSearchCache;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
+import fr.enimaloc.catapult.domain.dtdd.DtddSearchCache;
 import fr.enimaloc.catapult.getter.DtddApiClient;
 import fr.enimaloc.catapult.getter.DtddApiClient.DtddSearchResult;
-import fr.enimaloc.catapult.repository.DtddGameCacheRepository;
-import fr.enimaloc.catapult.repository.DtddGameMappingRepository;
-import fr.enimaloc.catapult.repository.DtddSearchCacheRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddSearchCacheRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

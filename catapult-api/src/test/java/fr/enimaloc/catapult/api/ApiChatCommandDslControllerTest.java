@@ -5,11 +5,11 @@ import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
-import fr.enimaloc.catapult.domain.ChatCommandSetting;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.repository.TwDefinitionRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -104,7 +104,7 @@ class ApiChatCommandDslControllerTest {
 
     @Test
     void catalogReturnsKnownTwsFromAllDefinitionsRegardlessOfEnabled() throws Exception {
-        fr.enimaloc.catapult.domain.TwDefinition def = new fr.enimaloc.catapult.domain.TwDefinition();
+        fr.enimaloc.catapult.domain.tw.TwDefinition def = new fr.enimaloc.catapult.domain.tw.TwDefinition();
         def.setId("violence_graphic");
         def.setLabel("Violence (graphic)");
         def.setEnabled(false);

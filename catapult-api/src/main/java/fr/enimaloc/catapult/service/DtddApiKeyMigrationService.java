@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.DtddApiKeyEntry;
+import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
 import fr.enimaloc.catapult.getter.DtddApiKeyRotator;
-import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.MinecraftFriendLink;
-import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.MinecraftFriendLinkRepository;
-import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.MinecraftGateService;
 import fr.enimaloc.catapult.service.MinecraftService;
 import fr.enimaloc.catapult.service.MinecraftTokenService;

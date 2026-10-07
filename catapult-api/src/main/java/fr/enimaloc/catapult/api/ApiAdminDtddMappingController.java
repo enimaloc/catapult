@@ -1,9 +1,13 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.RejectRequest;
-import fr.enimaloc.catapult.domain.*;
-import fr.enimaloc.catapult.domain.DtddMappingProposal.Status;
-import fr.enimaloc.catapult.repository.*;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
+import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
+import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal.Status;
+import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddTopicsCacheRepository;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;

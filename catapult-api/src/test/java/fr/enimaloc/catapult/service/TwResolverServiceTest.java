@@ -1,7 +1,10 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.domain.TwSteamKeyword;
-import fr.enimaloc.catapult.repository.*;
+import fr.enimaloc.catapult.domain.tw.TwSteamKeyword;
+import fr.enimaloc.catapult.repository.tw.TwDtddTopicMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwIgdbDescriptorMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwSteamContentIdMappingRepository;
+import fr.enimaloc.catapult.repository.tw.TwSteamKeywordRepository;
 import fr.enimaloc.catapult.service.SteamStoreService.SteamTwSignals;
 import org.junit.jupiter.api.Test;
 

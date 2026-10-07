@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.connections;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.getter.SteamApiClient;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
 import fr.enimaloc.catapult.security.TokenEncryptionService;

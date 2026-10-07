@@ -1,13 +1,13 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.FeedbackRequest;
-import fr.enimaloc.catapult.domain.Experiment;
-import fr.enimaloc.catapult.domain.ExperimentAssignment;
-import fr.enimaloc.catapult.domain.ExperimentFeedback;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ExperimentAssignmentRepository;
-import fr.enimaloc.catapult.repository.ExperimentFeedbackRepository;
-import fr.enimaloc.catapult.repository.ExperimentRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentFeedback;
+import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentFeedbackRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
