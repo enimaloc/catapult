@@ -162,5 +162,35 @@
                 </mdui-segmented-button>
             </mdui-segmented-button-group>
         </mdui-card>
+        <mdui-card th:if="${ch.obs() != null}" class="connection-card" variant="outlined" data-conn="obs">
+            <span th:text="#{channel.connections.obs}">OBS</span>
+            <mdui-chip class="obs-connected-chip" th:classappend="${!ch.obs().connected()} ? 'hidden'"
+                       th:text="#{channel.connections.connected}">Connecté
+            </mdui-chip>
+            <mdui-chip class="obs-not-connected-chip" th:classappend="${ch.obs().connected()} ? 'hidden'"
+                       th:text="#{channel.connections.not_connected}">Non connecté
+            </mdui-chip>
+
+            <div id="obs-status-body">
+                <div class="obs-fields">
+                    <input type="text" id="obs-host" th:placeholder="#{channel.connections.obs.host}" th:value="${ch.obs().host()}"/>
+                    <input type="number" id="obs-port" min="1" max="65535" th:placeholder="#{channel.connections.obs.port}"
+                           th:value="${ch.obs().port()}"/>
+                    <!-- The stored password is never sent back: leave the field empty and only
+                         hint that one exists. -->
+                    <input type="password" id="obs-password"
+                           th:placeholder="${ch.obs().hasPassword()} ? '••••••••' : #{channel.connections.obs.password}"/>
+                </div>
+            </div>
+
+            <div id="obs-actions" class="card-actions">
+                <mdui-button id="obs-connect-btn" th:text="#{channel.connections.obs.connect}" th:class="${!ch.obs().connected() ? '' : 'hidden'}">
+                    Se connecter
+                </mdui-button>
+                <mdui-button id="obs-disconnect-btn" th:text="#{channel.connections.obs.disconnect}" th:class="${ch.obs().connected() ? '' : 'hidden'}">
+                    Se déconnecter
+                </mdui-button>
+            </div>
+        </mdui-card>
     </div>
 </mdui-tab-panel>
