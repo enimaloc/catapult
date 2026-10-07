@@ -45,29 +45,21 @@ public class OAuth2ClientConfig {
     public ClientRegistrationRepository clientRegistrationRepository() {
         List<ClientRegistration> registrations = new ArrayList<>();
 
-        registrations.add(ClientRegistration.withRegistrationId("twitch")
-            .clientId(twitchClientId)
-            .clientSecret(twitchClientSecret)
+        registrations.add(authorizationCode("twitch", twitchClientId, twitchClientSecret)
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
             .scope("user:read:email", "channel:manage:broadcast",
                    "user:read:chat", "user:write:chat",
                    "channel:moderate", "channel:read:redemptions", "user:read:moderated_channels",
                    "moderator:read:followers", "moderator:manage:shoutouts")
-            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-            .redirectUri(baseUrl+"/login/oauth2/code/{registrationId}")
             .authorizationUri("https://id.twitch.tv/oauth2/authorize")
             .tokenUri("https://id.twitch.tv/oauth2/token")
             .userInfoUri("https://api.twitch.tv/helix/users")
             .userNameAttributeName("id")
             .build());
 
-        if (!xboxClientId.isBlank() && !xboxClientSecret.isBlank()) {
-            registrations.add(ClientRegistration.withRegistrationId("xbox")
-                .clientId(xboxClientId)
-                .clientSecret(xboxClientSecret)
+        if (configured(xboxClientId, xboxClientSecret)) {
+            registrations.add(authorizationCode("xbox", xboxClientId, xboxClientSecret)
                 .scope("XboxLive.signin", "XboxLive.offline_access")
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri(baseUrl+"/login/oauth2/code/{registrationId}")
                 .authorizationUri("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize")
                 .tokenUri("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
                 .userInfoUri("https://graph.microsoft.com/v1.0/me")
@@ -75,13 +67,9 @@ public class OAuth2ClientConfig {
                 .build());
         }
 
-        if (!battleNetClientId.isBlank() && !battleNetClientSecret.isBlank()) {
-            registrations.add(ClientRegistration.withRegistrationId("battlenet")
-                .clientId(battleNetClientId)
-                .clientSecret(battleNetClientSecret)
+        if (configured(battleNetClientId, battleNetClientSecret)) {
+            registrations.add(authorizationCode("battlenet", battleNetClientId, battleNetClientSecret)
                 .scope("openid")
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri(baseUrl+"/login/oauth2/code/{registrationId}")
                 .authorizationUri("https://oauth.battle.net/authorize")
                 .tokenUri("https://oauth.battle.net/token")
                 .userInfoUri("https://oauth.battle.net/userinfo")
@@ -90,6 +78,20 @@ public class OAuth2ClientConfig {
         }
 
         return new InMemoryClientRegistrationRepository(registrations);
+    }
+
+    /** An authorization-code registration redirecting back to this API's login callback. */
+    private ClientRegistration.Builder authorizationCode(String registrationId, String clientId, String clientSecret) {
+        return ClientRegistration.withRegistrationId(registrationId)
+            .clientId(clientId)
+            .clientSecret(clientSecret)
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .redirectUri(baseUrl + "/login/oauth2/code/{registrationId}");
+    }
+
+    /** Optional providers are only registered once both credentials are set. */
+    private static boolean configured(String clientId, String clientSecret) {
+        return !clientId.isBlank() && !clientSecret.isBlank();
     }
 
     @Bean
