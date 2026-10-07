@@ -81,19 +81,10 @@
                                    th:text="#{channel.bindings.filter.all}">Toutes
             </mdui-segmented-button>
             <mdui-segmented-button data-link
-                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},status='AUTO')}"
-                                   th:classappend="${ch.filterStatus() == 'AUTO'} ? 'filter-active'"
-                                   th:text="#{channel.bindings.filter.auto}">Auto
-            </mdui-segmented-button>
-            <mdui-segmented-button data-link
-                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},status='MANUAL')}"
-                                   th:classappend="${ch.filterStatus() == 'MANUAL'} ? 'filter-active'"
-                                   th:text="#{channel.bindings.filter.manual}">Manuel
-            </mdui-segmented-button>
-            <mdui-segmented-button data-link
-                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},status='INCOMPLETE')}"
-                                   th:classappend="${ch.filterStatus() == 'INCOMPLETE'} ? 'filter-active'"
-                                   th:text="#{channel.bindings.filter.incomplete}">Incomplet
+                                   th:each="status : ${ {'AUTO', 'MANUAL', 'INCOMPLETE'} }"
+                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},status=${status})}"
+                                   th:classappend="${ch.filterStatus() == status} ? 'filter-active'"
+                                   th:text="#{${'channel.bindings.filter.' + #strings.toLowerCase(status)}}">Auto
             </mdui-segmented-button>
             <mdui-segmented-button data-link
                                    th:each="platform : ${app.platforms}"
