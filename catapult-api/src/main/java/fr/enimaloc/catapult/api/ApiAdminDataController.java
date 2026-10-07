@@ -6,12 +6,15 @@ import fr.enimaloc.catapult.admindata.DataRegistry;
 import fr.enimaloc.catapult.admindata.IdCodec;
 import fr.enimaloc.catapult.admindata.ValueCoercion;
 import fr.enimaloc.catapult.common.dto.RepoSummaryDto;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import jakarta.persistence.metamodel.Attribute;
 import jakarta.persistence.metamodel.EntityType;
 import jakarta.persistence.metamodel.SingularAttribute;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -30,13 +33,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.lang.reflect.Field;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/admin/data")
@@ -70,33 +74,40 @@ public class ApiAdminDataController {
     }
 
     private List<Object> queryRows(DataRegistry.Entry entry, String q, int page, int size) {
-        StringBuilder jpql = new StringBuilder("SELECT e FROM ").append(entry.entityClass().getSimpleName()).append(" e");
-        List<String> searchableFields = searchableStringFields(entry.entityType());
-        boolean hasSearch = q != null && !q.isBlank() && !searchableFields.isEmpty();
-        if (hasSearch) {
-            jpql.append(" WHERE ");
-            jpql.append(String.join(" OR ", searchableFields.stream()
-                .map(f -> "LOWER(e." + f + ") LIKE :q").toList()));
-        }
-        TypedQuery<Object> query = entityManager.createQuery(jpql.toString(), Object.class);
-        if (hasSearch) {
-            query.setParameter("q", "%" + q.toLowerCase(Locale.ROOT) + "%");
+        Optional<String> search = searchClause(entry, q);
+        String jpql = "SELECT e FROM " + entry.entityClass().getSimpleName() + " e" + search.map(w -> " WHERE " + w).orElse("");
+        TypedQuery<Object> query = entityManager.createQuery(jpql, Object.class);
+        if (search.isPresent()) {
+            query.setParameter("q", likePattern(q));
         }
         return query.setFirstResult(page * size).setMaxResults(size).getResultList();
     }
 
     private long countRows(DataRegistry.Entry entry, String q) {
-        List<String> searchableFields = searchableStringFields(entry.entityType());
-        boolean hasSearch = q != null && !q.isBlank() && !searchableFields.isEmpty();
-        if (!hasSearch) {
+        Optional<String> search = searchClause(entry, q);
+        if (search.isEmpty()) {
             return entry.repository().count();
         }
-        StringBuilder jpql = new StringBuilder("SELECT COUNT(e) FROM ")
-            .append(entry.entityClass().getSimpleName()).append(" e WHERE ")
-            .append(String.join(" OR ", searchableFields.stream().map(f -> "LOWER(e." + f + ") LIKE :q").toList()));
-        return entityManager.createQuery(jpql.toString(), Long.class)
-            .setParameter("q", "%" + q.toLowerCase(Locale.ROOT) + "%")
+        String jpql = "SELECT COUNT(e) FROM " + entry.entityClass().getSimpleName() + " e WHERE " + search.get();
+        return entityManager.createQuery(jpql, Long.class)
+            .setParameter("q", likePattern(q))
             .getSingleResult();
+    }
+
+    /**
+     * {@code LOWER(e.f1) LIKE :q OR ...} over the entity's plain string columns — empty when there is
+     * nothing to search for, or nothing to search in.
+     */
+    private static Optional<String> searchClause(DataRegistry.Entry entry, String q) {
+        List<String> searchableFields = searchableStringFields(entry.entityType());
+        if (q == null || q.isBlank() || searchableFields.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(String.join(" OR ", searchableFields.stream().map(f -> "LOWER(e." + f + ") LIKE :q").toList()));
+    }
+
+    private static String likePattern(String q) {
+        return "%" + q.toLowerCase(Locale.ROOT) + "%";
     }
 
     private static List<String> searchableStringFields(EntityType<?> entityType) {
@@ -162,7 +173,7 @@ public class ApiAdminDataController {
     @SuppressWarnings("unchecked")
     private Object findEntity(DataRegistry.Entry entry, String encodedId) {
         Object id = IdCodec.decode(encodedId, entry.entityType());
-        java.util.Optional<Object> found = entry.repository().findById(id);
+        Optional<Object> found = entry.repository().findById(id);
         return found.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown id " + encodedId));
     }
 
@@ -219,11 +230,11 @@ public class ApiAdminDataController {
     }
 
     private List<Map<String, String>> toCollectionLinks(Object rawCollection) {
-        if (!(rawCollection instanceof java.util.Collection<?> collection)) {
+        if (!(rawCollection instanceof Collection<?> collection)) {
             return List.of();
         }
         return collection.stream().map(item -> {
-            Object real = org.hibernate.Hibernate.unproxy(item);
+            Object real = Hibernate.unproxy(item);
             EntityType<?> itemType = entityManager.getMetamodel().entity(real.getClass());
             Map<String, String> link = new LinkedHashMap<>();
             link.put("id", IdCodec.encode(readId(real, itemType), itemType));
@@ -253,7 +264,7 @@ public class ApiAdminDataController {
                         // values rather than the real data. Unproxy first to get the real,
                         // initialized target instance (safe here: entityList/entityDetail are
                         // @Transactional, so the session is still open).
-                        Object real = org.hibernate.Hibernate.unproxy(value);
+                        Object real = Hibernate.unproxy(value);
                         EntityType<?> targetType = entityManager.getMetamodel().entity(real.getClass());
                         // Emit the encoded target id as the field's round-trippable value (what a
                         // submitted edit form actually sends back to PUT/applyFields), and the
@@ -273,7 +284,7 @@ public class ApiAdminDataController {
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (JsonProcessingException e) {
             throw new IllegalStateException("Cannot serialize value " + value, e);
         }
     }
