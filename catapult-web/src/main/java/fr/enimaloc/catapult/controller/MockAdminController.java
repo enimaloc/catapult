@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.BindingDto;
+import fr.enimaloc.catapult.common.dto.GameDto;
 import fr.enimaloc.catapult.service.mock.MockApiService;
 import fr.enimaloc.catapult.service.mock.MockData;
 import fr.enimaloc.catapult.ws.event.*;
@@ -92,7 +93,8 @@ public class MockAdminController {
             eventPublisher.publishEvent(new ChannelLiveStateEvent(username, live));
         }
         data.setChannelAvatarUrl(avatarUrl);
-        if (!data.getGameDto().sourceName().equals(detectedSourceName) || !data.getGameDto().sourceType().equals(detectedSourceType)) {
+        GameDto game = data.getGameDto();
+        if (game == null || !game.sourceName().equals(detectedSourceName) || !game.sourceType().equals(detectedSourceType)) {
             BindingDto bindingDto = data.getBinding()
                         .stream()
                         .filter(b -> b.sourceName().equalsIgnoreCase(detectedSourceName)
