@@ -7,6 +7,11 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * A message source whose messages can embed other messages as {@code #{key}} (e.g.
+ * {@code hero.discover=Discover #{app.brand}}), expanded recursively in the same locale.
+ * Unknown keys are left as written; a reference cycle fails after {@value #MAX_DEPTH} levels.
+ */
 public class RecursiveMessageSource extends ResourceBundleMessageSource {
 
     private static final Pattern MESSAGE_REFERENCE =
@@ -25,18 +30,14 @@ public class RecursiveMessageSource extends ResourceBundleMessageSource {
         return resolveReferences(message, locale, 0);
     }
 
+    /**
+     * Expands references in the raw message before it becomes a {@link MessageFormat}: built
+     * first (as the parent does), a {@code #{key}} would be parsed as an argument named "key".
+     */
     @Override
     protected MessageFormat resolveCode(String code, Locale locale) {
-        MessageFormat messageFormat = super.resolveCode(code, locale);
-
-        if (messageFormat == null) {
-            return null;
-        }
-
-        String message = messageFormat.toPattern();
-        message = resolveReferences(message, locale, 0);
-
-        return createMessageFormat(message, locale);
+        String message = resolveCodeWithoutArguments(code, locale);
+        return message == null ? null : createMessageFormat(message, locale);
     }
 
     private String resolveReferences(
