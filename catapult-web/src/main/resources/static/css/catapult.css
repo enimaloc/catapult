@@ -1121,20 +1121,7 @@ a[data-link].active {
 
 /* Tabs */
 
-/*
- * Same light-theme leak as .bindings-filters below: mdui's tab labels, divider
- * and indicator read --mdui-color-on-surface(-variant), -surface-variant and
- * -primary, which never get dark values here. Bare "R G B" triplets, as mdui
- * expects.
- */
-.channel-tabs {
-    --mdui-color-on-surface: 244 246 251;
-    --mdui-color-on-surface-variant: 174 180 192;
-    --mdui-color-surface-variant: 41 46 58;
-    --mdui-color-primary: 167 139 250;
-}
-
-/* The tab strip paints its own rgb(--mdui-color-surface) background (white here). */
+/* The tab strip paints its own rgb(--mdui-color-surface) background, a shade off the page's. */
 .channel-tabs::part(container) {
     background-color: transparent;
 }
@@ -1208,15 +1195,7 @@ a[data-link].active {
 
 /* Bindings filters */
 
-/*
- * mdui's own light-theme --mdui-color-on-surface (near-black) never gets
- * replaced by a dark-theme value here, so segment labels render almost
- * invisible on this dark background. Same bare "R G B" triplet convention as
- * --catapult-text, consumed internally via rgb(var(--mdui-color-on-surface)).
- */
 .bindings-filters {
-    --mdui-color-on-surface: 244 246 251;
-
     flex-wrap: wrap;
 }
 
@@ -1425,9 +1404,6 @@ a[data-link].active {
 /* mdui-segmented-button-group, not a div — lays out its own segments internally,
  * so only the positioning within the card and the separator above it are ours. */
 .connection-card > .card-actions {
-    /* See .bindings-filters — same near-invisible label fix. */
-    --mdui-color-on-surface: 244 246 251;
-
     max-width: 100%;
 
     margin-top: auto;
