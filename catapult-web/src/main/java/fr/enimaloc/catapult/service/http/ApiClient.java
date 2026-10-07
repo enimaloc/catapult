@@ -23,7 +23,7 @@ public class ApiClient implements HttpClient {
 
     private final RestClient client;
 
-    public ApiClient(@Value("${catapult.backend-url") String apiUrl, RestClient.Builder builder) {
+    public ApiClient(@Value("${catapult.backend-url}") String apiUrl, RestClient.Builder builder) {
         this.client = builder
                 .baseUrl(apiUrl)
                 .requestInterceptor((request, body, execution) -> {
