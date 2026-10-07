@@ -27,7 +27,6 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
@@ -94,28 +93,27 @@ public class ApiSteamConnectController {
 
         if (userId == null) {
             log.warn("Steam OpenID callback with unknown or expired nonce: {}", nonce);
-            return redirect(webBaseUrl + "/connect/steam/close?error=nonce");
+            return closePopup("?error=nonce");
         }
 
         if (!"id_res".equals(params.get("openid.mode"))) {
             log.warn("Steam OpenID callback rejected: mode={}", params.get("openid.mode"));
-            return redirect(webBaseUrl + "/connect/steam/close?error=rejected");
+            return closePopup("?error=rejected");
         }
 
         if (!verifyWithSteam(params)) {
             log.warn("Steam OpenID verification failed for user {}", userId);
-            return redirect(webBaseUrl + "/connect/steam/close?error=verify");
+            return closePopup("?error=verify");
         }
 
         String claimedId = params.get("openid.claimed_id");
         if (claimedId == null || !claimedId.startsWith(STEAM_ID_PREFIX)) {
             log.warn("Invalid Steam claimed_id: {}", claimedId);
-            return redirect(webBaseUrl + "/connect/steam/close?error=invalid");
+            return closePopup("?error=invalid");
         }
 
         String steamId = claimedId.substring(STEAM_ID_PREFIX.length());
-        UserAccount account = userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        UserAccount account = findOrThrow(userId);
         account.setSteamId(steamId);
         userAccountRepository.save(account);
         log.info("Steam linked for user {}, steamId={}", account.getId(), steamId);
@@ -123,12 +121,13 @@ public class ApiSteamConnectController {
         channelEventPublisher.connectionChanged(account.getId(),
                 new ProviderConnectionsDto("STEAM", true, null));
 
-        return redirect(webBaseUrl + "/connect/steam/close");
+        return closePopup("");
     }
 
-    private static ResponseEntity<Void> redirect(String url) {
+    /** Sends the browser to catapult-web's page that closes the Steam popup, with {@code query} appended. */
+    private ResponseEntity<Void> closePopup(String query) {
         return ResponseEntity.status(HttpStatus.FOUND)
-                .header("Location", url)
+                .header("Location", webBaseUrl + "/connect/steam/close" + query)
                 .build();
     }
 
@@ -136,13 +135,17 @@ public class ApiSteamConnectController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void disconnect(@AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
-        UserAccount account = userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        UserAccount account = findOrThrow(userId);
         account.setSteamId(null);
         userAccountRepository.save(account);
         log.info("Steam disconnected for user {}", account.getId());
         channelEventPublisher.connectionChanged(account.getId(),
                 new ProviderConnectionsDto("STEAM", false, null));
+    }
+
+    private UserAccount findOrThrow(UUID userId) {
+        return userAccountRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     private static String generateNonce() {
