@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.UpdateBindingRequest;
+import fr.enimaloc.catapult.common.dto.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.ValidateRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -27,6 +28,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -91,13 +94,13 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
+    public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, Set<String> ccls) {
         client.postVoid("/api/channels/{username}/bindings/{bindingId}",
                 new UpdateBindingRequest(twitchGameId, twitchGameName, ccls), username, bindingId);
     }
 
     @Override
-    public void saveTws(String bindingId, java.util.Set<String> tws) {
+    public void saveTws(String bindingId, Set<String> tws) {
         client.postVoid("/api/channel/bindings/{bindingId}/tws", new SaveBody(tws), bindingId);
     }
 
@@ -140,7 +143,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public void minecraftEnroll(String username, String name) {
-        client.postVoid("/api/connect/minecraft", java.util.Map.of("name", name));
+        client.postVoid("/api/connect/minecraft", Map.of("name", name));
     }
 
     @Override
@@ -150,28 +153,28 @@ public class RealApiService implements ApiService {
 
     @Override
     public void minecraftDisconnect(String username) {
-        client.reqVoid(org.springframework.http.HttpMethod.DELETE, "/api/connect/minecraft", null, null);
+        client.delete("/api/connect/minecraft");
     }
 
     @Override
-    public void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls) {
+    public void saveCclSettings(String username, boolean enabled, Set<String> blockedCcls) {
         client.postVoid("/api/channels/{username}/settings/ccl",
                 new CclSettingsRequest(enabled, blockedCcls), username);
     }
 
     @Override
-    public void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws) {
+    public void saveTwSettings(String username, boolean enabled, Set<String> blockedTws) {
         client.postVoid("/api/channels/{username}/settings/tws",
                 new TwSettingsRequest(enabled, blockedTws), username);
     }
 
     @Override
-    public fr.enimaloc.catapult.common.dto.UserSettingsDto channelSettings(String username) {
-        return client.get("/api/channels/{username}/settings", fr.enimaloc.catapult.common.dto.UserSettingsDto.class, username);
+    public UserSettingsDto channelSettings(String username) {
+        return client.get("/api/channels/{username}/settings", UserSettingsDto.class, username);
     }
 
     @Override
-    public void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
+    public void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
                                     boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
         client.postVoid("/api/channels/{username}/settings/no-game",
                 new NoGameSettingsRequest(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd),
@@ -179,7 +182,7 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls) {
+    public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
         client.postVoid("/api/channels/{username}/settings/incomplete-fallback",
                 new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls), username);
     }
