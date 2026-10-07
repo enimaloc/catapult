@@ -141,6 +141,8 @@ public class MockData {
     private boolean hasXboxProvider;
     @Getter
     private boolean hasXbox;
+    @Getter
+    private boolean hasMinecraftProvider;
     private LinkStateResponse minecraftLink;
     @Setter
     @Getter
@@ -169,7 +171,7 @@ public class MockData {
                 SETTINGS_DTOS[Integer.min(id, SETTINGS_DTOS.length - 1)],
                 id == 0 ? List.of(CHANNEL_DTOS) : List.of(),
                 true, true, true, false, false, false, false,
-                false, false,
+                false, false, true,
                 new LinkStateResponse("NONE", null, null));
     }
 
@@ -199,9 +201,9 @@ public class MockData {
                 c.minecraft.status, c.minecraft.minecraftName, c.minecraft.serviceAccountUsername);
 
         MockData data = new MockData(channel, bindings, settings, List.of(),
-                c.steam.connected, c.steam.connected, c.steam.hasPersonalToken, c.steam.tokenShared,
+                true, c.steam.connected, c.steam.hasPersonalToken, c.steam.tokenShared,
                 c.steam.profilePrivate, c.steam.rateLimited, c.steam.offlineMode,
-                c.xbox.connected, c.xbox.connected, minecraft);
+                true, c.xbox.connected, true, minecraft);
         data.setBotEnabled(c.botEnabled);
         return data;
     }
@@ -210,7 +212,7 @@ public class MockData {
                     List<ChannelDto> channelsList,
                     boolean hasSteamProvider, boolean hasSteam, boolean hasSteamPersonalToken,
                     boolean steamTokenShared, boolean steamProfilePrivate, boolean steamRateLimited,
-                    boolean steamOfflineMode, boolean hasXboxProvider, boolean hasXbox,
+                    boolean steamOfflineMode, boolean hasXboxProvider, boolean hasXbox, boolean hasMinecraftProvider,
                     LinkStateResponse minecraftLink) {
         this.channelDto = channelDto;
         this.gameDto = new GameDto(bindingDto.getFirst().id(), bindingDto.getFirst().sourceName(), bindingDto.getFirst().sourceType());
@@ -231,6 +233,7 @@ public class MockData {
         this.hasXboxProvider = hasXboxProvider;
         this.hasXbox = hasXbox;
         this.minecraftLink = minecraftLink;
+        this.hasMinecraftProvider = hasMinecraftProvider;
         this.botEnabled = true;
     }
 
@@ -276,6 +279,7 @@ public class MockData {
                 hasSteamPersonalToken && random.nextBoolean(), hasSteam && random.nextBoolean(),
                 hasSteam && random.nextBoolean(), hasSteam && random.nextBoolean(),
                 true, random.nextBoolean(),
+                true,
                 new LinkStateResponse("NONE", null, null));
         data.setBotEnabled(true);
         return data;
@@ -295,9 +299,13 @@ public class MockData {
                 channelDto.live(), botEnabled, gameDto,
                 new PagedBindings(0, bindingDtos.isEmpty() ? 0 : 1, bindingDtos.size(), bindingDtos),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
-                status, source, hasSteamProvider, hasSteam, hasSteamPersonalToken, steamTokenShared,
-                steamProfilePrivate, steamRateLimited, steamOfflineMode, steamProfileCacheTtlMinutes,
-                hasXboxProvider, hasXbox, "00000000-0000-0000-0000-000000000000"
+                status, source, hasSteamProvider ? new SteamData(hasSteam,
+                hasSteamPersonalToken, steamTokenShared, steamProfilePrivate, steamRateLimited,
+                steamOfflineMode, steamProfileCacheTtlMinutes) : null, hasXboxProvider ?
+                new XboxData(hasXbox) : null, hasMinecraftProvider ?
+                new MinecraftData(minecraftLink.status(), minecraftLink.minecraftName(),
+                        minecraftLink.serviceAccountUsername()) : null,
+                "00000000-0000-0000-0000-000000000000"
         );
     }
 

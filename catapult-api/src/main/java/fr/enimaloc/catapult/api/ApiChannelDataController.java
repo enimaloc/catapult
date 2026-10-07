@@ -8,14 +8,18 @@ import fr.enimaloc.catapult.common.dto.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.DtddMappingProposalDto;
 import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.GameDto;
+import fr.enimaloc.catapult.common.dto.MinecraftData;
 import fr.enimaloc.catapult.common.dto.PagedBindings;
 import fr.enimaloc.catapult.common.dto.StatusData;
+import fr.enimaloc.catapult.common.dto.SteamData;
 import fr.enimaloc.catapult.common.dto.TwDto;
 import fr.enimaloc.catapult.common.dto.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.XboxData;
 import fr.enimaloc.catapult.domain.DtddGameCache;
 import fr.enimaloc.catapult.domain.DtddGameMapping;
 import fr.enimaloc.catapult.domain.DtddMappingProposal;
 import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
@@ -39,6 +43,7 @@ import fr.enimaloc.catapult.service.ConnectionEventService;
 import fr.enimaloc.catapult.service.GameStateService;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
 import fr.enimaloc.catapult.service.IgdbService;
+import fr.enimaloc.catapult.service.MinecraftFriendService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchService;
@@ -93,6 +98,8 @@ public class ApiChannelDataController {
     private final DtddMappingProposalRepository dtddProposalRepo;
     private final OAuthTokenRepository oAuthTokenRepository;
     private final DevBackdoorResolver devBackdoorResolver;
+    // Only present when minecraft.enabled (the service is @ConditionalOnBooleanProperty).
+    private final Optional<MinecraftFriendService> minecraftFriendService;
 
     private static final Set<GameBinding.SourceType> BACKDOOR_ENCODABLE =
             Set.of(GameBinding.SourceType.STEAM, GameBinding.SourceType.XBOX);
@@ -238,6 +245,11 @@ public class ApiChannelDataController {
         boolean hasXbox = hasXboxProvider
                 && oAuthTokenRepository.findByUserAndProvider(channelUser, OAuthToken.Provider.XBOX).isPresent();
 
+        // getLink() fetches the service account too, so its username is readable here (OSIV is off).
+        MinecraftFriendLink minecraftLink = minecraftFriendService
+                .flatMap(service -> service.getLink(channelUser))
+                .orElse(null);
+
         ChannelUserDto channelUserDto = new ChannelUserDto(
                 channelUser.getId().toString(),
                 channelUser.getTwitchId(),
@@ -265,16 +277,24 @@ public class ApiChannelDataController {
                 blockedTws,
                 status,
                 source,
-                hasSteamProvider,
-                hasSteam,
-                hasSteamPersonalToken,
-                steamTokenShared,
-                steamProfilePrivate,
-                steamRateLimited,
-                steamOfflineMode,
-                steamProfileCacheTtlMinutes,
-                hasXboxProvider,
-                hasXbox,
+                !hasSteamProvider ? null : new SteamData(
+                        hasSteam,
+                        hasSteamPersonalToken,
+                        steamTokenShared,
+                        steamProfilePrivate,
+                        steamRateLimited,
+                        steamOfflineMode,
+                        steamProfileCacheTtlMinutes
+                ),
+                !hasXboxProvider ? null : new XboxData(
+                        hasXbox
+                ),
+                minecraftFriendService.isEmpty() ? null : new MinecraftData(
+                        // "NONE" when unlinked, same as ApiMinecraftConnectController's status.
+                        minecraftLink == null ? "NONE" : minecraftLink.getStatus().name(),
+                        minecraftLink == null ? null : minecraftLink.getMinecraftName(),
+                        minecraftLink == null ? null : minecraftLink.getServiceAccount().getMinecraftUsername()
+                ),
                 exampleUuid
         );
     }
