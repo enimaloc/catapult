@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.chat.TwPlaceholderRegistry;
 import fr.enimaloc.catapult.common.dto.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.CacheSummaryDto;
+import fr.enimaloc.catapult.domain.IgdbGameDetails;
+import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.IgdbGameDetailsRepository;
@@ -13,6 +15,9 @@ import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.IgdbService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +32,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -71,7 +77,7 @@ public class ApiAdminCacheController {
     }
 
     @GetMapping("/{name}")
-    public org.springframework.data.domain.Page<CacheEntryDto> entries(
+    public Page<CacheEntryDto> entries(
             @PathVariable String name,
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
@@ -106,14 +112,14 @@ public class ApiAdminCacheController {
         return game.id();
     }
 
-    private fr.enimaloc.catapult.domain.UserAccount requireUser(String key) {
+    private UserAccount requireUser(String key) {
         return userAccountRepository.findById(parseUserId(key))
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown user " + key));
     }
 
     private Long expiresInSeconds(String name, Object detail) {
         if (!IGDB_DETAILS_TTL_CACHES.contains(name)
-                || !(detail instanceof fr.enimaloc.catapult.domain.IgdbGameDetails d)
+                || !(detail instanceof IgdbGameDetails d)
                 || d.getFetchedAt() == null) {
             return null;
         }
@@ -125,10 +131,8 @@ public class ApiAdminCacheController {
         return switch (name) {
             case "igdb-game-cache" -> igdbService.getGameCache().entrySet().stream()
                 .map(e -> new CacheEntryDto(e.getKey(), e.getValue())).toList();
-            case "igdb-name-index" -> igdbService.getNameIndex().entrySet().stream()
-                .map(e -> new CacheEntryDto(e.getKey(), e.getValue().id() + " / " + e.getValue().name())).toList();
-            case "igdb-exe-index" -> igdbService.getExeIndex().entrySet().stream()
-                .map(e -> new CacheEntryDto(e.getKey(), e.getValue().id() + " / " + e.getValue().name())).toList();
+            case "igdb-name-index" -> indexEntries(igdbService.getNameIndex());
+            case "igdb-exe-index" -> indexEntries(igdbService.getExeIndex());
             case "igdb-ccl-cache" -> igdbService.getCclCache().entrySet().stream()
                 .map(e -> new CacheEntryDto(e.getKey(), String.join(", ", e.getValue()))).toList();
             case "chat-command-user-cache" -> dynamicCommandResolver.cacheSnapshot().entrySet().stream()
@@ -141,23 +145,29 @@ public class ApiAdminCacheController {
         };
     }
 
+    /** A lookup index entry shown as {@code "<igdbId> / <name>"}. */
+    private static List<CacheEntryDto> indexEntries(Map<String, IgdbService.IgdbGame> index) {
+        return index.entrySet().stream()
+            .map(e -> new CacheEntryDto(e.getKey(), e.getValue().id() + " / " + e.getValue().name())).toList();
+    }
+
     private static List<CacheEntryDto> filter(List<CacheEntryDto> entries, String q) {
         if (q == null || q.isBlank()) {
             return entries;
         }
-        String needle = q.toLowerCase(java.util.Locale.ROOT);
+        String needle = q.toLowerCase(Locale.ROOT);
         return entries.stream()
-            .filter(e -> e.key().toLowerCase(java.util.Locale.ROOT).contains(needle)
-                      || e.value().toLowerCase(java.util.Locale.ROOT).contains(needle))
+            .filter(e -> e.key().toLowerCase(Locale.ROOT).contains(needle)
+                      || e.value().toLowerCase(Locale.ROOT).contains(needle))
             .toList();
     }
 
-    private static org.springframework.data.domain.Page<CacheEntryDto> paginate(List<CacheEntryDto> entries, int page, int size) {
+    private static Page<CacheEntryDto> paginate(List<CacheEntryDto> entries, int page, int size) {
         int fromIndex = Math.min(page * size, entries.size());
         int toIndex = Math.min(fromIndex + size, entries.size());
-        return new org.springframework.data.domain.PageImpl<>(
+        return new PageImpl<>(
             entries.subList(fromIndex, toIndex),
-            org.springframework.data.domain.PageRequest.of(page, size),
+            PageRequest.of(page, size),
             entries.size());
     }
 
