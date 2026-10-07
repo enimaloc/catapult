@@ -111,7 +111,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
     @Override
     public void connect(UserAccount user) {
         intentionallyDisconnected.remove(user.getId());
-        disconnect(user);
+        closeConnection(user, "reconnecting");
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
             .ifPresentOrElse(
                 token -> openConnection(user, token, WS_URL, false),
@@ -123,11 +123,16 @@ public class EventSubTwitchChatService implements TwitchChatService {
     @Override
     public void disconnect(UserAccount user) {
         intentionallyDisconnected.add(user.getId());
+        closeConnection(user, "bot disabled");
+    }
+
+    /** Drops the user's socket and its state; whether it comes back is up to the caller. */
+    private void closeConnection(UserAccount user, String reason) {
         cancelWatchdog(user.getId());
         keepaliveTimeoutSeconds.remove(user.getId());
         retryDelaySeconds.remove(user.getId());
         WebSocket ws = connections.remove(user.getId());
-        if (ws != null) ws.sendClose(WebSocket.NORMAL_CLOSURE, "bot disabled");
+        if (ws != null) ws.sendClose(WebSocket.NORMAL_CLOSURE, reason);
     }
 
     private void openConnection(UserAccount user, OAuthToken token, String wsUrl, boolean reconnectSession) {
