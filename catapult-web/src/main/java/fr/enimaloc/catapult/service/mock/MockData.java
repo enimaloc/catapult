@@ -38,6 +38,11 @@ public class MockData {
             new TwDto("social_issue", "Social Issue")
     );
 
+    /** Value sets the mock login and admin forms offer. */
+    public static final List<String> BINDING_STATUSES = List.of("AUTO", "MANUAL", "INCOMPLETE");
+    public static final List<String> SOURCE_TYPES = List.of("STEAM", "XBOX", "MINECRAFT");
+    public static final List<String> MINECRAFT_STATUSES = List.of("NONE", "PENDING", "INVITE_REJECTED", "ACCEPTED", "REMOVED");
+
     public static final ChannelDto[] CHANNEL_DTOS = {
             new ChannelDto(
                     UUID.nameUUIDFromBytes("online".getBytes(StandardCharsets.UTF_8)),
@@ -133,7 +138,7 @@ public class MockData {
     @Getter
     private boolean steamOfflineMode;
     /**
-     * Not reachable from the app's own UI — only {@link MockAdminController} edits this.
+     * Not reachable from the app's own UI — only {@link fr.enimaloc.catapult.controller.mock.MockAdminController} edits this.
      */
     @Getter
     private long steamProfileCacheTtlMinutes = 15L;
