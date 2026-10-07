@@ -20,6 +20,11 @@
                   spa:on="hasGame:GameChangedEvent"
                   spa:value="textContent:GameChangedEvent.sourceName"
                   th:text="${ch.currentGame() != null ? ch.currentGame().sourceName() : ''}">Game</span>
+            <mdui-chip id="channel-current-platform" spa:if="hasGame:${ch.currentGame() != null}"
+                       spa:on="hasGame:GameChangedEvent"
+                       spa:value="textContent:GameChangedEvent.sourceType"
+                       th:text="${ch.currentGame() != null ? ch.currentGame().sourceType() : ''}">Game
+            </mdui-chip>
             <!-- noGame has no spa:on: no event signals a detected game being cleared yet
                  (only GameChangedEvent exists), so this direction only ever updates on
                  the next full render — known gap, not something spa:on can fix alone. -->
