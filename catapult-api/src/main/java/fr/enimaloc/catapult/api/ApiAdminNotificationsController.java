@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.common.dto.NotificationDto;
 import fr.enimaloc.catapult.domain.Notification;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.repository.NotificationRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
 import fr.enimaloc.catapult.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -36,11 +35,11 @@ public class ApiAdminNotificationsController {
 
     private final NotificationService service;
     private final NotificationRepository repo;
-    private final UserAccountRepository userRepo;
+    private final ApiUserResolver userResolver;
 
     @PostMapping
     public ResponseEntity<NotificationDto> create(@RequestBody AdminNotificationCreateBody body, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount admin = currentUser(jwt);
+        UserAccount admin = userResolver.viewerByTwitchId(jwt);
         NotificationService.CreateRequest req = new NotificationService.CreateRequest(
                 body.title(), body.body(), body.severity(),
                 body.ctaUrl(), body.ctaLabel(), body.expiresAt(), body.targetUserId());
@@ -60,9 +59,4 @@ public class ApiAdminNotificationsController {
         repo.delete(n);
     }
 
-    private UserAccount currentUser(Jwt jwt) {
-        String twitchId = jwt.getClaimAsString("twitchId");
-        return userRepo.findByTwitchId(twitchId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-    }
 }
