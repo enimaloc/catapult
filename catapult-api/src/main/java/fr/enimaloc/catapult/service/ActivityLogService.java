@@ -36,8 +36,7 @@ public class ActivityLogService {
     public void addEntry(UUID userId, String level, String message) {
         LogEntry entry = new LogEntry(Instant.now(), level, message);
 
-        buffers.computeIfAbsent(userId, id -> new ArrayDeque<>());
-        Deque<LogEntry> buf = buffers.get(userId);
+        Deque<LogEntry> buf = buffers.computeIfAbsent(userId, id -> new ArrayDeque<>());
         synchronized (buf) {
             buf.addLast(entry);
             if (buf.size() > MAX_ENTRIES) buf.removeFirst();
@@ -46,11 +45,7 @@ public class ActivityLogService {
         List<SseEmitter> userEmitters = emitters.getOrDefault(userId, List.of());
         List<SseEmitter> dead = new ArrayList<>();
         for (SseEmitter emitter : userEmitters) {
-            try {
-                emitter.send(SseEmitter.event().data(entry.formatted()));
-            } catch (IOException e) {
-                dead.add(emitter);
-            }
+            if (!send(emitter, entry)) dead.add(emitter);
         }
         if (!dead.isEmpty()) {
             emitters.getOrDefault(userId, new CopyOnWriteArrayList<>()).removeAll(dead);
@@ -74,15 +69,21 @@ public class ActivityLogService {
         Deque<LogEntry> buf = buffers.getOrDefault(userId, new ArrayDeque<>());
         synchronized (buf) {
             for (LogEntry entry : buf) {
-                try {
-                    emitter.send(SseEmitter.event().data(entry.formatted()));
-                } catch (IOException e) {
-                    break;
-                }
+                if (!send(emitter, entry)) break;
             }
         }
 
         return emitter;
+    }
+
+    /** False once the client is gone. */
+    private static boolean send(SseEmitter emitter, LogEntry entry) {
+        try {
+            emitter.send(SseEmitter.event().data(entry.formatted()));
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private void remove(UUID userId, SseEmitter emitter) {
