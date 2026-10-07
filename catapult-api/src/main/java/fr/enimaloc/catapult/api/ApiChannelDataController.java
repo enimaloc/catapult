@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.DtddMappingProposalDto;
 import fr.enimaloc.catapult.common.dto.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.GameDto;
 import fr.enimaloc.catapult.common.dto.MinecraftData;
+import fr.enimaloc.catapult.common.dto.ObsData;
 import fr.enimaloc.catapult.common.dto.PagedBindings;
 import fr.enimaloc.catapult.common.dto.StatusData;
 import fr.enimaloc.catapult.common.dto.SteamData;
@@ -47,6 +48,7 @@ import fr.enimaloc.catapult.service.MinecraftFriendService;
 import fr.enimaloc.catapult.service.StreamStateService;
 import fr.enimaloc.catapult.service.TwitchCategory;
 import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -100,6 +102,7 @@ public class ApiChannelDataController {
     private final DevBackdoorResolver devBackdoorResolver;
     // Only present when minecraft.enabled (the service is @ConditionalOnBooleanProperty).
     private final Optional<MinecraftFriendService> minecraftFriendService;
+    private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
 
     private static final Set<GameBinding.SourceType> BACKDOOR_ENCODABLE =
             Set.of(GameBinding.SourceType.STEAM, GameBinding.SourceType.XBOX);
@@ -250,6 +253,9 @@ public class ApiChannelDataController {
                 .flatMap(service -> service.getLink(channelUser))
                 .orElse(null);
 
+        // Owner-only (the integrations tab is), and getOrCreate() may insert a row.
+        var twitchatSettings = isOwner ? twitchatWidgetSettingsService.getOrCreate(channelUser) : null;
+
         ChannelUserDto channelUserDto = new ChannelUserDto(
                 channelUser.getId().toString(),
                 channelUser.getTwitchId(),
@@ -294,6 +300,12 @@ public class ApiChannelDataController {
                         minecraftLink == null ? "NONE" : minecraftLink.getStatus().name(),
                         minecraftLink == null ? null : minecraftLink.getMinecraftName(),
                         minecraftLink == null ? null : minecraftLink.getServiceAccount().getMinecraftUsername()
+                ),
+                twitchatSettings == null ? null : new ObsData(
+                        twitchatSettings.isEnabled(),
+                        twitchatSettings.getObsHost(),
+                        twitchatSettings.getObsPort(),
+                        twitchatSettings.getObsPasswordEncrypted() != null
                 ),
                 exampleUuid
         );

@@ -1074,11 +1074,32 @@ a[data-link].active {
     max-width: 480px;
 }
 
-/* mdui-segmented-button-group, not a div — lays out its own segments internally,
- * so only its placement in the row is ours: right-aligned, under the details. */
+/* OBS: address, port and password side by side, the port narrower. */
+.connection-card .obs-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(90px, 1fr) minmax(0, 2fr);
+    gap: 10px;
+    max-width: 720px;
+}
+
+/* .connection-card > div caps inputs at 480px; the grid sizes them here instead. */
+.connection-card .obs-fields input {
+    max-width: none;
+}
+
+/* Actions sit right-aligned under the details. A segmented group lays out its own
+ * segments; a plain div (OBS) holds separate buttons. Either way, no separator:
+ * outranks the `.connection-card > div` rules above. */
 .connection-card > .card-actions {
     justify-self: end;
     max-width: 100%;
+}
+
+.connection-card > div.card-actions {
+    flex-direction: row;
+    gap: 8px;
+    padding-top: 0;
+    border-top: none;
 }
 
 /*
@@ -1156,7 +1177,7 @@ a[data-link].active {
 
 /* Form controls */
 
-.channel-section :is(input[type="text"], input[type="password"]) {
+.channel-section :is(input[type="text"], input[type="password"], input[type="number"]) {
     width: 100%;
     padding: 10px 14px;
     border-radius: 10px;
@@ -1168,7 +1189,7 @@ a[data-link].active {
     transition: border-color 120ms ease;
 }
 
-.channel-section :is(input[type="text"], input[type="password"]):focus {
+.channel-section :is(input[type="text"], input[type="password"], input[type="number"]):focus {
     outline: none;
     border-color: var(--catapult-primary-hover);
 }
@@ -1216,6 +1237,10 @@ a[data-link].active {
 
     .connection-card > .card-actions {
         justify-self: stretch;
+    }
+
+    .connection-card .obs-fields {
+        grid-template-columns: 1fr;
     }
 
     .bindings-pagination {

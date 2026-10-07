@@ -20,5 +20,6 @@ public record ChannelPageData(
         SteamData steam,
         XboxData xbox,
         MinecraftData minecraft,
+        ObsData obs,
         String exampleUuid
 ) {}
