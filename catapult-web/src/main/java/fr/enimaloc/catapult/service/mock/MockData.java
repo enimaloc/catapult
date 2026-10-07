@@ -221,7 +221,9 @@ public class MockData {
                     boolean steamOfflineMode, boolean hasXboxProvider, boolean hasXbox, boolean hasMinecraftProvider,
                     LinkStateResponse minecraftLink, boolean hasObsProvider, ObsData obsData) {
         this.channelDto = channelDto;
-        this.gameDto = new GameDto(bindingDto.getFirst().id(), bindingDto.getFirst().sourceName(), bindingDto.getFirst().sourceType());
+        // No binding (e.g. a random session that drew none) means no detected game either.
+        this.gameDto = bindingDto.isEmpty() ? null
+                : new GameDto(bindingDto.getFirst().id(), bindingDto.getFirst().sourceName(), bindingDto.getFirst().sourceType());
         this.binding = bindingDto;
         this.userSettingsDto = userSettingsDto;
         if (!channelsList.contains(channelDto)) {
@@ -463,7 +465,7 @@ public class MockData {
      * The game Catapult currently detects running — independent of the binding's Twitch category mapping.
      */
     public void setDetectedGame(String sourceType, String sourceName) {
-        gameDto = new GameDto(gameDto.bindingId(), sourceName, sourceType);
+        gameDto = new GameDto(gameDto == null ? null : gameDto.bindingId(), sourceName, sourceType);
     }
 
     public void setProviders(boolean hasSteamProvider, boolean hasSteam, boolean hasXboxProvider, boolean hasXbox) {
