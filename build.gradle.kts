@@ -20,7 +20,7 @@ subprojects {
  */
 val coverageFloors = mapOf(
     "catapult-common" to 0.95,
-    "catapult-api" to 0.64,
+    "catapult-api" to 0.73,
     "catapult-web" to 0.95,
 )
 
