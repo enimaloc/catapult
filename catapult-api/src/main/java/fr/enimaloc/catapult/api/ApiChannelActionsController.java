@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.domain.OAuthToken;
 import fr.enimaloc.catapult.domain.SteamApiKeyEntry;
 import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.domain.TwitchatPayloadPreset;
+import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.domain.UserAccount;
 import fr.enimaloc.catapult.domain.UserSettings;
 import fr.enimaloc.catapult.getter.SteamApiKeyRotator;
@@ -68,6 +69,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Slf4j
 @RestController
@@ -108,9 +110,7 @@ public class ApiChannelActionsController {
 
         UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         bindingService.toggleCclEnabled(channelUser, id, body.enabled());
-        bindingService.findBinding(channelUser, id)
-                .map(BindingDto::from)
-                .ifPresent(dto -> channelEventPublisher.bindingUpserted(channelUser.getId(), dto));
+        publishBinding(channelUser, id);
     }
 
     @PostMapping("/bindings/{id}/ignored-toggle")
@@ -123,9 +123,7 @@ public class ApiChannelActionsController {
 
         UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         bindingService.toggleIgnored(channelUser, id, body.ignored());
-        bindingService.findBinding(channelUser, id)
-                .map(BindingDto::from)
-                .ifPresent(dto -> channelEventPublisher.bindingUpserted(channelUser.getId(), dto));
+        publishBinding(channelUser, id);
     }
 
     @PostMapping("/bindings/{id}/delete")
@@ -151,9 +149,7 @@ public class ApiChannelActionsController {
         UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
         Set<String> ccls = body.ccls() != null ? body.ccls() : Set.of();
         bindingService.updateBinding(channelUser, id, body.twitchGameId(), body.twitchGameName(), ccls, false);
-        bindingService.findBinding(channelUser, id)
-                .map(BindingDto::from)
-                .ifPresent(dto -> channelEventPublisher.bindingUpserted(channelUser.getId(), dto));
+        publishBinding(channelUser, id);
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
@@ -175,8 +171,7 @@ public class ApiChannelActionsController {
 
         UserAccount channelUser = userResolver.ownChannel(username, jwt);
         var settings = twitchatWidgetSettingsService.getOrCreate(channelUser);
-        return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
-                settings.getObsPasswordEncrypted() != null, channelUser.getWidgetToken().toString());
+        return twitchatResponse(channelUser, settings);
     }
 
     @PostMapping("/settings/twitchat")
@@ -197,8 +192,7 @@ public class ApiChannelActionsController {
 
         UserAccount channelUser = userResolver.ownChannel(username, jwt);
         var settings = twitchatWidgetSettingsService.regenerateToken(channelUser);
-        return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
-                settings.getObsPasswordEncrypted() != null, channelUser.getWidgetToken().toString());
+        return twitchatResponse(channelUser, settings);
     }
 
     @GetMapping("/twitchat/presets")
@@ -304,12 +298,11 @@ public class ApiChannelActionsController {
             @RequestBody CclSettingsRequest body) {
 
         UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
-        UserSettings settings = getOrCreateSettings(channelUser);
-        settings.setCclFeatureEnabled(body.cclEnabled());
-        settings.getBlockedCcls().clear();
-        if (body.blockedCcls() != null) settings.getBlockedCcls().addAll(body.blockedCcls());
-        userSettingsRepository.save(settings);
-        channelEventPublisher.settingsUpdated(channelUser.getId(), UserSettingsDto.from(settings));
+        UserSettings settings = saveSettings(channelUser, s -> {
+            s.setCclFeatureEnabled(body.cclEnabled());
+            replace(s.getBlockedCcls(), body.blockedCcls());
+        });
+        publishSettings(channelUser, settings);
     }
 
     @PostMapping("/settings/tws")
@@ -320,12 +313,11 @@ public class ApiChannelActionsController {
             @RequestBody TwSettingsRequest body) {
 
         UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
-        UserSettings settings = getOrCreateSettings(channelUser);
-        settings.setTwFeatureEnabled(body.enabled());
-        settings.getBlockedTws().clear();
-        if (body.blockedTws() != null) settings.getBlockedTws().addAll(body.blockedTws());
-        userSettingsRepository.save(settings);
-        channelEventPublisher.settingsUpdated(channelUser.getId(), UserSettingsDto.from(settings));
+        UserSettings settings = saveSettings(channelUser, s -> {
+            s.setTwFeatureEnabled(body.enabled());
+            replace(s.getBlockedTws(), body.blockedTws());
+        });
+        publishSettings(channelUser, settings);
     }
 
     @PostMapping("/settings/no-game")
@@ -336,19 +328,19 @@ public class ApiChannelActionsController {
             @RequestBody NoGameSettingsRequest body) {
 
         UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
-        UserSettings settings = getOrCreateSettings(channelUser);
-        settings.setNoGameTwitchGameId(body.twitchGameId());
-        settings.setNoGameTwitchGameName(body.twitchGameName());
-        settings.getNoGameCcls().clear();
-        if (body.ccls() != null) settings.getNoGameCcls().addAll(body.ccls());
-        settings.setApplyDefaultOnStreamStart(body.applyOnStreamStart());
-        settings.setApplyDefaultOnNoGame(body.applyOnNoGame());
-        settings.setApplyDefaultOnStreamEnd(body.applyOnStreamEnd());
-        userSettingsRepository.save(settings);
+        UserSettings settings = saveSettings(channelUser, s -> {
+            s.setNoGameTwitchGameId(body.twitchGameId());
+            s.setNoGameTwitchGameName(body.twitchGameName());
+            replace(s.getNoGameCcls(), body.ccls());
+            s.setApplyDefaultOnStreamStart(body.applyOnStreamStart());
+            s.setApplyDefaultOnNoGame(body.applyOnNoGame());
+            s.setApplyDefaultOnStreamEnd(body.applyOnStreamEnd());
+        });
+        // Nothing detected right now: the new default category applies immediately.
         if (gameStateService.getLastKnownGame(channelUser).isEmpty()) {
             twitchService.resetToDefault(channelUser);
         }
-        channelEventPublisher.settingsUpdated(channelUser.getId(), UserSettingsDto.from(settings));
+        publishSettings(channelUser, settings);
     }
 
     @PostMapping("/settings/incomplete-fallback")
@@ -359,13 +351,12 @@ public class ApiChannelActionsController {
             @RequestBody IncompleteFallbackRequest body) {
 
         UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
-        UserSettings settings = getOrCreateSettings(channelUser);
-        settings.setIncompleteFallbackTwitchGameId(body.twitchGameId());
-        settings.setIncompleteFallbackTwitchGameName(body.twitchGameName());
-        settings.getIncompleteFallbackCcls().clear();
-        if (body.ccls() != null) settings.getIncompleteFallbackCcls().addAll(body.ccls());
-        userSettingsRepository.save(settings);
-        channelEventPublisher.settingsUpdated(channelUser.getId(), UserSettingsDto.from(settings));
+        UserSettings settings = saveSettings(channelUser, s -> {
+            s.setIncompleteFallbackTwitchGameId(body.twitchGameId());
+            s.setIncompleteFallbackTwitchGameName(body.twitchGameName());
+            replace(s.getIncompleteFallbackCcls(), body.ccls());
+        });
+        publishSettings(channelUser, settings);
     }
 
     @PostMapping("/settings/steam-personal-token")
@@ -460,12 +451,38 @@ public class ApiChannelActionsController {
         return steamDiagnostics.diagnose(channelUser);
     }
 
-    private UserSettings getOrCreateSettings(UserAccount user) {
-        return userSettingsRepository.findById(user.getId()).orElseGet(() -> {
-            UserSettings s = new UserSettings();
-            s.setUser(user);
-            return s;
+    /** Loads the channel's settings (new ones when it has none), applies {@code changes} and saves them. */
+    private UserSettings saveSettings(UserAccount channel, Consumer<UserSettings> changes) {
+        UserSettings settings = userSettingsRepository.findById(channel.getId()).orElseGet(() -> {
+            UserSettings created = new UserSettings();
+            created.setUser(channel);
+            return created;
         });
+        changes.accept(settings);
+        userSettingsRepository.save(settings);
+        return settings;
+    }
+
+    /** Replaces {@code target}'s content with {@code values} (none when null). */
+    private static void replace(Set<String> target, Set<String> values) {
+        target.clear();
+        if (values != null) target.addAll(values);
+    }
+
+    private void publishSettings(UserAccount channel, UserSettings settings) {
+        channelEventPublisher.settingsUpdated(channel.getId(), UserSettingsDto.from(settings));
+    }
+
+    /** Tells the channel's dashboards about a binding's new state (nothing if it's gone). */
+    private void publishBinding(UserAccount channel, UUID bindingId) {
+        bindingService.findBinding(channel, bindingId)
+                .map(BindingDto::from)
+                .ifPresent(dto -> channelEventPublisher.bindingUpserted(channel.getId(), dto));
+    }
+
+    private static TwitchatSettingsResponse twitchatResponse(UserAccount channel, TwitchatWidgetSettings settings) {
+        return new TwitchatSettingsResponse(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
+                settings.getObsPasswordEncrypted() != null, channel.getWidgetToken().toString());
     }
 
     private void syncTokenToPool(UserAccount user, String plainToken, boolean shared) {
