@@ -51,7 +51,7 @@ public class MockApiService implements ApiService {
         return token != null ? data.get(token) : null;
     }
 
-    /** Exposes the calling session's live instance for {@link MockAdminController} to read and mutate. */
+    /** Exposes the calling session's live instance for {@link fr.enimaloc.catapult.controller.mock.MockAdminController} to read and mutate. */
     public MockData getData() {
         return currentData();
     }
