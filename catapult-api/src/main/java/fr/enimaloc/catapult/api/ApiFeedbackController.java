@@ -62,7 +62,7 @@ public class ApiFeedbackController {
         submission.setUser(user);
         submission.setType(feedbackType);
         submission.setTitle(body.title().strip());
-        submission.setDescription(body.description() != null && !body.description().isBlank() ? body.description().strip() : null);
+        submission.setDescription(strippedOrNull(body.description()));
         submission.setGitlabIssueIid(created.iid());
         submission.setGitlabIssueUrl(created.webUrl());
         submission.setLastKnownUpdatedAt(created.updatedAt());
@@ -85,8 +85,14 @@ public class ApiFeedbackController {
         repository.save(submission);
     }
 
-    private String buildIssueBody(UserAccount user, String description) {
-        String body = description != null && !description.isBlank() ? description.strip() + "\n\n" : "";
+    /** The description (if any) followed by a signature naming the submitter. */
+    private static String buildIssueBody(UserAccount user, String description) {
+        String text = strippedOrNull(description);
+        String body = text != null ? text + "\n\n" : "";
         return body + "---\n*Soumis par @" + user.getTwitchUsername() + " via Catapult*";
+    }
+
+    private static String strippedOrNull(String text) {
+        return text != null && !text.isBlank() ? text.strip() : null;
     }
 }
