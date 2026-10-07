@@ -2,7 +2,6 @@ import java.time.Instant
 
 plugins {
     java
-    jacoco
     id("org.springframework.boot") version "4.0.4"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.sonarqube") version "7.3.0.8198"
@@ -109,15 +108,6 @@ tasks.processResources {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    finalizedBy(tasks.jacocoTestReport)
-}
-
-tasks.jacocoTestReport {
-    dependsOn(tasks.withType<Test>())
-    reports {
-        xml.required = true
-        html.required = true
-    }
 }
 
 springBoot {
