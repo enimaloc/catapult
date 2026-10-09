@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.domain.config.SystemSetting;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.experiment.provider.ActiveProviderHolder;
 import fr.enimaloc.catapult.experiment.provider.ExperimentProvider;
-import fr.enimaloc.catapult.experiment.provider.ExperimentSummary;
 import fr.enimaloc.catapult.repository.config.SystemSettingRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import org.junit.jupiter.api.BeforeEach;
