@@ -57,7 +57,7 @@ class IrcTwitchChatServiceFlowsTest {
         server = new ServerSocket(0, 5, InetAddress.getLoopbackAddress());
         server.setSoTimeout(5000);
         service = new IrcTwitchChatService(tokens, users, encryption, publisher, mock(TwitchHelixChannelClient.class),
-                meters, new TwitchChatRateLimiter(18, 3000, 30000, meters));
+                meters, new TwitchChatRateLimiter(18, 3000, meters));
         service.socketFactory = new LocalSocketFactory(server.getLocalPort());
 
         user = new UserAccount();

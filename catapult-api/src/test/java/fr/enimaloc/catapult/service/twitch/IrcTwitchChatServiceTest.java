@@ -203,7 +203,7 @@ class IrcTwitchChatServiceTest {
     @Test
     void sendMessageSkippedWhenRateLimiterHasNoCapacity() {
         // permitsPerWindow=0, maxWaitMs=0 -> acquire() always fails immediately
-        TwitchChatRateLimiter exhaustedLimiter = new TwitchChatRateLimiter(0, 0, 30000, METER_REGISTRY);
+        TwitchChatRateLimiter exhaustedLimiter = new TwitchChatRateLimiter(0, 0, METER_REGISTRY);
         IrcTwitchChatService service = new IrcTwitchChatService(
             null, null, null, mock(ApplicationEventPublisher.class), null, METER_REGISTRY, exhaustedLimiter);
         UserAccount user = new UserAccount();
@@ -219,7 +219,7 @@ class IrcTwitchChatServiceTest {
     }
 
     private static TwitchChatRateLimiter newRateLimiter() {
-        return new TwitchChatRateLimiter(18, 3000, 30000, METER_REGISTRY);
+        return new TwitchChatRateLimiter(18, 3000, METER_REGISTRY);
     }
 
     @SuppressWarnings("unchecked")
