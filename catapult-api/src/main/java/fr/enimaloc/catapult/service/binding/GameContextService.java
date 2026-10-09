@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.chat.GameContext;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameCcl;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
@@ -118,7 +119,7 @@ public class GameContextService {
 
         String ageRating = igdbId == null ? null
             : igdbGameCclRepository.findById(igdbId)
-                .map(c -> c.getAgeRatings())
+                .map(IgdbGameCcl::getAgeRatings)
                 .filter(s -> !s.isBlank())
                 .orElse(null);
 

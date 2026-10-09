@@ -9,6 +9,7 @@ import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -52,7 +53,7 @@ public class ApiSecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
                         jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
-                .csrf(csrf -> csrf.disable());
+                .csrf(AbstractHttpConfigurer::disable);
 
         return http.build();
     }
@@ -94,7 +95,7 @@ public class ApiSecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
                         jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
-                .csrf(csrf -> csrf.disable());
+                .csrf(AbstractHttpConfigurer::disable);
 
         return http.build();
     }

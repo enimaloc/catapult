@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.api.experiment;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.experiment.VariantResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,7 +33,7 @@ public class ApiUserExperimentsController {
     public VariantResponse getVariant(@PathVariable String key, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewer(jwt);
         return new VariantResponse(
-            experimentService.getVariant(user, key).map(v -> v.getKey()).orElse(null)
+            experimentService.getVariant(user, key).map(ExperimentVariant::getKey).orElse(null)
         );
     }
 }
