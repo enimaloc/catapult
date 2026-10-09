@@ -21,7 +21,6 @@ public class TwitchChatRateLimiter {
 
     private final int permitsPerWindow;
     private final long maxWaitMs;
-    private final long windowMs;
     private final MeterRegistry meterRegistry;
 
     private final ConcurrentHashMap<String, Semaphore> senderPermits = new ConcurrentHashMap<>();
@@ -30,12 +29,10 @@ public class TwitchChatRateLimiter {
     public TwitchChatRateLimiter(
         @Value("${twitch.chat.rate-limit.permits-per-window:18}") int permitsPerWindow,
         @Value("${twitch.chat.rate-limit.max-wait-ms:3000}") long maxWaitMs,
-        @Value("${twitch.chat.rate-limit.window-ms:30000}") long windowMs,
         MeterRegistry meterRegistry
     ) {
         this.permitsPerWindow = permitsPerWindow;
         this.maxWaitMs = maxWaitMs;
-        this.windowMs = windowMs;
         this.meterRegistry = meterRegistry;
         meterRegistry.counter("catapult.external.rate_limited", "api", "twitch_chat", "scope", "sender");
         Gauge.builder("catapult.external.keys", this, TwitchChatRateLimiter::blockedSenderCount)

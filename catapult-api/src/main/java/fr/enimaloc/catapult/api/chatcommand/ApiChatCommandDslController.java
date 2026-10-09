@@ -45,19 +45,16 @@ public class ApiChatCommandDslController {
 
     private final ServiceFunctionRegistry serviceFunctionRegistry;
     private final JsCompiler jsCompiler;
-    private final PlaceholderResolver placeholderResolver;
     private final ChatCommandSettingRepository settingRepository;
     private final UserAccountRepository userAccountRepository;
     private final TwDefinitionRepository twDefinitionRepository;
 
     public ApiChatCommandDslController(ServiceFunctionRegistry serviceFunctionRegistry, JsCompiler jsCompiler,
-                                        PlaceholderResolver placeholderResolver,
                                         ChatCommandSettingRepository settingRepository,
                                         UserAccountRepository userAccountRepository,
                                         TwDefinitionRepository twDefinitionRepository) {
         this.serviceFunctionRegistry = serviceFunctionRegistry;
         this.jsCompiler = jsCompiler;
-        this.placeholderResolver = placeholderResolver;
         this.settingRepository = settingRepository;
         this.userAccountRepository = userAccountRepository;
         this.twDefinitionRepository = twDefinitionRepository;

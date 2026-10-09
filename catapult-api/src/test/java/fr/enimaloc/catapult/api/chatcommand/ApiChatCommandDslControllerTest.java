@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
@@ -41,7 +40,6 @@ class ApiChatCommandDslControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ServiceFunctionRegistry serviceFunctionRegistry;
     @MockitoBean JsCompiler jsCompiler;
-    @MockitoBean PlaceholderResolver placeholderResolver;
     @MockitoBean ChatCommandSettingRepository settingRepository;
     @MockitoBean UserAccountRepository userAccountRepository;
     @MockitoBean TwDefinitionRepository twDefinitionRepository;
