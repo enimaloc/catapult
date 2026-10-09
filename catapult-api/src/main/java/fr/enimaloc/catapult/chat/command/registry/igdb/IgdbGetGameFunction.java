@@ -14,8 +14,8 @@ import java.util.List;
 public class IgdbGetGameFunction implements ServiceFunction {
 
     /**
-     * All-{@code ""} fields when no game is found — same sentinel pattern as {@link
-     * IgdbGetCurrentGameFunction#EMPTY}, deliberately NOT a bare empty map: a missing map key
+     * All-{@code ""} fields when no game is found — same sentinel pattern as {@code
+     * IgdbGetCurrentGameFunction.EMPTY}, deliberately NOT a bare empty map: a missing map key
      * reads as JS {@code undefined} through the sandbox's Map interop, and {@code undefined ==
      * ""} is false exactly like {@code "some value" == ""} is — making {@code
      * igdb#getGame(q).name == ""} indistinguishable between found and not-found. An all-blank
