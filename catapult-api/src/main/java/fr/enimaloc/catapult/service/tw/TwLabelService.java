@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.tw;
 
+import fr.enimaloc.catapult.domain.tw.TwDefinition;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
@@ -19,7 +20,7 @@ public class TwLabelService {
         try {
             return messageSource.getMessage("tw." + twId + ".label", null, locale);
         } catch (NoSuchMessageException ignored) {
-            return definitionRepo.findById(twId).map(d -> d.getLabel()).orElse(twId);
+            return definitionRepo.findById(twId).map(TwDefinition::getLabel).orElse(twId);
         }
     }
 }

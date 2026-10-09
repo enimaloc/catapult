@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.chat.command.ast.CommandAst;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
+import fr.enimaloc.catapult.chat.command.trace.TraceEntry;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -56,7 +57,7 @@ class SandboxExecutorTraceTest {
         assertThat(trace.finalOutput()).isEqualTo("Now playing Valorant");
         List<String> varValues = trace.entries().stream()
             .filter(e -> "var".equals(e.nodeType()) && "msg".equals(e.description()))
-            .map(e -> e.resolvedValue())
+            .map(TraceEntry::resolvedValue)
             .toList();
         assertThat(varValues).containsExactly("", "Now playing ", "Now playing Valorant");
     }
