@@ -128,7 +128,7 @@ public class ApiAdminExperimentsController {
     private static ExperimentVariant controlVariant(Experiment exp) {
         return exp.getVariants().stream()
                 .filter(ExperimentVariant::isControl).findFirst()
-                .orElse(exp.getVariants().get(0));
+                .orElse(exp.getVariants().getFirst());
     }
 
     @PostMapping("/{id}/activate")

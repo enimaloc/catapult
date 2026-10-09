@@ -47,7 +47,7 @@ public class XboxStoreServiceImpl implements XboxStoreService {
                 if (localized == null || localized.isEmpty()) {
                     return Optional.empty();
                 }
-                LocalizedProperties props = localized.get(0);
+                LocalizedProperties props = localized.getFirst();
                 return Optional.of(new XboxProduct(
                         props.productTitle(),
                         props.shortDescription(),

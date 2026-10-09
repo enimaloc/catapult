@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class MockDataTest {
 
     private static final ChannelDto LIVE = MockPresets.CHANNELS.getFirst();
-    private static final BindingDto STUNTBOOST = MockPresets.BINDINGS.get(0);
+    private static final BindingDto STUNTBOOST = MockPresets.BINDINGS.getFirst();
     private static final BindingDto CONTROL = MockPresets.BINDINGS.get(1);
 
     private static MockData session(List<BindingDto> bindings) {

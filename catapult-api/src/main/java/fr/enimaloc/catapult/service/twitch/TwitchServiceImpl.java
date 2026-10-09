@@ -185,7 +185,7 @@ public class TwitchServiceImpl implements TwitchService {
                     if (response != null) {
                         List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
                         if (data != null && !data.isEmpty()) {
-                            String id = (String) data.get(0).get("id");
+                            String id = (String) data.getFirst().get("id");
                             log.debug("findCategoryIdByName '{}' — exact match found: {}", gameName, id);
                             return Optional.ofNullable(id);
                         }

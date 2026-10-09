@@ -109,7 +109,7 @@ class IrcTwitchChatServiceTest {
         service.handleLine(user, writer, line);
 
         assertThat(published).hasSize(1);
-        ChatCommandEvent event = (ChatCommandEvent) published.get(0);
+        ChatCommandEvent event = (ChatCommandEvent) published.getFirst();
         assertThat(event.getCommand()).isEqualTo("!game");
         assertThat(event.getArgs()).isEmpty();
         assertThat(event.getSenderRole()).isEqualTo(ChatCommandEvent.SenderRole.BROADCASTER);
