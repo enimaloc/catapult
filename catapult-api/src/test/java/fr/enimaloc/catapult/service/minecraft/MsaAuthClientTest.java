@@ -22,9 +22,9 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
-@SuppressWarnings({"unchecked", "rawtypes"})
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
+@SuppressWarnings("unchecked")
 class MsaAuthClientTest {
 
     @Mock private RestClient restClient;

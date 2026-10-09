@@ -15,9 +15,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 
-@SuppressWarnings({"unchecked", "rawtypes"})
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
+@SuppressWarnings("rawtypes")
 class ApiAdminProviderSteamControllerTest {
 
     @Mock private RestClient restClient;

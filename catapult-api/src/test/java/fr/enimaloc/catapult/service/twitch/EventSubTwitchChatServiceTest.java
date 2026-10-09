@@ -33,9 +33,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
-@SuppressWarnings({"unchecked", "rawtypes"})
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
+@SuppressWarnings("unchecked")
 class EventSubTwitchChatServiceTest {
 
     @Mock private OAuthTokenRepository oAuthTokenRepository;
