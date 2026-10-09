@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
+import fr.enimaloc.catapult.common.dto.channel.SearchResultDto;
 import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
@@ -109,6 +110,6 @@ class ApiChannelDtddMappingControllerTest {
 
         var results = controller.search("stardew");
 
-        assertThat(results.results()).extracting(r -> r.dtddId()).containsExactlyInAnyOrder(4521L, 7777L);
+        assertThat(results.results()).extracting(SearchResultDto::dtddId).containsExactlyInAnyOrder(4521L, 7777L);
     }
 }
