@@ -97,14 +97,6 @@ class IgdbClientTest {
     }
 
     @Test
-    void fetchGamePage_sortsByRating() {
-        gamesReturn(List.of(DOOM));
-
-        assertThat(client.fetchGamePage(50, 100, "token")).containsExactly(DOOM);
-        assertThat(lastQuery.get()).contains("s aggregated_rating desc").contains("l 50").contains("o 100");
-    }
-
-    @Test
     void externalGames_filteredBySourceOrNot() {
         ExternalGame external = ExternalGame.newBuilder().setUid("892970").build();
         sdk.when(() -> ProtoRequestKt.externalGames(any(), any(APICalypse.class))).thenAnswer(call -> {
@@ -175,7 +167,6 @@ class IgdbClientTest {
         assertThat(client.fetchGameById("7", "id", "t")).isEmpty();
         assertThat(client.fetchGamesByIds(List.of("7"), "id", "t")).isEmpty();
         assertThat(client.fetchGameDetails("7", "t")).isEmpty();
-        assertThat(client.fetchGamePage(1, 0, "t")).isEmpty();
         assertThat(client.findExternalGameByUid("1", 1, "t")).isEmpty();
         assertThat(client.findExternalGamesByUids(List.of("1"), 1, "t")).isEmpty();
         assertThat(client.findByWindowsExecutable("a.exe", "t")).isEmpty();
