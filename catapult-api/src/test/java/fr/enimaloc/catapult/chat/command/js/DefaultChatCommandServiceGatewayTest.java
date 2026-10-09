@@ -22,7 +22,7 @@ import proto.Game;
 import proto.Genre;
 import proto.Platform;
 import proto.Website;
-import proto.WebsiteCategoryEnum;
+import proto.WebsiteType;
 
 import java.util.List;
 import java.util.Map;
@@ -111,7 +111,7 @@ class DefaultChatCommandServiceGatewayTest {
     @Test
     void igdbExternalPlatformsMergesWebsitesAndExternalGames() {
         Website official = Website.newBuilder()
-            .setCategory(WebsiteCategoryEnum.WEBSITE_OFFICIAL)
+            .setType(WebsiteType.newBuilder().setId(1L).setType("Official Website"))
             .setUrl("https://playvalorant.com")
             .build();
         ExternalGameSource steamSource = ExternalGameSource.newBuilder().setName("Steam").build();
@@ -265,8 +265,7 @@ class DefaultChatCommandServiceGatewayTest {
     void igdbAgeRatingsReturnsOrganizationAndRatingObjects() {
         proto.AgeRatingOrganization esrb = proto.AgeRatingOrganization.newBuilder().setName("ESRB").build();
         proto.AgeRating ageRating = proto.AgeRating.newBuilder()
-            .setOrganization(esrb)
-            .setRating(proto.AgeRatingRatingEnum.M)
+            .setRatingCategory(proto.AgeRatingCategory.newBuilder().setOrganization(esrb).setRating("M"))
             .build();
         Game details = Game.newBuilder().setId(1234L).addAgeRatings(ageRating).build();
         when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));

@@ -17,7 +17,7 @@ import proto.ExternalGame;
 import proto.ExternalGameSource;
 import proto.Game;
 import proto.Website;
-import proto.WebsiteCategoryEnum;
+import proto.WebsiteType;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -147,7 +147,7 @@ class IgdbGameDetailsServiceTest {
     void cache_miss_extracts_websites_and_external_games() {
         when(repository.findById(IGDB_ID)).thenReturn(Optional.empty());
         Website official = Website.newBuilder()
-            .setCategory(WebsiteCategoryEnum.WEBSITE_OFFICIAL)
+            .setType(WebsiteType.newBuilder().setId(1L).setType("Official Website"))
             .setUrl("https://example.com")
             .build();
         ExternalGameSource source = ExternalGameSource.newBuilder()

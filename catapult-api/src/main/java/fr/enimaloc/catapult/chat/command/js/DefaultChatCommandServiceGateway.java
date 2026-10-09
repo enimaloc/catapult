@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.chat.command.js;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.igdb.IgdbClient;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.igdb.IgdbWebsiteKeys;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import lombok.RequiredArgsConstructor;
@@ -141,8 +142,8 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
     @Override
     public Optional<List<Map<String, Object>>> igdbAgeRatings(String igdbId) {
         return fetchDetails(igdbId).map(game -> mapValues(game.getAgeRatingsList(), ar -> Map.<String, Object>of(
-            "organization", ar.getOrganization().getName(),
-            "rating", ar.getRating().name()
+            "organization", ar.getRatingCategory().getOrganization().getName(),
+            "rating", ar.getRatingCategory().getRating()
         )));
     }
 
@@ -199,12 +200,8 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
     private static Map<String, String> extractExternalPlatforms(Game game) {
         Map<String, String> map = new HashMap<>();
         for (Website website : game.getWebsitesList()) {
-            String category = website.getCategory().name().toLowerCase(Locale.ROOT);
-            if (category.startsWith("website_")) {
-                category = category.substring("website_".length());
-            }
             if (website.getUrl() != null && !website.getUrl().isBlank()) {
-                map.put(category, website.getUrl());
+                map.put(IgdbWebsiteKeys.key(website), website.getUrl());
             }
         }
         for (ExternalGame external : game.getExternalGamesList()) {

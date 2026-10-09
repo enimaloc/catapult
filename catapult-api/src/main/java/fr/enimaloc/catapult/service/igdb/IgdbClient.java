@@ -28,14 +28,14 @@ import java.util.stream.Collectors;
 @Component
 public class IgdbClient {
 
-    private static final String GAME_DETAILS_FIELDS = "id,name,slug,summary,first_release_date,websites.url,websites.category,external_games.uid,external_games.external_game_source.name"
+    private static final String GAME_DETAILS_FIELDS = "id,name,slug,summary,first_release_date,websites.url,websites.type.type,external_games.uid,external_games.external_game_source.name"
             + ",rating,aggregated_rating,platforms.name,dlcs.name,similar_games.name,genres.name"
             + ",cover.url,screenshots.url,videos.video_id,game_modes.name,themes.name,player_perspectives.name"
             + ",involved_companies.company.name,involved_companies.developer,involved_companies.publisher"
             + ",involved_companies.supporting,involved_companies.porting"
-            + ",age_ratings.organization.name,age_ratings.rating,franchises.name,keywords.name";
+            + ",age_ratings.rating_category.organization.name,age_ratings.rating_category.rating,franchises.name,keywords.name";
     private static final String GAME_PAGE_FIELDS =
-            "id,name,external_games.uid,external_games.external_game_source,age_ratings.id,age_ratings.category,age_ratings.rating";
+            "id,name,external_games.uid,external_games.external_game_source,age_ratings.id,age_ratings.rating_category.rating";
 
     @Value("${app.igdb.client-id:}")
     private String clientId;
