@@ -25,10 +25,10 @@ val igdbApiVersion = "1.3.2"
 val unleashVersion = "9.2.4"
 val growthbookVersion = "0.10.10"
 val icuVersion = "76.1"
-val jsoupVersion = "1.17.2"
+val jsoupVersion = "1.23.2"
 val jjwtVersion = "0.12.6"
 val commonmarkVersion = "0.22.0"
-val springCloudContextVersion = "5.0.2"
+val springCloudContextVersion = "5.0.3"
 
 dependencies {
     implementation(project(":catapult-common"))
