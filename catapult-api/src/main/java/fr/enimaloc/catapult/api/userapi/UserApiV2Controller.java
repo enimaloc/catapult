@@ -111,7 +111,7 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        return gameInfoFor(uuid, parseLocale(lang, acceptLanguage));
+        return gameInfoFor(uuid, RequestLocale.parse(lang, acceptLanguage));
     }
 
     @Operation(summary = "Get a compact summary of the widget's currently-detected game",
@@ -136,7 +136,7 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        return gameInfoFor(uuid, parseLocale(lang, acceptLanguage));
+        return gameInfoFor(uuid, RequestLocale.parse(lang, acceptLanguage));
     }
 
     /**
@@ -273,7 +273,7 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        Locale steamLocale = parseLocale(lang, acceptLanguage);
+        Locale steamLocale = RequestLocale.parse(lang, acceptLanguage);
         Optional<SteamStoreService.SteamStorePage> page = steamStoreService.fetchData(appId, steamLocale, false);
         if (page.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -300,7 +300,7 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        Optional<XboxStoreService.XboxProduct> product = xboxStoreService.fetchProduct(productId, parseLocale(lang, acceptLanguage));
+        Optional<XboxStoreService.XboxProduct> product = xboxStoreService.fetchProduct(productId, RequestLocale.parse(lang, acceptLanguage));
         if (product.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -372,7 +372,7 @@ public class UserApiV2Controller {
         return ResponseEntity.ok(new CatapultDetailResponse(b.getCreatedAt(), b.getUpdatedAt(), b.getSourceType(),
                 b.getSourceId(), b.getSourceName(), b.getTwitchGameId(), b.getTwitchGameName(), b.isIgnored(),
                 b.isCclEnabled(), b.getCcls(), b.isTwEnabled(), b.isTwOverride(), b.getTws(),
-                localizeTws(b.getTws(), parseLocale(lang, acceptLanguage))));
+                localizeTws(b.getTws(), RequestLocale.parse(lang, acceptLanguage))));
     }
 
     private GameInfoResponse.DtddObject resolveDtdd(DetectedGame detected, Optional<String> igdbId, Locale locale) {
@@ -401,28 +401,6 @@ public class UserApiV2Controller {
 
     private String moreUrl(String path) {
         return baseUrl + ApiV2.PATH + path;
-    }
-
-    // "lang" wins when present (it's the mechanism that works from a plain pasted OBS URL, with
-    // no header control); Accept-Language is the fallback for clients that do set headers. A
-    // request with neither, or an unparseable Accept-Language value, gets English — deliberately
-    // not the JVM/server default locale, which would make behavior depend on the deploy
-    // environment instead of being a documented, stable contract.
-    private static Locale parseLocale(String lang, String acceptLanguage) {
-        if (lang != null && !lang.isBlank()) {
-            return Locale.forLanguageTag(lang);
-        }
-        if (acceptLanguage != null && !acceptLanguage.isBlank()) {
-            try {
-                List<Locale.LanguageRange> ranges = Locale.LanguageRange.parse(acceptLanguage);
-                if (!ranges.isEmpty()) {
-                    return Locale.forLanguageTag(ranges.getFirst().getRange());
-                }
-            } catch (IllegalArgumentException ignored) {
-                // malformed Accept-Language header — fall through to the default
-            }
-        }
-        return Locale.ENGLISH;
     }
 
     private Set<String> localizeTws(Set<String> tws, Locale locale) {
