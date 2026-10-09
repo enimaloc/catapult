@@ -131,7 +131,6 @@ public class RealSteamApiClient implements SteamApiClient {
                 .filter(g -> appId.equals(String.valueOf(g.get("appid"))))
                 .findFirst()
                 .map(g -> g.get("playtime_forever"))
-                .filter(Objects::nonNull)
                 .map(minutes -> Duration.ofMinutes(((Number) minutes).longValue()))), steamExecutor);
     }
 

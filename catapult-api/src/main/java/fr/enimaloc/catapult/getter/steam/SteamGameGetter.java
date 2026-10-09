@@ -55,7 +55,7 @@ public class SteamGameGetter implements GameGetter {
 
     private DetectedGame toDetectedGame(SteamApiClient.PlayerSummary p) {
         if (p.gameId() == null) {
-            return new DetectedGame(p.gameId(), GameBinding.SourceType.STEAM, p.gameName());
+            return new DetectedGame(null, GameBinding.SourceType.STEAM, p.gameName());
         }
         return steamStoreService.resolveEffectiveApp(p.gameId())
             .map(parent -> new DetectedGame(parent.appId(), GameBinding.SourceType.STEAM, parent.name()))

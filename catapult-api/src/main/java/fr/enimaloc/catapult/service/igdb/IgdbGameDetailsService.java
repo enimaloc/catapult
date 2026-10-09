@@ -148,7 +148,7 @@ public class IgdbGameDetailsService {
     private Map<String, String> extractWebsites(Game game) {
         Map<String, String> map = new HashMap<>();
         for (Website website : game.getWebsitesList()) {
-            if (website.getUrl() != null && !website.getUrl().isBlank()) {
+            if (!website.getUrl().isBlank()) {
                 map.put(IgdbWebsiteKeys.key(website), website.getUrl());
             }
         }
@@ -157,11 +157,11 @@ public class IgdbGameDetailsService {
                 continue;
             }
             String source = external.getExternalGameSource().getName();
-            if (source == null || source.isBlank()) {
+            if (source.isBlank()) {
                 continue;
             }
             String key = source.toLowerCase(Locale.ROOT);
-            if (external.getUid() != null && !external.getUid().isBlank()) {
+            if (!external.getUid().isBlank()) {
                 map.put(key, external.getUid());
             }
         }

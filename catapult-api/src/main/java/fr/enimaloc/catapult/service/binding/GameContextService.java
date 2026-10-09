@@ -119,7 +119,7 @@ public class GameContextService {
         String ageRating = igdbId == null ? null
             : igdbGameCclRepository.findById(igdbId)
                 .map(c -> c.getAgeRatings())
-                .filter(s -> s != null && !s.isBlank())
+                .filter(s -> !s.isBlank())
                 .orElse(null);
 
         GameBinding binding = (gameBindingRepository != null)

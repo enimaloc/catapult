@@ -112,7 +112,7 @@ public class ApiSecurityConfig {
             List<String> roles = jwt.getClaimAsStringList("roles");
             Stream<GrantedAuthority> roleAuthorities = roles == null ? Stream.empty() :
                     roles.stream().map(SimpleGrantedAuthority::new);
-            return Stream.concat(scopes == null ? Stream.empty() : scopes.stream(), roleAuthorities).toList();
+            return Stream.concat(scopes.stream(), roleAuthorities).toList();
         });
         return converter;
     }
