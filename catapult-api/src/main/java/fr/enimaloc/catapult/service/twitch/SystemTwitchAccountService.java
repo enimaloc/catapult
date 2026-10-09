@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -89,7 +88,9 @@ public class SystemTwitchAccountService {
             .orElse(null);
     }
 
-    @Transactional
+    // Deliberately not @Transactional: it is only reached through getAccessToken() (a
+    // self-invocation the proxy never intercepts), and tokenRepo.save() is transactional on
+    // its own — wrapping it would also hold a DB connection across the Twitch HTTP call.
     public synchronized Optional<String> refresh() {
         Optional<UserAccount> systemAccount = userAccountRepository.findBySystemAccountTrue();
         if (systemAccount.isEmpty() || systemAccount.get().getTwitchId() == null) {
