@@ -70,12 +70,12 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
                 Instant.ofEpochSecond(game.getFirstReleaseDate().getSeconds()).atZone(ZoneOffset.UTC))
             : "";
         String platforms = String.join(", ", mapValues(game.getPlatformsList(), Platform::getName));
-        String igdbUrl = game.getSlug() == null || game.getSlug().isBlank()
+        String igdbUrl = game.getSlug().isBlank()
             ? "" : "https://www.igdb.com/games/" + game.getSlug();
         return new IgdbGame(
             String.valueOf(game.getId()),
-            game.getName() != null ? game.getName() : "",
-            game.getSummary() != null ? game.getSummary() : "",
+            game.getName(),
+            game.getSummary(),
             releaseDate,
             game.getRating() > 0 ? String.valueOf(Math.round(game.getRating())) : "",
             game.getAggregatedRating() > 0 ? String.valueOf(Math.round(game.getAggregatedRating())) : "",
@@ -200,7 +200,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
     private static Map<String, String> extractExternalPlatforms(Game game) {
         Map<String, String> map = new HashMap<>();
         for (Website website : game.getWebsitesList()) {
-            if (website.getUrl() != null && !website.getUrl().isBlank()) {
+            if (!website.getUrl().isBlank()) {
                 map.put(IgdbWebsiteKeys.key(website), website.getUrl());
             }
         }
@@ -209,10 +209,10 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
                 continue;
             }
             String source = external.getExternalGameSource().getName();
-            if (source == null || source.isBlank()) {
+            if (source.isBlank()) {
                 continue;
             }
-            if (external.getUid() != null && !external.getUid().isBlank()) {
+            if (!external.getUid().isBlank()) {
                 map.put(source.toLowerCase(Locale.ROOT), external.getUid());
             }
         }
