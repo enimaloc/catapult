@@ -64,11 +64,11 @@ class XboxServiceTest {
         verify(bodySpec).body(payload.capture());
 
         var json = mapper.readTree(mapper.writeValueAsString(payload.getValue()));
-        assertThat(json.at("/Properties/AuthMethod").asText()).isEqualTo("RPS");
-        assertThat(json.at("/Properties/SiteName").asText()).isEqualTo("user.auth.xboxlive.com");
-        assertThat(json.at("/Properties/RpsTicket").asText()).isEqualTo("d=my-rps-ticket");
-        assertThat(json.at("/RelyingParty").asText()).isEqualTo("http://auth.xboxlive.com");
-        assertThat(json.at("/TokenType").asText()).isEqualTo("JWT");
+        assertThat(json.at("/Properties/AuthMethod").asString()).isEqualTo("RPS");
+        assertThat(json.at("/Properties/SiteName").asString()).isEqualTo("user.auth.xboxlive.com");
+        assertThat(json.at("/Properties/RpsTicket").asString()).isEqualTo("d=my-rps-ticket");
+        assertThat(json.at("/RelyingParty").asString()).isEqualTo("http://auth.xboxlive.com");
+        assertThat(json.at("/TokenType").asString()).isEqualTo("JWT");
     }
 
     @Test
