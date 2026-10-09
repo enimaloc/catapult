@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,7 +54,7 @@ class DtoJsonContractTest {
                 if (type.isRecord()) records.add(type);
             }
         }
-        records.sort((a, b) -> a.getName().compareTo(b.getName()));
+        records.sort(Comparator.comparing(Class::getName));
         assertThat(records).as("records found in %s", PACKAGE).hasSizeGreaterThan(100);
         return records.stream();
     }

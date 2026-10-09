@@ -341,7 +341,7 @@ public class SandboxExecutor {
             Value ctx = context.eval("js", "({})");
             ctx.putMember("placeholder", (ProxyExecutable) args -> placeholders.resolve(args[0].asString()));
             ctx.putMember("list", (ProxyExecutable) args ->
-                boundedListProxyArray(new ArrayList<Object>(lists.resolveList(args[0].asString()))));
+                boundedListProxyArray(new ArrayList<>(lists.resolveList(args[0].asString()))));
             ctx.putMember("setting", (ProxyExecutable) args -> settings == null ? null : settings.resolve(args[0].asString()));
             ctx.putMember("call", (ProxyExecutable) args -> {
                 if (args.length < 2) {
@@ -378,7 +378,7 @@ public class SandboxExecutor {
                 List<Object> values = lists.resolveList(name);
                 String preview = values.stream().map(String::valueOf).collect(Collectors.joining(", "));
                 trace.record(new TraceEntry("for-each", "iterate " + name, preview, false));
-                return boundedListProxyArray(new ArrayList<Object>(values));
+                return boundedListProxyArray(new ArrayList<>(values));
             });
             ctx.putMember("setting", (ProxyExecutable) args -> {
                 String key = args[0].asString();
