@@ -18,6 +18,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.ui.ExtendedModelMap;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -91,7 +92,7 @@ class ModelFillerTest {
         filler().privacy(model, Locale.FRENCH);
 
         assertThat((String) model.get("privacy")).isNotBlank()
-                .isEqualTo(new String(getClass().getResourceAsStream("/lang/privacy/fr.html").readAllBytes()));
+                .isEqualTo(resource("/lang/privacy/fr.html"));
     }
 
     @Test
@@ -99,7 +100,7 @@ class ModelFillerTest {
         filler().privacy(model, Locale.JAPANESE);
 
         assertThat((String) model.get("privacy"))
-                .isEqualTo(new String(getClass().getResourceAsStream("/lang/privacy/en.html").readAllBytes()));
+                .isEqualTo(resource("/lang/privacy/en.html"));
     }
 
     @Test
@@ -183,5 +184,11 @@ class ModelFillerTest {
         request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, 403);
         filler().error(model, request);
         assertThat(model).containsEntry("errorCode", 403).containsEntry("errorTitle", "error.403.title");
+    }
+
+    private String resource(String path) throws IOException {
+        try (InputStream in = getClass().getResourceAsStream(path)) {
+            return new String(in.readAllBytes());
+        }
     }
 }
