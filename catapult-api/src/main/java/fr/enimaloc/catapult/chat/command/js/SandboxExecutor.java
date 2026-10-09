@@ -142,7 +142,7 @@ public class SandboxExecutor {
     }
 
     /**
-     * Same as {@link #execute(String, PlaceholderContext, ListContext, ServiceFunctionRegistry, UserAccount, Duration)}
+     * Same as {@link #execute(String, PlaceholderContext, ListContext, ServiceFunctionRegistry, UserAccount, SettingContext, Duration)}
      * but also records a step-by-step {@link ExecutionTrace} of every placeholder resolution,
      * list iteration and service call made during the run — used by the command editor's
      * "Tester" button so authors can see why a command produced (or failed to produce) a
