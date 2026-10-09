@@ -299,7 +299,7 @@ public class ApiAdminDataController {
             Object pk = idClass.getDeclaredConstructor().newInstance();
             for (SingularAttribute<?, ?> idAttr : entityType.getIdClassAttributes()) {
                 Object entityValue = readField(entity, idAttr.getName());
-                Object idValue = idAttr.isAssociation() ? readId((Object) entityValue,
+                Object idValue = idAttr.isAssociation() ? readId(entityValue,
                     entityManager.getMetamodel().entity(idAttr.getJavaType())) : entityValue;
                 Field f = idClass.getDeclaredField(idAttr.getName());
                 f.setAccessible(true);

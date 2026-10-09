@@ -59,11 +59,11 @@ public enum SteamLanguage {
             "th", "tr", "uk", "nl", "da", "fi", "no", "sv", "pl", "hu", "cs", "ro", "bg", "el",
             "vi", "ar", "id");
 
-    private SteamLanguage(String code) {
+    SteamLanguage(String code) {
         this(code, unused -> true);
     }
 
-    private SteamLanguage(String code, Predicate<Locale> additionalPredicate) {
+    SteamLanguage(String code, Predicate<Locale> additionalPredicate) {
         this.code = code;
         this.additionalPredicate = additionalPredicate;
     }
