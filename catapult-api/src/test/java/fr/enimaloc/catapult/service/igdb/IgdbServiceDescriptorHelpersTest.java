@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.service.igdb;
 
 import fr.enimaloc.catapult.domain.binding.GameBinding;
-import fr.enimaloc.catapult.domain.igdb.IgdbGameCacheEntry;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameCcl;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameCacheRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;

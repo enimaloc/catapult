@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
 import fr.enimaloc.catapult.repository.igdb.IgdbRatingDescriptorRepository;
 import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
