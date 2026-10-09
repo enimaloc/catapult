@@ -123,7 +123,7 @@ public class TwitchServiceImpl implements TwitchService {
         body.put("game_id", binding.getTwitchGameId());
 
         UserSettings userSettings = userSettingsRepository.findById(user.getId()).orElse(null);
-        boolean globalCclEnabled = userSettings != null ? userSettings.isCclFeatureEnabled() : true;
+        boolean globalCclEnabled = userSettings == null || userSettings.isCclFeatureEnabled();
         if (globalCclEnabled && binding.isCclEnabled()) {
             // Only apply the blocklist to persisted bindings; synthetic fallback bindings (id == null) bypass it
             Set<String> blocked = (userSettings != null && binding.getId() != null) ? userSettings.getBlockedCcls() : Set.of();
