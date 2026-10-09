@@ -114,7 +114,7 @@ public class BindingService {
             String twitchId = igdbGameDetailsService.getDetails(igdbId)
                     .map(IgdbGameDetails::getWebsites)
                     .map(websites -> websites.get("twitch"))
-                    .filter(id -> id != null && !id.isBlank())
+                    .filter(id -> !id.isBlank())
                     .or(() -> igdbService.findTwitchGameId(igdbId))
                     .or(() -> twitchService.findCategoryIdByName(user, gameName))
                     .orElse(null);
