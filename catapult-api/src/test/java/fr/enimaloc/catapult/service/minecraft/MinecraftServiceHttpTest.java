@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -43,14 +44,14 @@ class MinecraftServiceHttpTest {
     private void friendsUpdate(String expectedBody) {
         mojang.expect(requestTo(API + "/friends")).andExpect(method(HttpMethod.PUT))
                 .andExpect(header("Authorization", "Bearer mc-token"))
-                .andExpect(content().json(expectedBody, true))
+                .andExpect(content().json(expectedBody, JsonCompareMode.STRICT))
                 .andRespond(withSuccess(FRIENDS_JSON, MediaType.APPLICATION_JSON));
     }
 
     @Test
     void minecraftToken_isExchangedForTheXboxIdentity() {
         mojang.expect(requestTo(API + "/authentication/login_with_xbox")).andExpect(method(HttpMethod.POST))
-                .andExpect(content().json("{\"identityToken\": \"XBL3.0 x=hash;xsts\"}", true))
+                .andExpect(content().json("{\"identityToken\": \"XBL3.0 x=hash;xsts\"}", JsonCompareMode.STRICT))
                 .andRespond(withSuccess("{\"username\": \"u\", \"access_token\": \"mc\", \"expires_in\": 86400,"
                         + " \"token_type\": \"Bearer\"}", MediaType.APPLICATION_JSON));
         XboxService.Token xsts = new XboxService.Token(Instant.now(), Instant.now(), "xsts",
@@ -95,10 +96,10 @@ class MinecraftServiceHttpTest {
     @Test
     void presenceUpdates_returnTheFriendsPresence() {
         mojang.expect(requestTo(API + "/presence")).andExpect(method(HttpMethod.POST))
-                .andExpect(content().json("{\"status\": \"ONLINE\", \"joinInfo\": {\"value\": null, \"invites\": []}}", true))
+                .andExpect(content().json("{\"status\": \"ONLINE\", \"joinInfo\": {\"value\": null, \"invites\": []}}", JsonCompareMode.STRICT))
                 .andRespond(withSuccess(PRESENCE_JSON, MediaType.APPLICATION_JSON));
         mojang.expect(requestTo(API + "/presence"))
-                .andExpect(content().json("{\"status\": \"PLAYING_REALMS\", \"joinInfo\": {\"value\": \"r\", \"invites\": [\"x\"]}}", true))
+                .andExpect(content().json("{\"status\": \"PLAYING_REALMS\", \"joinInfo\": {\"value\": \"r\", \"invites\": [\"x\"]}}", JsonCompareMode.STRICT))
                 .andRespond(withSuccess(PRESENCE_JSON, MediaType.APPLICATION_JSON));
 
         MinecraftService.PresenceList presence = service.updatePresence(token, MinecraftService.PresenceStatus.ONLINE);
