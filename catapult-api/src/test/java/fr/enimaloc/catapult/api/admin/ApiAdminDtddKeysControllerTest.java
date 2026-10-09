@@ -55,7 +55,7 @@ class ApiAdminDtddKeysControllerTest {
         var page = controller.page();
         assertThat(page.dtddEnabled()).isTrue();
         assertThat(page.keys()).hasSize(1);
-        var status = page.keys().get(0);
+        var status = page.keys().getFirst();
         assertThat(status.masked()).contains("…");
         assertThat(status.id()).hasSize(16); // 64-bit hex prefix
         assertThat(status.id()).doesNotContain("ABCDEFGHIJKLMNOP");

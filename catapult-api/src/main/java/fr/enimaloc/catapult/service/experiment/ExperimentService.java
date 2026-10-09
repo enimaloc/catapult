@@ -267,14 +267,14 @@ public class ExperimentService {
 
     private ExperimentVariant weightedRandom(List<ExperimentVariant> variants, UserAccount user, String experimentKey) {
         int totalWeight = variants.stream().mapToInt(ExperimentVariant::getWeight).sum();
-        if (totalWeight == 0) return variants.get(0);
+        if (totalWeight == 0) return variants.getFirst();
         int bucket = fnvBucket(user.getId().toString() + ":variant", experimentKey) % totalWeight;
         int cumulative = 0;
         for (ExperimentVariant v : variants) {
             cumulative += v.getWeight();
             if (bucket < cumulative) return v;
         }
-        return variants.get(variants.size() - 1);
+        return variants.getLast();
     }
 
     private int fnvBucket(String part1, String part2) {

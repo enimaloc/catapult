@@ -28,6 +28,6 @@ public class ArrLastFunction implements ServiceFunction {
     @Override
     public Object invoke(UserAccount user, Object[] args) {
         List<Object> list = ArrList.coerce(args[0]);
-        return list.isEmpty() ? "" : String.valueOf(list.get(list.size() - 1));
+        return list.isEmpty() ? "" : String.valueOf(list.getLast());
     }
 }
