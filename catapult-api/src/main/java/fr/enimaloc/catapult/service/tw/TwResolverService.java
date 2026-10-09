@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.tw;
 
+import fr.enimaloc.catapult.domain.tw.TwSteamKeyword;
 import fr.enimaloc.catapult.repository.tw.TwDtddTopicMappingRepository;
 import fr.enimaloc.catapult.repository.tw.TwIgdbDescriptorMappingRepository;
 import fr.enimaloc.catapult.repository.tw.TwSteamContentIdMappingRepository;
@@ -53,7 +54,7 @@ public class TwResolverService {
                 String notes = s.notesLowercase();
                 out.addAll(steamKwRepo.findAll().stream()
                     .filter(k -> notes.contains(k.getKeyword()))
-                    .map(k -> k.getTwId())
+                    .map(TwSteamKeyword::getTwId)
                     .collect(Collectors.toSet()));
             }
         }

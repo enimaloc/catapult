@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.event.listener;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
@@ -75,7 +76,7 @@ public class GameEventListener {
         UserAccount user = event.getUser();
         log.debug("StreamOnlineEvent for user {}", user.getId());
         boolean applyDefault = userSettingsRepository.findById(user.getId())
-            .map(settings -> settings.isApplyDefaultOnStreamStart())
+            .map(UserSettings::isApplyDefaultOnStreamStart)
             .orElse(false);
         if (applyDefault) {
             twitchService.resetToDefault(user);
