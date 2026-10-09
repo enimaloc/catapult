@@ -70,7 +70,9 @@ public class IgdbService {
 
     private static final String CCL_FIELDS =
         "age_ratings.rating_content_descriptions.id," +
-        "age_ratings.rating_content_descriptions.description";
+        "age_ratings.rating_content_descriptions.description," +
+        "age_ratings.rating_category.rating," +
+        "age_ratings.rating_category.organization.name";
 
     // L1 cache: igdbId → name
     private final Map<String, String> igdbGameCache = new ConcurrentHashMap<>();
