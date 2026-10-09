@@ -22,7 +22,7 @@ import java.util.Set;
  * authenticated Twitch session (see CatapultOAuth2UserService#handleSecondaryLink) —
  * invalidating the session to retry would just log that user out of their real session.
  *
- * A single automatic retry covers transient/technical failures (Twitch API hiccup,
+ * <p>A single automatic retry covers transient/technical failures (Twitch API hiccup,
  * a stale authorization_request in session, ...) that a fresh attempt commonly fixes.
  * Known business-rule errors (not whitelisted, invite already used, ...) are
  * deterministic — retrying changes nothing — so they skip straight to the error page.
