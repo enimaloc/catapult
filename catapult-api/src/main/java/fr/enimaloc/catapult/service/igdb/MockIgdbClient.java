@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.igdb;
 
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
@@ -15,6 +16,10 @@ import java.util.List;
 @Primary
 @ConditionalOnProperty(name = "app.mock.igdb", havingValue = "true")
 public class MockIgdbClient extends IgdbClient {
+
+    public MockIgdbClient(ExternalApiObservations apiObservations) {
+        super(apiObservations);
+    }
 
     @Override
     public List<ExternalGameSource> findSourcesByName(String name, String token) {
