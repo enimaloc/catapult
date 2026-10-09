@@ -1,4 +1,4 @@
-<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.ChannelPageData"*/-->
+<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
 <mdui-tab-panel slot="panel" value="integrations" th:with="ch=${channelPage}" th:if="${channelPage.isOwner()}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
     <div class="section-header">
         <h2 th:text="#{channel.connections.title}">Connexions</h2>
