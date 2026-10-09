@@ -6,7 +6,6 @@ import com.api.igdb.request.IGDBWrapper;
 import com.api.igdb.request.ProtoRequestKt;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import proto.AlternativeName;
@@ -39,8 +38,11 @@ public class IgdbClient {
 
     private String currentToken = "";
 
-    @Autowired
-    private ExternalApiObservations apiObservations;
+    private final ExternalApiObservations apiObservations;
+
+    public IgdbClient(ExternalApiObservations apiObservations) {
+        this.apiObservations = apiObservations;
+    }
 
     /** One IGDB SDK endpoint call. */
     @FunctionalInterface
