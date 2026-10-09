@@ -117,7 +117,7 @@ public class RealSteamApiClient implements SteamApiClient {
     @Override
     public CompletableFuture<List<String>> getOwnedGameIds(String steamId, String personalToken) {
         return CompletableFuture.supplyAsync(() -> withOwnedGames("get_owned_games", "owned game fetch", steamId,
-            personalToken, false, List.<String>of(), games -> games.stream()
+            personalToken, false, List.of(), games -> games.stream()
                 .map(g -> g.get("appid"))
                 .filter(Objects::nonNull)
                 .map(String::valueOf)
@@ -127,7 +127,7 @@ public class RealSteamApiClient implements SteamApiClient {
     @Override
     public CompletableFuture<Optional<Duration>> getPlaytime(String steamId, String appId, String personalToken) {
         return CompletableFuture.supplyAsync(() -> withOwnedGames("get_playtime", "playtime fetch", steamId,
-            personalToken, true, Optional.<Duration>empty(), games -> games.stream()
+            personalToken, true, Optional.empty(), games -> games.stream()
                 .filter(g -> appId.equals(String.valueOf(g.get("appid"))))
                 .findFirst()
                 .map(g -> g.get("playtime_forever"))
@@ -167,7 +167,7 @@ public class RealSteamApiClient implements SteamApiClient {
 
     private Optional<Map<String, Object>> fetchPlayer(String steamId, String personalToken) {
         return apiObservations.observe("steam", "get_player_summary", () ->
-            attempt("player fetch", steamId, personalToken, Optional.<Map<String, Object>>empty(), key -> {
+            attempt("player fetch", steamId, personalToken, Optional.empty(), key -> {
                 List<Map<String, Object>> players = fetchList("players",
                     PLAYER_SUMMARIES_URL + "?key={key}&steamids={steamids}", key, steamId);
                 return players == null || players.isEmpty() ? Optional.empty() : Optional.of(players.getFirst());

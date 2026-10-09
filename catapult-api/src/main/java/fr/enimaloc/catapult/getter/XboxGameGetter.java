@@ -96,7 +96,7 @@ public class XboxGameGetter implements GameGetter {
                 return extractCurrentTitle(response);
             } catch (Exception e) {
                 log.warn("Failed to fetch Xbox presence for user {}: {}", user.getId(), e.getMessage());
-                return Optional.<TitlePresence>empty();
+                return Optional.empty();
             }
         });
     }
@@ -138,7 +138,7 @@ public class XboxGameGetter implements GameGetter {
                 return extractProductId(response);
             } catch (Exception e) {
                 log.warn("Failed to fetch Xbox title detail for titleId {}: {}", titleId, e.getMessage());
-                return Optional.<String>empty();
+                return Optional.empty();
             }
         });
     }

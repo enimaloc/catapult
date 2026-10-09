@@ -80,7 +80,7 @@ public class DynamicCommandResolver {
                     ChatCommand bean = staticByPresetKey.get(def.getPresetKey());
                     if (bean != null) return bean;
                 }
-                return (ChatCommand) new DynamicChatCommand(
+                return new DynamicChatCommand(
                     def, jsCompiler, sandboxExecutor, serviceFunctionRegistry,
                     gameContextService, placeholderResolver, resolveLocale(user), settingRepository,
                     repository, meterRegistry);

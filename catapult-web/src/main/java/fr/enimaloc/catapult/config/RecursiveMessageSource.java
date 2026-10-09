@@ -57,7 +57,7 @@ public class RecursiveMessageSource extends ResourceBundleMessageSource {
             return message;
         }
 
-        StringBuffer result = new StringBuffer();
+        StringBuilder result = new StringBuilder();
 
         do {
             String key = matcher.group(1);

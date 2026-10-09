@@ -119,7 +119,7 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             if (fresh.isPresent()) {
                 SteamAppParentEntry entry = fresh.get();
                 return entry.getParentAppId() == null
-                    ? Optional.<ResolvedParentApp>empty()
+                    ? Optional.empty()
                     : Optional.of(new ResolvedParentApp(entry.getParentAppId(), entry.getParentName()));
             }
 

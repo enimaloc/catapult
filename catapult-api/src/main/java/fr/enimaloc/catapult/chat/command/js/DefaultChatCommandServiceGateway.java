@@ -101,7 +101,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
                 return Map.of();
             }
             proto.Cover cover = game.getCover();
-            return Map.<String, Object>of("url", cover.getUrl(), "width", cover.getWidth(), "height", cover.getHeight());
+            return Map.of("url", cover.getUrl(), "width", cover.getWidth(), "height", cover.getHeight());
         });
     }
 
@@ -112,7 +112,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
 
     @Override
     public Optional<List<Map<String, Object>>> igdbVideos(String igdbId) {
-        return fetchDetails(igdbId).map(game -> mapValues(game.getVideosList(), v -> Map.<String, Object>of(
+        return fetchDetails(igdbId).map(game -> mapValues(game.getVideosList(), v -> Map.of(
             "name", v.getName(),
             "url", "https://www.youtube.com/watch?v=" + v.getVideoId()
         )));
@@ -141,7 +141,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
 
     @Override
     public Optional<List<Map<String, Object>>> igdbAgeRatings(String igdbId) {
-        return fetchDetails(igdbId).map(game -> mapValues(game.getAgeRatingsList(), ar -> Map.<String, Object>of(
+        return fetchDetails(igdbId).map(game -> mapValues(game.getAgeRatingsList(), ar -> Map.of(
             "organization", ar.getRatingCategory().getOrganization().getName(),
             "rating", ar.getRatingCategory().getRating()
         )));

@@ -443,7 +443,7 @@ public class IgdbService {
             try {
                 return objectMapper.readValue(
                     cached.get().getDescriptorIdsJson(),
-                    new TypeReference<Set<Long>>() {});
+                    new TypeReference<>() {});
             } catch (Exception e) {
                 log.warn("Bad descriptor_ids JSON for igdbId={}: {}", igdbGameId, e.getMessage());
             }

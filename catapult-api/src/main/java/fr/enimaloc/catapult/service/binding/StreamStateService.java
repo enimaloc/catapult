@@ -30,7 +30,7 @@ public class StreamStateService {
         Boolean previous = liveStatus.put(user.getId(), live);
         // Publish only on transition to avoid spamming subscribers when the
         // same value is reapplied (idempotent setters are common).
-        if (previous == null || previous.booleanValue() != live) {
+        if (previous == null || previous != live) {
             channelEventPublisher.streamStateChanged(user.getId(), live);
             if (live && user.isBotEnabled()) {
                 twitchatNotifier.onStreamStarted(user);
