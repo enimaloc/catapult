@@ -20,7 +20,7 @@ public interface XboxStoreService {
                             && (i.imagePurpose().equalsIgnoreCase("logo") || i.imagePurpose().equalsIgnoreCase("boxart")))
                     .map(XboxImage::uri)
                     .findFirst()
-                    .orElse(images.get(0).uri());
+                    .orElse(images.getFirst().uri());
         }
     }
 

@@ -90,9 +90,9 @@ class TwitchCategoryServiceTest {
         List<TwitchCategory> results = service.searchCategories("zelda");
 
         assertThat(results).hasSize(1);
-        assertThat(results.get(0).id()).isEqualTo("123");
-        assertThat(results.get(0).name()).isEqualTo("Zelda");
-        assertThat(results.get(0).boxArtUrl()).isEqualTo("https://img/zelda.jpg");
+        assertThat(results.getFirst().id()).isEqualTo("123");
+        assertThat(results.getFirst().name()).isEqualTo("Zelda");
+        assertThat(results.getFirst().boxArtUrl()).isEqualTo("https://img/zelda.jpg");
         verify(restClient, never()).get(); // no live call
     }
 
@@ -108,8 +108,8 @@ class TwitchCategoryServiceTest {
         List<TwitchCategory> results = service.searchCategories("fortnite");
 
         assertThat(results).hasSize(1);
-        assertThat(results.get(0).id()).isEqualTo("456");
-        assertThat(results.get(0).boxArtUrl()).isEqualTo("https://img/fn.jpg");
+        assertThat(results.getFirst().id()).isEqualTo("456");
+        assertThat(results.getFirst().boxArtUrl()).isEqualTo("https://img/fn.jpg");
         verify(cacheRepo).saveAll(anyList());
     }
 
@@ -180,7 +180,7 @@ class TwitchCategoryServiceTest {
 
         verify(cacheRepo, times(1)).saveAll(argThat(list -> {
             List<TwitchCategoryCache> l = (List<TwitchCategoryCache>) list;
-            return l.size() == 1 && "543".equals(l.get(0).getId());
+            return l.size() == 1 && "543".equals(l.getFirst().getId());
         }));
         // URI for first batch must start at 501
         verify(getSpec).uri(argThat((String uri) -> uri.contains("?id=501")));
@@ -202,7 +202,7 @@ class TwitchCategoryServiceTest {
 
         verify(cacheRepo, times(1)).saveAll(argThat(list -> {
             List<TwitchCategoryCache> l = (List<TwitchCategoryCache>) list;
-            return l.size() == 1 && "743".equals(l.get(0).getId()) && "7".equals(l.get(0).getIgdbId());
+            return l.size() == 1 && "743".equals(l.getFirst().getId()) && "7".equals(l.getFirst().getIgdbId());
         }));
         verify(cacheRepo, times(1)).saveAll(anyList());
     }
@@ -222,7 +222,7 @@ class TwitchCategoryServiceTest {
 
         verify(cacheRepo, times(1)).saveAll(argThat(list -> {
             List<TwitchCategoryCache> l = (List<TwitchCategoryCache>) list;
-            return l.size() == 1 && "1905".equals(l.get(0).getIgdbId());
+            return l.size() == 1 && "1905".equals(l.getFirst().getIgdbId());
         }));
     }
 

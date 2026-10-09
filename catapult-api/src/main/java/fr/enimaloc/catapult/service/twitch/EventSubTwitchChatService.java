@@ -279,7 +279,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         String botAccess = systemTwitchAccountService.getAccessToken();
         String botTwitchId = systemTwitchAccountService.getSystemTwitchId();
         if (botAccess != null && botTwitchId != null
-            && trySend(user, parts.get(0), botAccess, botTwitchId, "bot")) {
+            && trySend(user, parts.getFirst(), botAccess, botTwitchId, "bot")) {
             for (int i = 1; i < parts.size(); i++) {
                 trySend(user, parts.get(i), botAccess, botTwitchId, "bot");
             }

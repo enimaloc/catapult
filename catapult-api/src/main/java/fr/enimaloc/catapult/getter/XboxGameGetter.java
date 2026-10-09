@@ -148,11 +148,11 @@ public class XboxGameGetter implements GameGetter {
         if (response == null) return Optional.empty();
         List<Map<String, Object>> titles = (List<Map<String, Object>>) response.get("titles");
         if (titles == null || titles.isEmpty()) return Optional.empty();
-        Map<String, Object> detail = (Map<String, Object>) titles.get(0).get("detail");
+        Map<String, Object> detail = (Map<String, Object>) titles.getFirst().get("detail");
         if (detail == null) return Optional.empty();
         List<Map<String, Object>> availabilities = (List<Map<String, Object>>) detail.get("availabilities");
         if (availabilities == null || availabilities.isEmpty()) return Optional.empty();
-        Object availabilityId = availabilities.get(0).get("AvailabilityId");
+        Object availabilityId = availabilities.getFirst().get("AvailabilityId");
         return availabilityId == null ? Optional.empty() : Optional.of(String.valueOf(availabilityId));
     }
 

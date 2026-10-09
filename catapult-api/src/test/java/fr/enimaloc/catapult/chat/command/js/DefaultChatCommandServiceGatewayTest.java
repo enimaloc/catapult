@@ -253,7 +253,7 @@ class DefaultChatCommandServiceGatewayTest {
         var result = gateway.igdbInvolvedCompanies("1234");
         assertThat(result).isPresent();
         assertThat(result.get()).hasSize(1);
-        assertThat(result.get().get(0))
+        assertThat(result.get().getFirst())
             .containsEntry("name", "Riot Games")
             .containsEntry("developer", true)
             .containsEntry("publisher", true)

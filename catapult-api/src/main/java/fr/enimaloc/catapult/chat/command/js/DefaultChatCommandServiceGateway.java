@@ -56,8 +56,8 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
             }
             // The search endpoint only returns id/name — fetch the enriched fields (summary,
             // release date, ratings, platforms) the same way the game-details cache does.
-            Game game = igdbClient.fetchGameDetails(String.valueOf(results.get(0).getId()), token)
-                .orElse(results.get(0));
+            Game game = igdbClient.fetchGameDetails(String.valueOf(results.getFirst().getId()), token)
+                .orElse(results.getFirst());
             return Optional.of(toIgdbGame(game));
         } catch (Exception e) {
             return Optional.empty();

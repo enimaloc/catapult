@@ -82,10 +82,10 @@ public class DebugCommand implements ChatCommand {
 
     @Override
     public Object execute(UserAccount user, List<String> args) {
-        if (!args.isEmpty() && "tpl".equals(args.get(0))) {
+        if (!args.isEmpty() && "tpl".equals(args.getFirst())) {
             return executeTemplate(user, String.join(" ", args.subList(1, args.size())));
         }
-        if (!args.isEmpty() && "js".equals(args.get(0))) {
+        if (!args.isEmpty() && "js".equals(args.getFirst())) {
             return executeRawJs(String.join(" ", args.subList(1, args.size())));
         }
 
@@ -94,7 +94,7 @@ public class DebugCommand implements ChatCommand {
         Locale locale = Locale.FRANCE;
 
         if (!args.isEmpty()) {
-            String path = args.get(0);
+            String path = args.getFirst();
             if (!knownPaths().contains(path)) {
                 return "Placeholder inconnu : " + path;
             }
