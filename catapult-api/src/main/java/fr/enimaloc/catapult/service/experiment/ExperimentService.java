@@ -13,7 +13,6 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository
 import fr.enimaloc.catapult.repository.experiment.ExperimentEventRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;

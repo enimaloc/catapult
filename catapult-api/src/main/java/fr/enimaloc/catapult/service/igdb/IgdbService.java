@@ -11,7 +11,6 @@ import fr.enimaloc.catapult.repository.igdb.IgdbGameCacheRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameExternalIdRepository;
 import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
-import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;

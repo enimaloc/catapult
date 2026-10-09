@@ -11,7 +11,6 @@ import fr.enimaloc.catapult.common.dto.chatcommand.ServiceFunctionDto;
 import fr.enimaloc.catapult.common.dto.chatcommand.TwOptionDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
-import fr.enimaloc.catapult.domain.tw.TwDefinition;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
