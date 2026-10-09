@@ -9,8 +9,8 @@ Outil d'automatisation pour streamers Twitch : détecte le jeu en cours et met �
 
 - **Détection automatique du jeu** via Steam, Xbox et Battle.net (chaîne de priorité configurable)
 - **Mise à jour Twitch** — catégorie et labels CCL synchronisés à chaque changement de jeu
-- **Commandes chat data-driven** — presets `!game`, `!description`, `!store`, `!release`, `!igdb`, `!triggers` (templates customisables avec placeholders `{game.name|fallback}`, `{dtdd.yes|no|mostly}`, `{game.agerating}`), `!setgame` côté modération. Réponses postées par un compte bot dédié quand il est `/mod` du canal, sinon fallback transparent sur le compte du streamer. Gateé par l'experiment `chat.commands` (rolling release).
-- **Trigger warnings DoesTheDogDie** — intégration optionnelle de [doesthedogdie.com](https://www.doesthedogdie.com) avec pool de clés API rotatif, cache à 3 niveaux, mapping IGDB→DTDD revue par streamer/admin, et placeholders `{dtdd.*}` pour les chat commands.
+- **Commandes chat data-driven** — presets `!game`, `!description`, `!store`, `!release`, `!igdb`, `!triggers` (templates personnalisables avec placeholders `{game.name|fallback}`, `{dtdd.yes|no|mostly}`, `{game.agerating}`), `!setgame` côté modération. Réponses postées par un compte bot dédié quand il est `/mod` du canal, sinon fallback transparent sur le compte du streamer. Conditionnées par l'experiment `chat.commands` (rolling release).
+- **Trigger warnings DoesTheDogDie** — intégration optionnelle de [doesthedogdie.com](https://www.doesthedogdie.com) avec pool de clés API rotatif, cache à 3 niveaux, mapping IGDB→DTDD revu par streamer/admin, et placeholders `{dtdd.*}` pour les chat commands.
 - **Interface d'administration** — gestion des bindings jeu, des règles CCL et des paramètres utilisateur
 - **A/B testing** — moteur d'expérimentation interne, avec support optionnel Unleash, GrowthBook et GitLab Feature Flags
 - **Métriques Prometheus** exposées sur `/actuator/prometheus`
