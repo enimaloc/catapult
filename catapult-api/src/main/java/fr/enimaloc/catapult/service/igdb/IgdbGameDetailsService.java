@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import proto.ExternalGame;
 import proto.Franchise;
 import proto.Game;
 import proto.GameMode;
@@ -18,13 +17,9 @@ import proto.Platform;
 import proto.PlayerPerspective;
 import proto.Screenshot;
 import proto.Theme;
-import proto.Website;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 
@@ -111,7 +106,7 @@ public class IgdbGameDetailsService {
         if (game.hasFirstReleaseDate() && game.getFirstReleaseDate().getSeconds() > 0) {
             entity.setFirstReleaseDate(Instant.ofEpochSecond(game.getFirstReleaseDate().getSeconds()));
         }
-        entity.setWebsites(extractWebsites(game));
+        entity.setWebsites(IgdbWebsiteKeys.links(game));
         // proto3 scalar doubles have no presence tracking (no hasRating()/hasAggregatedRating()) —
         // 0 is indistinguishable from "IGDB omitted the field", so treat <= 0 as unset.
         entity.setRating(game.getRating() > 0 ? game.getRating() : null);
@@ -145,26 +140,4 @@ public class IgdbGameDetailsService {
         return url != null && url.startsWith("//") ? "https:" + url : url;
     }
 
-    private Map<String, String> extractWebsites(Game game) {
-        Map<String, String> map = new HashMap<>();
-        for (Website website : game.getWebsitesList()) {
-            if (!website.getUrl().isBlank()) {
-                map.put(IgdbWebsiteKeys.key(website), website.getUrl());
-            }
-        }
-        for (ExternalGame external : game.getExternalGamesList()) {
-            if (!external.hasExternalGameSource()) {
-                continue;
-            }
-            String source = external.getExternalGameSource().getName();
-            if (source.isBlank()) {
-                continue;
-            }
-            String key = source.toLowerCase(Locale.ROOT);
-            if (!external.getUid().isBlank()) {
-                map.put(key, external.getUid());
-            }
-        }
-        return map;
-    }
 }

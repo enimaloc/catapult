@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import proto.ExternalGame;
 import proto.Franchise;
 import proto.Game;
 import proto.GameMode;
@@ -21,14 +20,12 @@ import proto.Platform;
 import proto.PlayerPerspective;
 import proto.Screenshot;
 import proto.Theme;
-import proto.Website;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -86,7 +83,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
 
     @Override
     public Optional<Map<String, String>> igdbExternalPlatforms(String igdbId) {
-        return fetchDetails(igdbId).map(DefaultChatCommandServiceGateway::extractExternalPlatforms);
+        return fetchDetails(igdbId).map(IgdbWebsiteKeys::links);
     }
 
     @Override
@@ -193,31 +190,6 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
         }
     }
 
-    // Merges websites (official site, wikipedia, ...) and external_games (Steam/Xbox/... store
-    // links) into one lowercased-source -> id/url map — mirrors
-    // fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService#extractWebsites; not extracted to a
-    // shared helper since that one persists to a JPA entity and this one feeds the sandbox.
-    private static Map<String, String> extractExternalPlatforms(Game game) {
-        Map<String, String> map = new HashMap<>();
-        for (Website website : game.getWebsitesList()) {
-            if (!website.getUrl().isBlank()) {
-                map.put(IgdbWebsiteKeys.key(website), website.getUrl());
-            }
-        }
-        for (ExternalGame external : game.getExternalGamesList()) {
-            if (!external.hasExternalGameSource()) {
-                continue;
-            }
-            String source = external.getExternalGameSource().getName();
-            if (source.isBlank()) {
-                continue;
-            }
-            if (!external.getUid().isBlank()) {
-                map.put(source.toLowerCase(Locale.ROOT), external.getUid());
-            }
-        }
-        return map;
-    }
 
     @Override
     public Optional<String> twitchOwnDisplayName(UserAccount user) {

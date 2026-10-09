@@ -1,7 +1,10 @@
 package fr.enimaloc.catapult.service.igdb;
 
+import proto.ExternalGame;
+import proto.Game;
 import proto.Website;
 
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
@@ -13,6 +16,9 @@ import java.util.Map;
  * are the old category values, so they map back onto the keys the category enum produced
  * ({@code official}, {@code steam}, ...) — the ones {@code {game#store#official}} and friends
  * look up. Newer types (Xbox, PlayStation, ...) fall back to a slug of the type's name.
+ *
+ * <p>{@link #links} merges those websites with the game's external store ids into the one map
+ * both the cached game details and the chat-command sandbox expose.
  */
 public final class IgdbWebsiteKeys {
 
@@ -54,5 +60,28 @@ public final class IgdbWebsiteKeys {
             .replaceAll("[^a-z0-9]+", "_")
             .replaceAll("^_|_$", "");
         return slug.isEmpty() ? UNTYPED_KEY : slug;
+    }
+
+    /**
+     * Websites (keyed by {@link #key}) merged with external_games (keyed by lowercased source
+     * name, valued by the store's raw uid, e.g. {@code steam -> 440}).
+     */
+    public static Map<String, String> links(Game game) {
+        Map<String, String> map = new HashMap<>();
+        for (Website website : game.getWebsitesList()) {
+            if (!website.getUrl().isBlank()) {
+                map.put(key(website), website.getUrl());
+            }
+        }
+        for (ExternalGame external : game.getExternalGamesList()) {
+            if (!external.hasExternalGameSource()) {
+                continue;
+            }
+            String source = external.getExternalGameSource().getName();
+            if (!source.isBlank() && !external.getUid().isBlank()) {
+                map.put(source.toLowerCase(Locale.ROOT), external.getUid());
+            }
+        }
+        return map;
     }
 }
