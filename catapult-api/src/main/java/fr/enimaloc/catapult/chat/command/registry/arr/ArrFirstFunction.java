@@ -28,6 +28,6 @@ public class ArrFirstFunction implements ServiceFunction {
     @Override
     public Object invoke(UserAccount user, Object[] args) {
         List<Object> list = ArrList.coerce(args[0]);
-        return list.isEmpty() ? "" : String.valueOf(list.get(0));
+        return list.isEmpty() ? "" : String.valueOf(list.getFirst());
     }
 }

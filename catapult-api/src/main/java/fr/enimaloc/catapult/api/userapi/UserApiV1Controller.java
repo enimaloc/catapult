@@ -121,7 +121,7 @@ public class UserApiV1Controller {
             try {
                 List<Locale.LanguageRange> ranges = Locale.LanguageRange.parse(acceptLanguage);
                 if (!ranges.isEmpty()) {
-                    return Locale.forLanguageTag(ranges.get(0).getRange());
+                    return Locale.forLanguageTag(ranges.getFirst().getRange());
                 }
             } catch (IllegalArgumentException ignored) {
                 // malformed Accept-Language header — fall through to the default

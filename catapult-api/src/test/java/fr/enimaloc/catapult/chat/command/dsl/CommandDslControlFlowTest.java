@@ -22,7 +22,7 @@ class CommandDslControlFlowTest {
     @Test
     void parsesIfElse() {
         CommandAst ast = parser.parse("{if game#name == \"Valorant\"}yes{else}no{/if}");
-        IfStatement ifStatement = (IfStatement) ast.statements().get(0);
+        IfStatement ifStatement = (IfStatement) ast.statements().getFirst();
         assertThat(ifStatement.condition()).isEqualTo(new BinaryExpr(
             new ContextGetExpr("game#name"), "==", new LiteralExpr("Valorant", ValueType.STRING)));
         assertThat(ifStatement.thenBranch()).containsExactly(
@@ -35,7 +35,7 @@ class CommandDslControlFlowTest {
     void parsesIfWithAllSixComparisonOperators() {
         for (String op : new String[]{"==", "!=", "<", ">", "<=", ">="}) {
             CommandAst ast = parser.parse("{if game#agerating " + op + " \"18\"}x{/if}");
-            IfStatement ifStatement = (IfStatement) ast.statements().get(0);
+            IfStatement ifStatement = (IfStatement) ast.statements().getFirst();
             assertThat(ifStatement.condition().operator()).isEqualTo(op);
         }
     }
@@ -43,7 +43,7 @@ class CommandDslControlFlowTest {
     @Test
     void parsesForEachOverFallbacksWithVarRefBody() {
         CommandAst ast = parser.parse("{for f in fallbacks}-{f} {/for}");
-        ForEachStatement forStatement = (ForEachStatement) ast.statements().get(0);
+        ForEachStatement forStatement = (ForEachStatement) ast.statements().getFirst();
         assertThat(forStatement.bindingName()).isEqualTo("f");
         assertThat(forStatement.listSource()).isEqualTo("fallbacks");
         assertThat(forStatement.body()).containsExactly(
@@ -83,8 +83,8 @@ class CommandDslControlFlowTest {
         String source = "{for f in fallbacks}{if f == \"none\"}skip{else}{f}{/if}{/for}";
         CommandAst ast = parser.parse(source);
         assertThat(generator.generate(ast)).isEqualTo(source);
-        ForEachStatement forStatement = (ForEachStatement) ast.statements().get(0);
-        IfStatement nested = (IfStatement) forStatement.body().get(0);
+        ForEachStatement forStatement = (ForEachStatement) ast.statements().getFirst();
+        IfStatement nested = (IfStatement) forStatement.body().getFirst();
         // "f" inside the for-each body condition is the loop binding (VarRefExpr), not a context path
         assertThat(nested.condition().left()).isEqualTo(new VarRefExpr("f"));
     }

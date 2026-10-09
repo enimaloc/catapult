@@ -62,7 +62,7 @@ class RealDtddApiClientTest {
         Optional<List<DtddApiClient.DtddSearchResult>> result = client.search("stardew");
         assertThat(result).isPresent();
         assertThat(result.get()).hasSize(1);
-        assertThat(result.get().get(0).dtddId()).isEqualTo(4521L);
+        assertThat(result.get().getFirst().dtddId()).isEqualTo(4521L);
 
         RecordedRequest req = server.takeRequest();
         assertThat(req.getHeader("X-API-KEY")).isEqualTo("KEY_A");

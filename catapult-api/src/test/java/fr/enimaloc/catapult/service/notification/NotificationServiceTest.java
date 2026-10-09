@@ -68,7 +68,7 @@ class NotificationServiceTest {
         ArgumentCaptor<List<NotificationRecipient>> cap = ArgumentCaptor.forClass(List.class);
         verify(recipientRepo).saveAll(cap.capture());
         assertThat(cap.getValue()).hasSize(1);
-        assertThat(cap.getValue().get(0).getUser().getId()).isEqualTo(targetId);
+        assertThat(cap.getValue().getFirst().getUser().getId()).isEqualTo(targetId);
 
         verify(publisher).publishEvent(any(NotificationCreatedEvent.class));
     }

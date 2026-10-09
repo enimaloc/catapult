@@ -94,7 +94,7 @@ public class CommandDslParser {
             throw new CommandDslParseException(
                 "arg(N) or arg(N, \"default\") expected: " + text);
         }
-        String indexText = parts.get(0).trim();
+        String indexText = parts.getFirst().trim();
         if (!ARG_INDEX.matcher(indexText).matches()) {
             throw new CommandDslParseException(
                 "arg(N) requires a literal non-negative integer index: " + text);
@@ -379,7 +379,7 @@ public class CommandDslParser {
     private Expression parseGetExpression(String argsText) {
         List<String> args = splitTopLevelArgs(argsText);
         if (args.size() == 1) {
-            String arg = args.get(0).trim();
+            String arg = args.getFirst().trim();
             if (arg.startsWith("ctx.") && DOT_CHAIN.matcher(arg).matches()) {
                 return parseDotChain(arg);
             }

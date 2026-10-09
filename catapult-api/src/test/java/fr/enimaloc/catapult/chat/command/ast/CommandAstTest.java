@@ -16,7 +16,7 @@ class CommandAstTest {
         ));
 
         assertThat(ast.statements()).hasSize(2);
-        assertThat(ast.statements().get(0).typeName()).isEqualTo("print");
+        assertThat(ast.statements().getFirst().typeName()).isEqualTo("print");
     }
 
     @Test

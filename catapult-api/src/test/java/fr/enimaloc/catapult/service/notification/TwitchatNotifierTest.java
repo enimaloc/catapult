@@ -204,9 +204,9 @@ class TwitchatNotifierTest {
         assertThat(n.style()).isEqualTo("message"); // preset omitted style → default
         assertThat(n.authorName()).isEqualTo("MonBot");
         assertThat(n.actions()).hasSize(1);
-        assertThat(n.actions().get(0).label()).isEqualTo("Stop");
-        assertThat(n.actions().get(0).theme()).isEqualTo("primary");
-        assertThat(n.actions().get(0).url()).isEqualTo("https://example.com/act/" + token);
+        assertThat(n.actions().getFirst().label()).isEqualTo("Stop");
+        assertThat(n.actions().getFirst().theme()).isEqualTo("primary");
+        assertThat(n.actions().getFirst().url()).isEqualTo("https://example.com/act/" + token);
     }
 
     @Test
@@ -281,7 +281,7 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(1);
-        assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://example.com/act/" + token);
+        assertThat(captor.getValue().actions().getFirst().url()).isEqualTo("https://example.com/act/" + token);
     }
 
     @Test
@@ -302,8 +302,8 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(1);
-        assertThat(captor.getValue().actions().get(0).label()).isEqualTo("Stop");
-        assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://x/" + disableBotToken);
+        assertThat(captor.getValue().actions().getFirst().label()).isEqualTo("Stop");
+        assertThat(captor.getValue().actions().getFirst().url()).isEqualTo("https://x/" + disableBotToken);
         verify(actionTokenService, never()).generate(any(), eq(TwitchatActionType.REVERT_CATEGORY), any());
     }
 
@@ -319,7 +319,7 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(1);
-        assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://example.com/static");
+        assertThat(captor.getValue().actions().getFirst().url()).isEqualTo("https://example.com/static");
         verify(actionTokenService, never()).generate(any(), any(), any());
     }
 
@@ -353,7 +353,7 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(1);
-        assertThat(captor.getValue().actions().get(0).url())
+        assertThat(captor.getValue().actions().getFirst().url())
                 .isEqualTo("https://x/" + bindToken + "/" + revertToken);
     }
 
@@ -412,7 +412,7 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(1);
-        assertThat(captor.getValue().actions().get(0).actionType()).isEqualTo("url");
+        assertThat(captor.getValue().actions().getFirst().actionType()).isEqualTo("url");
     }
 
     @Test
@@ -431,7 +431,7 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(1);
-        TwitchatAction action = captor.getValue().actions().get(0);
+        TwitchatAction action = captor.getValue().actions().getFirst();
         assertThat(action.actionType()).isEqualTo("chat");
         assertThat(action.url()).isNull();
         assertThat(action.message()).isEqualTo("/so " + token);
@@ -474,8 +474,8 @@ class TwitchatNotifierTest {
         ArgumentCaptor<TwitchatNotification> captor = ArgumentCaptor.forClass(TwitchatNotification.class);
         verify(channelEventPublisher).twitchatNotify(eq(user.getId()), captor.capture());
         assertThat(captor.getValue().actions()).hasSize(1);
-        assertThat(captor.getValue().actions().get(0).url()).isEqualTo("https://x/static");
-        assertThat(captor.getValue().actions().get(0).message()).isEqualTo("/so " + disableBotToken);
+        assertThat(captor.getValue().actions().getFirst().url()).isEqualTo("https://x/static");
+        assertThat(captor.getValue().actions().getFirst().message()).isEqualTo("/so " + disableBotToken);
     }
 
     @Test
@@ -494,7 +494,7 @@ class TwitchatNotifierTest {
         TwitchatNotification n = captor.getValue();
         assertThat(n.message()).isEqualTo(">> Jeu de test <<");
         assertThat(n.actions()).hasSize(1); // REVERT_CATEGORY treated as applicable in test mode
-        assertThat(n.actions().get(0).url()).startsWith("https://x/");
+        assertThat(n.actions().getFirst().url()).startsWith("https://x/");
         // The token is never persisted — actionTokenService must never be called for a test render.
         verifyNoInteractions(actionTokenService);
     }

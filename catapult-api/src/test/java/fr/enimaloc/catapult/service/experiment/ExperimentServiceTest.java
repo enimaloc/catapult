@@ -464,7 +464,7 @@ class ExperimentServiceTest {
         ArgumentCaptor<Experiment> captor = ArgumentCaptor.forClass(Experiment.class);
         verify(experimentRepository).save(captor.capture());
         assertThat(captor.getValue().getVariants()).hasSize(1);
-        assertThat(captor.getValue().getVariants().get(0).isControl()).isTrue();
+        assertThat(captor.getValue().getVariants().getFirst().isControl()).isTrue();
     }
 
     @Test
