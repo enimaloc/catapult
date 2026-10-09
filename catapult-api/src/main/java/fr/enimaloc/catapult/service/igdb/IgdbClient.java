@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.service.igdb;
 
 import com.api.igdb.apicalypse.APICalypse;
-import com.api.igdb.apicalypse.Sort;
 import com.api.igdb.exceptions.RequestException;
 import com.api.igdb.request.IGDBWrapper;
 import com.api.igdb.request.ProtoRequestKt;
@@ -34,8 +33,6 @@ public class IgdbClient {
             + ",involved_companies.company.name,involved_companies.developer,involved_companies.publisher"
             + ",involved_companies.supporting,involved_companies.porting"
             + ",age_ratings.rating_category.organization.name,age_ratings.rating_category.rating,franchises.name,keywords.name";
-    private static final String GAME_PAGE_FIELDS =
-            "id,name,external_games.uid,external_games.external_game_source,age_ratings.id,age_ratings.rating_category.rating";
 
     @Value("${app.igdb.client-id:}")
     private String clientId;
@@ -153,21 +150,6 @@ public class IgdbClient {
             APICalypse query = new APICalypse().fields(GAME_DETAILS_FIELDS).where("id = " + Long.parseLong(igdbId)).limit(1);
             return fetchOrEmpty(token, "/games", "details id=" + igdbId, query, IgdbClient::games)
                     .stream().findFirst();
-        });
-    }
-
-    /**
-     * Récupère une page de jeux triés par popularité (preload).
-     */
-    public List<Game> fetchGamePage(int limit, int offset, String token) {
-        return apiObservations.observe("igdb", "fetch_game_page", () -> {
-            APICalypse query = new APICalypse()
-                    .fields(GAME_PAGE_FIELDS)
-                    .sort("aggregated_rating", Sort.DESCENDING)
-                    .limit(limit)
-                    .offset(offset);
-            return fetchOrEmpty(token, "/games", "page (limit=" + limit + ", offset=" + offset + ")", query,
-                    IgdbClient::games);
         });
     }
 
