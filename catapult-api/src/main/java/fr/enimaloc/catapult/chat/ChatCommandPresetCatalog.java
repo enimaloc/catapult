@@ -78,17 +78,12 @@ public class ChatCommandPresetCatalog {
     }
 
     /**
-     * Pré-enregistre tous les presets pour {@code user}, désactivés par défaut.
-     * Idempotent : ignore les presets qui ont déjà une définition (même nom).
-     * Appelé au premier affichage de la page côté liste afin que l'utilisateur
-     * voie d'emblée toutes les commandes pré-configurées et n'ait qu'à les
-     * activer.
-     */
-    /**
      * Pré-enregistre les presets data-driven (game, description, store...) pour
-     * {@code user}, désactivés par défaut. À n'appeler que lors du tout premier
-     * affichage de la page (liste vide) pour respecter une éventuelle
-     * suppression manuelle ultérieure.
+     * {@code user}, désactivés par défaut, afin que l'utilisateur voie d'emblée
+     * toutes les commandes préconfigurées et n'ait qu'à les activer.
+     * Idempotent : ignore les presets qui ont déjà une définition (même nom).
+     * À n'appeler que lors du tout premier affichage de la page (liste vide)
+     * pour respecter une éventuelle suppression manuelle ultérieure.
      */
     public void bootstrapPresetsDisabled(UserAccount user, Locale locale) {
         for (Map.Entry<String, Preset> entry : PRESETS.entrySet()) {

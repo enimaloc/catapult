@@ -25,7 +25,7 @@ import java.util.Optional;
  * and persists it both in the session AND in a short-lived HttpOnly cookie so
  * CatapultOAuth2UserService can read it during the OAuth callback.
  *
- * Must run BEFORE Spring Security's OAuth2AuthorizationRequestRedirectFilter,
+ * <p>Must run BEFORE Spring Security's OAuth2AuthorizationRequestRedirectFilter,
  * which otherwise intercepts /oauth2/authorization/** and short-circuits the chain.
  */
 @Slf4j
