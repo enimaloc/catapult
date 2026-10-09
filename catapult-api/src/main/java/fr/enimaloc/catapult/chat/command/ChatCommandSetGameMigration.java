@@ -19,8 +19,9 @@ import java.util.Set;
  * ChatCommand} bean with an editable template — {@code !debug} is the only static bean left now,
  * and it's owner-only, never gets a UI row at all): {@code !setgame} is now a fully data-driven
  * {@link ChatCommandPresetCatalog} preset ({@code chat.preset.setgame.*}) exactly like {@code
- * !game}/{@code !description}/etc., not a special case {@link CommandRegistry}/{@link
- * fr.enimaloc.catapult.chat.DynamicCommandResolver} need to know about.
+ * !game}/{@code !description}/etc., not a special case {@link
+ * fr.enimaloc.catapult.chat.CommandRegistry}/{@link fr.enimaloc.catapult.chat.DynamicCommandResolver}
+ * need to know about.
  *
  * <p>Every existing row seeded by the old {@code ChatCommandPresetCatalog#ensureBuiltins} still
  * has {@code presetKey = "builtin:setgame"} — {@link fr.enimaloc.catapult.chat.DynamicCommandResolver}
