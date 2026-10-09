@@ -7,7 +7,6 @@ import org.jsoup.nodes.Element;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.regex.Pattern;
 
 public class SteamIADisclosure {
