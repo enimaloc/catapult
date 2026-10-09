@@ -39,10 +39,8 @@ class IgdbClientTest {
     @BeforeEach
     void setUp() {
         sdk = mockStatic(ProtoRequestKt.class);
-        client = new IgdbClient();
+        client = new IgdbClient(new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry()));
         ReflectionTestUtils.setField(client, "clientId", "client-id");
-        ReflectionTestUtils.setField(client, "apiObservations",
-                new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry()));
     }
 
     @AfterEach
