@@ -26,9 +26,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
-@SuppressWarnings({"unchecked", "rawtypes"})
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
+@SuppressWarnings("rawtypes")
 class ApiAdminProviderTwitchControllerTest {
 
     @Mock private TwitchTokenService twitchTokenService;

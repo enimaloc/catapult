@@ -45,7 +45,6 @@ public class ApiAuthController {
         UserAccount account = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new IllegalStateException("User not found: " + userId));
 
-        @SuppressWarnings("unchecked")
         List<String> roles = jwt.getClaim("roles");
 
         return new UserInfoResponse(
