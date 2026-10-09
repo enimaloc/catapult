@@ -105,14 +105,14 @@ springBoot {
 /*
  * Browser-script unit tests (Vitest + jsdom, see vitest.config.js), part of `check`.
  */
-val npmInstall by tasks.registering(Exec::class) {
+val npmInstall = tasks.register<Exec>("npmInstall") {
     description = "Installs the JS test toolchain from package-lock.json."
     inputs.file("package-lock.json")
     outputs.dir("node_modules")
     commandLine("npm", "ci", "--no-fund", "--no-audit")
 }
 
-val jsTest by tasks.registering(Exec::class) {
+val jsTest = tasks.register<Exec>("jsTest") {
     description = "Runs the browser-script unit tests with coverage."
     group = "verification"
     dependsOn(npmInstall)
