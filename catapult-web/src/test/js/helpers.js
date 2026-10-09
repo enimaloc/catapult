@@ -21,7 +21,12 @@ export function render() {
     document.dispatchEvent(new CustomEvent("catapult:render"));
 }
 
-/** A resolved fetch Response-like object. */
+/**
+ * A resolved fetch Response-like object.
+ *
+ * @param {number} status
+ * @param {*} body a raw string, or any value served as JSON
+ */
 export function response(status = 200, body = "") {
     return {
         ok: status >= 200 && status < 300,
