@@ -125,27 +125,7 @@ public class TwBackfillService {
                     meterRegistry.counter("catapult.tw." + mode + ".skipped").increment();
                     continue;
                 }
-                try {
-                    Optional<String> igdbId = igdbService.resolveIgdbIdForBinding(b);
-                    Set<Long> descIds = igdbId.map(igdbService::fetchDescriptorIds).orElse(Set.of());
-                    String steamApp = b.getSourceType() == GameBinding.SourceType.STEAM ? b.getSourceId() : null;
-                    Set<String> tws = resolver.suggest(new TwResolverService.SuggestInput(
-                        igdbId.orElse(null), descIds, steamApp, b.getSourceName()));
-                    log.debug("[TW] {} mapping for binding {} game '{}' (igdb={}): {}",
-                        mode, b.getId(), b.getSourceName(), igdbId.orElse(null), tws);
-                    b.setTws(tws);
-                    bindingRepo.save(b);
-                    c.processed++;
-                    meterRegistry.counter("catapult.tw." + mode + ".processed").increment();
-                } catch (Exception e) {
-                    log.warn("TW {} failed for binding {}: {}", mode, b.getId(), e.getMessage());
-                    c.failed++;
-                    meterRegistry.counter("catapult.tw." + mode + ".failed").increment();
-                }
-                try {
-                    Thread.sleep(sleepMs);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
+                if (!remap(b, mode, c, sleepMs)) {
                     return c;
                 }
             }
@@ -153,7 +133,7 @@ public class TwBackfillService {
         return c;
     }
 
-    /** Same loop body as {@link #process}, but never skips on {@code twOverride}. */
+    /** Same loop as {@link #process}, but never skips on {@code twOverride}. */
     private Counts processForceAll() {
         long sleepMs = 1000L / Math.max(throttle, 1);
         Counts c = new Counts();
@@ -163,31 +143,42 @@ public class TwBackfillService {
         do {
             batch = bindingRepo.findAllCandidatesForTwForceRebuild(PageRequest.of(page++, batchSize));
             for (GameBinding b : batch) {
-                try {
-                    Optional<String> igdbId = igdbService.resolveIgdbIdForBinding(b);
-                    Set<Long> descIds = igdbId.map(igdbService::fetchDescriptorIds).orElse(Set.of());
-                    String steamApp = b.getSourceType() == GameBinding.SourceType.STEAM ? b.getSourceId() : null;
-                    Set<String> tws = resolver.suggest(new TwResolverService.SuggestInput(
-                        igdbId.orElse(null), descIds, steamApp, b.getSourceName()));
-                    log.debug("[TW] {} mapping for binding {} game '{}' (igdb={}): {}",
-                        mode, b.getId(), b.getSourceName(), igdbId.orElse(null), tws);
-                    b.setTws(tws);
-                    bindingRepo.save(b);
-                    c.processed++;
-                    meterRegistry.counter("catapult.tw." + mode + ".processed").increment();
-                } catch (Exception e) {
-                    log.warn("TW {} failed for binding {}: {}", mode, b.getId(), e.getMessage());
-                    c.failed++;
-                    meterRegistry.counter("catapult.tw." + mode + ".failed").increment();
-                }
-                try {
-                    Thread.sleep(sleepMs);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
+                if (!remap(b, mode, c, sleepMs)) {
                     return c;
                 }
             }
         } while (batch.hasNext());
         return c;
+    }
+
+    /**
+     * Re-resolves one binding's TW suggestions, records the outcome in {@code c}, then
+     * throttles. Returns {@code false} when interrupted during the throttle sleep.
+     */
+    private boolean remap(GameBinding b, String mode, Counts c, long sleepMs) {
+        try {
+            Optional<String> igdbId = igdbService.resolveIgdbIdForBinding(b);
+            Set<Long> descIds = igdbId.map(igdbService::fetchDescriptorIds).orElse(Set.of());
+            String steamApp = b.getSourceType() == GameBinding.SourceType.STEAM ? b.getSourceId() : null;
+            Set<String> tws = resolver.suggest(new TwResolverService.SuggestInput(
+                igdbId.orElse(null), descIds, steamApp, b.getSourceName()));
+            log.debug("[TW] {} mapping for binding {} game '{}' (igdb={}): {}",
+                mode, b.getId(), b.getSourceName(), igdbId.orElse(null), tws);
+            b.setTws(tws);
+            bindingRepo.save(b);
+            c.processed++;
+            meterRegistry.counter("catapult.tw." + mode + ".processed").increment();
+        } catch (Exception e) {
+            log.warn("TW {} failed for binding {}: {}", mode, b.getId(), e.getMessage());
+            c.failed++;
+            meterRegistry.counter("catapult.tw." + mode + ".failed").increment();
+        }
+        try {
+            Thread.sleep(sleepMs);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        return true;
     }
 }
