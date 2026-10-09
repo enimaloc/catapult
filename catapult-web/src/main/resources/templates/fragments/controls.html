@@ -25,6 +25,7 @@
 <th:block th:fragment="gamePicker(prefix, gameId, gameName)">
     <input type="text" th:id="${prefix} + '-game-input'"
            th:placeholder="#{channel.bindings.edit.game_placeholder}"
+           th:aria-label="#{channel.bindings.edit.game_placeholder}"
            th:value="${gameName}"/>
     <input type="hidden" th:id="${prefix} + '-game-id'" th:value="${gameId}"/>
     <mdui-list th:id="${prefix} + '-game-results'"></mdui-list>

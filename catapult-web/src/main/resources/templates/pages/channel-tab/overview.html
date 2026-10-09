@@ -68,7 +68,8 @@
         <mdui-button id="dtdd-correct-btn" th:text="#{channel.dtdd.correct}">Corriger</mdui-button>
 
         <div id="dtdd-search-dialog" hidden>
-            <input type="text" id="dtdd-search-input" th:placeholder="#{channel.dtdd.search_placeholder}"/>
+            <input type="text" id="dtdd-search-input" th:placeholder="#{channel.dtdd.search_placeholder}"
+                   th:aria-label="#{channel.dtdd.search_placeholder}"/>
             <mdui-list id="dtdd-search-results"></mdui-list>
         </div>
     </mdui-card>
@@ -128,7 +129,9 @@
                                       class="binding-delete-btn"></mdui-button-icon>
 
                     <div class="binding-edit-panel">
-                        <input type="text" class="binding-edit-game-input" placeholder="Rechercher un jeu…"
+                        <input type="text" class="binding-edit-game-input"
+                               th:placeholder="#{channel.bindings.edit.game_placeholder}"
+                               th:aria-label="#{channel.bindings.edit.game_placeholder}"
                                th:value="${b.twitchGameName()}"/>
                         <input type="hidden" class="binding-edit-game-id" th:value="${b.twitchGameId()}"/>
                         <mdui-list class="binding-edit-game-results"></mdui-list>
