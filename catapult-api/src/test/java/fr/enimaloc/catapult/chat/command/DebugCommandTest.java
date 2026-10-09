@@ -25,18 +25,16 @@ import static org.mockito.Mockito.when;
 
 class DebugCommandTest {
 
-    private TwPlaceholderRegistry twRegistry;
     private GameContextService gameContextService;
-    private ChatCommandSettingRepository settingRepository;
     private DebugCommand command;
     private UserAccount user;
 
     @BeforeEach
     void setup() {
-        twRegistry = mock(TwPlaceholderRegistry.class);
+        TwPlaceholderRegistry twRegistry = mock(TwPlaceholderRegistry.class);
         when(twRegistry.getKnownPaths()).thenReturn(Set.of("spiders"));
         gameContextService = mock(GameContextService.class);
-        settingRepository = mock(ChatCommandSettingRepository.class);
+        ChatCommandSettingRepository settingRepository = mock(ChatCommandSettingRepository.class);
         when(settingRepository.findByUser(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
         PlaceholderResolver resolver = new PlaceholderResolver(new SimpleMeterRegistry(), twRegistry);
         command = new DebugCommand(resolver, twRegistry, gameContextService,

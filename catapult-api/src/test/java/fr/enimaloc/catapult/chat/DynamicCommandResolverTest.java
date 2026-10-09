@@ -34,7 +34,6 @@ class DynamicCommandResolverTest {
     @Mock ChatCommandDefinitionRepository repository;
     @Mock GameContextService gameContextService;
 
-    private PlaceholderResolver placeholderResolver;
     private DynamicCommandResolver resolver;
     private UserAccount user;
 
@@ -42,7 +41,7 @@ class DynamicCommandResolverTest {
     void setup() {
         TwPlaceholderRegistry twRegistry = org.mockito.Mockito.mock(TwPlaceholderRegistry.class);
         org.mockito.Mockito.when(twRegistry.getKnownPaths()).thenReturn(java.util.Set.of());
-        placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry(), twRegistry);
+        PlaceholderResolver placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry(), twRegistry);
         resolver = new DynamicCommandResolver(repository, placeholderResolver, gameContextService,
             new JsCompiler(), new SandboxExecutor(), new ServiceFunctionRegistry(),
             org.mockito.Mockito.mock(ChatCommandSettingRepository.class),
