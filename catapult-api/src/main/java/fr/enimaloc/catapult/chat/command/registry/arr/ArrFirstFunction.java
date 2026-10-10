@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.chat.command.registry.arr;
 
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -28,6 +28,6 @@ public class ArrFirstFunction implements ServiceFunction {
     @Override
     public Object invoke(UserAccount user, Object[] args) {
         List<Object> list = ArrList.coerce(args[0]);
-        return list.isEmpty() ? "" : String.valueOf(list.get(0));
+        return list.isEmpty() ? "" : String.valueOf(list.getFirst());
     }
 }

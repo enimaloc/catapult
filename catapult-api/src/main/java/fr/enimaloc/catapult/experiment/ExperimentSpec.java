@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.experiment;
 
-import fr.enimaloc.catapult.domain.ExperimentAssignmentRule;
-import fr.enimaloc.catapult.domain.ExperimentOverride;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule;
+import fr.enimaloc.catapult.domain.experiment.ExperimentOverride;
 import org.springframework.stereotype.Component;
 
 import java.lang.annotation.*;

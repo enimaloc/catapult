@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.chat;
 
-import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 
 import java.time.LocalDate;

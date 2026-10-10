@@ -1,5 +1,4 @@
 import { test, expect } from "@playwright/test";
-import { publishRedis } from "./helpers/compose";
 
 const CHANNEL = process.env.CATAPULT_E2E_CHANNEL_USERNAME || "enimaloc";
 

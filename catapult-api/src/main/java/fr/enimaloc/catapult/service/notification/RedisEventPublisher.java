@@ -16,7 +16,7 @@ import java.util.UUID;
  * Publishes events to Redis pub/sub channels consumed by catapult-web's
  * {@code RedisEventSubscriber} and fanned out to WebSocket sessions.
  *
- * Channels:
+ * <p>Channels:
  * <ul>
  *   <li>{@code catapult:events:global} — broadcast to every connected client</li>
  *   <li>{@code catapult:events:user:{uuid}} — targeted to a single user's sessions</li>

@@ -82,15 +82,6 @@ test("3. watchdog degraded — stop web, overlay appears with cause=degraded", a
     await page.goto(BASE_URL + "/");
     await page.waitForFunction(() => (window as any).catapultWs !== undefined, { timeout: 5000 });
 
-    // Reduce the watchdog timeout for the test so we don't wait 45s; expose
-    // via a hook: re-attach ws-client by forcing a close, then wait.
-    await page.evaluate(() => {
-        // Force a close event from the client side to simulate connection loss.
-        const ws = (window as any).catapultWs;
-        // Internal: ws-client.js doesn't expose the socket directly, but the
-        // ws:degraded event handler triggers from a real backend stop.
-    });
-
     composeStop("catapult-web");
     try {
         // Initial connect-unreachable timer (5s) plus a bit of slack.

@@ -30,7 +30,7 @@ window.CatapultChannel = (function () {
 
     async function refresh() {
         const path = location.pathname.replace(/^\/+/, "") + location.search;
-        await navigate(path, false);
+        await CatapultSpa.navigate(path, false);
     }
 
     function showError(message) {

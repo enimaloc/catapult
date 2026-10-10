@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult;
 
-import fr.enimaloc.catapult.service.AdminCclService;
+import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

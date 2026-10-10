@@ -1495,7 +1495,7 @@
             "transformations": []
           }
         },
-        "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Verifier au premier deploiement sur /actuator/prometheus quelles series existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne.",
+        "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Vérifier au premier déploiement sur /actuator/prometheus quelles séries existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne.",
         "id": 204,
         "links": [],
         "title": "Latence p95 par API",
@@ -1612,7 +1612,7 @@
             "transformations": []
           }
         },
-        "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Verifier au premier deploiement sur /actuator/prometheus quelles series existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne.",
+        "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Vérifier au premier déploiement sur /actuator/prometheus quelles séries existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne.",
         "id": 205,
         "links": [],
         "title": "Appels par API",
@@ -1729,7 +1729,7 @@
             "transformations": []
           }
         },
-        "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Verifier au premier deploiement sur /actuator/prometheus quelles series existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne.",
+        "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Vérifier au premier déploiement sur /actuator/prometheus quelles séries existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne.",
         "id": 206,
         "links": [],
         "title": "Erreurs par API/opération",
@@ -1930,7 +1930,7 @@
             "transformations": []
           }
         },
-        "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Verifier au premier deploiement sur /actuator/prometheus quelles series existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne.",
+        "description": "Note : les buckets n'existent que si l'Observation handler publie les percentiles. Vérifier au premier déploiement sur /actuator/prometheus quelles séries existent. Fallback : utiliser catapult_external_api_seconds_max ou rate(_sum)/rate(_count) pour la latence moyenne.",
         "id": 208,
         "links": [],
         "title": "Top opérations lentes",
@@ -2770,7 +2770,7 @@
             "transformations": []
           }
         },
-        "description": "Note : verifier les noms exacts des series hibernate_* sur /actuator/prometheus au premier run. Micrometer expose hibernate_query_executions_total via HibernateMetrics ; ajuster si le suffixe differe.",
+        "description": "Note : vérifier les noms exacts des séries hibernate_* sur /actuator/prometheus au premier run. Micrometer expose hibernate_query_executions_total via HibernateMetrics ; ajuster si le suffixe diffère.",
         "id": 218,
         "links": [],
         "title": "Requêtes repository/s",
@@ -2887,7 +2887,7 @@
             "transformations": []
           }
         },
-        "description": "Note : verifier les noms exacts des series hibernate_* sur /actuator/prometheus au premier run. Micrometer expose hibernate_query_executions_total via HibernateMetrics ; ajuster si le suffixe differe.",
+        "description": "Note : vérifier les noms exacts des séries hibernate_* sur /actuator/prometheus au premier run. Micrometer expose hibernate_query_executions_total via HibernateMetrics ; ajuster si le suffixe diffère.",
         "id": 219,
         "links": [],
         "title": "Temps max par repository",

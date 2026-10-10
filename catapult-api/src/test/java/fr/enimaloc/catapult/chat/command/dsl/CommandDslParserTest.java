@@ -1,7 +1,9 @@
 package fr.enimaloc.catapult.chat.command.dsl;
 
 import fr.enimaloc.catapult.chat.command.ast.ArgGetExpr;
+import fr.enimaloc.catapult.chat.command.ast.AssignStatement;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
+import fr.enimaloc.catapult.chat.command.ast.ConcatStatement;
 import fr.enimaloc.catapult.chat.command.ast.ContextGetExpr;
 import fr.enimaloc.catapult.chat.command.ast.LiteralExpr;
 import fr.enimaloc.catapult.chat.command.ast.ObjectLiteralExpr;
@@ -11,8 +13,6 @@ import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
 import fr.enimaloc.catapult.chat.command.ast.ValueType;
 import fr.enimaloc.catapult.chat.command.ast.VarDeclStatement;
 import fr.enimaloc.catapult.chat.command.ast.VarRefExpr;
-import fr.enimaloc.catapult.chat.command.ast.AssignStatement;
-import fr.enimaloc.catapult.chat.command.ast.ConcatStatement;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -68,7 +68,7 @@ class CommandDslParserTest {
         // if-condition operand) is always the new '.' property-access operator. Context paths here
         // are spelled either "game#name" or the "ctx.game.name" sugar (see ctxDotChainWorksInAnIfCondition).
         CommandAst ast = parser.parse("{if game.name == \"Valorant\"}yes{/if}");
-        var ifStatement = (fr.enimaloc.catapult.chat.command.ast.IfStatement) ast.statements().get(0);
+        var ifStatement = (fr.enimaloc.catapult.chat.command.ast.IfStatement) ast.statements().getFirst();
         assertThat(ifStatement.condition().left())
             .isEqualTo(new PropertyGetExpr(new VarRefExpr("game"), "name"));
     }
@@ -117,7 +117,7 @@ class CommandDslParserTest {
     void parsesServiceCallWithLiteralArgumentAsBareTagShorthand() {
         CommandAst ast = parser.parse("{igdb#getGame(\"Valorant\")}");
         assertThat(ast.statements()).hasSize(1);
-        PrintStatement print = (PrintStatement) ast.statements().get(0);
+        PrintStatement print = (PrintStatement) ast.statements().getFirst();
         ServiceCallExpr call = (ServiceCallExpr) print.expr();
         assertThat(call.namespace()).isEqualTo("igdb");
         assertThat(call.function()).isEqualTo("getGame");
@@ -127,7 +127,7 @@ class CommandDslParserTest {
     @Test
     void parsesServiceCallWithBarePathArgument() {
         CommandAst ast = parser.parse("{steam#getPrice(game#store#steam)}");
-        PrintStatement print = (PrintStatement) ast.statements().get(0);
+        PrintStatement print = (PrintStatement) ast.statements().getFirst();
         ServiceCallExpr call = (ServiceCallExpr) print.expr();
         assertThat(call.args()).containsExactly(new ContextGetExpr("game#store#steam"));
     }
@@ -141,7 +141,7 @@ class CommandDslParserTest {
     @Test
     void parsesServiceCallWithLiteralArgumentContainingComma() {
         CommandAst ast = parser.parse("{igdb#getGame(\"Half-Life, part 2\")}");
-        PrintStatement print = (PrintStatement) ast.statements().get(0);
+        PrintStatement print = (PrintStatement) ast.statements().getFirst();
         ServiceCallExpr call = (ServiceCallExpr) print.expr();
         assertThat(call.args()).containsExactly(new LiteralExpr("Half-Life, part 2", ValueType.STRING));
     }
@@ -185,7 +185,7 @@ class CommandDslParserTest {
         // splitTopLevelArgs must track brace depth, not just quotes — otherwise the inner
         // object's own comma (between b and c) would be mistaken for a top-level separator.
         CommandAst ast = parser.parse("{var outer = {a: {b: 1, c: 2}, d: 3}}");
-        VarDeclStatement decl = (VarDeclStatement) ast.statements().get(0);
+        VarDeclStatement decl = (VarDeclStatement) ast.statements().getFirst();
         ObjectLiteralExpr outer = (ObjectLiteralExpr) decl.init();
         assertThat(outer.properties()).containsOnlyKeys("a", "d");
         ObjectLiteralExpr inner = (ObjectLiteralExpr) outer.properties().get("a");
@@ -205,7 +205,7 @@ class CommandDslParserTest {
     void objectPropertyAccessDoesNotCollideWithLegacyDotPathNormalization() {
         // get(x, "y") is a dedicated 2-arg form, distinct from get(path)'s 1-arg context read.
         CommandAst ast = parser.parse("{msg = get(game, \"store\")}");
-        AssignStatement assign = (AssignStatement) ast.statements().get(0);
+        AssignStatement assign = (AssignStatement) ast.statements().getFirst();
         assertThat(assign.expr()).isEqualTo(new PropertyGetExpr(new VarRefExpr("game"), "store"));
     }
 
@@ -260,14 +260,14 @@ class CommandDslParserTest {
     @Test
     void ctxDotChainWorksInAnIfCondition() {
         CommandAst ast = parser.parse("{if ctx.game.name == \"Valorant\"}yes{/if}");
-        var ifStatement = (fr.enimaloc.catapult.chat.command.ast.IfStatement) ast.statements().get(0);
+        var ifStatement = (fr.enimaloc.catapult.chat.command.ast.IfStatement) ast.statements().getFirst();
         assertThat(ifStatement.condition().left()).isEqualTo(new ContextGetExpr("game#name"));
     }
 
     @Test
     void dotOperatorWorksInsideAServiceCallArgument() {
         CommandAst ast = parser.parse("{igdb#getGame(game.name)}");
-        PrintStatement print = (PrintStatement) ast.statements().get(0);
+        PrintStatement print = (PrintStatement) ast.statements().getFirst();
         ServiceCallExpr call = (ServiceCallExpr) print.expr();
         assertThat(call.args()).containsExactly(new PropertyGetExpr(new VarRefExpr("game"), "name"));
     }

@@ -1,0 +1,32 @@
+<!--/* Form controls the dashboard's settings cards repeat. */-->
+
+<!--/*
+  A grid of switches, one per entry of `items` (CclDto/TwDto: anything with an id()), checked
+  when `checked` contains its id. `label` names the accessor giving its text ("name", "label").
+*/-->
+<div class="settings-switch-grid" th:fragment="switchGrid(items, switchClass, checked, label)">
+    <label th:each="item : ${items}">
+        <mdui-switch th:class="${switchClass}" th:value="${item.id()}"
+                     th:checked="${checked.contains(item.id())}"></mdui-switch>
+        <span th:text="${item.__${label}__()}">label</span>
+    </label>
+</div>
+
+<!--/* A single switch with its translated text; `labelClass` may be null. */-->
+<label th:fragment="labelledSwitch(id, checked, textKey, labelClass)" th:class="${labelClass}">
+    <mdui-switch th:id="${id}" th:checked="${checked}"></mdui-switch>
+    <span th:text="#{${textKey}}">text</span>
+</label>
+
+<!--/*
+  Game search box (wired by channel-settings.js through GameSearch): the visible name, the
+  picked game's id, and the results list, all ids prefixed with `prefix`.
+*/-->
+<th:block th:fragment="gamePicker(prefix, gameId, gameName)">
+    <input type="text" th:id="${prefix} + '-game-input'"
+           th:placeholder="#{channel.bindings.edit.game_placeholder}"
+           th:aria-label="#{channel.bindings.edit.game_placeholder}"
+           th:value="${gameName}"/>
+    <input type="hidden" th:id="${prefix} + '-game-id'" th:value="${gameId}"/>
+    <mdui-list th:id="${prefix} + '-game-results'"></mdui-list>
+</th:block>

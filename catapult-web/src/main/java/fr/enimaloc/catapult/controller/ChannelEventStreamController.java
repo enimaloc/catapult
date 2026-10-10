@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
-import fr.enimaloc.catapult.ws.event.ChannelUpdatedEvent;
+import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
@@ -19,11 +19,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Live updates for /channel/{username} over an SSE stream instead of a WebSocket — same
- * subscribe-by-username / fan-out-on-event shape catapult-api's own ConnectionEventService
- * already uses for its push events. The stream carries a bare "update" event with no
- * payload; the client reacts by re-fetching {@code /spa/channel/{username}} the same way
- * every mutation on this page already does on its own success.
+ * Live updates for /channel/{username} over Server-Sent Events: every {@link ChannelUpdatedEvent}
+ * published for a channel goes to that channel's open streams, named after the event's class
+ * (e.g. {@code GameChangedEvent}) with the event itself as JSON data. channel-events.js patches
+ * the page from it (see visibility.js) instead of re-fetching the fragment.
  */
 @Slf4j
 @RestController

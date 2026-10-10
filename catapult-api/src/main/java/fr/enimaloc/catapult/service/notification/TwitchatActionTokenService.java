@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.TwitchatActionType;
-import fr.enimaloc.catapult.domain.TwitchatActionToken;
-import fr.enimaloc.catapult.repository.TwitchatActionTokenRepository;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatActionToken;
+import fr.enimaloc.catapult.repository.twitchat.TwitchatActionTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;

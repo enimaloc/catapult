@@ -1,17 +1,17 @@
 package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.config.I18nConfig;
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.IgdbGameDetails;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.repository.GameBindingRepository;
-import fr.enimaloc.catapult.service.GameStateService;
-import fr.enimaloc.catapult.service.IgdbGameDetailsService;
-import fr.enimaloc.catapult.service.IgdbService;
-import fr.enimaloc.catapult.service.SteamStoreService;
-import fr.enimaloc.catapult.service.TwLabelService;
-import fr.enimaloc.catapult.service.WidgetTokenService;
+import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.service.account.WidgetTokenService;
+import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.service.tw.TwLabelService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;

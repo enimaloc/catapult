@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.chat;
 
-import fr.enimaloc.catapult.domain.TwDefinition;
+import fr.enimaloc.catapult.domain.tw.TwDefinition;
 import fr.enimaloc.catapult.event.TwDefinitionsChangedEvent;
-import fr.enimaloc.catapult.repository.TwDefinitionRepository;
+import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.experiment.targeting.resolver;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.experiment.targeting.AttributeValue;
 import org.junit.jupiter.api.Test;
 

@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.experiment;
 
-import fr.enimaloc.catapult.domain.ExperimentAssignmentRule.RuleType;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule.RuleType;
 
 @ExperimentSpec(
         key         = "invite-button-placement",
