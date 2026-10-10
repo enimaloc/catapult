@@ -187,6 +187,16 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void saveObsSettings_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/obs").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true,\"host\":\"10.0.0.2\",\"port\":4456,\"password\":null}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveObsSettings("enimaloc", true, "10.0.0.2", 4456, null);
+    }
+
+    @Test
     void saveCclSettings_callsApiServiceWithParsedBody() throws Exception {
         mvc.perform(post("/channel/enimaloc/settings/ccl").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
