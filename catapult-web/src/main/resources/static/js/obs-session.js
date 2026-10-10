@@ -7,6 +7,9 @@
  * Retries with a doubling delay (1s up to 30s) while OBS is unreachable (closed, restarting),
  * but not after a refusal retrying can't fix (wrong password, unsupported rpcVersion): that
  * waits for refresh(), which channel-connections.js calls after saving the OBS settings.
+ *
+ * /me/obs also carries the Twitchat branch picked in the integration settings, handed to
+ * twitchat.js ("auto" when there's none: OBS disabled, or logged out).
  */
 window.CatapultObsSession = (function () {
     const MIN_DELAY = 1000;
@@ -59,6 +62,7 @@ window.CatapultObsSession = (function () {
         const gen = ++generation;
         const next = await fetchConfig();
         if (gen !== generation) return;
+        window.CatapultTwitchat?.configure(next?.twitchatBranch ?? "auto");
         if (next && sameConfig(next, config) && CatapultObs.isConnected()) return;
         clearTimeout(timer);
         delay = MIN_DELAY;

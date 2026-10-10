@@ -45,4 +45,10 @@ document.addEventListener("catapult:render", function () {
     };
     on("obs-connect-btn", "click", () => saveObs(true));
     on("obs-disconnect-btn", "click", () => saveObs(false));
+
+    // Twitchat: the branch rides along /me/obs, which obs-session.js hands to twitchat.js.
+    on("twitchat-branch", "change", async event => {
+        await postJson(`${baseUrl}/settings/twitchat/branch`, { branch: event.currentTarget.value });
+        await window.CatapultObsSession?.refresh();
+    });
 });
