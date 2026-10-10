@@ -1082,6 +1082,11 @@ a[data-link].active {
     max-width: 720px;
 }
 
+/* Twitchat: the branch picker only needs its longest option's width. */
+.connection-card .twitchat-fields mdui-select {
+    max-width: 320px;
+}
+
 /* .connection-card > div caps inputs at 480px; the grid sizes them here instead. */
 .connection-card .obs-fields input {
     max-width: none;

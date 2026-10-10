@@ -208,10 +208,10 @@
 
             <div id="twitchat-status-body">
                 <div class="twitchat-fields">
-                    <mdui-select id="twitchat-branch" th:value="${ch.twitchat().branch()}"
-                                 th:aria-label="#{channel.connections.twitchat}">
-                        <mdui-select-item value="auto" th:text="#{channel.connections.twitchat.auto}">channel.connections.twitchat.auto</mdui-select-item>
-                        <mdui-select-item th:each="branch:${ch.twitchat().supportedBranches()}" th:value="${branch}" th:text="${branch}"></mdui-select-item>
+                    <mdui-select id="twitchat-branch" variant="outlined" th:value="${ch.twitchat().branch()}"
+                                 th:label="#{channel.connections.twitchat.branch}">
+                        <mdui-menu-item value="auto" th:text="#{channel.connections.twitchat.auto}">channel.connections.twitchat.auto</mdui-menu-item>
+                        <mdui-menu-item th:each="branch:${ch.twitchat().supportedBranches()}" th:value="${branch}" th:text="${branch}"></mdui-menu-item>
                     </mdui-select>
                 </div>
             </div>
