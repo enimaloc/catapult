@@ -193,6 +193,9 @@ ${subscriptionMembers}
     };
     readonly ObsError: typeof ObsError;
 
+    /** Logs every frame sent (↑) and received (↓) to the console; remembered across reloads. */
+    debug: boolean;
+
     /** One shortcut per request: requests.getSceneList() is call("GetSceneList"). */
     readonly requests: ObsRequests;
 
