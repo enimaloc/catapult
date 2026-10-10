@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
@@ -355,10 +356,23 @@ class MockDataTest {
             MockData data = session();
             data.saveObsSettings(true, "10.0.0.2", 4456, "pw");
             data.saveObsSettings(true, "10.0.0.2", 4456, null);
-            assertThat(data.obsConnection()).isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw"));
+            assertThat(data.obsConnection()).isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
 
             data.saveObsSettings(false, "10.0.0.2", 4456, null);
             assertThat(data.obsConnection()).isNull();
+        }
+
+        @Test
+        void twitchatBranchIsDetectedUntilOneIsPicked_andOnlyASupportedOne() {
+            MockData data = session();
+            data.saveObsSettings(true, "10.0.0.2", 4456, "pw");
+            assertThat(data.getPage(LIVE.twitchUsername(), null, null).twitchat())
+                    .isEqualTo(new TwitchatData("auto", List.of("stable", "beta")));
+
+            data.saveTwitchatBranch("beta");
+            assertThat(data.getPage(LIVE.twitchUsername(), null, null).twitchat().branch()).isEqualTo("beta");
+            assertThat(data.obsConnection().twitchatBranch()).isEqualTo("beta");
+            assertThatThrownBy(() -> data.saveTwitchatBranch("main")).isInstanceOf(IllegalArgumentException.class);
         }
     }
 

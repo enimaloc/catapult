@@ -185,6 +185,7 @@ describe("channel-connections", () => {
               <input id="obs-port" value="4456">
               <input id="obs-password" value="">
               <button id="obs-connect-btn"></button>
+              <select id="twitchat-branch"><option value="auto">auto</option><option value="beta">beta</option></select>
               <button id="obs-disconnect-btn"></button>
             </div>`);
         render();
@@ -233,6 +234,18 @@ describe("channel-connections", () => {
             ["/channel/enimaloc/settings/obs", { enabled: false, host: "10.0.0.2", port: null, password: "pw" }],
         ]);
         expect(refreshed()).toBe(2);
+    });
+
+    it("saves the Twitchat branch, then has obs-session.js apply it", async () => {
+        window.CatapultObsSession = { refresh: vi.fn(async () => {}) };
+        const select = document.getElementById("twitchat-branch");
+        select.value = "beta";
+        select.dispatchEvent(new Event("change"));
+        await flush();
+
+        expect(posts()).toEqual([["/channel/enimaloc/settings/twitchat/branch", { branch: "beta" }]]);
+        expect(CatapultObsSession.refresh).toHaveBeenCalledOnce();
+        delete window.CatapultObsSession;
     });
 
     it("does nothing outside the integrations tab", () => {

@@ -78,7 +78,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", true, true, true, null,
                 new PagedBindings(0, 1, 2, List.of(overridden, notOverridden)),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, "uuid");
+                null, null, null, null, null, null, null, "uuid");
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
 
         String html = mvc.perform(get("/spa/channel/enimaloc"))
@@ -106,7 +106,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", true, isLive, true, null,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, minecraft, null, "uuid");
+                null, null, null, null, minecraft, null, null, "uuid");
     }
 
     /** Extracts the opening tag text for the first element with the given id. */
@@ -151,7 +151,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", true, true, true, currentGame,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, "uuid");
+                null, null, null, null, null, null, null, "uuid");
     }
 
     @Test

@@ -21,5 +21,6 @@ public record ChannelPageData(
         XboxData xbox,
         MinecraftData minecraft,
         ObsData obs,
+        TwitchatData twitchat,
         String exampleUuid
 ) {}

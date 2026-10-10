@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.domain.twitchat;
 
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 
 import jakarta.persistence.*;
@@ -34,4 +35,8 @@ public class TwitchatWidgetSettings {
 
     @Column(name = "obs_password_encrypted")
     private String obsPasswordEncrypted;
+
+    /** See {@link TwitchatData}. */
+    @Column(name = "twitchat_branch", nullable = false)
+    private String twitchatBranch = TwitchatData.AUTO;
 }
