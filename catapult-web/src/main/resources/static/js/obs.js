@@ -201,7 +201,23 @@ window.CatapultObs = (function () {
         return sha256Base64(await sha256Base64(password + salt) + challenge);
     }
 
+    // Remembered across reloads: the connection opens with the page, before the console can
+    // switch it on. Storage may be unavailable (private mode, blocked site data).
+    const DEBUG_KEY = "catapult.obs.debug";
+    let debug = false;
+    try {
+        debug = localStorage.getItem(DEBUG_KEY) === "true";
+    } catch {
+        // stays off
+    }
+
+    /** Logs a frame when debugging: ↑ sent to OBS, ↓ received from it. */
+    function trace(direction, frame) {
+        if (debug) console.log(`[obs] ${direction} op ${frame.op}`, frame);
+    }
+
     function send(op, d) {
+        trace("↑", { op, d });
         socket.send(JSON.stringify({ op, d }));
     }
 
@@ -290,7 +306,12 @@ window.CatapultObs = (function () {
                         dispatch("catapult:obs:disconnected", { error });
                     }
                 };
-                current.onmessage = (event) => socket === current && obs.onMessage(JSON.parse(event.data));
+                current.onmessage = (event) => {
+                    if (socket !== current) return;
+                    const frame = JSON.parse(event.data);
+                    trace("↓", frame);
+                    obs.onMessage(frame);
+                };
             });
         },
 
@@ -299,6 +320,23 @@ window.CatapultObs = (function () {
          * ObsError telling why (code SessionInvalidated when OBS kicked this client, etc.).
          */
         onDisconnect() {},
+
+        /**
+         * When true, every frame sent to OBS (↑) and received from it (↓) is logged to the
+         * console. Remembered across reloads, so the handshake is logged too.
+         */
+        get debug() {
+            return debug;
+        },
+
+        set debug(enabled) {
+            debug = !!enabled;
+            try {
+                localStorage.setItem(DEBUG_KEY, String(debug));
+            } catch {
+                // only for this page then
+            }
+        },
 
         isConnected() {
             return connected;
