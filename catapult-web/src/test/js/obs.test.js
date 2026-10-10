@@ -2,7 +2,7 @@
  * obs.js against a fake WebSocket: each test drives the server side by hand (Hello, Identified,
  * responses, events, close) and checks what CatapultObs sends and resolves.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, load } from "./helpers.js";
 
 let sockets;
@@ -344,6 +344,40 @@ describe("page events", () => {
         await attempt.catch(() => {});
         CatapultObs.close();
         expect(events).toEqual([]);
+    });
+});
+
+describe("debug", () => {
+    afterEach(() => {
+        localStorage.clear();
+    });
+
+    it("logs every frame with its direction while on", async () => {
+        const log = vi.spyOn(console, "log").mockImplementation(() => {});
+        CatapultObs.debug = true;
+        const socket = await connected();
+        CatapultObs.requests.getSceneList();
+
+        const lines = log.mock.calls.map(([line, frame]) => [line, frame.op]);
+        expect(lines).toEqual([
+            ["[obs] ↓ op 0", 0], ["[obs] ↑ op 1", 1], ["[obs] ↓ op 2", 2], ["[obs] ↑ op 6", 6],
+            ["[obs] ↓ op 7", 7], ["[obs] ↑ op 6", 6],
+        ]);
+        expect(log.mock.calls.at(-1)[1]).toEqual({ op: 6, d: socket.lastSent(6) });
+
+        CatapultObs.debug = false;
+        CatapultObs.requests.getSceneList();
+        expect(log).toHaveBeenCalledTimes(6);
+        log.mockRestore();
+    });
+
+    it("is remembered across reloads", async () => {
+        CatapultObs.debug = true;
+        await load("suggest", "obs");
+        expect(CatapultObs.debug).toBe(true);
+        CatapultObs.debug = false;
+        await load("suggest", "obs");
+        expect(CatapultObs.debug).toBe(false);
     });
 });
 
