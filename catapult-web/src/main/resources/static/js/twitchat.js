@@ -66,8 +66,8 @@ window.CatapultTwitchat = (function () {
         const id = randomId();
         sentIds.add(id);
         if (sentIds.size > MAX_SENT_IDS) sentIds.delete(sentIds.values().next().value);
-        const eventData = data === undefined ? { origin: "twitchat", id, type: action } : { origin: "twitchat", id, type: action, data };
-        return CatapultObs.requests.broadcastCustomEvent({ eventData });
+        // Always a data object, as Twitchat's own clients send: some of its handlers read it unchecked.
+        return CatapultObs.requests.broadcastCustomEvent({ eventData: { origin: "twitchat", id, type: action, data: data ?? {} } });
     }
 
     /** send(), with action names in the errors written by `style` (shortcut or not). */
