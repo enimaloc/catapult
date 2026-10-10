@@ -1,16 +1,16 @@
 package fr.enimaloc.catapult.security;
 
-import fr.enimaloc.catapult.domain.GetterConfig;
-import fr.enimaloc.catapult.domain.OAuthToken;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.domain.UserSettings;
-import fr.enimaloc.catapult.repository.GetterConfigRepository;
-import fr.enimaloc.catapult.repository.OAuthTokenRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.repository.UserSettingsRepository;
-import fr.enimaloc.catapult.service.AdminMigrationService;
-import fr.enimaloc.catapult.service.InviteService;
-import fr.enimaloc.catapult.service.WhitelistService;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
+import fr.enimaloc.catapult.service.access.InviteService;
+import fr.enimaloc.catapult.service.access.WhitelistService;
+import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,6 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
@@ -35,7 +34,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @SuppressWarnings({"unchecked", "rawtypes"})

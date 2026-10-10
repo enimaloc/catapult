@@ -1,11 +1,16 @@
 package fr.enimaloc.catapult.api.userapi;
 
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.IgdbGameDetails;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.repository.GameBindingRepository;
-import fr.enimaloc.catapult.service.*;
+import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.service.account.WidgetTokenService;
+import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.service.tw.TwLabelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -100,29 +105,7 @@ public class UserApiV1Controller {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(buildResponse(user.get(), detected.get(), parseLocale(lang, acceptLanguage)));
-    }
-
-    // "lang" wins when present (it's the mechanism that works from a plain pasted OBS URL, with
-    // no header control); Accept-Language is the fallback for clients that do set headers. A
-    // request with neither, or an unparseable Accept-Language value, gets English — deliberately
-    // not the JVM/server default locale, which would make behavior depend on the deploy
-    // environment instead of being a documented, stable contract.
-    private static Locale parseLocale(String lang, String acceptLanguage) {
-        if (lang != null && !lang.isBlank()) {
-            return Locale.forLanguageTag(lang);
-        }
-        if (acceptLanguage != null && !acceptLanguage.isBlank()) {
-            try {
-                List<Locale.LanguageRange> ranges = Locale.LanguageRange.parse(acceptLanguage);
-                if (!ranges.isEmpty()) {
-                    return Locale.forLanguageTag(ranges.get(0).getRange());
-                }
-            } catch (IllegalArgumentException ignored) {
-                // malformed Accept-Language header — fall through to the default
-            }
-        }
-        return Locale.ENGLISH;
+        return ResponseEntity.ok(buildResponse(user.get(), detected.get(), RequestLocale.parse(lang, acceptLanguage)));
     }
 
     private GameInfoResponse buildResponse(UserAccount user, DetectedGame detected, Locale locale) {
@@ -192,8 +175,8 @@ public class UserApiV1Controller {
         return messageSource.getMessage("game_info.store." + sourceType.name(), null, locale);
     }
 
-    // IGDB's own "steam" website category is unreliable (see extractWebsites in
-    // IgdbGameDetailsService — external_games can overwrite it with a bare app id
+    // IGDB's own "steam" website category is unreliable (see IgdbWebsiteKeys#links —
+    // external_games can overwrite it with a bare app id
     // instead of a URL), so Steam gets a store.steampowered.com URL built directly
     // from the detected app id rather than trusting the cached website map.
     private static String storeUrl(DetectedGame detected, IgdbGameDetails details) {

@@ -1,10 +1,14 @@
 package fr.enimaloc.catapult.experiment;
 
-import fr.enimaloc.catapult.domain.*;
-import fr.enimaloc.catapult.repository.ExperimentOverrideRepository;
-import fr.enimaloc.catapult.repository.ExperimentRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.service.ExperimentService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule;
+import fr.enimaloc.catapult.domain.experiment.ExperimentOverride;
+import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
+import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

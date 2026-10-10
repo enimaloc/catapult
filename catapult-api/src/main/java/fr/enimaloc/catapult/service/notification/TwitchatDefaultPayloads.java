@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.TwitchatActionDefault;
-import fr.enimaloc.catapult.common.dto.TwitchatActionType;
-import fr.enimaloc.catapult.common.dto.TwitchatDefaultPayload;
-import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionDefault;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDefaultPayload;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

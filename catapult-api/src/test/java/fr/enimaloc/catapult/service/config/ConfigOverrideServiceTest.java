@@ -1,12 +1,12 @@
 package fr.enimaloc.catapult.service.config;
 
 import fr.enimaloc.catapult.config.DatabaseOverridePropertySource;
-import fr.enimaloc.catapult.domain.ConfigAudit;
-import fr.enimaloc.catapult.domain.ConfigOverride;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.config.ConfigAudit;
+import fr.enimaloc.catapult.domain.config.ConfigOverride;
 import fr.enimaloc.catapult.event.ConfigOverrideAppliedEvent;
-import fr.enimaloc.catapult.repository.ConfigAuditRepository;
-import fr.enimaloc.catapult.repository.ConfigOverrideRepository;
+import fr.enimaloc.catapult.repository.config.ConfigAuditRepository;
+import fr.enimaloc.catapult.repository.config.ConfigOverrideRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +23,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)

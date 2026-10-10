@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.chat.command.js;
 
 import com.google.protobuf.Timestamp;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.service.IgdbClient;
-import fr.enimaloc.catapult.service.IgdbService;
-import fr.enimaloc.catapult.service.SteamStoreService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.service.igdb.IgdbClient;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,7 +22,7 @@ import proto.Game;
 import proto.Genre;
 import proto.Platform;
 import proto.Website;
-import proto.WebsiteCategoryEnum;
+import proto.WebsiteType;
 
 import java.util.List;
 import java.util.Map;
@@ -32,12 +32,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-@SuppressWarnings({"unchecked", "rawtypes"})
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
+@SuppressWarnings("rawtypes")
 class DefaultChatCommandServiceGatewayTest {
 
     @Mock private IgdbClient igdbClient;
@@ -112,7 +111,7 @@ class DefaultChatCommandServiceGatewayTest {
     @Test
     void igdbExternalPlatformsMergesWebsitesAndExternalGames() {
         Website official = Website.newBuilder()
-            .setCategory(WebsiteCategoryEnum.WEBSITE_OFFICIAL)
+            .setType(WebsiteType.newBuilder().setId(1L).setType("Official Website"))
             .setUrl("https://playvalorant.com")
             .build();
         ExternalGameSource steamSource = ExternalGameSource.newBuilder().setName("Steam").build();
@@ -254,7 +253,7 @@ class DefaultChatCommandServiceGatewayTest {
         var result = gateway.igdbInvolvedCompanies("1234");
         assertThat(result).isPresent();
         assertThat(result.get()).hasSize(1);
-        assertThat(result.get().get(0))
+        assertThat(result.get().getFirst())
             .containsEntry("name", "Riot Games")
             .containsEntry("developer", true)
             .containsEntry("publisher", true)
@@ -266,8 +265,7 @@ class DefaultChatCommandServiceGatewayTest {
     void igdbAgeRatingsReturnsOrganizationAndRatingObjects() {
         proto.AgeRatingOrganization esrb = proto.AgeRatingOrganization.newBuilder().setName("ESRB").build();
         proto.AgeRating ageRating = proto.AgeRating.newBuilder()
-            .setOrganization(esrb)
-            .setRating(proto.AgeRatingRatingEnum.M)
+            .setRatingCategory(proto.AgeRatingCategory.newBuilder().setOrganization(esrb).setRating("M"))
             .build();
         Game details = Game.newBuilder().setId(1234L).addAgeRatings(ageRating).build();
         when(igdbClient.fetchGameDetails("1234", "app-token")).thenReturn(Optional.of(details));

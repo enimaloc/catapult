@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.chat;
 
-import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;

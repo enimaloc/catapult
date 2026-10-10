@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.settings;
 
-import fr.enimaloc.catapult.domain.UserSettings;
+import fr.enimaloc.catapult.domain.account.UserSettings;
 
 import java.util.Set;
 

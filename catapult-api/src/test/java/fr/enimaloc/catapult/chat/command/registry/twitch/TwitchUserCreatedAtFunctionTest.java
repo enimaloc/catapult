@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.chat.command.registry.twitch;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.service.TwitchChatService;
-import fr.enimaloc.catapult.service.TwitchUserProfile;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.service.twitch.TwitchChatService;
+import fr.enimaloc.catapult.service.twitch.TwitchUserProfile;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;

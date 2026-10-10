@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.TwitchatWidgetConfig;
-import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
+import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
-import fr.enimaloc.catapult.service.WidgetTokenService;
+import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

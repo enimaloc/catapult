@@ -34,10 +34,10 @@
         <p class="hint">What Catapult reports as currently running — independent of the binding's Twitch category below.</p>
         <label>Source type
             <select name="detectedSourceType">
-                <option th:each="s : ${sourceTypes}" th:value="${s}" th:text="${s}" th:selected="${s == game.sourceType()}"></option>
+                <option th:each="s : ${sourceTypes}" th:value="${s}" th:text="${s}" th:selected="${game != null and s == game.sourceType()}"></option>
             </select>
         </label>
-        <label>Source name <input type="text" name="detectedSourceName" th:value="${game.sourceName()}"/></label>
+        <label>Source name <input type="text" name="detectedSourceName" th:value="${game?.sourceName()}"/></label>
     </fieldset>
 
     <fieldset>

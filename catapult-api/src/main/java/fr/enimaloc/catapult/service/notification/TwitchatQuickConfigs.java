@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.TwitchatQuickConfig;
-import fr.enimaloc.catapult.common.dto.TwitchatQuickConfigParam;
-import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatQuickConfig;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatQuickConfigParam;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import org.springframework.context.MessageSource;
 
 import java.util.List;
@@ -23,7 +23,7 @@ import java.util.Locale;
  *
  * <p>One pair of entries ("-link" / "-chat") per (event type, action type) combination that
  * {@link TwitchatDefaultPayloads} actually uses, covering the full cross product of
- * {@link TwitchatNotificationEventType} and {@link fr.enimaloc.catapult.common.dto.TwitchatActionType}.
+ * {@link TwitchatNotificationEventType} and {@link fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType}.
  * "-link" delivers the action as a clickable button (Twitchat's "url" actionType); "-chat"
  * delivers it as a chat command carrying the action token as an argument, which — per
  * Twitchat's own actionType support — requires a matching Twitchat trigger the streamer must

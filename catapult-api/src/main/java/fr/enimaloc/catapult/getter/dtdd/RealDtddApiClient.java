@@ -1,0 +1,177 @@
+package fr.enimaloc.catapult.getter.dtdd;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+
+@Slf4j
+@Component
+@Profile("!mock")
+@ConditionalOnBooleanProperty("dtdd.enabled")
+public class RealDtddApiClient implements DtddApiClient {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private final RestClient client;
+    private final DtddApiKeyRotator rotator;
+    private final ExternalApiObservations apiObservations;
+
+    @Autowired
+    public RealDtddApiClient(@Value("${dtdd.api-base-url}") String baseUrl,
+                             RestClient.Builder builder,
+                             DtddApiKeyRotator rotator,
+                             ExternalApiObservations apiObservations) {
+        // Take the Boot-managed builder so the trace-logging customizer +
+        // buffering request factory wired in WebClientConfig apply here too.
+        this(builder.baseUrl(baseUrl).build(), rotator, apiObservations);
+    }
+
+    // visible for tests
+    RealDtddApiClient(RestClient client, DtddApiKeyRotator rotator, ExternalApiObservations apiObservations) {
+        this.client = client;
+        this.rotator = rotator;
+        this.apiObservations = apiObservations;
+    }
+
+    @Override
+    public Optional<List<DtddSearchResult>> search(String query, @Nullable String mediaType) {
+        return apiObservations.observe("dtdd", "search", () ->
+            callWithRetry(key -> client.get()
+                    .uri("/v3/items?q={q}", query)
+                    .header("X-API-KEY", key)
+                    .retrieve()
+                    .body(String.class), this::parseSearch)
+                    .map(list -> list.stream()
+                            .filter(result -> mediaType == null || mediaType.equals(result.mediaType()))
+                            .toList())
+        );
+    }
+
+    @Override
+    public Optional<DtddTopics> fetchTopics(long dtddId) {
+        return apiObservations.observe("dtdd", "fetch_topics", () ->
+            item(dtddId).map(item -> {
+                List<String> yes = new ArrayList<>(), no = new ArrayList<>(), mostly = new ArrayList<>();
+                for (DtddTopicItemStat topicItemStat : item.topicItemStats()) {
+                    if (topicItemStat.yesSum() > topicItemStat.noSum()) yes.add(topicItemStat.topicName());
+                    else if (topicItemStat.yesSum() < topicItemStat.noSum()) no.add(topicItemStat.topicName());
+                    else mostly.add(topicItemStat.topicName());
+                }
+                return new DtddTopics(yes, no, mostly);
+            })
+        );
+    }
+
+    @Override
+    public Optional<DtddItem> item(long dtddId) {
+        return apiObservations.observe("dtdd", "item", () ->
+            callWithRetry(key -> client.get()
+                    .uri("/v3/items/{id}", dtddId)
+                    .header("X-API-KEY", key)
+                    .retrieve()
+                    .body(String.class), this::parseItem)
+        );
+    }
+
+    private <T> Optional<T> callWithRetry(Function<String, String> call, Function<String, T> parser) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            Optional<String> keyOpt = rotator.nextKey();
+            if (keyOpt.isEmpty()) return Optional.empty();
+            String key = keyOpt.get();
+            try {
+                String body = call.apply(key);
+                return Optional.ofNullable(parser.apply(body));
+            } catch (RestClientResponseException e) {
+                HttpStatusCode status = e.getStatusCode();
+                if (status.value() == 404) return Optional.empty();
+                if (status.value() == 429) {
+                    String retryAfter = e.getResponseHeaders() != null
+                            ? e.getResponseHeaders().getFirst("Retry-After") : null;
+                    int seconds = parseRetryAfter(retryAfter);
+                    rotator.onKeyRateLimited(key, seconds);
+                    continue; // retry once
+                }
+                log.warn("DTDD HTTP {}: {}", status.value(), e.getResponseBodyAsString());
+                return Optional.empty();
+            } catch (Exception e) {
+                log.warn("DTDD call failed: {}", e.getMessage());
+                return Optional.empty();
+            }
+        }
+        return Optional.empty();
+    }
+
+    private int parseRetryAfter(String header) {
+        if (header == null || header.isBlank()) return 60;
+        try {
+            return Math.max(1, Integer.parseInt(header.trim()));
+        } catch (NumberFormatException e) {
+            return 60;
+        }
+    }
+
+    private DtddItem parseItem(String body) {
+        try {
+            return MAPPER.readValue(body, DtddItem.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private List<DtddSearchResult> parseSearch(String body) {
+        try {
+            JsonNode root = MAPPER.readTree(body);
+            List<DtddSearchResult> out = new ArrayList<>();
+            for (JsonNode it : root) {
+                out.add(new DtddSearchResult(
+                        it.path("id").asLong(),
+                        it.path("name").asText(null),
+                        "https://www.doesthedogdie.com/media/" + it.path("id").asLong(),
+                        it.path("itemTypeName").asText(null),
+                        it.path("posterUrl").isNull() ? null : it.path("posterUrl").asText(null)
+                ));
+            }
+            return out;
+        } catch (Exception e) {
+            log.warn("DTDD search parse failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private DtddTopics parseTopics(String body) {
+        try {
+            JsonNode root = MAPPER.readTree(body);
+            JsonNode stats = root.path("topicItemStats");
+            List<String> yes = new ArrayList<>(), no = new ArrayList<>(), mostly = new ArrayList<>();
+            for (JsonNode s : stats) {
+                String name = s.path("topic").path("name").asText(null);
+                if (name == null) continue;
+                int y = s.path("yesSum").asInt(0);
+                int n = s.path("noSum").asInt(0);
+                if (y > n) yes.add(name);
+                else if (n > y) no.add(name);
+                else mostly.add(name);
+            }
+            return new DtddTopics(yes, no, mostly);
+        } catch (Exception e) {
+            log.warn("DTDD topics parse failed: {}", e.getMessage());
+            return new DtddTopics(List.of(), List.of(), List.of());
+        }
+    }
+}

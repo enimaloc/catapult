@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.experiment.thymeleaf;
 
-import fr.enimaloc.catapult.domain.ExperimentAssignment;
-import fr.enimaloc.catapult.service.ExperimentService;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
+import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import org.thymeleaf.context.ITemplateContext;
 import org.thymeleaf.engine.AttributeName;
 import org.thymeleaf.model.IProcessableElementTag;

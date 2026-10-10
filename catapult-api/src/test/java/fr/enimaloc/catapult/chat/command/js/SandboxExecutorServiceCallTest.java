@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.chat.command.js;
 
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;

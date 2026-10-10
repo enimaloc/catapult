@@ -1,7 +1,8 @@
 package fr.enimaloc.catapult.chat;
 
+import fr.enimaloc.catapult.domain.tw.TwDefinition;
 import fr.enimaloc.catapult.event.TwDefinitionsChangedEvent;
-import fr.enimaloc.catapult.repository.TwDefinitionRepository;
+import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
@@ -24,7 +25,7 @@ public class TwPlaceholderRegistry {
     @PostConstruct
     public void load() {
         knownPaths = repo.findAllByEnabledTrueOrderBySortOrderAscIdAsc().stream()
-            .map(d -> d.getId()).collect(Collectors.toUnmodifiableSet());
+            .map(TwDefinition::getId).collect(Collectors.toUnmodifiableSet());
         allOptions = repo.findAllByOrderBySortOrderAscIdAsc().stream()
             .map(d -> {
                 Map<String, String> option = new LinkedHashMap<>();

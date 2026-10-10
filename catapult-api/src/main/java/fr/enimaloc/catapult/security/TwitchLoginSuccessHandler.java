@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.security;
 
-import fr.enimaloc.catapult.domain.OAuthToken;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.event.TwitchLoginEvent;
-import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

@@ -1,4 +1,4 @@
-<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.ChannelPageData"*/-->
+<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
 <!--/*@thymesVar id="app" type="fr.enimaloc.catapult.controller.ModelFiller$AppModel"*/-->
 <mdui-tab-panel slot="panel" value="overview" th:with="ch=${channelPage}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
     <div class="section-header">
@@ -68,7 +68,8 @@
         <mdui-button id="dtdd-correct-btn" th:text="#{channel.dtdd.correct}">Corriger</mdui-button>
 
         <div id="dtdd-search-dialog" hidden>
-            <input type="text" id="dtdd-search-input" th:placeholder="#{channel.dtdd.search_placeholder}"/>
+            <input type="text" id="dtdd-search-input" th:placeholder="#{channel.dtdd.search_placeholder}"
+                   th:aria-label="#{channel.dtdd.search_placeholder}"/>
             <mdui-list id="dtdd-search-results"></mdui-list>
         </div>
     </mdui-card>
@@ -81,19 +82,10 @@
                                    th:text="#{channel.bindings.filter.all}">Toutes
             </mdui-segmented-button>
             <mdui-segmented-button data-link
-                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},status='AUTO')}"
-                                   th:classappend="${ch.filterStatus() == 'AUTO'} ? 'filter-active'"
-                                   th:text="#{channel.bindings.filter.auto}">Auto
-            </mdui-segmented-button>
-            <mdui-segmented-button data-link
-                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},status='MANUAL')}"
-                                   th:classappend="${ch.filterStatus() == 'MANUAL'} ? 'filter-active'"
-                                   th:text="#{channel.bindings.filter.manual}">Manuel
-            </mdui-segmented-button>
-            <mdui-segmented-button data-link
-                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},status='INCOMPLETE')}"
-                                   th:classappend="${ch.filterStatus() == 'INCOMPLETE'} ? 'filter-active'"
-                                   th:text="#{channel.bindings.filter.incomplete}">Incomplet
+                                   th:each="status : ${ {'AUTO', 'MANUAL', 'INCOMPLETE'} }"
+                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},status=${status})}"
+                                   th:classappend="${ch.filterStatus() == status} ? 'filter-active'"
+                                   th:text="#{${'channel.bindings.filter.' + #strings.toLowerCase(status)}}">Auto
             </mdui-segmented-button>
             <mdui-segmented-button data-link
                                    th:each="platform : ${app.platforms}"
@@ -137,7 +129,9 @@
                                       class="binding-delete-btn"></mdui-button-icon>
 
                     <div class="binding-edit-panel">
-                        <input type="text" class="binding-edit-game-input" placeholder="Rechercher un jeu…"
+                        <input type="text" class="binding-edit-game-input"
+                               th:placeholder="#{channel.bindings.edit.game_placeholder}"
+                               th:aria-label="#{channel.bindings.edit.game_placeholder}"
                                th:value="${b.twitchGameName()}"/>
                         <input type="hidden" class="binding-edit-game-id" th:value="${b.twitchGameId()}"/>
                         <mdui-list class="binding-edit-game-results"></mdui-list>

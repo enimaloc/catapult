@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.experiment.thymeleaf;
 
-import fr.enimaloc.catapult.service.ExperimentService;
+import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.thymeleaf.dialect.AbstractProcessorDialect;

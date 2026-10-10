@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.config;
 
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
-import fr.enimaloc.catapult.service.AdminCclService;
+import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RedisConfigTest {
 
     @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static final GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {

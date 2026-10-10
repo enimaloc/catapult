@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.Severity;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.common.dto.notification.Severity;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
-import fr.enimaloc.catapult.service.AdminCclService;
+import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

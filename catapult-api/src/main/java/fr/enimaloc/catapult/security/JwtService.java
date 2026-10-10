@@ -1,9 +1,10 @@
 package fr.enimaloc.catapult.security;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -28,7 +29,7 @@ public class JwtService {
     public String generate(CatapultOAuth2User user) {
         UserAccount account = user.getUserAccount();
         List<String> roles = user.getAuthorities().stream()
-                .map(a -> a.getAuthority())
+                .map(GrantedAuthority::getAuthority)
                 .toList();
         return generateForUser(account, roles);
     }

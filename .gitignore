@@ -70,3 +70,4 @@ docker-compose.override.yml
 e2e/package-lock.json
 test-results/
 /catapult-web-old/
+catapult-web/node_modules/

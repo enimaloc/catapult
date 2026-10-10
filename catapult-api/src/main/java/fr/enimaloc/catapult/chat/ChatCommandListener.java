@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.chat;
 
-import fr.enimaloc.catapult.service.ExperimentService;
+import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
