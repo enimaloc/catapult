@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "generate:obs-types": "node scripts/generate-obs-types.mjs"
+    "generate:obs-types": "node scripts/generate-obs-types.mjs",
+    "generate:twitchat-protocol": "node scripts/generate-twitchat-protocol.mjs"
   },
   "devDependencies": {
     "jsdom": "^26.1.0",
