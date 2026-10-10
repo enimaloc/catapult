@@ -148,4 +148,29 @@ class TwitchatWidgetSettingsServiceTest {
         assertThat(result).isSameAs(existing);
         verify(widgetTokenService).regenerate(user);
     }
+
+    @Test
+    void enabledConfig_enabled_returnsTheDecryptedConnection() {
+        TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
+        settings.setEnabled(true);
+        settings.setObsHost("10.0.0.2");
+        settings.setObsPort(4456);
+        settings.setObsPasswordEncrypted("enc");
+        when(repository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(tokenEncryptionService.decrypt("enc")).thenReturn("pw");
+
+        assertThat(service.enabledConfig(user.getId())).contains(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw"));
+    }
+
+    @Test
+    void enabledConfig_disabledOrMissing_isEmpty() {
+        TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
+        settings.setEnabled(false);
+        when(repository.findById(user.getId())).thenReturn(Optional.of(settings));
+        UUID unknown = UUID.randomUUID();
+        when(repository.findById(unknown)).thenReturn(Optional.empty());
+
+        assertThat(service.enabledConfig(user.getId())).isEmpty();
+        assertThat(service.enabledConfig(unknown)).isEmpty();
+    }
 }

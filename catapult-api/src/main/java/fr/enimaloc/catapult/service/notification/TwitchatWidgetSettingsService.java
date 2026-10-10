@@ -10,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class TwitchatWidgetSettingsService {
@@ -51,15 +54,27 @@ public class TwitchatWidgetSettingsService {
         return saved;
     }
 
+    /**
+     * The OBS connection of the user's enabled relay, password decrypted: what the logged-in
+     * user's own browser connects to OBS with. Empty when disabled or never configured.
+     */
+    @Transactional(readOnly = true)
+    public Optional<TwitchatWidgetConfig> enabledConfig(UUID userId) {
+        return repository.findById(userId).filter(TwitchatWidgetSettings::isEnabled).map(this::config);
+    }
+
+    private TwitchatWidgetConfig config(TwitchatWidgetSettings settings) {
+        String password = settings.getObsPasswordEncrypted() == null
+                ? null : tokenEncryptionService.decrypt(settings.getObsPasswordEncrypted());
+        return new TwitchatWidgetConfig(settings.getObsHost(), settings.getObsPort(), password);
+    }
+
     // Pushed live so a widget page already open in a browser tab or OBS browser source picks
     // up host/port/password changes and reconnects without needing a manual reload. Not sent
     // from regenerateToken(): the whole point of regenerating is to cut off any existing
     // session using the old token, so it must NOT be kept alive with fresh values.
     private void publishWidgetConfig(TwitchatWidgetSettings settings) {
-        String password = settings.getObsPasswordEncrypted() == null
-                ? null : tokenEncryptionService.decrypt(settings.getObsPasswordEncrypted());
-        channelEventPublisher.twitchatWidgetSettingsUpdated(settings.getUser().getId(),
-                new TwitchatWidgetConfig(settings.getObsHost(), settings.getObsPort(), password));
+        channelEventPublisher.twitchatWidgetSettingsUpdated(settings.getUser().getId(), config(settings));
     }
 
     @Transactional
