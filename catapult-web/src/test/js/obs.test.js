@@ -50,7 +50,7 @@ async function connected(options = {}, availableRequests) {
 beforeEach(async () => {
     sockets = [];
     vi.stubGlobal("WebSocket", FakeSocket);
-    await load("obs");
+    await load("suggest", "obs");
 });
 
 describe("EventSubscription", () => {
