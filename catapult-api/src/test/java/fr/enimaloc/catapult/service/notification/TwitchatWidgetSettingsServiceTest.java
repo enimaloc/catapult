@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -99,6 +100,34 @@ class TwitchatWidgetSettingsServiceTest {
     }
 
     @Test
+    void newSettings_detectTheTwitchatBranch() {
+        assertThat(new TwitchatWidgetSettings().getTwitchatBranch()).isEqualTo("auto");
+    }
+
+    @Test
+    void updateBranch_savesAndPublishesIt() {
+        TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
+        existing.setUser(user);
+        when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        TwitchatWidgetSettings result = service.updateBranch(user, "beta");
+
+        assertThat(result.getTwitchatBranch()).isEqualTo("beta");
+        ArgumentCaptor<TwitchatWidgetConfig> captor = ArgumentCaptor.forClass(TwitchatWidgetConfig.class);
+        verify(channelEventPublisher).twitchatWidgetSettingsUpdated(eq(user.getId()), captor.capture());
+        assertThat(captor.getValue().twitchatBranch()).isEqualTo("beta");
+    }
+
+    @Test
+    void updateBranch_unknownBranch_rejectedWithoutSaving() {
+        assertThatThrownBy(() -> service.updateBranch(user, "main"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Unknown Twitchat branch main");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void updateSettings_withNullPassword_keepsExistingEncryptedPassword() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);
@@ -159,7 +188,7 @@ class TwitchatWidgetSettingsServiceTest {
         when(repository.findById(user.getId())).thenReturn(Optional.of(settings));
         when(tokenEncryptionService.decrypt("enc")).thenReturn("pw");
 
-        assertThat(service.enabledConfig(user.getId())).contains(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw"));
+        assertThat(service.enabledConfig(user.getId())).contains(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
     }
 
     @Test

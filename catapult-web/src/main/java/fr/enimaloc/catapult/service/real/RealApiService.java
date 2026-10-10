@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
@@ -167,6 +168,11 @@ public class RealApiService implements ApiService {
     public void saveObsSettings(String username, boolean enabled, String host, Integer port, String password) {
         client.postVoid("/api/channels/{username}/settings/obs",
                 new ObsSettingsRequest(enabled, host, port, password), username);
+    }
+
+    @Override
+    public void saveTwitchatBranch(String username, String branch) {
+        client.postVoid("/api/channels/{username}/settings/twitchat/branch", new TwitchatBranchRequest(branch), username);
     }
 
     @Override

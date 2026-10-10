@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
@@ -80,6 +81,7 @@ public class MockData {
     private LinkStateResponse minecraftLink;
     private ObsData obsData;
     private String obsPassword;
+    private String twitchatBranch = TwitchatData.AUTO;
     @Setter
     @Getter
     private boolean botEnabled = true;
@@ -223,7 +225,7 @@ public class MockData {
                 new PagedBindings(0, bindings.isEmpty() ? 0 : 1, bindings.size(), bindings),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
                 status, source, steamData(), hasXboxProvider ? new XboxData(hasXbox) : null, minecraftData(), obsData,
-                EXAMPLE_UUID);
+                obsData == null ? null : TwitchatData.of(twitchatBranch), EXAMPLE_UUID);
     }
 
     private SteamData steamData() {
@@ -350,13 +352,21 @@ public class MockData {
         if (password != null) obsPassword = password;
     }
 
+    /** Mirrors catapult-api: only "auto" or a supported branch. */
+    public void saveTwitchatBranch(String branch) {
+        if (!TwitchatData.isValid(branch)) {
+            throw new IllegalArgumentException("Unknown Twitchat branch " + branch);
+        }
+        twitchatBranch = branch;
+    }
+
     /**
      * What /api/me/obs would answer: null unless OBS is enabled. The presets' "has a password"
      * has no actual password behind it, so the password is null until one is saved.
      */
     public TwitchatWidgetConfig obsConnection() {
         return obsData == null || !obsData.connected() ? null
-                : new TwitchatWidgetConfig(obsData.host(), obsData.port(), obsPassword);
+                : new TwitchatWidgetConfig(obsData.host(), obsData.port(), obsPassword, twitchatBranch);
     }
 
     // --- admin-only mutators: no UI path reaches these, only the mock admin page ----------------

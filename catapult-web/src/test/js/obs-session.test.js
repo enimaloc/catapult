@@ -95,6 +95,29 @@ describe("retries", () => {
     });
 });
 
+describe("twitchat branch", () => {
+    afterEach(() => {
+        delete window.CatapultTwitchat;
+    });
+
+    it("hands the branch of /me/obs to twitchat.js on load and on every refresh", async () => {
+        window.CatapultTwitchat = { configure: vi.fn() };
+        await start(response(200, { ...CONFIG, twitchatBranch: "beta" }));
+        expect(CatapultTwitchat.configure).toHaveBeenLastCalledWith("beta");
+
+        fetch.mockResolvedValue(response(200, { ...CONFIG, twitchatBranch: "auto" }));
+        await CatapultObsSession.refresh();
+        expect(CatapultTwitchat.configure).toHaveBeenLastCalledWith("auto");
+        expect(connects).toHaveLength(1);
+    });
+
+    it("detects it while OBS is disabled", async () => {
+        window.CatapultTwitchat = { configure: vi.fn() };
+        await start(response(204));
+        expect(CatapultTwitchat.configure).toHaveBeenCalledWith("auto");
+    });
+});
+
 describe("refresh", () => {
     it("keeps a live connection to unchanged settings", async () => {
         await start(response(200, CONFIG));

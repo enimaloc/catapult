@@ -197,6 +197,16 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void saveTwitchatBranch_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/twitchat/branch").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"branch\":\"beta\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveTwitchatBranch("enimaloc", "beta");
+    }
+
+    @Test
     void saveCclSettings_callsApiServiceWithParsedBody() throws Exception {
         mvc.perform(post("/channel/enimaloc/settings/ccl").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
