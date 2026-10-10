@@ -122,6 +122,32 @@ describe("call", () => {
     });
 });
 
+describe("requests", () => {
+    it("turns each method into the request of the same name", async () => {
+        const socket = await connected();
+        const scenes = CatapultObs.requests.getSceneList();
+        expect(socket.lastSent(6)).toEqual({ requestType: "GetSceneList", requestId: expect.any(String) });
+        answer(socket, 7, { requestType: "GetSceneList", requestStatus: { result: true, code: 100 }, responseData: { scenes: [] } });
+        await expect(scenes).resolves.toEqual({ scenes: [] });
+
+        CatapultObs.requests.SetCurrentProgramScene({ sceneName: "A" });
+        expect(socket.lastSent(6)).toMatchObject({ requestType: "SetCurrentProgramScene", requestData: { sceneName: "A" } });
+    });
+
+    it("reuses the same function per name", () => {
+        expect(CatapultObs.requests.getVersion).toBe(CatapultObs.requests.getVersion);
+    });
+
+    it("isn't a thenable and has no shortcut for non-request names", async () => {
+        await connected();
+        expect(CatapultObs.requests.then).toBeUndefined();
+        expect(CatapultObs.requests.toJSON).toBeUndefined();
+        expect(CatapultObs.requests[Symbol.iterator]).toBeUndefined();
+        await expect(Promise.resolve(CatapultObs.requests)).resolves.toBe(CatapultObs.requests);
+        expect(last().lastSent(6)).toBeUndefined();
+    });
+});
+
 describe("callBatch", () => {
     it("sends the options and maps each result without rejecting on a failed one", async () => {
         const socket = await connected();

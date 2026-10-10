@@ -341,5 +341,27 @@ window.CatapultObs = (function () {
         },
     };
 
+    // Read on any object by await, JSON.stringify, test matchers…: never OBS request names, and
+    // turning them into requests would make `await obs.requests` send a "Then" request.
+    const NOT_REQUESTS = new Set(["then", "catch", "finally", "toJSON", "constructor", "asymmetricMatch", "nodeType", "$$typeof"]);
+    const shortcuts = new Map();
+
+    /**
+     * Shortcuts for every request: requests.getSceneList() is call("GetSceneList"), and
+     * requests.setCurrentProgramScene({ sceneName }) is call("SetCurrentProgramScene", { sceneName }).
+     * Built on access, so any request OBS knows works without being listed here; an unknown one
+     * rejects with OBS's UnknownRequestType status (204).
+     */
+    obs.requests = new Proxy({}, {
+        get(_, name) {
+            if (typeof name !== "string" || NOT_REQUESTS.has(name)) return undefined;
+            if (!shortcuts.has(name)) {
+                const requestType = name[0].toUpperCase() + name.slice(1);
+                shortcuts.set(name, (requestData) => obs.call(requestType, requestData));
+            }
+            return shortcuts.get(name);
+        },
+    });
+
     return obs;
 })();
