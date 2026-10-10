@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.channel.DisconnectRequest;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
@@ -183,6 +184,17 @@ public class ApiChannelActionsController {
 
         UserAccount channelUser = userResolver.ownChannel(username, jwt);
         twitchatWidgetSettingsService.updateSettings(channelUser, body.enabled(), body.obsHost(), body.obsPort(), body.obsPassword());
+    }
+
+    @PostMapping("/settings/obs")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveObsSettings(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody ObsSettingsRequest body) {
+
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
+        twitchatWidgetSettingsService.updateSettings(channelUser, body.enabled(), body.host(), body.port(), body.password());
     }
 
     @PostMapping("/settings/twitchat/regenerate")
