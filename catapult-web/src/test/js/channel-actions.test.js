@@ -185,6 +185,8 @@ describe("channel-connections", () => {
               <input id="obs-port" value="4456">
               <input id="obs-password" value="">
               <button id="obs-connect-btn"></button>
+              <mdui-chip class="twitchat-connected-chip hidden"></mdui-chip>
+              <mdui-chip class="twitchat-disconnected-chip"></mdui-chip>
               <select id="twitchat-branch"><option value="auto">auto</option><option value="beta">beta</option></select>
               <button id="obs-disconnect-btn"></button>
             </div>`);
@@ -246,6 +248,19 @@ describe("channel-connections", () => {
         expect(posts()).toEqual([["/channel/enimaloc/settings/twitchat/branch", { branch: "beta" }]]);
         expect(CatapultObsSession.refresh).toHaveBeenCalledOnce();
         delete window.CatapultObsSession;
+    });
+
+    it("shows whether a Twitchat answers, as twitchat.js announces it", () => {
+        const connectedChip = document.querySelector(".twitchat-connected-chip");
+        const disconnectedChip = document.querySelector(".twitchat-disconnected-chip");
+        window.CatapultTwitchat = { isTwitchatConnected: () => true };
+        document.dispatchEvent(new CustomEvent("catapult:twitchat:presence", { detail: { connected: true } }));
+        expect([connectedChip.classList.contains("hidden"), disconnectedChip.classList.contains("hidden")]).toEqual([false, true]);
+
+        window.CatapultTwitchat = { isTwitchatConnected: () => false };
+        render();
+        expect([connectedChip.classList.contains("hidden"), disconnectedChip.classList.contains("hidden")]).toEqual([true, false]);
+        delete window.CatapultTwitchat;
     });
 
     it("does nothing outside the integrations tab", () => {

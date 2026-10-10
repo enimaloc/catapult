@@ -4,8 +4,19 @@
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
  */
+
+// Twitchat's chips: whether a Twitchat answers is only known here, by twitchat.js through OBS.
+function showTwitchatPresence() {
+    const connected = window.CatapultTwitchat?.isTwitchatConnected() ?? false;
+    document.querySelector(".twitchat-connected-chip")?.classList.toggle("hidden", !connected);
+    document.querySelector(".twitchat-disconnected-chip")?.classList.toggle("hidden", connected);
+}
+
+document.addEventListener("catapult:twitchat:presence", showTwitchatPresence);
+
 document.addEventListener("catapult:render", function () {
     if (!document.getElementById("channel-connections")) return;
+    showTwitchatPresence();
 
     const { on, postJson, postAndRefresh } = CatapultChannel;
     const baseUrl = CatapultChannel.baseUrl();

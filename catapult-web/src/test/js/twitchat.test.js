@@ -157,7 +157,64 @@ describe("protocols", () => {
         expect(CatapultTwitchat.protocol).toBe("beta");
         expect(() => CatapultTwitchat.useProtocol("nightly")).toThrow("Unknown Twitchat protocol nightly");
         await CatapultTwitchat.actions.setGreetFeedReadAll();
-        expect(broadcasts().map(({ type }) => type)).toEqual(["SET_GREET_FEED_READ_ALL"]);
+        // Pinged all the same on reconnecting, to know whether a Twitchat is there.
+        expect(broadcasts().map(({ type }) => type)).toEqual(["GET_COLS_COUNT", "GET_GLOBAL_STATES", "SET_GREET_FEED_READ_ALL"]);
+    });
+});
+
+describe("presence", () => {
+    let announced;
+
+    beforeEach(() => {
+        announced = [];
+        document.addEventListener("catapult:twitchat:presence", (event) => announced.push(event.detail.connected));
+    });
+
+    it("is connected once Twitchat sends an event, not when another client sends an action", () => {
+        twitchatSends("CHAT_FEED_PAUSE");
+        expect(CatapultTwitchat.isTwitchatConnected()).toBe(false);
+
+        twitchatSends("ON_TWITCHAT_READY");
+        twitchatSends("FOLLOW", {});
+        expect(CatapultTwitchat.isTwitchatConnected()).toBe(true);
+        expect(announced).toEqual([true]);
+    });
+
+    it("pings Twitchat when OBS connects", async () => {
+        document.dispatchEvent(new CustomEvent("catapult:obs:connected"));
+        await twitchatAnswersProbe("beta");
+        await vi.advanceTimersByTimeAsync(0);
+        expect(CatapultTwitchat.isTwitchatConnected()).toBe(true);
+        expect(CatapultTwitchat.protocol).toBe("beta");
+    });
+
+    it("is disconnected when OBS connects without a Twitchat answering", async () => {
+        twitchatSends("TWITCHAT_READY");
+        document.dispatchEvent(new CustomEvent("catapult:obs:connected"));
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(CatapultTwitchat.isTwitchatConnected()).toBe(false);
+        expect(announced).toEqual([true, false]);
+    });
+
+    it("pings a quiet Twitchat, and is disconnected once it stops answering", async () => {
+        twitchatSends("TWITCHAT_READY");
+        await vi.advanceTimersByTimeAsync(20000);
+        expect(broadcasts()).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(20000);
+        expect(broadcasts().map(({ type }) => type)).toEqual(["GET_COLS_COUNT", "GET_GLOBAL_STATES"]);
+        twitchatSends("SET_COLS_COUNT", {});
+        await vi.advanceTimersByTimeAsync(0);
+        expect(CatapultTwitchat.isTwitchatConnected()).toBe(true);
+
+        await vi.advanceTimersByTimeAsync(40000 + 3000);
+        expect(CatapultTwitchat.isTwitchatConnected()).toBe(false);
+    });
+
+    it("is disconnected with OBS", () => {
+        twitchatSends("TWITCHAT_READY");
+        document.dispatchEvent(new CustomEvent("catapult:obs:disconnected"));
+        expect(CatapultTwitchat.isTwitchatConnected()).toBe(false);
     });
 });
 
