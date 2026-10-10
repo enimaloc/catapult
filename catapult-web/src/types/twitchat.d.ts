@@ -3196,8 +3196,16 @@ interface CatapultTwitchatApi {
     /** One shortcut per action: actions.chatFeedPause() is send("CHAT_FEED_PAUSE"). */
     readonly actions: TwitchatActions;
 
+    /**
+     * When true, every message sent to Twitchat (↑) and received through OBS (↓) is logged to
+     * the console. Remembered across reloads.
+     */
+    debug: boolean;
+
     /** Whether Twitchat can be reached, i.e. the page is connected to OBS. */
     isConnected(): boolean;
+    /** Whether a Twitchat answers on the other end of OBS. */
+    isTwitchatConnected(): boolean;
     /** Asks Twitchat which protocol it speaks; resolves with it, null without an answer. */
     detectProtocol(options?: TwitchatRequestOptions): Promise<TwitchatProtocolName | null>;
     /** Forces the protocol, detection aside. */
