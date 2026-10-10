@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 
 public interface ApiService {
     TokenResponse exchangeCode(String code);
@@ -30,6 +31,8 @@ public interface ApiService {
     void minecraftEnroll(String username, String name);
     void minecraftSync(String username);
     void minecraftDisconnect(String username);
+    /** The logged-in user's OBS connection; null when logged out or OBS isn't enabled. */
+    TwitchatWidgetConfig obsConnection();
     void saveObsSettings(String username, boolean enabled, String host, Integer port, String password);
     void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
     void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws);

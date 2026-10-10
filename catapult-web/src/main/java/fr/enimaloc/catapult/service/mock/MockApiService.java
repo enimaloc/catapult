@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
 import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
@@ -231,6 +232,13 @@ public class MockApiService implements ApiService {
         log.trace("minecraftDisconnect({})", username);
         currentData().minecraftDisconnect();
         eventPublisher.publishEvent(new MinecraftDisconnectedEvent(username));
+    }
+
+    @Override
+    public TwitchatWidgetConfig obsConnection() {
+        log.trace("obsConnection()");
+        MockData current = currentData();
+        return current == null ? null : current.obsConnection();
     }
 
     @Override
