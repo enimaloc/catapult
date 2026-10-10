@@ -321,6 +321,40 @@ describe("events", () => {
     });
 });
 
+describe("debug", () => {
+    beforeEach(() => CatapultTwitchat.useProtocol("stable"));
+
+    afterEach(() => {
+        localStorage.clear();
+    });
+
+    it("logs every message with its direction while on, but not this page's echoes", async () => {
+        CatapultTwitchat.debug = true;
+        await CatapultTwitchat.actions.chatFeedPause();
+        twitchatSends("CHAT_FEED_PAUSE", undefined, broadcasts()[0].id);
+        twitchatSends("FOLLOW", { user: "a" }, "e1");
+
+        const lines = console.log.mock.calls.filter(([line]) => /[↑↓]/.test(line));
+        expect(lines).toEqual([
+            ["[twitchat] ↑ CHAT_FEED_PAUSE", { origin: "twitchat", id: broadcasts()[0].id, type: "CHAT_FEED_PAUSE", data: {} }],
+            ["[twitchat] ↓ FOLLOW", { origin: "twitchat", id: "e1", type: "FOLLOW", data: { user: "a" } }],
+        ]);
+
+        CatapultTwitchat.debug = false;
+        twitchatSends("FOLLOW", {});
+        expect(console.log.mock.calls.filter(([line]) => /[↑↓]/.test(line))).toHaveLength(2);
+    });
+
+    it("is remembered across reloads", async () => {
+        CatapultTwitchat.debug = true;
+        await load("suggest", "twitchat-protocol", "twitchat");
+        expect(CatapultTwitchat.debug).toBe(true);
+        CatapultTwitchat.debug = false;
+        await load("suggest", "twitchat-protocol", "twitchat");
+        expect(CatapultTwitchat.debug).toBe(false);
+    });
+});
+
 describe("relay", () => {
     beforeEach(() => CatapultTwitchat.useProtocol("stable"));
 
