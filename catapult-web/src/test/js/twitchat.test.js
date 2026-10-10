@@ -72,6 +72,13 @@ describe("actions", () => {
         ]);
     });
 
+    it("works without crypto.randomUUID, as on a page served over plain HTTP", async () => {
+        const realCrypto = globalThis.crypto;
+        vi.stubGlobal("crypto", { getRandomValues: (array) => realCrypto.getRandomValues(array) });
+        await CatapultTwitchat.actions.chatFeedPause();
+        expect(broadcasts()[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    });
+
     it("resolves a get action with the data of Twitchat's answer", async () => {
         const triggers = CatapultTwitchat.actions.triggersGetAll();
         await vi.advanceTimersByTimeAsync(0);
