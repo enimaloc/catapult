@@ -234,6 +234,12 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public void saveObsSettings(String username, boolean enabled, String host, Integer port, String password) {
+        log.trace("saveObsSettings({}, {}, {}, {})", username, enabled, host, port);
+        currentData().saveObsSettings(enabled, host, port, password);
+    }
+
+    @Override
     public void saveCclSettings(String username, boolean enabled, Set<String> blockedCcls) {
         log.trace("saveCclSettings({}, {}, {})", username, enabled, blockedCcls);
         currentData().saveCclSettings(enabled, blockedCcls);

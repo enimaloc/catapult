@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.mock;
 
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
@@ -214,6 +215,14 @@ class MockApiServiceTest {
         assertThat(data.getMinecraftLink()).isEqualTo(new LinkStateResponse("NONE", null, null));
         assertThat(events).containsExactly(new MinecraftEnrollEvent(username, "PENDING", "Steve"),
                 new MinecraftSyncEvent(username, "ACCEPTED", "Steve"), new MinecraftDisconnectedEvent(username));
+    }
+
+    @Test
+    void obsSettings_areSavedWithoutEvents() {
+        service.saveObsSettings(username, false, "10.0.0.2", 4456, null);
+
+        assertThat(data.getPage(username, null, null).obs()).isEqualTo(new ObsData(false, "10.0.0.2", 4456, true));
+        assertThat(events).isEmpty();
     }
 
     @Test

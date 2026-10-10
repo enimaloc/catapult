@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
@@ -147,6 +148,12 @@ public class ChannelActionsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void minecraftDisconnect(@PathVariable String username) {
         apiService.minecraftDisconnect(username);
+    }
+
+    @PostMapping("/channel/{username}/settings/obs")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveObsSettings(@PathVariable String username, @RequestBody ObsSettingsRequest body) {
+        apiService.saveObsSettings(username, body.enabled(), body.host(), body.port(), body.password());
     }
 
     @PostMapping("/channel/{username}/settings/ccl")

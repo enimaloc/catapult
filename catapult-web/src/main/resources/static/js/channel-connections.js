@@ -1,5 +1,5 @@
 /**
- * Handlers for the Steam/Minecraft connection cards. Both cards' elements are all
+ * Handlers for the Steam/Minecraft/OBS connection cards. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
@@ -29,4 +29,17 @@ document.addEventListener("catapult:render", function () {
         postJson(`${baseUrl}/minecraft/enroll`, { name: value("minecraft-name-input") }));
     on("minecraft-check-btn", "click", () => postJson(`${baseUrl}/minecraft/sync`, {}));
     on("minecraft-disconnect-btn", "click", () => postJson(`${baseUrl}/minecraft/disconnect`, {}));
+
+    // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.
+    // An empty password field means "keep the stored one" (it's never sent back to the page),
+    // and blank host/port fall back to catapult-api's defaults. No SSE event covers OBS, hence
+    // the refresh to flip the chips and buttons.
+    const saveObs = enabled => postAndRefresh(`${baseUrl}/settings/obs`, {
+        enabled,
+        host: value("obs-host"),
+        port: value("obs-port") === "" ? null : Number(value("obs-port")),
+        password: value("obs-password") === "" ? null : value("obs-password"),
+    });
+    on("obs-connect-btn", "click", () => saveObs(true));
+    on("obs-disconnect-btn", "click", () => saveObs(false));
 });

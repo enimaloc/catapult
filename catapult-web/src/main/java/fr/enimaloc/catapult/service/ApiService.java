@@ -30,6 +30,7 @@ public interface ApiService {
     void minecraftEnroll(String username, String name);
     void minecraftSync(String username);
     void minecraftDisconnect(String username);
+    void saveObsSettings(String username, boolean enabled, String host, Integer port, String password);
     void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
     void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws);
     UserSettingsDto channelSettings(String username);
