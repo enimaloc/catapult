@@ -222,6 +222,14 @@ interface CatapultObsSessionApi {
     refresh(): Promise<void>;
 }
 
+/** Fired on document by obs.js. */
+interface DocumentEventMap {
+    /** The connection is ready for requests (connect() resolved). */
+    "catapult:obs:connected": CustomEvent<{ info: ObsInfo }>;
+    /** A ready connection ended, close() included; failed attempts don't fire it. */
+    "catapult:obs:disconnected": CustomEvent<{ error: ObsError }>;
+}
+
 declare var CatapultObs: CatapultObsApi;
 declare var CatapultObsSession: CatapultObsSessionApi;
 `;

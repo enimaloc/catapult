@@ -204,6 +204,15 @@ window.CatapultObs = (function () {
         identifiedWaiters = [];
     }
 
+    /**
+     * Page-wide connection state, for scripts that don't own the connection (obs-session.js
+     * does): "catapult:obs:connected" ({ info }) once connect() resolved, ready for requests,
+     * "catapult:obs:disconnected" ({ error }) when that connection ended, close() included.
+     */
+    function dispatch(type, detail) {
+        document.dispatchEvent(new CustomEvent(type, { detail }));
+    }
+
     function emit(eventType, event) {
         listeners.get(eventType)?.forEach((handler) => handler(event.eventData ?? {}, event));
     }
@@ -258,7 +267,10 @@ window.CatapultObs = (function () {
                     connected = false;
                     settle(false, error);
                     failPending(error);
-                    if (wasConnected) obs.onDisconnect(error);
+                    if (wasConnected) {
+                        obs.onDisconnect(error);
+                        dispatch("catapult:obs:disconnected", { error });
+                    }
                 };
                 current.onmessage = (event) => socket === current && obs.onMessage(JSON.parse(event.data));
             });
@@ -320,6 +332,7 @@ window.CatapultObs = (function () {
                         if (socket !== current) return;
                     }
                     settle(true, info);
+                    dispatch("catapult:obs:connected", { info });
                     break;
                 }
                 case OpCode.Event:
@@ -415,12 +428,14 @@ window.CatapultObs = (function () {
         close() {
             if (!socket) return;
             const closing = socket;
+            const wasConnected = connected;
             socket = null;
             connected = false;
             const error = new ObsError("Connection closed", { code: 1000 });
             settle(false, error);
             failPending(error);
             closing.close(1000);
+            if (wasConnected) dispatch("catapult:obs:disconnected", { error });
         },
     };
 
