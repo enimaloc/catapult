@@ -54,7 +54,7 @@ class IndexControllerTest {
                 "enimaloc", true, true, true, null,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), java.util.Set.of(), List.of(), java.util.Set.of(),
-                null, null, null, null, null, null, "uuid");
+                null, null, null, null, null, null, null, "uuid");
         lenient().when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
         lenient().when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
                 false, java.util.Set.of(), null, null, java.util.Set.of(), false, false, false,
@@ -87,7 +87,7 @@ class IndexControllerTest {
                 "enimaloc", true, true, true, null,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), java.util.Set.of(), List.of(), java.util.Set.of(),
-                null, null, null, null, null, null, "uuid");
+                null, null, null, null, null, null, null, "uuid");
         when(apiService.channelPage(org.mockito.ArgumentMatchers.eq("enimaloc"), anyInt(), any(), any()))
                 .thenReturn(data);
 
@@ -103,7 +103,7 @@ class IndexControllerTest {
                 "enimaloc", true, true, true, null,
                 new PagedBindings(2, 5, 90, List.of()),
                 List.of(), java.util.Set.of(), List.of(), java.util.Set.of(),
-                "AUTO", null, null, null, null, null, "uuid");
+                "AUTO", null, null, null, null, null, null, "uuid");
         when(apiService.channelPage("enimaloc", 2, "AUTO", null)).thenReturn(data);
 
         mvc.perform(get("/channel/enimaloc").param("page", "2").param("status", "AUTO"))
@@ -125,7 +125,7 @@ class IndexControllerTest {
                 "enimaloc", false, true, true, null,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), java.util.Set.of(), List.of(), java.util.Set.of(),
-                null, null, null, null, null, null, "uuid");
+                null, null, null, null, null, null, null, "uuid");
         when(apiService.channelPage(org.mockito.ArgumentMatchers.eq("enimaloc"), anyInt(), any(), any()))
                 .thenReturn(data);
 

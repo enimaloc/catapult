@@ -124,9 +124,9 @@ class RealApiServiceTest {
 
     @Test
     void obsConnection() {
-        respond(HttpMethod.GET, "/api/me/obs", "{\"obsHost\":\"10.0.0.2\",\"obsPort\":4456,\"obsPassword\":\"pw\"}");
+        respond(HttpMethod.GET, "/api/me/obs", "{\"obsHost\":\"10.0.0.2\",\"obsPort\":4456,\"obsPassword\":\"pw\",\"twitchatBranch\":\"auto\"}");
 
-        assertThat(service.obsConnection()).isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw"));
+        assertThat(service.obsConnection()).isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
     }
 
     @Test
@@ -253,6 +253,12 @@ class RealApiServiceTest {
         expectPost("/api/channels/enimaloc/settings/obs",
                 "{\"enabled\":true,\"host\":\"10.0.0.2\",\"port\":4456,\"password\":\"pw\"}");
         service.saveObsSettings("enimaloc", true, "10.0.0.2", 4456, "pw");
+    }
+
+    @Test
+    void saveTwitchatBranch() {
+        expectPost("/api/channels/enimaloc/settings/twitchat/branch", "{\"branch\":\"beta\"}");
+        service.saveTwitchatBranch("enimaloc", "beta");
     }
 
     @Test

@@ -34,7 +34,7 @@ class ApiMeObsControllerTest {
     @Test
     void enabled_returnsTheConnectionWithItsPassword() throws Exception {
         when(twitchatWidgetSettingsService.enabledConfig(userId))
-                .thenReturn(Optional.of(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw")));
+                .thenReturn(Optional.of(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto")));
 
         mvc.perform(get("/api/me/obs").with(jwt().jwt(j -> j.subject(userId.toString()))))
                 .andExpect(status().isOk())

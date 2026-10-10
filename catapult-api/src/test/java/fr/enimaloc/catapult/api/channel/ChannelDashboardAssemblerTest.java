@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.StatusData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
@@ -143,6 +144,7 @@ class ChannelDashboardAssemblerTest {
         obs.setEnabled(true);
         obs.setObsHost("10.0.0.2");
         obs.setObsPort(4456);
+        obs.setTwitchatBranch("beta");
         when(twitchat.getOrCreate(owner)).thenReturn(obs);
     }
 
@@ -170,6 +172,7 @@ class ChannelDashboardAssemblerTest {
             assertThat(page.blockedCcls()).containsExactly("Gore");
             assertThat(page.blockedTws()).containsExactly("spiders");
             assertThat(page.obs()).isEqualTo(new ObsData(true, "10.0.0.2", 4456, false));
+            assertThat(page.twitchat()).isEqualTo(new TwitchatData("beta", List.of("stable", "beta")));
             assertThat(page.minecraft()).isEqualTo(new MinecraftData("NONE", null, null));
         }
 
@@ -182,6 +185,7 @@ class ChannelDashboardAssemblerTest {
             assertThat(page.isOwner()).isFalse();
             assertThat(page.minecraft()).isNull();
             assertThat(page.obs()).isNull();
+            assertThat(page.twitchat()).isNull();
             assertThat(page.blockedCcls()).isEmpty();
             verifyNoInteractions(minecraft, twitchat);
         }

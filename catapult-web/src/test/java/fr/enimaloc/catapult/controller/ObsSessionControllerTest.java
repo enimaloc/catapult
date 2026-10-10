@@ -25,7 +25,7 @@ class ObsSessionControllerTest {
 
     @Test
     void enabled_returnsTheConnectionUncached() throws Exception {
-        when(apiService.obsConnection()).thenReturn(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw"));
+        when(apiService.obsConnection()).thenReturn(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
 
         mvc.perform(get("/me/obs"))
                 .andExpect(status().isOk())

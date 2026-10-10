@@ -197,5 +197,24 @@
                 </mdui-button>
             </div>
         </mdui-card>
+        <mdui-card th:if="${ch.twitchat() != null}" class="connection-card" variant="outlined" data-conn="twitchat">
+            <span th:text="#{channel.connections.twitchat}">channel.connections.twitchat</span>
+            <mdui-chip class="obs-connected-chip" th:classappend="${!ch.obs().connected()} ? 'hidden'"
+                       th:text="#{channel.connections.connected}">Connecté
+            </mdui-chip>
+            <mdui-chip class="obs-not-connected-chip" th:classappend="${ch.obs().connected()} ? 'hidden'"
+                       th:text="#{channel.connections.not_connected}">Non connecté
+            </mdui-chip>
+
+            <div id="twitchat-status-body">
+                <div class="twitchat-fields">
+                    <mdui-select id="twitchat-branch" th:value="${ch.twitchat().branch()}"
+                                 th:aria-label="#{channel.connections.twitchat}">
+                        <mdui-select-item value="auto" th:text="#{channel.connections.twitchat.auto}">channel.connections.twitchat.auto</mdui-select-item>
+                        <mdui-select-item th:each="branch:${ch.twitchat().supportedBranches()}" th:value="${branch}" th:text="${branch}"></mdui-select-item>
+                    </mdui-select>
+                </div>
+            </div>
+        </mdui-card>
     </div>
 </mdui-tab-panel>

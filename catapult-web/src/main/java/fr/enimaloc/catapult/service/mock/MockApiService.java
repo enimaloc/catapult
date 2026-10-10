@@ -248,6 +248,12 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public void saveTwitchatBranch(String username, String branch) {
+        log.trace("saveTwitchatBranch({}, {})", username, branch);
+        currentData().saveTwitchatBranch(branch);
+    }
+
+    @Override
     public void saveCclSettings(String username, boolean enabled, Set<String> blockedCcls) {
         log.trace("saveCclSettings({}, {}, {})", username, enabled, blockedCcls);
         currentData().saveCclSettings(enabled, blockedCcls);

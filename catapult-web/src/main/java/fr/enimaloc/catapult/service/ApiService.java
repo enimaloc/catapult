@@ -34,6 +34,8 @@ public interface ApiService {
     /** The logged-in user's OBS connection; null when logged out or OBS isn't enabled. */
     TwitchatWidgetConfig obsConnection();
     void saveObsSettings(String username, boolean enabled, String host, Integer port, String password);
+    /** "auto" or one of TwitchatData.SUPPORTED_BRANCHES. */
+    void saveTwitchatBranch(String username, String branch);
     void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
     void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws);
     UserSettingsDto channelSettings(String username);

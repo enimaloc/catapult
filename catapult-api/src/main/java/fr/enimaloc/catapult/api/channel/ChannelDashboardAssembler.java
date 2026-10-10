@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.StatusData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
@@ -126,6 +127,7 @@ public class ChannelDashboardAssembler {
                 xboxEnabled ? new XboxData(hasXboxToken(channel)) : null,
                 owner ? minecraftData(channel) : null,
                 owner ? obsData(channel) : null,
+                owner ? twitchatData(channel) : null,
                 exampleUuid(channel, detected));
     }
 
@@ -189,6 +191,11 @@ public class ChannelDashboardAssembler {
         var settings = twitchatWidgetSettingsService.getOrCreate(channel);
         return new ObsData(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
                 settings.getObsPasswordEncrypted() != null);
+    }
+
+    /** The Twitchat API the channel's pages speak, from the same settings row as obsData(). */
+    private TwitchatData twitchatData(UserAccount channel) {
+        return TwitchatData.of(twitchatWidgetSettingsService.getOrCreate(channel).getTwitchatBranch());
     }
 
     /**

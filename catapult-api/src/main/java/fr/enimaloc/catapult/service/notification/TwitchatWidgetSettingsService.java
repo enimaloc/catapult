@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
@@ -55,6 +56,23 @@ public class TwitchatWidgetSettingsService {
     }
 
     /**
+     * Sets the Twitchat API the user's pages speak, pushed live like the OBS settings.
+     *
+     * @throws IllegalArgumentException when not one of {@link TwitchatData}'s
+     */
+    @Transactional
+    public TwitchatWidgetSettings updateBranch(UserAccount user, String branch) {
+        if (!TwitchatData.isValid(branch)) {
+            throw new IllegalArgumentException("Unknown Twitchat branch " + branch);
+        }
+        TwitchatWidgetSettings settings = getOrCreate(user);
+        settings.setTwitchatBranch(branch);
+        TwitchatWidgetSettings saved = repository.save(settings);
+        publishWidgetConfig(saved);
+        return saved;
+    }
+
+    /**
      * The OBS connection of the user's enabled relay, password decrypted: what the logged-in
      * user's own browser connects to OBS with. Empty when disabled or never configured.
      */
@@ -66,7 +84,8 @@ public class TwitchatWidgetSettingsService {
     private TwitchatWidgetConfig config(TwitchatWidgetSettings settings) {
         String password = settings.getObsPasswordEncrypted() == null
                 ? null : tokenEncryptionService.decrypt(settings.getObsPasswordEncrypted());
-        return new TwitchatWidgetConfig(settings.getObsHost(), settings.getObsPort(), password);
+        return new TwitchatWidgetConfig(settings.getObsHost(), settings.getObsPort(), password,
+                settings.getTwitchatBranch());
     }
 
     // Pushed live so a widget page already open in a browser tab or OBS browser source picks

@@ -35,7 +35,7 @@ class ChannelEventPublisherTwitchatTest {
     @Test
     void twitchatWidgetSettingsUpdated_delegatesToRedisPublisherOnTwitchatChannel() {
         UUID ownerId = UUID.randomUUID();
-        TwitchatWidgetConfig config = new TwitchatWidgetConfig("127.0.0.1", 4455, "s3cret");
+        TwitchatWidgetConfig config = new TwitchatWidgetConfig("127.0.0.1", 4455, "s3cret", "auto");
 
         channelEventPublisher.twitchatWidgetSettingsUpdated(ownerId, config);
 

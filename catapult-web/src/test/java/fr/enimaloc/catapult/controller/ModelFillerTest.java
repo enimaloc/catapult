@@ -55,7 +55,7 @@ class ModelFillerTest {
     private static ChannelPageData page(boolean owner) {
         return new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", owner, false, true,
                 null, new PagedBindings(0, 1, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, "uuid");
+                null, null, null, null, null, null, null, "uuid");
     }
 
     @Test

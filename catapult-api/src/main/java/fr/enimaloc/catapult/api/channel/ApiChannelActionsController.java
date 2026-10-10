@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
@@ -195,6 +196,21 @@ public class ApiChannelActionsController {
 
         UserAccount channelUser = userResolver.ownChannel(username, jwt);
         twitchatWidgetSettingsService.updateSettings(channelUser, body.enabled(), body.host(), body.port(), body.password());
+    }
+
+    @PostMapping("/settings/twitchat/branch")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveTwitchatBranch(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody TwitchatBranchRequest body) {
+
+        UserAccount channelUser = userResolver.ownChannel(username, jwt);
+        try {
+            twitchatWidgetSettingsService.updateBranch(channelUser, body.branch());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
     }
 
     @PostMapping("/settings/twitchat/regenerate")
