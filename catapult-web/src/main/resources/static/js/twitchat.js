@@ -88,6 +88,21 @@ window.CatapultTwitchat = (function () {
         document.dispatchEvent(new CustomEvent("catapult:twitchat:presence", { detail: { connected: value } }));
     }
 
+    // Remembered across reloads, like CatapultObs.debug: the detection runs with the page,
+    // before the console can switch it on. Storage may be unavailable (private mode, blocked site data).
+    const DEBUG_KEY = "catapult.twitchat.debug";
+    let debug = false;
+    try {
+        debug = localStorage.getItem(DEBUG_KEY) === "true";
+    } catch {
+        // stays off
+    }
+
+    /** Logs a message when debugging: ↑ sent to Twitchat, ↓ received from it or another client. */
+    function trace(direction, envelope) {
+        if (debug) console.log(`[twitchat] ${direction} ${envelope.type}`, envelope);
+    }
+
     function emit(type, envelope) {
         listeners.get(type)?.forEach((handler) => handler(envelope.data ?? {}, envelope));
     }
@@ -95,6 +110,7 @@ window.CatapultTwitchat = (function () {
     CatapultObs.on("CustomEvent", (eventData) => {
         if (eventData?.origin !== "twitchat" || !eventData.type) return;
         if (eventData.id && sentIds.has(eventData.id)) return;
+        trace("↓", eventData);
         detectFrom(eventData.type);
         if (TWITCHAT_EVENTS.has(eventData.type)) {
             heard = true;
@@ -118,7 +134,9 @@ window.CatapultTwitchat = (function () {
         sentIds.add(id);
         if (sentIds.size > MAX_SENT_IDS) sentIds.delete(sentIds.values().next().value);
         // Always a data object, as Twitchat's own clients send: some of its handlers read it unchecked.
-        return CatapultObs.requests.broadcastCustomEvent({ eventData: { origin: "twitchat", id, type: action, data: data ?? {} } });
+        const envelope = { origin: "twitchat", id, type: action, data: data ?? {} };
+        trace("↑", envelope);
+        return CatapultObs.requests.broadcastCustomEvent({ eventData: envelope });
     }
 
     let pinging = null;
@@ -283,6 +301,24 @@ window.CatapultTwitchat = (function () {
          */
         get actions() {
             return actionProxies[protocol ?? DEFAULT_PROTOCOL];
+        },
+
+        /**
+         * When true, every message sent to Twitchat (↑) and received through OBS (↓, Twitchat's
+         * or another client's, this page's own echoes aside) is logged to the console.
+         * Remembered across reloads, so the detection is logged too.
+         */
+        get debug() {
+            return debug;
+        },
+
+        set debug(enabled) {
+            debug = !!enabled;
+            try {
+                localStorage.setItem(DEBUG_KEY, String(debug));
+            } catch {
+                // only for this page then
+            }
         },
 
         /** Whether Twitchat can be reached, i.e. the page is connected to OBS. */
