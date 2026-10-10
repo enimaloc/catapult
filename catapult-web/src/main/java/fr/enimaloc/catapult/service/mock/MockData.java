@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import lombok.Getter;
 import lombok.Setter;
 import tools.jackson.databind.json.JsonMapper;
@@ -78,6 +79,7 @@ public class MockData {
     private final boolean hasMinecraftProvider;
     private LinkStateResponse minecraftLink;
     private ObsData obsData;
+    private String obsPassword;
     @Setter
     @Getter
     private boolean botEnabled = true;
@@ -345,6 +347,16 @@ public class MockData {
                 host == null || host.isBlank() ? DEFAULT_OBS.host() : host,
                 port == null ? DEFAULT_OBS.port() : port,
                 password != null || obsData != null && obsData.hasPassword());
+        if (password != null) obsPassword = password;
+    }
+
+    /**
+     * What /api/me/obs would answer: null unless OBS is enabled. The presets' "has a password"
+     * has no actual password behind it, so the password is null until one is saved.
+     */
+    public TwitchatWidgetConfig obsConnection() {
+        return obsData == null || !obsData.connected() ? null
+                : new TwitchatWidgetConfig(obsData.host(), obsData.port(), obsPassword);
     }
 
     // --- admin-only mutators: no UI path reaches these, only the mock admin page ----------------
