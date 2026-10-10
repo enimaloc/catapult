@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.AfterEach;
@@ -119,6 +120,20 @@ class RealApiServiceTest {
         respond(HttpMethod.GET, "/api/connect/minecraft", "{\"status\":\"PENDING\",\"minecraftName\":\"Steve\"}");
 
         assertThat(service.minecraftStatus("enimaloc")).isEqualTo(new LinkStateResponse("PENDING", "Steve", null));
+    }
+
+    @Test
+    void obsConnection() {
+        respond(HttpMethod.GET, "/api/me/obs", "{\"obsHost\":\"10.0.0.2\",\"obsPort\":4456,\"obsPassword\":\"pw\"}");
+
+        assertThat(service.obsConnection()).isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw"));
+    }
+
+    @Test
+    void obsConnection_noContentIsNull() {
+        expect(HttpMethod.GET, "/api/me/obs").andRespond(withNoContent());
+
+        assertThat(service.obsConnection()).isNull();
     }
 
     @Test

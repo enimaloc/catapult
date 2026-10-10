@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -347,6 +348,17 @@ class MockDataTest {
 
             assertThat(data.getPage(LIVE.twitchUsername(), null, null).obs())
                     .isEqualTo(new ObsData(false, "127.0.0.1", 4455, true));
+        }
+
+        @Test
+        void obsConnectionIsOnlyGivenWhileEnabled_withTheLastSavedPassword() {
+            MockData data = session();
+            data.saveObsSettings(true, "10.0.0.2", 4456, "pw");
+            data.saveObsSettings(true, "10.0.0.2", 4456, null);
+            assertThat(data.obsConnection()).isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw"));
+
+            data.saveObsSettings(false, "10.0.0.2", 4456, null);
+            assertThat(data.obsConnection()).isNull();
         }
     }
 

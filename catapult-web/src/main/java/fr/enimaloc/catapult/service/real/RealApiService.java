@@ -21,6 +21,7 @@ import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -155,6 +156,11 @@ public class RealApiService implements ApiService {
     @Override
     public void minecraftDisconnect(String username) {
         client.delete("/api/connect/minecraft");
+    }
+
+    @Override
+    public TwitchatWidgetConfig obsConnection() {
+        return client.get("/api/me/obs", TwitchatWidgetConfig.class);
     }
 
     @Override
