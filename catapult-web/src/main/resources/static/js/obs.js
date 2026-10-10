@@ -118,43 +118,13 @@ window.CatapultObs = (function () {
     // unknown, which leaves OBS to judge request types itself.
     let available = null;
 
-    /** Case-insensitive Levenshtein distance. */
-    function distance(a, b) {
-        a = a.toLowerCase();
-        b = b.toLowerCase();
-        let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
-        for (let i = 1; i <= a.length; i++) {
-            const current = [i];
-            for (let j = 1; j <= b.length; j++) {
-                current[j] = Math.min(previous[j] + 1, current[j - 1] + 1,
-                    previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-            }
-            previous = current;
-        }
-        return previous[b.length];
-    }
-
-    /** The known request type closest to requestType, when near enough to be a typo of it. */
-    function closestRequestType(requestType) {
-        let closest = null;
-        let closestDistance = Infinity;
-        for (const candidate of available) {
-            const d = distance(requestType, candidate);
-            if (d < closestDistance) {
-                closest = candidate;
-                closestDistance = d;
-            }
-        }
-        return closestDistance <= Math.max(2, Math.floor(requestType.length / 4)) ? closest : null;
-    }
-
     /**
      * The ObsError for a request type the connected OBS doesn't know, null when it knows it (or
      * its list is unknown). `style` writes the names the way the caller did (shortcut or not).
      */
     function unknownRequestType(requestType, style = (name) => name) {
         if (!available || available.has(requestType)) return null;
-        const suggestion = closestRequestType(requestType);
+        const suggestion = CatapultSuggest.closest(requestType, available);
         const message = `${style(requestType)} isn't a request this OBS knows`
             + (suggestion ? `, did you mean ${style(suggestion)}?` : "");
         return new ObsError(message, { code: UNKNOWN_REQUEST_TYPE, requestType, suggestion });
