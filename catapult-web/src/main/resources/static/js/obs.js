@@ -38,6 +38,7 @@ window.CatapultObs = (function () {
             MediaInputs: 1 << 8,
             Vendors: 1 << 9,
             Ui: 1 << 10,
+            Canvases: 1 << 11,
             // High-volume events, left out of All: they must be asked for explicitly.
             InputVolumeMeters: 1 << 16,
             InputActiveStateChanged: 1 << 17,
@@ -45,7 +46,8 @@ window.CatapultObs = (function () {
             SceneItemTransformChanged: 1 << 19,
         };
         flags.All = flags.General | flags.Config | flags.Scenes | flags.Inputs | flags.Transitions
-            | flags.Filters | flags.Outputs | flags.SceneItems | flags.MediaInputs | flags.Vendors | flags.Ui;
+            | flags.Filters | flags.Outputs | flags.SceneItems | flags.MediaInputs | flags.Vendors | flags.Ui
+            | flags.Canvases;
         return Object.freeze(flags);
     })();
 
