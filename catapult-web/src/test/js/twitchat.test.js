@@ -53,16 +53,117 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe("protocol", () => {
-    it("exposes the generated actions, events and answers", () => {
-        expect(CatapultTwitchat.ACTIONS).toContain("CHAT_FEED_PAUSE");
-        expect(CatapultTwitchat.EVENTS).toContain("TRIGGER_LIST");
-        expect(CatapultTwitchat.EVENTS).not.toContain("CustomEvent");
-        expect(CatapultTwitchat.REPLIES.TRIGGERS_GET_ALL).toEqual(["TRIGGER_LIST"]);
+/** Twitchat answering this page's probe as one speaking `protocol` would. */
+async function twitchatAnswersProbe(protocol) {
+    await vi.advanceTimersByTimeAsync(0);
+    twitchatSends(protocol === "beta" ? "ON_GLOBAL_STATES" : "SET_COLS_COUNT", {});
+}
+
+describe("protocols", () => {
+    it("exposes both generated protocols, the stable one until detected", () => {
+        const { stable, beta } = CatapultTwitchat.PROTOCOLS;
+        expect(stable.actions).toContain("CHAT_FEED_PAUSE");
+        expect(stable.events).not.toContain("CustomEvent");
+        expect(stable.replies.TRIGGERS_GET_ALL).toEqual(["TRIGGER_LIST"]);
+        expect(beta.actions).toContain("SET_CHAT_FEED_PAUSE_STATE");
+        expect(beta.events).toContain("ON_TRIGGER_LIST");
+        expect(beta.replies.GET_TRIGGER_LIST).toEqual(["ON_TRIGGER_LIST"]);
+
+        expect(CatapultTwitchat.protocol).toBeNull();
+        expect(CatapultTwitchat.ACTIONS).toBe(stable.actions);
+        expect(CatapultTwitchat.EVENTS).toBe(stable.events);
+        expect(CatapultTwitchat.REPLIES).toBe(stable.replies);
+    });
+
+    it("detects the protocol from an event only one of them has", () => {
+        twitchatSends("ON_TWITCHAT_READY");
+        expect(CatapultTwitchat.protocol).toBe("beta");
+        expect(CatapultTwitchat.ACTIONS).toBe(CatapultTwitchat.PROTOCOLS.beta.actions);
+        expect(Object.keys(CatapultTwitchat.actions)).toContain("setChatFeedPauseState");
+        expect(Object.keys(CatapultTwitchat.actions)).not.toContain("chatFeedPause");
+
+        twitchatSends("TWITCHAT_READY");
+        expect(CatapultTwitchat.protocol).toBe("stable");
+    });
+
+    it("doesn't detect it from the actions other clients send", () => {
+        twitchatSends("GET_COLS_COUNT");
+        twitchatSends("SET_CHAT_FEED_PAUSE_STATE", { colIndex: 0 });
+        expect(CatapultTwitchat.protocol).toBeNull();
+    });
+
+    it("probes Twitchat before the first action, then sends it in the detected protocol", async () => {
+        const triggers = CatapultTwitchat.send("GET_TRIGGER_LIST");
+        await twitchatAnswersProbe("beta");
+        await vi.advanceTimersByTimeAsync(0);
+        twitchatSends("ON_TRIGGER_LIST", { triggerList: [] });
+
+        await expect(triggers).resolves.toEqual({ triggerList: [] });
+        expect(broadcasts().map(({ type }) => type)).toEqual(["GET_COLS_COUNT", "GET_GLOBAL_STATES", "GET_TRIGGER_LIST"]);
+        await CatapultTwitchat.actions.setChatFeedPauseState({ colIndex: 0 });
+        expect(broadcasts()).toHaveLength(4);
+    });
+
+    it("rejects an action of the other protocol, suggesting one of this Twitchat's", async () => {
+        twitchatSends("ON_TWITCHAT_READY");
+        await expect(CatapultTwitchat.actions.chatFeedPause()).rejects.toMatchObject({
+            code: "UNKNOWN_ACTION", action: "CHAT_FEED_PAUSE",
+            message: expect.stringMatching(/^chatFeedPause isn't a beta Twitchat action/),
+        });
+        await expect(CatapultTwitchat.actions.setChatFeedPauseStat()).rejects.toMatchObject({
+            code: "UNKNOWN_ACTION", suggestion: "SET_CHAT_FEED_PAUSE_STATE",
+            message: "setChatFeedPauseStat isn't a beta Twitchat action, did you mean setChatFeedPauseState?",
+        });
+        expect(broadcasts()).toEqual([]);
+    });
+
+    it("detects it anew when OBS reconnects", async () => {
+        twitchatSends("ON_TWITCHAT_READY");
+        document.dispatchEvent(new CustomEvent("catapult:obs:connected"));
+        expect(CatapultTwitchat.protocol).toBeNull();
+        await twitchatAnswersProbe("stable");
+        expect(CatapultTwitchat.protocol).toBe("stable");
+        expect(broadcasts().map(({ type }) => type)).toEqual(["GET_COLS_COUNT", "GET_GLOBAL_STATES"]);
+    });
+
+    it("sends in the stable protocol when Twitchat doesn't answer the probes", async () => {
+        const sent = CatapultTwitchat.actions.chatFeedPause(undefined, { timeout: 500 });
+        await vi.advanceTimersByTimeAsync(500);
+        await expect(sent).resolves.toBeUndefined();
+        expect(CatapultTwitchat.protocol).toBeNull();
+        expect(broadcasts().map(({ type }) => type)).toEqual(["GET_COLS_COUNT", "GET_GLOBAL_STATES", "CHAT_FEED_PAUSE"]);
+    });
+
+    it("configure() forces the picked branch, or detects it anew on auto", async () => {
+        CatapultTwitchat.configure("beta");
+        expect(CatapultTwitchat.protocol).toBe("beta");
+        twitchatSends("TWITCHAT_READY");
+        expect(CatapultTwitchat.protocol).toBe("beta");
+
+        CatapultTwitchat.configure("auto");
+        expect(CatapultTwitchat.protocol).toBeNull();
+        await twitchatAnswersProbe("stable");
+        expect(CatapultTwitchat.protocol).toBe("stable");
+
+        CatapultTwitchat.configure("auto");
+        expect(CatapultTwitchat.protocol).toBe("stable");
+        expect(() => CatapultTwitchat.configure("main")).toThrow("Unknown Twitchat protocol main");
+    });
+
+    it("keeps a forced protocol whatever Twitchat sends", async () => {
+        CatapultTwitchat.useProtocol("beta");
+        twitchatSends("TWITCHAT_READY");
+        document.dispatchEvent(new CustomEvent("catapult:obs:connected"));
+        expect(CatapultTwitchat.protocol).toBe("beta");
+        expect(() => CatapultTwitchat.useProtocol("nightly")).toThrow("Unknown Twitchat protocol nightly");
+        await CatapultTwitchat.actions.setGreetFeedReadAll();
+        expect(broadcasts().map(({ type }) => type)).toEqual(["SET_GREET_FEED_READ_ALL"]);
     });
 });
 
 describe("actions", () => {
+    beforeEach(() => CatapultTwitchat.useProtocol("stable"));
+
     it("broadcasts an action in Twitchat's envelope, resolving once sent", async () => {
         await expect(CatapultTwitchat.actions.chatFeedPause()).resolves.toBeUndefined();
         await CatapultTwitchat.send("GREET_FEED_READ", { count: 1 });
@@ -103,10 +204,10 @@ describe("actions", () => {
     it("rejects an unknown action without sending it, suggesting the closest one", async () => {
         await expect(CatapultTwitchat.actions.chatFeedPaus()).rejects.toMatchObject({
             code: "UNKNOWN_ACTION", action: "CHAT_FEED_PAUS", suggestion: "CHAT_FEED_PAUSE",
-            message: "chatFeedPaus isn't a Twitchat action, did you mean chatFeedPause?",
+            message: "chatFeedPaus isn't a stable Twitchat action, did you mean chatFeedPause?",
         });
         await expect(CatapultTwitchat.send("SHOUT_OUT")).rejects.toThrow(
-            "SHOUT_OUT isn't a Twitchat action, did you mean SHOUTOUT?");
+            "SHOUT_OUT isn't a stable Twitchat action, did you mean SHOUTOUT?");
         expect(broadcasts()).toEqual([]);
     });
 
@@ -125,6 +226,8 @@ describe("actions", () => {
 });
 
 describe("events", () => {
+    beforeEach(() => CatapultTwitchat.useProtocol("stable"));
+
     it("dispatches Twitchat's messages by type and to *, until unsubscribed", () => {
         const follow = vi.fn();
         const all = vi.fn();
@@ -162,6 +265,8 @@ describe("events", () => {
 });
 
 describe("relay", () => {
+    beforeEach(() => CatapultTwitchat.useProtocol("stable"));
+
     async function relay(notification = NOTIFICATION) {
         const result = CatapultTwitchat.relay(notification);
         await vi.advanceTimersByTimeAsync(150);
