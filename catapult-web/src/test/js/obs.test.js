@@ -106,6 +106,25 @@ describe("connect", () => {
         await expect(promise).resolves.toMatchObject({ authenticated: true });
     });
 
+    it("computes the same auth response without crypto.subtle, as on a page served over plain HTTP", async () => {
+        const { createHash } = await import("node:crypto");
+        const b64 = (input) => createHash("sha256").update(input).digest("base64");
+        const realCrypto = globalThis.crypto;
+        vi.stubGlobal("crypto", { getRandomValues: (array) => realCrypto.getRandomValues(array) });
+        // Lengths around SHA-256's 55/56/64-byte padding boundaries, and multi-byte UTF-8.
+        for (const password of ["", "secret", "x".repeat(47), "x".repeat(48), "x".repeat(56), "é".repeat(100)]) {
+            const promise = CatapultObs.connect({ host: "h", port: 1, password: password || "p" });
+            last().serverSends(0, { rpcVersion: 1, authentication: { salt: "salt-0123456789", challenge: "c" } });
+            await vi.waitFor(() => expect(last().sent).toHaveLength(1));
+            expect(last().lastSent(1).authentication).toBe(b64(b64(`${password || "p"}salt-0123456789`) + "c"));
+            last().serverSends(2, { negotiatedRpcVersion: 1 });
+            answerVersion(last());
+            await promise;
+        }
+        vi.unstubAllGlobals();
+        vi.stubGlobal("WebSocket", FakeSocket);
+    });
+
     it("rejects with the close code when OBS refuses the Identify, as on a wrong password", async () => {
         const promise = CatapultObs.connect({ host: "h", port: 1, password: "bad" });
         last().serverCloses(CatapultObs.CloseCode.AuthenticationFailed, "Authentication failed.");
