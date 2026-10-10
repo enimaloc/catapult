@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
@@ -154,6 +155,12 @@ public class RealApiService implements ApiService {
     @Override
     public void minecraftDisconnect(String username) {
         client.delete("/api/connect/minecraft");
+    }
+
+    @Override
+    public void saveObsSettings(String username, boolean enabled, String host, Integer port, String password) {
+        client.postVoid("/api/channels/{username}/settings/obs",
+                new ObsSettingsRequest(enabled, host, port, password), username);
     }
 
     @Override

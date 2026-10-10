@@ -337,6 +337,17 @@ class MockDataTest {
             data.deleteSteamToken();
             assertThat(data.getPage(LIVE.twitchUsername(), null, null).steam().hasPersonalToken()).isFalse();
         }
+
+        @Test
+        void obsSettingsFallBackToDefaultsAndKeepTheStoredPassword() {
+            MockData data = session();
+            data.saveObsSettings(true, "10.0.0.2", 4456, "pw");
+
+            data.saveObsSettings(false, "  ", null, null);
+
+            assertThat(data.getPage(LIVE.twitchUsername(), null, null).obs())
+                    .isEqualTo(new ObsData(false, "127.0.0.1", 4455, true));
+        }
     }
 
     @Nested

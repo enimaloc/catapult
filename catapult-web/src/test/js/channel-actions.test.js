@@ -181,6 +181,11 @@ describe("channel-connections", () => {
               <button id="minecraft-enroll-btn"></button>
               <button id="minecraft-check-btn"></button>
               <button id="minecraft-disconnect-btn"></button>
+              <input id="obs-host" value="10.0.0.2">
+              <input id="obs-port" value="4456">
+              <input id="obs-password" value="">
+              <button id="obs-connect-btn"></button>
+              <button id="obs-disconnect-btn"></button>
             </div>`);
         render();
     });
@@ -215,6 +220,19 @@ describe("channel-connections", () => {
             ["/channel/enimaloc/minecraft/sync", {}],
             ["/channel/enimaloc/minecraft/disconnect", {}],
         ]);
+    });
+
+    it("saves the OBS settings, keeping the stored password when the field is empty", async () => {
+        await click("#obs-connect-btn");
+        document.getElementById("obs-password").value = "pw";
+        document.getElementById("obs-port").value = "";
+        await click("#obs-disconnect-btn");
+
+        expect(posts()).toEqual([
+            ["/channel/enimaloc/settings/obs", { enabled: true, host: "10.0.0.2", port: 4456, password: null }],
+            ["/channel/enimaloc/settings/obs", { enabled: false, host: "10.0.0.2", port: null, password: "pw" }],
+        ]);
+        expect(refreshed()).toBe(2);
     });
 
     it("does nothing outside the integrations tab", () => {

@@ -234,6 +234,13 @@ class RealApiServiceTest {
     }
 
     @Test
+    void saveObsSettings() {
+        expectPost("/api/channels/enimaloc/settings/obs",
+                "{\"enabled\":true,\"host\":\"10.0.0.2\",\"port\":4456,\"password\":\"pw\"}");
+        service.saveObsSettings("enimaloc", true, "10.0.0.2", 4456, "pw");
+    }
+
+    @Test
     void minecraftSync() {
         expectPost("/api/connect/minecraft/sync");
         service.minecraftSync("enimaloc");

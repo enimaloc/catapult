@@ -77,7 +77,7 @@ public class MockData {
     private boolean hasXbox;
     private final boolean hasMinecraftProvider;
     private LinkStateResponse minecraftLink;
-    private final ObsData obsData;
+    private ObsData obsData;
     @Setter
     @Getter
     private boolean botEnabled = true;
@@ -337,6 +337,14 @@ public class MockData {
     public void deleteSteamToken() {
         hasSteamPersonalToken = false;
         steamTokenShared = false;
+    }
+
+    /** Mirrors catapult-api: blank host/port fall back to the defaults, a null password keeps the stored one. */
+    public void saveObsSettings(boolean enabled, String host, Integer port, String password) {
+        obsData = new ObsData(enabled,
+                host == null || host.isBlank() ? DEFAULT_OBS.host() : host,
+                port == null ? DEFAULT_OBS.port() : port,
+                password != null || obsData != null && obsData.hasPassword());
     }
 
     // --- admin-only mutators: no UI path reaches these, only the mock admin page ----------------
