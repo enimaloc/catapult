@@ -73,12 +73,12 @@ async function navigate(path, push = true, search = "") {
     if (!response.ok) {
         // Server-side error (unknown page or fragment failure): the
         // response body is the error fragment (see ErrorPageController
-        // and IndexController.SPAPages#unknown), render it in place
+        // and SpaFragmentController#unknown), render it in place
         // instead of reloading the whole page.
         return;
     }
 
-    document.title = config.titles[route.id] ?? document.title;
+    document.title = config.titles[route?.id] ?? document.title;
     updateActiveLink(path);
 
     window.scrollTo({
@@ -86,6 +86,9 @@ async function navigate(path, push = true, search = "") {
         behavior: "instant"
     });
 }
+
+// The router's public surface, for the per-fragment scripts (channel-page.js's refresh()).
+window.CatapultSpa = { navigate, resolveRoute };
 
 updateActiveLink(config.page);
 

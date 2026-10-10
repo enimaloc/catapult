@@ -1,10 +1,8 @@
 package fr.enimaloc.catapult.service.http;
 
-import fr.enimaloc.catapult.ws.auth.WsAuthContext;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -13,17 +11,26 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.util.Locale;
+import java.util.Objects;
 
+/**
+ * Calls catapult-api on behalf of the current browser session, authenticated with the JWT
+ * stored in that session (it never reaches the browser). A failed call is logged and
+ * reported as {@code null} rather than thrown, so a page still renders while the API is down.
+ */
 @Slf4j
 @Component
-public class ApiClient implements HttpClient {
+public class ApiClient {
     public static final String SESSION_JWT_KEY = "jwt";
-    public static final String NOT_STARTED_MESSAGE = "502 Bad Gateway: \"<html><EOL><EOL><head><title>502 Bad Gateway</title></head><EOL><EOL><body><EOL><EOL><center><h1>502 Bad Gateway</h1></center><EOL><EOL><hr><center>openresty</center><EOL><EOL></body><EOL><EOL></html><EOL><EOL>\"";
+
+    /** What nginx answers while catapult-api is still starting: expected, not worth a warning. */
+    static final String NOT_STARTED_MESSAGE = "502 Bad Gateway: \"<html><EOL><EOL><head><title>502 Bad Gateway</title></head><EOL><EOL><body><EOL><EOL><center><h1>502 Bad Gateway</h1></center><EOL><EOL><hr><center>openresty</center><EOL><EOL></body><EOL><EOL></html><EOL><EOL>\"";
+
+    private static final String AUTH_VALIDATE_PATH = "/api/auth/validate";
 
     private final RestClient client;
 
-    public ApiClient(@Value("${catapult.backend-url") String apiUrl, RestClient.Builder builder) {
+    public ApiClient(@Value("${catapult.backend-url}") String apiUrl, RestClient.Builder builder) {
         this.client = builder
                 .baseUrl(apiUrl)
                 .requestInterceptor((request, body, execution) -> {
@@ -31,56 +38,69 @@ public class ApiClient implements HttpClient {
                     if (token != null) request.getHeaders().setBearerAuth(token);
                     return execution.execute(request, body);
                 })
-                .defaultStatusHandler(HttpStatusCode::is4xxClientError, (req, res) -> {
-                    if (res.getStatusCode() != HttpStatus.UNAUTHORIZED && !req.getURI().getPath().equals("/api/auth/validate")) {
-                        log.warn("API returned {} for {}", res.getStatusCode(), req.getURI());
+                .defaultStatusHandler(HttpStatusCode::is4xxClientError, (request, response) -> {
+                    if (response.getStatusCode() != HttpStatus.UNAUTHORIZED
+                            && !request.getURI().getPath().equals(AUTH_VALIDATE_PATH)) {
+                        log.warn("API returned {} for {}", response.getStatusCode(), request.getURI());
                     }
                 })
                 .build();
     }
 
-    @Override
-    public <T> T req(HttpMethod method, String path, HttpClient.ResponseType<T> responseType, Locale locale, Object... uriVars) {
+    /** GET {@code path}, its body read as {@code type}; {@code null} when the call fails. */
+    public <T> T get(String path, Class<T> type, Object... uriVars) {
+        return exchange(HttpMethod.GET, path, type, uriVars);
+    }
+
+    /** POST {@code path} without a body, the response read as {@code type}; {@code null} on failure. */
+    public <T> T post(String path, Class<T> type, Object... uriVars) {
+        return exchange(HttpMethod.POST, path, type, uriVars);
+    }
+
+    /** POST {@code body} (none when {@code null}) to {@code path}, ignoring the response. */
+    public void postVoid(String path, Object body, Object... uriVars) {
+        send(HttpMethod.POST, path, body, uriVars);
+    }
+
+    /** DELETE {@code path}, ignoring the response. */
+    public void delete(String path, Object... uriVars) {
+        send(HttpMethod.DELETE, path, null, uriVars);
+    }
+
+    private <T> T exchange(HttpMethod method, String path, Class<T> type, Object... uriVars) {
         try {
-            RestClient.RequestHeadersSpec<?> uri = client.method(method).uri(path, uriVars);
-            if (locale != null) uri.header(HttpHeaders.ACCEPT_LANGUAGE, locale.toLanguageTag());
-            RestClient.ResponseSpec retrieve = uri.retrieve();
-            if (responseType.isLeft()) return retrieve.body(responseType.left());
-            else return retrieve.body(responseType.right());
+            return client.method(method).uri(path, uriVars).retrieve().body(type);
         } catch (Exception e) {
-            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
-                log.warn("{} {} failed: {}", method, path, e.getMessage());
-            }
+            logFailure(method, path, e);
             return null;
         }
     }
 
-    @Override
-    public void reqVoid(HttpMethod method, String path, Object body, Locale locale, Object... uriVars) {
+    private void send(HttpMethod method, String path, Object body, Object... uriVars) {
         try {
             RestClient.RequestBodySpec spec = client.method(method).uri(path, uriVars);
             if (body != null) spec.body(body);
-            if (locale != null) spec.header(HttpHeaders.ACCEPT_LANGUAGE, locale.toLanguageTag());
             spec.retrieve().toBodilessEntity();
         } catch (Exception e) {
-            if (!e.getMessage().equals(NOT_STARTED_MESSAGE)) {
-                log.warn("{} {} failed: {}", method, path, e.getMessage());
-            }
+            logFailure(method, path, e);
+        }
+    }
+
+    private static void logFailure(HttpMethod method, String path, Exception e) {
+        if (!Objects.equals(e.getMessage(), NOT_STARTED_MESSAGE)) {
+            log.warn("{} {} failed: {}", method, path, e.getMessage());
         }
     }
 
     private static String currentJwt() {
-        // WS dispatch threads have no HTTP RequestContext; the WS layer stashes
-        // the session JWT in WsAuthContext before invoking handlers/dispatcher.
-        String wsJwt = WsAuthContext.get();
-        if (wsJwt != null) return wsJwt;
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
+            return null;
+        }
         try {
-            ServletRequestAttributes attrs =
-                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attrs == null) return null;
-            HttpSession session = attrs.getRequest().getSession(false);
+            HttpSession session = attributes.getRequest().getSession(false);
             return session != null ? (String) session.getAttribute(SESSION_JWT_KEY) : null;
-        } catch (Exception e) {
+        } catch (IllegalStateException e) {
+            // The request is no longer active (e.g. read from an async thread).
             return null;
         }
     }

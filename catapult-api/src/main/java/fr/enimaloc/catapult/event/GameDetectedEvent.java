@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.event;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;

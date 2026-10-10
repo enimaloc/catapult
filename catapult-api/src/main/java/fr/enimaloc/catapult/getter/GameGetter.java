@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 
 import java.util.Optional;
 

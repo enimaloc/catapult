@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.OAuthToken;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.OAuthTokenRepository;
-import fr.enimaloc.catapult.service.XboxUserTokenService;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -96,7 +96,7 @@ public class XboxGameGetter implements GameGetter {
                 return extractCurrentTitle(response);
             } catch (Exception e) {
                 log.warn("Failed to fetch Xbox presence for user {}: {}", user.getId(), e.getMessage());
-                return Optional.<TitlePresence>empty();
+                return Optional.empty();
             }
         });
     }
@@ -138,7 +138,7 @@ public class XboxGameGetter implements GameGetter {
                 return extractProductId(response);
             } catch (Exception e) {
                 log.warn("Failed to fetch Xbox title detail for titleId {}: {}", titleId, e.getMessage());
-                return Optional.<String>empty();
+                return Optional.empty();
             }
         });
     }
@@ -148,11 +148,11 @@ public class XboxGameGetter implements GameGetter {
         if (response == null) return Optional.empty();
         List<Map<String, Object>> titles = (List<Map<String, Object>>) response.get("titles");
         if (titles == null || titles.isEmpty()) return Optional.empty();
-        Map<String, Object> detail = (Map<String, Object>) titles.get(0).get("detail");
+        Map<String, Object> detail = (Map<String, Object>) titles.getFirst().get("detail");
         if (detail == null) return Optional.empty();
         List<Map<String, Object>> availabilities = (List<Map<String, Object>>) detail.get("availabilities");
         if (availabilities == null || availabilities.isEmpty()) return Optional.empty();
-        Object availabilityId = availabilities.get(0).get("AvailabilityId");
+        Object availabilityId = availabilities.getFirst().get("AvailabilityId");
         return availabilityId == null ? Optional.empty() : Optional.of(String.valueOf(availabilityId));
     }
 

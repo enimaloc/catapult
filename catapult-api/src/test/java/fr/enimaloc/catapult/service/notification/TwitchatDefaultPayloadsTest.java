@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.TwitchatActionType;
-import fr.enimaloc.catapult.domain.TwitchatNotificationEventType;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

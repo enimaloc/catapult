@@ -12,10 +12,10 @@ import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutionException;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
-import fr.enimaloc.catapult.domain.ChatCommandSetting;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.service.GameContextService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.service.binding.GameContextService;
 import lombok.RequiredArgsConstructor;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
  * <p>
  * !debug tpl &lt;template text&gt; — parse/compile/exécute un template DSL à la volée à travers
  * le même pipeline sandboxé qu'une {@link fr.enimaloc.catapult.chat.DynamicChatCommand} réelle,
- * sans avoir à créer une {@link fr.enimaloc.catapult.domain.ChatCommandDefinition} au préalable.
+ * sans avoir à créer une {@link fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition} au préalable.
  * <p>
  * !debug js &lt;code&gt; — évalue du JS brut avec un accès host COMPLET (non sandboxé) : sûr
  * uniquement parce que {@link #isOwnerOnly()} garantit qu'aucun autre utilisateur que l'owner
@@ -82,10 +82,10 @@ public class DebugCommand implements ChatCommand {
 
     @Override
     public Object execute(UserAccount user, List<String> args) {
-        if (!args.isEmpty() && "tpl".equals(args.get(0))) {
+        if (!args.isEmpty() && "tpl".equals(args.getFirst())) {
             return executeTemplate(user, String.join(" ", args.subList(1, args.size())));
         }
-        if (!args.isEmpty() && "js".equals(args.get(0))) {
+        if (!args.isEmpty() && "js".equals(args.getFirst())) {
             return executeRawJs(String.join(" ", args.subList(1, args.size())));
         }
 
@@ -94,7 +94,7 @@ public class DebugCommand implements ChatCommand {
         Locale locale = Locale.FRANCE;
 
         if (!args.isEmpty()) {
-            String path = args.get(0);
+            String path = args.getFirst();
             if (!knownPaths().contains(path)) {
                 return "Placeholder inconnu : " + path;
             }

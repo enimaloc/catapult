@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
-import fr.enimaloc.catapult.service.SteamStoreService;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
 
 import java.time.Instant;
 import java.time.LocalDate;

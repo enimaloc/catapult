@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.chat.command.registry.catapult;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.domain.UserFlag;
-import fr.enimaloc.catapult.repository.UserFlagRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserFlag;
+import fr.enimaloc.catapult.repository.account.UserFlagRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;

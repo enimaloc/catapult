@@ -1,15 +1,25 @@
 package fr.enimaloc.catapult.api.userapi;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import fr.enimaloc.catapult.domain.DtddGameMapping;
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.IgdbGameDetails;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.getter.DtddApiClient;
-import fr.enimaloc.catapult.repository.GameBindingRepository;
-import fr.enimaloc.catapult.repository.TwDtddTopicMappingRepository;
-import fr.enimaloc.catapult.service.*;
+import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
+import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.tw.TwDtddTopicMappingRepository;
+import fr.enimaloc.catapult.service.account.WidgetTokenService;
+import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.dtdd.DtddMappingService;
+import fr.enimaloc.catapult.service.dtdd.DtddService;
+import fr.enimaloc.catapult.service.dtdd.DtddSignalService;
+import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.steam.SteamIADisclosure;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.service.tw.TwLabelService;
+import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -18,7 +28,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -102,20 +111,7 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        Optional<DetectedGame> detectedTmp = devBackdoorResolver.resolve(uuid);
-        Optional<UserAccount> user = Optional.empty();
-        if (detectedTmp.isEmpty()) {
-            user = widgetTokenService.resolve(uuid);
-            if (user.isEmpty()) {
-                return ResponseEntity.notFound().build();
-            }
-
-            detectedTmp = gameStateService.getLastKnownGame(user.get());
-            if (detectedTmp.isEmpty()) {
-                return ResponseEntity.ok(new GameInfoResponse(false));
-            }
-        }
-        return ResponseEntity.ok(getGIR(lang, acceptLanguage, detectedTmp, user));
+        return gameInfoFor(uuid, RequestLocale.parse(lang, acceptLanguage));
     }
 
     @Operation(summary = "Get a compact summary of the widget's currently-detected game",
@@ -140,77 +136,84 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        Optional<DetectedGame> detectedTmp = devBackdoorResolver.resolve(uuid);
-        Optional<UserAccount> user = Optional.empty();
-        if (detectedTmp.isEmpty()) {
-            user = widgetTokenService.resolve(uuid);
-            if (user.isEmpty()) {
-                return ResponseEntity.notFound().build();
-            }
-
-            detectedTmp = gameStateService.getLastKnownGame(user.get());
-            if (detectedTmp.isEmpty()) {
-                return ResponseEntity.ok(new GameInfoResponse(false));
-            }
-        }
-        return ResponseEntity.ok(getGIR(lang, acceptLanguage, detectedTmp, user));
+        return gameInfoFor(uuid, RequestLocale.parse(lang, acceptLanguage));
     }
 
-    private @NonNull GameInfoResponse getGIR(String lang, String acceptLanguage, Optional<DetectedGame> detected,
-                                             Optional<UserAccount> user) {
-        if (detected.isEmpty()) return new GameInfoResponse(false);
-        Locale locale = parseLocale(lang, acceptLanguage);
-        Optional<String> igdbId = resolveIgdbId(detected.get());
-        Optional<IgdbGameDetails> igdbGameDetails = igdbId.flatMap(igdbGameDetailsService::getDetails);
-        GameInfoResponse.IgdbObject igdb = null;
-        if (igdbGameDetails.isPresent()) {
-            IgdbGameDetails gameDetails = igdbGameDetails.get();
-            igdb = new GameInfoResponse.IgdbObject(igdbId.get(), gameDetails.getSlug(), gameDetails.getSummary(),
-                    normalizeProtocolRelative(gameDetails.getCoverUrl()), gameDetails.getGenres(),
-                    moreUrl("/igdb/" + igdbId.get()));
+    /**
+     * The aggregated game info behind a widget token or dev backdoor uuid: 404 for an unknown
+     * token, inGame=false while the widget's channel plays nothing detected.
+     */
+    private ResponseEntity<GameInfoResponse> gameInfoFor(UUID uuid, Locale locale) {
+        Optional<DetectedGame> backdoor = devBackdoorResolver.resolve(uuid);
+        if (backdoor.isPresent()) {
+            return ResponseEntity.ok(aggregate(backdoor.get(), Optional.empty(), locale));
         }
+        Optional<UserAccount> user = widgetTokenService.resolve(uuid);
+        if (user.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(gameStateService.getLastKnownGame(user.get())
+                .map(detected -> aggregate(detected, user, locale))
+                .orElseGet(() -> new GameInfoResponse(false)));
+    }
 
-        GameInfoResponse.SteamObject steam = null;
-        if (detected.get().getSourceType() == GameBinding.SourceType.STEAM && detected.get().getSourceId() != null) {
-            Optional<SteamStoreService.SteamStorePage> pageOpt = steamStoreService.fetchData(detected.get().getSourceId(), locale);
-            if (pageOpt.isPresent()) {
-                SteamStoreService.SteamStorePage page = pageOpt.get();
-                GameInfoResponse.IaDisclosure ia = steamStoreService.fetchIADisclosure(detected.get().getSourceId(), locale)
-                        .map(html -> {
-                            boolean hasDisclosure = SteamIADisclosure.hasDisclosure(html);
-                            String note = hasDisclosure ? SteamIADisclosure.extractDeveloperDescription(html).orElse(null) : null;
-                            return new GameInfoResponse.IaDisclosure(hasDisclosure, note);
-                        })
-                        .orElse(new GameInfoResponse.IaDisclosure(false, null));
-                steam = new GameInfoResponse.SteamObject(detected.get().getSourceId(), page.name(), page.shortDescription(),
+    /** Every platform object resolvable for {@code detected}, each null when unavailable. */
+    private GameInfoResponse aggregate(DetectedGame detected, Optional<UserAccount> user, Locale locale) {
+        Optional<String> igdbId = resolveIgdbId(detected);
+        return new GameInfoResponse(true,
+                igdbId.flatMap(this::igdbObject).orElse(null),
+                steamObject(detected, locale),
+                xboxObject(detected, locale),
+                resolveDtdd(detected, igdbId, locale),
+                user.flatMap(u -> catapultObject(u, detected)).orElse(null));
+    }
+
+    private Optional<GameInfoResponse.IgdbObject> igdbObject(String igdbId) {
+        return igdbGameDetailsService.getDetails(igdbId).map(details -> new GameInfoResponse.IgdbObject(igdbId,
+                details.getSlug(), details.getSummary(), normalizeProtocolRelative(details.getCoverUrl()),
+                details.getGenres(), moreUrl("/igdb/" + igdbId)));
+    }
+
+    private GameInfoResponse.SteamObject steamObject(DetectedGame detected, Locale locale) {
+        if (detected.getSourceType() != GameBinding.SourceType.STEAM || detected.getSourceId() == null) {
+            return null;
+        }
+        String appId = detected.getSourceId();
+        return steamStoreService.fetchData(appId, locale)
+                .map(page -> new GameInfoResponse.SteamObject(appId, page.name(), page.shortDescription(),
                         page.categories(), page.developers(), page.legalNotice(), page.headerImage(),
-                        page.releaseDate(), page.contentDescriptors(), ia, locale,
-                        moreUrl("/steam/" + detected.get().getSourceId()));
-            }
-        }
+                        page.releaseDate(), page.contentDescriptors(), iaDisclosure(appId, locale), locale,
+                        moreUrl("/steam/" + appId)))
+                .orElse(null);
+    }
 
-        GameInfoResponse.XboxObject xbox = null;
-        if (detected.get().getSourceType() == GameBinding.SourceType.XBOX && detected.get().getSourceId() != null) {
-            Optional<XboxStoreService.XboxProduct> product = xboxStoreService.fetchProduct(detected.get().getSourceId(), locale);
-            if (product.isPresent()) {
-                XboxStoreService.XboxProduct p = product.get();
-                xbox = new GameInfoResponse.XboxObject(detected.get().getSourceId(), p.title(), p.description(),
-                        p.publisherName(), p.developerName(), p.coverImage(), p.storeUrl(),
-                        moreUrl("/xbox/" + detected.get().getSourceId()));
-            }
+    private GameInfoResponse.XboxObject xboxObject(DetectedGame detected, Locale locale) {
+        if (detected.getSourceType() != GameBinding.SourceType.XBOX || detected.getSourceId() == null) {
+            return null;
         }
+        String productId = detected.getSourceId();
+        return xboxStoreService.fetchProduct(productId, locale)
+                .map(p -> new GameInfoResponse.XboxObject(productId, p.title(), p.description(), p.publisherName(),
+                        p.developerName(), p.coverImage(), p.storeUrl(), moreUrl("/xbox/" + productId)))
+                .orElse(null);
+    }
 
-        GameInfoResponse.DtddObject dtdd = resolveDtdd(detected.get(), igdbId, locale);
+    /** The widget channel's own tw/ccl config for the game, when it has a binding for it. */
+    private Optional<GameInfoResponse.CatapultObject> catapultObject(UserAccount user, DetectedGame detected) {
+        return gameBindingRepository.findByUserAndSourceIdAndSourceType(user, detected.getSourceId(), detected.getSourceType())
+                .map(binding -> new GameInfoResponse.CatapultObject(binding.getId(), binding.getCreatedAt(),
+                        binding.getTws(), binding.getCcls(), moreUrl("/catapult/" + binding.getId())));
+    }
 
-        Optional<GameBinding> bindingOpt = user.flatMap(u -> gameBindingRepository.findByUserAndSourceIdAndSourceType(u, detected.get().getSourceId(), detected.get().getSourceType()));
-        GameInfoResponse.CatapultObject catapult = null;
-        if (bindingOpt.isPresent()) {
-            GameBinding binding = bindingOpt.get();
-            catapult = new GameInfoResponse.CatapultObject(binding.getId(), binding.getCreatedAt(), binding.getTws(),
-                    binding.getCcls(), moreUrl("/catapult/" + binding.getId()));
-        }
-        GameInfoResponse body = new GameInfoResponse(true, igdb, steam, xbox, dtdd, catapult);
-        return body;
+    /** Whether the Steam store page declares AI-generated content, and the developer's note about it. */
+    private GameInfoResponse.IaDisclosure iaDisclosure(String appId, Locale locale) {
+        return steamStoreService.fetchIADisclosure(appId, locale)
+                .map(html -> {
+                    boolean hasDisclosure = SteamIADisclosure.hasDisclosure(html);
+                    String note = hasDisclosure ? SteamIADisclosure.extractDeveloperDescription(html).orElse(null) : null;
+                    return new GameInfoResponse.IaDisclosure(hasDisclosure, note);
+                })
+                .orElse(new GameInfoResponse.IaDisclosure(false, null));
     }
 
     // These "more" routes are keyed directly by the platform's own public id (igdb id, Steam
@@ -270,20 +273,14 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        Locale steamLocale = parseLocale(lang, acceptLanguage);
+        Locale steamLocale = RequestLocale.parse(lang, acceptLanguage);
         Optional<SteamStoreService.SteamStorePage> page = steamStoreService.fetchData(appId, steamLocale, false);
         if (page.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
         Set<String> ccls = steamStoreService.fetchCcls(List.of(appId)).getOrDefault(appId, Set.of());
         SteamStoreService.ResolvedParentApp parentApp = steamStoreService.resolveEffectiveApp(appId).orElse(null);
-        GameInfoResponse.IaDisclosure ia = steamStoreService.fetchIADisclosure(appId, steamLocale)
-                .map(html -> {
-                    boolean hasDisclosure = SteamIADisclosure.hasDisclosure(html);
-                    String note = hasDisclosure ? SteamIADisclosure.extractDeveloperDescription(html).orElse(null) : null;
-                    return new GameInfoResponse.IaDisclosure(hasDisclosure, note);
-                })
-                .orElse(new GameInfoResponse.IaDisclosure(false, null));
+        GameInfoResponse.IaDisclosure ia = iaDisclosure(appId, steamLocale);
         return ResponseEntity.ok(new SteamDetailResponse("https://store.steampowered.com/app/" + appId,
                 ccls, ia, parentApp == null ? null : new SteamDetailResponse.ParentApp(baseUrl, parentApp),
                 new SteamDetailResponse.Page(baseUrl, steamLocale, page.get())));
@@ -303,7 +300,7 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        Optional<XboxStoreService.XboxProduct> product = xboxStoreService.fetchProduct(productId, parseLocale(lang, acceptLanguage));
+        Optional<XboxStoreService.XboxProduct> product = xboxStoreService.fetchProduct(productId, RequestLocale.parse(lang, acceptLanguage));
         if (product.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -375,7 +372,7 @@ public class UserApiV2Controller {
         return ResponseEntity.ok(new CatapultDetailResponse(b.getCreatedAt(), b.getUpdatedAt(), b.getSourceType(),
                 b.getSourceId(), b.getSourceName(), b.getTwitchGameId(), b.getTwitchGameName(), b.isIgnored(),
                 b.isCclEnabled(), b.getCcls(), b.isTwEnabled(), b.isTwOverride(), b.getTws(),
-                localizeTws(b.getTws(), parseLocale(lang, acceptLanguage))));
+                localizeTws(b.getTws(), RequestLocale.parse(lang, acceptLanguage))));
     }
 
     private GameInfoResponse.DtddObject resolveDtdd(DetectedGame detected, Optional<String> igdbId, Locale locale) {
@@ -404,28 +401,6 @@ public class UserApiV2Controller {
 
     private String moreUrl(String path) {
         return baseUrl + ApiV2.PATH + path;
-    }
-
-    // "lang" wins when present (it's the mechanism that works from a plain pasted OBS URL, with
-    // no header control); Accept-Language is the fallback for clients that do set headers. A
-    // request with neither, or an unparseable Accept-Language value, gets English — deliberately
-    // not the JVM/server default locale, which would make behavior depend on the deploy
-    // environment instead of being a documented, stable contract.
-    private static Locale parseLocale(String lang, String acceptLanguage) {
-        if (lang != null && !lang.isBlank()) {
-            return Locale.forLanguageTag(lang);
-        }
-        if (acceptLanguage != null && !acceptLanguage.isBlank()) {
-            try {
-                List<Locale.LanguageRange> ranges = Locale.LanguageRange.parse(acceptLanguage);
-                if (!ranges.isEmpty()) {
-                    return Locale.forLanguageTag(ranges.get(0).getRange());
-                }
-            } catch (IllegalArgumentException ignored) {
-                // malformed Accept-Language header — fall through to the default
-            }
-        }
-        return Locale.ENGLISH;
     }
 
     private Set<String> localizeTws(Set<String> tws, Locale locale) {

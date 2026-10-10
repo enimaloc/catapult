@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
 import fr.enimaloc.catapult.chat.command.trace.TraceEntry;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -142,7 +142,7 @@ public class SandboxExecutor {
     }
 
     /**
-     * Same as {@link #execute(String, PlaceholderContext, ListContext, ServiceFunctionRegistry, UserAccount, Duration)}
+     * Same as {@link #execute(String, PlaceholderContext, ListContext, ServiceFunctionRegistry, UserAccount, SettingContext, Duration)}
      * but also records a step-by-step {@link ExecutionTrace} of every placeholder resolution,
      * list iteration and service call made during the run — used by the command editor's
      * "Tester" button so authors can see why a command produced (or failed to produce) a
@@ -341,7 +341,7 @@ public class SandboxExecutor {
             Value ctx = context.eval("js", "({})");
             ctx.putMember("placeholder", (ProxyExecutable) args -> placeholders.resolve(args[0].asString()));
             ctx.putMember("list", (ProxyExecutable) args ->
-                boundedListProxyArray(new ArrayList<Object>(lists.resolveList(args[0].asString()))));
+                boundedListProxyArray(new ArrayList<>(lists.resolveList(args[0].asString()))));
             ctx.putMember("setting", (ProxyExecutable) args -> settings == null ? null : settings.resolve(args[0].asString()));
             ctx.putMember("call", (ProxyExecutable) args -> {
                 if (args.length < 2) {
@@ -378,7 +378,7 @@ public class SandboxExecutor {
                 List<Object> values = lists.resolveList(name);
                 String preview = values.stream().map(String::valueOf).collect(Collectors.joining(", "));
                 trace.record(new TraceEntry("for-each", "iterate " + name, preview, false));
-                return boundedListProxyArray(new ArrayList<Object>(values));
+                return boundedListProxyArray(new ArrayList<>(values));
             });
             ctx.putMember("setting", (ProxyExecutable) args -> {
                 String key = args[0].asString();

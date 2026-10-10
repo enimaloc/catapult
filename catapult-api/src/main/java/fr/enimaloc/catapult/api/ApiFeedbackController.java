@@ -1,11 +1,10 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.SubmitRequest;
-import fr.enimaloc.catapult.domain.FeedbackSubmission;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.FeedbackSubmissionRepository;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.service.GitLabClient;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.feedback.FeedbackSubmission;
+import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
+import fr.enimaloc.catapult.service.feedback.GitLabClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -30,12 +29,12 @@ import java.util.UUID;
 public class ApiFeedbackController {
 
     private final FeedbackSubmissionRepository repository;
-    private final UserAccountRepository userAccountRepository;
+    private final ApiUserResolver userResolver;
     private final GitLabClient gitLabClient;
 
     @GetMapping
     public List<FeedbackSubmission> list(@AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = resolveUser(jwt);
+        UserAccount user = userResolver.viewer(jwt);
         return repository.findByUserOrderByCreatedAtDesc(user);
     }
 
@@ -53,7 +52,7 @@ public class ApiFeedbackController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid type");
         }
 
-        UserAccount user = resolveUser(jwt);
+        UserAccount user = userResolver.viewer(jwt);
         String label = feedbackType == FeedbackSubmission.Type.BUG ? "bug" : "enhancement";
         String issueBody = buildIssueBody(user, body.description());
 
@@ -63,7 +62,7 @@ public class ApiFeedbackController {
         submission.setUser(user);
         submission.setType(feedbackType);
         submission.setTitle(body.title().strip());
-        submission.setDescription(body.description() != null && !body.description().isBlank() ? body.description().strip() : null);
+        submission.setDescription(strippedOrNull(body.description()));
         submission.setGitlabIssueIid(created.iid());
         submission.setGitlabIssueUrl(created.webUrl());
         submission.setLastKnownUpdatedAt(created.updatedAt());
@@ -78,7 +77,7 @@ public class ApiFeedbackController {
     public void unsubscribe(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         FeedbackSubmission submission = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        UserAccount user = resolveUser(jwt);
+        UserAccount user = userResolver.viewer(jwt);
         if (!submission.getUser().getId().equals(user.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
@@ -86,14 +85,14 @@ public class ApiFeedbackController {
         repository.save(submission);
     }
 
-    private UserAccount resolveUser(Jwt jwt) {
-        UUID userId = UUID.fromString(jwt.getSubject());
-        return userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+    /** The description (if any) followed by a signature naming the submitter. */
+    private static String buildIssueBody(UserAccount user, String description) {
+        String text = strippedOrNull(description);
+        String body = text != null ? text + "\n\n" : "";
+        return body + "---\n*Soumis par @" + user.getTwitchUsername() + " via Catapult*";
     }
 
-    private String buildIssueBody(UserAccount user, String description) {
-        String body = description != null && !description.isBlank() ? description.strip() + "\n\n" : "";
-        return body + "---\n*Soumis par @" + user.getTwitchUsername() + " via Catapult*";
+    private static String strippedOrNull(String text) {
+        return text != null && !text.isBlank() ? text.strip() : null;
     }
 }
