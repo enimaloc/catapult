@@ -67,7 +67,7 @@ describe("actions", () => {
         await expect(CatapultTwitchat.actions.chatFeedPause()).resolves.toBeUndefined();
         await CatapultTwitchat.send("GREET_FEED_READ", { count: 1 });
         expect(broadcasts()).toEqual([
-            { origin: "twitchat", id: expect.any(String), type: "CHAT_FEED_PAUSE" },
+            { origin: "twitchat", id: expect.any(String), type: "CHAT_FEED_PAUSE", data: {} },
             { origin: "twitchat", id: expect.any(String), type: "GREET_FEED_READ", data: { count: 1 } },
         ]);
     });
