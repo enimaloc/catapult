@@ -53,6 +53,16 @@ beforeEach(async () => {
     await load("obs");
 });
 
+describe("EventSubscription", () => {
+    it("puts every low-volume category in All, high-volume ones aside", () => {
+        const { All, General, Ui, Canvases, InputVolumeMeters } = CatapultObs.EventSubscription;
+        expect(Canvases).toBe(1 << 11);
+        expect(All).toBe((1 << 12) - 1);
+        expect(All & (General | Ui | Canvases)).toBe(General | Ui | Canvases);
+        expect(All & InputVolumeMeters).toBe(0);
+    });
+});
+
 describe("connect", () => {
     it("identifies over the json subprotocol and resolves with what OBS announced", async () => {
         const promise = CatapultObs.connect({ host: "localhost", port: 4455 });
