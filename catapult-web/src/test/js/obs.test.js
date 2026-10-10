@@ -25,19 +25,26 @@ class FakeSocket {
 
 const last = () => sockets.at(-1);
 
-async function connected(options = {}) {
-    const promise = CatapultObs.connect({ host: "localhost", port: 4455, ...options });
-    last().serverSends(0, { obsWebSocketVersion: "5.5.0", rpcVersion: 1 });
-    await flush();
-    last().serverSends(2, { negotiatedRpcVersion: 1 });
-    await promise;
-    return last();
-}
-
 /** Answers the last request sent on socket. */
 function answer(socket, op, d) {
     const requestId = socket.sent.filter((frame) => frame.op === op - 1).at(-1).d.requestId;
     socket.serverSends(op, { requestId, ...d });
+}
+
+/** OBS's answer to the GetVersion sent once identified: no list means no request type check. */
+function answerVersion(socket, availableRequests) {
+    answer(socket, 7, { requestType: "GetVersion", requestStatus: { result: true, code: 100 },
+        responseData: availableRequests ? { availableRequests } : {} });
+}
+
+async function connected(options = {}, availableRequests) {
+    const promise = CatapultObs.connect({ host: "localhost", port: 4455, ...options });
+    last().serverSends(0, { obsWebSocketVersion: "5.5.0", rpcVersion: 1 });
+    await flush();
+    last().serverSends(2, { negotiatedRpcVersion: 1 });
+    answerVersion(last(), availableRequests);
+    await promise;
+    return last();
 }
 
 beforeEach(async () => {
@@ -53,12 +60,18 @@ describe("connect", () => {
         socket.serverSends(0, { obsWebSocketVersion: "5.5.0", rpcVersion: 1 });
         await flush();
         socket.serverSends(2, { negotiatedRpcVersion: 1 });
+        answerVersion(socket, ["GetVersion", "GetSceneList"]);
 
-        await expect(promise).resolves.toEqual(
-            { obsWebSocketVersion: "5.5.0", rpcVersion: 1, authenticated: false, negotiatedRpcVersion: 1 });
+        await expect(promise).resolves.toEqual({
+            obsWebSocketVersion: "5.5.0", rpcVersion: 1, authenticated: false, negotiatedRpcVersion: 1,
+            availableRequests: ["GetVersion", "GetSceneList"],
+        });
         expect(socket.url).toBe("ws://localhost:4455");
         expect(socket.protocol).toBe("obswebsocket.json");
-        expect(socket.sent).toEqual([{ op: 1, d: { rpcVersion: 1 } }]);
+        expect(socket.sent).toEqual([
+            { op: 1, d: { rpcVersion: 1 } },
+            { op: 6, d: { requestType: "GetVersion", requestId: expect.any(String) } },
+        ]);
         expect(CatapultObs.isConnected()).toBe(true);
         expect(CatapultObs.info().negotiatedRpcVersion).toBe(1);
     });
@@ -79,6 +92,7 @@ describe("connect", () => {
         const b64 = (input) => createHash("sha256").update(input).digest("base64");
         expect(last().lastSent(1).authentication).toBe(b64(b64("secrets") + "c"));
         last().serverSends(2, { negotiatedRpcVersion: 1 });
+        answerVersion(last());
         await expect(promise).resolves.toMatchObject({ authenticated: true });
     });
 
@@ -144,7 +158,53 @@ describe("requests", () => {
         expect(CatapultObs.requests.toJSON).toBeUndefined();
         expect(CatapultObs.requests[Symbol.iterator]).toBeUndefined();
         await expect(Promise.resolve(CatapultObs.requests)).resolves.toBe(CatapultObs.requests);
-        expect(last().lastSent(6)).toBeUndefined();
+        expect(last().lastSent(6).requestType).toBe("GetVersion");
+    });
+});
+
+describe("request type check", () => {
+    const AVAILABLE = ["GetVersion", "GetSceneList", "SetStudioModeEnabled", "GetStudioModeEnabled"];
+
+    it("rejects an unknown shortcut without sending it, suggesting the closest one", async () => {
+        const socket = await connected({}, AVAILABLE);
+        const sent = socket.sent.length;
+        const error = await CatapultObs.requests.setStudioModeEnable({ studioModeEnabled: true }).catch((e) => e);
+        expect(error).toMatchObject({
+            name: "ObsError", code: 204, requestType: "SetStudioModeEnable", suggestion: "SetStudioModeEnabled",
+            message: "setStudioModeEnable isn't a request this OBS knows, did you mean setStudioModeEnabled?",
+        });
+        expect(socket.sent).toHaveLength(sent);
+    });
+
+    it("writes call()'s errors with request type names, and suggests nothing far off", async () => {
+        await connected({}, AVAILABLE);
+        await expect(CatapultObs.call("GetScenList")).rejects.toThrow(
+            "GetScenList isn't a request this OBS knows, did you mean GetSceneList?");
+        await expect(CatapultObs.call("ExplodeEverything")).rejects.toMatchObject({
+            message: "ExplodeEverything isn't a request this OBS knows", suggestion: null });
+    });
+
+    it("rejects a batch holding an unknown request type without sending any of it", async () => {
+        const socket = await connected({}, AVAILABLE);
+        await expect(CatapultObs.callBatch([{ requestType: "GetVersion" }, { requestType: "GetSceneLis" }]))
+            .rejects.toMatchObject({ suggestion: "GetSceneList" });
+        expect(socket.lastSent(8)).toBeUndefined();
+    });
+
+    it("lets OBS judge when the list is unknown", async () => {
+        const socket = await connected();
+        CatapultObs.requests.setStudioModeEnable({ studioModeEnabled: true });
+        expect(socket.lastSent(6).requestType).toBe("SetStudioModeEnable");
+    });
+
+    it("still connects when GetVersion fails", async () => {
+        const promise = CatapultObs.connect({ host: "h", port: 1 });
+        last().serverSends(0, { rpcVersion: 1 });
+        await flush();
+        last().serverSends(2, { negotiatedRpcVersion: 1 });
+        answer(last(), 7, { requestType: "GetVersion", requestStatus: { result: false, code: 500 } });
+        await expect(promise).resolves.toMatchObject({ negotiatedRpcVersion: 1 });
+        expect(CatapultObs.info().availableRequests).toBeUndefined();
     });
 });
 

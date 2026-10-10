@@ -72,17 +72,22 @@ window.CatapultObs = (function () {
         UnsupportedFeature: 4012,
     });
 
+    /** OBS's request status for a request type it doesn't know. */
+    const UNKNOWN_REQUEST_TYPE = 204;
+
     /**
      * Every failure CatapultObs rejects with. `code` is the close code for a closed connection,
-     * the request status code for a failed request (`requestType`/`comment` set then too).
+     * the request status code for a failed request (`requestType`/`comment` set then too, and
+     * `suggestion`, the closest known request type, when the type was unknown).
      */
     class ObsError extends Error {
-        constructor(message, { code = null, requestType = null, comment = null } = {}) {
+        constructor(message, { code = null, requestType = null, comment = null, suggestion = null } = {}) {
             super(message);
             this.name = "ObsError";
             this.code = code;
             this.requestType = requestType;
             this.comment = comment;
+            this.suggestion = suggestion;
         }
     }
 
@@ -107,6 +112,65 @@ window.CatapultObs = (function () {
     let identifiedWaiters = [];
     let connected = false;
     let info = null;
+    // The request types the connected OBS knows (GetVersion's availableRequests); null when
+    // unknown, which leaves OBS to judge request types itself.
+    let available = null;
+
+    /** Case-insensitive Levenshtein distance. */
+    function distance(a, b) {
+        a = a.toLowerCase();
+        b = b.toLowerCase();
+        let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+        for (let i = 1; i <= a.length; i++) {
+            const current = [i];
+            for (let j = 1; j <= b.length; j++) {
+                current[j] = Math.min(previous[j] + 1, current[j - 1] + 1,
+                    previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+            }
+            previous = current;
+        }
+        return previous[b.length];
+    }
+
+    /** The known request type closest to requestType, when near enough to be a typo of it. */
+    function closestRequestType(requestType) {
+        let closest = null;
+        let closestDistance = Infinity;
+        for (const candidate of available) {
+            const d = distance(requestType, candidate);
+            if (d < closestDistance) {
+                closest = candidate;
+                closestDistance = d;
+            }
+        }
+        return closestDistance <= Math.max(2, Math.floor(requestType.length / 4)) ? closest : null;
+    }
+
+    /**
+     * The ObsError for a request type the connected OBS doesn't know, null when it knows it (or
+     * its list is unknown). `style` writes the names the way the caller did (shortcut or not).
+     */
+    function unknownRequestType(requestType, style = (name) => name) {
+        if (!available || available.has(requestType)) return null;
+        const suggestion = closestRequestType(requestType);
+        const message = `${style(requestType)} isn't a request this OBS knows`
+            + (suggestion ? `, did you mean ${style(suggestion)}?` : "");
+        return new ObsError(message, { code: UNKNOWN_REQUEST_TYPE, requestType, suggestion });
+    }
+
+    /** call(), with request type names in the errors written by `style`. */
+    function request(requestType, requestData, style) {
+        const unknown = unknownRequestType(requestType, style);
+        if (unknown) return Promise.reject(unknown);
+        const d = requestData === undefined ? { requestType } : { requestType, requestData };
+        return sendAwaiting(OpCode.Request, d, (answer, resolve, reject) => {
+            if (answer.requestStatus?.result) {
+                resolve(answer.responseData ?? {});
+            } else {
+                reject(requestError(requestType, answer.requestStatus));
+            }
+        });
+    }
 
     async function sha256Base64(input) {
         const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
@@ -170,6 +234,7 @@ window.CatapultObs = (function () {
             identifiedWaiters = [];
             connected = false;
             info = null;
+            available = null;
             return new Promise((resolve, reject) => {
                 let settled = false;
                 settle = (ok, value) => {
@@ -208,7 +273,7 @@ window.CatapultObs = (function () {
 
         /**
          * What OBS announced for the current connection, null before the Hello:
-         * { obsWebSocketVersion, rpcVersion, authenticated, negotiatedRpcVersion }.
+         * { obsWebSocketVersion, rpcVersion, authenticated, negotiatedRpcVersion, availableRequests }.
          */
         info() {
             return info;
@@ -229,14 +294,30 @@ window.CatapultObs = (function () {
                     if (socket === current) send(OpCode.Identify, identify);
                     break;
                 }
-                case OpCode.Identified:
-                    // Also OBS's answer to a Reidentify, hence the waiters.
-                    connected = true;
+                case OpCode.Identified: {
                     info = { ...info, negotiatedRpcVersion: d.negotiatedRpcVersion };
+                    if (connected) { // OBS's answer to a Reidentify
+                        identifiedWaiters.forEach(({ resolve }) => resolve(info));
+                        identifiedWaiters = [];
+                        break;
+                    }
+                    const current = socket;
+                    connected = true;
+                    // Before connect() resolves, so request types are checked from the first call.
+                    // Without the list (GetVersion failed), OBS keeps judging them itself.
+                    try {
+                        const { availableRequests } = await obs.call("GetVersion");
+                        if (socket !== current) return;
+                        if (Array.isArray(availableRequests)) {
+                            available = new Set(availableRequests);
+                            info = { ...info, availableRequests };
+                        }
+                    } catch {
+                        if (socket !== current) return;
+                    }
                     settle(true, info);
-                    identifiedWaiters.forEach(({ resolve }) => resolve(info));
-                    identifiedWaiters = [];
                     break;
+                }
                 case OpCode.Event:
                     emit(d.eventType, d);
                     emit("*", d);
@@ -254,17 +335,12 @@ window.CatapultObs = (function () {
 
         /**
          * Sends a request, resolving with its responseData ({} when OBS sends none), rejecting
-         * with an ObsError carrying the request status code and comment when it fails.
+         * with an ObsError carrying the request status code and comment when it fails. A request
+         * type the connected OBS doesn't know fails without being sent, with the closest known
+         * one as `suggestion`.
          */
         call(requestType, requestData) {
-            const d = requestData === undefined ? { requestType } : { requestType, requestData };
-            return sendAwaiting(OpCode.Request, d, (answer, resolve, reject) => {
-                if (answer.requestStatus?.result) {
-                    resolve(answer.responseData ?? {});
-                } else {
-                    reject(requestError(requestType, answer.requestStatus));
-                }
-            });
+            return request(requestType, requestData);
         },
 
         /**
@@ -279,6 +355,9 @@ window.CatapultObs = (function () {
          * @param {number} [options.executionType] RequestBatchExecutionType, SerialRealtime by default
          */
         callBatch(requests, { haltOnFailure, executionType } = {}) {
+            // A typo is a bug in the batch, not an outcome of one of its requests: nothing is sent.
+            const unknown = requests.map(({ requestType }) => unknownRequestType(requestType)).find(Boolean);
+            if (unknown) return Promise.reject(unknown);
             const d = {
                 requests: requests.map(({ requestType, requestData }) =>
                     (requestData === undefined ? { requestType } : { requestType, requestData })),
@@ -345,19 +424,20 @@ window.CatapultObs = (function () {
     // turning them into requests would make `await obs.requests` send a "Then" request.
     const NOT_REQUESTS = new Set(["then", "catch", "finally", "toJSON", "constructor", "asymmetricMatch", "nodeType", "$$typeof"]);
     const shortcuts = new Map();
+    const shortcutName = (requestType) => requestType[0].toLowerCase() + requestType.slice(1);
 
     /**
      * Shortcuts for every request: requests.getSceneList() is call("GetSceneList"), and
      * requests.setCurrentProgramScene({ sceneName }) is call("SetCurrentProgramScene", { sceneName }).
      * Built on access, so any request OBS knows works without being listed here; an unknown one
-     * rejects with OBS's UnknownRequestType status (204).
+     * rejects with status 204 (UnknownRequestType) and the closest known shortcut suggested.
      */
     obs.requests = new Proxy({}, {
         get(_, name) {
             if (typeof name !== "string" || NOT_REQUESTS.has(name)) return undefined;
             if (!shortcuts.has(name)) {
                 const requestType = name[0].toUpperCase() + name.slice(1);
-                shortcuts.set(name, (requestData) => obs.call(requestType, requestData));
+                shortcuts.set(name, (requestData) => request(requestType, requestData, shortcutName));
             }
             return shortcuts.get(name);
         },
