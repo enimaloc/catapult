@@ -296,6 +296,38 @@ describe("events", () => {
     });
 });
 
+describe("page events", () => {
+    function record() {
+        const events = [];
+        for (const type of ["catapult:obs:connected", "catapult:obs:disconnected"]) {
+            document.addEventListener(type, (e) => events.push([type, e.detail]));
+        }
+        return events;
+    }
+
+    it("fires connected once ready, disconnected when a live connection ends, close() included", async () => {
+        const events = record();
+        let socket = await connected({}, ["GetVersion"]);
+        expect(events).toEqual([["catapult:obs:connected", { info: CatapultObs.info() }]]);
+        socket.serverCloses(4011);
+        expect(events[1]).toEqual(["catapult:obs:disconnected", { error: expect.objectContaining({ code: 4011 }) }]);
+
+        await connected();
+        CatapultObs.close();
+        expect(events.map(([type]) => type)).toEqual([
+            "catapult:obs:connected", "catapult:obs:disconnected", "catapult:obs:connected", "catapult:obs:disconnected"]);
+    });
+
+    it("stays quiet on failed attempts", async () => {
+        const events = record();
+        const attempt = CatapultObs.connect({ host: "h", port: 1 });
+        last().serverCloses(1006);
+        await attempt.catch(() => {});
+        CatapultObs.close();
+        expect(events).toEqual([]);
+    });
+});
+
 describe("disconnects", () => {
     it("fires onDisconnect with the close code and fails pending requests when a live connection drops", async () => {
         CatapultObs.onDisconnect = vi.fn();
