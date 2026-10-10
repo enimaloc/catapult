@@ -1,0 +1,354 @@
+package fr.enimaloc.catapult.api.chatcommand;
+
+import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.chat.ChatCommandEvent;
+import fr.enimaloc.catapult.chat.ChatCommandPresetCatalog;
+import fr.enimaloc.catapult.chat.PlaceholderResolver;
+import fr.enimaloc.catapult.chat.command.ast.CommandAst;
+import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
+import fr.enimaloc.catapult.chat.command.ast.ServiceCallExpr;
+import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.common.dto.chatcommand.BotModStatusDto;
+import fr.enimaloc.catapult.common.dto.chatcommand.FallbackDto;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandFallback;
+import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import fr.enimaloc.catapult.service.twitch.SystemTwitchAccountService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * REST endpoints for managing chat command definitions owned by the current user.
+ *
+ * <p>All endpoints are gated by the {@code chat.commands} experiment.</p>
+ */
+@RestController
+@RequestMapping("/api/chat-commands")
+@RequiredArgsConstructor
+public class ApiChatCommandsController {
+
+    public static final String EXPERIMENT_KEY = "chat.commands";
+
+    private static final Set<String> RESERVED_NAMES = Set.of("!setgame");
+    private static final NodeJsonCodec AST_CODEC = new NodeJsonCodec();
+    private static final CommandDslGenerator DSL_GENERATOR = new CommandDslGenerator();
+
+    private final ChatCommandDefinitionRepository repository;
+    private final ChatCommandPresetCatalog catalog;
+    private final PlaceholderResolver placeholderResolver;
+    private final ExperimentService experimentService;
+    private final SystemTwitchAccountService systemAccount;
+    private final ApiUserResolver userResolver;
+    private final ApplicationEventPublisher eventPublisher;
+    private final JsCompiler jsCompiler;
+    private final ServiceFunctionRegistry serviceFunctionRegistry;
+    private final OAuthTokenRepository oAuthTokenRepository;
+
+    public record CommandDto(
+        UUID id,
+        String name,
+        String template,
+        ChatCommandEvent.SenderRole permission,
+        boolean enabled,
+        String presetKey,
+        List<FallbackDto> fallbacks,
+        String ejectedJs,
+        List<String> missingTwitchScopes
+    ) {
+        static CommandDto fromEntity(ChatCommandDefinition d) {
+            List<FallbackDto> fb = d.getFallbacks().stream()
+                .map(f -> new FallbackDto(f.getPlaceholder(), f.getFallbackText()))
+                .toList();
+            return new CommandDto(d.getId(), d.getName(), d.getTemplate(),
+                d.getPermission(), d.isEnabled(), d.getPresetKey(), fb, d.getEjectedJs(), List.of());
+        }
+    }
+
+    public record ListResponse(
+        List<String> presets,
+        List<CommandDto> commands,
+        BotModStatusDto botModStatus
+    ) {}
+
+    public record UpsertRequest(
+        @NotNull
+        @Pattern(regexp = "^![a-z][a-z0-9_]{0,30}$", message = "name must match ^![a-z][a-z0-9_]{0,30}$")
+        String name,
+        @NotNull @Size(max = 500) String template,
+        @NotNull ChatCommandEvent.SenderRole permission,
+        boolean enabled,
+        Map<String, String> fallbacks,
+        // Set by the Blocks/Text editor modal (Task 16-17): the NodeJsonCodec JSON of the
+        // edited CommandAst. Optional so older/simpler callers (e.g. the plain "add custom
+        // command" form) can keep sending template-only bodies. When present it is the
+        // source of truth; `template` is regenerated from it below to keep the read-only
+        // audit column in sync rather than trusting whatever text the client also sent.
+        String ast,
+        // "Eject to JS" (Phase 2): hand-edited JS that runs directly at dispatch time,
+        // bypassing the AST compiler. Reversible by design — ast/template above are never
+        // derived from this, and the client clears it (sends null/omits it) to revert to
+        // Blocks/Text. Null/blank means "not ejected".
+        String ejectedJs
+    ) {}
+
+    @GetMapping
+    @Transactional
+    public ListResponse list(@AuthenticationPrincipal Jwt jwt) {
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
+        gate(user);
+        // Built-ins (e.g. !setgame) are always ensured — they evolve as new
+        // Java ChatCommand beans get registered, and their deletion is not
+        // meaningful (the action stays in code).
+        catalog.ensureBuiltins(user, Locale.FRANCE);
+        List<ChatCommandDefinition> existing = repository.findByUser(user);
+        // First-ever visit: also seed all data-driven presets disabled.
+        // After that, a user can delete them freely without them coming back.
+        if (existing.stream().allMatch(ChatCommandPresetCatalog::isBuiltin)) {
+            catalog.bootstrapPresetsDisabled(user, Locale.FRANCE);
+            existing = repository.findByUser(user);
+        }
+        List<CommandDto> commands = existing.stream()
+            .map(CommandDto::fromEntity).toList();
+        SystemTwitchAccountService.BotModStatus s = checkBotMod(user);
+        return new ListResponse(
+            new ArrayList<>(catalog.allKeys()),
+            commands,
+            new BotModStatusDto(s.modded(), s.checkedAt())
+        );
+    }
+
+    @PostMapping("/presets/{presetKey}")
+    @Transactional
+    public ResponseEntity<CommandDto> instantiatePreset(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String presetKey
+    ) {
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
+        gate(user);
+        try {
+            ChatCommandDefinition def = catalog.instantiate(user, presetKey, Locale.FRANCE);
+            publishChanged(user);
+            return ResponseEntity.status(HttpStatus.CREATED).body(CommandDto.fromEntity(def));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
+    }
+
+    @PostMapping
+    @Transactional
+    public ResponseEntity<CommandDto> create(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody UpsertRequest req
+    ) {
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
+        gate(user);
+        validateTemplate(effectiveTemplate(req));
+        if (isReservedName(req.name())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Reserved command name");
+        }
+        if (repository.existsByUserAndName(user, req.name())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Name already used");
+        }
+        ChatCommandDefinition def = new ChatCommandDefinition();
+        def.setUser(user);
+        applyRequest(def, req);
+        repository.save(def);
+        publishChanged(user);
+        return ResponseEntity.status(HttpStatus.CREATED).body(withMissingScopes(def, user));
+    }
+
+    @PutMapping("/{id}")
+    @Transactional
+    public CommandDto update(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable UUID id,
+        @Valid @RequestBody UpsertRequest req
+    ) {
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
+        gate(user);
+        validateTemplate(effectiveTemplate(req));
+        ChatCommandDefinition def = repository.findById(id)
+            .filter(d -> d.getUser().getId().equals(user.getId()))
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        applyRequest(def, req);
+        repository.save(def);
+        publishChanged(user);
+        return withMissingScopes(def, user);
+    }
+
+    @DeleteMapping("/{id}")
+    @Transactional
+    public ResponseEntity<Void> delete(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable UUID id
+    ) {
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
+        gate(user);
+        ChatCommandDefinition def = repository.findById(id)
+            .filter(d -> d.getUser().getId().equals(user.getId()))
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (ChatCommandPresetCatalog.isBuiltin(def)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Built-in commands cannot be deleted");
+        }
+        repository.delete(def);
+        publishChanged(user);
+        return ResponseEntity.noContent().build();
+    }
+
+    private void gate(UserAccount user) {
+        // evaluateGate (not isRolledOut) so that an admin override on the user
+        // materialises the assignment on first call. isRolledOut only reads
+        // existing assignments, so overrides without a prior assignment would
+        // never let the user reach this page.
+        if (!experimentService.evaluateGate(user, EXPERIMENT_KEY)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature not enabled");
+        }
+    }
+
+    /**
+     * Best-effort bot mod status check. We do not have the streamer's decrypted OAuth token
+     * available in the controller — the full mod-status check is exercised lazily at
+     * sendMessage time. We pass an empty token here; {@link SystemTwitchAccountService#check}
+     * is expected to gracefully fall back to "not modded" on auth failure and cache it.
+     * <p>
+     * When no system bot is configured, the mod check makes no sense — the streamer's
+     * own account is used for sending — so we short-circuit to "modded=true" to keep
+     * the banner hidden.
+     */
+    private SystemTwitchAccountService.BotModStatus checkBotMod(UserAccount user) {
+        if (systemAccount.getSystemTwitchId() == null) {
+            return new SystemTwitchAccountService.BotModStatus(true, Instant.now());
+        }
+        try {
+            return systemAccount.check(user, "");
+        } catch (Exception e) {
+            return new SystemTwitchAccountService.BotModStatus(false, Instant.now());
+        }
+    }
+
+    private boolean isReservedName(String name) {
+        return RESERVED_NAMES.contains(name);
+    }
+
+    private void validateTemplate(String template) {
+        Set<String> unknown = placeholderResolver.findUnknownPaths(template);
+        if (!unknown.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Unknown placeholders: " + String.join(", ", unknown));
+        }
+    }
+
+    /**
+     * The DSL text the command should be validated/persisted with: regenerated from the
+     * client-supplied {@code ast} when present (Blocks/Text editor saves), or the raw
+     * {@code template} for callers that don't send an AST yet (e.g. the plain "add custom
+     * command" form). Keeps validation and persistence looking at the same text.
+     */
+    private String effectiveTemplate(UpsertRequest req) {
+        if (req.ast() == null) return req.template();
+        return DSL_GENERATOR.generate(AST_CODEC.fromJson(req.ast()));
+    }
+
+    private void applyRequest(ChatCommandDefinition def, UpsertRequest req) {
+        // Renommage autorisé même pour les built-ins : le DynamicCommandResolver
+        // route les rows builtin vers le bean Java statique via leur presetKey,
+        // donc le nom peut diverger de cmd.getName() sans casser la dispatch.
+        def.setName(req.name());
+        if (req.ast() != null) {
+            def.setAst(req.ast());
+            def.setTemplate(DSL_GENERATOR.generate(AST_CODEC.fromJson(req.ast())));
+        } else {
+            def.setTemplate(req.template());
+        }
+        def.setPermission(req.permission());
+        def.setEnabled(req.enabled());
+        def.setEjectedJs((req.ejectedJs() == null || req.ejectedJs().isBlank()) ? null : req.ejectedJs());
+
+        def.getFallbacks().clear();
+        if (req.fallbacks() != null) {
+            req.fallbacks().forEach((path, text) -> {
+                if (text != null && !text.isBlank()) {
+                    ChatCommandFallback fb = new ChatCommandFallback();
+                    fb.setCommand(def);
+                    fb.setPlaceholder(path);
+                    fb.setFallbackText(text.length() > 200 ? text.substring(0, 200) : text);
+                    def.getFallbacks().add(fb);
+                }
+            });
+        }
+    }
+
+    /**
+     * Builds the response DTO with {@code missingTwitchScopes} computed from the just-saved
+     * AST against the user's currently granted Twitch OAuth scopes. Best-effort: a command
+     * still saves successfully even when a referenced function needs a scope the user hasn't
+     * granted yet — it just fails gracefully at dispatch time, same as any other best-effort
+     * chat command failure. Non-Twitch functions (no requiredScopes()) never contribute here.
+     */
+    private CommandDto withMissingScopes(ChatCommandDefinition def, UserAccount user) {
+        List<String> missing = missingTwitchScopes(def, user);
+        CommandDto base = CommandDto.fromEntity(def);
+        return new CommandDto(base.id(), base.name(), base.template(), base.permission(), base.enabled(),
+            base.presetKey(), base.fallbacks(), base.ejectedJs(), missing);
+    }
+
+    private List<String> missingTwitchScopes(ChatCommandDefinition def, UserAccount user) {
+        if (def.getAst() == null) return List.of();
+        CommandAst ast = AST_CODEC.fromJson(def.getAst());
+        Set<ServiceCallExpr> calls = jsCompiler.collectServiceCalls(ast);
+        if (calls.isEmpty()) return List.of();
+
+        Set<String> granted = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+            .map(OAuthToken::getGrantedScopes)
+            .map(s -> Set.of(s.split(" ")))
+            .orElse(Set.of());
+
+        Set<String> missing = new java.util.LinkedHashSet<>();
+        for (ServiceCallExpr call : calls) {
+            serviceFunctionRegistry.lookup(call.namespace(), call.function())
+                .map(ServiceFunction::requiredScopes)
+                .ifPresent(required -> required.stream().filter(s -> !granted.contains(s)).forEach(missing::add));
+        }
+        return List.copyOf(missing);
+    }
+
+    private void publishChanged(UserAccount user) {
+        eventPublisher.publishEvent(new ChatCommandDefinitionChangedEvent(this, user.getId()));
+    }
+}

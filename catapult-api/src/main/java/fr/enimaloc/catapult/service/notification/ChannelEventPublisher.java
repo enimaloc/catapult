@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.TwitchatNotification;
-import fr.enimaloc.catapult.common.dto.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatNotification;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;

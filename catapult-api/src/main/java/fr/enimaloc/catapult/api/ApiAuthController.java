@@ -2,8 +2,8 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.AuthCodeStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -45,7 +45,6 @@ public class ApiAuthController {
         UserAccount account = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new IllegalStateException("User not found: " + userId));
 
-        @SuppressWarnings("unchecked")
         List<String> roles = jwt.getClaim("roles");
 
         return new UserInfoResponse(

@@ -1,6 +1,6 @@
 /**
  * Live updates for /channel/{username}: a Server-Sent Events stream that reacts to each
- * ChannelUpdatedEvent subtype published server-side (see ws/event/*.java) by patching just
+ * ChannelUpdatedEvent subtype published server-side (see event/*.java) by patching just
  * the affected part of the DOM — the same patch a successful mutation in this tab would
  * apply to itself, now driven by the server instead of the client's own postJson() call.
  * That's why the mutation handlers across channel-*.js no longer call CatapultChannel.refresh()

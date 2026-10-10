@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.repository.DtddApiKeyRepository;
+import fr.enimaloc.catapult.getter.dtdd.DtddApiKeyRotator;
+import fr.enimaloc.catapult.getter.steam.SteamRateLimiter;
+import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 

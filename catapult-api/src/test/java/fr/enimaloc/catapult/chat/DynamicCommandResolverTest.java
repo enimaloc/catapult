@@ -3,12 +3,12 @@ package fr.enimaloc.catapult.chat;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
-import fr.enimaloc.catapult.domain.ChatCommandDefinition;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
 import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
-import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.service.GameContextService;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.service.binding.GameContextService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,6 @@ class DynamicCommandResolverTest {
     @Mock ChatCommandDefinitionRepository repository;
     @Mock GameContextService gameContextService;
 
-    private PlaceholderResolver placeholderResolver;
     private DynamicCommandResolver resolver;
     private UserAccount user;
 
@@ -42,7 +41,7 @@ class DynamicCommandResolverTest {
     void setup() {
         TwPlaceholderRegistry twRegistry = org.mockito.Mockito.mock(TwPlaceholderRegistry.class);
         org.mockito.Mockito.when(twRegistry.getKnownPaths()).thenReturn(java.util.Set.of());
-        placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry(), twRegistry);
+        PlaceholderResolver placeholderResolver = new PlaceholderResolver(new SimpleMeterRegistry(), twRegistry);
         resolver = new DynamicCommandResolver(repository, placeholderResolver, gameContextService,
             new JsCompiler(), new SandboxExecutor(), new ServiceFunctionRegistry(),
             org.mockito.Mockito.mock(ChatCommandSettingRepository.class),

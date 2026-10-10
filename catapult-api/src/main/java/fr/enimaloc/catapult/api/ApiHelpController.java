@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.HelpContent;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.service.MinecraftGateService;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;

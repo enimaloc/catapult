@@ -1,4 +1,4 @@
-<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.ChannelPageData"*/-->
+<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
 <mdui-tab-panel slot="panel" value="integrations" th:with="ch=${channelPage}" th:if="${channelPage.isOwner()}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
     <div class="section-header">
         <h2 th:text="#{channel.connections.title}">Connexions</h2>
@@ -60,7 +60,8 @@
                 <div class="steam-token-none" spa:if="noToken:${!ch.steam().hasPersonalToken()}"
                      spa:on="noToken:SteamTokenDeletedEvent,noToken:!SteamTokenSavedEvent">
                     <input type="password" id="steam-token-input"
-                           th:placeholder="#{channel.connections.steam.token.placeholder}"/>
+                           th:placeholder="#{channel.connections.steam.token.placeholder}"
+                           th:aria-label="#{channel.connections.steam.token.placeholder}"/>
                     <label>
                         <mdui-switch id="steam-token-share-new"></mdui-switch>
                         <span th:text="#{channel.connections.steam.token.shared}">Partager avec les autres profils</span>
@@ -114,7 +115,8 @@
                 <div spa:if="caseNone:${ch.minecraft().status() == 'NONE'}"
                      spa:switch="caseNone:MinecraftEnrollEvent.status=NONE,caseNone:MinecraftSyncEvent.status=NONE,caseNone:MinecraftDisconnectedEvent">
                     <input type="text" id="minecraft-name-input"
-                           th:placeholder="#{channel.connections.minecraft.name_placeholder}"/>
+                           th:placeholder="#{channel.connections.minecraft.name_placeholder}"
+                           th:aria-label="#{channel.connections.minecraft.name_placeholder}"/>
                 </div>
                 <div spa:if="casePending:${ch.minecraft().status() == 'PENDING'}"
                      spa:switch="casePending:MinecraftEnrollEvent.status=PENDING,casePending:MinecraftSyncEvent.status=PENDING,casePending:!MinecraftDisconnectedEvent">
@@ -173,13 +175,16 @@
 
             <div id="obs-status-body">
                 <div class="obs-fields">
-                    <input type="text" id="obs-host" th:placeholder="#{channel.connections.obs.host}" th:value="${ch.obs().host()}"/>
+                    <input type="text" id="obs-host" th:placeholder="#{channel.connections.obs.host}"
+                           th:aria-label="#{channel.connections.obs.host}" th:value="${ch.obs().host()}"/>
                     <input type="number" id="obs-port" min="1" max="65535" th:placeholder="#{channel.connections.obs.port}"
+                           th:aria-label="#{channel.connections.obs.port}"
                            th:value="${ch.obs().port()}"/>
                     <!-- The stored password is never sent back: leave the field empty and only
                          hint that one exists. -->
                     <input type="password" id="obs-password"
-                           th:placeholder="${ch.obs().hasPassword()} ? '••••••••' : #{channel.connections.obs.password}"/>
+                           th:placeholder="${ch.obs().hasPassword()} ? '••••••••' : #{channel.connections.obs.password}"
+                           th:aria-label="#{channel.connections.obs.password}"/>
                 </div>
             </div>
 

@@ -1,15 +1,15 @@
 package fr.enimaloc.catapult.chat.command.js;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.service.IgdbClient;
-import fr.enimaloc.catapult.service.IgdbService;
-import fr.enimaloc.catapult.service.SteamStoreService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.service.igdb.IgdbClient;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.igdb.IgdbWebsiteKeys;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import proto.ExternalGame;
 import proto.Franchise;
 import proto.Game;
 import proto.GameMode;
@@ -20,14 +20,12 @@ import proto.Platform;
 import proto.PlayerPerspective;
 import proto.Screenshot;
 import proto.Theme;
-import proto.Website;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -55,8 +53,8 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
             }
             // The search endpoint only returns id/name — fetch the enriched fields (summary,
             // release date, ratings, platforms) the same way the game-details cache does.
-            Game game = igdbClient.fetchGameDetails(String.valueOf(results.get(0).getId()), token)
-                .orElse(results.get(0));
+            Game game = igdbClient.fetchGameDetails(String.valueOf(results.getFirst().getId()), token)
+                .orElse(results.getFirst());
             return Optional.of(toIgdbGame(game));
         } catch (Exception e) {
             return Optional.empty();
@@ -69,12 +67,12 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
                 Instant.ofEpochSecond(game.getFirstReleaseDate().getSeconds()).atZone(ZoneOffset.UTC))
             : "";
         String platforms = String.join(", ", mapValues(game.getPlatformsList(), Platform::getName));
-        String igdbUrl = game.getSlug() == null || game.getSlug().isBlank()
+        String igdbUrl = game.getSlug().isBlank()
             ? "" : "https://www.igdb.com/games/" + game.getSlug();
         return new IgdbGame(
             String.valueOf(game.getId()),
-            game.getName() != null ? game.getName() : "",
-            game.getSummary() != null ? game.getSummary() : "",
+            game.getName(),
+            game.getSummary(),
             releaseDate,
             game.getRating() > 0 ? String.valueOf(Math.round(game.getRating())) : "",
             game.getAggregatedRating() > 0 ? String.valueOf(Math.round(game.getAggregatedRating())) : "",
@@ -85,7 +83,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
 
     @Override
     public Optional<Map<String, String>> igdbExternalPlatforms(String igdbId) {
-        return fetchDetails(igdbId).map(DefaultChatCommandServiceGateway::extractExternalPlatforms);
+        return fetchDetails(igdbId).map(IgdbWebsiteKeys::links);
     }
 
     @Override
@@ -100,7 +98,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
                 return Map.of();
             }
             proto.Cover cover = game.getCover();
-            return Map.<String, Object>of("url", cover.getUrl(), "width", cover.getWidth(), "height", cover.getHeight());
+            return Map.of("url", cover.getUrl(), "width", cover.getWidth(), "height", cover.getHeight());
         });
     }
 
@@ -111,7 +109,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
 
     @Override
     public Optional<List<Map<String, Object>>> igdbVideos(String igdbId) {
-        return fetchDetails(igdbId).map(game -> mapValues(game.getVideosList(), v -> Map.<String, Object>of(
+        return fetchDetails(igdbId).map(game -> mapValues(game.getVideosList(), v -> Map.of(
             "name", v.getName(),
             "url", "https://www.youtube.com/watch?v=" + v.getVideoId()
         )));
@@ -140,9 +138,9 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
 
     @Override
     public Optional<List<Map<String, Object>>> igdbAgeRatings(String igdbId) {
-        return fetchDetails(igdbId).map(game -> mapValues(game.getAgeRatingsList(), ar -> Map.<String, Object>of(
-            "organization", ar.getOrganization().getName(),
-            "rating", ar.getRating().name()
+        return fetchDetails(igdbId).map(game -> mapValues(game.getAgeRatingsList(), ar -> Map.of(
+            "organization", ar.getRatingCategory().getOrganization().getName(),
+            "rating", ar.getRatingCategory().getRating()
         )));
     }
 
@@ -192,35 +190,6 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
         }
     }
 
-    // Merges websites (official site, wikipedia, ...) and external_games (Steam/Xbox/... store
-    // links) into one lowercased-source -> id/url map — mirrors
-    // fr.enimaloc.catapult.service.IgdbGameDetailsService#extractWebsites; not extracted to a
-    // shared helper since that one persists to a JPA entity and this one feeds the sandbox.
-    private static Map<String, String> extractExternalPlatforms(Game game) {
-        Map<String, String> map = new HashMap<>();
-        for (Website website : game.getWebsitesList()) {
-            String category = website.getCategory().name().toLowerCase(Locale.ROOT);
-            if (category.startsWith("website_")) {
-                category = category.substring("website_".length());
-            }
-            if (website.getUrl() != null && !website.getUrl().isBlank()) {
-                map.put(category, website.getUrl());
-            }
-        }
-        for (ExternalGame external : game.getExternalGamesList()) {
-            if (!external.hasExternalGameSource()) {
-                continue;
-            }
-            String source = external.getExternalGameSource().getName();
-            if (source == null || source.isBlank()) {
-                continue;
-            }
-            if (external.getUid() != null && !external.getUid().isBlank()) {
-                map.put(source.toLowerCase(Locale.ROOT), external.getUid());
-            }
-        }
-        return map;
-    }
 
     @Override
     public Optional<String> twitchOwnDisplayName(UserAccount user) {
@@ -245,7 +214,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
                     .body(Map.class);
                 if (body == null) return Optional.empty();
                 // Steam appdetails unwrapping (body.get(appId) -> success -> data -> field) mirrors
-                // fr.enimaloc.catapult.service.SteamStoreServiceImpl; not extracted to a shared helper here.
+                // fr.enimaloc.catapult.service.steam.SteamStoreServiceImpl; not extracted to a shared helper here.
                 Map<?, ?> appEntry = (Map<?, ?>) body.get(appId);
                 if (appEntry == null || !Boolean.TRUE.equals(appEntry.get("success"))) return Optional.empty();
                 Map<?, ?> data = (Map<?, ?>) appEntry.get("data");
@@ -276,7 +245,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
                         .body(Map.class);
                 if (body == null) return Optional.empty();
                 // Steam appdetails unwrapping (body.get(appId) -> success -> data -> field) mirrors
-                // fr.enimaloc.catapult.service.SteamStoreServiceImpl; not extracted to a shared helper here.
+                // fr.enimaloc.catapult.service.steam.SteamStoreServiceImpl; not extracted to a shared helper here.
                 Map<?, ?> appEntry = (Map<?, ?>) body.get(effectiveAppId);
                 if (appEntry == null || !Boolean.TRUE.equals(appEntry.get("success"))) return Optional.empty();
                 Map<?, ?> data = (Map<?, ?>) appEntry.get("data");

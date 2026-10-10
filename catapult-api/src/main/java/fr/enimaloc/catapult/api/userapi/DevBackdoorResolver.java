@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.api.userapi;
 
-import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.service.SteamStoreService;
-import fr.enimaloc.catapult.service.XboxStoreService;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
