@@ -33,13 +33,16 @@ document.addEventListener("catapult:render", function () {
     // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.
     // An empty password field means "keep the stored one" (it's never sent back to the page),
     // and blank host/port fall back to catapult-api's defaults. No SSE event covers OBS, hence
-    // the refresh to flip the chips and buttons.
-    const saveObs = enabled => postAndRefresh(`${baseUrl}/settings/obs`, {
-        enabled,
-        host: value("obs-host"),
-        port: value("obs-port") === "" ? null : Number(value("obs-port")),
-        password: value("obs-password") === "" ? null : value("obs-password"),
-    });
+    // the refresh to flip the chips and buttons, and obs-session.js's to follow the new settings.
+    const saveObs = async enabled => {
+        await postAndRefresh(`${baseUrl}/settings/obs`, {
+            enabled,
+            host: value("obs-host"),
+            port: value("obs-port") === "" ? null : Number(value("obs-port")),
+            password: value("obs-password") === "" ? null : value("obs-password"),
+        });
+        await window.CatapultObsSession?.refresh();
+    };
     on("obs-connect-btn", "click", () => saveObs(true));
     on("obs-disconnect-btn", "click", () => saveObs(false));
 });
