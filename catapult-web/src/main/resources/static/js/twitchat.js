@@ -7,6 +7,8 @@
  * Twitchat speaks one of two protocols, same wire format but other names: "stable" (its main
  * branch: CHAT_FEED_PAUSE, TRIGGER_LIST…) or "beta" (SET_CHAT_FEED_PAUSE_STATE, ON_TRIGGER_LIST…).
  * Which one is detected from the events it sends, or by asking it before the first action.
+ * Whether a Twitchat is there at all is known the same way (isTwitchatConnected(), announced
+ * as "catapult:twitchat:presence" on document), checked again when it's been quiet a while.
  *
  * - actions.<name>(data) / send(ACTION, data): sends an action; a "get" one resolves with the
  *   data of Twitchat's answer (TRIGGERS_GET_ALL -> TRIGGER_LIST's), the others once sent.
@@ -21,6 +23,8 @@ window.CatapultTwitchat = (function () {
     // A "get" action per protocol, unknown to the others: whichever gets answered names Twitchat's.
     const PROBES = { stable: "GET_COLS_COUNT", beta: "GET_GLOBAL_STATES" };
     const DEFAULT_TIMEOUT_MS = 3000;
+    // How often a quiet Twitchat is pinged, to notice it got closed.
+    const HEARTBEAT_MS = 20000;
     // Ids of the messages this page sent, to drop OBS's echo of them; capped like Twitchat's.
     const MAX_SENT_IDS = 1000;
 
@@ -71,6 +75,19 @@ window.CatapultTwitchat = (function () {
         if (speakers.length === 1) setProtocol(speakers[0], `received ${type}`);
     }
 
+    // Whether a Twitchat answers through OBS: set by any of its events, cleared when OBS
+    // disconnects or a ping goes unanswered. `heard`: an event came since the last heartbeat.
+    const TWITCHAT_EVENTS = new Set(Object.values(PROTOCOLS).flatMap(({ events }) => events));
+    let present = false;
+    let heard = false;
+
+    function setPresent(value) {
+        if (present === value) return;
+        present = value;
+        log(value ? "Twitchat connected" : "Twitchat disconnected");
+        document.dispatchEvent(new CustomEvent("catapult:twitchat:presence", { detail: { connected: value } }));
+    }
+
     function emit(type, envelope) {
         listeners.get(type)?.forEach((handler) => handler(envelope.data ?? {}, envelope));
     }
@@ -79,6 +96,10 @@ window.CatapultTwitchat = (function () {
         if (eventData?.origin !== "twitchat" || !eventData.type) return;
         if (eventData.id && sentIds.has(eventData.id)) return;
         detectFrom(eventData.type);
+        if (TWITCHAT_EVENTS.has(eventData.type)) {
+            heard = true;
+            setPresent(true);
+        }
         emit(eventData.type, eventData);
         emit("*", eventData);
     });
@@ -100,28 +121,51 @@ window.CatapultTwitchat = (function () {
         return CatapultObs.requests.broadcastCustomEvent({ eventData: { origin: "twitchat", id, type: action, data: data ?? {} } });
     }
 
-    let detecting = null;
+    let pinging = null;
 
     /**
-     * Asks Twitchat which protocol it speaks: sends every probe at once, the answer being
-     * detected by detectFrom(). Resolves with the protocol, null without an answer in time
-     * (Twitchat closed, or not connected to this OBS).
+     * Sends every probe at once, whichever protocol Twitchat speaks: its answer also gets that
+     * protocol detected, by detectFrom(). Resolves with whether one came in time; a ping
+     * already in flight is shared.
      */
-    function detectProtocol({ timeout = DEFAULT_TIMEOUT_MS } = {}) {
-        if (protocol || !CatapultObs.isConnected()) return Promise.resolve(protocol);
-        detecting ??= new Promise((resolve) => {
+    function ping({ timeout = DEFAULT_TIMEOUT_MS } = {}) {
+        if (!CatapultObs.isConnected()) return Promise.resolve(false);
+        pinging ??= new Promise((resolve) => {
             const answers = Object.entries(PROBES).flatMap(([name, probe]) => PROTOCOLS[name].replies[probe]);
-            const unsubscribes = answers.map((type) => client.on(type, () => done()));
+            let answered = false;
+            const unsubscribes = answers.map((type) => client.on(type, () => {
+                answered = true;
+                done();
+            }));
             const timer = setTimeout(done, timeout);
             function done() {
                 clearTimeout(timer);
                 unsubscribes.forEach((unsubscribe) => unsubscribe());
-                detecting = null;
-                resolve(protocol);
+                pinging = null;
+                resolve(answered);
             }
             Object.values(PROBES).forEach((probe) => broadcast(probe).catch((error) => log(`${probe} probe failed`, error)));
         });
-        return detecting;
+        return pinging;
+    }
+
+    /**
+     * Asks Twitchat which protocol it speaks. Resolves with the protocol, null without an
+     * answer in time (Twitchat closed, or not connected to this OBS).
+     */
+    function detectProtocol({ timeout = DEFAULT_TIMEOUT_MS } = {}) {
+        if (protocol || !CatapultObs.isConnected()) return Promise.resolve(protocol);
+        return ping({ timeout }).then(() => protocol);
+    }
+
+    /** Pings Twitchat unless it was heard from since the last beat: a closed one sends nothing. */
+    async function heartbeat() {
+        if (!CatapultObs.isConnected()) return setPresent(false);
+        if (heard) {
+            heard = false;
+            return;
+        }
+        setPresent(await ping());
     }
 
     function unknownAction(action, known, style, inProtocol) {
@@ -246,6 +290,11 @@ window.CatapultTwitchat = (function () {
             return CatapultObs.isConnected();
         },
 
+        /** Whether a Twitchat answers on the other end of OBS. */
+        isTwitchatConnected() {
+            return present;
+        },
+
         detectProtocol,
 
         /** Forces the protocol, e.g. for a Twitchat that never answers the probes. */
@@ -336,12 +385,15 @@ window.CatapultTwitchat = (function () {
     };
 
     document.addEventListener("catapult:twitchat:notify", (event) => client.relay(event.detail));
-    // Another OBS may have another Twitchat: detected anew, right away so actions lists its own.
-    document.addEventListener("catapult:obs:connected", () => {
-        if (forced) return;
-        protocol = null;
-        detectProtocol();
+    // Another OBS may have another Twitchat: looked for anew, its protocol detected right away
+    // so actions lists its own.
+    document.addEventListener("catapult:obs:connected", async () => {
+        if (!forced) protocol = null;
+        heard = false;
+        setPresent(await ping());
     });
+    document.addEventListener("catapult:obs:disconnected", () => setPresent(false));
+    setInterval(heartbeat, HEARTBEAT_MS);
 
     return client;
 })();

@@ -199,11 +199,12 @@
         </mdui-card>
         <mdui-card th:if="${ch.twitchat() != null}" class="connection-card" variant="outlined" data-conn="twitchat">
             <span th:text="#{channel.connections.twitchat}">channel.connections.twitchat</span>
-            <mdui-chip class="obs-connected-chip" th:classappend="${!ch.obs().connected()} ? 'hidden'"
+            <!-- Only the browser knows whether a Twitchat answers through OBS: channel-connections.js toggles these. -->
+            <mdui-chip class="twitchat-connected-chip hidden"
                        th:text="#{channel.connections.connected}">Connecté
             </mdui-chip>
-            <mdui-chip class="obs-not-connected-chip" th:classappend="${ch.obs().connected()} ? 'hidden'"
-                       th:text="#{channel.connections.not_connected}">Non connecté
+            <mdui-chip class="twitchat-disconnected-chip"
+                       th:text="#{channel.connections.twitchat.disconnected}">Déconnecté
             </mdui-chip>
 
             <div id="twitchat-status-body">
