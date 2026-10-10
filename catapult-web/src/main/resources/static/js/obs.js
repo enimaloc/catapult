@@ -237,6 +237,7 @@ window.CatapultObs = (function () {
             connected = false;
             info = null;
             available = null;
+            listShortcuts([]);
             return new Promise((resolve, reject) => {
                 let settled = false;
                 settle = (ok, value) => {
@@ -313,6 +314,7 @@ window.CatapultObs = (function () {
                         if (Array.isArray(availableRequests)) {
                             available = new Set(availableRequests);
                             info = { ...info, availableRequests };
+                            listShortcuts(availableRequests);
                         }
                     } catch {
                         if (socket !== current) return;
@@ -428,20 +430,37 @@ window.CatapultObs = (function () {
     const shortcuts = new Map();
     const shortcutName = (requestType) => requestType[0].toLowerCase() + requestType.slice(1);
 
+    function shortcut(name) {
+        if (!shortcuts.has(name)) {
+            const requestType = name[0].toUpperCase() + name.slice(1);
+            shortcuts.set(name, (requestData) => request(requestType, requestData, shortcutName));
+        }
+        return shortcuts.get(name);
+    }
+
+    // The Proxy's target: one real property per request the connected OBS knows, only there for
+    // the browser console's autocompletion to list (the Proxy answers any name regardless).
+    const listedShortcuts = {};
+
+    /** Lists the shortcuts of these request types, replacing the previous connection's. */
+    function listShortcuts(requestTypes) {
+        for (const name of Object.keys(listedShortcuts)) delete listedShortcuts[name];
+        for (const requestType of requestTypes) {
+            listedShortcuts[shortcutName(requestType)] = shortcut(shortcutName(requestType));
+        }
+    }
+
     /**
      * Shortcuts for every request: requests.getSceneList() is call("GetSceneList"), and
      * requests.setCurrentProgramScene({ sceneName }) is call("SetCurrentProgramScene", { sceneName }).
      * Built on access, so any request OBS knows works without being listed here; an unknown one
      * rejects with status 204 (UnknownRequestType) and the closest known shortcut suggested.
+     * Typed for IDEs by src/types/obs.d.ts.
      */
-    obs.requests = new Proxy({}, {
+    obs.requests = new Proxy(listedShortcuts, {
         get(_, name) {
             if (typeof name !== "string" || NOT_REQUESTS.has(name)) return undefined;
-            if (!shortcuts.has(name)) {
-                const requestType = name[0].toUpperCase() + name.slice(1);
-                shortcuts.set(name, (requestData) => request(requestType, requestData, shortcutName));
-            }
-            return shortcuts.get(name);
+            return shortcut(name);
         },
     });
 

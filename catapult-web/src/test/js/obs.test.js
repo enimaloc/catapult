@@ -201,6 +201,17 @@ describe("request type check", () => {
         expect(socket.lastSent(8)).toBeUndefined();
     });
 
+    it("lists the known shortcuts as real properties, for the console's autocompletion", async () => {
+        await connected({}, AVAILABLE);
+        CatapultObs.requests.setStudioModeEnable().catch(() => {});
+        expect(Object.keys(CatapultObs.requests)).toEqual(
+            ["getVersion", "getSceneList", "setStudioModeEnabled", "getStudioModeEnabled"]);
+        expect(CatapultObs.requests.getSceneList).toBe(Object.getOwnPropertyDescriptor(CatapultObs.requests, "getSceneList").value);
+
+        await connected({}, ["GetVersion"]);
+        expect(Object.keys(CatapultObs.requests)).toEqual(["getVersion"]);
+    });
+
     it("lets OBS judge when the list is unknown", async () => {
         const socket = await connected();
         CatapultObs.requests.setStudioModeEnable({ studioModeEnabled: true });
