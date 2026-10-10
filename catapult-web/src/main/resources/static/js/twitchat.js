@@ -4,6 +4,10 @@
  * every connected client. Names and answers come from twitchat-protocol.js (generated from
  * Twitchat's source); IDE typings from src/types/twitchat.d.ts.
  *
+ * Twitchat speaks one of two protocols, same wire format but other names: "stable" (its main
+ * branch: CHAT_FEED_PAUSE, TRIGGER_LIST…) or "beta" (SET_CHAT_FEED_PAUSE_STATE, ON_TRIGGER_LIST…).
+ * Which one is detected from the events it sends, or by asking it before the first action.
+ *
  * - actions.<name>(data) / send(ACTION, data): sends an action; a "get" one resolves with the
  *   data of Twitchat's answer (TRIGGERS_GET_ALL -> TRIGGER_LIST's), the others once sent.
  * - on / off / once: Twitchat's events, and actions other clients send ("*" for all of them).
@@ -11,8 +15,11 @@
  *   "catapult:twitchat:notify" event on document, its detail being the TwitchatNotification.
  */
 window.CatapultTwitchat = (function () {
-    const { actions: ACTIONS, events: EVENTS, replies: REPLIES } = CatapultTwitchatProtocol;
-    const KNOWN_ACTIONS = new Set(ACTIONS);
+    const PROTOCOLS = CatapultTwitchatProtocol;
+    // Assumed until detected: what the public Twitchat speaks.
+    const DEFAULT_PROTOCOL = "stable";
+    // A "get" action per protocol, unknown to the others: whichever gets answered names Twitchat's.
+    const PROBES = { stable: "GET_COLS_COUNT", beta: "GET_GLOBAL_STATES" };
     const DEFAULT_TIMEOUT_MS = 3000;
     // Ids of the messages this page sent, to drop OBS's echo of them; capped like Twitchat's.
     const MAX_SENT_IDS = 1000;
@@ -42,6 +49,28 @@ window.CatapultTwitchat = (function () {
     const shortcutName = (action) => action.toLowerCase().replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
     const actionName = (shortcut) => shortcut.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase();
 
+    // The protocol of the Twitchat on the other end, null until detected; forced by useProtocol().
+    let protocol = null;
+    let forced = false;
+    const current = () => PROTOCOLS[protocol ?? DEFAULT_PROTOCOL];
+    const knowsAction = (name, action) => PROTOCOLS[name].actions.includes(action);
+
+    function setProtocol(name, reason) {
+        if (protocol === name) return;
+        protocol = name;
+        log(`speaking the ${name} protocol (${reason})`);
+    }
+
+    /**
+     * Detects the protocol from what Twitchat sends: an event only one protocol has. Never from
+     * actions, which other clients send too (their probes asking for both protocols, among them).
+     */
+    function detectFrom(type) {
+        if (forced) return;
+        const speakers = Object.keys(PROTOCOLS).filter((name) => PROTOCOLS[name].events.includes(type));
+        if (speakers.length === 1) setProtocol(speakers[0], `received ${type}`);
+    }
+
     function emit(type, envelope) {
         listeners.get(type)?.forEach((handler) => handler(envelope.data ?? {}, envelope));
     }
@@ -49,6 +78,7 @@ window.CatapultTwitchat = (function () {
     CatapultObs.on("CustomEvent", (eventData) => {
         if (eventData?.origin !== "twitchat" || !eventData.type) return;
         if (eventData.id && sentIds.has(eventData.id)) return;
+        detectFrom(eventData.type);
         emit(eventData.type, eventData);
         emit("*", eventData);
     });
@@ -70,17 +100,50 @@ window.CatapultTwitchat = (function () {
         return CatapultObs.requests.broadcastCustomEvent({ eventData: { origin: "twitchat", id, type: action, data: data ?? {} } });
     }
 
+    let detecting = null;
+
+    /**
+     * Asks Twitchat which protocol it speaks: sends every probe at once, the answer being
+     * detected by detectFrom(). Resolves with the protocol, null without an answer in time
+     * (Twitchat closed, or not connected to this OBS).
+     */
+    function detectProtocol({ timeout = DEFAULT_TIMEOUT_MS } = {}) {
+        if (protocol || !CatapultObs.isConnected()) return Promise.resolve(protocol);
+        detecting ??= new Promise((resolve) => {
+            const answers = Object.entries(PROBES).flatMap(([name, probe]) => PROTOCOLS[name].replies[probe]);
+            const unsubscribes = answers.map((type) => client.on(type, () => done()));
+            const timer = setTimeout(done, timeout);
+            function done() {
+                clearTimeout(timer);
+                unsubscribes.forEach((unsubscribe) => unsubscribe());
+                detecting = null;
+                resolve(protocol);
+            }
+            Object.values(PROBES).forEach((probe) => broadcast(probe).catch((error) => log(`${probe} probe failed`, error)));
+        });
+        return detecting;
+    }
+
+    function unknownAction(action, known, style, inProtocol) {
+        const suggestion = CatapultSuggest.closest(action, known);
+        return new TwitchatError(`${style(action)} isn't a ${inProtocol ? `${inProtocol} ` : ""}Twitchat action`
+            + (suggestion ? `, did you mean ${style(suggestion)}?` : ""), { code: "UNKNOWN_ACTION", action, suggestion });
+    }
+
     /** send(), with action names in the errors written by `style` (shortcut or not). */
-    function sendAs(action, data, { timeout = DEFAULT_TIMEOUT_MS } = {}, style = (name) => name) {
-        if (!KNOWN_ACTIONS.has(action)) {
-            const suggestion = CatapultSuggest.closest(action, ACTIONS);
-            return Promise.reject(new TwitchatError(`${style(action)} isn't a Twitchat action`
-                + (suggestion ? `, did you mean ${style(suggestion)}?` : ""), { code: "UNKNOWN_ACTION", action, suggestion }));
+    async function sendAs(action, data, { timeout = DEFAULT_TIMEOUT_MS } = {}, style = (name) => name) {
+        if (!Object.keys(PROTOCOLS).some((name) => knowsAction(name, action))) {
+            throw unknownAction(action, current().actions, style, protocol);
         }
         if (!CatapultObs.isConnected()) {
-            return Promise.reject(new TwitchatError(`Can't send ${action}: OBS isn't connected`, { code: "NOT_CONNECTED", action }));
+            throw new TwitchatError(`Can't send ${action}: OBS isn't connected`, { code: "NOT_CONNECTED", action });
         }
-        const answers = REPLIES[action];
+        // Not awaiting a known protocol: listening for the answer must precede sending, synchronously.
+        // Without an answer to the probes, sent in the default protocol all the same: Twitchat may
+        // just be slow to answer, or open later.
+        const name = protocol ?? await detectProtocol({ timeout }) ?? DEFAULT_PROTOCOL;
+        if (!knowsAction(name, action)) throw unknownAction(action, PROTOCOLS[name].actions, style, name);
+        const answers = PROTOCOLS[name].replies[action];
         if (!answers) return broadcast(action, data).then(() => undefined);
         return new Promise((resolve, reject) => {
             // Listening before sending: the answer can't be missed.
@@ -115,8 +178,15 @@ window.CatapultTwitchat = (function () {
         return shortcuts.get(name);
     }
 
-    // The Proxy's target: one real property per known action, for the console's autocompletion.
-    const listedShortcuts = Object.fromEntries(ACTIONS.map((action) => [shortcutName(action), shortcut(shortcutName(action))]));
+    // Per protocol, a Proxy whose target has one real property per action of that protocol, for
+    // the console's autocompletion; any other name still goes through send()'s checks.
+    const actionProxies = Object.fromEntries(Object.entries(PROTOCOLS).map(([name, { actions }]) => [name, new Proxy(
+        Object.fromEntries(actions.map((action) => [shortcutName(action), shortcut(shortcutName(action))])), {
+            get(_, shortcutKey) {
+                if (typeof shortcutKey !== "string" || NOT_ACTIONS.has(shortcutKey)) return undefined;
+                return shortcut(shortcutKey);
+            },
+        })]));
 
     // Relaying Catapult's notifications. Several clients may be connected to the same OBS (this
     // page in two tabs, the old widget page in OBS's browser source…): they claim each
@@ -143,26 +213,59 @@ window.CatapultTwitchat = (function () {
     }
 
     const client = {
-        ACTIONS,
-        EVENTS,
-        REPLIES,
+        PROTOCOLS,
         TwitchatError,
+
+        /** The protocol of the Twitchat on the other end of OBS, null until detected. */
+        get protocol() {
+            return protocol;
+        },
+
+        /** This Twitchat's actions, events and answers: the default protocol's until detected. */
+        get ACTIONS() {
+            return current().actions;
+        },
+        get EVENTS() {
+            return current().events;
+        },
+        get REPLIES() {
+            return current().replies;
+        },
 
         /**
          * One shortcut per action: actions.chatFeedPause() is send("CHAT_FEED_PAUSE"), and
          * actions.triggersGetAll() resolves with TRIGGER_LIST's data. An unknown one rejects with
-         * the closest known shortcut suggested.
+         * the closest known shortcut suggested. Lists this Twitchat's actions.
          */
-        actions: new Proxy(listedShortcuts, {
-            get(_, name) {
-                if (typeof name !== "string" || NOT_ACTIONS.has(name)) return undefined;
-                return shortcut(name);
-            },
-        }),
+        get actions() {
+            return actionProxies[protocol ?? DEFAULT_PROTOCOL];
+        },
 
         /** Whether Twitchat can be reached, i.e. the page is connected to OBS. */
         isConnected() {
             return CatapultObs.isConnected();
+        },
+
+        detectProtocol,
+
+        /** Forces the protocol, e.g. for a Twitchat that never answers the probes. */
+        useProtocol(name) {
+            if (!PROTOCOLS[name]) throw new TypeError(`Unknown Twitchat protocol ${name}: ${Object.keys(PROTOCOLS).join(" or ")}`);
+            forced = true;
+            setProtocol(name, "forced");
+        },
+
+        /**
+         * Applies the branch picked in the integration settings: "auto" detects it (the default
+         * protocol when Twitchat doesn't answer), a protocol name forces it.
+         */
+        configure(branch) {
+            if (branch !== "auto") return client.useProtocol(branch);
+            if (!forced) return;
+            forced = false;
+            protocol = null;
+            log("detecting the protocol");
+            detectProtocol();
         },
 
         /**
@@ -233,6 +336,12 @@ window.CatapultTwitchat = (function () {
     };
 
     document.addEventListener("catapult:twitchat:notify", (event) => client.relay(event.detail));
+    // Another OBS may have another Twitchat: detected anew, right away so actions lists its own.
+    document.addEventListener("catapult:obs:connected", () => {
+        if (forced) return;
+        protocol = null;
+        detectProtocol();
+    });
 
     return client;
 })();
