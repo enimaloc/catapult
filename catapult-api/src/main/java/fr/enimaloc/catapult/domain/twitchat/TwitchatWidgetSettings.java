@@ -39,4 +39,8 @@ public class TwitchatWidgetSettings {
     /** See {@link TwitchatData}. */
     @Column(name = "twitchat_branch", nullable = false)
     private String twitchatBranch = TwitchatData.AUTO;
+
+    /** Whether this account's event actions were set up (see TwitchatEventActionService#ensureInitialized). */
+    @Column(name = "event_actions_initialized", nullable = false)
+    private boolean eventActionsInitialized = false;
 }
