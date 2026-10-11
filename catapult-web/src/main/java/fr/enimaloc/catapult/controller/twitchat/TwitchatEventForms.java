@@ -64,9 +64,9 @@ public final class TwitchatEventForms {
         return new IntegrationNode.Collapse(Attrs.id("twitchat-events"), items);
     }
 
-    /** A payload not saved yet: the action's field defaults. */
+    /** A payload not saved yet: the action's field defaults. UnknownAction unless in the catalog. */
     public TwitchatEventActionDto newPayload(String action) {
-        TwitchatCatalog.Action entry = catalog.action(action).orElseThrow();
+        TwitchatCatalog.Action entry = catalog.action(action).orElseThrow(() -> new UnknownAction(action));
         Map<String, Object> data = new LinkedHashMap<>();
         for (TwitchatCatalog.Field field : orEmpty(entry.fields())) {
             if (field.path() != null && field.defaultValue() != null) {
@@ -76,13 +76,18 @@ public final class TwitchatEventForms {
         return new TwitchatEventActionDto(action, entry.rawOnly() ? "RAW" : "FORM", JSON.writeValueAsString(data), true);
     }
 
+    /**
+     * A payload's card. One whose action left the catalog (regenerated since it was saved) keeps
+     * its raw JSON only, under its stored key, instead of breaking the whole page.
+     */
     public IntegrationNode payloadCard(String event, TwitchatEventActionDto payload) {
-        TwitchatCatalog.Action action = catalog.action(payload.action()).orElseThrow();
-        boolean raw = "RAW".equals(payload.mode());
+        TwitchatCatalog.Action action = catalog.action(payload.action()).orElseGet(() ->
+                new TwitchatCatalog.Action(payload.action(), Map.of(), null, null, "raw", List.of()));
+        boolean raw = action.rawOnly() || "RAW".equals(payload.mode());
         Map<String, Object> data = dataOf(payload.dataJson());
         return new Container(Attrs.cls("twitchat-payload"), Container.Kind.DIV, List.of(
                 new Hidden(Attrs.cls("twitchat-payload-action"), action.key()),
-                new Hidden(Attrs.cls("twitchat-payload-mode"), payload.mode()),
+                new Hidden(Attrs.cls("twitchat-payload-mode"), raw ? "RAW" : payload.mode()),
                 new Hidden(Attrs.cls("twitchat-payload-names"), JSON.writeValueAsString(orderedNames(action.names()))),
                 new Container(Attrs.cls("twitchat-payload-header"), Container.Kind.DIV, List.of(
                         new Text(Attrs.cls("twitchat-payload-title"), false, Message.literal(actionLabel(action))),
@@ -167,6 +172,13 @@ public final class TwitchatEventForms {
         Matcher matcher = url instanceof String text ? ACTION_URL.matcher(text) : null;
         String selected = matcher != null && matcher.find() ? matcher.group(1) : "";
         return new Select(Attrs.cls("twitchat-catapult-action"), label, selected, options, null);
+    }
+
+    /** An action the catalog doesn't know: no payload can be started from it. */
+    public static final class UnknownAction extends IllegalArgumentException {
+        public UnknownAction(String action) {
+            super("Unknown Twitchat action: " + action);
+        }
     }
 
     private List<Select.Option> actionOptions() {

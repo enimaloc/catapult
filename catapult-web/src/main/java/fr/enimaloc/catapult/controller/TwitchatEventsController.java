@@ -50,6 +50,9 @@ public class TwitchatEventsController {
     @PostMapping("/channel/{username}/twitchat/payload-form")
     public String payloadForm(@PathVariable String username, @RequestParam String event,
                               @RequestBody TwitchatEventActionDto payload, Model model) {
+        if (catalog.action(payload.action()).isEmpty()) {
+            throw new TwitchatEventForms.UnknownAction(payload.action());
+        }
         // A new payload (no dataJson) may leave required fields empty: it's a form to fill.
         TwitchatEventActionDto card = payload.dataJson() == null ? forms.newPayload(payload.action()) : payload;
         if (payload.dataJson() != null && "FORM".equals(card.mode())) {
@@ -72,6 +75,12 @@ public class TwitchatEventsController {
     @ResponseBody
     public ResponseEntity<List<TwitchatValidationError>> onFormRefused(FormRefused refused) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(refused.errors);
+    }
+
+    @ExceptionHandler(TwitchatEventForms.UnknownAction.class)
+    @ResponseBody
+    public ResponseEntity<List<TwitchatValidationError>> onUnknownAction(TwitchatEventForms.UnknownAction unknown) {
+        return ResponseEntity.badRequest().body(List.of(new TwitchatValidationError(0, "action", unknown.getMessage())));
     }
 
     /** Raw JSON that no longer fits its action's form: why, for the payload's card to show. */
