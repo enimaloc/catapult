@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
+import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** The fragments spa.js fetches on client-side navigation (the channel one is in IndexControllerTest). */
 @WebMvcTest(controllers = SpaFragmentController.class)
-@Import({ModelFiller.class, WebSecurityConfig.class})
+@Import({ModelFiller.class, WebSecurityConfig.class, TwitchatCatalogConfig.class})
 class SpaFragmentControllerTest {
 
     @Autowired MockMvc mvc;
