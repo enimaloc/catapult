@@ -31,7 +31,7 @@ class IntegrationNodeRenderingTest {
         engine.setTemplateEngineMessageSource(messages);
         Context context = new Context(Locale.ROOT);
         context.setVariable("node", node);
-        return engine.process("pages/channel-tab/integrations", Set.of("node-test"), context);
+        return engine.process("pages/channel-tab/integrations", Set.of("node-alone"), context);
     }
 
     @Test

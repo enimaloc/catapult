@@ -12,6 +12,8 @@ import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * update leaking into another's reset button.
  */
 @WebMvcTest(controllers = {IndexController.class, SpaFragmentController.class})
-@Import({ModelFiller.class, WebSecurityConfig.class})
+@Import({ModelFiller.class, WebSecurityConfig.class, TwitchatCatalogConfig.class})
 class ChannelVisibilityRenderingTest {
 
     @Autowired MockMvc mvc;
@@ -241,6 +244,8 @@ class ChannelVisibilityRenderingTest {
                 TwitchatData.of("beta"),
                 "uuid");
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
+        when(apiService.twitchatEvents("enimaloc")).thenReturn(Map.of("STREAM_STARTED",
+                List.of(new TwitchatEventActionDto("SEND_MESSAGE", "FORM", "{\"message\":\"Live\"}", true))));
 
         String html = mvc.perform(get("/spa/channel/enimaloc"))
                 .andExpect(status().isOk())
@@ -272,6 +277,8 @@ class ChannelVisibilityRenderingTest {
         // Twitchat: auto plus every supported branch, current one selected.
         assertThat(openingTagForId(html, "twitchat-branch")).contains("value=\"beta\"");
         assertThat(html).contains("value=\"auto\"", "value=\"stable\"");
+        assertThat(html).contains("id=\"twitchat-events\"").contains("value=\"NO_GAME_DETECTED\"")
+                .contains("class=\"twitchat-payload\"").contains("data-field=\"message\"");
         assertThat(html).doesNotContain("spa:state");
     }
 }
