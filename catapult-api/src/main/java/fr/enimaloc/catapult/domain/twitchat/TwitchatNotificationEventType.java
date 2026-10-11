@@ -5,5 +5,6 @@ public enum TwitchatNotificationEventType {
     CATEGORY_CHANGED_MANUALLY,
     STREAM_STARTED,
     BOT_ENABLED,
-    BOT_DISABLED
+    BOT_DISABLED,
+    NO_GAME_DETECTED
 }
