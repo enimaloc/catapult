@@ -73,4 +73,21 @@ class TwitchatEventsControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$[0].field").value("message"));
     }
+
+    @Test
+    void payloadForm_backToAFormThatWouldDropKeys_is422() throws Exception {
+        mvc.perform(post("/channel/streamer/twitchat/payload-form").param("event", "STREAM_STARTED").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"CUSTOM_CHAT_MESSAGE\",\"mode\":\"FORM\",\"dataJson\":\"{\\\"message\\\":\\\"Hi\\\",\\\"user\\\":{\\\"name\\\":\\\"Bot\\\",\\\"color\\\":\\\"#f00\\\"}}\",\"enabled\":true}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$[0].field").value("user.color"))
+                .andExpect(jsonPath("$[0].message").value("Not in the form"));
+    }
+
+    @Test
+    void payloadForm_backToAFormThatHoldsItAll_rendersTheCard() throws Exception {
+        mvc.perform(post("/channel/streamer/twitchat/payload-form").param("event", "STREAM_STARTED").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"CUSTOM_CHAT_MESSAGE\",\"mode\":\"FORM\",\"dataJson\":\"{\\\"message\\\":\\\"Hi\\\",\\\"user\\\":{\\\"name\\\":\\\"Bot\\\"}}\",\"enabled\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("data-field=\"user.name\"")));
+    }
 }
