@@ -4,6 +4,7 @@
   },
   "actions": {
     "CUSTOM_CHAT_MESSAGE": {
+      "description": "Message chat Catapult",
       "priority": 1,
       "fields": [
         { "path": "message", "type": "textarea", "label": "Message", "labelKey": "twitchat.field.message", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null },

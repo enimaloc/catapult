@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
     betaTypes, buildCatalog, fieldOf, fieldsOf, objectMembers, pairBeta, stableParams,
 } from "../../../scripts/twitchat-catalog.mjs";
+import SHIPPED_OVERRIDES from "../../../scripts/twitchat-catalog-overrides.json";
 
 const STABLE_DOC = `
 ## **SET_EMERGENCY_MODE**
@@ -280,5 +281,14 @@ describe("buildCatalog", () => {
         expect(catalog.actions[0].fields).toEqual([{ path: "x", type: "text" }]);
         expect(catalog.actions.slice(1).map((a) => a.key)).toEqual(
             ["CUSTOM_CHAT_MESSAGE", "EXECUTE_TRIGGER", "QUIZ_REVEAL", "SEND_CUSTOM_CHAT_MESSAGE", "SET_EMERGENCY_MODE"]);
+    });
+
+    it("lets an override replace Twitchat's description", () => {
+        const catalog = build({ pairs: {}, actions: { EXECUTE_TRIGGER: { description: "Run a trigger" } } });
+        expect(catalog.actions.find((a) => a.key === "EXECUTE_TRIGGER").description).toBe("Run a trigger");
+    });
+
+    it("names the Catapult chat message action in the shipped overrides", () => {
+        expect(SHIPPED_OVERRIDES.actions.CUSTOM_CHAT_MESSAGE.description).toBe("Message chat Catapult");
     });
 });
