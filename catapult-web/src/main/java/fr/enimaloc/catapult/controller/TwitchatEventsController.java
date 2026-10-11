@@ -53,7 +53,13 @@ public class TwitchatEventsController {
         // A new payload (no dataJson) may leave required fields empty: it's a form to fill.
         TwitchatEventActionDto card = payload.dataJson() == null ? forms.newPayload(payload.action()) : payload;
         if (payload.dataJson() != null && "FORM".equals(card.mode())) {
-            List<TwitchatValidationError> errors = new TwitchatPayloadValidator(catalog).validate(List.of(card));
+            TwitchatPayloadValidator validator = new TwitchatPayloadValidator(catalog);
+            List<TwitchatValidationError> errors = validator.validate(List.of(card));
+            if (errors.isEmpty()) {
+                // Keys the form has no field for would be silently dropped by going back to it.
+                errors = validator.outsideForm(0, catalog.action(card.action()).orElseThrow().fields(),
+                        validator.parse(card.dataJson()));
+            }
             if (!errors.isEmpty()) {
                 throw new FormRefused(errors);
             }
