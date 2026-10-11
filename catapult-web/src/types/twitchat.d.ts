@@ -3160,24 +3160,20 @@ declare class TwitchatError extends Error {
     suggestion: string | null;
 }
 
-/** catapult-common's TwitchatAction. */
-interface TwitchatNotificationAction {
-    label: string;
-    actionType: string;
-    url?: string | null;
-    message?: string | null;
-    theme?: string | null;
+/** catapult-common's TwitchatPayload. */
+interface TwitchatPayload {
+    /** A key of CatapultTwitchatCatalog. */
+    action: string;
+    data?: Record<string, any> | null;
 }
 
-/** catapult-common's TwitchatNotification. */
-interface TwitchatNotification {
-    /** Shared by every client relaying it, so only one of them does. */
+/** catapult-common's TwitchatDispatch. */
+interface TwitchatDispatch {
+    /** Shared by every client receiving it, so only one of them sends it. */
     id: string;
-    message: string;
-    style?: string | null;
-    icon?: string | null;
-    authorName?: string | null;
-    actions?: TwitchatNotificationAction[] | null;
+    channel: string;
+    eventType: string;
+    payloads: TwitchatPayload[];
 }
 
 interface CatapultTwitchatApi {
@@ -3220,14 +3216,16 @@ interface CatapultTwitchatApi {
     off(type: TwitchatEventType | TwitchatActionType | "*", handler: (...args: any[]) => void): void;
     /** Resolves with the data of the next such event. */
     once<T extends TwitchatEventType>(type: T): Promise<TwitchatEventMap[T]>;
-    /** Sends a Catapult notification to Twitchat's chat, once across every connected client. */
-    relay(notification: TwitchatNotification): Promise<boolean>;
+    /** Sends a Catapult dispatch's payloads in order, once across every connected client; resolves with how many were sent. */
+    dispatch(batch: TwitchatDispatch): Promise<number>;
+    /** The name this Twitchat gives a catalog action, null when its protocol hasn't it. */
+    actionName(key: string): TwitchatActionType | null;
 }
 
 /** Fired on document. */
 interface DocumentEventMap {
-    /** A notification for twitchat.js to relay. */
-    "catapult:twitchat:notify": CustomEvent<TwitchatNotification>;
+    /** A dispatch for twitchat.js to send. */
+    "catapult:twitchat:dispatch": CustomEvent<TwitchatDispatch>;
 }
 
 /** Each catalog action's name per protocol. */
