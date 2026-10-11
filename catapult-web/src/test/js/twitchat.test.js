@@ -428,3 +428,25 @@ describe("dispatch", () => {
         expect(CatapultTwitchat.actionName("NOPE")).toBeNull();
     });
 });
+
+describe("dispatch to a Twitchat not detected yet", () => {
+    it("detects its protocol before naming the first payload", async () => {
+        const result = CatapultTwitchat.dispatch({ ...DISPATCH, payloads: [...DISPATCH.payloads].reverse() });
+        await vi.advanceTimersByTimeAsync(150);
+        twitchatSends("ON_GLOBAL_STATES", {});
+        await vi.advanceTimersByTimeAsync(0);
+
+        await expect(result).resolves.toBe(2);
+        expect(broadcasts().map(({ type }) => type))
+            .toEqual(["GET_COLS_COUNT", "GET_GLOBAL_STATES", "SET_EXECUTE_TRIGGER", "CUSTOM_CHAT_MESSAGE"]);
+    });
+
+    it("names the payloads in the stable protocol when Twitchat doesn't answer", async () => {
+        const result = CatapultTwitchat.dispatch(DISPATCH);
+        await vi.advanceTimersByTimeAsync(15000);
+
+        await expect(result).resolves.toBe(2);
+        expect(broadcasts().map(({ type }) => type).filter((type) => !type.startsWith("GET_")))
+            .toEqual(["CUSTOM_CHAT_MESSAGE", "EXECUTE_TRIGGER"]);
+    });
+});
