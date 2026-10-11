@@ -4,9 +4,11 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatEventAction;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
+import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,10 +22,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.BOT_DISABLED;
+import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.BOT_ENABLED;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT;
+import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_MANUALLY;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NO_GAME_DETECTED;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.STREAM_STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,9 +36,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -111,6 +118,130 @@ class TwitchatEventDispatcherTest {
 
         assertThat(published().payloads().getFirst().data().get("actions")).isEqualTo(List.of());
         verify(actionTokenService, never()).generate(any(), eq(TwitchatActionType.REVERT_CATEGORY), any());
+    }
+
+    /** A chat message offering a button for each given Catapult action. */
+    private TwitchatEventAction buttons(TwitchatActionType... types) {
+        StringBuilder actions = new StringBuilder();
+        for (TwitchatActionType type : types) {
+            if (!actions.isEmpty()) actions.append(',');
+            actions.append("{\"label\":\"").append(type).append("\",\"url\":\"{{action:").append(type).append("}}\"}");
+        }
+        return row("CUSTOM_CHAT_MESSAGE", "{\"message\":\"x\",\"actions\":[" + actions + "]}");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> publishedButtons() {
+        return ((List<Map<String, Object>>) published().payloads().getFirst().data().get("actions")).stream()
+                .map(button -> (String) button.get("label")).toList();
+    }
+
+    private GameBinding bindingFor(DetectedGame detected, String appGameId) {
+        GameBinding binding = new GameBinding();
+        binding.setId(UUID.randomUUID());
+        binding.setTwitchGameId(appGameId);
+        binding.setTwitchGameName("Old Game");
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
+        when(bindingService.findBinding(user, detected)).thenReturn(Optional.of(binding));
+        return binding;
+    }
+
+    @Test
+    void categoryChangedManually_withABinding_mintsBindAndRevertToAppCategory() {
+        DetectedGame detected = mock(DetectedGame.class);
+        GameBinding binding = bindingFor(detected, "111");
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_MANUALLY)).thenReturn(List.of(
+                buttons(TwitchatActionType.BIND_GAME_CATEGORY, TwitchatActionType.REVERT_TO_APP_CATEGORY)));
+        when(actionTokenService.generate(any(), any(), any())).thenReturn(UUID.randomUUID());
+
+        dispatcher.onCategoryChangedManually(user, "222", "New Game", "Old Game");
+
+        assertThat(publishedButtons()).containsExactly("BIND_GAME_CATEGORY", "REVERT_TO_APP_CATEGORY");
+        verify(actionTokenService).generate(user.getId(), TwitchatActionType.BIND_GAME_CATEGORY,
+                Map.of("bindingId", binding.getId().toString(), "newGameId", "222", "newGameName", "New Game"));
+        verify(actionTokenService).generate(user.getId(), TwitchatActionType.REVERT_TO_APP_CATEGORY,
+                Map.of("gameId", "111", "gameName", "Old Game"));
+    }
+
+    @Test
+    void categoryChangedManually_sameGameAsTheBinding_offersNoRevertToAppCategory() {
+        bindingFor(mock(DetectedGame.class), "222");
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_MANUALLY)).thenReturn(List.of(
+                buttons(TwitchatActionType.BIND_GAME_CATEGORY, TwitchatActionType.REVERT_TO_APP_CATEGORY)));
+        when(actionTokenService.generate(any(), any(), any())).thenReturn(UUID.randomUUID());
+
+        dispatcher.onCategoryChangedManually(user, "222", "New Game", "Old Game");
+
+        assertThat(publishedButtons()).containsExactly("BIND_GAME_CATEGORY");
+        verify(actionTokenService, never()).generate(any(), eq(TwitchatActionType.REVERT_TO_APP_CATEGORY), any());
+    }
+
+    @Test
+    void categoryChangedManually_detectedGameWithoutBinding_mintsNothing_andOnlyLooksUp() {
+        DetectedGame detected = mock(DetectedGame.class);
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
+        when(bindingService.findBinding(user, detected)).thenReturn(Optional.empty());
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_MANUALLY)).thenReturn(List.of(
+                buttons(TwitchatActionType.BIND_GAME_CATEGORY, TwitchatActionType.REVERT_TO_APP_CATEGORY)));
+
+        dispatcher.onCategoryChangedManually(user, "222", "New Game", "Old Game");
+
+        assertThat(publishedButtons()).isEmpty();
+        verifyNoInteractions(actionTokenService);
+        verify(bindingService).findBinding(user, detected);
+        verifyNoMoreInteractions(bindingService);
+    }
+
+    @Test
+    void categoryChangedManually_noGameDetected_mintsNothing() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_MANUALLY)).thenReturn(List.of(
+                buttons(TwitchatActionType.BIND_GAME_CATEGORY, TwitchatActionType.REVERT_TO_APP_CATEGORY)));
+
+        dispatcher.onCategoryChangedManually(user, "222", "New Game", "Old Game");
+
+        assertThat(publishedButtons()).isEmpty();
+        verifyNoInteractions(actionTokenService, bindingService);
+    }
+
+    @Test
+    void botEnabled_offersDisableBot() {
+        when(eventActionService.enabledActions(user, BOT_ENABLED)).thenReturn(List.of(
+                buttons(TwitchatActionType.DISABLE_BOT, TwitchatActionType.ENABLE_BOT)));
+        when(actionTokenService.generate(any(), any(), any())).thenReturn(UUID.randomUUID());
+
+        dispatcher.onBotToggled(user, true);
+
+        assertThat(publishedButtons()).containsExactly("DISABLE_BOT");
+        verify(actionTokenService).generate(user.getId(), TwitchatActionType.DISABLE_BOT, Map.of());
+        verify(channelEventPublisher).twitchatDispatch(eq(user.getId()), org.mockito.ArgumentMatchers.argThat(
+                dispatch -> dispatch.eventType().equals("BOT_ENABLED")));
+    }
+
+    @Test
+    void botDisabled_offersEnableBot() {
+        when(eventActionService.enabledActions(user, BOT_DISABLED)).thenReturn(List.of(
+                buttons(TwitchatActionType.DISABLE_BOT, TwitchatActionType.ENABLE_BOT)));
+        when(actionTokenService.generate(any(), any(), any())).thenReturn(UUID.randomUUID());
+
+        dispatcher.onBotToggled(user, false);
+
+        assertThat(publishedButtons()).containsExactly("ENABLE_BOT");
+        verify(actionTokenService).generate(user.getId(), TwitchatActionType.ENABLE_BOT, Map.of());
+        verify(channelEventPublisher).twitchatDispatch(eq(user.getId()), org.mockito.ArgumentMatchers.argThat(
+                dispatch -> dispatch.eventType().equals("BOT_DISABLED")));
+    }
+
+    @Test
+    void streamStarted_offersDisableBot() {
+        when(eventActionService.enabledActions(user, STREAM_STARTED)).thenReturn(List.of(
+                buttons(TwitchatActionType.DISABLE_BOT, TwitchatActionType.ENABLE_BOT)));
+        when(actionTokenService.generate(any(), any(), any())).thenReturn(UUID.randomUUID());
+
+        dispatcher.onStreamStarted(user);
+
+        assertThat(publishedButtons()).containsExactly("DISABLE_BOT");
+        verify(actionTokenService).generate(user.getId(), TwitchatActionType.DISABLE_BOT, Map.of());
     }
 
     @Test
