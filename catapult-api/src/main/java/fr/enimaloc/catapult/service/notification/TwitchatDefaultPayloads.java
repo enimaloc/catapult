@@ -10,8 +10,8 @@ import java.util.Map;
 
 /**
  * The canonical French copy for every Twitchat notification Catapult sends — this is exactly
- * what {@code TwitchatNotifier} hardcoded before payload presets existed. Also the fallback used
- * whenever a user has no active preset for an event type, or their preset fails to parse/render.
+ * what Catapult sent before event actions were configurable. The source of the pre-filled event
+ * actions (see {@link TwitchatEventDefaults}).
  */
 public final class TwitchatDefaultPayloads {
 
