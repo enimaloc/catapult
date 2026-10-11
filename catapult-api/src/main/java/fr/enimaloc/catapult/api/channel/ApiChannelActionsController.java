@@ -17,7 +17,6 @@ import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActivePresetBody;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPresetBody;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPresetResponse;
-import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPresetTestBody;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPresetUpdateBody;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsBody;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
@@ -43,7 +42,7 @@ import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
-import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
+import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatPayloadPresetService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import fr.enimaloc.catapult.service.settings.UserSettingsDto;
@@ -93,7 +92,7 @@ public class ApiChannelActionsController {
     private final ChannelEventPublisher channelEventPublisher;
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     private final TwitchatPayloadPresetService twitchatPayloadPresetService;
-    private final TwitchatNotifier twitchatNotifier;
+    private final TwitchatEventDispatcher twitchatEventDispatcher;
     private final SteamProfileDiagnostics steamDiagnostics;
 
     @Autowired(required = false)
@@ -279,15 +278,6 @@ public class ApiChannelActionsController {
         UserAccount channelUser = userResolver.ownChannel(username, jwt);
         UUID presetId = body.presetId() == null || body.presetId().isBlank() ? null : UUID.fromString(body.presetId());
         twitchatPayloadPresetService.setActivePreset(channelUser, parseEventType(eventType), presetId);
-    }
-
-    @PostMapping("/twitchat/presets/test")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void testTwitchatPreset(
-            @PathVariable String username, @AuthenticationPrincipal Jwt jwt,
-            @RequestBody TwitchatPresetTestBody body) {
-        UserAccount channelUser = userResolver.ownChannel(username, jwt);
-        twitchatNotifier.sendTestNotification(channelUser, parseEventType(body.eventType()), body.payloadJson());
     }
 
     private static TwitchatNotificationEventType parseEventType(String raw) {

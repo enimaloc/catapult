@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.twitchat.TwitchatNotification;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.BindingDto;
@@ -78,8 +78,8 @@ public class ChannelEventPublisher {
         publish(channelOwnerId, "connection.changed", Map.of("provider", provider));
     }
 
-    public void twitchatNotify(UUID channelOwnerId, TwitchatNotification notification) {
-        redisPublisher.publishTwitchat(channelOwnerId, "twitchat.notify", notification);
+    public void twitchatDispatch(UUID channelOwnerId, TwitchatDispatch dispatch) {
+        redisPublisher.publishTwitchat(channelOwnerId, "twitchat.dispatch", dispatch);
     }
 
     public void twitchatWidgetSettingsUpdated(UUID channelOwnerId, TwitchatWidgetConfig config) {
