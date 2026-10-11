@@ -38,6 +38,12 @@ public class TwitchatEventActionService {
             FROM twitchat_active_preset ap JOIN twitchat_payload_preset p ON p.id = ap.preset_id
             WHERE ap.user_id = ?""";
 
+    // to_regclass is Postgres-only (not H2): this service is only unit-tested with a mocked JdbcTemplate.
+    // Checking first avoids a failing statement, which would abort the surrounding Postgres transaction.
+    private static final String LEGACY_TABLES_EXIST = """
+            SELECT to_regclass('public.twitchat_active_preset') IS NOT NULL
+               AND to_regclass('public.twitchat_payload_preset') IS NOT NULL""";
+
     private final TwitchatEventActionRepository repository;
     private final TwitchatWidgetSettingsRepository widgetSettingsRepository;
     private final JdbcTemplate jdbc;
@@ -110,8 +116,16 @@ public class TwitchatEventActionService {
     private Map<TwitchatNotificationEventType, String> activePresets(UUID userId) {
         Map<TwitchatNotificationEventType, String> presets = new EnumMap<>(TwitchatNotificationEventType.class);
         try {
+            if (!Boolean.TRUE.equals(jdbc.queryForObject(LEGACY_TABLES_EXIST, Boolean.class))) {
+                return presets;
+            }
             jdbc.query(ACTIVE_PRESETS, rs -> {
-                presets.put(TwitchatNotificationEventType.valueOf(rs.getString("event_type")), rs.getString("payload_json"));
+                String eventType = rs.getString("event_type");
+                try {
+                    presets.put(TwitchatNotificationEventType.valueOf(eventType), rs.getString("payload_json"));
+                } catch (IllegalArgumentException e) {
+                    log.warn("Skipping legacy Twitchat preset of unknown event {} for {}", eventType, userId);
+                }
             }, userId);
         } catch (DataAccessException e) {
             log.debug("No legacy Twitchat presets to convert for {}: {}", userId, e.getMessage());
