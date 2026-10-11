@@ -14,13 +14,17 @@ import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import lombok.Getter;
 import lombok.Setter;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -85,6 +89,9 @@ public class MockData {
     @Setter
     @Getter
     private boolean botEnabled = true;
+    /** Each Twitchat event's payloads; only STREAM_STARTED starts with one, a greeting. */
+    @Getter
+    private final Map<String, List<TwitchatEventActionDto>> twitchatEvents = defaultTwitchatEvents();
 
     /**
      * @param steam     null when Steam isn't available to the channel
@@ -113,6 +120,21 @@ public class MockData {
         this.hasMinecraftProvider = minecraft != null;
         this.minecraftLink = minecraft;
         this.obsData = obs;
+    }
+
+    private static Map<String, List<TwitchatEventActionDto>> defaultTwitchatEvents() {
+        Map<String, List<TwitchatEventActionDto>> events = new LinkedHashMap<>();
+        for (String event : TwitchatEvents.ALL) {
+            events.put(event, "STREAM_STARTED".equals(event)
+                    ? List.of(new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "FORM",
+                    "{\"message\":\"Le bot Catapult est actif.\",\"style\":\"message\",\"icon\":\"live\",\"user\":{\"name\":\"Catapult\"},\"actions\":[]}", true))
+                    : List.of());
+        }
+        return events;
+    }
+
+    public void setTwitchatEvent(String eventType, List<TwitchatEventActionDto> payloads) {
+        twitchatEvents.put(eventType, List.copyOf(payloads));
     }
 
     // --- factories -----------------------------------------------------------------------------
