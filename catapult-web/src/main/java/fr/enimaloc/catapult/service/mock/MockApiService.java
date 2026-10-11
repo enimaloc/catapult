@@ -7,7 +7,13 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPayload;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.common.twitchat.TwitchatCatalog;
+import fr.enimaloc.catapult.common.twitchat.TwitchatPayloadValidator;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
 import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
@@ -24,6 +30,7 @@ import fr.enimaloc.catapult.event.tw.TwResetEvent;
 import fr.enimaloc.catapult.event.tw.TwUpdatedEvent;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.twitchat.TwitchatDispatchHub;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +39,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.Map;
@@ -44,7 +52,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 @Profile("mock")
 public class MockApiService implements ApiService {
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
     private final ApplicationEventPublisher eventPublisher;
+    private final TwitchatDispatchHub twitchatHub;
+    private final TwitchatPayloadValidator twitchatValidator = new TwitchatPayloadValidator(TwitchatCatalog.load());
 
     /**
      * One {@link MockData} per mock connection, keyed by a random token minted in
@@ -307,5 +319,44 @@ public class MockApiService implements ApiService {
     public void dtddPropose(String igdbId, Long dtddId, String reason) {
         log.trace("dtddPropose({}, {}, {})", igdbId, dtddId, reason);
         // no-op in mock mode
+    }
+
+    @Override
+    public UUID currentUserId() {
+        MockData current = currentData();
+        return current == null ? null : current.getChannelDto().id();
+    }
+
+    @Override
+    public Map<String, List<TwitchatEventActionDto>> twitchatEvents(String username) {
+        log.trace("twitchatEvents({})", username);
+        return currentData().getTwitchatEvents();
+    }
+
+    @Override
+    public List<TwitchatValidationError> saveTwitchatEvent(String username, String eventType, List<TwitchatEventActionDto> payloads) {
+        log.trace("saveTwitchatEvent({}, {})", username, eventType);
+        List<TwitchatValidationError> errors = twitchatValidator.validate(payloads);
+        if (errors.isEmpty()) currentData().setTwitchatEvent(eventType, payloads);
+        return errors;
+    }
+
+    @Override
+    public List<TwitchatValidationError> testTwitchatEvent(String username, String eventType, List<TwitchatEventActionDto> payloads) {
+        log.trace("testTwitchatEvent({}, {})", username, eventType);
+        List<TwitchatValidationError> errors = twitchatValidator.validate(payloads);
+        if (errors.isEmpty()) {
+            List<TwitchatPayload> parsed = payloads.stream()
+                    .map(p -> new TwitchatPayload(p.action(), twitchatValidator.parse(p.dataJson())))
+                    .toList();
+            twitchatHub.publish(currentUserId(), JSON.writeValueAsString(new TwitchatDispatch(username, eventType, parsed)));
+        }
+        return errors;
+    }
+
+    @Override
+    public boolean executeTwitchatAction(String token) {
+        log.trace("executeTwitchatAction({})", token);
+        return true;
     }
 }

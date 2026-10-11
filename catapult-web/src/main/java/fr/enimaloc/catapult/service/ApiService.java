@@ -7,6 +7,8 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 
 public interface ApiService {
@@ -46,4 +48,14 @@ public interface ApiService {
     SearchResponse dtddSearch(String q);
     void dtddValidate(String igdbId);
     void dtddPropose(String igdbId, Long dtddId, String reason);
+    /** The logged-in user's account id (the subject of their JWT); null when logged out. */
+    java.util.UUID currentUserId();
+    /** Every event's Twitchat payloads, by event name. */
+    java.util.Map<String, java.util.List<TwitchatEventActionDto>> twitchatEvents(String username);
+    /** Replaces an event's payloads; the validation errors, empty when saved. */
+    java.util.List<TwitchatValidationError> saveTwitchatEvent(String username, String eventType, java.util.List<TwitchatEventActionDto> payloads);
+    /** Sends payloads as edited, saved or not; the validation errors, empty when sent. */
+    java.util.List<TwitchatValidationError> testTwitchatEvent(String username, String eventType, java.util.List<TwitchatEventActionDto> payloads);
+    /** Runs the Catapult action behind a Twitchat button's token; false when used or expired. */
+    boolean executeTwitchatAction(String token);
 }

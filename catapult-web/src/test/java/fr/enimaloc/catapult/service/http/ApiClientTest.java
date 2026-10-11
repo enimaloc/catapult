@@ -195,4 +195,53 @@ class ApiClientTest {
 
         assertThat(client.get("/api/a", Payload.class)).isEqualTo(new Payload("late"));
     }
+
+    @Test
+    void call_keepsThe4xxStatusAndBody() {
+        server.enqueue(new MockResponse().setResponseCode(400).setHeader("Content-Type", "application/json")
+                .setBody("{\"name\":\"bad\"}"));
+
+        ApiClient.Result<Payload> result = client.call(org.springframework.http.HttpMethod.PUT, "/api/a", new Payload("x"), Payload.class);
+
+        assertThat(result).isEqualTo(new ApiClient.Result<>(400, new Payload("bad")));
+        assertThat(result.ok()).isFalse();
+    }
+
+    @Test
+    void call_noContent_hasANullBody() {
+        server.enqueue(new MockResponse().setResponseCode(204));
+
+        assertThat(client.call(org.springframework.http.HttpMethod.POST, "/api/a", null, Payload.class))
+                .isEqualTo(new ApiClient.Result<Payload>(204, null));
+    }
+
+    @Test
+    void call_unreachableBackend_is502() throws IOException {
+        server.shutdown();
+
+        assertThat(client.call(org.springframework.http.HttpMethod.POST, "/api/a", null, Payload.class).status()).isEqualTo(502);
+    }
+
+    private static String jwtWithPayload(String json) {
+        return "h." + java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(json.getBytes()) + ".sig";
+    }
+
+    @Test
+    void currentSubject_readsTheJwtSubject() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        inSessionWithJwt(jwtWithPayload("{\"sub\":\"" + id + "\"}"));
+
+        assertThat(ApiClient.currentSubject()).isEqualTo(id);
+    }
+
+    @Test
+    void currentSubject_isNullWithoutASessionOrWithAMalformedJwt() {
+        assertThat(ApiClient.currentSubject()).isNull();
+
+        inSessionWithJwt("not-a-jwt");
+        assertThat(ApiClient.currentSubject()).isNull();
+
+        inSessionWithJwt(jwtWithPayload("{\"sub\":\"nope\"}"));
+        assertThat(ApiClient.currentSubject()).isNull();
+    }
 }
