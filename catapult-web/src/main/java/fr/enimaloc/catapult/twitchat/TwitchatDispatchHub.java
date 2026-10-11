@@ -22,7 +22,10 @@ public class TwitchatDispatchHub {
     private final Map<UUID, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     public SseEmitter subscribe(UUID userId) {
-        SseEmitter emitter = new SseEmitter(0L);
+        return subscribe(userId, new SseEmitter(0L));
+    }
+
+    SseEmitter subscribe(UUID userId, SseEmitter emitter) {
         emitters.computeIfAbsent(userId, ignored -> new CopyOnWriteArrayList<>()).add(emitter);
         emitter.onCompletion(() -> remove(userId, emitter));
         emitter.onTimeout(() -> remove(userId, emitter));

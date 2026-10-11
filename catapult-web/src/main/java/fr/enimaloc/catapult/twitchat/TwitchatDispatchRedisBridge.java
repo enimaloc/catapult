@@ -47,7 +47,7 @@ public class TwitchatDispatchRedisBridge {
             try {
                 twitchatDispatchListener.start();
             } catch (RuntimeException e) {
-                log.error("Twitchat dispatches will not be relayed, Redis is unreachable: {}", e.getMessage());
+                log.error("Twitchat dispatches will not be relayed, Redis is unreachable", e);
             }
         };
     }
