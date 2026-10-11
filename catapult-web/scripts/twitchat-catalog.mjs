@@ -10,6 +10,19 @@ const SCALARS = { string: "text", number: "number", boolean: "switch" };
 const OPENERS = "{[(<";
 const CLOSERS = "}])>";
 
+/** Skip a comment at position i, returning the index after the comment (or i if no comment). */
+function skipComment(source, i) {
+    if (source[i] === "/" && source[i + 1] === "/") {
+        const end = source.indexOf("\n", i);
+        return end === -1 ? source.length : end;
+    }
+    if (source[i] === "/" && source[i + 1] === "*") {
+        const end = source.indexOf("*/", i + 2);
+        return end === -1 ? source.length : end + 2;
+    }
+    return i;
+}
+
 /** The members of the first object type literal in `source`, null without one. */
 export function objectMembers(source) {
     if (source == null) return null;
@@ -33,7 +46,7 @@ export function objectMembers(source) {
             const end = source.indexOf("\n", i);
             const stop = end === -1 ? source.length : end;
             doc.push(source.slice(i + 2, stop).trim());
-            i = stop;
+            i = stop - 1; // -1 so the loop's i++ lands on the newline
             continue;
         }
         if (depth === 0 && c === "/" && source[i + 1] === "*") {
@@ -48,8 +61,22 @@ export function objectMembers(source) {
             if (depth === 0) break;
             depth--;
         }
-        if (depth === 0 && (c === ";" || c === "\n" || c === ",")) {
+        if (depth === 0 && c === ";") {
             flush();
+            continue;
+        }
+        if (depth === 0 && c === ",") {
+            flush();
+            continue;
+        }
+        if (depth === 0 && c === "\n") {
+            // Check if the line continues (ends with | or next line starts with |)
+            const trimmedText = text.trim();
+            const nextNonSpace = source.slice(i + 1).search(/\S/);
+            const nextChar = nextNonSpace === -1 ? "" : source[i + 1 + nextNonSpace];
+            if (!trimmedText.endsWith("|") && nextChar !== "|") {
+                flush();
+            }
             continue;
         }
         text += c;
@@ -94,6 +121,17 @@ export function betaTypes(eventsSource) {
         let depth = 0;
         let end = from;
         for (; end < body.length; end++) {
+            // Skip comments in depth tracking
+            if (body[end] === "/" && body[end + 1] === "/") {
+                const lineEnd = body.indexOf("\n", end);
+                end = lineEnd === -1 ? body.length : lineEnd;
+                continue;
+            }
+            if (body[end] === "/" && body[end + 1] === "*") {
+                const blockEnd = body.indexOf("*/", end + 2);
+                end = blockEnd === -1 ? body.length : blockEnd + 1;
+                continue;
+            }
             const c = body[end];
             if ("{[(".includes(c)) depth++;
             else if ("}])".includes(c)) depth--;
