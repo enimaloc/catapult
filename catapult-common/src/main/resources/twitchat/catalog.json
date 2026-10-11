@@ -2985,8 +2985,31 @@
       },
       "description": "Triggered when wheel overlay animation starts",
       "priority": null,
-      "form": "raw",
-      "fields": []
+      "form": "generated",
+      "fields": [
+        {
+          "path": "items",
+          "type": "json",
+          "label": "items",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "winner",
+          "type": "text",
+          "label": "winner",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
     }
   ]
 }
