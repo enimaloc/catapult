@@ -164,6 +164,20 @@ class TwitchatEventDispatcherTest {
     }
 
     @Test
+    void categoryChangedManually_withoutGameName_bindsWithAnEmptyName() {
+        DetectedGame detected = mock(DetectedGame.class);
+        GameBinding binding = bindingFor(detected, "222");
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_MANUALLY)).thenReturn(List.of(
+                buttons(TwitchatActionType.BIND_GAME_CATEGORY)));
+        when(actionTokenService.generate(any(), any(), any())).thenReturn(UUID.randomUUID());
+
+        dispatcher.onCategoryChangedManually(user, "222", null, null);
+
+        verify(actionTokenService).generate(user.getId(), TwitchatActionType.BIND_GAME_CATEGORY,
+                Map.of("bindingId", binding.getId().toString(), "newGameId", "222", "newGameName", ""));
+    }
+
+    @Test
     void categoryChangedManually_sameGameAsTheBinding_offersNoRevertToAppCategory() {
         bindingFor(mock(DetectedGame.class), "222");
         when(eventActionService.enabledActions(user, CATEGORY_CHANGED_MANUALLY)).thenReturn(List.of(
