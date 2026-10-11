@@ -93,6 +93,24 @@ describe("objectMembers", () => {
         expect(objectMembers("string")).toBeNull();
         expect(objectMembers(null)).toBeNull();
     });
+
+    it("handles trailing line comment without terminator (regression: issue 1)", () => {
+        const members = objectMembers("{\n a: string // first\n b: number\n}");
+        expect(members.length).toBe(2);
+        expect(members[0].name).toBe("a");
+        expect(members[0].type).toBe("string");
+        expect(members[1].name).toBe("b");
+        expect(members[1].type).toBe("number");
+    });
+
+    it("handles multi-line union types (regression: issue 3)", () => {
+        const members = objectMembers('{\n a: "x"\n | "y";\n}');
+        expect(members.length).toBe(1);
+        expect(members[0].name).toBe("a");
+        // The type should contain both literals
+        expect(members[0].type).toContain('"x"');
+        expect(members[0].type).toContain('"y"');
+    });
 });
 
 describe("fieldOf", () => {
@@ -151,6 +169,23 @@ describe("betaTypes", () => {
         expect(types.get("SET_EXECUTE_TRIGGER")).toContain("id: string;");
         expect(types.get("GET_TRIGGER_LIST")).toBe("undefined");
         expect(types.get("CUSTOM_CHAT_MESSAGE")).toBe(types.get("SET_SEND_CUSTOM_CHAT_MESSAGE"));
+    });
+
+    it("skips comments with unbalanced brackets in depth tracking (regression: issue 2)", () => {
+        const source = `export type TwitchatEventMap = {
+\tSET_A: {
+\t\t/** foo ( unbalanced */
+\t\tid: string;
+\t};
+\tSET_B: {
+\t\tvalue: number;
+\t};
+};`;
+        const types = betaTypes(source);
+        // SET_A's type must NOT contain "SET_B"
+        expect(types.get("SET_A")).not.toContain("SET_B");
+        expect(types.get("SET_A")).toContain("id: string;");
+        expect(types.get("SET_B")).toContain("value: number;");
     });
 });
 
