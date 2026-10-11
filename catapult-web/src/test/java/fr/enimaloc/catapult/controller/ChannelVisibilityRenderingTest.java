@@ -6,8 +6,12 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
+import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.SteamData;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.channel.XboxData;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.BeforeEach;
@@ -220,5 +224,54 @@ class ChannelVisibilityRenderingTest {
         assertThat(openingTagForId(html, "minecraft-enroll-btn")).contains("hidden");
         assertThat(openingTagForId(html, "minecraft-check-btn")).doesNotContain("hidden");
         assertThat(openingTagForId(html, "minecraft-disconnect-btn")).contains("hidden");
+    }
+
+    @Test
+    void integrationCards_renderEveryIntegrationFromTheirDtos() throws Exception {
+        ChannelPageData data = new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null,
+                new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null,
+                new SteamData(true, true, true, false, true, false, 30),
+                new XboxData(false),
+                new MinecraftData("ACCEPTED", "Steve123", null),
+                new ObsData(true, "localhost", 4455, true),
+                TwitchatData.of("beta"),
+                "uuid");
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("data-conn=\"twitch\"", "data-conn=\"steam\"", "data-conn=\"xbox\"",
+                "data-conn=\"minecraft\"", "data-conn=\"obs\"", "data-conn=\"twitchat\"");
+
+        // Steam: connected with a token, rate limited but not private.
+        assertThat(html).contains("data-if=\"connected,rateLimited\"")
+                .contains("data-on=\"connected:SteamConnectionStateEvent.connected,rateLimited:SteamConnectionStateEvent.rateLimited\"");
+        assertThat(openingTagForId(html, "steam-token-delete-btn")).doesNotContain("hidden")
+                .contains("data-on=\"hasToken:SteamTokenSavedEvent,hasToken:!SteamTokenDeletedEvent\"");
+        assertThat(openingTagForId(html, "steam-token-save-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "steam-token-shared")).contains("checked")
+                .contains("data-value=\"checked:SteamTokenSavedEvent.shared,checked:SteamTokenSharedStateEvent.shared\"");
+
+        // Minecraft: accepted, its name synced from both events.
+        assertThat(openingTagForId(html, "minecraft-disconnect-btn")).doesNotContain("hidden")
+                .contains("data-on=\"showDisconnect:MinecraftEnrollEvent.status=ACCEPTED,showDisconnect:MinecraftSyncEvent.status=ACCEPTED,showDisconnect:!MinecraftDisconnectedEvent\"");
+        assertThat(html).contains(">Steve123<");
+
+        // OBS: connected, password only hinted.
+        assertThat(openingTagForId(html, "obs-connect-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "obs-disconnect-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "obs-port")).contains("value=\"4455\"").contains("min=\"1\"");
+        assertThat(openingTagForId(html, "obs-password")).contains("placeholder=\"••••••••\"");
+
+        // Twitchat: auto plus every supported branch, current one selected.
+        assertThat(openingTagForId(html, "twitchat-branch")).contains("value=\"beta\"");
+        assertThat(html).contains("value=\"auto\"", "value=\"stable\"");
+        assertThat(html).doesNotContain("spa:state");
     }
 }
