@@ -7,7 +7,7 @@
         "stable": "CUSTOM_CHAT_MESSAGE",
         "beta": "CUSTOM_CHAT_MESSAGE"
       },
-      "description": "Just here for retro compatibility",
+      "description": "Message chat Catapult",
       "priority": 1,
       "form": "override",
       "fields": [
