@@ -100,7 +100,7 @@ public class ModelFiller {
         model.addAttribute("channels", apiService.channelList().channels());
     }
 
-    /** The dashboard model; settings and the DTDD mapping only for the channel's owner. */
+    /** The dashboard model; settings, the DTDD mapping and the integration cards only for the channel's owner. */
     public void channel(Model model, String username, int page, String status, String source) {
         model.addAttribute("username", username);
         var channelPage = apiService.channelPage(username, page, status, source);
@@ -108,6 +108,7 @@ public class ModelFiller {
         if (channelPage.isOwner()) {
             model.addAttribute("channelSettings", apiService.channelSettings(username));
             model.addAttribute("dtddMapping", apiService.dtddMappingStatus(username));
+            model.addAttribute("integrations", IntegrationCards.of(channelPage));
         }
     }
 
