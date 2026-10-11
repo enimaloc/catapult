@@ -20,10 +20,10 @@ dependencyManagement {
 dependencies {
     api("com.fasterxml.jackson.core:jackson-annotations")
     api("jakarta.validation:jakarta.validation-api")
+    implementation("tools.jackson.core:jackson-databind")
 
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core")
-    testImplementation("tools.jackson.core:jackson-databind")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
