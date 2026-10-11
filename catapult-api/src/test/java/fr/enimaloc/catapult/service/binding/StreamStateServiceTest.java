@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.service.binding;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
-import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
+import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,15 +15,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class StreamStateServiceTest {
 
     private StreamStateService service;
-    private TwitchatNotifier twitchatNotifier;
+    private TwitchatEventDispatcher twitchatEventDispatcher;
     private UserAccount user;
 
     @BeforeEach
     void setUp() {
-        twitchatNotifier = org.mockito.Mockito.mock(TwitchatNotifier.class);
+        twitchatEventDispatcher = org.mockito.Mockito.mock(TwitchatEventDispatcher.class);
         service = new StreamStateService(
                 org.mockito.Mockito.mock(fr.enimaloc.catapult.service.notification.ChannelEventPublisher.class),
-                twitchatNotifier);
+                twitchatEventDispatcher);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
@@ -93,7 +93,7 @@ class StreamStateServiceTest {
 
         service.setLive(botEnabledUser, true);
 
-        verify(twitchatNotifier).onStreamStarted(botEnabledUser);
+        verify(twitchatEventDispatcher).onStreamStarted(botEnabledUser);
     }
 
     @Test
@@ -104,6 +104,6 @@ class StreamStateServiceTest {
 
         service.setLive(botDisabledUser, true);
 
-        verifyNoInteractions(twitchatNotifier);
+        verifyNoInteractions(twitchatEventDispatcher);
     }
 }

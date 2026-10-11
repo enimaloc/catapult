@@ -99,21 +99,6 @@ class ApiChannelActionsTwitchatPresetsTest extends ApiChannelActionsTestSupport 
     }
 
     @Test
-    void testTwitchatPreset_owner_delegatesToNotifier() throws Exception {
-        UUID userId = UUID.randomUUID();
-        UserAccount user = stubOwner(userId, "streamer");
-
-        mvc.perform(post("/api/channels/streamer/twitchat/presets/test")
-                        .with(userJwt(userId)).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"eventType\":\"STREAM_STARTED\",\"payloadJson\":\"{\\\"message\\\":\\\"Hi\\\"}\"}"))
-                .andExpect(status().isNoContent());
-
-        verify(twitchatNotifier).sendTestNotification(user, TwitchatNotificationEventType.STREAM_STARTED,
-                "{\"message\":\"Hi\"}");
-    }
-
-    @Test
     void listPresets_nonOwner_forbidden() throws Exception {
         UUID viewerId = UUID.randomUUID();
         UserAccount viewer = new UserAccount();

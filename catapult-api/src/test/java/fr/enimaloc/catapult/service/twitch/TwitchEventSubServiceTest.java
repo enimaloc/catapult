@@ -9,7 +9,7 @@ import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
-import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
+import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,7 +44,7 @@ class TwitchEventSubServiceTest {
     @Mock private StreamStateService streamStateService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RestClient restClient;
-    @Mock private TwitchatNotifier twitchatNotifier;
+    @Mock private TwitchatEventDispatcher twitchatEventDispatcher;
     @Mock private CatapultCategoryChangeStateService categoryChangeStateService;
 
     @Mock private RestClient.RequestBodyUriSpec postUriSpec;
@@ -143,8 +143,8 @@ class TwitchEventSubServiceTest {
         service.handleMessage(user, token, firstMessage, false);
         service.handleMessage(user, token, secondMessage, false);
 
-        verify(twitchatNotifier).onCategoryChangedByCatapult(user, "222", "New Game", "111");
-        verify(twitchatNotifier, never()).onCategoryChangedManually(any(), any(), any());
+        verify(twitchatEventDispatcher).onCategoryChangedByCatapult(user, "222", "New Game", "111", "Old Game");
+        verify(twitchatEventDispatcher, never()).onCategoryChangedManually(any(), any(), any(), any());
     }
 
     @Test
@@ -167,8 +167,8 @@ class TwitchEventSubServiceTest {
         service.handleMessage(user, token, firstMessage, false);
         service.handleMessage(user, token, secondMessage, false);
 
-        verify(twitchatNotifier).onCategoryChangedManually(user, "222", "New Game");
-        verify(twitchatNotifier, never()).onCategoryChangedByCatapult(any(), any(), any(), any());
+        verify(twitchatEventDispatcher).onCategoryChangedManually(user, "222", "New Game", "Old Game");
+        verify(twitchatEventDispatcher, never()).onCategoryChangedByCatapult(any(), any(), any(), any(), any());
     }
 
     @Test
