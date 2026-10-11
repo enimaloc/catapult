@@ -100,6 +100,7 @@ class TwitchatEventActionServiceTest {
     void ensureInitialized_convertsActivePresets_andSeedsDefaultsForTheOthers() {
         when(widgetSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
         when(repository.existsByUser(user)).thenReturn(false);
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class))).thenReturn(true);
         doAnswer(invocation -> {
             RowCallbackHandler handler = invocation.getArgument(1);
             java.sql.ResultSet rs = org.mockito.Mockito.mock(java.sql.ResultSet.class);
@@ -122,15 +123,34 @@ class TwitchatEventActionServiceTest {
     }
 
     @Test
-    void ensureInitialized_withoutLegacyTables_seedsDefaults() {
+    void ensureInitialized_withoutLegacyTables_seedsDefaults_withoutQueryingThem() {
         when(widgetSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
         when(repository.existsByUser(user)).thenReturn(false);
-        doThrow(new DataAccessResourceFailureException("no table")).when(jdbc)
-                .query(anyString(), any(RowCallbackHandler.class), eq(user.getId()));
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class))).thenReturn(false);
 
         service.ensureInitialized(user);
 
         verify(repository, org.mockito.Mockito.times(5)).save(any());
+        verify(jdbc, never()).query(anyString(), any(RowCallbackHandler.class), eq(user.getId()));
+    }
+
+    @Test
+    void ensureInitialized_skipsAnUnknownLegacyEvent_andStillSeedsTheOthers() {
+        when(widgetSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(repository.existsByUser(user)).thenReturn(false);
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class))).thenReturn(true);
+        doAnswer(invocation -> {
+            RowCallbackHandler handler = invocation.getArgument(1);
+            java.sql.ResultSet rs = org.mockito.Mockito.mock(java.sql.ResultSet.class);
+            when(rs.getString("event_type")).thenReturn("REMOVED_EVENT");
+            handler.processRow(rs);
+            return null;
+        }).when(jdbc).query(anyString(), any(RowCallbackHandler.class), eq(user.getId()));
+
+        service.ensureInitialized(user);
+
+        verify(repository, org.mockito.Mockito.times(5)).save(any());
+        assertThat(settings.isEventActionsInitialized()).isTrue();
     }
 
     @Test
