@@ -139,6 +139,36 @@ describe("editing", () => {
         expect(card.querySelector(".twitchat-payload-errors").textContent).toContain("message");
     });
 
+    it("shows invalid JSON of a json field instead of switching to raw", () => {
+        const card = document.querySelector(".twitchat-payload");
+        card.querySelector(".json-field").value = "{oops";
+        card.querySelector(".twitchat-payload-raw-btn").click();
+        expect(card.querySelector(".twitchat-payload-mode").value).toBe("FORM");
+        expect(card.querySelector(".twitchat-payload-errors").textContent).not.toBe("");
+    });
+
+    it("lets the same action be added twice in a row", async () => {
+        const select = document.querySelector(".twitchat-add-action");
+        for (let i = 0; i < 2; i++) {
+            fetchMock.mockResolvedValueOnce(response(200, CARD("SEND_MESSAGE")));
+            select.value = "SEND_MESSAGE";
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            await flush();
+        }
+        expect(document.querySelectorAll(".twitchat-payload")).toHaveLength(4);
+    });
+
+    it("re-checks availability on the card that comes back from raw JSON", async () => {
+        CatapultTwitchat.isTwitchatConnected = () => true;
+        CatapultTwitchat.actionName = () => null;
+        const card = document.querySelector(".twitchat-payload");
+        card.querySelector(".twitchat-payload-raw-btn").click();
+        fetchMock.mockResolvedValueOnce(response(200, CARD("SEND_MESSAGE")));
+        card.querySelector(".twitchat-payload-raw-btn").click();
+        await flush();
+        expect(document.querySelector(".twitchat-payload-unavailable").classList.contains("hidden")).toBe(false);
+    });
+
     it("adds a payload rendered by the server", async () => {
         fetchMock.mockResolvedValueOnce(response(200, CARD("SEND_MESSAGE")));
         document.querySelector(".twitchat-add-action").dispatchEvent(new Event("change", { bubbles: true }));
@@ -175,6 +205,21 @@ describe("saving and testing", () => {
         expect(document.querySelector(".twitchat-event-errors").textContent).not.toBe("");
     });
 
+    it("reports a network failure instead of rejecting", async () => {
+        fetchMock.mockRejectedValueOnce(new Error("offline"));
+        document.querySelector(".twitchat-save-btn").click();
+        await flush();
+        expect(document.querySelector(".twitchat-event-errors").textContent).toContain("offline");
+    });
+
+    it("reports a network failure when fetching a card", async () => {
+        window.CatapultChannel.showError = vi.fn();
+        fetchMock.mockRejectedValueOnce(new Error("offline"));
+        document.querySelector(".twitchat-add-action").dispatchEvent(new Event("change", { bubbles: true }));
+        await flush();
+        expect(CatapultChannel.showError).toHaveBeenCalled();
+    });
+
     it("tests one payload, or all of them", async () => {
         document.querySelector(".twitchat-payload-test").click();
         await flush();
@@ -193,6 +238,14 @@ describe("Twitchat-dependent bits", () => {
         CatapultTwitchat.isTwitchatConnected = () => true;
         render();
         expect(document.querySelector(".twitchat-payload-unavailable").classList.contains("hidden")).toBe(false);
+    });
+
+    it("marks nothing unavailable while the protocol is undetected", () => {
+        html(EVENT(CARD("QUIZ_REVEAL")));
+        CatapultTwitchat.isTwitchatConnected = () => true;
+        CatapultTwitchat.protocol = null;
+        render();
+        expect(document.querySelector(".twitchat-payload-unavailable").classList.contains("hidden")).toBe(true);
     });
 
     it("fills a live select from Twitchat, keeping the stored value", async () => {
