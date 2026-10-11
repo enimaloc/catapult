@@ -59,10 +59,12 @@ window.CatapultTwitchat = (function () {
     const current = () => PROTOCOLS[protocol ?? DEFAULT_PROTOCOL];
     const knowsAction = (name, action) => PROTOCOLS[name].actions.includes(action);
 
+    /** Sets the protocol (null: undetected), announced as catapult:twitchat:protocol when it changes. */
     function setProtocol(name, reason) {
         if (protocol === name) return;
         protocol = name;
-        log(`speaking the ${name} protocol (${reason})`);
+        log(name ? `speaking the ${name} protocol (${reason})` : reason);
+        document.dispatchEvent(new CustomEvent("catapult:twitchat:protocol", { detail: { protocol } }));
     }
 
     /**
@@ -348,8 +350,7 @@ window.CatapultTwitchat = (function () {
             if (branch !== "auto") return client.useProtocol(branch);
             if (!forced) return;
             forced = false;
-            protocol = null;
-            log("detecting the protocol");
+            setProtocol(null, "detecting the protocol");
             detectProtocol();
         },
 
@@ -437,7 +438,7 @@ window.CatapultTwitchat = (function () {
     // Another OBS may have another Twitchat: looked for anew, its protocol detected right away
     // so actions lists its own.
     document.addEventListener("catapult:obs:connected", async () => {
-        if (!forced) protocol = null;
+        if (!forced) setProtocol(null, "detecting the protocol anew");
         heard = false;
         setPresent(await ping());
     });

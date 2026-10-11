@@ -145,6 +145,16 @@ describe("protocols", () => {
         expect(() => CatapultTwitchat.configure("main")).toThrow("Unknown Twitchat protocol main");
     });
 
+    it("announces each change of protocol", async () => {
+        const announced = [];
+        document.addEventListener("catapult:twitchat:protocol", (event) => announced.push(event.detail.protocol));
+        CatapultTwitchat.configure("beta");
+        CatapultTwitchat.configure("beta");
+        CatapultTwitchat.configure("auto");
+        await twitchatAnswersProbe("stable");
+        expect(announced).toEqual(["beta", null, "stable"]);
+    });
+
     it("keeps a forced protocol whatever Twitchat sends", async () => {
         CatapultTwitchat.useProtocol("beta");
         twitchatSends("TWITCHAT_READY");
