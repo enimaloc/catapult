@@ -95,7 +95,7 @@ public class TwitchatEventDispatcher {
             if (existing.isPresent()) {
                 GameBinding binding = existing.get();
                 applicable.put(TwitchatActionType.BIND_GAME_CATEGORY, Map.of("bindingId", binding.getId().toString(),
-                        "newGameId", newGameId, "newGameName", newGameName));
+                        "newGameId", newGameId, "newGameName", nullToEmpty(newGameName)));
                 String appGameId = binding.getTwitchGameId();
                 if (appGameId != null && !appGameId.equals(newGameId)) {
                     applicable.put(TwitchatActionType.REVERT_TO_APP_CATEGORY,
