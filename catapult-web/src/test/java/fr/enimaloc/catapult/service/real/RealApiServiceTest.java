@@ -1,5 +1,10 @@
 package fr.enimaloc.catapult.service.real;
 
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -310,5 +315,41 @@ class RealApiServiceTest {
     void dtddPropose() {
         expectPost("/api/channel/dtdd-mapping/propose", "{\"igdbId\":\"42\",\"dtddId\":9,\"reason\":\"correction\"}");
         service.dtddPropose("42", 9L, "correction");
+    }
+
+    @Test
+    void twitchatEvents_readsTheOwnersLists() {
+        expect(HttpMethod.GET, "/api/channels/streamer/twitchat/events").andRespond(withSuccess(
+                "{\"STREAM_STARTED\":[{\"action\":\"SEND_MESSAGE\",\"mode\":\"FORM\",\"dataJson\":\"{}\",\"enabled\":true}]}",
+                MediaType.APPLICATION_JSON));
+
+        assertThat(service.twitchatEvents("streamer").get("STREAM_STARTED")).singleElement()
+                .extracting(TwitchatEventActionDto::action).isEqualTo("SEND_MESSAGE");
+    }
+
+    @Test
+    void saveTwitchatEvent_putsTheList_andReturnsNoErrorOn204() {
+        expect(HttpMethod.PUT, "/api/channels/streamer/twitchat/events/STREAM_STARTED/actions")
+                .andExpect(content().json("[{\"action\":\"SEND_MESSAGE\",\"mode\":\"RAW\",\"dataJson\":\"{}\",\"enabled\":false}]"))
+                .andRespond(withNoContent());
+
+        assertThat(service.saveTwitchatEvent("streamer", "STREAM_STARTED",
+                List.of(new TwitchatEventActionDto("SEND_MESSAGE", "RAW", "{}", false)))).isEmpty();
+    }
+
+    @Test
+    void saveTwitchatEvent_relaysTheValidationErrors() {
+        expect(HttpMethod.PUT, "/api/channels/streamer/twitchat/events/STREAM_STARTED/actions")
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body("[{\"index\":0,\"field\":\"message\",\"message\":\"Required\"}]"));
+
+        assertThat(service.saveTwitchatEvent("streamer", "STREAM_STARTED", List.of()))
+                .containsExactly(new TwitchatValidationError(0, "message", "Required"));
+    }
+
+    @Test
+    void executeTwitchatAction_isTrueOnlyWhenExecuted() {
+        expect(HttpMethod.POST, "/api/twitchat/actions/tok").andRespond(withSuccess("{\"result\":\"EXECUTED\"}", MediaType.APPLICATION_JSON));
+        assertThat(service.executeTwitchatAction("tok")).isTrue();
     }
 }

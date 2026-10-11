@@ -6,12 +6,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import tools.jackson.databind.json.JsonMapper;
+
+import java.util.Base64;
+import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Calls catapult-api on behalf of the current browser session, authenticated with the JWT
@@ -26,6 +33,7 @@ public class ApiClient {
     /** What nginx answers while catapult-api is still starting: expected, not worth a warning. */
     static final String NOT_STARTED_MESSAGE = "502 Bad Gateway: \"<html><EOL><EOL><head><title>502 Bad Gateway</title></head><EOL><EOL><body><EOL><EOL><center><h1>502 Bad Gateway</h1></center><EOL><EOL><hr><center>openresty</center><EOL><EOL></body><EOL><EOL></html><EOL><EOL>\"";
 
+    private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String AUTH_VALIDATE_PATH = "/api/auth/validate";
 
     private final RestClient client;
@@ -50,6 +58,39 @@ public class ApiClient {
     /** GET {@code path}, its body read as {@code type}; {@code null} when the call fails. */
     public <T> T get(String path, Class<T> type, Object... uriVars) {
         return exchange(HttpMethod.GET, path, type, uriVars);
+    }
+
+    /** GET {@code path}, its body read as the generic {@code type}; {@code null} when the call fails. */
+    public <T> T get(String path, ParameterizedTypeReference<T> type, Object... uriVars) {
+        try {
+            return client.get().uri(path, uriVars).retrieve().body(type);
+        } catch (Exception e) {
+            logFailure(HttpMethod.GET, path, e);
+            return null;
+        }
+    }
+
+    /** A call's HTTP status and its body read as {@code type} (null when empty); status 502 when the call itself failed. */
+    public record Result<T>(int status, T body) {
+        public boolean ok() {
+            return status >= 200 && status < 300;
+        }
+    }
+
+    /**
+     * {@code method} {@code body} (none when null) to {@code path}, keeping the status and body
+     * of a 4xx answer instead of dropping them, for callers that relay validation errors.
+     */
+    public <T> Result<T> call(HttpMethod method, String path, Object body, Class<T> type, Object... uriVars) {
+        try {
+            RestClient.RequestBodySpec spec = client.method(method).uri(path, uriVars);
+            if (body != null) spec.body(body);
+            ResponseEntity<T> entity = spec.retrieve().toEntity(type);
+            return new Result<>(entity.getStatusCode().value(), entity.getBody());
+        } catch (Exception e) {
+            logFailure(method, path, e);
+            return new Result<>(502, null);
+        }
     }
 
     /** POST {@code path} without a body, the response read as {@code type}; {@code null} on failure. */
@@ -89,6 +130,20 @@ public class ApiClient {
     private static void logFailure(HttpMethod method, String path, Exception e) {
         if (!Objects.equals(e.getMessage(), NOT_STARTED_MESSAGE)) {
             log.warn("{} {} failed: {}", method, path, e.getMessage());
+        }
+    }
+
+    /** The subject (account id) of the calling session's JWT; null without one. Read, not verified: the session holds it server-side. */
+    public static UUID currentSubject() {
+        String jwt = currentJwt();
+        if (jwt == null) return null;
+        String[] parts = jwt.split("\\.");
+        if (parts.length < 2) return null;
+        try {
+            Map<?, ?> claims = JSON.readValue(Base64.getUrlDecoder().decode(parts[1]), Map.class);
+            return UUID.fromString(String.valueOf(claims.get("sub")));
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
