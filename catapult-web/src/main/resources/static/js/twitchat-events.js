@@ -85,7 +85,13 @@ window.CatapultTwitchatEvents = (function () {
             event.querySelector(".twitchat-event-errors").textContent = error.message;
             return false;
         }
-        const response = await CatapultCsrf.postJson(url(path), body);
+        let response;
+        try {
+            response = await CatapultCsrf.postJson(url(path), body);
+        } catch (error) {
+            event.querySelector(".twitchat-event-errors").textContent = `Request failed: ${error.message}`;
+            return false;
+        }
         if (response.status === 400) {
             showErrors(event, await response.json());
             return false;
@@ -99,7 +105,13 @@ window.CatapultTwitchatEvents = (function () {
     }
 
     async function cardFromServer(event, payload) {
-        const response = await CatapultCsrf.postJson(url(`payload-form?event=${eventTypeOf(event)}`), payload);
+        let response;
+        try {
+            response = await CatapultCsrf.postJson(url(`payload-form?event=${eventTypeOf(event)}`), payload);
+        } catch (error) {
+            CatapultChannel.showError(`Request failed: ${error.message}`);
+            return {};
+        }
         if (response.status === 422) return { errors: await response.json() };
         if (!response.ok) {
             CatapultChannel.showError(`Action failed (${response.status})`);
@@ -115,7 +127,13 @@ window.CatapultTwitchatEvents = (function () {
     async function toggleRaw(card) {
         const event = card.closest(".twitchat-event");
         if (part(card, "mode").value === "FORM") {
-            part(card, "raw-json").value = JSON.stringify(formData(part(card, "form")), null, 2);
+            try {
+                part(card, "raw-json").value = JSON.stringify(formData(part(card, "form")), null, 2);
+            } catch (error) {
+                part(card, "errors").textContent = error.message;
+                return;
+            }
+            part(card, "errors").textContent = "";
             part(card, "mode").value = "RAW";
             part(card, "form").classList.add("hidden");
             part(card, "raw").classList.remove("hidden");
@@ -126,7 +144,10 @@ window.CatapultTwitchatEvents = (function () {
             part(card, "errors").textContent = errors.map(({ field, message }) => `${field}: ${message}`).join(", ");
             return;
         }
-        rendered && card.replaceWith(rendered);
+        if (rendered) {
+            card.replaceWith(rendered);
+            markAvailability(event);
+        }
     }
 
     function move(card, offset) {
@@ -157,7 +178,7 @@ window.CatapultTwitchatEvents = (function () {
         const twitchat = window.CatapultTwitchat;
         if (!twitchat?.isTwitchatConnected()) return;
         const source = JSON.parse(select.dataset.source);
-        const action = source[twitchat.protocol ?? "stable"];
+        const action = source[twitchat.protocol];
         if (!action) return;
         try {
             const options = liveOptions(await twitchat.send(action, {}));
@@ -181,7 +202,7 @@ window.CatapultTwitchatEvents = (function () {
             const flag = part(card, "unavailable");
             if (!flag) continue;
             const action = part(card, "action")?.value;
-            flag.classList.toggle("hidden", !connected || twitchat.actionName(action) != null);
+            flag.classList.toggle("hidden", !connected || twitchat.protocol == null || twitchat.actionName(action) != null);
         }
     }
 
@@ -216,7 +237,10 @@ window.CatapultTwitchatEvents = (function () {
         event.querySelector(".twitchat-test-all-btn")?.addEventListener("click", () =>
             send(event, `events/${type()}/test`, () => payloadsOf(event)));
         event.querySelector(".twitchat-add-action")?.addEventListener("change", async (change) => {
-            const { card } = await cardFromServer(event, { action: change.target.value, mode: "FORM", dataJson: null, enabled: true });
+            const action = change.target.value;
+            change.target.value = ""; // so picking the same action again fires another change
+            if (!action) return;
+            const { card } = await cardFromServer(event, { action, mode: "FORM", dataJson: null, enabled: true });
             if (card) {
                 event.querySelector(".twitchat-payloads").appendChild(card);
                 markAvailability(event);
