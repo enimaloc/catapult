@@ -206,7 +206,7 @@ public final class IntegrationCards {
                 new Container(Attrs.id("twitchat-status-body"), Container.Kind.DIV, List.of(
                         new Container(Attrs.cls("twitchat-fields"), Container.Kind.DIV, List.of(
                                 new Select(Attrs.id("twitchat-branch"), key(PREFIX + "twitchat.branch"),
-                                        twitchat.branch(), branches))))));
+                                        twitchat.branch(), branches, null))))));
     }
 
     private static Button segmented(Attrs attrs, Message text) {
