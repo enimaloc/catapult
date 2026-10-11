@@ -244,4 +244,13 @@ class ApiClientTest {
         inSessionWithJwt(jwtWithPayload("{\"sub\":\"nope\"}"));
         assertThat(ApiClient.currentSubject()).isNull();
     }
+
+    @Test
+    void call_keepsTheStatus_whenTheBodyIsNotTheRequestedType() {
+        server.enqueue(new MockResponse().setResponseCode(403).setHeader("Content-Type", "application/json")
+                .setBody("{\"detail\":\"nope\"}"));
+
+        assertThat(client.call(org.springframework.http.HttpMethod.PUT, "/api/a", null, Payload[].class))
+                .isEqualTo(new ApiClient.Result<Payload[]>(403, null));
+    }
 }

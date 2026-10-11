@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.http.ResponseEntity;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -85,8 +84,15 @@ public class ApiClient {
         try {
             RestClient.RequestBodySpec spec = client.method(method).uri(path, uriVars);
             if (body != null) spec.body(body);
-            ResponseEntity<T> entity = spec.retrieve().toEntity(type);
-            return new Result<>(entity.getStatusCode().value(), entity.getBody());
+            return spec.exchange((request, response) -> {
+                int status = response.getStatusCode().value();
+                try {
+                    return new Result<>(status, response.bodyTo(type));
+                } catch (Exception e) {
+                    // The answer's body isn't a {@code type} (e.g. a ProblemDetail): the status still counts.
+                    return new Result<T>(status, null);
+                }
+            });
         } catch (Exception e) {
             logFailure(method, path, e);
             return new Result<>(502, null);
