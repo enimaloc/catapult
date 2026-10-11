@@ -65,6 +65,23 @@ class TwitchatPayloadRendererTest {
     }
 
     @Test
+    void actionKeywordInAnyCase_isStillAPlaceholder_neverShippedAsText() {
+        TwitchatPayloadRenderer renderer = renderer(Set.of(TwitchatActionType.values()));
+        assertThat(renderer.render("SEND_MESSAGE", map("message", "{{Action:DISABLE_BOT}}")).orElseThrow().data())
+                .isEqualTo(map("message", "tok-DISABLE_BOT"));
+        assertThat(renderer.render("SEND_MESSAGE", map("message", "{{ ACTION : DISABLE_BOT }}")).orElseThrow().data())
+                .isEqualTo(map("message", "tok-DISABLE_BOT"));
+        assertThat(renderer.render("SEND_MESSAGE", map("message", "{{ACTION:disable_bot}}"))).isEmpty();
+    }
+
+    @Test
+    void chatMessage_dropsAButtonWhoseActionKeywordIsUppercase_andInapplicable() {
+        TwitchatPayload payload = renderer(Set.of()).render("CUSTOM_CHAT_MESSAGE", map("message", "x", "actions",
+                List.of(map("label", "Off", "url", "{{ACTION:DISABLE_BOT}}")))).orElseThrow();
+        assertThat(payload.data().get("actions")).isEqualTo(List.of());
+    }
+
+    @Test
     void aTokenIsMintedOncePerType_andSharedAcrossPayloads() {
         TwitchatPayloadRenderer renderer = renderer(Set.of(TwitchatActionType.DISABLE_BOT));
         renderer.render("SEND_MESSAGE", map("message", "{{action:DISABLE_BOT}} {{action:DISABLE_BOT}}"));
