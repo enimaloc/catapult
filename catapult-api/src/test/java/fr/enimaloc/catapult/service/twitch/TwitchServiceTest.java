@@ -214,7 +214,7 @@ class TwitchServiceTest {
 
         twitchService.updateChannel(user, binding);
 
-        // TwitchatNotifier is no longer a collaborator of TwitchServiceImpl: the notification
+        // The Twitchat dispatcher is not a collaborator of TwitchServiceImpl: the notification
         // is emitted once, from TwitchEventSubService's channel.update handler.
         verify(categoryChangeStateService).recordCatapultChangeAndReturnPrevious(user, "222");
     }
