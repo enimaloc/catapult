@@ -140,12 +140,12 @@ export function betaTypes(eventsSource) {
     return types;
 }
 
-/** PUBLIC_API.md's "### JSON param" block of each "## **NAME**" section. */
+/** PUBLIC_API.md's "### JSON param" block of each "## **NAME**" section (prose lines may precede its fence). */
 export function stableParams(markdown) {
     const params = new Map();
     const sections = markdown.split(/^## \*\*([A-Z_]+)\*\*\s*$/m);
     for (let i = 1; i < sections.length; i += 2) {
-        const block = sections[i + 1].match(/^### JSON param[^\n]*\n```[a-z]*\n([\s\S]*?)```/m);
+        const block = sections[i + 1].match(/^### JSON param[^\n]*\n(?:(?!```|#)[^\n]*\n)*```[a-z]*\n([\s\S]*?)```/m);
         if (block) params.set(sections[i], block[1].replace(/\t/g, "    "));
     }
     return params;

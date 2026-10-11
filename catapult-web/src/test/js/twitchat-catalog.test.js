@@ -205,6 +205,14 @@ describe("stableParams", () => {
         expect(params.get("SHOUTOUT").trim()).toBe("-none-");
         expect(params.get("CUSTOM_CHAT_MESSAGE")).toContain("message?: string;");
     });
+
+    it("skips prose lines between the header and the fence, without reaching the next header", () => {
+        const doc = "## **PROSE**\n\n### JSON param *(optional)*\nFirst line.\nSecond line.\n```typescript\n{\n\tid: string;\n}\n```\n"
+            + "## **NOFENCE**\n\n### JSON param\nSome prose.\n### Other\n```ts\nnope\n```\n";
+        const params = stableParams(doc);
+        expect(params.get("PROSE")).toContain("id: string;");
+        expect(params.has("NOFENCE")).toBe(false);
+    });
 });
 
 describe("pairBeta", () => {
