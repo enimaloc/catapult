@@ -3230,4 +3230,7 @@ interface DocumentEventMap {
     "catapult:twitchat:notify": CustomEvent<TwitchatNotification>;
 }
 
+/** Each catalog action's name per protocol. */
+declare var CatapultTwitchatCatalog: Readonly<Record<string, Readonly<Partial<Record<TwitchatProtocolName, TwitchatActionType>>>>>;
+
 declare var CatapultTwitchat: CatapultTwitchatApi;
