@@ -10,19 +10,6 @@ const SCALARS = { string: "text", number: "number", boolean: "switch" };
 const OPENERS = "{[(<";
 const CLOSERS = "}])>";
 
-/** Skip a comment at position i, returning the index after the comment (or i if no comment). */
-function skipComment(source, i) {
-    if (source[i] === "/" && source[i + 1] === "/") {
-        const end = source.indexOf("\n", i);
-        return end === -1 ? source.length : end;
-    }
-    if (source[i] === "/" && source[i + 1] === "*") {
-        const end = source.indexOf("*/", i + 2);
-        return end === -1 ? source.length : end + 2;
-    }
-    return i;
-}
-
 /** The members of the first object type literal in `source`, null without one. */
 export function objectMembers(source) {
     if (source == null) return null;
@@ -42,17 +29,24 @@ export function objectMembers(source) {
     };
     for (let i = start + 1; i < source.length; i++) {
         const c = source[i];
-        if (depth === 0 && c === "/" && source[i + 1] === "/") {
+        // Skip comments at any depth, collecting doc only at depth 0
+        if (c === "/" && source[i + 1] === "/") {
             const end = source.indexOf("\n", i);
             const stop = end === -1 ? source.length : end;
-            doc.push(source.slice(i + 2, stop).trim());
-            i = stop - 1; // -1 so the loop's i++ lands on the newline
+            if (depth === 0) {
+                doc.push(source.slice(i + 2, stop).trim());
+                i = stop - 1; // -1 so the loop's i++ lands on the newline
+            } else {
+                i = stop; // Skip to newline but don't process it (will continue)
+            }
             continue;
         }
-        if (depth === 0 && c === "/" && source[i + 1] === "*") {
+        if (c === "/" && source[i + 1] === "*") {
             const end = source.indexOf("*/", i + 2);
             const stop = end === -1 ? source.length : end;
-            doc.push(...source.slice(i + 2, stop).split("\n").map((line) => line.replace(/^\s*\*+\s?/, "").trim()));
+            if (depth === 0) {
+                doc.push(...source.slice(i + 2, stop).split("\n").map((line) => line.replace(/^\s*\*+\s?/, "").trim()));
+            }
             i = stop + 1;
             continue;
         }

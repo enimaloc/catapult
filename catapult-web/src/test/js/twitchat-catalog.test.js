@@ -111,6 +111,15 @@ describe("objectMembers", () => {
         expect(members[0].type).toContain('"x"');
         expect(members[0].type).toContain('"y"');
     });
+
+    it("ignores comments with unbalanced brackets inside nested types (regression: issue 2 part 2)", () => {
+        const members = objectMembers("{\n a: {\n // note (\n x: string;\n };\n b: number;\n}");
+        expect(members.length).toBe(2);
+        expect(members[0].name).toBe("a");
+        expect(members[0].type).toContain("x: string;");
+        expect(members[1].name).toBe("b");
+        expect(members[1].type).toBe("number");
+    });
 });
 
 describe("fieldOf", () => {
