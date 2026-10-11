@@ -264,6 +264,33 @@ describe("Twitchat-dependent bits", () => {
         expect(document.querySelector(".twitchat-payload-unavailable").classList.contains("hidden")).toBe(true);
     });
 
+    it("flags them against the picked branch while no Twitchat is connected", () => {
+        html(EVENT(CARD("QUIZ_REVEAL", '{"beta":"SET_QUIZ_REVEAL"}') + CARD("SEND_MESSAGE")));
+        CatapultTwitchat.protocol = "beta"; // forced by configure("beta")
+        render();
+        const flags = [...document.querySelectorAll(".twitchat-payload-unavailable")].map((flag) => flag.classList.contains("hidden"));
+        expect(flags).toEqual([false, true]);
+    });
+
+    it("marks nothing on auto while no Twitchat answered", () => {
+        html(EVENT(CARD("QUIZ_REVEAL")));
+        CatapultTwitchat.protocol = null;
+        render();
+        expect(document.querySelector(".twitchat-payload-unavailable").classList.contains("hidden")).toBe(true);
+    });
+
+    it("re-flags the payloads when the protocol changes", () => {
+        html(EVENT(CARD("QUIZ_REVEAL")));
+        CatapultTwitchat.protocol = null;
+        render();
+        CatapultTwitchat.protocol = "beta";
+        document.dispatchEvent(new CustomEvent("catapult:twitchat:protocol", { detail: { protocol: "beta" } }));
+        expect(document.querySelector(".twitchat-payload-unavailable").classList.contains("hidden")).toBe(false);
+        CatapultTwitchat.protocol = null;
+        document.dispatchEvent(new CustomEvent("catapult:twitchat:protocol", { detail: { protocol: null } }));
+        expect(document.querySelector(".twitchat-payload-unavailable").classList.contains("hidden")).toBe(true);
+    });
+
     it("fills a live select from Twitchat, keeping the stored value", async () => {
         html(EVENT(`<div class="twitchat-payload"><mdui-select data-field="id" data-source='{"stable":"TRIGGERS_GET_ALL"}' value="gone">
             <mdui-menu-item value="gone">gone</mdui-menu-item></mdui-select></div>`));

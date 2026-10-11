@@ -198,14 +198,18 @@ window.CatapultTwitchatEvents = (function () {
         }
     }
 
+    /**
+     * Flags the payloads Twitchat's protocol hasn't: the detected one, else the branch picked
+     * (forced, connected or not). On auto, nothing is flagged until a Twitchat answered.
+     */
     function markAvailability(root) {
         const twitchat = window.CatapultTwitchat;
-        const connected = twitchat?.isTwitchatConnected() ?? false;
+        const known = twitchat?.protocol != null;
         for (const card of root.querySelectorAll(".twitchat-payload")) {
             const flag = part(card, "unavailable");
             if (!flag) continue;
             const action = part(card, "action")?.value;
-            flag.classList.toggle("hidden", !connected || twitchat.protocol == null || twitchat.actionName(action) != null);
+            flag.classList.toggle("hidden", !known || twitchat.actionName(action) != null);
         }
     }
 
@@ -267,6 +271,11 @@ window.CatapultTwitchatEvents = (function () {
         if (!root) return;
         markAvailability(root);
         if (window.CatapultTwitchat?.isTwitchatConnected()) root.querySelectorAll("[data-source]").forEach(fillLiveSelect);
+    });
+
+    document.addEventListener("catapult:twitchat:protocol", () => {
+        const root = document.getElementById("channel-connections");
+        if (root) markAvailability(root);
     });
 
     return { formData, payloadOf, payloadsOf };
