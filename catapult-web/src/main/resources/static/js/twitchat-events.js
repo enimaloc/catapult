@@ -178,9 +178,11 @@ window.CatapultTwitchatEvents = (function () {
         const twitchat = window.CatapultTwitchat;
         if (!twitchat?.isTwitchatConnected()) return;
         const source = JSON.parse(select.dataset.source);
-        const action = source[twitchat.protocol];
-        if (!action) return;
+        let action;
         try {
+            const protocol = twitchat.protocol ?? await twitchat.detectProtocol() ?? "stable";
+            action = source[protocol];
+            if (!action) return;
             const options = liveOptions(await twitchat.send(action, {}));
             const known = new Set([...select.querySelectorAll("mdui-menu-item")].map((item) => item.getAttribute("value")));
             for (const { value, label } of options) {
@@ -261,7 +263,9 @@ window.CatapultTwitchatEvents = (function () {
 
     document.addEventListener("catapult:twitchat:presence", () => {
         const root = document.getElementById("channel-connections");
-        if (root) markAvailability(root);
+        if (!root) return;
+        markAvailability(root);
+        if (window.CatapultTwitchat?.isTwitchatConnected()) root.querySelectorAll("[data-source]").forEach(fillLiveSelect);
     });
 
     return { formData, payloadOf, payloadsOf };

@@ -259,4 +259,35 @@ describe("Twitchat-dependent bits", () => {
         expect(values).toEqual([["gone", "gone"], ["t-1", "Intro"]]);
         expect(CatapultTwitchat.send).toHaveBeenCalledWith("TRIGGERS_GET_ALL", {});
     });
+
+    const LIVE = `<div class="twitchat-payload"><mdui-select data-field="id" data-source='{"stable":"TRIGGERS_GET_ALL","beta":"BETA_TRIGGERS"}' value="">
+        </mdui-select></div>`;
+    const items = () => [...document.querySelectorAll("mdui-menu-item")].map((item) => item.getAttribute("value"));
+
+    it("awaits protocol detection before filling a live select", async () => {
+        html(EVENT(LIVE));
+        CatapultTwitchat.isTwitchatConnected = () => true;
+        CatapultTwitchat.protocol = null;
+        CatapultTwitchat.detectProtocol = vi.fn(async () => "beta");
+        CatapultTwitchat.send.mockResolvedValue({ triggerList: [{ id: "t-1", name: "Intro" }] });
+        render();
+        await flush();
+        expect(CatapultTwitchat.detectProtocol).toHaveBeenCalled();
+        expect(CatapultTwitchat.send).toHaveBeenCalledWith("BETA_TRIGGERS", {});
+        expect(items()).toEqual(["t-1"]);
+    });
+
+    it("fills live selects when Twitchat shows up later, without duplicating options", async () => {
+        html(EVENT(LIVE));
+        CatapultTwitchat.send.mockResolvedValue({ triggerList: [{ id: "t-1", name: "Intro" }] });
+        render();
+        await flush();
+        expect(items()).toEqual([]);
+        CatapultTwitchat.isTwitchatConnected = () => true;
+        document.dispatchEvent(new CustomEvent("catapult:twitchat:presence"));
+        await flush();
+        document.dispatchEvent(new CustomEvent("catapult:twitchat:presence"));
+        await flush();
+        expect(items()).toEqual(["t-1"]);
+    });
 });
