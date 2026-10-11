@@ -23,6 +23,7 @@ public class SPADialect extends AbstractProcessorDialect {
                 new OnAttributeProcessor(dialectPrefix),
                 new ValueAttributeProcessor(dialectPrefix),
                 new InAttributeProcessor(dialectPrefix),
-                new SwitchAttributeProcessor(dialectPrefix));
+                new SwitchAttributeProcessor(dialectPrefix),
+                new StateAttributeProcessor(dialectPrefix));
     }
 }
