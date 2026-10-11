@@ -64,23 +64,24 @@ window.CatapultTwitchatEvents = (function () {
     const eventTypeOf = (event) => event.querySelector(".twitchat-event-type").value;
     const url = (path) => `${CatapultChannel.baseUrl()}/twitchat/${path}`;
 
-    function showErrors(event, errors) {
-        cardsOf(event).forEach((card) => { part(card, "errors").textContent = ""; });
+    /** Errors on the cards they concern: an error's index is its card's among those posted. */
+    function showErrors(event, cards, errors) {
+        cards.forEach((card) => { part(card, "errors").textContent = ""; });
         const general = [];
         for (const { index, field, message } of errors) {
-            const card = cardsOf(event)[index];
+            const card = cards[index];
             if (card) part(card, "errors").textContent = `${field}: ${message}`;
             else general.push(message);
         }
         event.querySelector(".twitchat-event-errors").textContent = general.join(" ");
     }
 
-    /** Posts payloads; shows the errors a 400 lists. Resolves with whether it went through. */
-    async function send(event, path, payloads) {
+    /** Posts these cards' payloads; shows the errors a 400 lists. Resolves with whether it went through. */
+    async function send(event, path, cards) {
         event.querySelector(".twitchat-event-errors").textContent = "";
         let body;
         try {
-            body = payloads();
+            body = cards.map(payloadOf);
         } catch (error) {
             event.querySelector(".twitchat-event-errors").textContent = error.message;
             return false;
@@ -93,14 +94,14 @@ window.CatapultTwitchatEvents = (function () {
             return false;
         }
         if (response.status === 400) {
-            showErrors(event, await response.json());
+            showErrors(event, cards, await response.json());
             return false;
         }
         if (!response.ok) {
             CatapultChannel.showError(`Action failed (${response.status})`);
             return false;
         }
-        showErrors(event, []);
+        showErrors(event, cards, []);
         return true;
     }
 
@@ -214,7 +215,7 @@ window.CatapultTwitchatEvents = (function () {
         on("down", (c) => move(c, 1));
         on("delete", (c) => c.remove());
         on("raw-btn", toggleRaw);
-        on("test", (c) => send(c.closest(".twitchat-event"), `events/${eventTypeOf(c.closest(".twitchat-event"))}/test`, () => [payloadOf(c)]));
+        on("test", (c) => send(c.closest(".twitchat-event"), `events/${eventTypeOf(c.closest(".twitchat-event"))}/test`, [c]));
         card.addEventListener("click", (event) => {
             const button = event.target.closest(".repeater-add, .repeater-remove");
             if (!button) return;
@@ -235,9 +236,9 @@ window.CatapultTwitchatEvents = (function () {
         const type = () => eventTypeOf(event);
         cardsOf(event).forEach(wireCard);
         event.querySelector(".twitchat-save-btn")?.addEventListener("click", () =>
-            send(event, `events/${type()}`, () => payloadsOf(event)));
+            send(event, `events/${type()}`, cardsOf(event)));
         event.querySelector(".twitchat-test-all-btn")?.addEventListener("click", () =>
-            send(event, `events/${type()}/test`, () => payloadsOf(event)));
+            send(event, `events/${type()}/test`, cardsOf(event)));
         event.querySelector(".twitchat-add-action")?.addEventListener("change", async (change) => {
             const action = change.target.value;
             change.target.value = ""; // so picking the same action again fires another change

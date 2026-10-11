@@ -232,6 +232,22 @@ describe("saving and testing", () => {
     });
 });
 
+describe("testing one payload among several", () => {
+    beforeEach(() => { html(EVENT(CARD() + CARD("SEND_MESSAGE") + CARD("EXECUTE_TRIGGER"))); render(); });
+
+    it("shows the errors on the card tested, not on the first one", async () => {
+        const cards = document.querySelectorAll(".twitchat-payload");
+        cards[0].querySelector(".twitchat-payload-errors").textContent = "message: Required";
+        fetchMock.mockResolvedValueOnce(response(400, [{ index: 0, field: "id", message: "Required" }]));
+        cards[2].querySelector(".twitchat-payload-test").click();
+        await flush();
+
+        expect(posted()[0][1].map(({ action }) => action)).toEqual(["EXECUTE_TRIGGER"]);
+        const errors = [...cards].map((card) => card.querySelector(".twitchat-payload-errors").textContent);
+        expect(errors).toEqual(["message: Required", "", "id: Required"]);
+    });
+});
+
 describe("Twitchat-dependent bits", () => {
     it("flags payloads the connected Twitchat can't run", () => {
         html(EVENT(CARD("QUIZ_REVEAL", '{"beta":"SET_QUIZ_REVEAL"}')));
