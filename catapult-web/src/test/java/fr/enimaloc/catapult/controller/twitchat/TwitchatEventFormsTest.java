@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TwitchatEventFormsTest {
 
@@ -100,5 +101,34 @@ class TwitchatEventFormsTest {
                 "CATEGORY_CHANGED_BY_CATAPULT", "CATEGORY_CHANGED_MANUALLY", "STREAM_STARTED", "BOT_ENABLED", "BOT_DISABLED", "NO_GAME_DETECTED");
         assertThat(collapse.items().get(2).text().args()).containsExactly(1);
         assertThat(collapse.items().get(5).text().args()).containsExactly(0);
+    }
+
+    @Test
+    void cardOfAnActionGoneFromTheCatalog_keepsItsRawJsonOnly_underItsStoredKey() {
+        IntegrationNode card = forms.payloadCard("STREAM_STARTED", new TwitchatEventActionDto("GONE_ACTION", "FORM", "{\"a\":1}", true));
+
+        assertThat(of(card, IntegrationNode.Text.class)).filteredOn(t -> t.attrs().className().contains("twitchat-payload-title")).singleElement().satisfies(t -> {
+            assertThat(t.attrs().className()).contains("twitchat-payload-title");
+            assertThat(t.text().literal()).isEqualTo("GONE_ACTION");
+        });
+        assertThat(of(card, IntegrationNode.Hidden.class)).extracting(IntegrationNode.Hidden::value).contains("GONE_ACTION", "RAW");
+        assertThat(of(card, IntegrationNode.Container.class)).filteredOn(c -> c.attrs().className().contains("twitchat-payload-form"))
+                .singleElement().satisfies(form -> assertThat(form.attrs().className()).contains("hidden"));
+        assertThat(of(card, IntegrationNode.Container.class)).filteredOn(c -> c.attrs().className().contains("twitchat-payload-raw"))
+                .singleElement().satisfies(rawPart -> assertThat(rawPart.attrs().className()).doesNotContain("hidden"));
+        assertThat(of(card, IntegrationNode.Button.class)).filteredOn(b -> b.attrs().className().contains("twitchat-payload-raw-btn"))
+                .singleElement().satisfies(toggle -> assertThat(toggle.attrs().className()).contains("hidden"));
+        assertThat(of(card, IntegrationNode.TextField.class)).anySatisfy(t -> assertThat(t.value()).asString().contains("\"a\" : 1"));
+    }
+
+    @Test
+    void eventsSection_survivesAPayloadWhoseActionLeftTheCatalog() {
+        assertThat(forms.eventsSection(Map.of("STREAM_STARTED", List.of(
+                new TwitchatEventActionDto("GONE_ACTION", "FORM", "{}", true))))).isNotNull();
+    }
+
+    @Test
+    void newPayload_ofAnUnknownAction_isRefused() {
+        assertThatThrownBy(() -> forms.newPayload("GONE_ACTION")).isInstanceOf(TwitchatEventForms.UnknownAction.class);
     }
 }

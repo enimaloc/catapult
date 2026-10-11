@@ -90,4 +90,15 @@ class TwitchatEventsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-field=\"user.name\"")));
     }
+
+    @Test
+    void payloadForm_unknownAction_is400() throws Exception {
+        mvc.perform(post("/channel/streamer/twitchat/payload-form").param("event", "STREAM_STARTED").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"GONE\",\"mode\":\"FORM\",\"dataJson\":null,\"enabled\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$[0].field").value("action"));
+        mvc.perform(post("/channel/streamer/twitchat/payload-form").param("event", "STREAM_STARTED").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"GONE\",\"mode\":\"FORM\",\"dataJson\":\"{}\",\"enabled\":true}"))
+                .andExpect(status().isBadRequest());
+    }
 }
