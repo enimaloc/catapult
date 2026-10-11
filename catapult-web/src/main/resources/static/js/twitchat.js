@@ -404,6 +404,9 @@ window.CatapultTwitchat = (function () {
                 log("already dispatched by another client:", batch.eventType);
                 return 0;
             }
+            // Each payload is named in this Twitchat's protocol: asked first if not known yet,
+            // or a beta Twitchat would miss every action named otherwise in the stable one.
+            if (!protocol && !forced) await detectProtocol();
             let sent = 0;
             for (const { action, data } of batch.payloads ?? []) {
                 const name = client.actionName(action);
