@@ -26,8 +26,9 @@ public final class TwitchatPayloadRenderer {
 
     static final String CHAT_MESSAGE = "CUSTOM_CHAT_MESSAGE";
     // Permissive on purpose: any {{action:...}}-shaped text must be recognized as an attempted
-    // placeholder (wrong case, spaces, unknown type) so the payload is skipped, not shipped as is.
-    private static final Pattern ACTION = Pattern.compile("\\{\\{\\s*action\\s*:\\s*([^}]*?)\\s*\\}\\}");
+    // placeholder (keyword in any case, spaces, unknown or wrong-case type) so the payload is
+    // skipped, not shipped as is. The type itself still has to match exactly to resolve.
+    private static final Pattern ACTION = Pattern.compile("\\{\\{\\s*(?i:action)\\s*:\\s*([^}]*?)\\s*\\}\\}");
     private static final Pattern VARIABLE = Pattern.compile("\\{\\{\\s*([A-Za-z]+)\\s*\\}\\}");
 
     private final Map<String, String> variables;
