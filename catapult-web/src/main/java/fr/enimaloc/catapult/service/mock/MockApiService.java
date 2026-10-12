@@ -12,7 +12,10 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPayload;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents;
 import fr.enimaloc.catapult.common.twitchat.TwitchatCatalog;
+import fr.enimaloc.catapult.common.twitchat.TwitchatPayloadRenderer;
 import fr.enimaloc.catapult.common.twitchat.TwitchatPayloadValidator;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
 import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
@@ -39,8 +42,12 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -118,6 +125,7 @@ public class MockApiService implements ApiService {
         MockData data = currentData();
         data.setBotEnabled(!data.isBotEnabled());
         eventPublisher.publishEvent(new BotStateChangedEvent(username, data.isBotEnabled()));
+        dispatchTwitchatEvent(data.isBotEnabled() ? "BOT_ENABLED" : "BOT_DISABLED", Map.of());
     }
 
     @Override
@@ -346,12 +354,51 @@ public class MockApiService implements ApiService {
         log.trace("testTwitchatEvent({}, {})", username, eventType);
         List<TwitchatValidationError> errors = twitchatValidator.validate(payloads);
         if (errors.isEmpty()) {
-            List<TwitchatPayload> parsed = payloads.stream()
-                    .map(p -> new TwitchatPayload(p.action(), twitchatValidator.parse(p.dataJson())))
-                    .toList();
-            twitchatHub.publish(currentUserId(), JSON.writeValueAsString(new TwitchatDispatch(username, eventType, parsed)));
+            // As the API's test: every button shows, its token leading nowhere.
+            publishTwitchat(username, eventType, render(payloads, Map.of("gameName", "Jeu de test", "previousGameName", "Jeu précédent"),
+                    EnumSet.allOf(TwitchatActionType.class)));
         }
         return errors;
+    }
+
+    /**
+     * Sends the session's enabled payloads of {@code eventType} to its Twitchat, as catapult-api's
+     * TwitchatEventDispatcher would when Catapult sees the event: variables filled, buttons of
+     * the event's Catapult actions kept (with mock tokens). Returns how many payloads went.
+     */
+    public int dispatchTwitchatEvent(String eventType, Map<String, String> eventVariables) {
+        log.trace("dispatchTwitchatEvent({}, {})", eventType, eventVariables);
+        MockData current = currentData();
+        if (current == null) return 0;
+        List<TwitchatEventActionDto> enabled = current.getTwitchatEvents().getOrDefault(eventType, List.of()).stream()
+                .filter(TwitchatEventActionDto::enabled)
+                .toList();
+        Set<TwitchatActionType> applicable = EnumSet.noneOf(TwitchatActionType.class);
+        applicable.addAll(TwitchatEvents.ACTIONS.getOrDefault(eventType, List.of()));
+        List<TwitchatPayload> rendered = render(enabled, eventVariables, applicable);
+        publishTwitchat(current.getChannelDto().twitchUsername(), eventType, rendered);
+        return rendered.size();
+    }
+
+    private List<TwitchatPayload> render(List<TwitchatEventActionDto> payloads, Map<String, String> eventVariables,
+                                         Set<TwitchatActionType> applicable) {
+        Map<String, String> variables = new HashMap<>(eventVariables);
+        variables.put("baseUrl", ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString());
+        MockData current = currentData();
+        variables.put("channel", current == null ? "" : current.getChannelDto().twitchUsername());
+        TwitchatPayloadRenderer renderer = new TwitchatPayloadRenderer(variables, applicable,
+                action -> "mock-" + action.name().toLowerCase() + "-" + UUID.randomUUID());
+        List<TwitchatPayload> rendered = new ArrayList<>();
+        for (TwitchatEventActionDto payload : payloads) {
+            renderer.render(payload.action(), twitchatValidator.parse(payload.dataJson())).ifPresent(rendered::add);
+        }
+        return rendered;
+    }
+
+    private void publishTwitchat(String username, String eventType, List<TwitchatPayload> payloads) {
+        if (!payloads.isEmpty()) {
+            twitchatHub.publish(currentUserId(), JSON.writeValueAsString(new TwitchatDispatch(username, eventType, payloads)));
+        }
     }
 
     @Override

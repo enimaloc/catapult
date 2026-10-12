@@ -269,4 +269,47 @@ class MockApiServiceTest {
         org.mockito.Mockito.verify(hub).publish(org.mockito.ArgumentMatchers.eq(service.currentUserId()),
                 org.mockito.ArgumentMatchers.contains("\"eventType\":\"BOT_ENABLED\""));
     }
+
+    @Test
+    void testTwitchatEvent_rendersVariablesAndEveryButton() {
+        List<TwitchatEventActionDto> payloads = List.of(new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "RAW",
+                "{\"message\":\"{{channel}} joue à {{gameName}}\",\"actions\":[{\"label\":\"x\",\"url\":\"{{action:REVERT_CATEGORY}}\"}]}", true));
+
+        service.testTwitchatEvent(username, "BOT_ENABLED", payloads);
+
+        org.mockito.Mockito.verify(hub).publish(org.mockito.ArgumentMatchers.eq(service.currentUserId()), org.mockito.ArgumentMatchers.argThat(json ->
+                json.contains(username + " joue à Jeu de test") && json.contains("mock-revert_category-")));
+    }
+
+    @Test
+    void dispatchTwitchatEvent_sendsTheEnabledPayloads_withTheEventsActionsOnly() {
+        service.saveTwitchatEvent(username, "STREAM_STARTED", List.of(
+                new TwitchatEventActionDto("SEND_MESSAGE", "RAW", "{\"message\":\"{{channel}} is live\"}", true),
+                new TwitchatEventActionDto("SEND_MESSAGE", "RAW", "{\"message\":\"off\"}", false),
+                // REVERT_CATEGORY doesn't apply to a stream start: skipped whole, like catapult-api does.
+                new TwitchatEventActionDto("SEND_MESSAGE", "RAW", "{\"message\":\"{{action:REVERT_CATEGORY}}\"}", true)));
+
+        assertThat(service.dispatchTwitchatEvent("STREAM_STARTED", Map.of())).isEqualTo(1);
+
+        org.mockito.Mockito.verify(hub).publish(org.mockito.ArgumentMatchers.eq(service.currentUserId()), org.mockito.ArgumentMatchers.argThat(json ->
+                json.contains(username + " is live") && !json.contains("off") && json.contains("\"eventType\":\"STREAM_STARTED\"")));
+    }
+
+    @Test
+    void dispatchTwitchatEvent_withNothingToSend_publishesNothing() {
+        assertThat(service.dispatchTwitchatEvent("NO_GAME_DETECTED", Map.of())).isZero();
+
+        org.mockito.Mockito.verifyNoInteractions(hub);
+    }
+
+    @Test
+    void toggleBot_sendsItsTwitchatEvent() {
+        service.saveTwitchatEvent(username, "BOT_DISABLED", List.of(
+                new TwitchatEventActionDto("SEND_MESSAGE", "RAW", "{\"message\":\"bot off\"}", true)));
+
+        service.toggleBot(username);
+
+        org.mockito.Mockito.verify(hub).publish(org.mockito.ArgumentMatchers.eq(service.currentUserId()),
+                org.mockito.ArgumentMatchers.contains("\"eventType\":\"BOT_DISABLED\""));
+    }
 }
