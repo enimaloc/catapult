@@ -14,12 +14,20 @@
             { "value": "highlight", "label": "highlight", "labelKey": "twitchat.field.style.highlight" },
             { "value": "error", "label": "error", "labelKey": "twitchat.field.style.error" }
           ] },
+        { "path": "highlightColor", "type": "text", "label": "Highlight color", "labelKey": "twitchat.field.highlight_color", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null,
+          "showIf": { "path": "style", "values": ["highlight"] } },
+        { "path": "quote", "type": "textarea", "label": "Quote", "labelKey": "twitchat.field.quote", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
         { "path": "icon", "type": "text", "label": "Icon", "labelKey": "twitchat.field.icon", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
         { "path": "user.name", "type": "text", "label": "Author", "labelKey": "twitchat.field.author", "required": false, "options": null, "source": null, "defaultValue": "Catapult", "fields": null },
+        { "path": "user.color", "type": "text", "label": "Author color", "labelKey": "twitchat.field.author_color", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
+        { "path": "col", "type": "number", "label": "Column", "labelKey": "twitchat.field.col", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
+        { "path": "todayFirst", "type": "switch", "label": "Show in Greet them", "labelKey": "twitchat.field.today_first", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
+        { "path": "canClose", "type": "switch", "label": "Closable", "labelKey": "twitchat.field.can_close", "required": false, "options": null, "source": null, "defaultValue": true, "fields": null },
         { "path": "actions", "type": "repeater", "label": "Buttons", "labelKey": "twitchat.field.buttons", "required": false, "options": null, "source": null, "defaultValue": null,
           "fields": [
             { "path": null, "type": "catapult-action", "label": "Catapult action", "labelKey": "twitchat.field.button.catapult_action", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
             { "path": "label", "type": "text", "label": "Label", "labelKey": "twitchat.field.button.label", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null },
+            { "path": "icon", "type": "text", "label": "Icon", "labelKey": "twitchat.field.button.icon", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
             { "path": "theme", "type": "select", "label": "Theme", "labelKey": "twitchat.field.button.theme", "required": false, "source": null, "defaultValue": "default", "fields": null,
               "options": [
                 { "value": "default", "label": "default", "labelKey": null },
@@ -30,10 +38,19 @@
             { "path": "actionType", "type": "select", "label": "Type", "labelKey": "twitchat.field.button.type", "required": true, "source": null, "defaultValue": "url", "fields": null,
               "options": [
                 { "value": "url", "label": "url", "labelKey": "twitchat.field.button.type.url" },
-                { "value": "message", "label": "message", "labelKey": "twitchat.field.button.type.message" }
+                { "value": "trigger", "label": "trigger", "labelKey": "twitchat.field.button.type.trigger" },
+                { "value": "message", "label": "message", "labelKey": "twitchat.field.button.type.message" },
+                { "value": "discord", "label": "discord", "labelKey": "twitchat.field.button.type.discord" }
               ] },
-            { "path": "url", "type": "text", "label": "URL", "labelKey": "twitchat.field.button.url", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
-            { "path": "message", "type": "text", "label": "Chat message", "labelKey": "twitchat.field.button.message", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null }
+            { "path": "url", "type": "text", "label": "URL", "labelKey": "twitchat.field.button.url", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null,
+              "showIf": { "path": "actionType", "values": ["url"] } },
+            { "path": "urlTarget", "type": "text", "label": "URL target", "labelKey": "twitchat.field.button.url_target", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null,
+              "showIf": { "path": "actionType", "values": ["url"] } },
+            { "path": "triggerId", "type": "select", "label": "Trigger", "labelKey": "twitchat.field.button.trigger", "required": false, "options": null, "defaultValue": null, "fields": null,
+              "source": { "stable": "TRIGGERS_GET_ALL", "beta": "GET_TRIGGER_LIST" },
+              "showIf": { "path": "actionType", "values": ["trigger"] } },
+            { "path": "message", "type": "text", "label": "Chat message", "labelKey": "twitchat.field.button.message", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null,
+              "showIf": { "path": "actionType", "values": ["message", "discord"] } }
           ] }
       ]
     },

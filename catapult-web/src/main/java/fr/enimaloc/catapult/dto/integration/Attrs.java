@@ -2,12 +2,13 @@ package fr.enimaloc.catapult.dto.integration;
 
 /**
  * Attributes every node may carry: the id/classes channel-connections.js looks elements up by,
- * the SSE-driven state (null when the element never changes after render), and the data path
- * an editable element maps to ({@code field}, rendered as data-field).
+ * the SSE-driven state (null when the element never changes after render), the data path
+ * an editable element maps to ({@code field}, rendered as data-field), and the JSON condition
+ * twitchat-events.js shows it under ({@code showIf}, rendered as data-show-if).
  */
-public record Attrs(String id, String className, SpaState state, String field) {
+public record Attrs(String id, String className, SpaState state, String field, String showIf) {
 
-    public static final Attrs NONE = new Attrs(null, null, null, null);
+    public static final Attrs NONE = new Attrs(null, null, null, null, null);
 
     public static Attrs id(String id) {
         return NONE.withId(id);
@@ -27,19 +28,23 @@ public record Attrs(String id, String className, SpaState state, String field) {
     }
 
     public Attrs withId(String id) {
-        return new Attrs(id, className, state, field);
+        return new Attrs(id, className, state, field, showIf);
     }
 
     public Attrs withClass(String className) {
-        return new Attrs(id, this.className == null ? className : this.className + " " + className, state, field);
+        return new Attrs(id, this.className == null ? className : this.className + " " + className, state, field, showIf);
     }
 
     public Attrs withState(SpaState state) {
-        return new Attrs(id, className, state, field);
+        return new Attrs(id, className, state, field, showIf);
     }
 
     public Attrs withField(String field) {
-        return new Attrs(id, className, state, field);
+        return new Attrs(id, className, state, field, showIf);
+    }
+
+    public Attrs withShowIf(String showIf) {
+        return new Attrs(id, className, state, field, showIf);
     }
 
     /** Server-side only toggle, for elements whose JS flips {@code hidden} itself (OBS, Twitchat). */

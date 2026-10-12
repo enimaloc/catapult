@@ -29,11 +29,16 @@ window.CatapultTwitchatEvents = (function () {
         return raw;
     }
 
-    /** The data under `root`: each data-field set at its path, a repeater's rows as an array. */
+    /**
+     * The data under `root`: each data-field set at its path, a repeater's rows as an array.
+     * A field its data-show-if hides (a button's URL while it runs a trigger) is left out.
+     */
     function formData(root) {
         const data = {};
         for (const el of root.querySelectorAll("[data-field]")) {
             if (el.closest("template")) continue;
+            const hidden = el.closest(".hidden");
+            if (hidden && hidden !== root && root.contains(hidden)) continue;
             const repeater = el.parentElement.closest("[data-repeater]");
             if (repeater && root.contains(repeater)) continue; // a row's field, read with its row
             if (el.hasAttribute("data-repeater")) {
@@ -158,6 +163,19 @@ window.CatapultTwitchatEvents = (function () {
         else sibling.after(card);
     }
 
+    /** The row (or form) a field belongs to: where its data-show-if looks up its sibling. */
+    const scopeOf = (el) => el.closest(".repeater-row, .twitchat-payload-form");
+
+    /** Shows each field under `root` whose data-show-if sibling holds one of its values. */
+    function applyConditions(root) {
+        for (const el of root.querySelectorAll("[data-show-if]")) {
+            const { path, values } = JSON.parse(el.dataset.showIf);
+            const scope = scopeOf(el);
+            const sibling = [...(scope?.querySelectorAll(`[data-field="${path}"]`) ?? [])].find((field) => scopeOf(field) === scope);
+            el.classList.toggle("hidden", !values.includes(sibling?.value ?? ""));
+        }
+    }
+
     function pointAtCatapultAction(select) {
         const row = select.closest(".repeater-row");
         if (!row || !select.value) return;
@@ -167,6 +185,7 @@ window.CatapultTwitchatEvents = (function () {
         };
         set("actionType", "url");
         set("url", ACTION_URL(select.value));
+        applyConditions(row);
     }
 
     /** The option list a live select's data answer holds: its first array, by id and name. */
@@ -228,10 +247,24 @@ window.CatapultTwitchatEvents = (function () {
                 return;
             }
             const repeater = button.closest("[data-repeater]");
-            repeater.querySelector(".repeater-rows").appendChild(repeater.querySelector("template").content.firstElementChild.cloneNode(true));
+            const row = repeater.querySelector("template").content.firstElementChild.cloneNode(true);
+            repeater.querySelector(".repeater-rows").appendChild(row);
+            row.querySelectorAll("[data-source]").forEach(fillLiveSelect);
         });
         card.addEventListener("change", (event) => {
-            if (event.target.classList?.contains("twitchat-catapult-action")) pointAtCatapultAction(event.target);
+            const target = event.target;
+            if (target.classList?.contains("twitchat-catapult-action")) {
+                pointAtCatapultAction(target);
+                return;
+            }
+            // A button no longer opening a link no longer runs a Catapult action either.
+            const row = target.closest?.(".repeater-row");
+            if (row && target.dataset?.field === "actionType" && target.value !== "url") {
+                const action = row.querySelector(".twitchat-catapult-action");
+                if (action) action.value = "";
+            }
+            const scope = target.closest?.(".repeater-row, .twitchat-payload-form");
+            if (scope) applyConditions(scope);
         });
         card.querySelectorAll("[data-source]").forEach(fillLiveSelect);
     }

@@ -50,6 +50,34 @@
           ]
         },
         {
+          "path": "highlightColor",
+          "type": "text",
+          "label": "Highlight color",
+          "labelKey": "twitchat.field.highlight_color",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null,
+          "showIf": {
+            "path": "style",
+            "values": [
+              "highlight"
+            ]
+          }
+        },
+        {
+          "path": "quote",
+          "type": "textarea",
+          "label": "Quote",
+          "labelKey": "twitchat.field.quote",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
           "path": "icon",
           "type": "text",
           "label": "Icon",
@@ -69,6 +97,50 @@
           "options": null,
           "source": null,
           "defaultValue": "Catapult",
+          "fields": null
+        },
+        {
+          "path": "user.color",
+          "type": "text",
+          "label": "Author color",
+          "labelKey": "twitchat.field.author_color",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "col",
+          "type": "number",
+          "label": "Column",
+          "labelKey": "twitchat.field.col",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "todayFirst",
+          "type": "switch",
+          "label": "Show in Greet them",
+          "labelKey": "twitchat.field.today_first",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "canClose",
+          "type": "switch",
+          "label": "Closable",
+          "labelKey": "twitchat.field.can_close",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": true,
           "fields": null
         },
         {
@@ -98,6 +170,17 @@
               "label": "Label",
               "labelKey": "twitchat.field.button.label",
               "required": true,
+              "options": null,
+              "source": null,
+              "defaultValue": null,
+              "fields": null
+            },
+            {
+              "path": "icon",
+              "type": "text",
+              "label": "Icon",
+              "labelKey": "twitchat.field.button.icon",
+              "required": false,
               "options": null,
               "source": null,
               "defaultValue": null,
@@ -151,9 +234,19 @@
                   "labelKey": "twitchat.field.button.type.url"
                 },
                 {
+                  "value": "trigger",
+                  "label": "trigger",
+                  "labelKey": "twitchat.field.button.type.trigger"
+                },
+                {
                   "value": "message",
                   "label": "message",
                   "labelKey": "twitchat.field.button.type.message"
+                },
+                {
+                  "value": "discord",
+                  "label": "discord",
+                  "labelKey": "twitchat.field.button.type.discord"
                 }
               ]
             },
@@ -166,7 +259,50 @@
               "options": null,
               "source": null,
               "defaultValue": null,
-              "fields": null
+              "fields": null,
+              "showIf": {
+                "path": "actionType",
+                "values": [
+                  "url"
+                ]
+              }
+            },
+            {
+              "path": "urlTarget",
+              "type": "text",
+              "label": "URL target",
+              "labelKey": "twitchat.field.button.url_target",
+              "required": false,
+              "options": null,
+              "source": null,
+              "defaultValue": null,
+              "fields": null,
+              "showIf": {
+                "path": "actionType",
+                "values": [
+                  "url"
+                ]
+              }
+            },
+            {
+              "path": "triggerId",
+              "type": "select",
+              "label": "Trigger",
+              "labelKey": "twitchat.field.button.trigger",
+              "required": false,
+              "options": null,
+              "defaultValue": null,
+              "fields": null,
+              "source": {
+                "stable": "TRIGGERS_GET_ALL",
+                "beta": "GET_TRIGGER_LIST"
+              },
+              "showIf": {
+                "path": "actionType",
+                "values": [
+                  "trigger"
+                ]
+              }
             },
             {
               "path": "message",
@@ -177,7 +313,14 @@
               "options": null,
               "source": null,
               "defaultValue": null,
-              "fields": null
+              "fields": null,
+              "showIf": {
+                "path": "actionType",
+                "values": [
+                  "message",
+                  "discord"
+                ]
+              }
             }
           ]
         }
