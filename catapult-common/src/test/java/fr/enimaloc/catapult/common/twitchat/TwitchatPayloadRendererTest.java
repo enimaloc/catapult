@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.service.notification;
+package fr.enimaloc.catapult.common.twitchat;
 
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPayload;
