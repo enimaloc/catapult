@@ -13,6 +13,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -36,5 +37,32 @@ class MockAuthControllerTest {
                 .andExpect(model().attribute("minecraftStatuses", MockPresets.MINECRAFT_STATUSES))
                 .andExpect(content().string(containsString("/auth/callback?code=1")))
                 .andExpect(content().string(containsString("Offline account")));
+    }
+
+    @Test
+    void keepsTheAccountPickerAtItsOwnPath() throws Exception {
+        mvc.perform(get("/mock/login"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("mock/jwt-select"))
+                .andExpect(content().string(containsString("data-role=\"popout\"")));
+    }
+
+    @WebMvcTest(controllers = MockAuthController.class)
+    @Import(WebSecurityConfig.class)
+    @ActiveProfiles({"mock", MockAuthController.QUICK_LOGIN_PROFILE})
+    static class QuickLogin {
+
+        @Autowired MockMvc mvc;
+
+        @Test
+        void logsInAsTheFirstQuickAccount_skippingThePicker() throws Exception {
+            mvc.perform(get("/oauth2/authorization/twitch"))
+                    .andExpect(redirectedUrl("/auth/callback?code=0"));
+        }
+
+        @Test
+        void stillOffersThePickerToSwitchAccount() throws Exception {
+            mvc.perform(get("/mock/login")).andExpect(view().name("mock/jwt-select"));
+        }
     }
 }
