@@ -21,7 +21,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -47,21 +46,6 @@ class ApiTwitchatWidgetControllerTest {
     @MockitoBean WidgetTokenService widgetTokenService;
     @MockitoBean TokenEncryptionService tokenEncryptionService;
     @MockitoBean TwitchatActionExecutor actionExecutor;
-
-    @Test
-    void defaults_returnsAllFiveEventTypes() throws Exception {
-        mvc.perform(get("/api/twitchat/defaults"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.STREAM_STARTED.message").value("Le bot Catapult est actif."))
-                .andExpect(jsonPath("$.STREAM_STARTED.icon").value("live"))
-                .andExpect(jsonPath("$.STREAM_STARTED.actions", hasSize(1)))
-                .andExpect(jsonPath("$.STREAM_STARTED.actions[0].label").value("Désactiver le bot"))
-                .andExpect(jsonPath("$.STREAM_STARTED.actions[0].actionType").value("url"))
-                .andExpect(jsonPath("$.STREAM_STARTED.actions[0].theme").value("alert"))
-                .andExpect(jsonPath("$.STREAM_STARTED.actions[0].url")
-                        .value("http://localhost:8081/widget/twitchat/action/{{action:DISABLE_BOT}}"))
-                .andExpect(jsonPath("$.CATEGORY_CHANGED_BY_CATAPULT.actions", hasSize(2)));
-    }
 
     @Test
     void access_unknownToken_returns404() throws Exception {
@@ -141,18 +125,5 @@ class ApiTwitchatWidgetControllerTest {
         mvc.perform(post("/api/twitchat/actions/{token}", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result").value("EXECUTED"));
-    }
-
-    @Test
-    void quickConfigs_returnsCatalogWithBaseUrlResolved() throws Exception {
-        mvc.perform(get("/api/twitchat/quick-configs"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].key").value("stream-started-disable-link"))
-                .andExpect(jsonPath("$[0].templateJson").value(org.hamcrest.Matchers.containsString(
-                        "http://localhost:8081/widget/twitchat/action/{{action:DISABLE_BOT}}")))
-                .andExpect(jsonPath("$[1].key").value("stream-started-disable-chat"))
-                .andExpect(jsonPath("$[1].parameters[0].key").value("command"))
-                .andExpect(jsonPath("$[1].templateJson").value(org.hamcrest.Matchers.containsString(
-                        "{{param:command}}")));
     }
 }

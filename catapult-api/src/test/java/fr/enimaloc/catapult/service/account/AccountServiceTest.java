@@ -14,8 +14,7 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
 import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
 import fr.enimaloc.catapult.repository.twitch.CatapultCategoryChangeStateRepository;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatActionTokenRepository;
-import fr.enimaloc.catapult.repository.twitchat.TwitchatActivePresetRepository;
-import fr.enimaloc.catapult.repository.twitchat.TwitchatPayloadPresetRepository;
+import fr.enimaloc.catapult.repository.twitchat.TwitchatEventActionRepository;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.service.twitch.EventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
@@ -51,8 +50,7 @@ class AccountServiceTest {
     @Mock private TwitchatWidgetSettingsRepository twitchatWidgetSettingsRepository;
     @Mock private CatapultCategoryChangeStateRepository catapultCategoryChangeStateRepository;
     @Mock private TwitchatActionTokenRepository twitchatActionTokenRepository;
-    @Mock private TwitchatActivePresetRepository twitchatActivePresetRepository;
-    @Mock private TwitchatPayloadPresetRepository twitchatPayloadPresetRepository;
+    @Mock private TwitchatEventActionRepository twitchatEventActionRepository;
     @Mock private BotToggleService botToggleService;
     @Mock private TwitchChatService twitchChatService;
     @Mock private EventSubService twitchEventSubService;
@@ -115,13 +113,12 @@ class AccountServiceTest {
         accountService.deleteAccountImmediately(account);
 
         InOrder order = inOrder(twitchatWidgetSettingsRepository, catapultCategoryChangeStateRepository,
-            twitchatActionTokenRepository, twitchatActivePresetRepository, twitchatPayloadPresetRepository,
+            twitchatActionTokenRepository, twitchatEventActionRepository,
             userAccountRepository);
         order.verify(twitchatWidgetSettingsRepository).deleteByUser(account);
         order.verify(catapultCategoryChangeStateRepository).deleteByUser(account);
         order.verify(twitchatActionTokenRepository).deleteByUserId(account.getId());
-        order.verify(twitchatActivePresetRepository).deleteByUserId(account.getId());
-        order.verify(twitchatPayloadPresetRepository).deleteByUser(account);
+        order.verify(twitchatEventActionRepository).deleteAllOfUser(account);
         order.verify(userAccountRepository).delete(account);
     }
 

@@ -13,8 +13,8 @@
  * - actions.<name>(data) / send(ACTION, data): sends an action; a "get" one resolves with the
  *   data of Twitchat's answer (TRIGGERS_GET_ALL -> TRIGGER_LIST's), the others once sent.
  * - on / off / once: Twitchat's events, and actions other clients send ("*" for all of them).
- * - relay(notification): Catapult's notifications, posted in Twitchat's chat. Each arrives as a
- *   "catapult:twitchat:notify" event on document, its detail being the TwitchatNotification.
+ * - dispatch(batch): a Catapult event's payloads, sent in order under this Twitchat's names. Each arrives as a
+ *   "catapult:twitchat:dispatch" event on document, its detail being the TwitchatDispatch.
  */
 window.CatapultTwitchat = (function () {
     const PROTOCOLS = CatapultTwitchatProtocol;
@@ -250,26 +250,26 @@ window.CatapultTwitchat = (function () {
             },
         })]));
 
-    // Relaying Catapult's notifications. Several clients may be connected to the same OBS (this
+    // Dispatching Catapult's payloads. Several clients may be connected to the same OBS (this
     // page in two tabs, the old widget page in OBS's browser source…): they claim each
-    // notification in OBS's persistent data, the only storage they all share, so only one posts it.
+    // dispatch in OBS's persistent data, the only storage they all share, so only one sends it.
     const DEDUP_REALM = "OBS_WEBSOCKET_DATA_REALM_GLOBAL";
     const DEDUP_SLOT = "catapult_twitchat_relay_dedup";
     const MAX_JITTER_MS = 150;
 
     /**
-     * Whether this client should relay the notification: false when another one already
+     * Whether this client should send the dispatch: false when another one already
      * claimed it. The random jitter narrows (but can't close) the race between two clients
-     * checking at once. If OBS fails to answer, relays anyway: a duplicate beats a lost one.
+     * checking at once. If OBS fails to answer, sends anyway: a duplicate beats a lost one.
      */
-    async function claim(notificationId) {
+    async function claim(dispatchId) {
         await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * MAX_JITTER_MS)));
         try {
             const { slotValue } = await CatapultObs.requests.getPersistentData({ realm: DEDUP_REALM, slotName: DEDUP_SLOT });
-            if (slotValue === notificationId) return false;
-            await CatapultObs.requests.setPersistentData({ realm: DEDUP_REALM, slotName: DEDUP_SLOT, slotValue: notificationId });
+            if (slotValue === dispatchId) return false;
+            await CatapultObs.requests.setPersistentData({ realm: DEDUP_REALM, slotName: DEDUP_SLOT, slotValue: dispatchId });
         } catch (error) {
-            log("relay coordination failed, relaying anyway", error);
+            log("dispatch coordination failed, sending anyway", error);
         }
         return true;
     }
@@ -389,38 +389,51 @@ window.CatapultTwitchat = (function () {
         },
 
         /**
-         * Posts a Catapult notification in Twitchat's chat. Resolves with whether this page posted
-         * it: not while OBS is disconnected (dropped rather than queued: a late notification is
-         * stale), nor when another client claimed it already.
+         * Sends a Catapult dispatch's payloads to Twitchat, in order, each under the name this
+         * Twitchat's protocol gives its catalog action. Resolves with how many were sent: none
+         * while OBS is disconnected (dropped rather than queued: a late dispatch is stale) or
+         * when another client claimed it already. A payload failing, or unknown to this
+         * Twitchat, is logged and skipped: the next ones still go.
          */
-        async relay(notification) {
+        async dispatch(batch) {
             if (!CatapultObs.isConnected()) {
-                log("OBS not connected, notification dropped:", notification.message);
-                return false;
+                log("OBS not connected, dispatch dropped:", batch.eventType);
+                return 0;
             }
-            if (!await claim(notification.id)) {
-                log("already relayed by another client:", notification.message);
-                return false;
+            if (!await claim(batch.id)) {
+                log("already dispatched by another client:", batch.eventType);
+                return 0;
             }
-            try {
-                await sendAs("CUSTOM_CHAT_MESSAGE", {
-                    message: notification.message,
-                    style: notification.style,
-                    icon: notification.icon,
-                    user: notification.authorName ? { name: notification.authorName } : undefined,
-                    actions: (notification.actions ?? []).map(({ label, actionType, url, message, theme }) =>
-                        ({ label, actionType, url, message, theme })),
-                });
-                log("relayed:", notification.message);
-                return true;
-            } catch (error) {
-                log("relay failed", error);
-                return false;
+            // Each payload is named in this Twitchat's protocol: asked first if not known yet,
+            // or a beta Twitchat would miss every action named otherwise in the stable one.
+            if (!protocol && !forced) await detectProtocol();
+            let sent = 0;
+            for (const { action, data } of batch.payloads ?? []) {
+                const name = client.actionName(action);
+                if (!name) {
+                    log(`${action} unavailable in this Twitchat (${protocol ?? DEFAULT_PROTOCOL}), skipped`);
+                    continue;
+                }
+                try {
+                    await sendAs(name, data ?? {});
+                    sent++;
+                } catch (error) {
+                    log(`${action} failed`, error);
+                }
             }
+            log(`dispatched ${sent}/${batch.payloads?.length ?? 0} payload(s) of ${batch.eventType}`);
+            return sent;
+        },
+
+        /** The name this Twitchat gives a catalog action, null when its protocol hasn't it. */
+        actionName(key) {
+            const current = protocol ?? DEFAULT_PROTOCOL;
+            const name = window.CatapultTwitchatCatalog?.[key]?.[current];
+            return name && knowsAction(current, name) ? name : null;
         },
     };
 
-    document.addEventListener("catapult:twitchat:notify", (event) => client.relay(event.detail));
+    document.addEventListener("catapult:twitchat:dispatch", (event) => client.dispatch(event.detail));
     // Another OBS may have another Twitchat: looked for anew, its protocol detected right away
     // so actions lists its own.
     document.addEventListener("catapult:obs:connected", async () => {

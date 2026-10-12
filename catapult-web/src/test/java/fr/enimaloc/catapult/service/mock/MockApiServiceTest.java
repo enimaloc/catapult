@@ -19,7 +19,9 @@ import fr.enimaloc.catapult.event.steam.SteamTokenSharedStateEvent;
 import fr.enimaloc.catapult.event.tw.TwEnabledStateEvent;
 import fr.enimaloc.catapult.event.tw.TwResetEvent;
 import fr.enimaloc.catapult.event.tw.TwUpdatedEvent;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.twitchat.TwitchatDispatchHub;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MockApiServiceTest {
 
     private final List<Object> events = new ArrayList<>();
-    private final MockApiService service = new MockApiService(events::add);
+    private final TwitchatDispatchHub hub = org.mockito.Mockito.mock(TwitchatDispatchHub.class);
+    private final MockApiService service = new MockApiService(events::add, hub);
 
     private MockData data;
     private String username;
@@ -237,5 +240,33 @@ class MockApiServiceTest {
         assertThat(data.getUserSettings().noGameTwitchGameName()).isEqualTo("Just Chatting");
         assertThat(data.getUserSettings().incompleteFallbackCcls()).containsExactly("Drugs");
         assertThat(events).isEmpty();
+    }
+
+    @Test
+    void twitchatEvents_areSavedThenReadBack() {
+        List<TwitchatEventActionDto> payloads = List.of(new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "RAW", "{\"message\":\"hi\"}", true));
+
+        assertThat(service.saveTwitchatEvent(username, "BOT_ENABLED", payloads)).isEmpty();
+
+        assertThat(service.twitchatEvents(username).get("BOT_ENABLED")).isEqualTo(payloads);
+    }
+
+    @Test
+    void invalidTwitchatEvent_returnsItsErrors_andIsNotSaved() {
+        List<TwitchatEventActionDto> bad = List.of(new TwitchatEventActionDto("NOPE", "RAW", "{}", true));
+
+        assertThat(service.saveTwitchatEvent(username, "BOT_ENABLED", bad)).isNotEmpty();
+
+        assertThat(service.twitchatEvents(username).get("BOT_ENABLED")).isEmpty();
+    }
+
+    @Test
+    void testTwitchatEvent_publishesTheDispatchOnTheHub() {
+        List<TwitchatEventActionDto> payloads = List.of(new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "RAW", "{\"message\":\"hi\"}", true));
+
+        assertThat(service.testTwitchatEvent(username, "BOT_ENABLED", payloads)).isEmpty();
+
+        org.mockito.Mockito.verify(hub).publish(org.mockito.ArgumentMatchers.eq(service.currentUserId()),
+                org.mockito.ArgumentMatchers.contains("\"eventType\":\"BOT_ENABLED\""));
     }
 }

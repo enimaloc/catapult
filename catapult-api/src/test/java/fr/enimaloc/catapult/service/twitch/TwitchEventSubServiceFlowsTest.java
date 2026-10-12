@@ -10,7 +10,7 @@ import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
-import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
+import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -64,7 +64,7 @@ class TwitchEventSubServiceFlowsTest {
     private final TwitchTokenService tokenService = mock(TwitchTokenService.class);
     private final StreamStateService streamState = mock(StreamStateService.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
-    private final TwitchatNotifier twitchat = mock(TwitchatNotifier.class);
+    private final TwitchatEventDispatcher twitchat = mock(TwitchatEventDispatcher.class);
     private final CatapultCategoryChangeStateService selfChanges = mock(CatapultCategoryChangeStateService.class);
     private final HttpClient httpClient = mock(HttpClient.class);
     private final WebSocket.Builder wsBuilder = mock(WebSocket.Builder.class);
@@ -277,7 +277,7 @@ class TwitchEventSubServiceFlowsTest {
             verify(publisher).publishEvent(event.capture());
             assertThat(event.getValue()).isInstanceOfSatisfying(ChannelCclChangedEvent.class,
                     e -> assertThat(e.getCclIds()).containsExactly("Gambling"));
-            verify(twitchat, never()).onCategoryChangedManually(any(), anyString(), anyString());
+            verify(twitchat, never()).onCategoryChangedManually(any(), anyString(), anyString(), anyString());
         }
 
         @Test
@@ -291,7 +291,7 @@ class TwitchEventSubServiceFlowsTest {
             verify(publisher).publishEvent(event.capture());
             assertThat(event.getValue()).isInstanceOfSatisfying(ChannelCategoryChangedEvent.class,
                     e -> assertThat(e.getCategoryName()).isEqualTo("Game Two"));
-            verify(twitchat).onCategoryChangedManually(user, "2", "Game Two");
+            verify(twitchat).onCategoryChangedManually(user, "2", "Game Two", "Game One");
         }
     }
 }

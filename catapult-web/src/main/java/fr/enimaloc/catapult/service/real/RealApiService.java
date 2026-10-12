@@ -22,22 +22,29 @@ import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Profile("!mock")
 public class RealApiService implements ApiService {
+    private static final ParameterizedTypeReference<Map<String, List<TwitchatEventActionDto>>> EVENTS = new ParameterizedTypeReference<>() {};
+
     private final ApiClient client;
 
     @Override
@@ -224,5 +231,42 @@ public class RealApiService implements ApiService {
     @Override
     public void dtddPropose(String igdbId, Long dtddId, String reason) {
         client.postVoid("/api/channel/dtdd-mapping/propose", new ProposeRequest(igdbId, dtddId, reason));
+    }
+
+    @Override
+    public UUID currentUserId() {
+        return ApiClient.currentSubject();
+    }
+
+    @Override
+    public Map<String, List<TwitchatEventActionDto>> twitchatEvents(String username) {
+        Map<String, List<TwitchatEventActionDto>> events = client.get("/api/channels/{username}/twitchat/events", EVENTS, username);
+        return events == null ? Map.of() : events;
+    }
+
+    @Override
+    public List<TwitchatValidationError> saveTwitchatEvent(String username, String eventType, List<TwitchatEventActionDto> payloads) {
+        return errors(client.call(HttpMethod.PUT, "/api/channels/{username}/twitchat/events/{eventType}/actions",
+                payloads, TwitchatValidationError[].class, username, eventType));
+    }
+
+    @Override
+    public List<TwitchatValidationError> testTwitchatEvent(String username, String eventType, List<TwitchatEventActionDto> payloads) {
+        return errors(client.call(HttpMethod.POST, "/api/channels/{username}/twitchat/events/{eventType}/test",
+                payloads, TwitchatValidationError[].class, username, eventType));
+    }
+
+    @Override
+    public boolean executeTwitchatAction(String token) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = client.post("/api/twitchat/actions/{token}", Map.class, token);
+        return result != null && "EXECUTED".equals(result.get("result"));
+    }
+
+    /** No error when it went through; a 4xx/5xx without a list becomes one error naming the status. */
+    private static List<TwitchatValidationError> errors(ApiClient.Result<TwitchatValidationError[]> result) {
+        if (result.ok()) return List.of();
+        if (result.body() != null) return List.of(result.body());
+        return List.of(new TwitchatValidationError(-1, "", "HTTP " + result.status()));
     }
 }

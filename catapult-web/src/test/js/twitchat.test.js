@@ -1,14 +1,9 @@
 /*
  * twitchat.js against a stubbed CatapultObs and the generated twitchat-protocol.js: what gets
- * broadcast to Twitchat, how its answers and events come back, and the notification relay.
+ * broadcast to Twitchat, how its answers and events come back, and the dispatch of Catapult's payloads.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { load } from "./helpers.js";
-
-const NOTIFICATION = {
-    id: "n-1", message: "Catégorie changée", style: "highlight", icon: "info", authorName: "Catapult",
-    actions: [{ label: "Annuler", actionType: "URL", url: "https://x", message: null, theme: "primary", extra: 1 }],
-};
 
 let connected;
 let slot;
@@ -355,57 +350,103 @@ describe("debug", () => {
     });
 });
 
-describe("relay", () => {
+const DISPATCH = {
+    id: "d-1", channel: "streamer", eventType: "STREAM_STARTED",
+    payloads: [
+        { action: "CUSTOM_CHAT_MESSAGE", data: { message: "Live", user: { name: "Catapult" } } },
+        { action: "EXECUTE_TRIGGER", data: { id: "t-1" } },
+    ],
+};
+
+describe("dispatch", () => {
     beforeEach(() => CatapultTwitchat.useProtocol("stable"));
 
-    async function relay(notification = NOTIFICATION) {
-        const result = CatapultTwitchat.relay(notification);
+    async function dispatch(batch = DISPATCH) {
+        const result = CatapultTwitchat.dispatch(batch);
         await vi.advanceTimersByTimeAsync(150);
         return result;
     }
 
-    it("claims the notification, then posts it as a custom chat message", async () => {
-        await expect(relay()).resolves.toBe(true);
-        expect(slot).toBe("n-1");
-        expect(broadcasts()).toEqual([{
-            origin: "twitchat",
-            id: expect.any(String),
-            type: "CUSTOM_CHAT_MESSAGE",
-            data: {
-                message: "Catégorie changée", style: "highlight", icon: "info", user: { name: "Catapult" },
-                actions: [{ label: "Annuler", actionType: "URL", url: "https://x", message: null, theme: "primary" }],
-            },
-        }]);
+    const sent = () => broadcasts().map(({ type, data }) => [type, data]);
+
+    it("claims the dispatch, then sends every payload in order under the protocol's names", async () => {
+        await expect(dispatch()).resolves.toBe(2);
+        expect(slot).toBe("d-1");
+        expect(sent()).toEqual([
+            ["CUSTOM_CHAT_MESSAGE", { message: "Live", user: { name: "Catapult" } }],
+            ["EXECUTE_TRIGGER", { id: "t-1" }],
+        ]);
     });
 
-    it("skips a notification another client claimed", async () => {
-        slot = "n-1";
-        await expect(relay()).resolves.toBe(false);
+    it("speaks the beta names to a beta Twitchat", async () => {
+        CatapultTwitchat.useProtocol("beta");
+        await dispatch();
+        expect(sent().map(([type]) => type)).toEqual(["CUSTOM_CHAT_MESSAGE", "SET_EXECUTE_TRIGGER"]);
+    });
+
+    it("skips an action this Twitchat doesn't know, and still sends the next ones", async () => {
+        await expect(dispatch({ ...DISPATCH, payloads: [{ action: "QUIZ_REVEAL", data: {} }, DISPATCH.payloads[1]] }))
+            .resolves.toBe(1);
+        expect(sent().map(([type]) => type)).toEqual(["EXECUTE_TRIGGER"]);
+    });
+
+    it("sends an empty data object when a payload has none", async () => {
+        await dispatch({ ...DISPATCH, payloads: [{ action: "SHOUTOUT", data: null }] });
+        expect(sent()).toEqual([["SHOUTOUT", {}]]);
+    });
+
+    it("skips a dispatch another client claimed", async () => {
+        slot = "d-1";
+        await expect(dispatch()).resolves.toBe(0);
         expect(broadcasts()).toEqual([]);
     });
 
-    it("relays anyway when OBS can't coordinate", async () => {
+    it("dispatches anyway when OBS can't coordinate", async () => {
         const requestsStub = CatapultObs.requests;
         CatapultObs.requests = new Proxy({}, { get: (_, name) => (name === "getPersistentData"
             ? () => Promise.reject(new Error("boom")) : requestsStub[name]) });
-        await expect(relay()).resolves.toBe(true);
-        expect(broadcasts()).toHaveLength(1);
+        await expect(dispatch()).resolves.toBe(2);
+        expect(broadcasts()).toHaveLength(2);
     });
 
-    it("drops the notification while OBS is disconnected", async () => {
+    it("drops the dispatch while OBS is disconnected", async () => {
         connected = false;
-        await expect(relay()).resolves.toBe(false);
+        await expect(dispatch()).resolves.toBe(0);
         expect(requests).toEqual([]);
     });
 
-    it("leaves user out without an author and actions empty without any", async () => {
-        await relay({ id: "n-2", message: "Bot activé", style: null, icon: null, authorName: null, actions: null });
-        expect(broadcasts()[0].data).toEqual({ message: "Bot activé", style: null, icon: null, user: undefined, actions: [] });
+    it("dispatches what catapult:twitchat:dispatch carries", async () => {
+        document.dispatchEvent(new CustomEvent("catapult:twitchat:dispatch", { detail: DISPATCH }));
+        await vi.advanceTimersByTimeAsync(150);
+        expect(broadcasts()).toHaveLength(2);
     });
 
-    it("relays what catapult:twitchat:notify carries", async () => {
-        document.dispatchEvent(new CustomEvent("catapult:twitchat:notify", { detail: NOTIFICATION }));
+    it("names each catalog action per protocol", () => {
+        expect(CatapultTwitchat.actionName("EXECUTE_TRIGGER")).toBe("EXECUTE_TRIGGER");
+        CatapultTwitchat.useProtocol("beta");
+        expect(CatapultTwitchat.actionName("EXECUTE_TRIGGER")).toBe("SET_EXECUTE_TRIGGER");
+        expect(CatapultTwitchat.actionName("NOPE")).toBeNull();
+    });
+});
+
+describe("dispatch to a Twitchat not detected yet", () => {
+    it("detects its protocol before naming the first payload", async () => {
+        const result = CatapultTwitchat.dispatch({ ...DISPATCH, payloads: [...DISPATCH.payloads].reverse() });
         await vi.advanceTimersByTimeAsync(150);
-        expect(broadcasts()).toHaveLength(1);
+        twitchatSends("ON_GLOBAL_STATES", {});
+        await vi.advanceTimersByTimeAsync(0);
+
+        await expect(result).resolves.toBe(2);
+        expect(broadcasts().map(({ type }) => type))
+            .toEqual(["GET_COLS_COUNT", "GET_GLOBAL_STATES", "SET_EXECUTE_TRIGGER", "CUSTOM_CHAT_MESSAGE"]);
+    });
+
+    it("names the payloads in the stable protocol when Twitchat doesn't answer", async () => {
+        const result = CatapultTwitchat.dispatch(DISPATCH);
+        await vi.advanceTimersByTimeAsync(15000);
+
+        await expect(result).resolves.toBe(2);
+        expect(broadcasts().map(({ type }) => type).filter((type) => !type.startsWith("GET_")))
+            .toEqual(["CUSTOM_CHAT_MESSAGE", "EXECUTE_TRIGGER"]);
     });
 });

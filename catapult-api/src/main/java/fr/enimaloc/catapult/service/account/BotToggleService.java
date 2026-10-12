@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.service.account;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
-import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
+import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.twitch.EventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ public class BotToggleService {
     private final TwitchChatService twitchChatService;
     private final EventSubService twitchEventSubService;
     private final ChannelEventPublisher channelEventPublisher;
-    private final TwitchatNotifier twitchatNotifier;
+    private final TwitchatEventDispatcher twitchatEventDispatcher;
 
     @Transactional
     public void setBotEnabled(UserAccount user, boolean enabled) {
@@ -47,7 +47,7 @@ public class BotToggleService {
             twitchEventSubService.disconnect(user);
         }
         channelEventPublisher.botToggled(user.getId(), enabled);
-        twitchatNotifier.onBotToggled(user, enabled);
+        twitchatEventDispatcher.onBotToggled(user, enabled);
         log.info("botEnabled set to {} for user {}", enabled, user.getId());
     }
 }
