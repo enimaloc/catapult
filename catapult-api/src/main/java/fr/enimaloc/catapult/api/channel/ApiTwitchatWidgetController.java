@@ -1,9 +1,6 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
-import fr.enimaloc.catapult.common.dto.channel.DefaultActionResponse;
-import fr.enimaloc.catapult.common.dto.channel.DefaultPayloadResponse;
-import fr.enimaloc.catapult.common.dto.twitchat.TwitchatQuickConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
@@ -11,13 +8,9 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -30,7 +23,6 @@ public class ApiTwitchatWidgetController {
     private final WidgetTokenService widgetTokenService;
     private final TokenEncryptionService tokenEncryptionService;
     private final TwitchatActionExecutor actionExecutor;
-    private final MessageSource messageSource;
 
     @GetMapping("/widget/{uuid}/access")
     public ResponseEntity<TwitchatWidgetAccessResponse> access(@PathVariable UUID uuid) {
@@ -56,38 +48,5 @@ public class ApiTwitchatWidgetController {
     public ResponseEntity<Map<String, String>> executeAction(@PathVariable UUID token) {
         TwitchatActionExecutor.Result result = actionExecutor.execute(token);
         return ResponseEntity.ok(Map.of("result", result.name()));
-    }
-
-    @org.springframework.beans.factory.annotation.Value("${app.web-url:http://localhost:8081}")
-    private String publicWebUrl;
-
-    @GetMapping("/defaults")
-    public Map<String, DefaultPayloadResponse> defaults() {
-        Map<String, DefaultPayloadResponse> result = new LinkedHashMap<>();
-        String base = stripTrailingSlash(publicWebUrl);
-        for (var entry : fr.enimaloc.catapult.service.notification.TwitchatDefaultPayloads.DEFAULTS.entrySet()) {
-            var d = entry.getValue();
-            List<DefaultActionResponse> actions = new java.util.ArrayList<>();
-            d.actions().forEach((type, def) -> actions.add(new DefaultActionResponse(def.label(), "url",
-                    base + "/widget/twitchat/action/{{action:" + type.name() + "}}", def.theme())));
-            result.put(entry.getKey().name(),
-                    new DefaultPayloadResponse(d.message(), d.style(), d.icon(), d.authorName(), actions));
-        }
-        return result;
-    }
-
-    @GetMapping("/quick-configs")
-    public List<TwitchatQuickConfig> quickConfigs(Locale locale) {
-        String base = stripTrailingSlash(publicWebUrl);
-        return fr.enimaloc.catapult.service.notification.TwitchatQuickConfigs.resolve(messageSource, locale).stream()
-                .map(qc -> new TwitchatQuickConfig(
-                        qc.key(), qc.label(), qc.description().replace("{{baseUrl}}", base), qc.eventType(),
-                        qc.groupKey(), qc.groupLabel(), qc.variant(),
-                        qc.parameters(), qc.templateJson().replace("{{baseUrl}}", base)))
-                .toList();
-    }
-
-    private static String stripTrailingSlash(String url) {
-        return url != null && url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 }

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<!--/* Standalone (no SPA shell): opened by Twitchat's buttons, often in a new tab. */-->
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Catapult</title>
+    <style>
+        body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
+        main { max-width: 32rem; text-align: center; }
+        .tip { opacity: .7; font-size: .9em; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<main th:attr="data-executed=${executed}">
+    <p th:if="${executed}" th:text="#{widget.twitchat_action.executed}">Action effectuée — vous pouvez fermer cette page.</p>
+    <p th:unless="${executed}" th:text="#{widget.twitchat_action.expired}">Ce lien a déjà été utilisé ou a expiré.</p>
+    <button type="button" onclick="window.close()" th:text="#{widget.twitchat_action.close}">Fermer</button>
+    <p class="tip" th:text="#{widget.twitchat_action.tip}">Astuce…</p>
+</main>
+</body>
+</html>

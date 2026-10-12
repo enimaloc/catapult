@@ -28,6 +28,7 @@ public class TwitchatWidgetSettingsService {
     private final TokenEncryptionService tokenEncryptionService;
     private final ChannelEventPublisher channelEventPublisher;
     private final WidgetTokenService widgetTokenService;
+    private final TwitchatEventActionService eventActionService;
 
     @Transactional
     public TwitchatWidgetSettings getOrCreate(UserAccount user) {
@@ -52,6 +53,9 @@ public class TwitchatWidgetSettingsService {
         }
         TwitchatWidgetSettings saved = repository.save(settings);
         publishWidgetConfig(saved);
+        if (saved.isEnabled()) {
+            eventActionService.ensureInitialized(user);
+        }
         return saved;
     }
 
