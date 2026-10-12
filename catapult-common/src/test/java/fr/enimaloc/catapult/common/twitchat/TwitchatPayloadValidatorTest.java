@@ -71,4 +71,39 @@ class TwitchatPayloadValidatorTest {
                 new TwitchatEventActionDto("SEND_MESSAGE", "FORM", "{}", true)));
         assertThat(errors).containsExactly(new TwitchatValidationError(1, "message", "Required"));
     }
+
+    private List<TwitchatValidationError> outsideForm(String action, String json) {
+        return validator.outsideForm(3, TwitchatCatalog.load().action(action).orElseThrow().fields(), validator.parse(json));
+    }
+
+    @Test
+    void outsideForm_isEmptyForWhatTheFormHolds() {
+        assertThat(outsideForm("CUSTOM_CHAT_MESSAGE", """
+                {"message":"Hi","style":"highlight","icon":"live","user":{"name":"Catapult"},
+                 "actions":[{"label":"Revert","theme":"primary","actionType":"url","url":"https://x","message":"!x"}]}
+                """)).isEmpty();
+    }
+
+    @Test
+    void outsideForm_listsTheKeysTheFormWouldDrop_atAnyDepth_andInRows() {
+        assertThat(outsideForm("CUSTOM_CHAT_MESSAGE", """
+                {"message":"Hi","quote":"q","user":{"name":"Catapult","color":"#f00"},
+                 "actions":[{"label":"a"},{"label":"b","extra":1}]}
+                """)).containsExactly(
+                new TwitchatValidationError(3, "quote", "Not in the form"),
+                new TwitchatValidationError(3, "user.color", "Not in the form"),
+                new TwitchatValidationError(3, "actions[1].extra", "Not in the form"));
+    }
+
+    @Test
+    void outsideForm_reportsAScalarWhereTheFormExpectsAnObject() {
+        assertThat(outsideForm("CUSTOM_CHAT_MESSAGE", "{\"message\":\"Hi\",\"user\":\"Bot\",\"icon\":null}"))
+                .containsExactly(new TwitchatValidationError(3, "user", "Not in the form"));
+    }
+
+    @Test
+    void outsideForm_aJsonFieldCoversItsWholeSubtree() {
+        assertThat(outsideForm("SEND_CUSTOM_CHAT_MESSAGE",
+                "{\"message\":\"Hi\",\"user\":{\"name\":\"a\",\"color\":\"#f00\"},\"actions\":[{\"any\":1}]}")).isEmpty();
+    }
 }

@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms;
 import fr.enimaloc.catapult.dto.integration.Attrs;
 import fr.enimaloc.catapult.dto.integration.IntegrationDto;
 import fr.enimaloc.catapult.dto.integration.IntegrationNode;
@@ -21,6 +23,7 @@ import fr.enimaloc.catapult.dto.integration.SpaState;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static fr.enimaloc.catapult.dto.integration.Message.key;
@@ -41,7 +44,8 @@ public final class IntegrationCards {
     private IntegrationCards() {
     }
 
-    public static List<IntegrationDto> of(ChannelPageData ch) {
+    public static List<IntegrationDto> of(ChannelPageData ch, Map<String, List<TwitchatEventActionDto>> twitchatEvents,
+                                          TwitchatEventForms forms) {
         List<IntegrationDto> cards = new ArrayList<>();
         cards.add(card("twitch", new Chip(Attrs.NONE, CONNECTED)));
         if (ch.steam() != null) {
@@ -57,7 +61,7 @@ public final class IntegrationCards {
             cards.add(obs(ch.obs()));
         }
         if (ch.twitchat() != null) {
-            cards.add(twitchat(ch.twitchat()));
+            cards.add(twitchat(ch.twitchat(), forms.eventsSection(twitchatEvents)));
         }
         return cards;
     }
@@ -194,7 +198,7 @@ public final class IntegrationCards {
     // Twitchat: only the browser knows whether a Twitchat answers through OBS, so
     // channel-connections.js toggles the chips.
 
-    private static IntegrationDto twitchat(TwitchatData twitchat) {
+    private static IntegrationDto twitchat(TwitchatData twitchat, IntegrationNode events) {
         List<Select.Option> branches = Stream.concat(
                 Stream.of(new Select.Option(TwitchatData.AUTO, key(PREFIX + "twitchat.auto"))),
                 twitchat.supportedBranches().stream().map(branch -> new Select.Option(branch, Message.literal(branch))))
@@ -206,7 +210,9 @@ public final class IntegrationCards {
                 new Container(Attrs.id("twitchat-status-body"), Container.Kind.DIV, List.of(
                         new Container(Attrs.cls("twitchat-fields"), Container.Kind.DIV, List.of(
                                 new Select(Attrs.id("twitchat-branch"), key(PREFIX + "twitchat.branch"),
-                                        twitchat.branch(), branches))))));
+                                        twitchat.branch(), branches, null))))),
+                new Text(Attrs.cls("twitchat-events-title"), true, key(PREFIX + "twitchat.events")),
+                events);
     }
 
     private static Button segmented(Attrs attrs, Message text) {

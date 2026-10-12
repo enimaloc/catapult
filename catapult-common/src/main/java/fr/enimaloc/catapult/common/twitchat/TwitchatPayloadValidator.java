@@ -118,6 +118,60 @@ public final class TwitchatPayloadValidator {
         }
     }
 
+    /**
+     * The keys of {@code data} no field of the form holds, each reported as "Not in the form":
+     * the form would drop them. A field covers its path, a json one its whole subtree, and a
+     * repeater's rows are checked against its row fields. Mistyped values are validate()'s job.
+     */
+    public List<TwitchatValidationError> outsideForm(int index, List<TwitchatCatalog.Field> fields, Map<String, Object> data) {
+        List<TwitchatValidationError> errors = new ArrayList<>();
+        outsideForm(index, "", coverage(fields), data, errors);
+        return errors;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void outsideForm(int index, String prefix, Map<String, Object> coverage, Map<String, Object> data,
+                                    List<TwitchatValidationError> errors) {
+        data.forEach((key, value) -> {
+            String name = prefix + key;
+            Object covered = coverage.get(key);
+            if (covered instanceof TwitchatCatalog.Field field) {
+                if ("repeater".equals(field.type()) && value instanceof List<?> rows) {
+                    for (int r = 0; r < rows.size(); r++) {
+                        if (rows.get(r) instanceof Map<?, ?> row) {
+                            outsideForm(index, name + "[" + r + "].", coverage(field.fields()), (Map<String, Object>) row, errors);
+                        }
+                    }
+                }
+            } else if (covered instanceof Map<?, ?> children && value instanceof Map<?, ?> object) {
+                outsideForm(index, name + ".", (Map<String, Object>) children, (Map<String, Object>) object, errors);
+            } else if (covered == null || value != null) {
+                errors.add(new TwitchatValidationError(index, name, "Not in the form"));
+            }
+        });
+    }
+
+    /** The fields by path step: a Field where one ends (holding all below it), else the next steps. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> coverage(List<TwitchatCatalog.Field> fields) {
+        Map<String, Object> root = new LinkedHashMap<>();
+        for (TwitchatCatalog.Field field : fields == null ? List.<TwitchatCatalog.Field>of() : fields) {
+            if (field.path() == null) {
+                continue;
+            }
+            String[] steps = field.path().split("\\.");
+            Map<String, Object> node = root;
+            for (int i = 0; i < steps.length - 1 && node != null; i++) {
+                Object child = node.computeIfAbsent(steps[i], ignored -> new LinkedHashMap<String, Object>());
+                node = child instanceof Map<?, ?> map ? (Map<String, Object>) map : null; // under a field: covered
+            }
+            if (node != null) {
+                node.put(steps[steps.length - 1], field);
+            }
+        }
+        return root;
+    }
+
     /** The value at a dotted path ("user.name"), null when any step is missing. */
     public static Object valueAt(Map<String, Object> data, String path) {
         Object current = data;
