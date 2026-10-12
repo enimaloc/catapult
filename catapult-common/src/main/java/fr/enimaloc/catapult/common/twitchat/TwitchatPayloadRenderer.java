@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.service.notification;
+package fr.enimaloc.catapult.common.twitchat;
 
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPayload;
@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  */
 public final class TwitchatPayloadRenderer {
 
-    static final String CHAT_MESSAGE = "CUSTOM_CHAT_MESSAGE";
+    public static final String CHAT_MESSAGE = "CUSTOM_CHAT_MESSAGE";
     // Permissive on purpose: any {{action:...}}-shaped text must be recognized as an attempted
     // placeholder (keyword in any case, spaces, unknown or wrong-case type) so the payload is
     // skipped, not shipped as is. The type itself still has to match exactly to resolve.
