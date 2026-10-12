@@ -33,6 +33,10 @@
             </mdui-top-app-bar-title>
         </a>
 
+        <!-- Mock profile only: reopens the member's config popout (mock-popout.js). -->
+        <mdui-button th:if="${mock}" id="mock-popout-btn" variant="text" icon="tune"
+                     style="margin-left: auto">Mock</mdui-button>
+
         <div slot="end-icon">
             <mdui-button variant="text" href="/oauth2/authorization/twitch" th:text="#{nav.login}">nav.login
             </mdui-button>
@@ -93,5 +97,6 @@
 <script src="/js/twitchat-events.js"></script>
 <script src="/js/channel-settings.js"></script>
 <script src="/js/channel-dtdd.js"></script>
+<script th:if="${mock}" src="/js/mock-popout.js"></script>
 </body>
 </html>
