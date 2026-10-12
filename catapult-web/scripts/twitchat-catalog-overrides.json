@@ -2,6 +2,7 @@
   "pairs": {
     "SET_CHAT_FEED_PAUSE_STATE": "CHAT_FEED_PAUSE"
   },
+  "hidden": ["CREATE_RAFFLE", "STOP_RAFFLE", "SEND_CUSTOM_CHAT_MESSAGE", "STREAMDECK_AUTHENTICATE"],
   "actions": {
     "CUSTOM_CHAT_MESSAGE": {
       "description": "Message chat Catapult",
@@ -17,7 +18,7 @@
         { "path": "highlightColor", "type": "text", "label": "Highlight color", "labelKey": "twitchat.field.highlight_color", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null,
           "showIf": { "path": "style", "values": ["highlight"] } },
         { "path": "quote", "type": "textarea", "label": "Quote", "labelKey": "twitchat.field.quote", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
-        { "path": "icon", "type": "text", "label": "Icon", "labelKey": "twitchat.field.icon", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
+        { "path": "icon", "type": "select", "label": "Icon", "labelKey": "twitchat.field.icon", "required": false, "options": "$beta:SET_SEND_CUSTOM_CHAT_MESSAGE.icon", "source": null, "defaultValue": null, "fields": null },
         { "path": "user.name", "type": "text", "label": "Author", "labelKey": "twitchat.field.author", "required": false, "options": null, "source": null, "defaultValue": "Catapult", "fields": null },
         { "path": "user.color", "type": "text", "label": "Author color", "labelKey": "twitchat.field.author_color", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
         { "path": "col", "type": "number", "label": "Column", "labelKey": "twitchat.field.col", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
@@ -27,7 +28,7 @@
           "fields": [
             { "path": null, "type": "catapult-action", "label": "Catapult action", "labelKey": "twitchat.field.button.catapult_action", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
             { "path": "label", "type": "text", "label": "Label", "labelKey": "twitchat.field.button.label", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null },
-            { "path": "icon", "type": "text", "label": "Icon", "labelKey": "twitchat.field.button.icon", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
+            { "path": "icon", "type": "select", "label": "Icon", "labelKey": "twitchat.field.button.icon", "required": false, "options": "$beta:SET_SEND_CUSTOM_CHAT_MESSAGE.icon", "source": null, "defaultValue": null, "fields": null },
             { "path": "theme", "type": "select", "label": "Theme", "labelKey": "twitchat.field.button.theme", "required": false, "source": null, "defaultValue": "default", "fields": null,
               "options": [
                 { "value": "default", "label": "default", "labelKey": null },
@@ -79,6 +80,120 @@
             { "value": "SET", "label": "SET", "labelKey": "twitchat.field.counter_action.set" }
           ] },
         { "path": "value", "type": "text", "label": "Value", "labelKey": "twitchat.field.counter_value", "required": true, "options": null, "source": null, "defaultValue": "1", "fields": null }
+      ]
+    },
+    "BINGO_GRID_OVERLAY_PRESENCE": { "kind": "data" },
+    "CHAT_HIGHLIGHT_OVERLAY_PRESENCE": { "kind": "data" },
+    "ENDING_CREDITS_PRESENCE": { "kind": "data" },
+    "ENDING_CREDITS_DATA": { "kind": "data" },
+    "TOGGLE_TRIGGER": {
+      "description": "Enable, disable or toggle a trigger",
+      "fields": [
+        {"path": "triggerId", "type": "select", "label": "Trigger", "labelKey": "twitchat.field.trigger", "required": true, "options": null, "source": {"stable": "TRIGGERS_GET_ALL", "beta": "GET_TRIGGER_LIST"}, "defaultValue": null, "fields": null},
+        {"path": "triggerAction", "type": "select", "label": "Operation", "labelKey": "twitchat.field.trigger_action", "required": false, "options": [{"value": "enable", "label": "enable", "labelKey": "twitchat.field.trigger_action.enable"}, {"value": "disable", "label": "disable", "labelKey": "twitchat.field.trigger_action.disable"}, {"value": "toggle", "label": "toggle", "labelKey": "twitchat.field.trigger_action.toggle"}], "source": null, "defaultValue": "enable", "fields": null}
+      ]
+    },
+    "TRIGGER_STATE": {
+      "fields": [
+        {"path": "id", "type": "select", "label": "Trigger", "labelKey": "twitchat.field.trigger", "required": true, "options": null, "source": {"stable": "TRIGGERS_GET_ALL", "beta": "GET_TRIGGER_LIST"}, "defaultValue": null, "fields": null},
+        {"path": "forcedState", "type": "switch", "label": "Enabled", "labelKey": "twitchat.field.trigger_enabled", "required": false, "options": null, "source": null, "defaultValue": true, "fields": null}
+      ]
+    },
+    "CHAT_FEED_SELECT_ACTION_PIN": {
+      "description": "Pin the currently selected message in a chat feed",
+      "fields": [
+        {"path": "colIndex", "type": "number", "label": "Column", "labelKey": "twitchat.field.col", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null}
+      ]
+    },
+    "ANIMATED_TEXT_SET": {
+      "description": "Set text content for an animated text overlay",
+      "fields": [
+        {"path": "overlayId", "type": "text", "label": "Overlay ID", "labelKey": "twitchat.field.overlay_id", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "queryId", "type": "text", "label": "Query ID", "labelKey": "twitchat.field.query_id", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "text", "type": "textarea", "label": "Text", "labelKey": "twitchat.field.text", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "autoHide", "type": "switch", "label": "Auto hide", "labelKey": "twitchat.field.auto_hide", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "bypassAll", "type": "switch", "label": "Replace the current text immediately", "labelKey": "twitchat.field.bypass_all", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null}
+      ]
+    },
+    "ANIMATED_TEXT_CLOSE": {
+      "description": "Hide an animated text overlay's text",
+      "fields": [
+        {"path": "overlayId", "type": "text", "label": "Overlay ID", "labelKey": "twitchat.field.overlay_id", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "queryId", "type": "text", "label": "Query ID", "labelKey": "twitchat.field.query_id", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null}
+      ]
+    },
+    "CREATE_POLL": {
+      "description": "Open the poll creation form",
+      "fields": []
+    },
+    "POLL_CREATE": {
+      "description": "Open the poll creation form (voice control)",
+      "fields": []
+    },
+    "CREATE_PREDICTION": {
+      "description": "Open the prediction creation form",
+      "fields": []
+    },
+    "RAFFLE_START": {
+      "description": "Open the raffle creation form",
+      "fields": []
+    },
+    "RAFFLE_END": {
+      "description": "Stop the first active raffle, after confirmation",
+      "fields": []
+    },
+    "HIDE_ALERT": {
+      "description": "Hide the current chat alert",
+      "fields": []
+    },
+    "CHAT_POLL_START": {
+      "fields": [
+        {"path": "title", "type": "text", "label": "Title", "labelKey": "twitchat.field.poll_title", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "choices", "type": "list", "label": "Choices", "labelKey": "twitchat.field.poll_choices", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "duration", "type": "number", "label": "Duration (seconds)", "labelKey": "twitchat.field.duration_seconds", "required": true, "options": null, "source": null, "defaultValue": 60, "fields": null},
+        {"path": "maxVotePerUser", "type": "number", "label": "Max votes per user", "labelKey": "twitchat.field.max_votes", "required": true, "options": null, "source": null, "defaultValue": 1, "fields": null}
+      ]
+    },
+    "WHEEL_OVERLAY_START": {
+      "fields": [
+        {"path": "items", "type": "repeater", "label": "Segments", "labelKey": "twitchat.field.wheel_items", "required": true, "options": null, "source": null, "defaultValue": null, "fields": [
+            {"path": "id", "type": "text", "label": "ID", "labelKey": "twitchat.field.wheel_item_id", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+            {"path": "label", "type": "text", "label": "Label", "labelKey": "twitchat.field.wheel_item_label", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+            {"path": "data", "type": "json", "label": "Data (JSON)", "labelKey": "twitchat.field.wheel_item_data", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null}
+          ] },
+        {"path": "winner", "type": "text", "label": "Winner ID", "labelKey": "twitchat.field.wheel_winner", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "sessionId", "type": "text", "label": "Session ID", "labelKey": "twitchat.field.session_id", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "skin", "type": "text", "label": "Skin", "labelKey": "twitchat.field.skin", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null}
+      ]
+    },
+    "CLICKABLE_AREA_STATE": {
+      "fields": [
+        {"path": "id", "type": "text", "label": "Area ID", "labelKey": "twitchat.field.area_id", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "state", "type": "choice", "label": "State", "labelKey": "twitchat.field.area_state", "required": true, "options": [{"value": "true", "label": "true", "labelKey": "twitchat.field.area_state.on"}, {"value": "false", "label": "false", "labelKey": "twitchat.field.area_state.off"}, {"value": "\"toggle\"", "label": "toggle", "labelKey": "twitchat.field.area_state.toggle"}], "source": null, "defaultValue": true, "fields": null}
+      ]
+    },
+    "ENDING_CREDITS_CONTROL": {
+      "fields": [
+        {"path": "prev", "type": "switch", "label": "Previous section", "labelKey": "twitchat.field.credits_prev", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "next", "type": "switch", "label": "Next section", "labelKey": "twitchat.field.credits_next", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "speed", "type": "number", "label": "Speed", "labelKey": "twitchat.field.credits_speed", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "scrollToSectionID", "type": "text", "label": "Section ID", "labelKey": "twitchat.field.credits_section", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null}
+      ]
+    },
+    "SHOW_CLIP": {
+      "fields": [
+        {"path": "clip", "type": "json", "label": "Clip (Twitch API JSON)", "labelKey": "twitchat.field.clip", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "params.position", "type": "select", "label": "Position", "labelKey": "twitchat.field.position", "required": true, "options": [{"value": "tl", "label": "tl", "labelKey": "twitchat.field.position.tl"}, {"value": "t", "label": "t", "labelKey": "twitchat.field.position.t"}, {"value": "tr", "label": "tr", "labelKey": "twitchat.field.position.tr"}, {"value": "l", "label": "l", "labelKey": "twitchat.field.position.l"}, {"value": "m", "label": "m", "labelKey": "twitchat.field.position.m"}, {"value": "r", "label": "r", "labelKey": "twitchat.field.position.r"}, {"value": "bl", "label": "bl", "labelKey": "twitchat.field.position.bl"}, {"value": "b", "label": "b", "labelKey": "twitchat.field.position.b"}, {"value": "br", "label": "br", "labelKey": "twitchat.field.position.br"}], "source": null, "defaultValue": "m", "fields": null}
+      ]
+    },
+    "SET_CHAT_HIGHLIGHT_OVERLAY_MESSAGE": {
+      "fields": [
+        {"path": "message", "type": "textarea", "label": "Message", "labelKey": "twitchat.field.message", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "user", "type": "json", "label": "User (Twitch JSON)", "labelKey": "twitchat.field.twitch_user", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "params.position", "type": "select", "label": "Position", "labelKey": "twitchat.field.position", "required": true, "options": [{"value": "tl", "label": "tl", "labelKey": "twitchat.field.position.tl"}, {"value": "t", "label": "t", "labelKey": "twitchat.field.position.t"}, {"value": "tr", "label": "tr", "labelKey": "twitchat.field.position.tr"}, {"value": "l", "label": "l", "labelKey": "twitchat.field.position.l"}, {"value": "m", "label": "m", "labelKey": "twitchat.field.position.m"}, {"value": "r", "label": "r", "labelKey": "twitchat.field.position.r"}, {"value": "bl", "label": "bl", "labelKey": "twitchat.field.position.bl"}, {"value": "b", "label": "b", "labelKey": "twitchat.field.position.b"}, {"value": "br", "label": "br", "labelKey": "twitchat.field.position.br"}], "source": null, "defaultValue": "m", "fields": null},
+        {"path": "dateLabel", "type": "text", "label": "Date label", "labelKey": "twitchat.field.date_label", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "message_id", "type": "text", "label": "Message ID", "labelKey": "twitchat.field.message_id", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null},
+        {"path": "skin", "type": "text", "label": "Skin", "labelKey": "twitchat.field.skin", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null}
       ]
     }
   }

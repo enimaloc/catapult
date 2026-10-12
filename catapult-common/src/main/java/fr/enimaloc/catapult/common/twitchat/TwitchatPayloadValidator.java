@@ -42,6 +42,10 @@ public final class TwitchatPayloadValidator {
                 errors.add(new TwitchatValidationError(i, "action", "Unknown Twitchat action: " + payload.action()));
                 continue;
             }
+            if (action.get().dataOnly()) {
+                errors.add(new TwitchatValidationError(i, "action", "Only returns data, does nothing: " + payload.action()));
+                continue;
+            }
             if (!FORM.equals(payload.mode()) && !RAW.equals(payload.mode())) {
                 errors.add(new TwitchatValidationError(i, "mode", "Expected FORM or RAW"));
                 continue;
@@ -98,7 +102,12 @@ public final class TwitchatPayloadValidator {
                 case "select" -> field.options() == null
                         || field.options().stream().anyMatch(option -> option.value().equals(String.valueOf(value)))
                         ? null : "Not one of the choices";
+                case "choice" -> field.options() == null
+                        || field.options().stream().anyMatch(option -> option.value().equals(JSON.writeValueAsString(value)))
+                        ? null : "Not one of the choices";
                 case "repeater" -> value instanceof List<?> ? null : "Expected a list";
+                case "list" -> value instanceof List<?> items && items.stream().allMatch(String.class::isInstance)
+                        ? null : "Expected a list of texts";
                 default -> null;
             };
             if (problem != null) {

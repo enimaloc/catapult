@@ -59,6 +59,7 @@ const BETA_SOURCE = `export type TwitchatEventMap = {
 \tGET_TRIGGER_LIST: undefined;
 \tSET_SEND_CUSTOM_CHAT_MESSAGE: {
 \t\tmessage?: string;
+\t\tstyle?: "message" | "highlight" | "error";
 \t};
 \tCUSTOM_CHAT_MESSAGE: TwitchatEventMap["SET_SEND_CUSTOM_CHAT_MESSAGE"];
 \tSET_QUIZ_REVEAL: undefined;
@@ -246,12 +247,32 @@ describe("buildCatalog", () => {
     });
     const byKey = (catalog) => Object.fromEntries(catalog.actions.map((a) => [a.key, a]));
 
-    it("keeps write actions only, under one key per stable/beta pair", () => {
+    it("keeps every request under one key per stable/beta pair, the data ones marked as such", () => {
         const actions = byKey(build());
-        expect(Object.keys(actions).sort()).toEqual(
+        const keys = (kind) => Object.keys(actions).filter((key) => actions[key].kind === kind).sort();
+        expect(keys("action")).toEqual(
             ["CUSTOM_CHAT_MESSAGE", "EXECUTE_TRIGGER", "QUIZ_REVEAL", "SEND_CUSTOM_CHAT_MESSAGE", "SET_EMERGENCY_MODE", "SHOUTOUT"]);
+        expect(keys("data")).toEqual(["GET_COLS_COUNT", "GET_TRIGGER_LIST", "TRIGGERS_GET_ALL"]);
         expect(actions.EXECUTE_TRIGGER.names).toEqual({ stable: "EXECUTE_TRIGGER", beta: "SET_EXECUTE_TRIGGER" });
         expect(actions.QUIZ_REVEAL.names).toEqual({ beta: "SET_QUIZ_REVEAL" });
+    });
+
+    it("lets an override mark a request as data, or hide it", () => {
+        const actions = byKey(build({ pairs: {}, hidden: ["SEND_CUSTOM_CHAT_MESSAGE"], actions: { QUIZ_REVEAL: { kind: "data" } } }));
+        expect(actions.SEND_CUSTOM_CHAT_MESSAGE).toBeUndefined();
+        // Its generated form stays: the override has no fields.
+        expect(actions.QUIZ_REVEAL).toMatchObject({ kind: "data", form: "generated" });
+    });
+
+    it("fills an override's options from a beta member's choices, else falls back to text", () => {
+        const fields = byKey(build({ pairs: {}, actions: { SHOUTOUT: { fields: [
+            { path: "style", type: "select", options: "$beta:SET_SEND_CUSTOM_CHAT_MESSAGE.style" },
+            { path: "gone", type: "select", options: "$beta:SET_SEND_CUSTOM_CHAT_MESSAGE.nope" },
+            { path: "rows", type: "repeater", fields: [{ path: "s", type: "select", options: "$beta:SET_SEND_CUSTOM_CHAT_MESSAGE.style" }] },
+        ] } } })).SHOUTOUT.fields;
+        expect(fields[0].options.map((o) => o.value)).toEqual(["message", "highlight", "error"]);
+        expect(fields[1]).toMatchObject({ type: "text", options: null });
+        expect(fields[2].fields[0].options).toHaveLength(3);
     });
 
     it("prefers the beta typing, falls back to the stable one, else raw", () => {
@@ -279,8 +300,8 @@ describe("buildCatalog", () => {
         });
         expect(catalog.actions[0]).toMatchObject({ key: "SHOUTOUT", priority: 1, form: "override" });
         expect(catalog.actions[0].fields).toEqual([{ path: "x", type: "text" }]);
-        expect(catalog.actions.slice(1).map((a) => a.key)).toEqual(
-            ["CUSTOM_CHAT_MESSAGE", "EXECUTE_TRIGGER", "QUIZ_REVEAL", "SEND_CUSTOM_CHAT_MESSAGE", "SET_EMERGENCY_MODE"]);
+        expect(catalog.actions.slice(1).map((a) => a.key)).toEqual(["CUSTOM_CHAT_MESSAGE", "EXECUTE_TRIGGER", "GET_COLS_COUNT",
+            "GET_TRIGGER_LIST", "QUIZ_REVEAL", "SEND_CUSTOM_CHAT_MESSAGE", "SET_EMERGENCY_MODE", "TRIGGERS_GET_ALL"]);
     });
 
     it("lets an override replace Twitchat's description", () => {

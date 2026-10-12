@@ -49,9 +49,31 @@ class TwitchatPayloadValidatorTest {
     }
 
     @Test
+    void aDataRequest_isRefused_itWouldDoNothing() {
+        assertThat(validate("TRIGGERS_GET_ALL", "RAW", "{}"))
+                .containsExactly(new TwitchatValidationError(0, "action", "Only returns data, does nothing: TRIGGERS_GET_ALL"));
+    }
+
+    @Test
+    void choiceField_comparesItsJsonLiterals() {
+        assertThat(validate("CLICKABLE_AREA_STATE", "FORM", "{\"id\":\"a\",\"state\":true}")).isEmpty();
+        assertThat(validate("CLICKABLE_AREA_STATE", "FORM", "{\"id\":\"a\",\"state\":\"toggle\"}")).isEmpty();
+        assertThat(validate("CLICKABLE_AREA_STATE", "FORM", "{\"id\":\"a\",\"state\":\"true\"}"))
+                .extracting(TwitchatValidationError::field).containsExactly("state");
+    }
+
+    @Test
+    void listField_wantsTexts() {
+        String poll = "{\"title\":\"t\",\"duration\":60,\"maxVotePerUser\":1,\"choices\":%s}";
+        assertThat(validate("CHAT_POLL_START", "FORM", poll.formatted("[\"a\",\"b\"]"))).isEmpty();
+        assertThat(validate("CHAT_POLL_START", "FORM", poll.formatted("[1]")))
+                .extracting(TwitchatValidationError::field).containsExactly("choices");
+    }
+
+    @Test
     void numberField_acceptsAPlaceholder() {
         // COUNTER_ADD.value is "text" (an arithmetic expression), so use a generated number field instead:
-        TwitchatCatalog catalog = new TwitchatCatalog(1, List.of(new TwitchatCatalog.Action("X", Map.of(), "", null, "generated",
+        TwitchatCatalog catalog = new TwitchatCatalog(1, List.of(new TwitchatCatalog.Action("X", Map.of(), "", null, "action", "generated",
                 List.of(new TwitchatCatalog.Field("n", "number", "n", null, true, null, null, null, null, null)))));
         TwitchatPayloadValidator v = new TwitchatPayloadValidator(catalog);
         assertThat(v.validate(List.of(new TwitchatEventActionDto("X", "FORM", "{\"n\":\"{{count}}\"}", true)))).isEmpty();
@@ -103,7 +125,7 @@ class TwitchatPayloadValidatorTest {
 
     @Test
     void outsideForm_aJsonFieldCoversItsWholeSubtree() {
-        assertThat(outsideForm("SEND_CUSTOM_CHAT_MESSAGE",
-                "{\"message\":\"Hi\",\"user\":{\"name\":\"a\",\"color\":\"#f00\"},\"actions\":[{\"any\":1}]}")).isEmpty();
+        assertThat(outsideForm("SHOW_CLIP",
+                "{\"clip\":{\"id\":\"a\",\"any\":{\"deep\":[1]}},\"params\":{\"position\":\"m\"}}")).isEmpty();
     }
 }
