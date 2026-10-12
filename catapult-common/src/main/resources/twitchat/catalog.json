@@ -9,6 +9,7 @@
       },
       "description": "Message chat Catapult",
       "priority": 1,
+      "kind": "action",
       "form": "override",
       "fields": [
         {
@@ -79,1711 +80,9 @@
         },
         {
           "path": "icon",
-          "type": "text",
+          "type": "select",
           "label": "Icon",
           "labelKey": "twitchat.field.icon",
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "user.name",
-          "type": "text",
-          "label": "Author",
-          "labelKey": "twitchat.field.author",
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": "Catapult",
-          "fields": null
-        },
-        {
-          "path": "user.color",
-          "type": "text",
-          "label": "Author color",
-          "labelKey": "twitchat.field.author_color",
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "col",
-          "type": "number",
-          "label": "Column",
-          "labelKey": "twitchat.field.col",
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "todayFirst",
-          "type": "switch",
-          "label": "Show in Greet them",
-          "labelKey": "twitchat.field.today_first",
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "canClose",
-          "type": "switch",
-          "label": "Closable",
-          "labelKey": "twitchat.field.can_close",
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": true,
-          "fields": null
-        },
-        {
-          "path": "actions",
-          "type": "repeater",
-          "label": "Buttons",
-          "labelKey": "twitchat.field.buttons",
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": [
-            {
-              "path": null,
-              "type": "catapult-action",
-              "label": "Catapult action",
-              "labelKey": "twitchat.field.button.catapult_action",
-              "required": false,
-              "options": null,
-              "source": null,
-              "defaultValue": null,
-              "fields": null
-            },
-            {
-              "path": "label",
-              "type": "text",
-              "label": "Label",
-              "labelKey": "twitchat.field.button.label",
-              "required": true,
-              "options": null,
-              "source": null,
-              "defaultValue": null,
-              "fields": null
-            },
-            {
-              "path": "icon",
-              "type": "text",
-              "label": "Icon",
-              "labelKey": "twitchat.field.button.icon",
-              "required": false,
-              "options": null,
-              "source": null,
-              "defaultValue": null,
-              "fields": null
-            },
-            {
-              "path": "theme",
-              "type": "select",
-              "label": "Theme",
-              "labelKey": "twitchat.field.button.theme",
-              "required": false,
-              "source": null,
-              "defaultValue": "default",
-              "fields": null,
-              "options": [
-                {
-                  "value": "default",
-                  "label": "default",
-                  "labelKey": null
-                },
-                {
-                  "value": "primary",
-                  "label": "primary",
-                  "labelKey": null
-                },
-                {
-                  "value": "secondary",
-                  "label": "secondary",
-                  "labelKey": null
-                },
-                {
-                  "value": "alert",
-                  "label": "alert",
-                  "labelKey": null
-                }
-              ]
-            },
-            {
-              "path": "actionType",
-              "type": "select",
-              "label": "Type",
-              "labelKey": "twitchat.field.button.type",
-              "required": true,
-              "source": null,
-              "defaultValue": "url",
-              "fields": null,
-              "options": [
-                {
-                  "value": "url",
-                  "label": "url",
-                  "labelKey": "twitchat.field.button.type.url"
-                },
-                {
-                  "value": "trigger",
-                  "label": "trigger",
-                  "labelKey": "twitchat.field.button.type.trigger"
-                },
-                {
-                  "value": "message",
-                  "label": "message",
-                  "labelKey": "twitchat.field.button.type.message"
-                },
-                {
-                  "value": "discord",
-                  "label": "discord",
-                  "labelKey": "twitchat.field.button.type.discord"
-                }
-              ]
-            },
-            {
-              "path": "url",
-              "type": "text",
-              "label": "URL",
-              "labelKey": "twitchat.field.button.url",
-              "required": false,
-              "options": null,
-              "source": null,
-              "defaultValue": null,
-              "fields": null,
-              "showIf": {
-                "path": "actionType",
-                "values": [
-                  "url"
-                ]
-              }
-            },
-            {
-              "path": "urlTarget",
-              "type": "text",
-              "label": "URL target",
-              "labelKey": "twitchat.field.button.url_target",
-              "required": false,
-              "options": null,
-              "source": null,
-              "defaultValue": null,
-              "fields": null,
-              "showIf": {
-                "path": "actionType",
-                "values": [
-                  "url"
-                ]
-              }
-            },
-            {
-              "path": "triggerId",
-              "type": "select",
-              "label": "Trigger",
-              "labelKey": "twitchat.field.button.trigger",
-              "required": false,
-              "options": null,
-              "defaultValue": null,
-              "fields": null,
-              "source": {
-                "stable": "TRIGGERS_GET_ALL",
-                "beta": "GET_TRIGGER_LIST"
-              },
-              "showIf": {
-                "path": "actionType",
-                "values": [
-                  "trigger"
-                ]
-              }
-            },
-            {
-              "path": "message",
-              "type": "text",
-              "label": "Chat message",
-              "labelKey": "twitchat.field.button.message",
-              "required": false,
-              "options": null,
-              "source": null,
-              "defaultValue": null,
-              "fields": null,
-              "showIf": {
-                "path": "actionType",
-                "values": [
-                  "message",
-                  "discord"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "key": "EXECUTE_TRIGGER",
-      "names": {
-        "stable": "EXECUTE_TRIGGER",
-        "beta": "SET_EXECUTE_TRIGGER"
-      },
-      "description": "Execute a specific trigger manually",
-      "priority": 2,
-      "form": "override",
-      "fields": [
-        {
-          "path": "id",
-          "type": "select",
-          "label": "Trigger",
-          "labelKey": "twitchat.field.trigger",
-          "required": true,
-          "options": null,
-          "defaultValue": null,
-          "fields": null,
-          "source": {
-            "stable": "TRIGGERS_GET_ALL",
-            "beta": "GET_TRIGGER_LIST"
-          }
-        }
-      ]
-    },
-    {
-      "key": "SEND_MESSAGE",
-      "names": {
-        "stable": "SEND_MESSAGE",
-        "beta": "SET_SEND_MESSAGE"
-      },
-      "description": "Send a message to chat",
-      "priority": 3,
-      "form": "override",
-      "fields": [
-        {
-          "path": "message",
-          "type": "textarea",
-          "label": "Message",
-          "labelKey": "twitchat.field.message",
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "COUNTER_ADD",
-      "names": {
-        "stable": "COUNTER_ADD",
-        "beta": "SET_COUNTER_ADD"
-      },
-      "description": "Add a value to a counter",
-      "priority": 4,
-      "form": "override",
-      "fields": [
-        {
-          "path": "id",
-          "type": "select",
-          "label": "Counter",
-          "labelKey": "twitchat.field.counter",
-          "required": true,
-          "options": null,
-          "defaultValue": null,
-          "fields": null,
-          "source": {
-            "stable": "COUNTER_GET_ALL",
-            "beta": "GET_ALL_COUNTERS"
-          }
-        },
-        {
-          "path": "action",
-          "type": "select",
-          "label": "Operation",
-          "labelKey": "twitchat.field.counter_action",
-          "required": true,
-          "source": null,
-          "defaultValue": "ADD",
-          "fields": null,
-          "options": [
-            {
-              "value": "ADD",
-              "label": "ADD",
-              "labelKey": "twitchat.field.counter_action.add"
-            },
-            {
-              "value": "DEL",
-              "label": "DEL",
-              "labelKey": "twitchat.field.counter_action.del"
-            },
-            {
-              "value": "SET",
-              "label": "SET",
-              "labelKey": "twitchat.field.counter_action.set"
-            }
-          ]
-        },
-        {
-          "path": "value",
-          "type": "text",
-          "label": "Value",
-          "labelKey": "twitchat.field.counter_value",
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": "1",
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "ANIMATED_TEXT_CLOSE",
-      "names": {
-        "stable": "ANIMATED_TEXT_CLOSE"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "ANIMATED_TEXT_CONTENT",
-      "names": {
-        "beta": "SET_ANIMATED_TEXT_CONTENT"
-      },
-      "description": "Set text content for an animated text overlay",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "id",
-          "type": "text",
-          "label": "Overlay ID to send the text to",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "queryId",
-          "type": "text",
-          "label": "Query ID to identify this text set action",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "text",
-          "type": "text",
-          "label": "Text to display",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "autoHide",
-          "type": "switch",
-          "label": "Auto hide after showing.",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "bypassAll",
-          "type": "switch",
-          "label": "Hides current text immediately, bypassing any hide animation, empty the",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "ANIMATED_TEXT_CONTENT_FROM_SD",
-      "names": {
-        "beta": "SET_ANIMATED_TEXT_CONTENT_FROM_SD"
-      },
-      "description": "Alias of SET_ANIMATED_TEXT_CONTENT but that's listend by Twitchat.\nTwitchat will then broadcast SET_ANIMATED_TEXT_CONTENT to the overlay.\nThis way SD can send animated text to the overlay even though it's not\ndirectly connected to it.",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "id",
-          "type": "text",
-          "label": "Overlay ID to send the text to",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "queryId",
-          "type": "text",
-          "label": "Query ID to identify this text set action",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "text",
-          "type": "text",
-          "label": "Text to display",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "autoHide",
-          "type": "switch",
-          "label": "Auto hide after showing.",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "bypassAll",
-          "type": "switch",
-          "label": "Hides current text immediately, bypassing any hide animation, empty the",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "ANIMATED_TEXT_SET",
-      "names": {
-        "stable": "ANIMATED_TEXT_SET"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "AUTOMOD_ACCEPT",
-      "names": {
-        "stable": "AUTOMOD_ACCEPT",
-        "beta": "SET_AUTOMOD_ACCEPT"
-      },
-      "description": "Accept latest message held by automod",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "AUTOMOD_REJECT",
-      "names": {
-        "stable": "AUTOMOD_REJECT",
-        "beta": "SET_AUTOMOD_REJECT"
-      },
-      "description": "Reject latest message held by automod",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "BINGO_GRID_OVERLAY_PRESENCE",
-      "names": {
-        "beta": "SET_BINGO_GRID_OVERLAY_PRESENCE"
-      },
-      "description": "Advertise bingo grid overlay presence",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "BINGO_GRID_STATE",
-      "names": {
-        "beta": "SET_BINGO_GRID_STATE"
-      },
-      "description": "Enable or disable a specific bingo grid",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "id",
-          "type": "text",
-          "label": "Grid ID to change state of",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "forcedState",
-          "type": "switch",
-          "label": "Force grid state:",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "BINGO_GRID_VISIBILITY",
-      "names": {
-        "beta": "SET_BINGO_GRID_VISIBILITY"
-      },
-      "description": "Set bingo grid visibility",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "show",
-          "type": "switch",
-          "label": "Show or hide the bingo grid",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "BINGO_GRID_VISIBILITY_FROM_SD",
-      "names": {
-        "beta": "SET_BINGO_GRID_VISIBILITY_FROM_SD"
-      },
-      "description": "Alias of SET_BINGO_GRID_VISIBILITY but that's listend by Twitchat.\nTwitchat will then broadcast SET_BINGO_GRID_VISIBILITY to the overlay.\nThis way SD can change bingo grid visibility even though it's not\ndirectly connected to it.",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "show",
-          "type": "switch",
-          "label": "Show or hide the bingo grid",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "BINGO_TOGGLE",
-      "names": {
-        "stable": "BINGO_TOGGLE",
-        "beta": "SET_BINGO_TOGGLE"
-      },
-      "description": "Toggle current bingo display (NOT bingo GRID!)",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "CENSOR_DELETED_MESSAGES_TOGGLE",
-      "names": {
-        "stable": "CENSOR_DELETED_MESSAGES_TOGGLE",
-        "beta": "SET_CENSOR_DELETED_MESSAGES_TOGGLE"
-      },
-      "description": "Toggle censorship of deleted messages",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "CHAT_FEED_PAUSE",
-      "names": {
-        "stable": "CHAT_FEED_PAUSE",
-        "beta": "SET_CHAT_FEED_PAUSE_STATE"
-      },
-      "description": "Pause auto-scrolling in a chat feed",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "pause",
-          "type": "switch",
-          "label": "Force paused state",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_READ",
-      "names": {
-        "stable": "CHAT_FEED_READ",
-        "beta": "SET_CHAT_FEED_READ"
-      },
-      "description": "Move read marker in chat feed",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "count",
-          "type": "number",
-          "label": "Number of messages to read",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_READ_ALL",
-      "names": {
-        "stable": "CHAT_FEED_READ_ALL",
-        "beta": "SET_CHAT_FEED_READ_ALL"
-      },
-      "description": "Mark all messages as read in a chat feed",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_SCROLL",
-      "names": {
-        "stable": "CHAT_FEED_SCROLL",
-        "beta": "SET_CHAT_FEED_SCROLL"
-      },
-      "description": "Scroll a chat feed by a specific amount",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "scrollBy",
-          "type": "number",
-          "label": "Number of pixels to scroll by.",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "mode",
-          "type": "select",
-          "label": "Scroll mode.",
-          "labelKey": null,
-          "required": true,
-          "options": [
-            {
-              "value": "messages",
-              "label": "messages",
-              "labelKey": null
-            },
-            {
-              "value": "pixels",
-              "label": "pixels",
-              "labelKey": null
-            }
-          ],
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_SCROLL_BOTTOM",
-      "names": {
-        "stable": "CHAT_FEED_SCROLL_BOTTOM",
-        "beta": "SET_CHAT_FEED_SCROLL_BOTTOM"
-      },
-      "description": "Scroll a chat feed to the bottom",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_SCROLL_DOWN",
-      "names": {
-        "stable": "CHAT_FEED_SCROLL_DOWN"
-      },
-      "description": "Scroll the chat feed down by the number of pixels specified in the `scrollBy` value.\n*Default value = 100*\n### JSON param *(optional)*",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "CHAT_FEED_SCROLL_UP",
-      "names": {
-        "stable": "CHAT_FEED_SCROLL_UP"
-      },
-      "description": "Scroll the chat feed up by the number of pixels specified in the `scrollBy` value.\n*Default value = 100*\n### JSON param *(optional)*",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "CHAT_FEED_SELECT",
-      "names": {
-        "stable": "CHAT_FEED_SELECT",
-        "beta": "SET_CHAT_FEED_SELECT"
-      },
-      "description": "Move message selection in a chat feed",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "direction",
-          "type": "number",
-          "label": "Direction to move selection",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_SELECT_ACTION_BAN",
-      "names": {
-        "stable": "CHAT_FEED_SELECT_ACTION_BAN",
-        "beta": "SET_CHAT_FEED_SELECT_ACTION_BAN"
-      },
-      "description": "Ban the user of the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "duration",
-          "type": "number",
-          "label": "Optional ban duration in seconds.",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_SELECT_ACTION_CANCEL",
-      "names": {
-        "stable": "CHAT_FEED_SELECT_ACTION_CANCEL",
-        "beta": "SET_CHAT_FEED_SELECT_ACTION_CANCEL"
-      },
-      "description": "Cancel the action selection for the currently selected message in a chat feed",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_SELECT_ACTION_DELETE",
-      "names": {
-        "stable": "CHAT_FEED_SELECT_ACTION_DELETE",
-        "beta": "SET_CHAT_FEED_SELECT_ACTION_DELETE"
-      },
-      "description": "Delete the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_SELECT_ACTION_HIGHLIGHT",
-      "names": {
-        "stable": "CHAT_FEED_SELECT_ACTION_HIGHLIGHT",
-        "beta": "SET_CHAT_FEED_SELECT_ACTION_HIGHLIGHT"
-      },
-      "description": "Highlight the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_SELECT_ACTION_PIN",
-      "names": {
-        "stable": "CHAT_FEED_SELECT_ACTION_PIN"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "CHAT_FEED_SELECT_ACTION_SAVE",
-      "names": {
-        "beta": "SET_CHAT_FEED_SELECT_ACTION_SAVE"
-      },
-      "description": "Save the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_SELECT_ACTION_SHOUTOUT",
-      "names": {
-        "stable": "CHAT_FEED_SELECT_ACTION_SHOUTOUT",
-        "beta": "SET_CHAT_FEED_SELECT_ACTION_SHOUTOUT"
-      },
-      "description": "Shoutout the user of the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_SELECT_CHOOSING_ACTION",
-      "names": {
-        "stable": "CHAT_FEED_SELECT_CHOOSING_ACTION",
-        "beta": "SET_CHAT_FEED_SELECT_CHOOSING_ACTION"
-      },
-      "description": "Open action chooser for the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "colIndex",
-          "type": "number",
-          "label": "Column index",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_FEED_UNPAUSE",
-      "names": {
-        "stable": "CHAT_FEED_UNPAUSE"
-      },
-      "description": "Resumes the chat by scrolling back to bottom\n### JSON param",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "CHAT_HIGHLIGHT_OVERLAY_CLIP",
-      "names": {
-        "beta": "SET_CHAT_HIGHLIGHT_OVERLAY_CLIP"
-      },
-      "description": "Send a clip to the chat highlight overlay",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "CHAT_HIGHLIGHT_OVERLAY_PRESENCE",
-      "names": {
-        "beta": "SET_CHAT_HIGHLIGHT_OVERLAY_PRESENCE"
-      },
-      "description": "Advertise for highlight overlay presence",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "CHAT_POLL_START",
-      "names": {
-        "beta": "SET_CHAT_POLL_START"
-      },
-      "description": "Start a chat poll",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "title",
-          "type": "text",
-          "label": "Poll title",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "choices",
-          "type": "json",
-          "label": "List of poll choices",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "duration",
-          "type": "number",
-          "label": "Duration of the poll in seconds",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "maxVotePerUser",
-          "type": "number",
-          "label": "Maximum answers a user can vote for",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CHAT_POLL_STOP",
-      "names": {
-        "beta": "SET_CHAT_POLL_STOP"
-      },
-      "description": "Triggerd when a chat poll ends",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "CLEAR_CHAT_HIGHLIGHT",
-      "names": {
-        "stable": "CLEAR_CHAT_HIGHLIGHT",
-        "beta": "SET_CLEAR_CHAT_HIGHLIGHT"
-      },
-      "description": "Clear any current message or clip displayed in chat highlight overlay",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "CLICKABLE_AREA_STATE",
-      "names": {
-        "beta": "SET_CLICKABLE_AREA_STATE"
-      },
-      "description": "Change the enabled state of a clickable area",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "id",
-          "type": "text",
-          "label": "Area ID",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "state",
-          "type": "json",
-          "label": "New area state",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "COUNTDOWN_ADD",
-      "names": {
-        "stable": "COUNTDOWN_ADD",
-        "beta": "SET_COUNTDOWN_ADD"
-      },
-      "description": "Add time to a countdown",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "id",
-          "type": "text",
-          "label": "Countdown ID to add time to",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "value",
-          "type": "text",
-          "label": "Value to add to the countdown.",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "CREATE_POLL",
-      "names": {
-        "stable": "CREATE_POLL"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "CREATE_PREDICTION",
-      "names": {
-        "stable": "CREATE_PREDICTION"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "CREATE_RAFFLE",
-      "names": {
-        "stable": "CREATE_RAFFLE"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "DISABLE_STT",
-      "names": {
-        "stable": "DISABLE_STT"
-      },
-      "description": "Disable the speech recognition\n### JSON param *(optional)*",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "ENABLE_STT",
-      "names": {
-        "stable": "ENABLE_STT"
-      },
-      "description": "Enabled the speech recognition to control twitchat with your voice\n### JSON param *(optional)*",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "ENDING_CREDITS_CONTROL",
-      "names": {
-        "beta": "SET_ENDING_CREDITS_CONTROL"
-      },
-      "description": "Control ending credits playback",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "prev",
-          "type": "json",
-          "label": "Go to previous section",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "next",
-          "type": "json",
-          "label": "Go to next section",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "speed",
-          "type": "number",
-          "label": "Scrolling speed multiplier (can be negative for reverse direction)",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "scrollToSectionID",
-          "type": "text",
-          "label": "Section ID to jump to",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "ENDING_CREDITS_DATA",
-      "names": {
-        "beta": "SET_ENDING_CREDITS_DATA"
-      },
-      "description": "Response with ending credits data",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "ENDING_CREDITS_PRESENCE",
-      "names": {
-        "beta": "SET_ENDING_CREDITS_PRESENCE"
-      },
-      "description": "Response with current ending credits overlay presence",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "GREET_FEED_READ",
-      "names": {
-        "stable": "GREET_FEED_READ",
-        "beta": "SET_GREET_FEED_READ"
-      },
-      "description": "Mark messages as read in the greet them feed",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "messageCount",
-          "type": "number",
-          "label": "Number of messages to mark as read",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "GREET_FEED_READ_ALL",
-      "names": {
-        "stable": "GREET_FEED_READ_ALL",
-        "beta": "SET_GREET_FEED_READ_ALL"
-      },
-      "description": "Clears the greet them feed",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "HIDE_ALERT",
-      "names": {
-        "stable": "HIDE_ALERT"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "HIDE_CHAT_ALERT",
-      "names": {
-        "beta": "SET_HIDE_CHAT_ALERT"
-      },
-      "description": "Hide current chat alert\nSee settings => chat features => Enable chat alert",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "MERGE_TOGGLE",
-      "names": {
-        "stable": "MERGE_TOGGLE",
-        "beta": "SET_MERGE_TOGGLE"
-      },
-      "description": "Toggle merge feature\nSee settings => chat features => Merge consecutive messages of a user",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "MOD_TOOLS_TOGGLE",
-      "names": {
-        "stable": "MOD_TOOLS_TOGGLE",
-        "beta": "SET_MOD_TOOLS_TOGGLE"
-      },
-      "description": "Toggle moderation tools display",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "OPEN_PREDICTION_CREATION_FORM",
-      "names": {
-        "beta": "SET_OPEN_PREDICTION_CREATION_FORM"
-      },
-      "description": "Open prediction creation form",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "PLAY_SFXR",
-      "names": {
-        "stable": "PLAY_SFXR",
-        "beta": "SET_PLAY_SFXR"
-      },
-      "description": "Play an SFXR sound",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "params",
-          "type": "text",
-          "label": "SFXR sound parameters as a string",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "volume",
-          "type": "number",
-          "label": "Volume from 0 to 100",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "POLL_CREATE",
-      "names": {
-        "stable": "POLL_CREATE"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "POLL_TOGGLE",
-      "names": {
-        "stable": "POLL_TOGGLE",
-        "beta": "SET_POLL_TOGGLE"
-      },
-      "description": "Toggle current poll display",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "PREDICTION_TOGGLE",
-      "names": {
-        "stable": "PREDICTION_TOGGLE",
-        "beta": "SET_PREDICTION_TOGGLE"
-      },
-      "description": "Toggle current prediction display",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "PROMPT_PARAMS_ACCEPT",
-      "names": {
-        "beta": "SET_PROMPT_PARAMS_ACCEPT"
-      },
-      "description": "Accept current prompt window",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "PROMPT_PARAMS_REJECT",
-      "names": {
-        "beta": "SET_PROMPT_PARAMS_REJECT"
-      },
-      "description": "Reject current prompt window",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "QNA_HIGHLIGHT",
-      "names": {
-        "stable": "QNA_HIGHLIGHT",
-        "beta": "SET_QNA_HIGHLIGHT"
-      },
-      "description": "Highlights the top most message of given Q&A session",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "id",
-          "type": "text",
-          "label": "Q&A session ID",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "QNA_SKIP",
-      "names": {
-        "stable": "QNA_SKIP",
-        "beta": "SET_QNA_SKIP"
-      },
-      "description": "Skips the top most message of given Q&A session",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "id",
-          "type": "text",
-          "label": "Q&A session ID",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
-    },
-    {
-      "key": "QUIZ_NEXT_QUESTION",
-      "names": {
-        "beta": "SET_QUIZ_NEXT_QUESTION"
-      },
-      "description": "Moves to the next question in the current quiz",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "QUIZ_REVEAL",
-      "names": {
-        "beta": "SET_QUIZ_REVEAL"
-      },
-      "description": "Reveals the answer for current quiz question",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "QUIZ_TOGGLE_LEADERBOARD",
-      "names": {
-        "beta": "SET_QUIZ_TOGGLE_LEADERBOARD"
-      },
-      "description": "Toggle quiz leaderboard display",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "RAFFLE_END",
-      "names": {
-        "stable": "RAFFLE_END"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "RAFFLE_PICK_WINNER",
-      "names": {
-        "stable": "RAFFLE_PICK_WINNER",
-        "beta": "SET_RAFFLE_PICK_WINNER"
-      },
-      "description": "Pick a winner for the first active raffle.\nIf multiple raffles are active, only the first one started will be considered.",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "RAFFLE_START",
-      "names": {
-        "stable": "RAFFLE_START"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
-      "fields": []
-    },
-    {
-      "key": "RAFFLE_TOGGLE",
-      "names": {
-        "stable": "RAFFLE_TOGGLE",
-        "beta": "SET_RAFFLE_TOGGLE"
-      },
-      "description": "Toggle current raffle display",
-      "priority": null,
-      "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "SEND_CUSTOM_CHAT_MESSAGE",
-      "names": {
-        "beta": "SET_SEND_CUSTOM_CHAT_MESSAGE"
-      },
-      "description": "Send a custom message to the chat feed with optional styling and actions",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "message",
-          "type": "text",
-          "label": "Message to display",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "canClose",
-          "type": "switch",
-          "label": "Defines if the close button should be displayed",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "todayFirst",
-          "type": "switch",
-          "label": "Defines if the message should be displayed on the \"greet them\" section",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "user",
-          "type": "json",
-          "label": "User info",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "col",
-          "type": "number",
-          "label": "Column index to display the message to",
-          "labelKey": null,
-          "required": false,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "icon",
-          "type": "select",
-          "label": "Button icon see list of values above",
-          "labelKey": null,
           "required": false,
           "options": [
             {
@@ -2702,10 +1001,21 @@
           "fields": null
         },
         {
-          "path": "highlightColor",
+          "path": "user.name",
           "type": "text",
-          "label": "Color of the message for \"highlight\" style",
-          "labelKey": null,
+          "label": "Author",
+          "labelKey": "twitchat.field.author",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": "Catapult",
+          "fields": null
+        },
+        {
+          "path": "user.color",
+          "type": "text",
+          "label": "Author color",
+          "labelKey": "twitchat.field.author_color",
           "required": false,
           "options": null,
           "source": null,
@@ -2713,47 +1023,1340 @@
           "fields": null
         },
         {
-          "path": "style",
-          "type": "select",
-          "label": "Message style",
-          "labelKey": null,
+          "path": "col",
+          "type": "number",
+          "label": "Column",
+          "labelKey": "twitchat.field.col",
           "required": false,
-          "options": [
-            {
-              "value": "message",
-              "label": "message",
-              "labelKey": null
-            },
-            {
-              "value": "highlight",
-              "label": "highlight",
-              "labelKey": null
-            },
-            {
-              "value": "error",
-              "label": "error",
-              "labelKey": null
-            }
-          ],
+          "options": null,
           "source": null,
           "defaultValue": null,
           "fields": null
         },
         {
-          "path": "quote",
-          "type": "text",
-          "label": "Option quote displayed in a dedicated holder",
-          "labelKey": null,
+          "path": "todayFirst",
+          "type": "switch",
+          "label": "Show in Greet them",
+          "labelKey": "twitchat.field.today_first",
           "required": false,
           "options": null,
           "source": null,
           "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "canClose",
+          "type": "switch",
+          "label": "Closable",
+          "labelKey": "twitchat.field.can_close",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": true,
           "fields": null
         },
         {
           "path": "actions",
-          "type": "json",
-          "label": "buttons to add",
+          "type": "repeater",
+          "label": "Buttons",
+          "labelKey": "twitchat.field.buttons",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": [
+            {
+              "path": null,
+              "type": "catapult-action",
+              "label": "Catapult action",
+              "labelKey": "twitchat.field.button.catapult_action",
+              "required": false,
+              "options": null,
+              "source": null,
+              "defaultValue": null,
+              "fields": null
+            },
+            {
+              "path": "label",
+              "type": "text",
+              "label": "Label",
+              "labelKey": "twitchat.field.button.label",
+              "required": true,
+              "options": null,
+              "source": null,
+              "defaultValue": null,
+              "fields": null
+            },
+            {
+              "path": "icon",
+              "type": "select",
+              "label": "Icon",
+              "labelKey": "twitchat.field.button.icon",
+              "required": false,
+              "options": [
+                {
+                  "value": "ad",
+                  "label": "ad",
+                  "labelKey": null
+                },
+                {
+                  "value": "add",
+                  "label": "add",
+                  "labelKey": null
+                },
+                {
+                  "value": "alert",
+                  "label": "alert",
+                  "labelKey": null
+                },
+                {
+                  "value": "animate",
+                  "label": "animate",
+                  "labelKey": null
+                },
+                {
+                  "value": "announcement",
+                  "label": "announcement",
+                  "labelKey": null
+                },
+                {
+                  "value": "anon",
+                  "label": "anon",
+                  "labelKey": null
+                },
+                {
+                  "value": "api",
+                  "label": "api",
+                  "labelKey": null
+                },
+                {
+                  "value": "automod",
+                  "label": "automod",
+                  "labelKey": null
+                },
+                {
+                  "value": "badge",
+                  "label": "badge",
+                  "labelKey": null
+                },
+                {
+                  "value": "ban",
+                  "label": "ban",
+                  "labelKey": null
+                },
+                {
+                  "value": "bingo",
+                  "label": "bingo",
+                  "labelKey": null
+                },
+                {
+                  "value": "bits",
+                  "label": "bits",
+                  "labelKey": null
+                },
+                {
+                  "value": "block",
+                  "label": "block",
+                  "labelKey": null
+                },
+                {
+                  "value": "boost",
+                  "label": "boost",
+                  "labelKey": null
+                },
+                {
+                  "value": "bot",
+                  "label": "bot",
+                  "labelKey": null
+                },
+                {
+                  "value": "broadcast",
+                  "label": "broadcast",
+                  "labelKey": null
+                },
+                {
+                  "value": "broadcaster",
+                  "label": "broadcaster",
+                  "labelKey": null
+                },
+                {
+                  "value": "change",
+                  "label": "change",
+                  "labelKey": null
+                },
+                {
+                  "value": "channelPoints",
+                  "label": "channelPoints",
+                  "labelKey": null
+                },
+                {
+                  "value": "chatCommand",
+                  "label": "chatCommand",
+                  "labelKey": null
+                },
+                {
+                  "value": "chatPoll",
+                  "label": "chatPoll",
+                  "labelKey": null
+                },
+                {
+                  "value": "checkmark",
+                  "label": "checkmark",
+                  "labelKey": null
+                },
+                {
+                  "value": "clearChat",
+                  "label": "clearChat",
+                  "labelKey": null
+                },
+                {
+                  "value": "click",
+                  "label": "click",
+                  "labelKey": null
+                },
+                {
+                  "value": "clip",
+                  "label": "clip",
+                  "labelKey": null
+                },
+                {
+                  "value": "coffee",
+                  "label": "coffee",
+                  "labelKey": null
+                },
+                {
+                  "value": "coin",
+                  "label": "coin",
+                  "labelKey": null
+                },
+                {
+                  "value": "color",
+                  "label": "color",
+                  "labelKey": null
+                },
+                {
+                  "value": "commands",
+                  "label": "commands",
+                  "labelKey": null
+                },
+                {
+                  "value": "conversation",
+                  "label": "conversation",
+                  "labelKey": null
+                },
+                {
+                  "value": "copy",
+                  "label": "copy",
+                  "labelKey": null
+                },
+                {
+                  "value": "count",
+                  "label": "count",
+                  "labelKey": null
+                },
+                {
+                  "value": "countdown",
+                  "label": "countdown",
+                  "labelKey": null
+                },
+                {
+                  "value": "credits",
+                  "label": "credits",
+                  "labelKey": null
+                },
+                {
+                  "value": "cross",
+                  "label": "cross",
+                  "labelKey": null
+                },
+                {
+                  "value": "date",
+                  "label": "date",
+                  "labelKey": null
+                },
+                {
+                  "value": "debug",
+                  "label": "debug",
+                  "labelKey": null
+                },
+                {
+                  "value": "delete",
+                  "label": "delete",
+                  "labelKey": null
+                },
+                {
+                  "value": "dice",
+                  "label": "dice",
+                  "labelKey": null
+                },
+                {
+                  "value": "discord",
+                  "label": "discord",
+                  "labelKey": null
+                },
+                {
+                  "value": "donor",
+                  "label": "donor",
+                  "labelKey": null
+                },
+                {
+                  "value": "download",
+                  "label": "download",
+                  "labelKey": null
+                },
+                {
+                  "value": "dragZone",
+                  "label": "dragZone",
+                  "labelKey": null
+                },
+                {
+                  "value": "easing",
+                  "label": "easing",
+                  "labelKey": null
+                },
+                {
+                  "value": "edit",
+                  "label": "edit",
+                  "labelKey": null
+                },
+                {
+                  "value": "elevated",
+                  "label": "elevated",
+                  "labelKey": null
+                },
+                {
+                  "value": "elgato",
+                  "label": "elgato",
+                  "labelKey": null
+                },
+                {
+                  "value": "emergency",
+                  "label": "emergency",
+                  "labelKey": null
+                },
+                {
+                  "value": "emote",
+                  "label": "emote",
+                  "labelKey": null
+                },
+                {
+                  "value": "enter",
+                  "label": "enter",
+                  "labelKey": null
+                },
+                {
+                  "value": "filters",
+                  "label": "filters",
+                  "labelKey": null
+                },
+                {
+                  "value": "firstTime",
+                  "label": "firstTime",
+                  "labelKey": null
+                },
+                {
+                  "value": "fix",
+                  "label": "fix",
+                  "labelKey": null
+                },
+                {
+                  "value": "follow",
+                  "label": "follow",
+                  "labelKey": null
+                },
+                {
+                  "value": "follow_outline",
+                  "label": "follow_outline",
+                  "labelKey": null
+                },
+                {
+                  "value": "font",
+                  "label": "font",
+                  "labelKey": null
+                },
+                {
+                  "value": "fontSize",
+                  "label": "fontSize",
+                  "labelKey": null
+                },
+                {
+                  "value": "fullscreen",
+                  "label": "fullscreen",
+                  "labelKey": null
+                },
+                {
+                  "value": "gift",
+                  "label": "gift",
+                  "labelKey": null
+                },
+                {
+                  "value": "github",
+                  "label": "github",
+                  "labelKey": null
+                },
+                {
+                  "value": "goxlr",
+                  "label": "goxlr",
+                  "labelKey": null
+                },
+                {
+                  "value": "goxlr_bleep",
+                  "label": "goxlr_bleep",
+                  "labelKey": null
+                },
+                {
+                  "value": "goxlr_fx",
+                  "label": "goxlr_fx",
+                  "labelKey": null
+                },
+                {
+                  "value": "hand",
+                  "label": "hand",
+                  "labelKey": null
+                },
+                {
+                  "value": "heat",
+                  "label": "heat",
+                  "labelKey": null
+                },
+                {
+                  "value": "help",
+                  "label": "help",
+                  "labelKey": null
+                },
+                {
+                  "value": "hide",
+                  "label": "hide",
+                  "labelKey": null
+                },
+                {
+                  "value": "highlight",
+                  "label": "highlight",
+                  "labelKey": null
+                },
+                {
+                  "value": "history",
+                  "label": "history",
+                  "labelKey": null
+                },
+                {
+                  "value": "hypeChat",
+                  "label": "hypeChat",
+                  "labelKey": null
+                },
+                {
+                  "value": "idea",
+                  "label": "idea",
+                  "labelKey": null
+                },
+                {
+                  "value": "info",
+                  "label": "info",
+                  "labelKey": null
+                },
+                {
+                  "value": "internet",
+                  "label": "internet",
+                  "labelKey": null
+                },
+                {
+                  "value": "kofi",
+                  "label": "kofi",
+                  "labelKey": null
+                },
+                {
+                  "value": "leave",
+                  "label": "leave",
+                  "labelKey": null
+                },
+                {
+                  "value": "list",
+                  "label": "list",
+                  "labelKey": null
+                },
+                {
+                  "value": "live",
+                  "label": "live",
+                  "labelKey": null
+                },
+                {
+                  "value": "loader",
+                  "label": "loader",
+                  "labelKey": null
+                },
+                {
+                  "value": "lock",
+                  "label": "lock",
+                  "labelKey": null
+                },
+                {
+                  "value": "loop",
+                  "label": "loop",
+                  "labelKey": null
+                },
+                {
+                  "value": "magnet",
+                  "label": "magnet",
+                  "labelKey": null
+                },
+                {
+                  "value": "markRead",
+                  "label": "markRead",
+                  "labelKey": null
+                },
+                {
+                  "value": "max",
+                  "label": "max",
+                  "labelKey": null
+                },
+                {
+                  "value": "merge",
+                  "label": "merge",
+                  "labelKey": null
+                },
+                {
+                  "value": "microphone",
+                  "label": "microphone",
+                  "labelKey": null
+                },
+                {
+                  "value": "microphone_mute",
+                  "label": "microphone_mute",
+                  "labelKey": null
+                },
+                {
+                  "value": "microphone_recording",
+                  "label": "microphone_recording",
+                  "labelKey": null
+                },
+                {
+                  "value": "min",
+                  "label": "min",
+                  "labelKey": null
+                },
+                {
+                  "value": "minus",
+                  "label": "minus",
+                  "labelKey": null
+                },
+                {
+                  "value": "mod",
+                  "label": "mod",
+                  "labelKey": null
+                },
+                {
+                  "value": "move",
+                  "label": "move",
+                  "labelKey": null
+                },
+                {
+                  "value": "music",
+                  "label": "music",
+                  "labelKey": null
+                },
+                {
+                  "value": "mute",
+                  "label": "mute",
+                  "labelKey": null
+                },
+                {
+                  "value": "newtab",
+                  "label": "newtab",
+                  "labelKey": null
+                },
+                {
+                  "value": "next",
+                  "label": "next",
+                  "labelKey": null
+                },
+                {
+                  "value": "noMusic",
+                  "label": "noMusic",
+                  "labelKey": null
+                },
+                {
+                  "value": "notification",
+                  "label": "notification",
+                  "labelKey": null
+                },
+                {
+                  "value": "number",
+                  "label": "number",
+                  "labelKey": null
+                },
+                {
+                  "value": "obs",
+                  "label": "obs",
+                  "labelKey": null
+                },
+                {
+                  "value": "offline",
+                  "label": "offline",
+                  "labelKey": null
+                },
+                {
+                  "value": "online",
+                  "label": "online",
+                  "labelKey": null
+                },
+                {
+                  "value": "orderable",
+                  "label": "orderable",
+                  "labelKey": null
+                },
+                {
+                  "value": "overlay",
+                  "label": "overlay",
+                  "labelKey": null
+                },
+                {
+                  "value": "params",
+                  "label": "params",
+                  "labelKey": null
+                },
+                {
+                  "value": "partner",
+                  "label": "partner",
+                  "labelKey": null
+                },
+                {
+                  "value": "patreon",
+                  "label": "patreon",
+                  "labelKey": null
+                },
+                {
+                  "value": "pause",
+                  "label": "pause",
+                  "labelKey": null
+                },
+                {
+                  "value": "paypal",
+                  "label": "paypal",
+                  "labelKey": null
+                },
+                {
+                  "value": "pin",
+                  "label": "pin",
+                  "labelKey": null
+                },
+                {
+                  "value": "pipette",
+                  "label": "pipette",
+                  "labelKey": null
+                },
+                {
+                  "value": "placeholder",
+                  "label": "placeholder",
+                  "labelKey": null
+                },
+                {
+                  "value": "play",
+                  "label": "play",
+                  "labelKey": null
+                },
+                {
+                  "value": "poll",
+                  "label": "poll",
+                  "labelKey": null
+                },
+                {
+                  "value": "polygon",
+                  "label": "polygon",
+                  "labelKey": null
+                },
+                {
+                  "value": "prediction",
+                  "label": "prediction",
+                  "labelKey": null
+                },
+                {
+                  "value": "premium",
+                  "label": "premium",
+                  "labelKey": null
+                },
+                {
+                  "value": "presentation",
+                  "label": "presentation",
+                  "labelKey": null
+                },
+                {
+                  "value": "press",
+                  "label": "press",
+                  "labelKey": null
+                },
+                {
+                  "value": "prev",
+                  "label": "prev",
+                  "labelKey": null
+                },
+                {
+                  "value": "prime",
+                  "label": "prime",
+                  "labelKey": null
+                },
+                {
+                  "value": "pros",
+                  "label": "pros",
+                  "labelKey": null
+                },
+                {
+                  "value": "qna",
+                  "label": "qna",
+                  "labelKey": null
+                },
+                {
+                  "value": "raid",
+                  "label": "raid",
+                  "labelKey": null
+                },
+                {
+                  "value": "read",
+                  "label": "read",
+                  "labelKey": null
+                },
+                {
+                  "value": "refresh",
+                  "label": "refresh",
+                  "labelKey": null
+                },
+                {
+                  "value": "reply",
+                  "label": "reply",
+                  "labelKey": null
+                },
+                {
+                  "value": "returning",
+                  "label": "returning",
+                  "labelKey": null
+                },
+                {
+                  "value": "reward_highlight",
+                  "label": "reward_highlight",
+                  "labelKey": null
+                },
+                {
+                  "value": "rightClick",
+                  "label": "rightClick",
+                  "labelKey": null
+                },
+                {
+                  "value": "rotate",
+                  "label": "rotate",
+                  "labelKey": null
+                },
+                {
+                  "value": "save",
+                  "label": "save",
+                  "labelKey": null
+                },
+                {
+                  "value": "scale",
+                  "label": "scale",
+                  "labelKey": null
+                },
+                {
+                  "value": "scroll",
+                  "label": "scroll",
+                  "labelKey": null
+                },
+                {
+                  "value": "scrollDown",
+                  "label": "scrollDown",
+                  "labelKey": null
+                },
+                {
+                  "value": "scrollUp",
+                  "label": "scrollUp",
+                  "labelKey": null
+                },
+                {
+                  "value": "search",
+                  "label": "search",
+                  "labelKey": null
+                },
+                {
+                  "value": "shadow",
+                  "label": "shadow",
+                  "labelKey": null
+                },
+                {
+                  "value": "shield",
+                  "label": "shield",
+                  "labelKey": null
+                },
+                {
+                  "value": "shieldMode",
+                  "label": "shieldMode",
+                  "labelKey": null
+                },
+                {
+                  "value": "shoutout",
+                  "label": "shoutout",
+                  "labelKey": null
+                },
+                {
+                  "value": "show",
+                  "label": "show",
+                  "labelKey": null
+                },
+                {
+                  "value": "skip",
+                  "label": "skip",
+                  "labelKey": null
+                },
+                {
+                  "value": "slow",
+                  "label": "slow",
+                  "labelKey": null
+                },
+                {
+                  "value": "spotify",
+                  "label": "spotify",
+                  "labelKey": null
+                },
+                {
+                  "value": "stars",
+                  "label": "stars",
+                  "labelKey": null
+                },
+                {
+                  "value": "stop",
+                  "label": "stop",
+                  "labelKey": null
+                },
+                {
+                  "value": "sub",
+                  "label": "sub",
+                  "labelKey": null
+                },
+                {
+                  "value": "test",
+                  "label": "test",
+                  "labelKey": null
+                },
+                {
+                  "value": "thickness",
+                  "label": "thickness",
+                  "labelKey": null
+                },
+                {
+                  "value": "ticket",
+                  "label": "ticket",
+                  "labelKey": null
+                },
+                {
+                  "value": "tiktok",
+                  "label": "tiktok",
+                  "labelKey": null
+                },
+                {
+                  "value": "timeout",
+                  "label": "timeout",
+                  "labelKey": null
+                },
+                {
+                  "value": "timer",
+                  "label": "timer",
+                  "labelKey": null
+                },
+                {
+                  "value": "train",
+                  "label": "train",
+                  "labelKey": null
+                },
+                {
+                  "value": "train_boost",
+                  "label": "train_boost",
+                  "labelKey": null
+                },
+                {
+                  "value": "translate",
+                  "label": "translate",
+                  "labelKey": null
+                },
+                {
+                  "value": "trash",
+                  "label": "trash",
+                  "labelKey": null
+                },
+                {
+                  "value": "tts",
+                  "label": "tts",
+                  "labelKey": null
+                },
+                {
+                  "value": "twitch",
+                  "label": "twitch",
+                  "labelKey": null
+                },
+                {
+                  "value": "twitchat",
+                  "label": "twitchat",
+                  "labelKey": null
+                },
+                {
+                  "value": "twitter",
+                  "label": "twitter",
+                  "labelKey": null
+                },
+                {
+                  "value": "ulule",
+                  "label": "ulule",
+                  "labelKey": null
+                },
+                {
+                  "value": "unban",
+                  "label": "unban",
+                  "labelKey": null
+                },
+                {
+                  "value": "unblock",
+                  "label": "unblock",
+                  "labelKey": null
+                },
+                {
+                  "value": "unfollow",
+                  "label": "unfollow",
+                  "labelKey": null
+                },
+                {
+                  "value": "unlock",
+                  "label": "unlock",
+                  "labelKey": null
+                },
+                {
+                  "value": "unmod",
+                  "label": "unmod",
+                  "labelKey": null
+                },
+                {
+                  "value": "unmute",
+                  "label": "unmute",
+                  "labelKey": null
+                },
+                {
+                  "value": "unpin",
+                  "label": "unpin",
+                  "labelKey": null
+                },
+                {
+                  "value": "unvip",
+                  "label": "unvip",
+                  "labelKey": null
+                },
+                {
+                  "value": "update",
+                  "label": "update",
+                  "labelKey": null
+                },
+                {
+                  "value": "upload",
+                  "label": "upload",
+                  "labelKey": null
+                },
+                {
+                  "value": "url",
+                  "label": "url",
+                  "labelKey": null
+                },
+                {
+                  "value": "user",
+                  "label": "user",
+                  "labelKey": null
+                },
+                {
+                  "value": "vibrate",
+                  "label": "vibrate",
+                  "labelKey": null
+                },
+                {
+                  "value": "vip",
+                  "label": "vip",
+                  "labelKey": null
+                },
+                {
+                  "value": "voice",
+                  "label": "voice",
+                  "labelKey": null
+                },
+                {
+                  "value": "voicemod",
+                  "label": "voicemod",
+                  "labelKey": null
+                },
+                {
+                  "value": "volume",
+                  "label": "volume",
+                  "labelKey": null
+                },
+                {
+                  "value": "watchStreak",
+                  "label": "watchStreak",
+                  "labelKey": null
+                },
+                {
+                  "value": "whispers",
+                  "label": "whispers",
+                  "labelKey": null
+                },
+                {
+                  "value": "youtube",
+                  "label": "youtube",
+                  "labelKey": null
+                }
+              ],
+              "source": null,
+              "defaultValue": null,
+              "fields": null
+            },
+            {
+              "path": "theme",
+              "type": "select",
+              "label": "Theme",
+              "labelKey": "twitchat.field.button.theme",
+              "required": false,
+              "source": null,
+              "defaultValue": "default",
+              "fields": null,
+              "options": [
+                {
+                  "value": "default",
+                  "label": "default",
+                  "labelKey": null
+                },
+                {
+                  "value": "primary",
+                  "label": "primary",
+                  "labelKey": null
+                },
+                {
+                  "value": "secondary",
+                  "label": "secondary",
+                  "labelKey": null
+                },
+                {
+                  "value": "alert",
+                  "label": "alert",
+                  "labelKey": null
+                }
+              ]
+            },
+            {
+              "path": "actionType",
+              "type": "select",
+              "label": "Type",
+              "labelKey": "twitchat.field.button.type",
+              "required": true,
+              "source": null,
+              "defaultValue": "url",
+              "fields": null,
+              "options": [
+                {
+                  "value": "url",
+                  "label": "url",
+                  "labelKey": "twitchat.field.button.type.url"
+                },
+                {
+                  "value": "trigger",
+                  "label": "trigger",
+                  "labelKey": "twitchat.field.button.type.trigger"
+                },
+                {
+                  "value": "message",
+                  "label": "message",
+                  "labelKey": "twitchat.field.button.type.message"
+                },
+                {
+                  "value": "discord",
+                  "label": "discord",
+                  "labelKey": "twitchat.field.button.type.discord"
+                }
+              ]
+            },
+            {
+              "path": "url",
+              "type": "text",
+              "label": "URL",
+              "labelKey": "twitchat.field.button.url",
+              "required": false,
+              "options": null,
+              "source": null,
+              "defaultValue": null,
+              "fields": null,
+              "showIf": {
+                "path": "actionType",
+                "values": [
+                  "url"
+                ]
+              }
+            },
+            {
+              "path": "urlTarget",
+              "type": "text",
+              "label": "URL target",
+              "labelKey": "twitchat.field.button.url_target",
+              "required": false,
+              "options": null,
+              "source": null,
+              "defaultValue": null,
+              "fields": null,
+              "showIf": {
+                "path": "actionType",
+                "values": [
+                  "url"
+                ]
+              }
+            },
+            {
+              "path": "triggerId",
+              "type": "select",
+              "label": "Trigger",
+              "labelKey": "twitchat.field.button.trigger",
+              "required": false,
+              "options": null,
+              "defaultValue": null,
+              "fields": null,
+              "source": {
+                "stable": "TRIGGERS_GET_ALL",
+                "beta": "GET_TRIGGER_LIST"
+              },
+              "showIf": {
+                "path": "actionType",
+                "values": [
+                  "trigger"
+                ]
+              }
+            },
+            {
+              "path": "message",
+              "type": "text",
+              "label": "Chat message",
+              "labelKey": "twitchat.field.button.message",
+              "required": false,
+              "options": null,
+              "source": null,
+              "defaultValue": null,
+              "fields": null,
+              "showIf": {
+                "path": "actionType",
+                "values": [
+                  "message",
+                  "discord"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "EXECUTE_TRIGGER",
+      "names": {
+        "stable": "EXECUTE_TRIGGER",
+        "beta": "SET_EXECUTE_TRIGGER"
+      },
+      "description": "Execute a specific trigger manually",
+      "priority": 2,
+      "kind": "action",
+      "form": "override",
+      "fields": [
+        {
+          "path": "id",
+          "type": "select",
+          "label": "Trigger",
+          "labelKey": "twitchat.field.trigger",
+          "required": true,
+          "options": null,
+          "defaultValue": null,
+          "fields": null,
+          "source": {
+            "stable": "TRIGGERS_GET_ALL",
+            "beta": "GET_TRIGGER_LIST"
+          }
+        }
+      ]
+    },
+    {
+      "key": "SEND_MESSAGE",
+      "names": {
+        "stable": "SEND_MESSAGE",
+        "beta": "SET_SEND_MESSAGE"
+      },
+      "description": "Send a message to chat",
+      "priority": 3,
+      "kind": "action",
+      "form": "override",
+      "fields": [
+        {
+          "path": "message",
+          "type": "textarea",
+          "label": "Message",
+          "labelKey": "twitchat.field.message",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "COUNTER_ADD",
+      "names": {
+        "stable": "COUNTER_ADD",
+        "beta": "SET_COUNTER_ADD"
+      },
+      "description": "Add a value to a counter",
+      "priority": 4,
+      "kind": "action",
+      "form": "override",
+      "fields": [
+        {
+          "path": "id",
+          "type": "select",
+          "label": "Counter",
+          "labelKey": "twitchat.field.counter",
+          "required": true,
+          "options": null,
+          "defaultValue": null,
+          "fields": null,
+          "source": {
+            "stable": "COUNTER_GET_ALL",
+            "beta": "GET_ALL_COUNTERS"
+          }
+        },
+        {
+          "path": "action",
+          "type": "select",
+          "label": "Operation",
+          "labelKey": "twitchat.field.counter_action",
+          "required": true,
+          "source": null,
+          "defaultValue": "ADD",
+          "fields": null,
+          "options": [
+            {
+              "value": "ADD",
+              "label": "ADD",
+              "labelKey": "twitchat.field.counter_action.add"
+            },
+            {
+              "value": "DEL",
+              "label": "DEL",
+              "labelKey": "twitchat.field.counter_action.del"
+            },
+            {
+              "value": "SET",
+              "label": "SET",
+              "labelKey": "twitchat.field.counter_action.set"
+            }
+          ]
+        },
+        {
+          "path": "value",
+          "type": "text",
+          "label": "Value",
+          "labelKey": "twitchat.field.counter_value",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": "1",
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "ANIMATED_TEXT_CLOSE",
+      "names": {
+        "stable": "ANIMATED_TEXT_CLOSE"
+      },
+      "description": "Hide an animated text overlay's text",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": [
+        {
+          "path": "overlayId",
+          "type": "text",
+          "label": "Overlay ID",
+          "labelKey": "twitchat.field.overlay_id",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "queryId",
+          "type": "text",
+          "label": "Query ID",
+          "labelKey": "twitchat.field.query_id",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "ANIMATED_TEXT_CONTENT",
+      "names": {
+        "beta": "SET_ANIMATED_TEXT_CONTENT"
+      },
+      "description": "Set text content for an animated text overlay",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Overlay ID to send the text to",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "queryId",
+          "type": "text",
+          "label": "Query ID to identify this text set action",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "text",
+          "type": "text",
+          "label": "Text to display",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "autoHide",
+          "type": "switch",
+          "label": "Auto hide after showing.",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "bypassAll",
+          "type": "switch",
+          "label": "Hides current text immediately, bypassing any hide animation, empty the",
           "labelKey": null,
           "required": false,
           "options": null,
@@ -2764,6 +2367,2022 @@
       ]
     },
     {
+      "key": "ANIMATED_TEXT_CONTENT_FROM_SD",
+      "names": {
+        "beta": "SET_ANIMATED_TEXT_CONTENT_FROM_SD"
+      },
+      "description": "Alias of SET_ANIMATED_TEXT_CONTENT but that's listend by Twitchat.\nTwitchat will then broadcast SET_ANIMATED_TEXT_CONTENT to the overlay.\nThis way SD can send animated text to the overlay even though it's not\ndirectly connected to it.",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Overlay ID to send the text to",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "queryId",
+          "type": "text",
+          "label": "Query ID to identify this text set action",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "text",
+          "type": "text",
+          "label": "Text to display",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "autoHide",
+          "type": "switch",
+          "label": "Auto hide after showing.",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "bypassAll",
+          "type": "switch",
+          "label": "Hides current text immediately, bypassing any hide animation, empty the",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "ANIMATED_TEXT_SET",
+      "names": {
+        "stable": "ANIMATED_TEXT_SET"
+      },
+      "description": "Set text content for an animated text overlay",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": [
+        {
+          "path": "overlayId",
+          "type": "text",
+          "label": "Overlay ID",
+          "labelKey": "twitchat.field.overlay_id",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "queryId",
+          "type": "text",
+          "label": "Query ID",
+          "labelKey": "twitchat.field.query_id",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "text",
+          "type": "textarea",
+          "label": "Text",
+          "labelKey": "twitchat.field.text",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "autoHide",
+          "type": "switch",
+          "label": "Auto hide",
+          "labelKey": "twitchat.field.auto_hide",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "bypassAll",
+          "type": "switch",
+          "label": "Replace the current text immediately",
+          "labelKey": "twitchat.field.bypass_all",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "AUTOMOD_ACCEPT",
+      "names": {
+        "stable": "AUTOMOD_ACCEPT",
+        "beta": "SET_AUTOMOD_ACCEPT"
+      },
+      "description": "Accept latest message held by automod",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "AUTOMOD_REJECT",
+      "names": {
+        "stable": "AUTOMOD_REJECT",
+        "beta": "SET_AUTOMOD_REJECT"
+      },
+      "description": "Reject latest message held by automod",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "BINGO_GRID_OVERLAY_PRESENCE",
+      "names": {
+        "beta": "SET_BINGO_GRID_OVERLAY_PRESENCE"
+      },
+      "description": "Advertise bingo grid overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "BINGO_GRID_STATE",
+      "names": {
+        "beta": "SET_BINGO_GRID_STATE"
+      },
+      "description": "Enable or disable a specific bingo grid",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Grid ID to change state of",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "forcedState",
+          "type": "switch",
+          "label": "Force grid state:",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "BINGO_GRID_VISIBILITY",
+      "names": {
+        "beta": "SET_BINGO_GRID_VISIBILITY"
+      },
+      "description": "Set bingo grid visibility",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "show",
+          "type": "switch",
+          "label": "Show or hide the bingo grid",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "BINGO_GRID_VISIBILITY_FROM_SD",
+      "names": {
+        "beta": "SET_BINGO_GRID_VISIBILITY_FROM_SD"
+      },
+      "description": "Alias of SET_BINGO_GRID_VISIBILITY but that's listend by Twitchat.\nTwitchat will then broadcast SET_BINGO_GRID_VISIBILITY to the overlay.\nThis way SD can change bingo grid visibility even though it's not\ndirectly connected to it.",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "show",
+          "type": "switch",
+          "label": "Show or hide the bingo grid",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "BINGO_TOGGLE",
+      "names": {
+        "stable": "BINGO_TOGGLE",
+        "beta": "SET_BINGO_TOGGLE"
+      },
+      "description": "Toggle current bingo display (NOT bingo GRID!)",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "CENSOR_DELETED_MESSAGES_TOGGLE",
+      "names": {
+        "stable": "CENSOR_DELETED_MESSAGES_TOGGLE",
+        "beta": "SET_CENSOR_DELETED_MESSAGES_TOGGLE"
+      },
+      "description": "Toggle censorship of deleted messages",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "CHAT_FEED_PAUSE",
+      "names": {
+        "stable": "CHAT_FEED_PAUSE",
+        "beta": "SET_CHAT_FEED_PAUSE_STATE"
+      },
+      "description": "Pause auto-scrolling in a chat feed",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "pause",
+          "type": "switch",
+          "label": "Force paused state",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_READ",
+      "names": {
+        "stable": "CHAT_FEED_READ",
+        "beta": "SET_CHAT_FEED_READ"
+      },
+      "description": "Move read marker in chat feed",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "count",
+          "type": "number",
+          "label": "Number of messages to read",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_READ_ALL",
+      "names": {
+        "stable": "CHAT_FEED_READ_ALL",
+        "beta": "SET_CHAT_FEED_READ_ALL"
+      },
+      "description": "Mark all messages as read in a chat feed",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SCROLL",
+      "names": {
+        "stable": "CHAT_FEED_SCROLL",
+        "beta": "SET_CHAT_FEED_SCROLL"
+      },
+      "description": "Scroll a chat feed by a specific amount",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "scrollBy",
+          "type": "number",
+          "label": "Number of pixels to scroll by.",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "mode",
+          "type": "select",
+          "label": "Scroll mode.",
+          "labelKey": null,
+          "required": true,
+          "options": [
+            {
+              "value": "messages",
+              "label": "messages",
+              "labelKey": null
+            },
+            {
+              "value": "pixels",
+              "label": "pixels",
+              "labelKey": null
+            }
+          ],
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SCROLL_BOTTOM",
+      "names": {
+        "stable": "CHAT_FEED_SCROLL_BOTTOM",
+        "beta": "SET_CHAT_FEED_SCROLL_BOTTOM"
+      },
+      "description": "Scroll a chat feed to the bottom",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SCROLL_DOWN",
+      "names": {
+        "stable": "CHAT_FEED_SCROLL_DOWN"
+      },
+      "description": "Scroll the chat feed down by the number of pixels specified in the `scrollBy` value.\n*Default value = 100*\n### JSON param *(optional)*",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "CHAT_FEED_SCROLL_UP",
+      "names": {
+        "stable": "CHAT_FEED_SCROLL_UP"
+      },
+      "description": "Scroll the chat feed up by the number of pixels specified in the `scrollBy` value.\n*Default value = 100*\n### JSON param *(optional)*",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "CHAT_FEED_SELECT",
+      "names": {
+        "stable": "CHAT_FEED_SELECT",
+        "beta": "SET_CHAT_FEED_SELECT"
+      },
+      "description": "Move message selection in a chat feed",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "direction",
+          "type": "number",
+          "label": "Direction to move selection",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SELECT_ACTION_BAN",
+      "names": {
+        "stable": "CHAT_FEED_SELECT_ACTION_BAN",
+        "beta": "SET_CHAT_FEED_SELECT_ACTION_BAN"
+      },
+      "description": "Ban the user of the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "duration",
+          "type": "number",
+          "label": "Optional ban duration in seconds.",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SELECT_ACTION_CANCEL",
+      "names": {
+        "stable": "CHAT_FEED_SELECT_ACTION_CANCEL",
+        "beta": "SET_CHAT_FEED_SELECT_ACTION_CANCEL"
+      },
+      "description": "Cancel the action selection for the currently selected message in a chat feed",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SELECT_ACTION_DELETE",
+      "names": {
+        "stable": "CHAT_FEED_SELECT_ACTION_DELETE",
+        "beta": "SET_CHAT_FEED_SELECT_ACTION_DELETE"
+      },
+      "description": "Delete the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SELECT_ACTION_HIGHLIGHT",
+      "names": {
+        "stable": "CHAT_FEED_SELECT_ACTION_HIGHLIGHT",
+        "beta": "SET_CHAT_FEED_SELECT_ACTION_HIGHLIGHT"
+      },
+      "description": "Highlight the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SELECT_ACTION_PIN",
+      "names": {
+        "stable": "CHAT_FEED_SELECT_ACTION_PIN"
+      },
+      "description": "Pin the currently selected message in a chat feed",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column",
+          "labelKey": "twitchat.field.col",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SELECT_ACTION_SAVE",
+      "names": {
+        "beta": "SET_CHAT_FEED_SELECT_ACTION_SAVE"
+      },
+      "description": "Save the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SELECT_ACTION_SHOUTOUT",
+      "names": {
+        "stable": "CHAT_FEED_SELECT_ACTION_SHOUTOUT",
+        "beta": "SET_CHAT_FEED_SELECT_ACTION_SHOUTOUT"
+      },
+      "description": "Shoutout the user of the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_SELECT_CHOOSING_ACTION",
+      "names": {
+        "stable": "CHAT_FEED_SELECT_CHOOSING_ACTION",
+        "beta": "SET_CHAT_FEED_SELECT_CHOOSING_ACTION"
+      },
+      "description": "Open action chooser for the currently selected message in a chat feed\nFirst select a message with SET_CHAT_FEED_SELECT",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "colIndex",
+          "type": "number",
+          "label": "Column index",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_FEED_UNPAUSE",
+      "names": {
+        "stable": "CHAT_FEED_UNPAUSE"
+      },
+      "description": "Resumes the chat by scrolling back to bottom\n### JSON param",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "CHAT_HIGHLIGHT_OVERLAY_CLIP",
+      "names": {
+        "beta": "SET_CHAT_HIGHLIGHT_OVERLAY_CLIP"
+      },
+      "description": "Send a clip to the chat highlight overlay",
+      "priority": null,
+      "kind": "action",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "CHAT_HIGHLIGHT_OVERLAY_PRESENCE",
+      "names": {
+        "beta": "SET_CHAT_HIGHLIGHT_OVERLAY_PRESENCE"
+      },
+      "description": "Advertise for highlight overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "CHAT_POLL_START",
+      "names": {
+        "beta": "SET_CHAT_POLL_START"
+      },
+      "description": "Start a chat poll",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": [
+        {
+          "path": "title",
+          "type": "text",
+          "label": "Title",
+          "labelKey": "twitchat.field.poll_title",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "choices",
+          "type": "list",
+          "label": "Choices",
+          "labelKey": "twitchat.field.poll_choices",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "duration",
+          "type": "number",
+          "label": "Duration (seconds)",
+          "labelKey": "twitchat.field.duration_seconds",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": 60,
+          "fields": null
+        },
+        {
+          "path": "maxVotePerUser",
+          "type": "number",
+          "label": "Max votes per user",
+          "labelKey": "twitchat.field.max_votes",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": 1,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "CHAT_POLL_STOP",
+      "names": {
+        "beta": "SET_CHAT_POLL_STOP"
+      },
+      "description": "Triggerd when a chat poll ends",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "CLEAR_CHAT_HIGHLIGHT",
+      "names": {
+        "stable": "CLEAR_CHAT_HIGHLIGHT",
+        "beta": "SET_CLEAR_CHAT_HIGHLIGHT"
+      },
+      "description": "Clear any current message or clip displayed in chat highlight overlay",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "CLICKABLE_AREA_STATE",
+      "names": {
+        "beta": "SET_CLICKABLE_AREA_STATE"
+      },
+      "description": "Change the enabled state of a clickable area",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Area ID",
+          "labelKey": "twitchat.field.area_id",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "state",
+          "type": "choice",
+          "label": "State",
+          "labelKey": "twitchat.field.area_state",
+          "required": true,
+          "options": [
+            {
+              "value": "true",
+              "label": "true",
+              "labelKey": "twitchat.field.area_state.on"
+            },
+            {
+              "value": "false",
+              "label": "false",
+              "labelKey": "twitchat.field.area_state.off"
+            },
+            {
+              "value": "\"toggle\"",
+              "label": "toggle",
+              "labelKey": "twitchat.field.area_state.toggle"
+            }
+          ],
+          "source": null,
+          "defaultValue": true,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "COUNTDOWN_ADD",
+      "names": {
+        "stable": "COUNTDOWN_ADD",
+        "beta": "SET_COUNTDOWN_ADD"
+      },
+      "description": "Add time to a countdown",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Countdown ID to add time to",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "value",
+          "type": "text",
+          "label": "Value to add to the countdown.",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "COUNTER_GET",
+      "names": {
+        "stable": "COUNTER_GET"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "COUNTER_GET_ALL",
+      "names": {
+        "stable": "COUNTER_GET_ALL"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "CREATE_POLL",
+      "names": {
+        "stable": "CREATE_POLL"
+      },
+      "description": "Open the poll creation form",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": []
+    },
+    {
+      "key": "CREATE_PREDICTION",
+      "names": {
+        "stable": "CREATE_PREDICTION"
+      },
+      "description": "Open the prediction creation form",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": []
+    },
+    {
+      "key": "DISABLE_STT",
+      "names": {
+        "stable": "DISABLE_STT"
+      },
+      "description": "Disable the speech recognition\n### JSON param *(optional)*",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "ENABLE_STT",
+      "names": {
+        "stable": "ENABLE_STT"
+      },
+      "description": "Enabled the speech recognition to control twitchat with your voice\n### JSON param *(optional)*",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "ENDING_CREDITS_CONTROL",
+      "names": {
+        "beta": "SET_ENDING_CREDITS_CONTROL"
+      },
+      "description": "Control ending credits playback",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": [
+        {
+          "path": "prev",
+          "type": "switch",
+          "label": "Previous section",
+          "labelKey": "twitchat.field.credits_prev",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "next",
+          "type": "switch",
+          "label": "Next section",
+          "labelKey": "twitchat.field.credits_next",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "speed",
+          "type": "number",
+          "label": "Speed",
+          "labelKey": "twitchat.field.credits_speed",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "scrollToSectionID",
+          "type": "text",
+          "label": "Section ID",
+          "labelKey": "twitchat.field.credits_section",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "ENDING_CREDITS_DATA",
+      "names": {
+        "beta": "SET_ENDING_CREDITS_DATA"
+      },
+      "description": "Response with ending credits data",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "ENDING_CREDITS_PRESENCE",
+      "names": {
+        "beta": "SET_ENDING_CREDITS_PRESENCE"
+      },
+      "description": "Response with current ending credits overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_AD_BREAK_OVERLAY_CONFIGS",
+      "names": {
+        "beta": "GET_AD_BREAK_OVERLAY_CONFIGS"
+      },
+      "description": "Request ad break overlay configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_AD_BREAK_OVERLAY_PARAMETERS",
+      "names": {
+        "stable": "GET_AD_BREAK_OVERLAY_PARAMETERS"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_AD_BREAK_OVERLAY_PRESENCE",
+      "names": {
+        "stable": "GET_AD_BREAK_OVERLAY_PRESENCE",
+        "beta": "GET_AD_BREAK_OVERLAY_PRESENCE"
+      },
+      "description": "Request ad break overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_ALL_COUNTERS",
+      "names": {
+        "beta": "GET_ALL_COUNTERS"
+      },
+      "description": "Request list of all counters",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_ANIMATED_TEXT_CONFIGS",
+      "names": {
+        "stable": "GET_ANIMATED_TEXT_CONFIGS",
+        "beta": "GET_ANIMATED_TEXT_CONFIGS"
+      },
+      "description": "Request animated text overlay configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Animated text overlay ID",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "GET_BINGO_GRID_CONFIGS",
+      "names": {
+        "beta": "GET_BINGO_GRID_CONFIGS"
+      },
+      "description": "Request bingo grid configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_BINGO_GRID_PARAMETERS",
+      "names": {
+        "stable": "GET_BINGO_GRID_PARAMETERS"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_BITS_WALL_OVERLAY_PARAMETERS",
+      "names": {
+        "stable": "GET_BITS_WALL_OVERLAY_PARAMETERS"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_BITSWALL_OVERLAY_CONFIGS",
+      "names": {
+        "beta": "GET_BITSWALL_OVERLAY_CONFIGS"
+      },
+      "description": "Request bitswall overlay configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_BITSWALL_OVERLAY_PRESENCE",
+      "names": {
+        "stable": "GET_BITSWALL_OVERLAY_PRESENCE",
+        "beta": "GET_BITSWALL_OVERLAY_PRESENCE"
+      },
+      "description": "Request bitswall overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_CHAT_COLUMNS_COUNT",
+      "names": {
+        "beta": "GET_CHAT_COLUMNS_COUNT"
+      },
+      "description": "Request number of chat columns",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_CHAT_HIGHLIGHT_OVERLAY_PRESENCE",
+      "names": {
+        "stable": "GET_CHAT_HIGHLIGHT_OVERLAY_PRESENCE",
+        "beta": "GET_CHAT_HIGHLIGHT_OVERLAY_PRESENCE"
+      },
+      "description": "Request current chat highlight overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_CHAT_POLL_INFO",
+      "names": {
+        "beta": "GET_CHAT_POLL_INFO"
+      },
+      "description": "Request for current chat poll info",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_CHAT_POLL_OVERLAY_CONFIGS",
+      "names": {
+        "beta": "GET_CHAT_POLL_OVERLAY_CONFIGS"
+      },
+      "description": "Request chat poll overlay configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_CHAT_POLL_OVERLAY_PARAMETERS",
+      "names": {
+        "stable": "GET_CHAT_POLL_OVERLAY_PARAMETERS"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_CHAT_POLL_OVERLAY_PRESENCE",
+      "names": {
+        "stable": "GET_CHAT_POLL_OVERLAY_PRESENCE",
+        "beta": "GET_CHAT_POLL_OVERLAY_PRESENCE"
+      },
+      "description": "Request chat poll overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_COLS_COUNT",
+      "names": {
+        "stable": "GET_COLS_COUNT"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_COUNTER",
+      "names": {
+        "beta": "GET_COUNTER"
+      },
+      "description": "Request a specific counter entity",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Counter ID to get value of",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "GET_CREDITS_OVERLAY_PRESENCE",
+      "names": {
+        "stable": "GET_CREDITS_OVERLAY_PRESENCE"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_CURRENT_TIMERS",
+      "names": {
+        "stable": "GET_CURRENT_TIMERS"
+      },
+      "description": "Request current timer / countdown values\nIf it does you'll receive the `TIMER_START` nor `COUNTDOWN_START` event.\n### JSON param *(optional)*",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_CURRENT_TRACK",
+      "names": {
+        "stable": "GET_CURRENT_TRACK",
+        "beta": "GET_CURRENT_TRACK"
+      },
+      "description": "Request current playing track information",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_CUSTOM_TRAIN_DATA",
+      "names": {
+        "beta": "GET_CUSTOM_TRAIN_DATA"
+      },
+      "description": "Request custom train data and state",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Custom train ID to get state for",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "GET_CUSTOM_TRAIN_STATE",
+      "names": {
+        "stable": "GET_CUSTOM_TRAIN_STATE"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_DISTORT_OVERLAY_CONFIGS",
+      "names": {
+        "beta": "GET_DISTORT_OVERLAY_CONFIGS"
+      },
+      "description": "Request distortion overlay configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Distortion overlay ID to get parameters for",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "GET_DISTORT_OVERLAY_PARAMETERS",
+      "names": {
+        "stable": "GET_DISTORT_OVERLAY_PARAMETERS"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_DONATION_GOALS_OVERLAY_CONFIGS",
+      "names": {
+        "beta": "GET_DONATION_GOALS_OVERLAY_CONFIGS"
+      },
+      "description": "Request donation goals overlay configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Overlay ID to get parameters for",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "GET_DONATION_GOALS_OVERLAY_PARAMS",
+      "names": {
+        "stable": "GET_DONATION_GOALS_OVERLAY_PARAMS"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_ENDING_CREDITS_DATA",
+      "names": {
+        "beta": "GET_ENDING_CREDITS_DATA"
+      },
+      "description": "Request for ending credits data",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "dateOffset",
+          "type": "number",
+          "label": "Date offset to get data from",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "includeOverlayParams",
+          "type": "switch",
+          "label": "Include overlay parameters to response",
+          "labelKey": null,
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "GET_ENDING_CREDITS_PRESENCE",
+      "names": {
+        "beta": "GET_ENDING_CREDITS_PRESENCE"
+      },
+      "description": "Request current ending credits overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_GLOBAL_STATES",
+      "names": {
+        "beta": "GET_GLOBAL_STATES"
+      },
+      "description": "Requests for global states",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_LABEL_OVERLAY_CONFIGS",
+      "names": {
+        "beta": "GET_LABEL_OVERLAY_CONFIGS"
+      },
+      "description": "Request label overlay configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Label ID",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "GET_LABEL_OVERLAY_PARAMS",
+      "names": {
+        "stable": "GET_LABEL_OVERLAY_PARAMS"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_LABEL_OVERLAY_PLACEHOLDERS",
+      "names": {
+        "stable": "GET_LABEL_OVERLAY_PLACEHOLDERS",
+        "beta": "GET_LABEL_OVERLAY_PLACEHOLDERS"
+      },
+      "description": "Request available label overlay placeholders",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_POLLS_OVERLAY_CONFIGS",
+      "names": {
+        "beta": "GET_POLLS_OVERLAY_CONFIGS"
+      },
+      "description": "Request polls overlay configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_POLLS_OVERLAY_PARAMETERS",
+      "names": {
+        "stable": "GET_POLLS_OVERLAY_PARAMETERS"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_POLLS_OVERLAY_PRESENCE",
+      "names": {
+        "stable": "GET_POLLS_OVERLAY_PRESENCE",
+        "beta": "GET_POLLS_OVERLAY_PRESENCE"
+      },
+      "description": "Request polls overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_PREDICTIONS_OVERLAY_CONFIGS",
+      "names": {
+        "beta": "GET_PREDICTIONS_OVERLAY_CONFIGS"
+      },
+      "description": "Request predictions overlay configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_PREDICTIONS_OVERLAY_PARAMETERS",
+      "names": {
+        "stable": "GET_PREDICTIONS_OVERLAY_PARAMETERS"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_PREDICTIONS_OVERLAY_PRESENCE",
+      "names": {
+        "stable": "GET_PREDICTIONS_OVERLAY_PRESENCE",
+        "beta": "GET_PREDICTIONS_OVERLAY_PRESENCE"
+      },
+      "description": "Request predictions overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_QNA_SESSION_LIST",
+      "names": {
+        "beta": "GET_QNA_SESSION_LIST"
+      },
+      "description": "Request list of all Q&A sessions",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_QUIZ_CONFIGS",
+      "names": {
+        "beta": "GET_QUIZ_CONFIGS"
+      },
+      "description": "Request quiz overlay configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_QUIZ_OVERLAY_PRESENCE",
+      "names": {
+        "beta": "GET_QUIZ_OVERLAY_PRESENCE"
+      },
+      "description": "Request quiz overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_SUMMARY_DATA",
+      "names": {
+        "stable": "GET_SUMMARY_DATA"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "GET_TIMER",
+      "names": {
+        "beta": "GET_TIMER"
+      },
+      "description": "Request specific timer configuration",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Timer ID to get configs for",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "GET_TIMER_LIST",
+      "names": {
+        "beta": "GET_TIMER_LIST"
+      },
+      "description": "Request list of all timers",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_TIMER_OVERLAY_PRESENCE",
+      "names": {
+        "stable": "GET_TIMER_OVERLAY_PRESENCE",
+        "beta": "GET_TIMER_OVERLAY_PRESENCE"
+      },
+      "description": "Request timer overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_TRIGGER_LIST",
+      "names": {
+        "beta": "GET_TRIGGER_LIST"
+      },
+      "description": "Request list of all triggers",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GET_WHEEL_OVERLAY_PRESENCE",
+      "names": {
+        "stable": "GET_WHEEL_OVERLAY_PRESENCE",
+        "beta": "GET_WHEEL_OVERLAY_PRESENCE"
+      },
+      "description": "Request wheel overlay presence",
+      "priority": null,
+      "kind": "data",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "GREET_FEED_READ",
+      "names": {
+        "stable": "GREET_FEED_READ",
+        "beta": "SET_GREET_FEED_READ"
+      },
+      "description": "Mark messages as read in the greet them feed",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "messageCount",
+          "type": "number",
+          "label": "Number of messages to mark as read",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "GREET_FEED_READ_ALL",
+      "names": {
+        "stable": "GREET_FEED_READ_ALL",
+        "beta": "SET_GREET_FEED_READ_ALL"
+      },
+      "description": "Clears the greet them feed",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "HIDE_ALERT",
+      "names": {
+        "stable": "HIDE_ALERT"
+      },
+      "description": "Hide the current chat alert",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": []
+    },
+    {
+      "key": "HIDE_CHAT_ALERT",
+      "names": {
+        "beta": "SET_HIDE_CHAT_ALERT"
+      },
+      "description": "Hide current chat alert\nSee settings => chat features => Enable chat alert",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "MERGE_TOGGLE",
+      "names": {
+        "stable": "MERGE_TOGGLE",
+        "beta": "SET_MERGE_TOGGLE"
+      },
+      "description": "Toggle merge feature\nSee settings => chat features => Merge consecutive messages of a user",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "MOD_TOOLS_TOGGLE",
+      "names": {
+        "stable": "MOD_TOOLS_TOGGLE",
+        "beta": "SET_MOD_TOOLS_TOGGLE"
+      },
+      "description": "Toggle moderation tools display",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "OPEN_PREDICTION_CREATION_FORM",
+      "names": {
+        "beta": "SET_OPEN_PREDICTION_CREATION_FORM"
+      },
+      "description": "Open prediction creation form",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "PLAY_SFXR",
+      "names": {
+        "stable": "PLAY_SFXR",
+        "beta": "SET_PLAY_SFXR"
+      },
+      "description": "Play an SFXR sound",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "params",
+          "type": "text",
+          "label": "SFXR sound parameters as a string",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "volume",
+          "type": "number",
+          "label": "Volume from 0 to 100",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "POLL_CREATE",
+      "names": {
+        "stable": "POLL_CREATE"
+      },
+      "description": "Open the poll creation form (voice control)",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": []
+    },
+    {
+      "key": "POLL_TOGGLE",
+      "names": {
+        "stable": "POLL_TOGGLE",
+        "beta": "SET_POLL_TOGGLE"
+      },
+      "description": "Toggle current poll display",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "PREDICTION_TOGGLE",
+      "names": {
+        "stable": "PREDICTION_TOGGLE",
+        "beta": "SET_PREDICTION_TOGGLE"
+      },
+      "description": "Toggle current prediction display",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "PROMPT_PARAMS_ACCEPT",
+      "names": {
+        "beta": "SET_PROMPT_PARAMS_ACCEPT"
+      },
+      "description": "Accept current prompt window",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "PROMPT_PARAMS_REJECT",
+      "names": {
+        "beta": "SET_PROMPT_PARAMS_REJECT"
+      },
+      "description": "Reject current prompt window",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "QNA_HIGHLIGHT",
+      "names": {
+        "stable": "QNA_HIGHLIGHT",
+        "beta": "SET_QNA_HIGHLIGHT"
+      },
+      "description": "Highlights the top most message of given Q&A session",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Q&A session ID",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "QNA_SESSION_GET_ALL",
+      "names": {
+        "stable": "QNA_SESSION_GET_ALL"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
+    },
+    {
+      "key": "QNA_SKIP",
+      "names": {
+        "stable": "QNA_SKIP",
+        "beta": "SET_QNA_SKIP"
+      },
+      "description": "Skips the top most message of given Q&A session",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": [
+        {
+          "path": "id",
+          "type": "text",
+          "label": "Q&A session ID",
+          "labelKey": null,
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        }
+      ]
+    },
+    {
+      "key": "QUIZ_NEXT_QUESTION",
+      "names": {
+        "beta": "SET_QUIZ_NEXT_QUESTION"
+      },
+      "description": "Moves to the next question in the current quiz",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "QUIZ_REVEAL",
+      "names": {
+        "beta": "SET_QUIZ_REVEAL"
+      },
+      "description": "Reveals the answer for current quiz question",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "QUIZ_TOGGLE_LEADERBOARD",
+      "names": {
+        "beta": "SET_QUIZ_TOGGLE_LEADERBOARD"
+      },
+      "description": "Toggle quiz leaderboard display",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "RAFFLE_END",
+      "names": {
+        "stable": "RAFFLE_END"
+      },
+      "description": "Stop the first active raffle, after confirmation",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": []
+    },
+    {
+      "key": "RAFFLE_PICK_WINNER",
+      "names": {
+        "stable": "RAFFLE_PICK_WINNER",
+        "beta": "SET_RAFFLE_PICK_WINNER"
+      },
+      "description": "Pick a winner for the first active raffle.\nIf multiple raffles are active, only the first one started will be considered.",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
+      "key": "RAFFLE_START",
+      "names": {
+        "stable": "RAFFLE_START"
+      },
+      "description": "Open the raffle creation form",
+      "priority": null,
+      "kind": "action",
+      "form": "override",
+      "fields": []
+    },
+    {
+      "key": "RAFFLE_TOGGLE",
+      "names": {
+        "stable": "RAFFLE_TOGGLE",
+        "beta": "SET_RAFFLE_TOGGLE"
+      },
+      "description": "Toggle current raffle display",
+      "priority": null,
+      "kind": "action",
+      "form": "generated",
+      "fields": []
+    },
+    {
       "key": "SET_CHAT_HIGHLIGHT_OVERLAY_MESSAGE",
       "names": {
         "stable": "SET_CHAT_HIGHLIGHT_OVERLAY_MESSAGE",
@@ -2771,13 +4390,14 @@
       },
       "description": "Send a message to the chat highlight overlay",
       "priority": null,
-      "form": "generated",
+      "kind": "action",
+      "form": "override",
       "fields": [
         {
           "path": "message",
-          "type": "text",
-          "label": "message",
-          "labelKey": null,
+          "type": "textarea",
+          "label": "Message",
+          "labelKey": "twitchat.field.message",
           "required": true,
           "options": null,
           "source": null,
@@ -2787,8 +4407,8 @@
         {
           "path": "user",
           "type": "json",
-          "label": "Message with emotes parsed as HTML tags",
-          "labelKey": null,
+          "label": "User (Twitch JSON)",
+          "labelKey": "twitchat.field.twitch_user",
           "required": true,
           "options": null,
           "source": null,
@@ -2796,11 +4416,90 @@
           "fields": null
         },
         {
-          "path": "params",
-          "type": "json",
-          "label": "params",
-          "labelKey": null,
+          "path": "params.position",
+          "type": "select",
+          "label": "Position",
+          "labelKey": "twitchat.field.position",
           "required": true,
+          "options": [
+            {
+              "value": "tl",
+              "label": "tl",
+              "labelKey": "twitchat.field.position.tl"
+            },
+            {
+              "value": "t",
+              "label": "t",
+              "labelKey": "twitchat.field.position.t"
+            },
+            {
+              "value": "tr",
+              "label": "tr",
+              "labelKey": "twitchat.field.position.tr"
+            },
+            {
+              "value": "l",
+              "label": "l",
+              "labelKey": "twitchat.field.position.l"
+            },
+            {
+              "value": "m",
+              "label": "m",
+              "labelKey": "twitchat.field.position.m"
+            },
+            {
+              "value": "r",
+              "label": "r",
+              "labelKey": "twitchat.field.position.r"
+            },
+            {
+              "value": "bl",
+              "label": "bl",
+              "labelKey": "twitchat.field.position.bl"
+            },
+            {
+              "value": "b",
+              "label": "b",
+              "labelKey": "twitchat.field.position.b"
+            },
+            {
+              "value": "br",
+              "label": "br",
+              "labelKey": "twitchat.field.position.br"
+            }
+          ],
+          "source": null,
+          "defaultValue": "m",
+          "fields": null
+        },
+        {
+          "path": "dateLabel",
+          "type": "text",
+          "label": "Date label",
+          "labelKey": "twitchat.field.date_label",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "message_id",
+          "type": "text",
+          "label": "Message ID",
+          "labelKey": "twitchat.field.message_id",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "skin",
+          "type": "text",
+          "label": "Skin",
+          "labelKey": "twitchat.field.skin",
+          "required": false,
           "options": null,
           "source": null,
           "defaultValue": null,
@@ -2816,6 +4515,7 @@
       },
       "description": "Enable/disable/toggle emergency mode\nEither give an object with \"enabled\" boolean to force a specific\nstate, or don't give any parameter to toggle current state",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": [
         {
@@ -2849,6 +4549,7 @@
       },
       "description": "Sends a shoutout to the latest raider\n### JSON param *(optional)*",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": []
     },
@@ -2859,6 +4560,7 @@
       },
       "description": "Shoutout the user that raided the channel the most recently",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": []
     },
@@ -2869,13 +4571,14 @@
       },
       "description": "Send a clip to be displayed on the chat highlight overlay\n### JSON param",
       "priority": null,
-      "form": "generated",
+      "kind": "action",
+      "form": "override",
       "fields": [
         {
           "path": "clip",
           "type": "json",
-          "label": "This is the same JSON as the one sent by the Twitch API",
-          "labelKey": null,
+          "label": "Clip (Twitch API JSON)",
+          "labelKey": "twitchat.field.clip",
           "required": true,
           "options": null,
           "source": null,
@@ -2883,14 +4586,60 @@
           "fields": null
         },
         {
-          "path": "params",
-          "type": "json",
-          "label": "params",
-          "labelKey": null,
+          "path": "params.position",
+          "type": "select",
+          "label": "Position",
+          "labelKey": "twitchat.field.position",
           "required": true,
-          "options": null,
+          "options": [
+            {
+              "value": "tl",
+              "label": "tl",
+              "labelKey": "twitchat.field.position.tl"
+            },
+            {
+              "value": "t",
+              "label": "t",
+              "labelKey": "twitchat.field.position.t"
+            },
+            {
+              "value": "tr",
+              "label": "tr",
+              "labelKey": "twitchat.field.position.tr"
+            },
+            {
+              "value": "l",
+              "label": "l",
+              "labelKey": "twitchat.field.position.l"
+            },
+            {
+              "value": "m",
+              "label": "m",
+              "labelKey": "twitchat.field.position.m"
+            },
+            {
+              "value": "r",
+              "label": "r",
+              "labelKey": "twitchat.field.position.r"
+            },
+            {
+              "value": "bl",
+              "label": "bl",
+              "labelKey": "twitchat.field.position.bl"
+            },
+            {
+              "value": "b",
+              "label": "b",
+              "labelKey": "twitchat.field.position.b"
+            },
+            {
+              "value": "br",
+              "label": "br",
+              "labelKey": "twitchat.field.position.br"
+            }
+          ],
           "source": null,
-          "defaultValue": null,
+          "defaultValue": "m",
           "fields": null
         }
       ]
@@ -2902,6 +4651,7 @@
       },
       "description": "Starts the emergency mode as the user clicked the emergency button\n### JSON param *(optional)*",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": []
     },
@@ -2912,6 +4662,7 @@
       },
       "description": "Stop any current text-to-speech audio playback",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": []
     },
@@ -2922,6 +4673,7 @@
       },
       "description": "Stop the emergency mode\n### JSON param *(optional)*",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": []
     },
@@ -2933,6 +4685,7 @@
       },
       "description": "Stop any Twitch poll currently running",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": []
     },
@@ -2944,17 +4697,8 @@
       },
       "description": "Stop any Twitch prediction currently running",
       "priority": null,
+      "kind": "action",
       "form": "generated",
-      "fields": []
-    },
-    {
-      "key": "STOP_RAFFLE",
-      "names": {
-        "stable": "STOP_RAFFLE"
-      },
-      "description": "",
-      "priority": null,
-      "form": "raw",
       "fields": []
     },
     {
@@ -2964,41 +4708,9 @@
       },
       "description": "Stops any currently playing text to speech audio\n### JSON param *(optional)*",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": []
-    },
-    {
-      "key": "STREAMDECK_AUTHENTICATE",
-      "names": {
-        "beta": "SET_STREAMDECK_AUTHENTICATE"
-      },
-      "description": "",
-      "priority": null,
-      "form": "generated",
-      "fields": [
-        {
-          "path": "isMainApp",
-          "type": "switch",
-          "label": "Declare as an actual twitchat instance.",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        },
-        {
-          "path": "secretKey",
-          "type": "text",
-          "label": "Secret key.",
-          "labelKey": null,
-          "required": true,
-          "options": null,
-          "source": null,
-          "defaultValue": null,
-          "fields": null
-        }
-      ]
     },
     {
       "key": "TIMER_ADD",
@@ -3008,6 +4720,7 @@
       },
       "description": "Add time to a timer",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": [
         {
@@ -3039,10 +4752,53 @@
       "names": {
         "stable": "TOGGLE_TRIGGER"
       },
-      "description": "",
+      "description": "Enable, disable or toggle a trigger",
       "priority": null,
-      "form": "raw",
-      "fields": []
+      "kind": "action",
+      "form": "override",
+      "fields": [
+        {
+          "path": "triggerId",
+          "type": "select",
+          "label": "Trigger",
+          "labelKey": "twitchat.field.trigger",
+          "required": true,
+          "options": null,
+          "source": {
+            "stable": "TRIGGERS_GET_ALL",
+            "beta": "GET_TRIGGER_LIST"
+          },
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "triggerAction",
+          "type": "select",
+          "label": "Operation",
+          "labelKey": "twitchat.field.trigger_action",
+          "required": false,
+          "options": [
+            {
+              "value": "enable",
+              "label": "enable",
+              "labelKey": "twitchat.field.trigger_action.enable"
+            },
+            {
+              "value": "disable",
+              "label": "disable",
+              "labelKey": "twitchat.field.trigger_action.disable"
+            },
+            {
+              "value": "toggle",
+              "label": "toggle",
+              "labelKey": "twitchat.field.trigger_action.toggle"
+            }
+          ],
+          "source": null,
+          "defaultValue": "enable",
+          "fields": null
+        }
+      ]
     },
     {
       "key": "TRIGGER_STATE",
@@ -3051,31 +4807,46 @@
       },
       "description": "Enable or disable a specific trigger",
       "priority": null,
-      "form": "generated",
+      "kind": "action",
+      "form": "override",
       "fields": [
         {
           "path": "id",
-          "type": "text",
-          "label": "Trigger ID to change state of",
-          "labelKey": null,
+          "type": "select",
+          "label": "Trigger",
+          "labelKey": "twitchat.field.trigger",
           "required": true,
           "options": null,
-          "source": null,
+          "source": {
+            "stable": "TRIGGERS_GET_ALL",
+            "beta": "GET_TRIGGER_LIST"
+          },
           "defaultValue": null,
           "fields": null
         },
         {
           "path": "forcedState",
           "type": "switch",
-          "label": "Force trigger state:",
-          "labelKey": null,
+          "label": "Enabled",
+          "labelKey": "twitchat.field.trigger_enabled",
           "required": false,
           "options": null,
           "source": null,
-          "defaultValue": null,
+          "defaultValue": true,
           "fields": null
         }
       ]
+    },
+    {
+      "key": "TRIGGERS_GET_ALL",
+      "names": {
+        "stable": "TRIGGERS_GET_ALL"
+      },
+      "description": "",
+      "priority": null,
+      "kind": "data",
+      "form": "raw",
+      "fields": []
     },
     {
       "key": "UNPIN_TWITCH_MESSAGE",
@@ -3084,6 +4855,7 @@
       },
       "description": "Request to unpin currently pinned message on Twitch",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": []
     },
@@ -3095,6 +4867,7 @@
       },
       "description": "Toggle viewers count display",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": []
     },
@@ -3105,6 +4878,7 @@
       },
       "description": "Set voice bot enabled/disabled state",
       "priority": null,
+      "kind": "action",
       "form": "generated",
       "fields": [
         {
@@ -3128,13 +4902,59 @@
       },
       "description": "Triggered when wheel overlay animation starts",
       "priority": null,
-      "form": "generated",
+      "kind": "action",
+      "form": "override",
       "fields": [
         {
           "path": "items",
-          "type": "json",
-          "label": "items",
-          "labelKey": null,
+          "type": "repeater",
+          "label": "Segments",
+          "labelKey": "twitchat.field.wheel_items",
+          "required": true,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": [
+            {
+              "path": "id",
+              "type": "text",
+              "label": "ID",
+              "labelKey": "twitchat.field.wheel_item_id",
+              "required": true,
+              "options": null,
+              "source": null,
+              "defaultValue": null,
+              "fields": null
+            },
+            {
+              "path": "label",
+              "type": "text",
+              "label": "Label",
+              "labelKey": "twitchat.field.wheel_item_label",
+              "required": true,
+              "options": null,
+              "source": null,
+              "defaultValue": null,
+              "fields": null
+            },
+            {
+              "path": "data",
+              "type": "json",
+              "label": "Data (JSON)",
+              "labelKey": "twitchat.field.wheel_item_data",
+              "required": false,
+              "options": null,
+              "source": null,
+              "defaultValue": null,
+              "fields": null
+            }
+          ]
+        },
+        {
+          "path": "winner",
+          "type": "text",
+          "label": "Winner ID",
+          "labelKey": "twitchat.field.wheel_winner",
           "required": true,
           "options": null,
           "source": null,
@@ -3142,11 +4962,22 @@
           "fields": null
         },
         {
-          "path": "winner",
+          "path": "sessionId",
           "type": "text",
-          "label": "winner",
-          "labelKey": null,
-          "required": true,
+          "label": "Session ID",
+          "labelKey": "twitchat.field.session_id",
+          "required": false,
+          "options": null,
+          "source": null,
+          "defaultValue": null,
+          "fields": null
+        },
+        {
+          "path": "skin",
+          "type": "text",
+          "label": "Skin",
+          "labelKey": "twitchat.field.skin",
+          "required": false,
           "options": null,
           "source": null,
           "defaultValue": null,

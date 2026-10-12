@@ -43,7 +43,11 @@ window.CatapultTwitchatEvents = (function () {
             if (repeater && root.contains(repeater)) continue; // a row's field, read with its row
             if (el.hasAttribute("data-repeater")) {
                 const rows = [...el.querySelector(".repeater-rows").children].filter((row) => row.classList.contains("repeater-row"));
-                setPath(data, el.dataset.field, rows.map(formData));
+                // A list of texts holds its items' values, its empty ones left out.
+                const items = el.classList.contains("list-repeater")
+                    ? rows.map((row) => fieldValue(row.querySelector("[data-field]"))).filter((value) => value !== undefined)
+                    : rows.map(formData);
+                setPath(data, el.dataset.field, items);
             } else {
                 const value = fieldValue(el);
                 if (value !== undefined) setPath(data, el.dataset.field, value);

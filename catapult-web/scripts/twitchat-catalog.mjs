@@ -1,6 +1,7 @@
 /*
- * The pure half of the Twitchat catalog (catapult-common's twitchat/catalog.json): every "write"
- * action of either protocol under one protocol-neutral key, its form fields deduced from its
+ * The pure half of the Twitchat catalog (catapult-common's twitchat/catalog.json): every request
+ * of either protocol under one protocol-neutral key, an "action" or a "data" one (only answering
+ * with data), its form fields deduced from its
  * typing (the beta's TwitchatEventMap, else the stable PUBLIC_API.md's "JSON param"), then the
  * hand-written overrides of twitchat-catalog-overrides.json. Fetching and writing stay in
  * generate-twitchat-protocol.mjs.
@@ -163,43 +164,77 @@ export function pairBeta(stableActions, betaActions, pairs = {}) {
     return keys;
 }
 
-/** Whether an action changes something, rather than asking for data ("get" actions). */
+/** Whether a request changes something, rather than asking for data ("get" requests, answered ones). */
 const isWrite = (name, replies) => !name.startsWith("GET_") && !/_GET(_ALL)?$/.test(name) && !replies[name];
 
 const byPriorityThenKey = (a, b) =>
     (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER) || a.key.localeCompare(b.key);
 
-/** The whole catalog, as written to catalog.json. */
+/**
+ * An override's options given as "$beta:ACTION.path": the choices of that beta typing's member,
+ * so a long enum (Twitchat's icons) follows Twitchat. Null when it can't be read.
+ */
+function referencedOptions(reference, types) {
+    const [, name, path] = reference.match(/^\$beta:([A-Z0-9_]+)\.(.+)$/) ?? [];
+    return fieldsOf(types.get(name) ?? null)?.find((field) => field.path === path)?.options ?? null;
+}
+
+/** The override's fields with their referenced options resolved; a select whose options are gone becomes text. */
+function resolveFields(fields, types) {
+    return fields?.map((field) => {
+        const resolved = { ...field };
+        if (field.fields) resolved.fields = resolveFields(field.fields, types);
+        if (typeof field.options === "string") {
+            resolved.options = referencedOptions(field.options, types);
+            if (!resolved.options) resolved.type = "text";
+        }
+        return resolved;
+    });
+}
+
+/**
+ * The whole catalog, as written to catalog.json: every request of either protocol, its kind
+ * "action" (it does something) or "data" (it only answers with data, never offered as a
+ * payload), the overrides' "hidden" ones left out.
+ */
 export function buildCatalog({ stable, beta, stableParams: params, betaTypes: types, overrides }) {
     const actions = new Map();
     const typings = new Map();
     const entry = (key) => {
         if (!actions.has(key)) {
-            actions.set(key, { key, names: {}, description: "", priority: null, form: "raw", fields: [] });
+            actions.set(key, { key, names: {}, description: "", priority: null, kind: "action", form: "raw", fields: [] });
             typings.set(key, {});
         }
         return actions.get(key);
     };
-    for (const name of stable.actions.filter((n) => isWrite(n, stable.replies))) {
+    for (const name of stable.actions) {
         const action = entry(name);
         action.names.stable = name;
         action.description = stable.docs.get(name)?.description ?? "";
+        if (!isWrite(name, stable.replies)) action.kind = "data";
         typings.get(name).stable = fieldsOf(params.get(name) ?? null);
     }
     const keys = pairBeta(stable.actions, beta.actions, overrides.pairs);
-    for (const name of beta.actions.filter((n) => isWrite(n, beta.replies))) {
+    for (const name of beta.actions) {
         const key = keys.get(name);
         const action = entry(key);
         action.names.beta = name;
         action.description = beta.docs.get(name)?.description || action.description;
+        if (!isWrite(name, beta.replies)) action.kind = "data";
         typings.get(key).beta = fieldsOf(types.get(name) ?? null);
     }
+    const hidden = new Set(overrides.hidden ?? []);
     for (const action of actions.values()) {
         const { beta: betaFields, stable: stableFields } = typings.get(action.key);
         const fields = betaFields ?? stableFields;
         if (fields) Object.assign(action, { form: "generated", fields });
         const override = overrides.actions[action.key];
-        if (override) Object.assign(action, { form: "override" }, override);
+        if (override) {
+            // An override without fields (a kind, a description) keeps the generated form.
+            Object.assign(action, override.fields ? { form: "override" } : {}, override);
+            if (override.fields) action.fields = resolveFields(override.fields, types);
+        }
     }
-    return { version: 1, actions: [...actions.values()].sort(byPriorityThenKey) };
+    const kept = [...actions.values()].filter((action) => !hidden.has(action.key));
+    return { version: 1, actions: kept.sort(byPriorityThenKey) };
 }

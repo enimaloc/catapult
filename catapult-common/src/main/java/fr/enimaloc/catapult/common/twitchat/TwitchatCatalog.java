@@ -19,9 +19,15 @@ public record TwitchatCatalog(int version, List<Action> actions) {
 
     public static final String RESOURCE = "/twitchat/catalog.json";
 
-    /** {@code form}: "generated" (from Twitchat's typing), "override" (hand-written) or "raw" (JSON only). */
+    /**
+     * {@code kind}: "action" (it does something) or "data" (it only answers with data: never a
+     * payload). {@code form}: "generated" (from Twitchat's typing), "override" (hand-written) or
+     * "raw" (JSON only).
+     */
     public record Action(String key, Map<String, String> names, String description, Integer priority,
-                         String form, List<Field> fields) {
+                         String kind, String form, List<Field> fields) {
+        public static final String DATA = "data";
+
         public Action {
             names = names == null ? Map.of() : Map.copyOf(names);
             fields = fields == null ? List.of() : List.copyOf(fields);
@@ -30,11 +36,16 @@ public record TwitchatCatalog(int version, List<Action> actions) {
         public boolean rawOnly() {
             return "raw".equals(form);
         }
+
+        public boolean dataOnly() {
+            return DATA.equals(kind);
+        }
     }
 
     /**
-     * {@code type}: text, textarea, number, switch, select, json, repeater (rows of {@code fields})
-     * or catapult-action (a helper with no {@code path}, never stored). A select's options are
+     * {@code type}: text, textarea, number, switch, select, json, repeater (rows of {@code fields}),
+     * list (a list of texts), choice (a select whose option values are JSON literals: true, false,
+     * "toggle"…) or catapult-action (a helper with no {@code path}, never stored). A select's options are
      * {@code options}, or fetched live from Twitchat with the "get" action {@code source} names.
      * {@code showIf} (or null) shows the field only while a sibling holds one of some values.
      */

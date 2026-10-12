@@ -163,6 +163,46 @@ class TwitchatEventFormsTest {
     }
 
     @Test
+    void dataRequests_areNeitherOffered_norStartable() {
+        IntegrationNode.Select add = of(forms.eventsSection(Map.of()), IntegrationNode.Select.class).stream()
+                .filter(s -> s.attrs().className() != null && s.attrs().className().contains("twitchat-add-action"))
+                .findFirst().orElseThrow();
+        assertThat(add.options()).extracting(IntegrationNode.Select.Option::value)
+                .contains("SEND_MESSAGE", "TOGGLE_TRIGGER").doesNotContain("TRIGGERS_GET_ALL", "GET_TRIGGER_LIST", "ENDING_CREDITS_PRESENCE");
+        assertThatThrownBy(() -> forms.newPayload("TRIGGERS_GET_ALL")).isInstanceOf(TwitchatEventForms.UnknownAction.class);
+    }
+
+    @Test
+    void listField_rendersOneTextFieldPerItem() {
+        IntegrationNode card = forms.payloadCard("STREAM_STARTED", new TwitchatEventActionDto("CHAT_POLL_START", "FORM",
+                "{\"title\":\"Best?\",\"choices\":[\"A\",\"B\"]}", true));
+        IntegrationNode.Repeater choices = (IntegrationNode.Repeater) byField(card, "choices");
+        assertThat(choices.attrs().className()).contains("list-repeater");
+        assertThat(choices.rows()).extracting(row -> ((IntegrationNode.TextField) row.getFirst()).value()).containsExactly("A", "B");
+        assertThat(((IntegrationNode.TextField) choices.template().getFirst()).value()).isNull();
+    }
+
+    @Test
+    void choiceField_selectsItsJsonLiteral() {
+        IntegrationNode card = forms.payloadCard("STREAM_STARTED", new TwitchatEventActionDto("CLICKABLE_AREA_STATE", "FORM",
+                "{\"id\":\"a\",\"state\":\"toggle\"}", true));
+        IntegrationNode.Select state = (IntegrationNode.Select) byField(card, "state");
+        assertThat(state.attrs().className()).contains("json-field");
+        assertThat(state.value()).isEqualTo("\"toggle\"");
+        assertThat(state.options()).extracting(IntegrationNode.Select.Option::value).containsExactly("true", "false", "\"toggle\"");
+    }
+
+    @Test
+    void optionalSelect_canBeEmptied_aRequiredOneCannot() {
+        IntegrationNode card = forms.payloadCard("STREAM_STARTED", forms.newPayload("CUSTOM_CHAT_MESSAGE"));
+        IntegrationNode.Select icon = (IntegrationNode.Select) byField(card, "icon");
+        assertThat(icon.options().getFirst().value()).isEmpty();
+        assertThat(icon.options()).extracting(IntegrationNode.Select.Option::value).contains("live", "bot");
+        IntegrationNode trigger = forms.payloadCard("STREAM_STARTED", forms.newPayload("TOGGLE_TRIGGER"));
+        assertThat(((IntegrationNode.Select) byField(trigger, "triggerId")).options()).isEmpty();
+    }
+
+    @Test
     void newPayload_ofAnUnknownAction_isRefused() {
         assertThatThrownBy(() -> forms.newPayload("GONE_ACTION")).isInstanceOf(TwitchatEventForms.UnknownAction.class);
     }
