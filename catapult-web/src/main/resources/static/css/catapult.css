@@ -1087,6 +1087,13 @@ a[data-link].active {
     max-width: 320px;
 }
 
+/* mdui opens a select's menu at its full height in a fixed panel: a long one (Twitchat's
+ * actions, its icons) ran past the window, its end out of reach. Cap it and let it scroll. */
+mdui-select::part(menu) {
+    max-height: min(50vh, 360px);
+    overflow-y: auto;
+}
+
 /* Twitchat events: an event's body stacks its payload cards, then the add/test/save row. */
 .connection-card .twitchat-events-title {
     padding-top: 12px;
