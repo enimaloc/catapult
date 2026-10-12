@@ -77,9 +77,9 @@ class TwitchatEventsControllerTest {
     @Test
     void payloadForm_backToAFormThatWouldDropKeys_is422() throws Exception {
         mvc.perform(post("/channel/streamer/twitchat/payload-form").param("event", "STREAM_STARTED").with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"CUSTOM_CHAT_MESSAGE\",\"mode\":\"FORM\",\"dataJson\":\"{\\\"message\\\":\\\"Hi\\\",\\\"user\\\":{\\\"name\\\":\\\"Bot\\\",\\\"color\\\":\\\"#f00\\\"}}\",\"enabled\":true}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"CUSTOM_CHAT_MESSAGE\",\"mode\":\"FORM\",\"dataJson\":\"{\\\"message\\\":\\\"Hi\\\",\\\"user\\\":{\\\"name\\\":\\\"Bot\\\",\\\"badge\\\":\\\"mod\\\"}}\",\"enabled\":true}"))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$[0].field").value("user.color"))
+                .andExpect(jsonPath("$[0].field").value("user.badge"))
                 .andExpect(jsonPath("$[0].message").value("Not in the form"));
     }
 

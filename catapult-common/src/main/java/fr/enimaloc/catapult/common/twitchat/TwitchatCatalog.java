@@ -36,9 +36,18 @@ public record TwitchatCatalog(int version, List<Action> actions) {
      * {@code type}: text, textarea, number, switch, select, json, repeater (rows of {@code fields})
      * or catapult-action (a helper with no {@code path}, never stored). A select's options are
      * {@code options}, or fetched live from Twitchat with the "get" action {@code source} names.
+     * {@code showIf} (or null) shows the field only while a sibling holds one of some values.
      */
     public record Field(String path, String type, String label, String labelKey, boolean required,
-                        List<Option> options, Map<String, String> source, Object defaultValue, List<Field> fields) {
+                        List<Option> options, Map<String, String> source, Object defaultValue, List<Field> fields,
+                        Condition showIf) {
+    }
+
+    /** The sibling field at {@code path} (same row, or same form) holds one of {@code values}. */
+    public record Condition(String path, List<String> values) {
+        public Condition {
+            values = List.copyOf(values);
+        }
     }
 
     public record Option(String value, String label, String labelKey) {
