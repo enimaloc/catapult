@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * entirely instead of being threaded into the model.
  */
 @WebMvcTest(controllers = {IndexController.class, SpaFragmentController.class})
-@Import({ModelFiller.class, WebSecurityConfig.class})
+@Import({ModelFiller.class, WebSecurityConfig.class, TwitchatCatalogConfig.class})
 class IndexControllerTest {
 
     @Autowired MockMvc mvc;
