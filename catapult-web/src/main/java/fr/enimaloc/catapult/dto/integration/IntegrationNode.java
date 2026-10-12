@@ -49,7 +49,12 @@ public sealed interface IntegrationNode {
         }
     }
 
-    record Select(Attrs attrs, Message text, String value, List<Option> options) implements IntegrationNode {
+    /**
+     * An mdui-select; {@code source} (JSON {@code {"stable":…,"beta":…}}, or null) names the
+     * Twitchat requests that fill its options at runtime, rendered as data-source.
+     */
+    record Select(Attrs attrs, Message text, String value, List<Option> options, String source)
+            implements IntegrationNode {
         public record Option(String value, Message text) {}
 
         public Select {
@@ -62,10 +67,14 @@ public sealed interface IntegrationNode {
     }
 
     record Button(Attrs attrs, Kind kind, Message text) implements IntegrationNode {
-        public enum Kind { SEGMENTED, FILLED }
+        public enum Kind { SEGMENTED, FILLED, TEXT }
 
         public String type() {
-            return kind == Kind.SEGMENTED ? "segmented-button" : "button";
+            return switch (kind) {
+                case SEGMENTED -> "segmented-button";
+                case FILLED -> "button";
+                case TEXT -> "text-button";
+            };
         }
     }
 
@@ -78,6 +87,53 @@ public sealed interface IntegrationNode {
 
         public String type() {
             return kind == Kind.DIV ? "div" : "segmented-group";
+        }
+    }
+
+    /** An mdui-text-field labelled {@code text}; {@code multiline} grows with its content. */
+    record TextField(Attrs attrs, Message text, String inputType, Object value, boolean multiline) implements IntegrationNode {
+        public String type() {
+            return "text-field";
+        }
+    }
+
+    /** A hidden input: values the page's JS reads back (a payload's action, mode, names). */
+    record Hidden(Attrs attrs, String value) implements IntegrationNode {
+        public String type() {
+            return "hidden";
+        }
+    }
+
+    record Collapse(Attrs attrs, List<Item> items) implements IntegrationNode {
+        /** One mdui-collapse-item: {@code text} its header, {@code value} its collapse value. */
+        public record Item(Attrs attrs, String value, Message text, List<IntegrationNode> children) {
+            public Item {
+                children = List.copyOf(children);
+            }
+        }
+
+        public Collapse {
+            items = List.copyOf(items);
+        }
+
+        public String type() {
+            return "collapse";
+        }
+    }
+
+    /**
+     * A list of rows edited in place (a chat message's buttons): {@code template} is the row
+     * "add" clones; each row's fields are paths relative to the row.
+     */
+    record Repeater(Attrs attrs, Message text, List<List<IntegrationNode>> rows, List<IntegrationNode> template)
+            implements IntegrationNode {
+        public Repeater {
+            rows = rows.stream().map(List::copyOf).toList();
+            template = List.copyOf(template);
+        }
+
+        public String type() {
+            return "repeater";
         }
     }
 

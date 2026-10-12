@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.RequestDispatcher;
@@ -15,7 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @WebMvcTest(controllers = ErrorPageController.class)
-@Import({ModelFiller.class, WebSecurityConfig.class})
+@Import({ModelFiller.class, WebSecurityConfig.class, TwitchatCatalogConfig.class})
 class ErrorPageControllerTest {
 
     @Autowired MockMvc mvc;

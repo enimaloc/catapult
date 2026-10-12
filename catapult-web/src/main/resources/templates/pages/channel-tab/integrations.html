@@ -25,40 +25,79 @@
 <th:block th:fragment="node(n)" th:switch="${n.type()}"
           th:with="text=${n.text() == null ? null : (n.text().isKey() ? #messages.msgWithParams(n.text().key(), n.text().argsArray()) : n.text().literal())}"
           xmlns:spa="urn:fr.enimaloc.catapult:spa">
-    <span th:case="'span'" th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}"
+    <span th:case="'span'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
           spa:state="${n.attrs().state()}" th:text="${text}"></span>
-    <p th:case="'paragraph'" th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}"
+    <p th:case="'paragraph'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
        spa:state="${n.attrs().state()}" th:text="${text}"></p>
-    <mdui-chip th:case="'chip'" th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}"
+    <mdui-chip th:case="'chip'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
                spa:state="${n.attrs().state()}" th:text="${text}"></mdui-chip>
-    <input th:case="'input'" th:type="${n.inputType()}" th:id="${n.attrs().id()}"
+    <input th:case="'input'" th:type="${n.inputType()}" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
            th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
            th:placeholder="${text}"
            th:aria-label="${n.ariaLabel().isKey() ? #messages.msgWithParams(n.ariaLabel().key(), n.ariaLabel().argsArray()) : n.ariaLabel().literal()}"
            th:value="${n.value()}" th:min="${n.min()}" th:max="${n.max()}"/>
     <label th:case="'switch'">
-        <mdui-switch th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}"
+        <mdui-switch th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
                      spa:state="${n.attrs().state()}" th:checked="${n.checked()}"></mdui-switch>
         <span th:text="${text}"></span>
     </label>
-    <mdui-select th:case="'select'" variant="outlined" th:id="${n.attrs().id()}"
+    <mdui-select th:case="'select'" variant="outlined" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
                  th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
-                 th:value="${n.value()}" th:label="${text}">
+                 th:value="${n.value()}" th:label="${text}" th:data-source="${n.source()}">
         <mdui-menu-item th:each="option : ${n.options()}" th:value="${option.value()}"
                         th:text="${option.text().isKey() ? #messages.msgWithParams(option.text().key(), option.text().argsArray()) : option.text().literal()}"></mdui-menu-item>
     </mdui-select>
-    <mdui-segmented-button th:case="'segmented-button'" th:id="${n.attrs().id()}"
+    <mdui-segmented-button th:case="'segmented-button'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
                            th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
                            th:text="${text}"></mdui-segmented-button>
-    <mdui-button th:case="'button'" th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}"
+    <mdui-button th:case="'button'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
                  spa:state="${n.attrs().state()}" th:text="${text}"></mdui-button>
-    <div th:case="'div'" th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}"
+    <div th:case="'div'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
          spa:state="${n.attrs().state()}">
         <th:block th:each="child : ${n.children()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
     </div>
-    <mdui-segmented-button-group th:case="'segmented-group'" th:id="${n.attrs().id()}"
+    <mdui-segmented-button-group th:case="'segmented-group'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
                                  th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}">
         <th:block th:each="child : ${n.children()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
     </mdui-segmented-button-group>
+    <mdui-text-field th:case="'text-field'" variant="outlined" th:id="${n.attrs().id()}"
+                     th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
+                     th:data-field="${n.attrs().field()}" th:type="${n.inputType()}" th:label="${text}"
+                     th:value="${n.value()}" th:rows="${n.multiline()} ? 3 : null"
+                     th:attr="autosize=${n.multiline()} ? 'autosize' : null"></mdui-text-field>
+    <input th:case="'hidden'" type="hidden" th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}"
+           th:data-field="${n.attrs().field()}" th:value="${n.value()}"/>
+    <mdui-button th:case="'text-button'" variant="text" th:id="${n.attrs().id()}"
+                 th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
+                 th:text="${text}"></mdui-button>
+    <mdui-collapse th:case="'collapse'" th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}">
+        <mdui-collapse-item th:each="item : ${n.items()}" th:value="${item.value()}"
+                            th:id="${item.attrs().id()}" th:classappend="${item.attrs().className()}">
+            <mdui-list-item slot="header" th:text="${item.text().isKey() ? #messages.msgWithParams(item.text().key(), item.text().argsArray()) : item.text().literal()}"></mdui-list-item>
+            <div class="collapse-body">
+                <th:block th:each="child : ${item.children()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
+            </div>
+        </mdui-collapse-item>
+    </mdui-collapse>
+    <div th:case="'repeater'" class="repeater" data-repeater th:id="${n.attrs().id()}"
+         th:classappend="${n.attrs().className()}" th:data-field="${n.attrs().field()}">
+        <span class="repeater-label" th:text="${text}"></span>
+        <div class="repeater-rows">
+            <div class="repeater-row" th:each="row : ${n.rows()}">
+                <th:block th:each="child : ${row}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
+                <mdui-button-icon class="repeater-remove" icon="delete" th:aria-label="#{twitchat.repeater.remove}"></mdui-button-icon>
+            </div>
+        </div>
+        <template>
+            <div class="repeater-row">
+                <th:block th:each="child : ${n.template()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
+                <mdui-button-icon class="repeater-remove" icon="delete" th:aria-label="#{twitchat.repeater.remove}"></mdui-button-icon>
+            </div>
+        </template>
+        <mdui-button class="repeater-add" variant="text" icon="add" th:text="#{twitchat.repeater.add}"></mdui-button>
+    </div>
     <th:block th:case="'raw'" th:utext="${n.html()}"></th:block>
 </th:block>
+
+<!--/* Renders ${node} alone: IntegrationNodeRenderingTest's entry point. */-->
+<th:block th:fragment="node-alone" th:insert="~{pages/channel-tab/integrations :: node(${node})}"></th:block>

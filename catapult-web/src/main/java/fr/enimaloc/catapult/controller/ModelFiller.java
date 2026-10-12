@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms;
 import fr.enimaloc.catapult.dto.index.FeatureDto;
 import fr.enimaloc.catapult.dto.index.PlatformDto;
 import fr.enimaloc.catapult.dto.index.SpaPage;
@@ -42,6 +44,7 @@ public class ModelFiller {
     private final Optional<BuildProperties> buildProperties;
     private final MessageSource messageSource;
     private final ApiService apiService;
+    private final TwitchatEventForms twitchatEventForms;
 
     public void defaultAttr(Model model, String page) {
         model.addAttribute("app", APP_MODEL);
@@ -108,7 +111,9 @@ public class ModelFiller {
         if (channelPage.isOwner()) {
             model.addAttribute("channelSettings", apiService.channelSettings(username));
             model.addAttribute("dtddMapping", apiService.dtddMappingStatus(username));
-            model.addAttribute("integrations", IntegrationCards.of(channelPage));
+            var twitchatEvents = channelPage.twitchat() == null ? Map.<String, List<TwitchatEventActionDto>>of()
+                    : apiService.twitchatEvents(username);
+            model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
         }
     }
 

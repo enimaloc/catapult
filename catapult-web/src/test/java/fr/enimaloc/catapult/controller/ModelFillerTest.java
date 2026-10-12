@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.twitchat.TwitchatCatalog;
+import fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms;
 import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +42,7 @@ class ModelFillerTest {
     private ExtendedModelMap model;
 
     private ModelFiller filler(Optional<BuildProperties> buildProperties) {
-        return new ModelFiller(buildProperties, messages, api);
+        return new ModelFiller(buildProperties, messages, api, new TwitchatEventForms(TwitchatCatalog.load()));
     }
 
     private ModelFiller filler() {
