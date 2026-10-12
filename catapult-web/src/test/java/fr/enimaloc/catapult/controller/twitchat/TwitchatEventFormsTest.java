@@ -127,6 +127,41 @@ class TwitchatEventFormsTest {
                 new TwitchatEventActionDto("GONE_ACTION", "FORM", "{}", true))))).isNotNull();
     }
 
+    private static boolean hidden(IntegrationNode node) {
+        return node.attrs().className() != null && node.attrs().className().contains("hidden");
+    }
+
+    private static IntegrationNode inRow(List<IntegrationNode> row, String field) {
+        return row.stream().filter(n -> field.equals(n.attrs().field())).findFirst().orElseThrow();
+    }
+
+    @Test
+    void buttonRow_showsOnlyTheFieldsOfItsType_theTemplateThoseOfTheDefaultType() {
+        IntegrationNode card = forms.payloadCard("STREAM_STARTED", new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "FORM",
+                "{\"message\":\"Hi\",\"actions\":[{\"label\":\"Intro\",\"actionType\":\"trigger\",\"triggerId\":\"t-1\"}]}", true));
+        IntegrationNode.Repeater buttons = (IntegrationNode.Repeater) byField(card, "actions");
+
+        List<IntegrationNode> row = buttons.rows().getFirst();
+        assertThat(hidden(inRow(row, "triggerId"))).isFalse();
+        assertThat(((IntegrationNode.Select) inRow(row, "triggerId")).source()).contains("TRIGGERS_GET_ALL");
+        assertThat(hidden(inRow(row, "url"))).isTrue();
+        assertThat(hidden(inRow(row, "message"))).isTrue();
+        assertThat(inRow(row, "url").attrs().showIf()).isEqualTo("{\"path\":\"actionType\",\"values\":[\"url\"]}");
+
+        assertThat(hidden(inRow(buttons.template(), "url"))).isFalse();
+        assertThat(hidden(inRow(buttons.template(), "triggerId"))).isTrue();
+    }
+
+    @Test
+    void switchWithoutAStoredValue_showsItsDefault() {
+        IntegrationNode stored = forms.payloadCard("STREAM_STARTED", new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "FORM", "{\"message\":\"Hi\"}", true));
+        assertThat(((IntegrationNode.Switch) byField(stored, "canClose")).checked()).isTrue();
+        assertThat(((IntegrationNode.Switch) byField(stored, "todayFirst")).checked()).isFalse();
+
+        IntegrationNode closed = forms.payloadCard("STREAM_STARTED", new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "FORM", "{\"canClose\":false}", true));
+        assertThat(((IntegrationNode.Switch) byField(closed, "canClose")).checked()).isFalse();
+    }
+
     @Test
     void newPayload_ofAnUnknownAction_isRefused() {
         assertThatThrownBy(() -> forms.newPayload("GONE_ACTION")).isInstanceOf(TwitchatEventForms.UnknownAction.class);

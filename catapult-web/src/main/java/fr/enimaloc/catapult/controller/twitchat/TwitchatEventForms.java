@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -109,19 +110,23 @@ public final class TwitchatEventForms {
     public List<IntegrationNode> fields(String event, List<TwitchatCatalog.Field> fields, Map<String, Object> data) {
         List<IntegrationNode> nodes = new ArrayList<>();
         for (TwitchatCatalog.Field field : fields) {
-            nodes.add(field(event, field, data));
+            nodes.add(field(event, field, data, fields));
         }
         return nodes;
     }
 
-    private IntegrationNode field(String event, TwitchatCatalog.Field field, Map<String, Object> data) {
+    private IntegrationNode field(String event, TwitchatCatalog.Field field, Map<String, Object> data,
+                                  List<TwitchatCatalog.Field> siblings) {
         Message label = field.labelKey() != null ? key(field.labelKey()) : Message.literal(field.label());
         Object value = field.path() == null ? null : TwitchatPayloadValidator.valueAt(data, field.path());
         Attrs attrs = Attrs.field(field.path());
+        if (field.showIf() != null) {
+            attrs = attrs.withShowIf(JSON.writeValueAsString(field.showIf())).hiddenIf(!shown(field.showIf(), data, siblings));
+        }
         return switch (field.type()) {
             case "textarea" -> new TextField(attrs, label, "text", value, true);
             case "number" -> new TextField(attrs, label, "number", value, false);
-            case "switch" -> new IntegrationNode.Switch(attrs, Boolean.TRUE.equals(value), label);
+            case "switch" -> new IntegrationNode.Switch(attrs, Boolean.TRUE.equals(value == null ? field.defaultValue() : value), label);
             case "json" -> new TextField(attrs.withClass("json-field"), label, "text",
                     value == null ? null : JSON.writeValueAsString(value), true);
             case "select" -> new Select(attrs, label, value == null ? null : value.toString(),
@@ -130,6 +135,16 @@ public final class TwitchatEventForms {
             case "catapult-action" -> catapultAction(event, label, data);
             default -> new TextField(attrs, label, "text", value, false);
         };
+    }
+
+    /** Whether {@code condition} holds on this data: its sibling's value, else that sibling's default. */
+    private static boolean shown(TwitchatCatalog.Condition condition, Map<String, Object> data, List<TwitchatCatalog.Field> siblings) {
+        Object value = TwitchatPayloadValidator.valueAt(data, condition.path());
+        if (value == null) {
+            value = siblings.stream().filter(sibling -> condition.path().equals(sibling.path()))
+                    .map(TwitchatCatalog.Field::defaultValue).filter(Objects::nonNull).findFirst().orElse(null);
+        }
+        return value != null && condition.values().contains(value.toString());
     }
 
     private List<Select.Option> selectOptions(TwitchatCatalog.Field field, Object value) {

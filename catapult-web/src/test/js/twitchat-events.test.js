@@ -334,3 +334,75 @@ describe("Twitchat-dependent bits", () => {
         expect(items()).toEqual(["t-1"]);
     });
 });
+
+describe("button types", () => {
+    const SHOW = (values) => `data-show-if='{"path":"actionType","values":${JSON.stringify(values)}}'`;
+    const ROW = (hidden = "") => `<div class="repeater-row">
+          <select class="twitchat-catapult-action"><option value=""></option><option value="DISABLE_BOT">x</option></select>
+          <input data-field="label" value="Go"><input data-field="actionType" value="url">
+          <input data-field="url" value="https://x" ${SHOW(["url"])}>
+          <mdui-select data-field="triggerId" class="hidden" data-source='{"stable":"TRIGGERS_GET_ALL"}' ${SHOW(["trigger"])}></mdui-select>
+          <input data-field="message" value="" class="hidden" ${SHOW(["message", "discord"])}>
+          <mdui-button class="repeater-remove"></mdui-button>
+        </div>`;
+    const BUTTONS = `<div class="twitchat-payload">
+      <input type="hidden" class="twitchat-payload-action" value="CUSTOM_CHAT_MESSAGE">
+      <input type="hidden" class="twitchat-payload-mode" value="FORM">
+      <mdui-switch class="twitchat-payload-enabled"></mdui-switch>
+      <div class="twitchat-payload-form">
+        <input data-field="message" value="Hi">
+        <div data-repeater data-field="actions">
+          <div class="repeater-rows">${ROW()}</div>
+          <template>${ROW()}</template>
+          <mdui-button class="repeater-add"></mdui-button>
+        </div>
+      </div>
+      <p class="twitchat-payload-errors"></p>
+    </div>`;
+    const row = () => document.querySelector(".repeater-rows > .repeater-row");
+    const field = (name) => row().querySelector(`[data-field="${name}"]`);
+    const setType = (value) => {
+        field("actionType").value = value;
+        field("actionType").dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const data = () => CatapultTwitchatEvents.payloadOf(document.querySelector(".twitchat-payload"));
+
+    beforeEach(() => { html(EVENT(BUTTONS)); render(); });
+
+    it("shows only the fields of the picked type, and saves only those", () => {
+        setType("trigger");
+        expect(field("url").classList.contains("hidden")).toBe(true);
+        expect(field("triggerId").classList.contains("hidden")).toBe(false);
+        field("triggerId").value = "t-1";
+        expect(JSON.parse(data().dataJson).actions).toEqual([{ label: "Go", actionType: "trigger", triggerId: "t-1" }]);
+        setType("discord");
+        expect(field("message").classList.contains("hidden")).toBe(false);
+        expect(field("triggerId").classList.contains("hidden")).toBe(true);
+    });
+
+    it("drops the Catapult action once the button no longer opens a link", () => {
+        const action = row().querySelector(".twitchat-catapult-action");
+        action.value = "DISABLE_BOT";
+        action.dispatchEvent(new Event("change", { bubbles: true }));
+        setType("message");
+        expect(action.value).toBe("");
+    });
+
+    it("brings the URL back when a Catapult action is picked", () => {
+        setType("trigger");
+        const action = row().querySelector(".twitchat-catapult-action");
+        action.value = "DISABLE_BOT";
+        action.dispatchEvent(new Event("change", { bubbles: true }));
+        expect(field("actionType").value).toBe("url");
+        expect(field("url").classList.contains("hidden")).toBe(false);
+    });
+
+    it("fills the trigger list of a row added later", async () => {
+        CatapultTwitchat.isTwitchatConnected = () => true;
+        CatapultTwitchat.send.mockResolvedValue({ triggerList: [{ id: "t-1", name: "Intro" }] });
+        document.querySelector(".repeater-add").click();
+        await flush();
+        const added = document.querySelectorAll(".repeater-rows > .repeater-row")[1];
+        expect(added.querySelector('[data-field="triggerId"] mdui-menu-item')?.getAttribute("value")).toBe("t-1");
+    });
+});

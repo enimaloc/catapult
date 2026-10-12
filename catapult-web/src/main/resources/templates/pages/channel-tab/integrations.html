@@ -43,7 +43,8 @@
     </label>
     <mdui-select th:case="'select'" variant="outlined" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
                  th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
-                 th:value="${n.value()}" th:label="${text}" th:data-source="${n.source()}">
+                 th:value="${n.value()}" th:label="${text}" th:data-source="${n.source()}"
+                 th:data-show-if="${n.attrs().showIf()}">
         <mdui-menu-item th:each="option : ${n.options()}" th:value="${option.value()}"
                         th:text="${option.text().isKey() ? #messages.msgWithParams(option.text().key(), option.text().argsArray()) : option.text().literal()}"></mdui-menu-item>
     </mdui-select>
@@ -62,7 +63,8 @@
     </mdui-segmented-button-group>
     <mdui-text-field th:case="'text-field'" variant="outlined" th:id="${n.attrs().id()}"
                      th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
-                     th:data-field="${n.attrs().field()}" th:type="${n.inputType()}" th:label="${text}"
+                     th:data-field="${n.attrs().field()}" th:data-show-if="${n.attrs().showIf()}"
+                     th:type="${n.inputType()}" th:label="${text}"
                      th:value="${n.value()}" th:rows="${n.multiline()} ? 3 : null"
                      th:attr="autosize=${n.multiline()} ? 'autosize' : null"></mdui-text-field>
     <input th:case="'hidden'" type="hidden" th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}"

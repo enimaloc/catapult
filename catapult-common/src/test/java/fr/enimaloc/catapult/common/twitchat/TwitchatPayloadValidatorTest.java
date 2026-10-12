@@ -52,7 +52,7 @@ class TwitchatPayloadValidatorTest {
     void numberField_acceptsAPlaceholder() {
         // COUNTER_ADD.value is "text" (an arithmetic expression), so use a generated number field instead:
         TwitchatCatalog catalog = new TwitchatCatalog(1, List.of(new TwitchatCatalog.Action("X", Map.of(), "", null, "generated",
-                List.of(new TwitchatCatalog.Field("n", "number", "n", null, true, null, null, null, null)))));
+                List.of(new TwitchatCatalog.Field("n", "number", "n", null, true, null, null, null, null, null)))));
         TwitchatPayloadValidator v = new TwitchatPayloadValidator(catalog);
         assertThat(v.validate(List.of(new TwitchatEventActionDto("X", "FORM", "{\"n\":\"{{count}}\"}", true)))).isEmpty();
         assertThat(v.validate(List.of(new TwitchatEventActionDto("X", "FORM", "{\"n\":\"three\"}", true))))
@@ -87,11 +87,11 @@ class TwitchatPayloadValidatorTest {
     @Test
     void outsideForm_listsTheKeysTheFormWouldDrop_atAnyDepth_andInRows() {
         assertThat(outsideForm("CUSTOM_CHAT_MESSAGE", """
-                {"message":"Hi","quote":"q","user":{"name":"Catapult","color":"#f00"},
+                {"message":"Hi","sticker":"q","user":{"name":"Catapult","badge":"mod"},
                  "actions":[{"label":"a"},{"label":"b","extra":1}]}
                 """)).containsExactly(
-                new TwitchatValidationError(3, "quote", "Not in the form"),
-                new TwitchatValidationError(3, "user.color", "Not in the form"),
+                new TwitchatValidationError(3, "sticker", "Not in the form"),
+                new TwitchatValidationError(3, "user.badge", "Not in the form"),
                 new TwitchatValidationError(3, "actions[1].extra", "Not in the form"));
     }
 
