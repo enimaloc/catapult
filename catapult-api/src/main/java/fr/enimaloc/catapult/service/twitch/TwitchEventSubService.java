@@ -13,7 +13,7 @@ import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
-import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
+import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -49,7 +49,7 @@ public class TwitchEventSubService implements EventSubService {
     private final ApplicationEventPublisher eventPublisher;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
-    private final TwitchatNotifier twitchatNotifier;
+    private final TwitchatEventDispatcher twitchatEventDispatcher;
     private final CatapultCategoryChangeStateService categoryChangeStateService;
 
     @Value("${twitch.client-id:}")
@@ -66,7 +66,7 @@ public class TwitchEventSubService implements EventSubService {
                                  ApplicationEventPublisher eventPublisher,
                                  RestClient restClient,
                                  ObjectMapper objectMapper,
-                                 TwitchatNotifier twitchatNotifier,
+                                 TwitchatEventDispatcher twitchatEventDispatcher,
                                  CatapultCategoryChangeStateService categoryChangeStateService) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
@@ -75,7 +75,7 @@ public class TwitchEventSubService implements EventSubService {
         this.eventPublisher = eventPublisher;
         this.restClient = restClient;
         this.objectMapper = objectMapper;
-        this.twitchatNotifier = twitchatNotifier;
+        this.twitchatEventDispatcher = twitchatEventDispatcher;
         this.categoryChangeStateService = categoryChangeStateService;
         this.connections = new EventSubConnections(
             "[EventSub]", "twitch-eventsub-watchdog", oAuthTokenRepository, this::handleMessage);
@@ -216,10 +216,10 @@ public class TwitchEventSubService implements EventSubService {
             Optional<CatapultCategoryChangeStateService.SelfChange> selfSet =
                     categoryChangeStateService.consumeIfMatches(user, newCategoryId);
             if (selfSet.isPresent()) {
-                twitchatNotifier.onCategoryChangedByCatapult(user, newCategoryId, newCategoryName,
-                        selfSet.get().previousGameId());
+                twitchatEventDispatcher.onCategoryChangedByCatapult(user, newCategoryId, newCategoryName,
+                        selfSet.get().previousGameId(), previous.categoryName());
             } else {
-                twitchatNotifier.onCategoryChangedManually(user, newCategoryId, newCategoryName);
+                twitchatEventDispatcher.onCategoryChangedManually(user, newCategoryId, newCategoryName, previous.categoryName());
             }
         }
         if (!newCcls.equals(previous.cclIds())) {

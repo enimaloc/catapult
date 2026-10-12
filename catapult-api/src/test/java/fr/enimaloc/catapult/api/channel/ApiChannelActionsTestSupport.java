@@ -14,8 +14,8 @@ import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
-import fr.enimaloc.catapult.service.notification.TwitchatNotifier;
-import fr.enimaloc.catapult.service.notification.TwitchatPayloadPresetService;
+import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
+import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,8 +58,8 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean ChannelEventPublisher channelEventPublisher;
     @MockitoBean SchedulerService schedulerService;
     @MockitoBean TwitchatWidgetSettingsService twitchatWidgetSettingsService;
-    @MockitoBean TwitchatPayloadPresetService twitchatPayloadPresetService;
-    @MockitoBean TwitchatNotifier twitchatNotifier;
+    @MockitoBean TwitchatEventActionService twitchatEventActionService;
+    @MockitoBean TwitchatEventDispatcher twitchatEventDispatcher;
     @MockitoBean SteamProfileDiagnostics steamProfileDiagnostics;
 
     static RequestPostProcessor userJwt(UUID id) {

@@ -4,7 +4,6 @@ import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatAction;
-import fr.enimaloc.catapult.common.dto.twitchat.TwitchatNotification;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -70,15 +69,6 @@ class DtoBehaviourTest {
     void twitchatAction_urlButton() {
         assertThat(TwitchatAction.urlButton("Open", "https://x", "primary"))
                 .isEqualTo(new TwitchatAction("Open", "url", "https://x", null, "primary"));
-    }
-
-    @Test
-    void twitchatNotification_withoutId_getsAFreshRandomOne() {
-        var first = new TwitchatNotification("m", "s", "i", "a", List.of());
-        var second = new TwitchatNotification("m", "s", "i", "a", List.of());
-
-        assertThat(first.id()).isNotBlank().isNotEqualTo(second.id());
-        assertThat(first.message()).isEqualTo("m");
     }
 
     @Test

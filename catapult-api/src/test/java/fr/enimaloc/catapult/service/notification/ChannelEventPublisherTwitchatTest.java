@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.twitchat.TwitchatAction;
-import fr.enimaloc.catapult.common.dto.twitchat.TwitchatNotification;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,15 +20,13 @@ class ChannelEventPublisherTwitchatTest {
     @InjectMocks private ChannelEventPublisher channelEventPublisher;
 
     @Test
-    void twitchatNotify_delegatesToRedisPublisherOnTwitchatChannel() {
+    void twitchatDispatch_delegatesToRedisPublisherOnTwitchatChannel() {
         UUID ownerId = UUID.randomUUID();
-        TwitchatNotification notification = new TwitchatNotification(
-                "Le bot a été activé.", "message", "online", "Catapult",
-                List.of(new TwitchatAction("Désactiver le bot", "url", "https://x/y", null, "alert")));
+        TwitchatDispatch dispatch = new TwitchatDispatch("streamer", "STREAM_STARTED", List.of());
 
-        channelEventPublisher.twitchatNotify(ownerId, notification);
+        channelEventPublisher.twitchatDispatch(ownerId, dispatch);
 
-        verify(redisPublisher).publishTwitchat(ownerId, "twitchat.notify", notification);
+        verify(redisPublisher).publishTwitchat(ownerId, "twitchat.dispatch", dispatch);
     }
 
     @Test

@@ -28,6 +28,7 @@ class TwitchatWidgetSettingsServiceTest {
     @Mock private TokenEncryptionService tokenEncryptionService;
     @Mock private ChannelEventPublisher channelEventPublisher;
     @Mock private WidgetTokenService widgetTokenService;
+    @Mock private TwitchatEventActionService eventActionService;
     @InjectMocks private TwitchatWidgetSettingsService service;
 
     private UserAccount user;
@@ -201,5 +202,25 @@ class TwitchatWidgetSettingsServiceTest {
 
         assertThat(service.enabledConfig(user.getId())).isEmpty();
         assertThat(service.enabledConfig(unknown)).isEmpty();
+    }
+
+    @Test
+    void enablingTheWidget_initializesItsEventActions() {
+        when(repository.findById(user.getId())).thenReturn(Optional.empty());
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.updateSettings(user, true, null, null, null);
+
+        verify(eventActionService).ensureInitialized(user);
+    }
+
+    @Test
+    void savingADisabledWidget_initializesNothing() {
+        when(repository.findById(user.getId())).thenReturn(Optional.empty());
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.updateSettings(user, false, null, null, null);
+
+        verify(eventActionService, never()).ensureInitialized(any());
     }
 }
