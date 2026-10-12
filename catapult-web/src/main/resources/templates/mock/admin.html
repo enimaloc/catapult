@@ -1,96 +1,184 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>[MOCK] Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>[MOCK] Config du membre</title>
+    <link rel="stylesheet" href="/_static/mdui/2.1.4/mdui.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="/css/catapult.css">
+    <script src="/_static/mdui/2.1.4/mdui.global.js"></script>
+    <script>
+        mdui.setTheme("dark");
+        mdui.setColorScheme("#8b5cf6");
+    </script>
     <style>
-        body { font-family: sans-serif; max-width: 720px; margin: 2rem auto; }
-        fieldset { margin-bottom: 1rem; }
-        label { display: block; margin: 0.25rem 0; }
-        label.inline { display: inline-block; margin-right: 1rem; }
-        input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; }
-        p.hint { color: #666; font-size: 0.85em; margin: 0 0 0.5rem; }
+        .mock-admin { max-width: 760px; margin: 0 auto; padding: 16px 16px 96px; }
+        .mock-admin header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 16px; }
+        .mock-admin h1 { margin: 0; font-size: 1.4rem; flex: 1 1 auto; }
+        .mock-admin h2 { margin: 0 0 4px; font-size: 1.05rem; }
+        .mock-card {
+            display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; padding: 16px;
+            border: 1px solid var(--catapult-border); border-radius: 12px; background: var(--catapult-surface-elevated);
+        }
+        .mock-hint { margin: 0; color: var(--catapult-text-muted); font-size: 0.85rem; line-height: 1.5; }
+        .mock-row { display: flex; flex-wrap: wrap; gap: 12px; }
+        .mock-row > * { flex: 1 1 200px; min-width: 0; }
+        .mock-switches { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+        .mock-switches label { display: inline-flex; align-items: center; gap: 8px; }
+        .mock-checks { display: flex; flex-wrap: wrap; gap: 0 8px; }
+        .mock-binding { border-top: 1px solid var(--catapult-border); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+        .mock-binding:first-of-type { border-top: none; padding-top: 0; }
+        .mock-actions {
+            position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 8px; padding: 12px 0;
+            background: var(--catapult-background); border-top: 1px solid var(--catapult-border);
+        }
+        .mock-result { margin: 0 0 16px; padding: 12px 16px; border-radius: 12px; background: var(--catapult-surface); }
     </style>
 </head>
 <body>
-<h1>[MOCK] Admin</h1>
-<p class="hint">
-    State here has no path through the app's own UI — everything else (bot toggle, bindings'
-    game/CCL/TW, connections, settings forms) is edited from
-    <a th:href="@{/channel/{u}(u=${channel.twitchUsername()})}" th:text="'/channel/' + ${channel.twitchUsername()}">the channel page</a>
-    itself and already persists there.
-</p>
+<main class="mock-admin">
+    <header>
+        <h1>Config du membre</h1>
+        <mdui-chip icon="person" th:text="${channel.twitchUsername()}">username</mdui-chip>
+        <mdui-button variant="text" icon="swap_horiz" href="/mock/login">Changer de compte</mdui-button>
+    </header>
+    <p class="mock-hint">
+        L'état que l'appli ne permet pas de modifier. Le reste (associations du jeu, CCL/TW, connexions, réglages)
+        se modifie depuis la page de la chaîne elle-même. Appliquer recharge l'appli.
+    </p>
+    <p class="mock-result" th:if="${twitchatResult}" th:text="${twitchatResult}"></p>
 
-<form method="post" th:action="@{/mock/admin}">
-    <fieldset>
-        <legend>Channel</legend>
-        <p class="hint" th:text="'Username: ' + ${channel.twitchUsername()} + ' (set at login only, not editable here)'"></p>
-        <label class="inline"><input type="checkbox" name="live" th:checked="${channel.live()}"/> Live</label>
-        <label>Avatar URL <input type="text" name="avatarUrl" th:value="${channel.profileImageUrl()}"/></label>
-    </fieldset>
+    <form id="mock-admin-form" method="post" th:action="@{/mock/admin}">
+        <section class="mock-card">
+            <h2>Chaîne</h2>
+            <div class="mock-switches">
+                <label><mdui-switch name="live" th:checked="${channel.live()}"></mdui-switch> En live</label>
+                <label><mdui-switch name="botEnabled" th:checked="${botEnabled}"></mdui-switch> Bot actif</label>
+            </div>
+            <mdui-text-field variant="outlined" name="avatarUrl" label="URL de l'avatar" th:value="${channel.profileImageUrl()}"></mdui-text-field>
+            <p class="mock-hint">Passer en live envoie « Début de stream » à Twitchat ; changer le bot, « Bot activé / désactivé ».</p>
+        </section>
 
-    <fieldset>
-        <legend>Detected game</legend>
-        <p class="hint">What Catapult reports as currently running — independent of the binding's Twitch category below.</p>
-        <label>Source type
-            <select name="detectedSourceType">
-                <option th:each="s : ${sourceTypes}" th:value="${s}" th:text="${s}" th:selected="${game != null and s == game.sourceType()}"></option>
-            </select>
-        </label>
-        <label>Source name <input type="text" name="detectedSourceName" th:value="${game?.sourceName()}"/></label>
-    </fieldset>
+        <section class="mock-card">
+            <h2>Jeu détecté</h2>
+            <div class="mock-row">
+                <mdui-select variant="outlined" name="detectedSourceType" label="Source" th:value="${game?.sourceType()}">
+                    <mdui-menu-item th:each="s : ${sourceTypes}" th:value="${s}" th:text="${s}"></mdui-menu-item>
+                </mdui-select>
+                <mdui-text-field variant="outlined" name="detectedSourceName" label="Nom dans la source" th:value="${game?.sourceName()}"></mdui-text-field>
+            </div>
+            <p class="mock-hint">
+                Ce que Catapult voit tourner. En changer envoie « Catégorie changée par Catapult » quand une association
+                lui donne une catégorie (et que le bot est actif), « Aucun jeu trouvé » sinon.
+            </p>
+        </section>
 
-    <fieldset>
-        <legend>Providers</legend>
-        <label class="inline"><input type="checkbox" name="hasSteamProvider" th:checked="${hasSteamProvider}"/> Steam provider available</label>
-        <label class="inline"><input type="checkbox" name="hasSteam" th:checked="${hasSteam}"/> Steam connected</label>
-        <label class="inline"><input type="checkbox" name="hasXboxProvider" th:checked="${hasXboxProvider}"/> Xbox provider available</label>
-        <label class="inline"><input type="checkbox" name="hasXbox" th:checked="${hasXbox}"/> Xbox connected</label>
-    </fieldset>
+        <section class="mock-card">
+            <h2>Steam</h2>
+            <div class="mock-switches">
+                <label><mdui-switch name="hasSteamProvider" th:checked="${hasSteamProvider}"></mdui-switch> Fournisseur disponible</label>
+                <label><mdui-switch name="hasSteam" th:checked="${hasSteam}"></mdui-switch> Connecté</label>
+                <label><mdui-switch name="hasSteamPersonalToken" th:checked="${hasSteamPersonalToken}"></mdui-switch> Token personnel</label>
+                <label><mdui-switch name="steamTokenShared" th:checked="${steamTokenShared}"></mdui-switch> Token partagé</label>
+                <label><mdui-switch name="steamProfilePrivate" th:checked="${steamProfilePrivate}"></mdui-switch> Profil privé</label>
+                <label><mdui-switch name="steamRateLimited" th:checked="${steamRateLimited}"></mdui-switch> Limité (rate limit)</label>
+                <label><mdui-switch name="steamOfflineMode" th:checked="${steamOfflineMode}"></mdui-switch> Mode hors ligne</label>
+            </div>
+            <mdui-text-field variant="outlined" type="number" name="steamProfileCacheTtlMinutes" label="Cache du profil (minutes)"
+                             th:value="${steamProfileCacheTtlMinutes}"></mdui-text-field>
+        </section>
 
-    <fieldset>
-        <legend>Steam diagnostics</legend>
-        <label class="inline"><input type="checkbox" name="steamProfilePrivate" th:checked="${steamProfilePrivate}"/> Profile private</label>
-        <label class="inline"><input type="checkbox" name="steamRateLimited" th:checked="${steamRateLimited}"/> Rate limited</label>
-        <label class="inline"><input type="checkbox" name="steamOfflineMode" th:checked="${steamOfflineMode}"/> Offline mode</label>
-        <label>Profile cache TTL (minutes) <input type="number" name="steamProfileCacheTtlMinutes" th:value="${steamProfileCacheTtlMinutes}"/></label>
-    </fieldset>
+        <section class="mock-card">
+            <h2>Xbox</h2>
+            <div class="mock-switches">
+                <label><mdui-switch name="hasXboxProvider" th:checked="${hasXboxProvider}"></mdui-switch> Fournisseur disponible</label>
+                <label><mdui-switch name="hasXbox" th:checked="${hasXbox}"></mdui-switch> Connecté</label>
+            </div>
+        </section>
 
-    <fieldset>
-        <legend>Binding</legend>
-        <p class="hint" th:if="${binding == null}">No binding exists right now (deleted, or never set) — submitting this section creates one.</p>
-        <label>Status
-            <select name="bindingStatus">
-                <option th:each="s : ${bindingStatuses}" th:value="${s}" th:text="${s}"
-                        th:selected="${binding != null and s == binding.status()}"></option>
-            </select>
-        </label>
-        <label>Source type
-            <select name="bindingSourceType">
-                <option th:each="s : ${sourceTypes}" th:value="${s}" th:text="${s}"
-                        th:selected="${binding != null ? s == binding.sourceType() : s == 'STEAM'}"></option>
-            </select>
-        </label>
-        <label>Source name <input type="text" name="bindingSourceName" th:value="${binding != null ? binding.sourceName() : 'STUNTBOOST'}"/></label>
-        <label>Twitch game ID <input type="text" name="bindingTwitchGameId" th:value="${binding != null ? binding.twitchGameId() : '000001'}"/></label>
-        <label>Twitch game name <input type="text" name="bindingTwitchGameName" th:value="${binding != null ? binding.twitchGameName() : 'Stuntboost'}"/></label>
-        <label class="inline"><input type="checkbox" name="bindingIgnored" th:checked="${binding != null and binding.ignored()}"/> Ignored</label>
-        <label class="inline"><input type="checkbox" name="bindingCclEnabled" th:checked="${binding == null or binding.cclEnabled()}"/> CCL enabled</label>
-        <label class="inline"><input type="checkbox" name="bindingTwEnabled" th:checked="${binding == null or binding.twEnabled()}"/> TW enabled</label>
-        <label class="inline"><input type="checkbox" name="bindingTwOverride" th:checked="${binding != null and binding.twOverride()}"/> TW override</label>
-        <p>CCLs on this binding:</p>
-        <label class="inline" th:each="ccl : ${availableCcls}">
-            <input type="checkbox" name="bindingCcls" th:value="${ccl.id()}"
-                   th:checked="${binding != null and binding.ccls().contains(ccl.id())}"/> <span th:text="${ccl.name()}"></span>
-        </label>
-        <p>TWs on this binding:</p>
-        <label class="inline" th:each="tw : ${availableTws}">
-            <input type="checkbox" name="bindingTws" th:value="${tw.id()}"
-                   th:checked="${binding != null and binding.tws().contains(tw.id())}"/> <span th:text="${tw.label()}"></span>
-        </label>
-    </fieldset>
+        <section class="mock-card">
+            <h2>Minecraft</h2>
+            <div class="mock-switches">
+                <label><mdui-switch name="hasMinecraftProvider" th:checked="${hasMinecraftProvider}"></mdui-switch> Fournisseur disponible</label>
+            </div>
+            <div class="mock-row">
+                <mdui-select variant="outlined" name="minecraftStatus" label="Statut du lien" th:value="${minecraft.status()}">
+                    <mdui-menu-item th:each="s : ${minecraftStatuses}" th:value="${s}" th:text="${s}"></mdui-menu-item>
+                </mdui-select>
+                <mdui-text-field variant="outlined" name="minecraftName" label="Pseudo Minecraft" th:value="${minecraft.minecraftName()}"></mdui-text-field>
+                <mdui-text-field variant="outlined" name="minecraftServiceAccount" label="Compte de service"
+                                 th:value="${minecraft.serviceAccountUsername()}"></mdui-text-field>
+            </div>
+        </section>
 
-    <button type="submit">Apply</button>
-</form>
+        <section class="mock-card">
+            <h2>Associations</h2>
+            <p class="mock-hint" th:if="${bindings.isEmpty()}">Aucune association pour l'instant.</p>
+            <div class="mock-binding" th:each="b, it : ${bindings}" th:with="p=|bindings[${it.index}]|">
+                <input type="hidden" th:name="|${p}.id|" th:value="${b.id()}">
+                <div class="mock-row">
+                    <mdui-select variant="outlined" th:name="|${p}.sourceType|" label="Source" th:value="${b.sourceType()}">
+                        <mdui-menu-item th:each="s : ${sourceTypes}" th:value="${s}" th:text="${s}"></mdui-menu-item>
+                    </mdui-select>
+                    <mdui-text-field variant="outlined" th:name="|${p}.sourceName|" label="Nom dans la source" th:value="${b.sourceName()}"></mdui-text-field>
+                    <mdui-select variant="outlined" th:name="|${p}.status|" label="Statut" th:value="${b.status()}">
+                        <mdui-menu-item th:each="s : ${bindingStatuses}" th:value="${s}" th:text="${s}"></mdui-menu-item>
+                    </mdui-select>
+                </div>
+                <div class="mock-row">
+                    <mdui-text-field variant="outlined" th:name="|${p}.twitchGameId|" label="ID de la catégorie Twitch" th:value="${b.twitchGameId()}"></mdui-text-field>
+                    <mdui-text-field variant="outlined" th:name="|${p}.twitchGameName|" label="Catégorie Twitch" th:value="${b.twitchGameName()}"></mdui-text-field>
+                </div>
+                <div class="mock-switches">
+                    <label><mdui-switch th:name="|${p}.ignored|" th:checked="${b.ignored()}"></mdui-switch> Ignorée</label>
+                    <label><mdui-switch th:name="|${p}.cclEnabled|" th:checked="${b.cclEnabled()}"></mdui-switch> CCL actifs</label>
+                    <label><mdui-switch th:name="|${p}.twEnabled|" th:checked="${b.twEnabled()}"></mdui-switch> TW actifs</label>
+                    <label><mdui-switch th:name="|${p}.twOverride|" th:checked="${b.twOverride()}"></mdui-switch> TW personnalisés</label>
+                </div>
+                <p class="mock-hint">CCL</p>
+                <div class="mock-checks">
+                    <mdui-checkbox th:each="ccl : ${availableCcls}" th:name="|${p}.ccls|" th:value="${ccl.id()}"
+                                   th:checked="${b.ccls().contains(ccl.id())}" th:text="${ccl.name()}"></mdui-checkbox>
+                </div>
+                <p class="mock-hint">TW</p>
+                <div class="mock-checks">
+                    <mdui-checkbox th:each="tw : ${availableTws}" th:name="|${p}.tws|" th:value="${tw.id()}"
+                                   th:checked="${b.tws().contains(tw.id())}" th:text="${tw.label()}"></mdui-checkbox>
+                </div>
+                <div class="mock-switches">
+                    <label><mdui-switch th:name="|${p}.delete|"></mdui-switch> Supprimer cette association</label>
+                </div>
+            </div>
+            <div>
+                <mdui-button variant="tonal" icon="add" type="submit" formaction="/mock/admin?addBinding=true">Ajouter une association</mdui-button>
+            </div>
+        </section>
+
+        <div class="mock-actions">
+            <mdui-button type="submit" icon="check">Appliquer</mdui-button>
+        </div>
+    </form>
+
+    <form id="mock-twitchat-form" method="post" th:action="@{/mock/admin/twitchat}">
+        <section class="mock-card">
+            <h2>Envoyer un événement à Twitchat</h2>
+            <p class="mock-hint">
+                Envoie les payloads actifs de l'événement, comme catapult-api quand il se produit. Il faut une page de la
+                chaîne ouverte et connectée à OBS, avec Twitchat.
+            </p>
+            <mdui-select variant="outlined" name="event" label="Événement" th:value="${twitchatEvents.keySet().iterator().next()}">
+                <mdui-menu-item th:each="e : ${twitchatEvents}" th:value="${e.key}"
+                                th:text="${#messages.msg('channel.connections.twitchat.event.' + e.key, e.value)}"></mdui-menu-item>
+            </mdui-select>
+            <div class="mock-row">
+                <mdui-text-field variant="outlined" name="gameName" label="{{gameName}}" value="Jeu de test"></mdui-text-field>
+                <mdui-text-field variant="outlined" name="previousGameName" label="{{previousGameName}}" value="Jeu précédent"></mdui-text-field>
+            </div>
+            <div><mdui-button variant="tonal" icon="send" type="submit">Envoyer</mdui-button></div>
+        </section>
+    </form>
+</main>
+<script src="/js/mock-popout.js" data-role="popout"></script>
 </body>
 </html>

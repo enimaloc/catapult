@@ -66,7 +66,9 @@ public class MockData {
     private boolean hasSteamProvider;
     @Getter
     private boolean hasSteam;
+    @Getter
     private boolean hasSteamPersonalToken;
+    @Getter
     private boolean steamTokenShared;
     @Getter
     private boolean steamProfilePrivate;
@@ -81,7 +83,8 @@ public class MockData {
     private boolean hasXboxProvider;
     @Getter
     private boolean hasXbox;
-    private final boolean hasMinecraftProvider;
+    @Getter
+    private boolean hasMinecraftProvider;
     private LinkStateResponse minecraftLink;
     private ObsData obsData;
     private String obsPassword;
@@ -422,25 +425,43 @@ public class MockData {
         this.steamProfileCacheTtlMinutes = cacheTtlMinutes;
     }
 
-    /** The binding the admin page's single-slot form edits — the first one, or null when there's none. */
+    /** The first binding, or null when there's none. */
     public BindingDto getPrimaryBinding() {
         return binding.isEmpty() ? null : binding.getFirst();
     }
 
     /**
-     * Creates or fully replaces the admin page's binding slot (the first entry), including
-     * {@code status} — which the dashboard never touches — and works even after that entry was
-     * deleted, since the UI has no "add binding" action. Other bindings are left untouched.
+     * Replaces every binding at once, as the admin page edits them, {@code status} included
+     * (which the dashboard never touches). A binding without an id gets one.
      */
-    public void replaceBinding(String status, String sourceType, String sourceName, String twitchGameId,
-                               String twitchGameName, boolean ignored, boolean cclEnabled, Set<String> ccls,
-                               boolean twEnabled, boolean twOverride, Set<String> tws) {
-        BindingDto primary = getPrimaryBinding();
-        String id = primary != null ? primary.id() : MockPresets.uuidOf(sourceName).toString();
-        BindingDto replaced = new BindingDto(id, status, sourceType, sourceName, twitchGameId, twitchGameName,
-                ignored, cclEnabled, Set.copyOf(ccls), twEnabled, twOverride, Set.copyOf(tws));
-        List<BindingDto> rest = primary != null ? binding.subList(1, binding.size()) : binding;
-        binding = Stream.concat(Stream.of(replaced), rest.stream()).toList();
+    public void setBindings(List<BindingDto> bindings) {
+        binding = bindings.stream()
+                .map(b -> b.id() != null && !b.id().isBlank() ? b : new BindingDto(UUID.randomUUID().toString(), b.status(),
+                        b.sourceType(), b.sourceName(), b.twitchGameId(), b.twitchGameName(), b.ignored(), b.cclEnabled(),
+                        b.ccls(), b.twEnabled(), b.twOverride(), b.tws()))
+                .toList();
+    }
+
+    /** Adds a blank binding for the admin page to fill in: the UI has no "add binding" action. */
+    public void addBinding() {
+        binding = Stream.concat(binding.stream(), Stream.of(new BindingDto(UUID.randomUUID().toString(), "MANUAL", "STEAM",
+                "Nouveau jeu", "", "", false, true, Set.of(), true, false, Set.of()))).toList();
+    }
+
+    public void setSteamPersonalToken(boolean hasPersonalToken, boolean shared) {
+        hasSteamPersonalToken = hasPersonalToken;
+        steamTokenShared = hasPersonalToken && shared;
+    }
+
+    /** The Minecraft link as the admin page forces it: "NONE" unlinks, whatever the name. */
+    public void setMinecraft(boolean provider, String status, String name, String serviceAccountUsername) {
+        hasMinecraftProvider = provider;
+        minecraftLink = status == null || "NONE".equals(status) ? MINECRAFT_UNLINKED
+                : new LinkStateResponse(status, blankToNull(name), blankToNull(serviceAccountUsername));
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text;
     }
 
     // --- helpers -------------------------------------------------------------------------------

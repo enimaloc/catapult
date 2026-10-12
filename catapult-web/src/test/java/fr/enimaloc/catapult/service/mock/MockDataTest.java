@@ -167,7 +167,8 @@ class MockDataTest {
         @Test
         void filtersBindingsByStatusAndSourceIgnoringCase() {
             MockData data = session();
-            data.replaceBinding("MANUAL", "XBOX", "Halo", "1", "Halo", false, true, Set.of(), true, false, Set.of());
+            data.setBindings(List.of(new BindingDto(STUNTBOOST.id(), "MANUAL", "XBOX", "Halo", "1", "Halo",
+                    false, true, Set.of(), true, false, Set.of()), CONTROL));
 
             assertThat(data.getPage(LIVE.twitchUsername(), "manual", null).bindings().content())
                     .extracting(BindingDto::sourceName).containsExactly("Halo");
@@ -258,26 +259,45 @@ class MockDataTest {
         }
 
         @Test
-        void replacesThePrimaryBindingKeepingItsId() {
+        void setsEveryBinding_givingAnIdToANewOne() {
             MockData data = session();
+            BindingDto edited = new BindingDto(STUNTBOOST.id(), "MANUAL", "XBOX", "Halo", "1", "Halo",
+                    true, false, Set.of("a"), false, true, Set.of("b"));
 
-            data.replaceBinding("MANUAL", "XBOX", "Halo", "1", "Halo", true, false, Set.of("a"), false, true, Set.of("b"));
+            data.setBindings(List.of(edited, new BindingDto(null, "AUTO", "STEAM", "Valheim", "1", "Valheim",
+                    false, true, Set.of(), true, false, Set.of())));
 
-            BindingDto primary = data.getPrimaryBinding();
-            assertThat(primary.id()).isEqualTo(STUNTBOOST.id());
-            assertThat(primary).isEqualTo(new BindingDto(STUNTBOOST.id(), "MANUAL", "XBOX", "Halo", "1", "Halo",
-                    true, false, Set.of("a"), false, true, Set.of("b")));
-            assertThat(data.getBinding()).hasSize(2).endsWith(CONTROL);
+            assertThat(data.getPrimaryBinding()).isEqualTo(edited);
+            assertThat(data.getBinding()).hasSize(2).last().extracting(BindingDto::id).isNotNull();
         }
 
         @Test
-        void replacingWithoutAnyBinding_createsOne() {
+        void addsABlankBinding() {
             MockData data = session(List.of());
 
-            data.replaceBinding("AUTO", "STEAM", "Valheim", "1", "Valheim", false, true, Set.of(), true, false, Set.of());
+            data.addBinding();
 
-            assertThat(data.getBinding()).singleElement()
-                    .extracting(BindingDto::id).isEqualTo(MockPresets.uuidOf("Valheim").toString());
+            assertThat(data.getBinding()).singleElement().satisfies(b -> {
+                assertThat(b.id()).isNotBlank();
+                assertThat(b.status()).isEqualTo("MANUAL");
+            });
+        }
+
+        @Test
+        void forcesTheSteamTokenAndTheMinecraftLink() {
+            MockData data = session();
+
+            data.setSteamPersonalToken(false, true);
+            assertThat(data.isSteamTokenShared()).isFalse(); // no token, nothing to share
+            data.setSteamPersonalToken(true, true);
+            assertThat(data.isHasSteamPersonalToken()).isTrue();
+            assertThat(data.isSteamTokenShared()).isTrue();
+
+            data.setMinecraft(true, "PENDING", "Steve", " ");
+            assertThat(data.getMinecraftLink()).isEqualTo(new LinkStateResponse("PENDING", "Steve", null));
+            data.setMinecraft(false, "NONE", "Steve", "bot");
+            assertThat(data.getMinecraftLink()).isEqualTo(new LinkStateResponse("NONE", null, null));
+            assertThat(data.isHasMinecraftProvider()).isFalse();
         }
     }
 
