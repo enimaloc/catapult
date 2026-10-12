@@ -67,7 +67,8 @@ public final class TwitchatEventForms {
 
     /** A payload not saved yet: the action's field defaults. UnknownAction unless in the catalog. */
     public TwitchatEventActionDto newPayload(String action) {
-        TwitchatCatalog.Action entry = catalog.action(action).orElseThrow(() -> new UnknownAction(action));
+        TwitchatCatalog.Action entry = catalog.action(action).filter(found -> !found.dataOnly())
+                .orElseThrow(() -> new UnknownAction(action));
         Map<String, Object> data = new LinkedHashMap<>();
         for (TwitchatCatalog.Field field : orEmpty(entry.fields())) {
             if (field.path() != null && field.defaultValue() != null) {
@@ -83,7 +84,7 @@ public final class TwitchatEventForms {
      */
     public IntegrationNode payloadCard(String event, TwitchatEventActionDto payload) {
         TwitchatCatalog.Action action = catalog.action(payload.action()).orElseGet(() ->
-                new TwitchatCatalog.Action(payload.action(), Map.of(), null, null, "raw", List.of()));
+                new TwitchatCatalog.Action(payload.action(), Map.of(), null, null, "action", "raw", List.of()));
         boolean raw = action.rawOnly() || "RAW".equals(payload.mode());
         Map<String, Object> data = dataOf(payload.dataJson());
         return new Container(Attrs.cls("twitchat-payload"), Container.Kind.DIV, List.of(
@@ -131,6 +132,10 @@ public final class TwitchatEventForms {
                     value == null ? null : JSON.writeValueAsString(value), true);
             case "select" -> new Select(attrs, label, value == null ? null : value.toString(),
                     selectOptions(field, value), field.source() == null ? null : JSON.writeValueAsString(field.source()));
+            // Its options' values are JSON literals, read back as such (json-field).
+            case "choice" -> new Select(attrs.withClass("json-field"), label, value == null ? null : JSON.writeValueAsString(value),
+                    selectOptions(field, value == null ? null : JSON.writeValueAsString(value)), null);
+            case "list" -> list(attrs, label, value);
             case "repeater" -> repeater(event, field, attrs, label, value);
             case "catapult-action" -> catapultAction(event, label, data);
             default -> new TextField(attrs, label, "text", value, false);
@@ -149,6 +154,10 @@ public final class TwitchatEventForms {
 
     private List<Select.Option> selectOptions(TwitchatCatalog.Field field, Object value) {
         List<Select.Option> options = new ArrayList<>();
+        // An optional select can be emptied, leaving the key out of the data.
+        if (!field.required()) {
+            options.add(new Select.Option("", key("twitchat.field.none")));
+        }
         if (field.options() != null) {
             for (TwitchatCatalog.Option option : field.options()) {
                 options.add(new Select.Option(option.value(),
@@ -160,6 +169,18 @@ public final class TwitchatEventForms {
             options.add(new Select.Option(value.toString(), Message.literal(value.toString())));
         }
         return options;
+    }
+
+    /** A list of texts: one text field per item, "add" cloning an empty one; read back as an array. */
+    private static IntegrationNode list(Attrs attrs, Message label, Object value) {
+        List<List<IntegrationNode>> rows = new ArrayList<>();
+        if (value instanceof List<?> items) {
+            for (Object item : items) {
+                rows.add(List.of(new TextField(Attrs.field("value"), label, "text", item, false)));
+            }
+        }
+        return new IntegrationNode.Repeater(attrs.withClass("list-repeater"), label, rows,
+                List.of(new TextField(Attrs.field("value"), label, "text", null, false)));
     }
 
     private IntegrationNode repeater(String event, TwitchatCatalog.Field field, Attrs attrs, Message label, Object value) {
@@ -198,6 +219,7 @@ public final class TwitchatEventForms {
 
     private List<Select.Option> actionOptions() {
         return catalog.actions().stream()
+                .filter(action -> !action.dataOnly())
                 .map(action -> new Select.Option(action.key(), Message.literal(actionLabel(action))))
                 .toList();
     }

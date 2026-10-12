@@ -406,3 +406,27 @@ describe("button types", () => {
         expect(added.querySelector('[data-field="triggerId"] mdui-menu-item')?.getAttribute("value")).toBe("t-1");
     });
 });
+
+describe("lists of texts", () => {
+    const LIST = `<div class="twitchat-payload">
+      <input type="hidden" class="twitchat-payload-action" value="CHAT_POLL_START">
+      <input type="hidden" class="twitchat-payload-mode" value="FORM">
+      <mdui-switch class="twitchat-payload-enabled"></mdui-switch>
+      <div class="twitchat-payload-form">
+        <input data-field="title" value="Best?">
+        <div data-repeater data-field="choices" class="list-repeater">
+          <div class="repeater-rows">
+            <div class="repeater-row"><input data-field="value" value="A"></div>
+            <div class="repeater-row"><input data-field="value" value=""></div>
+            <div class="repeater-row"><input data-field="value" value="B"></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+    it("reads a list back as its items' texts, empty ones left out", () => {
+        html(EVENT(LIST)); render();
+        const data = JSON.parse(CatapultTwitchatEvents.payloadOf(document.querySelector(".twitchat-payload")).dataJson);
+        expect(data).toEqual({ title: "Best?", choices: ["A", "B"] });
+    });
+});
