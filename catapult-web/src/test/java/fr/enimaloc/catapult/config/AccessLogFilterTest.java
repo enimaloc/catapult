@@ -1,10 +1,12 @@
 package fr.enimaloc.catapult.config;
 
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -14,7 +16,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(OutputCaptureExtension.class)
 class AccessLogFilterTest {
-    private final AccessLogFilter filter = new AccessLogFilter();
+    private final AccessLogFilter filter = new AccessLogFilter(new MockEnvironment());
+
+    private static AccessLogFilter devFilter() {
+        MockEnvironment env = new MockEnvironment();
+        env.setActiveProfiles("dev");
+        return new AccessLogFilter(env);
+    }
 
     private static MockHttpServletRequest request(String method, String uri) {
         MockHttpServletRequest request = new MockHttpServletRequest(method, uri);
@@ -60,5 +68,40 @@ class AccessLogFilterTest {
 
         request.getAsyncContext().complete();
         assertThat(output).containsPattern("GET /me/twitchat/events 200 \\d+ms");
+    }
+
+    @Test
+    void staysOnOneLineOutsideDev(CapturedOutput output) throws Exception {
+        MockHttpServletRequest request = request("GET", "/channels");
+        request.addHeader("User-Agent", "test-agent");
+
+        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+        assertThat(output).doesNotContain("> GET").doesNotContain("test-agent");
+    }
+
+    @Test
+    void showsTheWholeExchangeLikeCurlVerbose_inDev(CapturedOutput output) throws Exception {
+        MockHttpServletRequest request = request("GET", "/auth/callback");
+        request.setQueryString("code=1");
+        request.addHeader("User-Agent", "test-agent");
+        request.addHeader("Cookie", "SESSION=abc");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        devFilter().doFilter(request, response, (req, res) -> {
+            HttpServletResponse r = (HttpServletResponse) res;
+            r.setStatus(302);
+            r.setHeader("Location", "/channels");
+            r.addHeader("Set-Cookie", "SESSION=def");
+        });
+
+        assertThat(output)
+                .contains("> GET /auth/callback?code=1 HTTP/1.1")
+                .contains("> User-Agent: test-agent")
+                .contains("> Cookie: ***")
+                .contains("< HTTP/1.1 302")
+                .contains("< Location: /channels")
+                .contains("< Set-Cookie: ***")
+                .doesNotContain("abc").doesNotContain("def");
     }
 }
