@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.Test;
@@ -8,10 +10,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -20,9 +25,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = ChannelActionsController.class)
 @Import(WebSecurityConfig.class)
+@RecordApplicationEvents
 class ChannelActionsControllerTest {
 
     @Autowired MockMvc mvc;
+    @Autowired ApplicationEvents events;
     @MockitoBean ApiService apiService;
 
     @Test
@@ -39,6 +46,24 @@ class ChannelActionsControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(apiService).recheckGame("enimaloc");
+    }
+
+    @Test
+    void recheckGame_publishesTheGameNowDetected() throws Exception {
+        when(apiService.currentGame("enimaloc")).thenReturn(new GameDto("b1", "Halo", "XBOX"));
+
+        mvc.perform(post("/channel/enimaloc/game/recheck").with(csrf()));
+
+        assertThat(events.stream(GameChangedEvent.class))
+                .containsExactly(new GameChangedEvent("enimaloc", "b1", "XBOX", "Halo"));
+    }
+
+    @Test
+    void recheckGame_publishesNoGameWhenNoneIsDetected() throws Exception {
+        mvc.perform(post("/channel/enimaloc/game/recheck").with(csrf()));
+
+        assertThat(events.stream(GameChangedEvent.class))
+                .containsExactly(new GameChangedEvent("enimaloc", null, null, null));
     }
 
     @Test

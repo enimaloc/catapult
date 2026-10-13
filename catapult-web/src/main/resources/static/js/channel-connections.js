@@ -14,11 +14,20 @@ function showTwitchatPresence() {
 
 document.addEventListener("catapult:twitchat:presence", showTwitchatPresence);
 
+// The OBS card's chips and buttons, as IntegrationCards renders them for these settings.
+function showObsEnabled(enabled) {
+    const toggle = (selector, hidden) => document.querySelector(selector)?.classList.toggle("hidden", hidden);
+    toggle(".obs-connected-chip", !enabled);
+    toggle(".obs-not-connected-chip", enabled);
+    toggle("#obs-connect-btn", enabled);
+    toggle("#obs-disconnect-btn", !enabled);
+}
+
 document.addEventListener("catapult:render", function () {
     if (!document.getElementById("channel-connections")) return;
     showTwitchatPresence();
 
-    const { on, postJson, postAndRefresh } = CatapultChannel;
+    const { on, postJson } = CatapultChannel;
     const baseUrl = CatapultChannel.baseUrl();
     const value = id => document.getElementById(id).value;
     const checked = id => document.getElementById(id).checked;
@@ -31,9 +40,9 @@ document.addEventListener("catapult:render", function () {
     on("steam-token-save-btn", "click", () =>
         postJson(`${baseUrl}/settings/steam-personal-token`,
             { token: value("steam-token-input"), shared: checked("steam-token-share-new") }));
-    // No SSE event covers the profile cache yet.
+    // Only drops the cached profile: nothing on the page shows it until the next check.
     on("steam-refresh-cache-btn", "click", () =>
-        postAndRefresh(`${baseUrl}/steam/refresh-profile-cache`, {}));
+        postJson(`${baseUrl}/steam/refresh-profile-cache`, {}));
 
     // Minecraft
     on("minecraft-enroll-btn", "click", () =>
@@ -43,15 +52,24 @@ document.addEventListener("catapult:render", function () {
 
     // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.
     // An empty password field means "keep the stored one" (it's never sent back to the page),
-    // and blank host/port fall back to catapult-api's defaults. No SSE event covers OBS, hence
-    // the refresh to flip the chips and buttons, and obs-session.js's to follow the new settings.
+    // and blank host/port fall back to catapult-api's defaults. No SSE event covers OBS, so the
+    // chips and buttons flip here, and obs-session.js follows the new settings.
     const saveObs = async enabled => {
-        await postAndRefresh(`${baseUrl}/settings/obs`, {
+        const password = value("obs-password");
+        const response = await postJson(`${baseUrl}/settings/obs`, {
             enabled,
             host: value("obs-host"),
             port: value("obs-port") === "" ? null : Number(value("obs-port")),
-            password: value("obs-password") === "" ? null : value("obs-password"),
+            password: password === "" ? null : password,
         });
+        if (!response.ok) return;
+        showObsEnabled(enabled);
+        if (password !== "") {
+            // Stored now: shown like any stored password, as a placeholder.
+            const field = document.getElementById("obs-password");
+            field.value = "";
+            field.placeholder = "••••••••";
+        }
         await window.CatapultObsSession?.refresh();
     };
     on("obs-connect-btn", "click", () => saveObs(true));

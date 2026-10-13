@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
@@ -178,6 +179,21 @@ class RealApiServiceTest {
     void recheckGame() {
         expectPost("/api/channels/enimaloc/game/recheck");
         service.recheckGame("enimaloc");
+    }
+
+    @Test
+    void currentGame() {
+        respond(HttpMethod.GET, "/api/channels/enimaloc/status",
+                "{\"channelUsername\":\"enimaloc\",\"isOwner\":true,\"botEnabled\":true,\"isLive\":false,\"currentGame\":{\"bindingId\":\"b1\",\"sourceName\":\"Halo\",\"sourceType\":\"XBOX\"}}");
+
+        assertThat(service.currentGame("enimaloc")).isEqualTo(new GameDto("b1", "Halo", "XBOX"));
+    }
+
+    @Test
+    void currentGame_none() {
+        respond(HttpMethod.GET, "/api/channels/enimaloc/status", "{\"channelUsername\":\"enimaloc\",\"isOwner\":true,\"botEnabled\":true,\"isLive\":false,\"currentGame\":null}");
+
+        assertThat(service.currentGame("enimaloc")).isNull();
     }
 
     @Test

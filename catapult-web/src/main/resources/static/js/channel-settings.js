@@ -1,20 +1,20 @@
 /**
- * Settings tab. No SSE event covers channel settings yet, so every save re-renders
- * (postAndRefresh); the active tab survives it through location.hash (channel-page.js).
+ * Settings tab. Each card's fields already show what it saves, so a save only posts: no
+ * re-render, which would lose the scroll position and any card being edited.
  */
 document.addEventListener("catapult:render", function () {
     if (!document.getElementById("channel-ccl-settings-form")) return;
 
-    const { on, checkedValues, postAndRefresh } = CatapultChannel;
+    const { on, checkedValues, postJson } = CatapultChannel;
     const baseUrl = CatapultChannel.baseUrl();
     const byId = id => document.getElementById(id);
 
-    on("ccl-settings-save-btn", "click", () => postAndRefresh(`${baseUrl}/settings/ccl`, {
+    on("ccl-settings-save-btn", "click", () => postJson(`${baseUrl}/settings/ccl`, {
         cclEnabled: byId("ccl-enabled-checkbox").checked,
         blockedCcls: checkedValues(byId("channel-ccl-settings-form"), ".ccl-block-checkbox")
     }));
 
-    on("tw-settings-save-btn", "click", () => postAndRefresh(`${baseUrl}/settings/tws`, {
+    on("tw-settings-save-btn", "click", () => postJson(`${baseUrl}/settings/tws`, {
         enabled: byId("tw-enabled-checkbox").checked,
         blockedTws: checkedValues(byId("channel-tw-settings-form"), ".tw-block-checkbox")
     }));
@@ -27,7 +27,7 @@ document.addEventListener("catapult:render", function () {
         GameSearch.attach(gameInput, byId(`${prefix}-game-results`), `${baseUrl}/games/search`,
             game => { gameIdInput.value = game.id; });
 
-        on(`${prefix}-settings-save-btn`, "click", () => postAndRefresh(`${baseUrl}/settings/${endpoint}`, {
+        on(`${prefix}-settings-save-btn`, "click", () => postJson(`${baseUrl}/settings/${endpoint}`, {
             twitchGameId: gameIdInput.value || null,
             twitchGameName: gameInput.value || null,
             ccls: checkedValues(byId(`channel-${prefix}-settings-form`), `.${prefix}-ccl-checkbox`),

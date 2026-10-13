@@ -25,7 +25,7 @@ describe("username / baseUrl", () => {
     });
 });
 
-describe("refresh / postJson / postAndRefresh", () => {
+describe("refresh / postJson", () => {
     it("re-renders the current path and query without pushing history", async () => {
         history.replaceState(null, "", "/channel/enimaloc?status=AUTO#settings");
 
@@ -50,13 +50,6 @@ describe("refresh / postJson / postAndRefresh", () => {
         const snackbar = document.querySelector("mdui-snackbar");
         expect(snackbar.textContent).toBe("Action failed (403)");
         expect(snackbar.open).toBe(true);
-    });
-
-    it("refreshes after posting", async () => {
-        await CatapultChannel.postAndRefresh("/x", { a: 1 });
-
-        expect(postJson).toHaveBeenCalledWith("/x", { a: 1 });
-        expect(CatapultSpa.navigate).toHaveBeenCalledOnce();
     });
 });
 

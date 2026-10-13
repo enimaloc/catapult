@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
@@ -14,6 +15,7 @@ import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.StatusData;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwEnabledBody;
@@ -79,6 +81,12 @@ public class RealApiService implements ApiService {
     @Override
     public void recheckGame(String username) {
         client.postVoid("/api/channels/{username}/game/recheck", null, username);
+    }
+
+    @Override
+    public GameDto currentGame(String username) {
+        StatusData status = client.get("/api/channels/{username}/status", StatusData.class, username);
+        return status == null ? null : status.currentGame();
     }
 
     @Override
