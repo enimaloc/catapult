@@ -192,6 +192,15 @@ window.CatapultTwitchatEvents = (function () {
         applyConditions(row);
     }
 
+    /** Shows the picked option's picture beside a select whose options have some (Twitchat's icons). */
+    function showPickedIcon(select) {
+        const icon = select.querySelector(':scope > [slot="icon"]');
+        if (!icon) return;
+        const picked = [...select.querySelectorAll("mdui-menu-item")].find((item) => item.getAttribute("value") === select.value);
+        const url = picked?.dataset.icon;
+        icon.style.setProperty("--option-icon", url ? `url('${url}')` : "none");
+    }
+
     /** The option list a live select's data answer holds: its first array, by id and name. */
     function liveOptions(data) {
         const list = Object.values(data ?? {}).find(Array.isArray) ?? [];
@@ -222,7 +231,7 @@ window.CatapultTwitchatEvents = (function () {
     }
 
     /**
-     * Flags the payloads Twitchat's protocol hasn't: the detected one, else the branch picked
+     * Flags the payloads and options Twitchat's protocol hasn't: the detected one, else the branch picked
      * (forced, connected or not). On auto, nothing is flagged until a Twitchat answered.
      */
     function markAvailability(root) {
@@ -234,6 +243,20 @@ window.CatapultTwitchatEvents = (function () {
             const action = part(card, "action")?.value;
             flag.classList.toggle("hidden", !known || twitchat.actionName(action) != null);
         }
+        root.querySelectorAll("mdui-select[data-unavailable]").forEach((select) => markOptions(select, known ? twitchat.protocol : null));
+    }
+
+    /**
+     * Hides the options the protocol hasn't (data-protocols: the branches that have them), and
+     * says so under the select when the picked one is among them. A null protocol hides nothing.
+     */
+    function markOptions(select, protocol) {
+        for (const item of select.querySelectorAll("mdui-menu-item[data-protocols]")) {
+            item.hidden = protocol != null && !item.dataset.protocols.split(",").includes(protocol);
+        }
+        const picked = [...select.querySelectorAll("mdui-menu-item")].find((item) => item.getAttribute("value") === select.value);
+        if (picked?.hidden) select.setAttribute("helper", select.dataset.unavailable);
+        else select.removeAttribute("helper");
     }
 
     function wireCard(card) {
@@ -257,6 +280,8 @@ window.CatapultTwitchatEvents = (function () {
         });
         card.addEventListener("change", (event) => {
             const target = event.target;
+            if (target.classList?.contains("icon-select")) showPickedIcon(target);
+            if (target.dataset?.unavailable) markAvailability(card);
             if (target.classList?.contains("twitchat-catapult-action")) {
                 pointAtCatapultAction(target);
                 return;

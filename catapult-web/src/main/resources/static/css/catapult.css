@@ -1094,6 +1094,17 @@ mdui-select::part(menu) {
     overflow-y: auto;
 }
 
+/* An option's picture (Twitchat's icons), beside it and beside the select once picked. Used as
+ * a mask painted in the text color, like Twitchat's own forceFill: its SVGs are white. */
+.option-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-color: currentColor;
+    -webkit-mask: var(--option-icon) center / contain no-repeat;
+    mask: var(--option-icon) center / contain no-repeat;
+}
+
 /* Twitchat events: an event's body stacks its payload cards, then the add/test/save row. */
 .connection-card .twitchat-events-title {
     padding-top: 12px;

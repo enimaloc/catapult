@@ -161,7 +161,7 @@ public final class TwitchatEventForms {
         if (field.options() != null) {
             for (TwitchatCatalog.Option option : field.options()) {
                 options.add(new Select.Option(option.value(),
-                        option.labelKey() != null ? key(option.labelKey()) : Message.literal(option.label())));
+                        option.labelKey() != null ? key(option.labelKey()) : Message.literal(option.label()), option.icon(), option.protocols()));
             }
         }
         // A live list (or a value from before its choices changed) keeps the stored value selectable.

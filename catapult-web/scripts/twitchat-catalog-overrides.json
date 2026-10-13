@@ -18,7 +18,7 @@
         { "path": "highlightColor", "type": "text", "label": "Highlight color", "labelKey": "twitchat.field.highlight_color", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null,
           "showIf": { "path": "style", "values": ["highlight"] } },
         { "path": "quote", "type": "textarea", "label": "Quote", "labelKey": "twitchat.field.quote", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
-        { "path": "icon", "type": "select", "label": "Icon", "labelKey": "twitchat.field.icon", "required": false, "options": "$beta:SET_SEND_CUSTOM_CHAT_MESSAGE.icon", "source": null, "defaultValue": null, "fields": null },
+        { "path": "icon", "type": "select", "label": "Icon", "labelKey": "twitchat.field.icon", "required": false, "options": "$icons", "source": null, "defaultValue": null, "fields": null },
         { "path": "user.name", "type": "text", "label": "Author", "labelKey": "twitchat.field.author", "required": false, "options": null, "source": null, "defaultValue": "Catapult", "fields": null },
         { "path": "user.color", "type": "text", "label": "Author color", "labelKey": "twitchat.field.author_color", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
         { "path": "col", "type": "number", "label": "Column", "labelKey": "twitchat.field.col", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
@@ -28,7 +28,7 @@
           "fields": [
             { "path": null, "type": "catapult-action", "label": "Catapult action", "labelKey": "twitchat.field.button.catapult_action", "required": false, "options": null, "source": null, "defaultValue": null, "fields": null },
             { "path": "label", "type": "text", "label": "Label", "labelKey": "twitchat.field.button.label", "required": true, "options": null, "source": null, "defaultValue": null, "fields": null },
-            { "path": "icon", "type": "select", "label": "Icon", "labelKey": "twitchat.field.button.icon", "required": false, "options": "$beta:SET_SEND_CUSTOM_CHAT_MESSAGE.icon", "source": null, "defaultValue": null, "fields": null },
+            { "path": "icon", "type": "select", "label": "Icon", "labelKey": "twitchat.field.button.icon", "required": false, "options": "$icons", "source": null, "defaultValue": null, "fields": null },
             { "path": "theme", "type": "select", "label": "Theme", "labelKey": "twitchat.field.button.theme", "required": false, "source": null, "defaultValue": "default", "fields": null,
               "options": [
                 { "value": "default", "label": "default", "labelKey": null },

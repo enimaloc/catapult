@@ -242,8 +242,8 @@ describe("buildCatalog", () => {
         replies: { GET_TRIGGER_LIST: ["ON_TRIGGER_LIST"] },
         docs: new Map([["SET_EXECUTE_TRIGGER", { description: "Execute a specific trigger manually" }]]),
     };
-    const build = (overrides = { pairs: {}, actions: {} }) => buildCatalog({
-        stable, beta, stableParams: stableParams(STABLE_DOC), betaTypes: betaTypes(BETA_SOURCE), overrides,
+    const build = (overrides = { pairs: {}, actions: {} }, icons = undefined) => buildCatalog({
+        stable, beta, stableParams: stableParams(STABLE_DOC), betaTypes: betaTypes(BETA_SOURCE), overrides, icons,
     });
     const byKey = (catalog) => Object.fromEntries(catalog.actions.map((a) => [a.key, a]));
 
@@ -273,6 +273,20 @@ describe("buildCatalog", () => {
         expect(fields[0].options.map((o) => o.value)).toEqual(["message", "highlight", "error"]);
         expect(fields[1]).toMatchObject({ type: "text", options: null });
         expect(fields[2].fields[0].options).toHaveLength(3);
+    });
+
+    it("fills $icons options with Twitchat's icons and their pictures, else falls back to text", () => {
+        const overrides = { pairs: {}, actions: { SHOUTOUT: { fields: [{ path: "icon", type: "select", options: "$icons" }] } } };
+        const icons = [
+            { name: "add", url: "https://x/add.svg", protocols: ["beta", "stable"] },
+            { name: "quiz", url: "https://x/quiz.svg", protocols: ["beta"] },
+        ];
+        const withIcons = byKey(build(overrides, icons)).SHOUTOUT.fields[0];
+        expect(withIcons).toMatchObject({ type: "select", options: [
+            { value: "add", label: "add", labelKey: null, icon: "https://x/add.svg", protocols: null },
+            { value: "quiz", icon: "https://x/quiz.svg", protocols: ["beta"] },
+        ] });
+        expect(byKey(build(overrides)).SHOUTOUT.fields[0]).toMatchObject({ type: "text", options: null });
     });
 
     it("prefers the beta typing, falls back to the stable one, else raw", () => {

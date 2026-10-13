@@ -42,11 +42,18 @@
         <span th:text="${text}"></span>
     </label>
     <mdui-select th:case="'select'" variant="outlined" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
-                 th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
+                 th:classappend="${(n.attrs().className() ?: '') + (n.hasIcons() ? ' icon-select' : '')}" spa:state="${n.attrs().state()}"
                  th:value="${n.value()}" th:label="${text}" th:data-source="${n.source()}"
-                 th:data-show-if="${n.attrs().showIf()}">
-        <mdui-menu-item th:each="option : ${n.options()}" th:value="${option.value()}"
-                        th:text="${option.text().isKey() ? #messages.msgWithParams(option.text().key(), option.text().argsArray()) : option.text().literal()}"></mdui-menu-item>
+                 th:data-show-if="${n.attrs().showIf()}"
+                 th:data-unavailable="${n.hasBranchOptions()} ? #{twitchat.option.unavailable}">
+        <span th:if="${n.hasIcons()}" slot="icon" class="option-icon"
+              th:style="${n.pickedIcon()} ? |--option-icon: url('${n.pickedIcon()}')|"></span>
+        <mdui-menu-item th:each="option : ${n.options()}" th:value="${option.value()}" th:data-icon="${option.icon()}"
+                        th:data-protocols="${option.protocols() == null ? null : #strings.listJoin(option.protocols(), ',')}"
+                        th:end-text="${option.protocols() == null ? null : #strings.listJoin(option.protocols(), ', ')}">
+            <span th:if="${option.icon()}" slot="icon" class="option-icon" th:style="|--option-icon: url('${option.icon()}')|"></span>
+            <th:block th:text="${option.text().isKey() ? #messages.msgWithParams(option.text().key(), option.text().argsArray()) : option.text().literal()}"></th:block>
+        </mdui-menu-item>
     </mdui-select>
     <mdui-segmented-button th:case="'segmented-button'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
                            th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"

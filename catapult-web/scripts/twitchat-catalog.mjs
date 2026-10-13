@@ -171,21 +171,31 @@ const byPriorityThenKey = (a, b) =>
     (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER) || a.key.localeCompare(b.key);
 
 /**
- * An override's options given as "$beta:ACTION.path": the choices of that beta typing's member,
- * so a long enum (Twitchat's icons) follows Twitchat. Null when it can't be read.
+ * An override's options given as a reference: "$beta:ACTION.path", the choices of that beta
+ * typing's member, so a long enum follows Twitchat; "$icons", every icon Twitchat can show (its
+ * assets/icons folder), each with its picture's URL and, when only some branches have it, those
+ * (protocols). Null when it can't be read.
  */
-function referencedOptions(reference, types) {
+function referencedOptions(reference, types, icons) {
+    if (reference === "$icons") {
+        // An icon only some branches have names them: Twitchat shows an error in its place elsewhere.
+        const everywhere = new Set(icons?.flatMap((icon) => icon.protocols ?? []));
+        return icons?.length ? icons.map(({ name, url, protocols }) => ({
+            value: name, label: name, labelKey: null, icon: url,
+            protocols: protocols && protocols.length < everywhere.size ? protocols : null,
+        })) : null;
+    }
     const [, name, path] = reference.match(/^\$beta:([A-Z0-9_]+)\.(.+)$/) ?? [];
     return fieldsOf(types.get(name) ?? null)?.find((field) => field.path === path)?.options ?? null;
 }
 
 /** The override's fields with their referenced options resolved; a select whose options are gone becomes text. */
-function resolveFields(fields, types) {
+function resolveFields(fields, types, icons) {
     return fields?.map((field) => {
         const resolved = { ...field };
-        if (field.fields) resolved.fields = resolveFields(field.fields, types);
+        if (field.fields) resolved.fields = resolveFields(field.fields, types, icons);
         if (typeof field.options === "string") {
-            resolved.options = referencedOptions(field.options, types);
+            resolved.options = referencedOptions(field.options, types, icons);
             if (!resolved.options) resolved.type = "text";
         }
         return resolved;
@@ -197,7 +207,7 @@ function resolveFields(fields, types) {
  * "action" (it does something) or "data" (it only answers with data, never offered as a
  * payload), the overrides' "hidden" ones left out.
  */
-export function buildCatalog({ stable, beta, stableParams: params, betaTypes: types, overrides }) {
+export function buildCatalog({ stable, beta, stableParams: params, betaTypes: types, overrides, icons = [] }) {
     const actions = new Map();
     const typings = new Map();
     const entry = (key) => {
@@ -232,7 +242,7 @@ export function buildCatalog({ stable, beta, stableParams: params, betaTypes: ty
         if (override) {
             // An override without fields (a kind, a description) keeps the generated form.
             Object.assign(action, override.fields ? { form: "override" } : {}, override);
-            if (override.fields) action.fields = resolveFields(override.fields, types);
+            if (override.fields) action.fields = resolveFields(override.fields, types, icons);
         }
     }
     const kept = [...actions.values()].filter((action) => !hidden.has(action.key));
