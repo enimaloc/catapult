@@ -189,7 +189,9 @@ class ChannelVisibilityRenderingTest {
         String gameTag = openingTagForId(html, "channel-current-game");
         String noGameTag = openingTagForId(html, "channel-no-game");
         assertThat(gameTag).contains("data-if=\"hasGame\"").contains("hidden");
-        assertThat(noGameTag).contains("data-if=\"noGame\"").doesNotContain("hidden");
+        assertThat(noGameTag).contains("data-if=\"noGame\"").doesNotContain("hidden")
+                .contains("data-on=\"noGame:GameChangedEvent.!sourceName\"");
+        assertThat(gameTag).contains("data-on=\"hasGame:GameChangedEvent.sourceName\"");
     }
 
     @Test

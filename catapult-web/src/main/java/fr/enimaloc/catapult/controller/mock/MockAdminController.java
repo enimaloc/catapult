@@ -140,13 +140,33 @@ public class MockAdminController {
         return events;
     }
 
-    /** Applies the form; {@code addBinding} (its "add a binding" button) then appends a blank binding. */
+    /**
+     * The part of the session no event tells an open page about: when it changes, the page has to
+     * re-render to show it (the popout has the app do so, see mock-popout.js).
+     */
+    private record Unpushed(String avatarUrl, List<BindingDto> bindings, boolean hasSteamProvider,
+                            boolean hasSteamPersonalToken, boolean steamTokenShared, long steamProfileCacheTtlMinutes,
+                            boolean hasXboxProvider, boolean hasXbox, boolean hasMinecraftProvider) {
+        static Unpushed of(MockData data) {
+            return new Unpushed(data.getChannelDto().profileImageUrl(), List.copyOf(data.getBinding()),
+                    data.isHasSteamProvider(), data.isHasSteamPersonalToken(), data.isSteamTokenShared(),
+                    data.getSteamProfileCacheTtlMinutes(), data.isHasXboxProvider(), data.isHasXbox(),
+                    data.isHasMinecraftProvider());
+        }
+    }
+
+    /**
+     * Applies the form; {@code addBinding} (its "add a binding" button) then appends a blank binding.
+     * Flags {@code appStale} when something changed that no event carries to the app.
+     */
     @PostMapping("/mock/admin")
-    public String apply(@ModelAttribute AdminForm form, @RequestParam(defaultValue = "false") boolean addBinding) {
+    public String apply(@ModelAttribute AdminForm form, @RequestParam(defaultValue = "false") boolean addBinding,
+                        RedirectAttributes redirect) {
         MockData data = mockApiService.getData();
         if (data == null) {
             return REDIRECT_LOGIN;
         }
+        Unpushed before = Unpushed.of(data);
         String username = data.getChannelDto().twitchUsername();
 
         data.setBindings(form.getBindings().stream().filter(b -> !b.isDelete()).map(BindingForm::toDto).toList());
@@ -169,9 +189,10 @@ public class MockAdminController {
             Optional<BindingDto> previousBinding = previous == null ? Optional.empty()
                     : bindingOf(data, previous.sourceType(), previous.sourceName());
             Optional<BindingDto> current = bindingOf(data, form.getDetectedSourceType(), form.getDetectedSourceName());
-            data.setDetectedGame(form.getDetectedSourceType(), form.getDetectedSourceName());
-            eventPublisher.publishEvent(new GameChangedEvent(username, current.map(BindingDto::id).orElse(null),
-                    current.map(BindingDto::sourceType).orElse(null), current.map(BindingDto::sourceName).orElse(null)));
+            String bindingId = current.map(BindingDto::id).orElse(null);
+            data.setDetectedGame(bindingId, form.getDetectedSourceType(), form.getDetectedSourceName());
+            eventPublisher.publishEvent(new GameChangedEvent(username, bindingId,
+                    form.getDetectedSourceType(), form.getDetectedSourceName()));
             dispatchGameChange(data, current, previousBinding.map(BindingDto::twitchGameName)
                     .orElse(previous == null ? "" : previous.sourceName()));
         }
@@ -197,6 +218,9 @@ public class MockAdminController {
         }
         if (addBinding) {
             data.addBinding();
+        }
+        if (!before.equals(Unpushed.of(data))) {
+            redirect.addFlashAttribute("appStale", true);
         }
         return REDIRECT_ADMIN;
     }

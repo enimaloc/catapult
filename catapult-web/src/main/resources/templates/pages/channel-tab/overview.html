@@ -17,18 +17,17 @@
             </mdui-chip>
 
             <span id="channel-current-game" spa:if="hasGame:${ch.currentGame() != null}"
-                  spa:on="hasGame:GameChangedEvent"
+                  spa:on="hasGame:GameChangedEvent.sourceName"
                   spa:value="textContent:GameChangedEvent.sourceName"
                   th:text="${ch.currentGame() != null ? ch.currentGame().sourceName() : ''}">Game</span>
             <mdui-chip id="channel-current-platform" spa:if="hasGame:${ch.currentGame() != null}"
-                       spa:on="hasGame:GameChangedEvent"
+                       spa:on="hasGame:GameChangedEvent.sourceName"
                        spa:value="textContent:GameChangedEvent.sourceType"
                        th:text="${ch.currentGame() != null ? ch.currentGame().sourceType() : ''}">Game
             </mdui-chip>
-            <!-- noGame has no spa:on: no event signals a detected game being cleared yet
-                 (only GameChangedEvent exists), so this direction only ever updates on
-                 the next full render — known gap, not something spa:on can fix alone. -->
+            <!-- A GameChangedEvent without a sourceName says no game is detected any more. -->
             <span id="channel-no-game" spa:if="noGame:${ch.currentGame() == null}"
+                  spa:on="noGame:GameChangedEvent.!sourceName"
                   th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
 
             <mdui-button-icon icon="refresh" th:if="${ch.isOwner()}"
@@ -50,10 +49,13 @@
                th:attr="data-igdb-id=${dtddMapping.igdbId()}">
         <h3 th:text="#{channel.dtdd.title}">Association DTDD</h3>
 
+        <!--/* The verified chip and the proposal note are always rendered: channel-dtdd.js reveals
+             them once validated or proposed, instead of re-rendering the page. */-->
         <div th:if="${dtddMapping.current() != null}">
             <span th:text="${dtddMapping.current().name() ?: '—'}">DTDD name</span>
-            <mdui-chip th:text="${dtddMapping.current().confidence() * 100} + '%'">confidence</mdui-chip>
-            <mdui-chip th:if="${dtddMapping.current().verified()}" th:text="#{channel.dtdd.verified}">
+            <mdui-chip id="dtdd-confidence" th:text="${dtddMapping.current().confidence() * 100} + '%'">confidence</mdui-chip>
+            <mdui-chip id="dtdd-verified" th:classappend="${dtddMapping.current().verified()} ? '' : 'hidden'"
+                       th:text="#{channel.dtdd.verified}">
                 Vérifié
             </mdui-chip>
         </div>
@@ -66,6 +68,8 @@
             Valider
         </mdui-button>
         <mdui-button id="dtdd-correct-btn" th:text="#{channel.dtdd.correct}">Corriger</mdui-button>
+        <p id="dtdd-proposed" th:classappend="${dtddMapping.myPendingProposal() != null} ? '' : 'hidden'"
+           th:text="#{channel.dtdd.proposed}">Correction proposée, en attente de validation.</p>
 
         <div id="dtdd-search-dialog" hidden>
             <input type="text" id="dtdd-search-input" th:placeholder="#{channel.dtdd.search_placeholder}"

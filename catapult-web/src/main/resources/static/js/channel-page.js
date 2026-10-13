@@ -9,11 +9,11 @@
  *   URL, instead of every file re-deriving `location.pathname.split("/")[2]`.
  *   username() is null outside /channel/{username}.
  * - refresh(): re-renders the current fragment through the SPA router, preserving
- *   the query string (page/status/source filters) instead of dropping it. Only
- *   used where no SSE event yet covers the mutation (see channel-settings.js).
+ *   the query string (page/status/source filters) instead of dropping it. No action
+ *   of the page uses it: each patches the page itself or through its SSE echo. Only
+ *   the mock profile's popout does, for the changes no event carries (mock-popout.js).
  * - postJson(): wraps CatapultCsrf.postJson and surfaces a visible error when the
- *   mutation didn't succeed, instead of silently re-rendering as if it had.
- *   postAndRefresh() chains it with refresh().
+ *   mutation didn't succeed.
  * - on(): the null-guarded addEventListener every optional control needs (owner-only
  *   and provider-dependent elements simply aren't rendered for everyone).
  * - checkedValues(): values of the checked switches under a root.
@@ -46,11 +46,6 @@ window.CatapultChannel = (function () {
             showError(`Action failed (${response.status})`);
         }
         return response;
-    }
-
-    async function postAndRefresh(url, body) {
-        await postJson(url, body);
-        await refresh();
     }
 
     function on(id, type, handler) {
@@ -103,7 +98,7 @@ window.CatapultChannel = (function () {
     // No handler is needed here for any Steam or Minecraft event.
 
     return {
-        username, baseUrl, refresh, postJson, postAndRefresh, showError,
+        username, baseUrl, refresh, postJson, showError,
         on, checkedValues,
         getBindingsElements, getBindingElement,
         setCurrentGame,
@@ -113,7 +108,7 @@ window.CatapultChannel = (function () {
 
 // Keeps the active #channel-tabs tab in location.hash. refresh() re-renders the whole
 // fragment without pushing a history entry, so the hash survives it and the restore
-// below lands back on the tab the user was on (e.g. after saving a settings card)
+// below lands back on the tab the user was on (e.g. after the mock popout's re-render)
 // instead of resetting to the overview. Also makes each tab directly linkable.
 document.addEventListener("catapult:render", function () {
     const tabs = document.getElementById("channel-tabs");

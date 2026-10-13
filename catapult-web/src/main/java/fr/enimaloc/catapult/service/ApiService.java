@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
@@ -17,6 +18,8 @@ public interface ApiService {
     ChannelPageData channelPage(String username, int page, String status, String source);
     void toggleBot(String username);
     void recheckGame(String username);
+    /** The game Catapult currently detects on the channel; null when none. */
+    GameDto currentGame(String username);
     void cclToggle(String username, String bindingId, boolean enabled);
     void ignoredToggle(String username, String bindingId, boolean ignored);
     void deleteBinding(String username, String bindingId);

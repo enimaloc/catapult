@@ -176,6 +176,19 @@ describe("dispatch", () => {
         expect($("#game").textContent).toBe("Valheim");
     });
 
+    it("flips the current game and the no-game message both ways, as overview.html wires them", () => {
+        html(`
+            <span id="game" data-if="hasGame" data-on="hasGame:GameChangedEvent.sourceName"
+                  data-value="textContent:GameChangedEvent.sourceName">Valheim</span>
+            <span id="none" data-if="noGame" data-on="noGame:GameChangedEvent.!sourceName" class="hidden"></span>`);
+
+        Visibility.dispatch("GameChangedEvent", { bindingId: null, sourceType: null, sourceName: null });
+        expect([hidden($("#game")), hidden($("#none"))]).toEqual([true, false]);
+
+        Visibility.dispatch("GameChangedEvent", { bindingId: null, sourceType: "XBOX", sourceName: "Halo" });
+        expect([hidden($("#game")), hidden($("#none")), $("#game").textContent]).toEqual([false, true, "Halo"]);
+    });
+
     it("assigns data-value properties, with a default for empty values", () => {
         html(`
             <div data-binding-id="b1">

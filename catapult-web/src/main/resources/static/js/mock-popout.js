@@ -5,12 +5,12 @@
  * In the app (index.html): the "Mock" button opens the popout.
  *
  * In the popout (the mock pages, data-role "popout"): picking an account logs the app in without
- * leaving the popout, and saving the config reloads the app to show it.
+ * leaving the popout. The config's forms post in the background, the popout swapping in the page
+ * it gets back; the app's page follows through its events, re-rendering only for what none carries.
  */
 window.CatapultMockPopout = (function () {
     const NAME = "catapult-mock";
     const FEATURES = "popup,width=780,height=900";
-    const SAVED = "catapult-mock-saved";
 
     const script = document.currentScript ?? document.querySelector('script[src$="mock-popout.js"]');
 
@@ -50,15 +50,57 @@ window.CatapultMockPopout = (function () {
             const code = document.getElementById("code-field").value;
             loginThrough(`/auth/callback?code=${encodeURIComponent(code)}`, app, window);
         });
-        document.getElementById("mock-admin-form")?.addEventListener("submit", () => {
-            try { sessionStorage.setItem(SAVED, "1"); } catch { /* no storage: the app just won't reload */ }
-        });
-        let saved = null;
+        // The button that submitted, for its formaction ("add a binding"): mdui-buttons aren't
+        // reliably the submit event's submitter.
+        document.addEventListener("click", (event) => {
+            submitter = event.target.closest?.('[type="submit"]') ?? null;
+        }, true);
+        wireForms(app);
+    }
+
+    let submitter = null;
+
+    /** The config's forms, wired again on every page swapped in. */
+    function wireForms(app) {
+        for (const form of document.querySelectorAll("#mock-admin-form, #mock-twitchat-form")) {
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                const action = submitter?.closest("form") === form ? submitter.getAttribute("formaction") : null;
+                submitter = null;
+                postInPlace(form, action ?? form.getAttribute("action"), app);
+            });
+        }
+    }
+
+    /**
+     * Posts `form` to `action`, swapping its answer into the popout. The app's page re-renders
+     * only when the config changed something no event carries to it (MockAdminController's appStale).
+     */
+    async function postInPlace(form, action, app) {
+        let response;
         try {
-            saved = sessionStorage.getItem(SAVED);
-            sessionStorage.removeItem(SAVED);
-        } catch { /* no storage */ }
-        if (saved) app.location.reload();
+            response = await fetch(action, {
+                method: "POST",
+                credentials: "same-origin",
+                body: new URLSearchParams(new FormData(form)),
+            });
+        } catch (error) {
+            console.warn("[mock] saving failed", error);
+            return;
+        }
+        const landed = response.url ? new URL(response.url).pathname : "/mock/admin";
+        if (!response.ok || landed !== "/mock/admin") {
+            location.href = response.url || "/mock/admin"; // logged out, or failed: the plain page says why
+            return;
+        }
+        const page = new DOMParser().parseFromString(await response.text(), "text/html");
+        const main = document.adoptNode(page.querySelector("main"));
+        const scroll = window.scrollY;
+        document.querySelector("main").replaceWith(main);
+        window.scrollTo(0, scroll);
+        wireForms(app);
+        // The app's page follows the rest through its events.
+        if (main.dataset.appStale === "true") app.CatapultChannel?.refresh();
     }
 
     if (script?.dataset.role === "popout") wirePopout();
