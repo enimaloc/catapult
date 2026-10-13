@@ -38,6 +38,8 @@ const { values: args } = parseArgs({
 const source = (ref, path) => `https://raw.githubusercontent.com/Durss/Twitchat/${ref}/${path}`;
 const EVENTS_PATH = "src_front/events/TwitchatEvent.ts";
 const DOCS_PATH = "PUBLIC_API.md";
+const ICONS_PATH = "src_front/assets/icons";
+const GITHUB_API = "https://api.github.com/repos/Durss/Twitchat";
 
 /**
  * The event the stable Twitchat answers each "get" action with, read from the handlers in its
@@ -81,8 +83,8 @@ const STABLE_REPLIES = {
 // Not Twitchat's: the obs-websocket event carrying its messages.
 const NOT_TWITCHAT_EVENTS = new Set(["CustomEvent"]);
 
-async function fetchText(url) {
-    const response = await fetch(url);
+async function fetchText(url, headers = {}) {
+    const response = await fetch(url, { headers });
     if (!response.ok) throw new Error(`${url}: ${response.status} ${response.statusText}`);
     return response.text();
 }
@@ -149,6 +151,31 @@ function betaProtocol(ref, eventsSource) {
         if (unknown.length) throw new Error(`${ref}: ${action} answered by unknown ${unknown.join(", ")}`);
     }
     return { actions, events, replies, docs, types: betaTypes(eventsSource) };
+}
+
+/**
+ * Every icon Twitchat can show: the SVGs of its assets/icons folder (its Icon component loads
+ * any of them by name, more than the API's typing lists), each with its URL pinned to the ref's
+ * current commit so a preview never breaks when an icon goes.
+ */
+async function icons(ref) {
+    const commit = await fetchText(`${GITHUB_API}/commits/${ref}`, { Accept: "application/vnd.github.sha" });
+    const listing = JSON.parse(await fetchText(`${GITHUB_API}/contents/${ICONS_PATH}?ref=${commit}`));
+    return listing.filter((file) => file.type === "file" && file.name.endsWith(".svg"))
+        .map((file) => ({ name: file.name.slice(0, -".svg".length), url: source(commit, file.path) }));
+}
+
+/** Both branches' icons, each once (the beta's picture first) with the branches that have it. */
+async function allIcons(refs) {
+    const byName = new Map();
+    for (const [protocol, ref] of refs) {
+        for (const { name, url } of await icons(ref)) {
+            const icon = byName.get(name) ?? { name, url, protocols: [] };
+            icon.protocols.push(protocol);
+            byName.set(name, icon);
+        }
+    }
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function protocol(ref) {
@@ -373,6 +400,7 @@ const catalog = buildCatalog({
     stable: protocols.stable, beta: protocols.beta,
     stableParams: protocols.stable.params ?? new Map(), betaTypes: protocols.beta.types ?? new Map(),
     overrides: JSON.parse(await readFile(OVERRIDES, "utf8")),
+    icons: await allIcons([["beta", args.beta], ["stable", args.stable]]),
 });
 
 await mkdir(dirname(TYPES_OUTPUT), { recursive: true });

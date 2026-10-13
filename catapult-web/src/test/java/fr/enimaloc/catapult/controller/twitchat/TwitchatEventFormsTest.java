@@ -203,6 +203,37 @@ class TwitchatEventFormsTest {
     }
 
     @Test
+    void iconSelect_showsEveryTwitchatIconWithItsPicture_thePickedOneBesideIt() {
+        TwitchatEventActionDto payload = new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "FORM",
+                "{\"message\":\"x\",\"icon\":\"add\"}", true);
+        IntegrationNode.Select icon = (IntegrationNode.Select) byField(forms.payloadCard("STREAM_STARTED", payload), "icon");
+
+        assertThat(icon.hasIcons()).isTrue();
+        assertThat(icon.pickedIcon()).startsWith("https://raw.githubusercontent.com/Durss/Twitchat/").endsWith("/src_front/assets/icons/add.svg");
+        // More than the API's typing lists: every icon Twitchat's folder holds.
+        assertThat(icon.options()).extracting(IntegrationNode.Select.Option::value).contains("bluesky", "folder");
+        // The "none" option has no picture.
+        assertThat(icon.options().getFirst().icon()).isNull();
+        // An icon the stable Twitchat lacks says so; one both have names no branch.
+        assertThat(icon.hasBranchOptions()).isTrue();
+        assertThat(option(icon, "bluesky").protocols()).containsExactly("beta");
+        assertThat(option(icon, "add").protocols()).isNull();
+    }
+
+    private static IntegrationNode.Select.Option option(IntegrationNode.Select select, String value) {
+        return select.options().stream().filter(o -> o.value().equals(value)).findFirst().orElseThrow();
+    }
+
+    @Test
+    void selectWithoutPictures_hasNoIcons() {
+        IntegrationNode card = forms.payloadCard("STREAM_STARTED", forms.newPayload("CUSTOM_CHAT_MESSAGE"));
+        IntegrationNode.Select style = (IntegrationNode.Select) byField(card, "style");
+        assertThat(style.hasIcons()).isFalse();
+        assertThat(style.hasBranchOptions()).isFalse();
+        assertThat(style.pickedIcon()).isNull();
+    }
+
+    @Test
     void newPayload_ofAnUnknownAction_isRefused() {
         assertThatThrownBy(() -> forms.newPayload("GONE_ACTION")).isInstanceOf(TwitchatEventForms.UnknownAction.class);
     }
