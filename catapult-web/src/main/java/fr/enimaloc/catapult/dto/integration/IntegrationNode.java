@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.dto.integration;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * One element of an integration card, rendered by integrations.html's {@code node} fragment,
@@ -51,11 +52,37 @@ public sealed interface IntegrationNode {
 
     /**
      * An mdui-select; {@code source} (JSON {@code {"stable":…,"beta":…}}, or null) names the
-     * Twitchat requests that fill its options at runtime, rendered as data-source.
+     * Twitchat requests that fill its options at runtime, rendered as data-source. An option's
+     * {@code icon} (a picture URL, or null) shows beside it, and beside the select once picked.
      */
     record Select(Attrs attrs, Message text, String value, List<Option> options, String source)
             implements IntegrationNode {
-        public record Option(String value, Message text) {}
+        /** {@code protocols}: the Twitchat branches that have it (data-protocols), null when all do. */
+        public record Option(String value, Message text, String icon, List<String> protocols) {
+            public Option {
+                protocols = protocols == null ? null : List.copyOf(protocols);
+            }
+
+            public Option(String value, Message text) {
+                this(value, text, null, null);
+            }
+        }
+
+        /** Whether any option has a picture: the select then shows the picked one's. */
+        public boolean hasIcons() {
+            return options.stream().anyMatch(option -> option.icon() != null);
+        }
+
+        /** Whether some option exists on some Twitchat branches only: those are hidden on the others. */
+        public boolean hasBranchOptions() {
+            return options.stream().anyMatch(option -> option.protocols() != null);
+        }
+
+        /** The picked option's picture, null without one. */
+        public String pickedIcon() {
+            return options.stream().filter(option -> option.value().equals(value)).map(Option::icon)
+                    .filter(Objects::nonNull).findFirst().orElse(null);
+        }
 
         public Select {
             options = List.copyOf(options);

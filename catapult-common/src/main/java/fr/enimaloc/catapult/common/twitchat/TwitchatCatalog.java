@@ -61,7 +61,18 @@ public record TwitchatCatalog(int version, List<Action> actions) {
         }
     }
 
-    public record Option(String value, String label, String labelKey) {
+    /**
+     * One choice; {@code icon} is its picture's URL (Twitchat's icons), null for most;
+     * {@code protocols} the Twitchat branches that have it, null when all do.
+     */
+    public record Option(String value, String label, String labelKey, String icon, List<String> protocols) {
+        public Option {
+            protocols = protocols == null ? null : List.copyOf(protocols);
+        }
+
+        public Option(String value, String label, String labelKey) {
+            this(value, label, labelKey, null, null);
+        }
     }
 
     public TwitchatCatalog {

@@ -121,6 +121,30 @@ describe("editing", () => {
         expect(row.querySelector('[data-field="actionType"]').value).toBe("url");
     });
 
+    it("shows the picked icon beside an icon select, none when the option has no picture", () => {
+        const select = document.createElement("mdui-select");
+        select.className = "icon-select";
+        select.innerHTML = '<span slot="icon" class="option-icon"></span>'
+            + '<mdui-menu-item value="">none</mdui-menu-item><mdui-menu-item value="add" data-icon="https://x/add.svg">add</mdui-menu-item>';
+        document.querySelector(".twitchat-payload-form").appendChild(select);
+        const icon = select.querySelector('[slot="icon"]');
+
+        select.value = "add";
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        expect(icon.style.getPropertyValue("--option-icon")).toBe("url('https://x/add.svg')");
+
+        select.value = "";
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        expect(icon.style.getPropertyValue("--option-icon")).toBe("none");
+    });
+
+    it("leaves an icon select without its picture slot alone", () => {
+        const select = document.createElement("mdui-select");
+        select.className = "icon-select";
+        document.querySelector(".twitchat-payload-form").appendChild(select);
+        expect(() => select.dispatchEvent(new Event("change", { bubbles: true }))).not.toThrow();
+    });
+
     it("switches to raw JSON prefilled from the form", () => {
         const card = document.querySelector(".twitchat-payload");
         card.querySelector(".twitchat-payload-raw-btn").click();
@@ -245,6 +269,56 @@ describe("testing one payload among several", () => {
         expect(posted()[0][1].map(({ action }) => action)).toEqual(["EXECUTE_TRIGGER"]);
         const errors = [...cards].map((card) => card.querySelector(".twitchat-payload-errors").textContent);
         expect(errors).toEqual(["message: Required", "", "id: Required"]);
+    });
+});
+
+describe("options some Twitchat branches lack", () => {
+    /** An icon select as rendered, "quiz" on the beta only, its picked value set like mdui would. */
+    function iconSelect(value) {
+        html(EVENT(CARD()));
+        const select = document.createElement("mdui-select");
+        select.className = "icon-select";
+        select.dataset.unavailable = "Not on this Twitchat";
+        select.innerHTML = '<mdui-menu-item value="add">add</mdui-menu-item>'
+            + '<mdui-menu-item value="quiz" data-protocols="beta">quiz</mdui-menu-item>';
+        select.value = value;
+        document.querySelector(".twitchat-payload-form").appendChild(select);
+        return select;
+    }
+    const quiz = (select) => select.querySelector('[value="quiz"]');
+
+    it("hides them on the other branch, and says so when one is picked", () => {
+        const select = iconSelect("quiz");
+        CatapultTwitchat.protocol = "stable";
+        render();
+        expect(quiz(select).hidden).toBe(true);
+        expect(select.querySelector('[value="add"]').hidden).toBe(false);
+        expect(select.getAttribute("helper")).toBe("Not on this Twitchat");
+    });
+
+    it("offers them on their branch", () => {
+        const select = iconSelect("quiz");
+        CatapultTwitchat.protocol = "beta";
+        render();
+        expect(quiz(select).hidden).toBe(false);
+        expect(select.hasAttribute("helper")).toBe(false);
+    });
+
+    it("hides nothing while the branch is unknown", () => {
+        const select = iconSelect("quiz");
+        CatapultTwitchat.protocol = null;
+        render();
+        expect(quiz(select).hidden).toBe(false);
+        expect(select.hasAttribute("helper")).toBe(false);
+    });
+
+    it("drops the warning once another option is picked", () => {
+        const select = iconSelect("quiz");
+        CatapultTwitchat.protocol = "stable";
+        render();
+        select.value = "add";
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        expect(select.hasAttribute("helper")).toBe(false);
     });
 });
 
