@@ -43,14 +43,14 @@ describe("channel-status", () => {
         expect(refreshed()).toBe(0);
     });
 
-    it("rechecks the game, then re-renders", async () => {
+    it("rechecks the game, the result coming back as an event", async () => {
         html(`<button id="channel-recheck-game" data-recheck-url="/channel/enimaloc/game/recheck"></button>`);
         render();
 
         await click("#channel-recheck-game");
 
         expect(posts()).toEqual([["/channel/enimaloc/game/recheck", {}]]);
-        expect(refreshed()).toBe(1);
+        expect(refreshed()).toBe(0);
     });
 
     it("tolerates viewers without these owner-only controls", () => {
@@ -184,11 +184,13 @@ describe("channel-connections", () => {
               <input id="obs-host" value="10.0.0.2">
               <input id="obs-port" value="4456">
               <input id="obs-password" value="">
+              <mdui-chip class="obs-connected-chip hidden"></mdui-chip>
+              <mdui-chip class="obs-not-connected-chip"></mdui-chip>
               <button id="obs-connect-btn"></button>
               <mdui-chip class="twitchat-connected-chip hidden"></mdui-chip>
               <mdui-chip class="twitchat-disconnected-chip"></mdui-chip>
               <select id="twitchat-branch"><option value="auto">auto</option><option value="beta">beta</option></select>
-              <button id="obs-disconnect-btn"></button>
+              <button id="obs-disconnect-btn" class="hidden"></button>
             </div>`);
         render();
     });
@@ -206,11 +208,11 @@ describe("channel-connections", () => {
         expect(refreshed()).toBe(0);
     });
 
-    it("refreshes the Steam profile cache, then re-renders", async () => {
+    it("refreshes the Steam profile cache, without re-rendering", async () => {
         await click("#steam-refresh-cache-btn");
 
         expect(posts()).toEqual([["/channel/enimaloc/steam/refresh-profile-cache", {}]]);
-        expect(refreshed()).toBe(1);
+        expect(refreshed()).toBe(0);
     });
 
     it("drives the Minecraft link", async () => {
@@ -235,7 +237,32 @@ describe("channel-connections", () => {
             ["/channel/enimaloc/settings/obs", { enabled: true, host: "10.0.0.2", port: 4456, password: null }],
             ["/channel/enimaloc/settings/obs", { enabled: false, host: "10.0.0.2", port: null, password: "pw" }],
         ]);
-        expect(refreshed()).toBe(2);
+        expect(refreshed()).toBe(0);
+    });
+
+    /** Which of the OBS card's chips and buttons show. */
+    const obsShown = () => [".obs-connected-chip", ".obs-not-connected-chip", "#obs-connect-btn", "#obs-disconnect-btn"]
+        .filter(selector => !document.querySelector(selector).classList.contains("hidden"));
+
+    it("flips the OBS card in place once saved, the sent password now stored", async () => {
+        const password = document.getElementById("obs-password");
+        password.value = "pw";
+        await click("#obs-connect-btn");
+
+        expect(obsShown()).toEqual([".obs-connected-chip", "#obs-disconnect-btn"]);
+        expect([password.value, password.placeholder]).toEqual(["", "••••••••"]);
+
+        await click("#obs-disconnect-btn");
+        expect(obsShown()).toEqual([".obs-not-connected-chip", "#obs-connect-btn"]);
+    });
+
+    it("leaves the OBS card as it was when saving fails", async () => {
+        posted.mockResolvedValue(response(500));
+        document.getElementById("obs-password").value = "pw";
+        await click("#obs-connect-btn");
+
+        expect(obsShown()).toEqual([".obs-not-connected-chip", "#obs-connect-btn"]);
+        expect(document.getElementById("obs-password").value).toBe("pw");
     });
 
     it("saves the Twitchat branch, then has obs-session.js apply it", async () => {
@@ -307,7 +334,7 @@ describe("channel-settings", () => {
         render();
     });
 
-    it("saves each card, then re-renders", async () => {
+    it("saves each card, without re-rendering", async () => {
         await click("#ccl-settings-save-btn");
         await click("#tw-settings-save-btn");
         await click("#no-game-settings-save-btn");
@@ -322,7 +349,7 @@ describe("channel-settings", () => {
             }],
             ["/channel/enimaloc/settings/incomplete-fallback", { twitchGameId: null, twitchGameName: null, ccls: [] }],
         ]);
-        expect(refreshed()).toBe(4);
+        expect(refreshed()).toBe(0);
     });
 
     it("fills the game id when a search result is picked", async () => {
@@ -352,7 +379,10 @@ describe("channel-dtdd", () => {
     beforeEach(() => {
         html(`
             <div id="channel-dtdd-mapping-card" data-igdb-id="1234">
+              <span id="dtdd-confidence">80%</span>
+              <span id="dtdd-verified" class="hidden"></span>
               <button id="dtdd-validate-btn"></button>
+              <p id="dtdd-proposed" class="hidden"></p>
               <button id="dtdd-correct-btn"></button>
               <div id="dtdd-search-dialog" hidden>
                 <input id="dtdd-search-input">
@@ -362,11 +392,23 @@ describe("channel-dtdd", () => {
         render();
     });
 
-    it("validates the current mapping, then re-renders", async () => {
+    const shown = id => !document.getElementById(id).classList.contains("hidden");
+
+    it("validates the current mapping, showing it verified in place", async () => {
         await click("#dtdd-validate-btn");
 
         expect(posts()).toEqual([["/channel/dtdd-mapping/validate", { igdbId: "1234" }]]);
-        expect(refreshed()).toBe(1);
+        expect(refreshed()).toBe(0);
+        expect([shown("dtdd-verified"), shown("dtdd-validate-btn")]).toEqual([true, false]);
+        expect(document.getElementById("dtdd-confidence").textContent).toBe("100%");
+    });
+
+    it("leaves the card as it was when validating fails", async () => {
+        posted.mockResolvedValue(response(409));
+        await click("#dtdd-validate-btn");
+
+        expect([shown("dtdd-verified"), shown("dtdd-validate-btn")]).toEqual([false, true]);
+        expect(document.getElementById("dtdd-confidence").textContent).toBe("80%");
     });
 
     it("toggles the correction search", async () => {
@@ -379,8 +421,9 @@ describe("channel-dtdd", () => {
         expect(dialog.hidden).toBe(true);
     });
 
-    it("proposes the picked DTDD entry, then re-renders", async () => {
+    it("proposes the picked DTDD entry, noting it pending in place", async () => {
         vi.useFakeTimers();
+        document.getElementById("dtdd-search-dialog").hidden = false;
         fetch.mockResolvedValueOnce(response(200, { results: [{ dtddId: 99, name: "Doom (2016)" }] }));
         const input = document.getElementById("dtdd-search-input");
         input.value = "doom";
@@ -392,7 +435,9 @@ describe("channel-dtdd", () => {
 
         expect(fetch).toHaveBeenCalledWith("/channel/dtdd-mapping/search?q=doom");
         expect(posts()).toEqual([["/channel/dtdd-mapping/propose", { igdbId: "1234", dtddId: 99, reason: "correction" }]]);
-        expect(refreshed()).toBe(1);
+        expect(refreshed()).toBe(0);
+        expect([shown("dtdd-proposed"), shown("dtdd-validate-btn")]).toEqual([true, false]);
+        expect(document.getElementById("dtdd-search-dialog").hidden).toBe(true);
     });
 
     it("does nothing without a mapping card", () => {

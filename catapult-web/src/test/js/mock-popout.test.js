@@ -121,18 +121,87 @@ describe("in the popout", () => {
         expect(app.location.href).toBe("/channels");
     });
 
-    it("reloads the app once the config is saved, and only then", async () => {
-        html('<form id="mock-admin-form"></form>');
-        tag({ "data-role": "popout" });
-        await load("mock-popout");
-        expect(app.location.reload).not.toHaveBeenCalled();
+    /** The config page as /mock/admin renders it: both forms, a result line. */
+    const configPage = (result = "", appStale = false) => `<main${appStale ? ' data-app-stale="true"' : ""}>
+        <p class="mock-result">${result}</p>
+        <form id="mock-admin-form" action="/mock/admin">
+          <input name="avatarUrl" value="a.png">
+          <button id="add" type="submit" formaction="/mock/admin?addBinding=true">add</button>
+          <button id="apply" type="submit">apply</button>
+        </form>
+        <form id="mock-twitchat-form" action="/mock/admin/twitchat">
+          <input name="event" value="STREAM_STARTED">
+          <button id="send" type="submit">send</button>
+        </form>
+      </main>`;
+    const answer = (body, url = "http://localhost/mock/admin") => ({ ...response(200, body), url });
 
-        document.getElementById("mock-admin-form").dispatchEvent(new Event("submit"));
-        await load("mock-popout"); // the page the form posted to, redirected back
-        expect(app.location.reload).toHaveBeenCalledTimes(1);
+    /** Clicks a submit button, which submits its form; returns that submit event. */
+    async function submitWith(id) {
+        let submit = null;
+        const form = document.getElementById(id).closest("form");
+        form.addEventListener("submit", (event) => { submit = event; });
+        click(document.getElementById(id));
+        await flush();
+        return submit;
+    }
 
-        await load("mock-popout");
-        expect(app.location.reload).toHaveBeenCalledTimes(1);
+    describe("the config's forms", () => {
+        beforeEach(async () => {
+            vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+            app.CatapultChannel = { refresh: vi.fn() };
+            html(configPage());
+            tag({ "data-role": "popout" });
+            await load("mock-popout");
+        });
+
+        it("saves the config in the background, swapping in the page it gets back", async () => {
+            fetchMock.mockResolvedValue(answer(configPage("saved")));
+            const submit = await submitWith("apply");
+
+            expect(submit.defaultPrevented).toBe(true);
+            const [url, init] = fetchMock.mock.calls[0];
+            expect(url).toBe("/mock/admin");
+            expect(init.method).toBe("POST");
+            expect(init.body.toString()).toBe("avatarUrl=a.png");
+            expect(document.querySelector(".mock-result").textContent).toBe("saved");
+            expect(app.CatapultChannel.refresh).not.toHaveBeenCalled(); // its events carry the rest
+            expect(app.location.reload).not.toHaveBeenCalled();
+            expect(self.href).toBe("");
+        });
+
+        it("re-renders the app's page when the config changed what no event carries", async () => {
+            fetchMock.mockResolvedValue(answer(configPage("", true)));
+            await submitWith("apply");
+
+            expect(app.CatapultChannel.refresh).toHaveBeenCalledOnce();
+            expect(app.location.reload).not.toHaveBeenCalled();
+        });
+
+        it("posts to the button's formaction, and keeps the swapped-in page working", async () => {
+            fetchMock.mockResolvedValue(answer(configPage()));
+            await submitWith("add");
+            await submitWith("apply");
+
+            expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/mock/admin?addBinding=true", "/mock/admin"]);
+        });
+
+        it("sends a Twitchat event without touching the app, showing the result", async () => {
+            fetchMock.mockResolvedValue(answer(configPage("1 payload(s) envoyé(s)")));
+            await submitWith("send");
+
+            expect(fetchMock.mock.calls[0][0]).toBe("/mock/admin/twitchat");
+            expect(document.querySelector(".mock-result").textContent).toBe("1 payload(s) envoyé(s)");
+            expect(app.CatapultChannel.refresh).not.toHaveBeenCalled();
+        });
+
+        it("follows to the page it lands on when it isn't the config (logged out)", async () => {
+            fetchMock.mockResolvedValue(answer("<main>login</main>", "http://localhost/mock/login"));
+            await submitWith("apply");
+
+            expect(self.href).toBe("http://localhost/mock/login");
+            expect(app.CatapultChannel.refresh).not.toHaveBeenCalled();
+        });
     });
 
     it("does nothing when opened on its own", async () => {

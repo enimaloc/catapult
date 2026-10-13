@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
@@ -132,6 +133,12 @@ public class MockApiService implements ApiService {
     public void recheckGame(String username) {
         log.trace("recheckGame({})", username);
         // no-op in mock mode
+    }
+
+    @Override
+    public GameDto currentGame(String username) {
+        log.trace("currentGame({})", username);
+        return currentData().getGameDto();
     }
 
     @Override

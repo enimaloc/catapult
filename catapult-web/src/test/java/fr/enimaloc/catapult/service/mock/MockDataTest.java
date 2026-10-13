@@ -411,12 +411,12 @@ class MockDataTest {
         }
 
         @Test
-        void changesTheDetectedGameKeepingItsBinding() {
+        void changesTheDetectedGameWithItsBinding() {
             MockData data = session();
 
-            data.setDetectedGame("XBOX", "Halo");
+            data.setDetectedGame(null, "XBOX", "Halo");
 
-            assertThat(data.getGameDto().bindingId()).isEqualTo(STUNTBOOST.id());
+            assertThat(data.getGameDto().bindingId()).isNull();
             assertThat(data.getGameDto().sourceName()).isEqualTo("Halo");
         }
 
@@ -424,7 +424,7 @@ class MockDataTest {
         void sessionWithoutBindings_canStillBeGivenADetectedGame() {
             MockData data = session(List.of());
 
-            data.setDetectedGame("STEAM", "Valheim");
+            data.setDetectedGame(null, "STEAM", "Valheim");
 
             assertThat(data.getGameDto().bindingId()).isNull();
             assertThat(data.getGameDto().sourceName()).isEqualTo("Valheim");

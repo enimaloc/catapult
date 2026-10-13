@@ -406,9 +406,9 @@ public class MockData {
                 avatarUrl, channelDto.live());
     }
 
-    /** The game Catapult currently detects running — independent of the binding's Twitch category mapping. */
-    public void setDetectedGame(String sourceType, String sourceName) {
-        gameDto = new GameDto(gameDto == null ? null : gameDto.bindingId(), sourceName, sourceType);
+    /** What Catapult now sees running; {@code bindingId} is its binding's, null when it has none. */
+    public void setDetectedGame(String bindingId, String sourceType, String sourceName) {
+        gameDto = new GameDto(bindingId, sourceName, sourceType);
     }
 
     public void setProviders(boolean hasSteamProvider, boolean hasSteam, boolean hasXboxProvider, boolean hasXbox) {

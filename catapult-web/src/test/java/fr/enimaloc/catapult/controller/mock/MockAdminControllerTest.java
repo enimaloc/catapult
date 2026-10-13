@@ -135,10 +135,26 @@ class MockAdminControllerTest {
     }
 
     @Test
+    void apply_whatEventsCarry_leavesTheAppAlone() throws Exception {
+        mvc.perform(form("live", data.getChannelDto().live() ? null : "on", "detectedSourceType", "XBOX",
+                        "detectedSourceName", "Halo", "steamRateLimited", "on"))
+                .andExpect(flash().attributeCount(0));
+    }
+
+    @Test
+    void apply_whatNoEventCarries_marksTheAppStale() throws Exception {
+        mvc.perform(form("avatarUrl", "https://img")).andExpect(flash().attribute("appStale", true));
+        mvc.perform(form("hasXbox", data.isHasXbox() ? null : "on")).andExpect(flash().attribute("appStale", true));
+        mvc.perform(form("steamProfileCacheTtlMinutes", "30")).andExpect(flash().attribute("appStale", true));
+        mvc.perform(form().param("addBinding", "true")).andExpect(flash().attribute("appStale", true));
+        mvc.perform(form("bindings[0].delete", "on")).andExpect(flash().attribute("appStale", true));
+    }
+
+    @Test
     void apply_unchangedForm_publishesNothing() throws Exception {
         List<BindingDto> before = data.getBinding();
 
-        mvc.perform(form()).andExpect(redirectedUrl("/mock/admin"));
+        mvc.perform(form()).andExpect(redirectedUrl("/mock/admin")).andExpect(flash().attributeCount(0));
 
         assertThat(eventCount()).isZero();
         assertThat(data.getBinding()).isEqualTo(before);
@@ -159,22 +175,24 @@ class MockAdminControllerTest {
     @Test
     void apply_detectedGameChange_pointsAtTheMatchingBinding() throws Exception {
         var binding = data.getPrimaryBinding();
-        data.setDetectedGame("XBOX", "Something else");
+        data.setDetectedGame(null, "XBOX", "Something else");
 
         mvc.perform(form("detectedSourceType", binding.sourceType().toLowerCase(),
                 "detectedSourceName", binding.sourceName().toLowerCase()));
 
-        assertThat(events.stream(GameChangedEvent.class)).containsExactly(
-                new GameChangedEvent(username, binding.id(), binding.sourceType(), binding.sourceName()));
+        assertThat(events.stream(GameChangedEvent.class)).containsExactly(new GameChangedEvent(username, binding.id(),
+                binding.sourceType().toLowerCase(), binding.sourceName().toLowerCase()));
         assertThat(data.getGameDto().sourceName()).isEqualTo(binding.sourceName().toLowerCase());
+        assertThat(data.getGameDto().bindingId()).isEqualTo(binding.id());
     }
 
     @Test
     void apply_detectedGameWithoutBinding_isPublishedWithoutOne() throws Exception {
         mvc.perform(form("detectedSourceType", "XBOX", "detectedSourceName", "Halo"));
 
-        assertThat(events.stream(GameChangedEvent.class)).containsExactly(new GameChangedEvent(username, null, null, null));
+        assertThat(events.stream(GameChangedEvent.class)).containsExactly(new GameChangedEvent(username, null, "XBOX", "Halo"));
         assertThat(data.getGameDto().sourceName()).isEqualTo("Halo");
+        assertThat(data.getGameDto().bindingId()).isNull();
     }
 
     @Test
@@ -243,7 +261,7 @@ class MockAdminControllerTest {
     void apply_gameWithACategory_sendsTheCategoryChange_elseNoGameFound() throws Exception {
         var binding = data.getPrimaryBinding();
         data.setBotEnabled(true);
-        data.setDetectedGame("XBOX", "Something else");
+        data.setDetectedGame(null, "XBOX", "Something else");
 
         mvc.perform(form("detectedSourceType", binding.sourceType(), "detectedSourceName", binding.sourceName()));
         verify(mockApiService).dispatchTwitchatEvent("CATEGORY_CHANGED_BY_CATAPULT",

@@ -37,7 +37,7 @@
     </style>
 </head>
 <body>
-<main class="mock-admin">
+<main class="mock-admin" th:data-app-stale="${appStale}">
     <header>
         <h1>Config du membre</h1>
         <mdui-chip icon="person" th:text="${channel.twitchUsername()}">username</mdui-chip>
@@ -45,7 +45,7 @@
     </header>
     <p class="mock-hint">
         L'état que l'appli ne permet pas de modifier. Le reste (associations du jeu, CCL/TW, connexions, réglages)
-        se modifie depuis la page de la chaîne elle-même. Appliquer recharge l'appli.
+        se modifie depuis la page de la chaîne elle-même. Appliquer met à jour la page de l'appli.
     </p>
     <p class="mock-result" th:if="${twitchatResult}" th:text="${twitchatResult}"></p>
 
