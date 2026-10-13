@@ -21,7 +21,8 @@ public final class MockPresets {
     public static final List<CclDto> AVAILABLE_CCLS = List.of(
             new CclDto("DrugsIntoxication", "Drogue"),
             new CclDto("ProfanityVulgarity", "Vulgarité"),
-            new CclDto("SexualThemes", "Thèmes sexuels")
+            new CclDto("SexualThemes", "Thèmes sexuels"),
+            new CclDto("ViolentGraphic", "Violence graphique")
     );
 
     public static final List<TwDto> AVAILABLE_TWS = List.of(
