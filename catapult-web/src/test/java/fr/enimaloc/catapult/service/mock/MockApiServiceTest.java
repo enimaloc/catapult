@@ -54,7 +54,8 @@ class MockApiServiceTest {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
         data = service.getData();
         username = data.getChannelDto().twitchUsername();
-        bindingId = data.getPrimaryBinding().id();
+        // A random session (digit code) may draw no binding at all.
+        bindingId = data.getPrimaryBinding() == null ? null : data.getPrimaryBinding().id();
     }
 
     @BeforeEach
