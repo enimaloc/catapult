@@ -94,6 +94,10 @@ public class MockData {
     @Setter
     @Getter
     private boolean botEnabled = true;
+    /** Whether the member is a Catapult admin (ROLE_ADMIN in the real JWT); only the mock admin page sets it. */
+    @Setter
+    @Getter
+    private boolean admin;
     /** Each Twitchat event's payloads; only STREAM_STARTED starts with one, a greeting. */
     @Getter
     private final Map<String, List<TwitchatEventActionDto>> twitchatEvents = defaultTwitchatEvents();

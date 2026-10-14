@@ -75,7 +75,8 @@ window.CatapultMockPopout = (function () {
 
     /**
      * Posts `form` to `action`, swapping its answer into the popout. The app's page re-renders
-     * only when the config changed something no event carries to it (MockAdminController's appStale).
+     * only when the config changed something no event carries to it (MockAdminController's appStale),
+     * and reloads when the navbar itself changed (appReload).
      */
     async function postInPlace(form, action, app) {
         let response;
@@ -100,8 +101,9 @@ window.CatapultMockPopout = (function () {
         document.querySelector("main").replaceWith(main);
         window.scrollTo(0, scroll);
         wireForms(app);
-        // The app's page follows the rest through its events.
-        if (main.dataset.appStale === "true") app.CatapultChannel?.refresh();
+        // The app's page follows the rest through its events; the navbar is only rendered with the page.
+        if (main.dataset.appReload === "true") app.location.reload();
+        else if (main.dataset.appStale === "true") app.CatapultChannel?.refresh();
     }
 
     if (script?.dataset.role === "popout") wirePopout();

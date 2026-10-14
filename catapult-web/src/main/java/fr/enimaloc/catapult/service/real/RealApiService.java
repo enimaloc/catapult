@@ -247,6 +247,11 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public boolean isAdmin() {
+        return ApiClient.currentRoles().contains("ROLE_ADMIN");
+    }
+
+    @Override
     public Map<String, List<TwitchatEventActionDto>> twitchatEvents(String username) {
         Map<String, List<TwitchatEventActionDto>> events = client.get("/api/channels/{username}/twitchat/events", EVENTS, username);
         return events == null ? Map.of() : events;

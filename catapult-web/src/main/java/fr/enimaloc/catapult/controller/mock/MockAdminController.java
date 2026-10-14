@@ -61,6 +61,7 @@ public class MockAdminController {
         private boolean live;
         private String avatarUrl;
         private boolean botEnabled;
+        private boolean admin;
         private String detectedSourceType;
         private String detectedSourceName;
         private boolean hasSteamProvider;
@@ -128,6 +129,7 @@ public class MockAdminController {
         LinkStateResponse minecraft = data.getMinecraftLink();
         model.addAttribute("channel", data.getChannelDto());
         model.addAttribute("botEnabled", data.isBotEnabled());
+        model.addAttribute("admin", data.isAdmin());
         model.addAttribute("game", data.getGameDto());
         model.addAttribute("bindings", data.getBinding());
         model.addAttribute("moderated", data.getModeratedChannels());
@@ -179,7 +181,8 @@ public class MockAdminController {
     /**
      * Applies the form; {@code addBinding} / {@code addModerated} (its "add" buttons) then append a
      * blank binding / moderated channel. Flags {@code appStale} when something changed that no event
-     * carries to the app; a change of the navbar's channels is pushed to it like catapult-api would.
+     * carries to the app, {@code appReload} when the navbar itself has to be rendered again (the admin
+     * menu); a change of the navbar's channels is pushed to it like catapult-api would.
      */
     @PostMapping("/mock/admin")
     public String apply(@ModelAttribute AdminForm form, @RequestParam(defaultValue = "false") boolean addBinding,
@@ -208,6 +211,10 @@ public class MockAdminController {
         data.setChannelAvatarUrl(form.getAvatarUrl());
         if (data.isBotEnabled() != form.isBotEnabled()) {
             mockApiService.toggleBot(username); // and its Twitchat event
+        }
+        if (data.isAdmin() != form.isAdmin()) {
+            data.setAdmin(form.isAdmin());
+            redirect.addFlashAttribute("appReload", true);
         }
 
         GameDto previous = data.getGameDto();

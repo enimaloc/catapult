@@ -70,6 +70,7 @@ class MockAdminControllerTest {
         Map<String, String> fields = new LinkedHashMap<>();
         if (data.getChannelDto().live()) fields.put("live", "on");
         if (data.isBotEnabled()) fields.put("botEnabled", "on");
+        if (data.isAdmin()) fields.put("admin", "on");
         fields.put("avatarUrl", data.getChannelDto().profileImageUrl());
         fields.put("detectedSourceType", data.getGameDto().sourceType());
         fields.put("detectedSourceName", data.getGameDto().sourceName());
@@ -305,6 +306,17 @@ class MockAdminControllerTest {
 
         verify(mockApiService).dispatchTwitchatEvent("STREAM_STARTED", Map.of());
         verify(mockApiService).toggleBot(username);
+    }
+
+    @Test
+    void apply_admin_switchesIt_andHasTheAppReloadOnlyWhenItChanged() throws Exception {
+        mvc.perform(form()).andExpect(flash().attributeCount(0));
+
+        mvc.perform(form("admin", "on")).andExpect(flash().attribute("appReload", true));
+        assertThat(data.isAdmin()).isTrue();
+
+        mvc.perform(form("admin", null)).andExpect(flash().attribute("appReload", true));
+        assertThat(data.isAdmin()).isFalse();
     }
 
     @Test

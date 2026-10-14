@@ -15,6 +15,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -144,15 +145,32 @@ public class ApiClient {
         return currentJwt() != null;
     }
 
-    /** The subject (account id) of the calling session's JWT; null without one. Read, not verified: the session holds it server-side. */
+    /** The subject (account id) of the calling session's JWT; null without one. */
     public static UUID currentSubject() {
+        Map<?, ?> claims = currentClaims();
+        if (claims == null) return null;
+        try {
+            return UUID.fromString(String.valueOf(claims.get("sub")));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** The roles (e.g. ROLE_ADMIN) of the calling session's JWT; empty without one. */
+    public static List<String> currentRoles() {
+        Map<?, ?> claims = currentClaims();
+        if (claims == null || !(claims.get("roles") instanceof List<?> roles)) return List.of();
+        return roles.stream().map(String::valueOf).toList();
+    }
+
+    /** The calling session's JWT claims; null without one. Read, not verified: the session holds it server-side. */
+    private static Map<?, ?> currentClaims() {
         String jwt = currentJwt();
         if (jwt == null) return null;
         String[] parts = jwt.split("\\.");
         if (parts.length < 2) return null;
         try {
-            Map<?, ?> claims = JSON.readValue(Base64.getUrlDecoder().decode(parts[1]), Map.class);
-            return UUID.fromString(String.valueOf(claims.get("sub")));
+            return JSON.readValue(Base64.getUrlDecoder().decode(parts[1]), Map.class);
         } catch (RuntimeException e) {
             return null;
         }
