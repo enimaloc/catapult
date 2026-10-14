@@ -1,8 +1,11 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
+import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,10 +13,17 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.List;
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
@@ -25,15 +35,23 @@ class ChannelEventStreamControllerTest {
 
     @Autowired MockMvc mvc;
     @Autowired ChannelEventStreamController controller;
+    @MockitoBean ApiService apiService;
 
     private MvcResult subscribe(String username) throws Exception {
         return subscribe(username, loggedIn());
     }
 
-    private static MockHttpSession loggedIn() {
+    /** A logged-in session whose member can act on {@code usernames} (by default, every channel these tests follow). */
+    private static MockHttpSession loggedIn(String... usernames) {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(ApiClient.SESSION_JWT_KEY, "jwt");
+        List<String> names = usernames.length > 0 ? List.of(usernames) : List.of("enimaloc", "closing");
+        SessionChannels.remember(session, names.stream().map(ChannelEventStreamControllerTest::channel).toList());
         return session;
+    }
+
+    private static ChannelDto channel(String username) {
+        return new ChannelDto(UUID.randomUUID(), "1", username, "img", false);
     }
 
     private MvcResult subscribe(String username, MockHttpSession session) throws Exception {
@@ -110,5 +128,35 @@ class ChannelEventStreamControllerTest {
         assertThat(oldest.getAsyncResult(1000)).isNull();
         assertThat(oldest.getResponse().getContentAsString()).doesNotContain("BotStateChangedEvent");
         assertThat(newest.getResponse().getContentAsString()).contains("BotStateChangedEvent");
+    }
+
+    @Test
+    void aChannelTheMemberNeitherOwnsNorModerates_cannotBeFollowed() throws Exception {
+        when(apiService.channelList()).thenReturn(new ChannelListResponse("1", List.of(channel("enimaloc"))));
+
+        mvc.perform(get("/events/channel/{username}", "someone-else").session(loggedIn("enimaloc"))
+                        .accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aChannelMissingFromTheSessionsList_isCheckedWithTheApi_thenKept() throws Exception {
+        MockHttpSession session = loggedIn("enimaloc");
+        when(apiService.channelList()).thenReturn(new ChannelListResponse("1", List.of(channel("enimaloc"), channel("newly-moderated"))));
+
+        subscribe("Newly-Moderated", session);
+        subscribe("newly-moderated", session);
+
+        verify(apiService, times(1)).channelList();
+        assertThat(SessionChannels.of(session)).extracting(ChannelDto::twitchUsername).contains("newly-moderated");
+    }
+
+    @Test
+    void anApiThatFails_grantsNothing() throws Exception {
+        when(apiService.channelList()).thenReturn(null);
+
+        mvc.perform(get("/events/channel/{username}", "someone-else").session(loggedIn("enimaloc"))
+                        .accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isForbidden());
     }
 }

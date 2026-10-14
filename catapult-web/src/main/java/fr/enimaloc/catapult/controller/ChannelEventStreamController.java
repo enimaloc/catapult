@@ -1,8 +1,10 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
+import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
@@ -27,11 +29,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * published for a channel goes to that channel's open streams, named after the event's class
  * (e.g. {@code GameChangedEvent}) with the event itself as JSON data. channel-events.js patches
  * the page from it (see visibility.js) instead of re-fetching the fragment. Logged-in sessions
- * only, a few streams each (see {@link SessionStreams}).
+ * only, a few streams each (see {@link SessionStreams}), and only for a channel their member owns
+ * or moderates (see {@link SessionChannels}): its events tell what the dashboard does.
  */
 @Slf4j
 @RestController
+@RequiredArgsConstructor
 public class ChannelEventStreamController {
+    private final ApiService apiService;
     private final Map<String, List<SseEmitter>> emittersByUsername = new ConcurrentHashMap<>();
     private final SessionStreams streams = new SessionStreams();
 
@@ -40,6 +45,9 @@ public class ChannelEventStreamController {
         HttpSession session = SessionStreams.loggedIn(request);
         if (session == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (!SessionChannels.canFollow(session, username, apiService)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         String sessionId = session.getId();
         SseEmitter emitter = new SseEmitter(0L);
