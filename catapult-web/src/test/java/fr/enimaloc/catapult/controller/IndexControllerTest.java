@@ -43,6 +43,7 @@ class IndexControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
+    @MockitoBean NavEventStreamController navEvents;
 
     /**
      * The channel template now dereferences {@code channelPage} on the model, so every
