@@ -3,10 +3,13 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -21,40 +24,51 @@ import java.util.function.Predicate;
 
 /**
  * Live updates for the navbar's channels over Server-Sent Events, one stream per open page of a
- * session: {@code NavChannelLive} ({@code {username, live}}) when one of the channels it lists
- * goes live or offline, {@code NavChannelsChanged} when the list itself changed (spa.js then
- * reloads it). Which channels a session lists is what /spa/nav-channels last served it.
+ * logged-in session: {@code NavChannelLive} ({@code {username, live}}) when one of the channels it
+ * lists goes live or offline, {@code NavChannelsChanged} when the list itself changed (spa.js then
+ * reloads it). Which channels a session lists is what /spa/nav-channels last served it, kept in
+ * that session: it goes with it.
  */
 @RestController
 public class NavEventStreamController {
     static final String LIVE = "NavChannelLive";
     static final String CHANGED = "NavChannelsChanged";
+    static final String CHANNELS = NavEventStreamController.class.getName() + ".channels";
 
     /** A {@link #LIVE} event's data. */
     record NavChannelLive(String username, boolean live) {}
 
-    /** What a session's navbar shows, and its open streams. */
-    private static final class Nav {
-        volatile List<ChannelDto> channels = List.of();
-        final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
-    }
+    /** A session with streams open, and those streams. */
+    private record Nav(HttpSession session, List<SseEmitter> emitters) {}
 
+    /** Only the sessions with a stream open. */
     private final Map<String, Nav> navsBySession = new ConcurrentHashMap<>();
+    private final SessionStreams streams = new SessionStreams();
 
     @GetMapping(value = "/events/nav", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter subscribe(HttpSession session) {
+    public ResponseEntity<SseEmitter> subscribe(HttpServletRequest request) {
+        HttpSession session = SessionStreams.loggedIn(request);
+        if (session == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         String sessionId = session.getId();
         SseEmitter emitter = new SseEmitter(0L);
-        navsBySession.computeIfAbsent(sessionId, ignored -> new Nav()).emitters.add(emitter);
+        // Added within compute: remove() drops an emptied Nav atomically too.
+        navsBySession.compute(sessionId, (id, nav) -> {
+            Nav current = nav == null ? new Nav(session, new CopyOnWriteArrayList<>()) : nav;
+            current.emitters().add(emitter);
+            return current;
+        });
         emitter.onCompletion(() -> remove(sessionId, emitter));
         emitter.onTimeout(() -> remove(sessionId, emitter));
         emitter.onError(e -> remove(sessionId, emitter));
-        return emitter;
+        streams.open(sessionId, emitter);
+        return ResponseEntity.ok(emitter);
     }
 
-    /** The channels {@code sessionId}'s navbar now lists (see SpaFragmentController#navChannels). */
-    public void remember(String sessionId, List<ChannelDto> channels) {
-        navsBySession.computeIfAbsent(sessionId, ignored -> new Nav()).channels = List.copyOf(channels);
+    /** The channels {@code session}'s navbar now lists (see SpaFragmentController#navChannels). */
+    public void remember(HttpSession session, List<ChannelDto> channels) {
+        session.setAttribute(CHANNELS, List.copyOf(channels));
     }
 
     /** The mock's channels go live by name (MockAdminController). */
@@ -77,32 +91,48 @@ public class NavEventStreamController {
     }
 
     private void live(Predicate<ChannelDto> which, boolean live) {
-        navsBySession.values().forEach(nav -> nav.channels.stream().filter(which).forEach(channel -> {
-            nav.channels = nav.channels.stream().map(c -> c == channel
-                    ? new ChannelDto(c.id(), c.twitchId(), c.twitchUsername(), c.profileImageUrl(), live) : c).toList();
-            send(nav, LIVE, new NavChannelLive(channel.twitchUsername(), live));
-        }));
+        navsBySession.values().forEach(nav -> {
+            List<ChannelDto> channels = channelsOf(nav);
+            if (channels.stream().noneMatch(which)) return;
+            nav.session().setAttribute(CHANNELS, channels.stream().map(c -> which.test(c)
+                    ? new ChannelDto(c.id(), c.twitchId(), c.twitchUsername(), c.profileImageUrl(), live) : c).toList());
+            channels.stream().filter(which)
+                    .forEach(channel -> send(nav, LIVE, new NavChannelLive(channel.twitchUsername(), live)));
+        });
+    }
+
+    /** What {@code nav}'s session lists; none once that session is gone, whose streams then close. */
+    @SuppressWarnings("unchecked")
+    private static List<ChannelDto> channelsOf(Nav nav) {
+        try {
+            Object channels = nav.session().getAttribute(CHANNELS);
+            return channels == null ? List.of() : (List<ChannelDto>) channels;
+        } catch (IllegalStateException e) {
+            nav.emitters().forEach(SseEmitter::complete);
+            return List.of();
+        }
     }
 
     private static void send(Nav nav, String name, Object data) {
-        for (SseEmitter emitter : nav.emitters) {
+        for (SseEmitter emitter : nav.emitters()) {
             try {
                 emitter.send(SseEmitter.event().name(name).data(data));
             } catch (IOException | IllegalStateException e) {
-                nav.emitters.remove(emitter);
+                nav.emitters().remove(emitter);
             }
         }
     }
 
     private void remove(String sessionId, SseEmitter emitter) {
+        streams.closed(sessionId, emitter);
         navsBySession.computeIfPresent(sessionId, (id, nav) -> {
-            nav.emitters.remove(emitter);
-            return nav.emitters.isEmpty() ? null : nav;
+            nav.emitters().remove(emitter);
+            return nav.emitters().isEmpty() ? null : nav;
         });
     }
 
     @EventListener
     public void onContextClosed(ContextClosedEvent event) {
-        navsBySession.values().forEach(nav -> nav.emitters.forEach(SseEmitter::complete));
+        navsBySession.values().forEach(nav -> nav.emitters().forEach(SseEmitter::complete));
     }
 }

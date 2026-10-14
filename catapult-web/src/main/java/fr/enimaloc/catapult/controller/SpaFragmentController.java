@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -39,8 +42,12 @@ public class SpaFragmentController {
 
     /** The navbar's channels, which spa.js loads once the page is shown; their live updates follow them. */
     @GetMapping("/nav-channels")
-    String navChannels(Model model, HttpSession session) {
-        navEvents.remember(session.getId(), filler.navChannels(model));
+    String navChannels(Model model, HttpServletRequest request) {
+        List<ChannelDto> channels = filler.navChannels(model);
+        HttpSession session = SessionStreams.loggedIn(request);
+        if (session != null) {
+            navEvents.remember(session, channels);
+        }
         return "fragments/nav-channels :: channels";
     }
 
