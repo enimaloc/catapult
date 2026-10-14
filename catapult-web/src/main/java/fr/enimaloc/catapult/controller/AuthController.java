@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
+import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpSession;
@@ -18,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequiredArgsConstructor
 public class AuthController {
     private final ApiService apiService;
+    private final InteractionMetrics metrics;
 
     @GetMapping("/auth/callback")
     public String callback(@RequestParam String code, HttpSession session) {
         TokenResponse jwt = apiService.exchangeCode(code);
+        metrics.login(jwt != null);
         if (jwt == null) {
             log.warn("Auth code exchange failed or expired");
             return "redirect:/login?error";

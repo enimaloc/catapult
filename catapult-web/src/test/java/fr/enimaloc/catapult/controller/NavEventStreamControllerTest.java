@@ -3,8 +3,11 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
+import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -24,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = NavEventStreamController.class)
-@Import(WebSecurityConfig.class)
+@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class})
 class NavEventStreamControllerTest {
 
     private static final ChannelDto OWN = new ChannelDto(UUID.randomUUID(), "1", "enimaloc", "img", false);
@@ -32,6 +35,7 @@ class NavEventStreamControllerTest {
 
     @Autowired MockMvc mvc;
     @Autowired NavEventStreamController controller;
+    @Autowired MeterRegistry registry;
 
     private static MockHttpSession loggedIn() {
         MockHttpSession session = new MockHttpSession();
@@ -124,6 +128,8 @@ class NavEventStreamControllerTest {
                 .andExpect(status().isUnauthorized()).andReturn();
 
         assertThat(result.getRequest().getSession(false)).isNull();
+        assertThat(registry.get("catapult.web.sse.refused").tags("stream", "nav", "reason", "unauthenticated")
+                .counter().count()).isPositive();
     }
 
     @Test
