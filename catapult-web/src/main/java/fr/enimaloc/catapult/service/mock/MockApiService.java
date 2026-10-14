@@ -343,6 +343,12 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public boolean isAdmin() {
+        MockData current = currentData();
+        return current != null && current.isAdmin();
+    }
+
+    @Override
     public Map<String, List<TwitchatEventActionDto>> twitchatEvents(String username) {
         log.trace("twitchatEvents({})", username);
         return currentData().getTwitchatEvents();
