@@ -116,14 +116,11 @@ class IndexControllerTest {
     }
 
     /**
-     * Regression test for a NullPointerException on non-owner viewers (e.g. a moderator
-     * viewing a channel they don't own): ModelFiller#channel only fetches
-     * channelSettings/dtddMapping when isOwner() is true, so the template
-     * must not dereference those attributes unconditionally. Deliberately does not stub
-     * channelSettings/dtddMapping — that's the point being verified.
+     * A moderator viewing a channel they don't own: the page renders without the owner-only
+     * parts (integrations, bot), whose model ModelFiller#channel leaves out for them.
      */
     @Test
-    void channelFullPage_nonOwnerViewer_rendersWithoutError() throws Exception {
+    void channelFullPage_moderatorViewer_rendersWithoutError() throws Exception {
         ChannelPageData data = new ChannelPageData(
                 new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
                 "enimaloc", false, true, true, null,
