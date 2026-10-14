@@ -1,11 +1,28 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html th:lang="${#locale.language}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Catapult</title>
+    <!--/* See ModelFiller#seo: a member's page and an error stay out of search engines. */-->
+    <title th:text="${seo.title}">Catapult</title>
+    <th:block th:if="${seo.indexed}">
+        <meta name="description" th:content="${seo.description}">
+        <link th:if="${seo.canonicalUrl}" rel="canonical" th:href="${seo.canonicalUrl}">
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" th:content="#{app.brand}">
+        <meta property="og:title" th:content="${seo.title}">
+        <meta property="og:description" th:content="${seo.description}">
+        <meta th:if="${seo.canonicalUrl}" property="og:url" th:content="${seo.canonicalUrl}">
+        <meta name="twitter:card" content="summary">
+    </th:block>
+    <meta th:unless="${seo.indexed}" name="robots" content="noindex">
+    <script th:if="${seo.indexed and page == '' and seo.canonicalUrl != null}" type="application/ld+json" th:inline="javascript">
+        {"@context": "https://schema.org", "@type": "WebSite", "name": /*[[#{app.brand}]]*/ "", "url": /*[[${seo.canonicalUrl}]]*/ ""}
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
 
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="/_static/mdui/2.1.4/mdui.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="/css/catapult.css">

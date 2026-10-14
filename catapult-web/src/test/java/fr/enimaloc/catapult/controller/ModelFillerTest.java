@@ -18,6 +18,8 @@ import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.ui.ExtendedModelMap;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -87,6 +89,50 @@ class ModelFillerTest {
         assertThat(titles).containsEntry("privacy", "Confidentialité")
                 .containsEntry("channels", "page.title.channels")
                 .containsOnlyKeys("", "privacy", "channels", "channel");
+    }
+
+    @Test
+    void defaultAttr_withLocale_describesAPublicPageWithItsCanonicalUrl() {
+        messages.addMessage("page.title.privacy", Locale.FRENCH, "Confidentialité");
+        messages.addMessage("page.description.privacy", Locale.FRENCH, "Vos données.");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+        try {
+            filler().defaultAttr(model, "privacy", Locale.FRENCH);
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+
+        assertThat(model.get("seo")).isEqualTo(
+                new ModelFiller.Seo("Confidentialité", "Vos données.", "http://localhost/privacy", true));
+    }
+
+    @Test
+    void defaultAttr_withLocale_outsideARequest_hasNoCanonicalUrl() {
+        filler().defaultAttr(model, "", Locale.FRENCH);
+
+        assertThat(((ModelFiller.Seo) model.get("seo")).canonicalUrl()).isNull();
+    }
+
+    @Test
+    void defaultAttr_withLocale_keepsTheChannelOutOfSearchEngines_namingIt() {
+        messages.addMessage("page.title.channel", Locale.FRENCH, "{0} - Catapult");
+        model.addAttribute("username", "enimaloc");
+
+        filler().defaultAttr(model, "channel", Locale.FRENCH);
+
+        assertThat(model.get("seo")).isEqualTo(new ModelFiller.Seo("enimaloc - Catapult", null, null, false));
+    }
+
+    @Test
+    void defaultAttr_withLocale_titlesAnErrorByIt_keptOutOfSearchEngines() {
+        messages.addMessage("error.404.title", Locale.FRENCH, "Page introuvable");
+        messages.addMessage("page.title.error", Locale.FRENCH, "{0} - Catapult");
+        model.addAttribute("error", true);
+        filler().error(model, 404);
+
+        filler().defaultAttr(model, "nope", Locale.FRENCH);
+
+        assertThat(model.get("seo")).isEqualTo(new ModelFiller.Seo("Page introuvable - Catapult", null, null, false));
     }
 
     @Test
