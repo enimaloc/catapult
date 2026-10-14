@@ -69,6 +69,15 @@ describe("navigate", () => {
         expect(document.title).toBe("enimaloc - Catapult");
     });
 
+    it("renders with the new URL already in place, for scripts reading it", async () => {
+        let seen = null;
+        document.addEventListener("catapult:render", () => { seen = location.pathname; }, { once: true });
+
+        await CatapultSpa.navigate("channel/other");
+
+        expect(seen).toBe("/channel/other");
+    });
+
     it("appends the dynamic param and the query string", async () => {
         await CatapultSpa.navigate("channel/enimaloc", true, "?page=2");
 

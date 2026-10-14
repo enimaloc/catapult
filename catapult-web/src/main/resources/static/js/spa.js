@@ -57,8 +57,8 @@ async function navigate(path, push = true, search = "") {
 
     const html = await response.text();
     app.innerHTML = html;
-    document.dispatchEvent(new CustomEvent("catapult:render"));
 
+    // Before the render: its listeners read the page's channel off location (CatapultChannel.username()).
     if (push) {
         history.pushState(
             {
@@ -69,6 +69,7 @@ async function navigate(path, push = true, search = "") {
             (path === "" ? "/" : `/${path}`) + search
         );
     }
+    document.dispatchEvent(new CustomEvent("catapult:render"));
 
     if (!response.ok) {
         // Server-side error (unknown page or fragment failure): the
