@@ -106,13 +106,15 @@ window.CatapultChannel = (function () {
     };
 })();
 
-// Keeps the active #channel-tabs tab in location.hash. refresh() re-renders the whole
-// fragment without pushing a history entry, so the hash survives it and the restore
-// below lands back on the tab the user was on (e.g. after the mock popout's re-render)
-// instead of resetting to the overview. Also makes each tab directly linkable.
+// Keeps the active tab of a page's hash-mirrored tabs (data-hash-tabs: the channel's, the admin
+// page's) in location.hash. refresh() re-renders the whole fragment without pushing a history
+// entry, so the hash survives it and the restore below lands back on the tab the user was on
+// (e.g. after the mock popout's re-render) instead of resetting to the first one. Also makes
+// each tab directly linkable.
 document.addEventListener("catapult:render", function () {
-    const tabs = document.getElementById("channel-tabs");
+    const tabs = document.querySelector("mdui-tabs[data-hash-tabs]");
     if (!tabs) return;
+    const first = tabs.value;
 
     const wanted = location.hash.slice(1);
     // Non-owners only get the overview tab: ignore a hash naming one they don't have.
@@ -121,7 +123,7 @@ document.addEventListener("catapult:render", function () {
     }
 
     tabs.addEventListener("change", () => {
-        const hash = tabs.value === "overview" ? "" : `#${tabs.value}`;
+        const hash = tabs.value === first ? "" : `#${tabs.value}`;
         history.replaceState(history.state, "", location.pathname + location.search + hash);
     });
 });

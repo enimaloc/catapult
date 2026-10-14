@@ -72,7 +72,12 @@ public class ModelFiller {
         model.addAttribute("titles", titles(locale));
         model.addAttribute("seo", seo(model, page == null ? "" : page, locale));
         model.addAttribute("loggedIn", ApiClient.hasSession());
-        model.addAttribute("admin", ApiClient.hasSession() && apiService.isAdmin());
+        model.addAttribute("admin", isAdmin());
+    }
+
+    /** Whether the visitor is logged in as a Catapult admin: they get the admin button and page. */
+    public boolean isAdmin() {
+        return ApiClient.hasSession() && apiService.isAdmin();
     }
 
     /**

@@ -91,7 +91,7 @@ class ModelFillerTest {
         Map<String, String> titles = (Map<String, String>) model.get("titles");
         assertThat(titles).containsEntry("privacy", "Confidentialité")
                 .containsEntry("channel", "page.title.channel")
-                .containsOnlyKeys("", "privacy", "channel");
+                .containsOnlyKeys("", "privacy", "channel", "admin");
     }
 
     @Test

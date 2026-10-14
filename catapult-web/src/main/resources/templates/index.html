@@ -55,18 +55,11 @@
 
         <!--/* mdui-top-app-bar only has a default slot: this is a plain flex item, sized like the brand. */-->
         <div class="app-bar-end">
-            <!--/* Admins only (ROLE_ADMIN). The admin pages aren't in this UI yet: their entries stay disabled until they are. */-->
-            <mdui-dropdown th:if="${admin}" id="nav-admin" placement="bottom-end">
-                <mdui-button slot="trigger" variant="text" icon="admin_panel_settings" end-icon="arrow_drop_down"
-                             th:aria-label="#{nav.admin}"><span class="nav-admin-label" th:text="#{nav.admin}">nav.admin</span></mdui-button>
-                <mdui-menu>
-                    <mdui-menu-item icon="group" disabled th:text="#{nav.admin.members}">nav.admin.members</mdui-menu-item>
-                    <mdui-menu-item icon="tune" disabled th:text="#{nav.admin.ccl}">nav.admin.ccl</mdui-menu-item>
-                    <mdui-menu-item icon="rule" disabled th:text="#{nav.admin.process-rules}">nav.admin.process-rules</mdui-menu-item>
-                    <mdui-menu-item icon="cached" disabled th:text="#{nav.admin.caches}">nav.admin.caches</mdui-menu-item>
-                    <mdui-menu-item icon="storage" disabled th:text="#{nav.admin.data}">nav.admin.data</mdui-menu-item>
-                </mdui-menu>
-            </mdui-dropdown>
+            <!--/* Admins only (ROLE_ADMIN): opens the admin page, marked active there by spa.js like a channel. */-->
+            <a th:if="${admin}" id="nav-admin" data-link class="nav-channel nav-admin" href="/admin" th:title="#{nav.admin}">
+                <mdui-icon name="admin_panel_settings"></mdui-icon>
+                <span th:text="#{nav.admin}">nav.admin</span>
+            </a>
             <!-- Mock profile only: reopens the member's config popout (mock-popout.js). -->
             <mdui-button th:if="${mock}" id="mock-popout-btn" variant="text" icon="tune">Mock</mdui-button>
             <mdui-button th:unless="${loggedIn}" variant="text" href="/oauth2/authorization/twitch"
