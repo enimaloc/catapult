@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
@@ -25,6 +26,7 @@ import org.springframework.test.web.client.ResponseActions;
 import org.springframework.web.client.RestClient;
 
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -81,9 +83,12 @@ class RealApiServiceTest {
 
     @Test
     void channelList() {
-        respond(HttpMethod.GET, "/api/channel", "{\"ownTwitchId\":\"1\",\"channels\":[]}");
+        respond(HttpMethod.GET, "/api/channels", """
+                {"viewerTwitchId":"1","channels":[{"id":"00000000-0000-0000-0000-000000000001","twitchId":"1",
+                 "twitchUsername":"enimaloc","profileImageUrl":"img","live":true}]}""");
 
-        assertThat(service.channelList()).isInstanceOf(ChannelListResponse.class);
+        assertThat(service.channelList()).isEqualTo(new ChannelListResponse("1", List.of(new ChannelDto(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"), "1", "enimaloc", "img", true))));
     }
 
     @Test

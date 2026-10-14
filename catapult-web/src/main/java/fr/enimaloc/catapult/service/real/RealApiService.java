@@ -56,7 +56,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public ChannelListResponse channelList() {
-        return client.get("/api/channel", ChannelListResponse.class);
+        return client.get("/api/channels", ChannelListResponse.class);
     }
 
     @Override
