@@ -26,14 +26,13 @@ import java.util.function.Predicate;
  * Live updates for the navbar's channels over Server-Sent Events, one stream per open page of a
  * logged-in session: {@code NavChannelLive} ({@code {username, live}}) when one of the channels it
  * lists goes live or offline, {@code NavChannelsChanged} when the list itself changed (spa.js then
- * reloads it). Which channels a session lists is what /spa/nav-channels last served it, kept in
- * that session: it goes with it.
+ * reloads it). Which channels a session lists is what /spa/nav-channels last served it (see
+ * {@link SessionChannels}).
  */
 @RestController
 public class NavEventStreamController {
     static final String LIVE = "NavChannelLive";
     static final String CHANGED = "NavChannelsChanged";
-    static final String CHANNELS = NavEventStreamController.class.getName() + ".channels";
 
     /** A {@link #LIVE} event's data. */
     record NavChannelLive(String username, boolean live) {}
@@ -68,7 +67,7 @@ public class NavEventStreamController {
 
     /** The channels {@code session}'s navbar now lists (see SpaFragmentController#navChannels). */
     public void remember(HttpSession session, List<ChannelDto> channels) {
-        session.setAttribute(CHANNELS, List.copyOf(channels));
+        SessionChannels.remember(session, channels);
     }
 
     /** The mock's channels go live by name (MockAdminController). */
@@ -94,7 +93,7 @@ public class NavEventStreamController {
         navsBySession.values().forEach(nav -> {
             List<ChannelDto> channels = channelsOf(nav);
             if (channels.stream().noneMatch(which)) return;
-            nav.session().setAttribute(CHANNELS, channels.stream().map(c -> which.test(c)
+            SessionChannels.remember(nav.session(), channels.stream().map(c -> which.test(c)
                     ? new ChannelDto(c.id(), c.twitchId(), c.twitchUsername(), c.profileImageUrl(), live) : c).toList());
             channels.stream().filter(which)
                     .forEach(channel -> send(nav, LIVE, new NavChannelLive(channel.twitchUsername(), live)));
@@ -102,11 +101,9 @@ public class NavEventStreamController {
     }
 
     /** What {@code nav}'s session lists; none once that session is gone, whose streams then close. */
-    @SuppressWarnings("unchecked")
     private static List<ChannelDto> channelsOf(Nav nav) {
         try {
-            Object channels = nav.session().getAttribute(CHANNELS);
-            return channels == null ? List.of() : (List<ChannelDto>) channels;
+            return SessionChannels.of(nav.session());
         } catch (IllegalStateException e) {
             nav.emitters().forEach(SseEmitter::complete);
             return List.of();

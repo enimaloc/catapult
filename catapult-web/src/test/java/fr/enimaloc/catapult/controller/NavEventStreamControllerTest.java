@@ -145,7 +145,7 @@ class NavEventStreamControllerTest {
     void theListIsKeptInTheSession_andGoesWithIt() throws Exception {
         MockHttpSession session = loggedIn();
         MvcResult stream = navbar(session, OWN);
-        assertThat(session.getAttribute(NavEventStreamController.CHANNELS)).isEqualTo(List.of(OWN));
+        assertThat(SessionChannels.of(session)).isEqualTo(List.of(OWN));
 
         session.invalidate();
         controller.onChannelLive(new ChannelLiveStateEvent("enimaloc", true));
