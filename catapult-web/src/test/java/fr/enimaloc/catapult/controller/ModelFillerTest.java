@@ -228,7 +228,7 @@ class ModelFillerTest {
     }
 
     @Test
-    void channel_ownerAlsoGetsSettingsAndDtddMapping() {
+    void channel_ownerGetsSettingsAndDtddMapping() {
         UserSettingsDto settings = mock(UserSettingsDto.class);
         DtddMappingStatusDto dtdd = new DtddMappingStatusDto(null, null, false, null);
         when(api.channelPage("enimaloc", 1, "AUTO", null)).thenReturn(page(true));
@@ -242,13 +242,20 @@ class ModelFillerTest {
     }
 
     @Test
-    void channel_visitorGetsThePageOnly() {
+    void channel_aModeratorGetsTheSettingsAndDtddMapping_butNotTheIntegrations() {
+        UserSettingsDto settings = mock(UserSettingsDto.class);
+        DtddMappingStatusDto dtdd = new DtddMappingStatusDto(null, null, false, null);
         when(api.channelPage("enimaloc", 0, null, null)).thenReturn(page(false));
+        when(api.channelSettings("enimaloc")).thenReturn(settings);
+        when(api.dtddMappingStatus("enimaloc")).thenReturn(dtdd);
 
         filler().channel(model, "enimaloc", 0, null, null);
 
-        assertThat(model).containsKeys("username", "channelPage").doesNotContainKeys("channelSettings", "dtddMapping");
+        assertThat(model).containsEntry("channelSettings", settings).containsEntry("dtddMapping", dtdd)
+                .doesNotContainKey("integrations");
         verify(api).channelPage("enimaloc", 0, null, null);
+        verify(api).channelSettings("enimaloc");
+        verify(api).dtddMappingStatus("enimaloc");
         verifyNoMoreInteractions(api);
     }
 

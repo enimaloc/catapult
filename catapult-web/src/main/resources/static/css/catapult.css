@@ -868,15 +868,6 @@ a[data-link].active {
     margin-top: 56px;
 }
 
-/* Non-owners only get the overview: a strip holding one lone tab is just noise. */
-.channel-tabs-single::part(container) {
-    display: none;
-}
-
-.channel-tabs-single mdui-tab-panel {
-    padding-top: 0;
-}
-
 /* Dashboard cards (surface shared via Cards above) */
 
 .status-card,

@@ -153,14 +153,17 @@ public class ModelFiller {
         return new ClassPathResource("lang/privacy/%s.html".formatted(language));
     }
 
-    /** The dashboard model; settings, the DTDD mapping and the integration cards only for the channel's owner. */
+    /**
+     * The dashboard model. Only its owner and moderators see a channel (catapult-api refuses anyone
+     * else), and both may change its settings; the integration cards are the owner's alone.
+     */
     public void channel(Model model, String username, int page, String status, String source) {
         model.addAttribute("username", username);
         var channelPage = apiService.channelPage(username, page, status, source);
         model.addAttribute("channelPage", channelPage);
+        model.addAttribute("channelSettings", apiService.channelSettings(username));
+        model.addAttribute("dtddMapping", apiService.dtddMappingStatus(username));
         if (channelPage.isOwner()) {
-            model.addAttribute("channelSettings", apiService.channelSettings(username));
-            model.addAttribute("dtddMapping", apiService.dtddMappingStatus(username));
             var twitchatEvents = channelPage.twitchat() == null ? Map.<String, List<TwitchatEventActionDto>>of()
                     : apiService.twitchatEvents(username);
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));

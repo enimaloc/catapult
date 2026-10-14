@@ -50,12 +50,9 @@ class ChannelVisibilityRenderingTest {
     @MockitoBean ApiService apiService;
     @MockitoBean NavEventStreamController navEvents;
 
-    /**
-     * The channel template dereferences channelSettings unconditionally once isOwner()
-     * is true (see IndexControllerTest), so every owner-rendering test needs this stubbed.
-     */
+    /** The channel template dereferences channelSettings and the DTDD mapping, for its owner and moderators alike. */
     @BeforeEach
-    void stubOwnerOnlyAttributes() {
+    void stubSettingsAndDtddMapping() {
         lenient().when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
                 false, Set.of(), null, null, Set.of(), false, false, false,
                 null, null, Set.of(), List.of(), false, Set.of(), List.of()));
@@ -102,6 +99,34 @@ class ChannelVisibilityRenderingTest {
         // Each row also needs its own data-on breadcrumb for the generic SSE dispatcher
         // (Visibility.dispatch) to re-evaluate hasOverride per row without any JS change.
         assertThat(countOccurrences(html, "data-on=\"hasOverride:TwUpdatedEvent.tws,hasOverride:!TwResetEvent\"")).isEqualTo(2);
+    }
+
+    /** A moderator changes the channel's settings and bindings, but not its TWs, bot, game recheck or integrations. */
+    @Test
+    void aModerator_editsSettingsAndBindings_notWhatIsTheOwnersAlone() throws Exception {
+        BindingDto binding = new BindingDto("binding-1", "AUTO", "STEAM", "Game A", null, "Game A",
+                false, true, Set.of(), true, false, Set.of());
+        ChannelPageData data = new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 1, List.of(binding)),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, "uuid");
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html)
+                .contains("<mdui-tab value=\"settings\"")
+                .contains("id=\"channel-ccl-settings-form\"", "id=\"channel-tw-settings-form\"",
+                        "id=\"channel-no-game-settings-form\"", "id=\"channel-incomplete-fallback-settings-form\"")
+                .contains("binding-ignored-toggle", "binding-delete-btn", "binding-edit-game-input", "binding-ccl-enabled")
+                .doesNotContain("binding-tw-panel")
+                .doesNotContain("<mdui-tab value=\"integrations\"")
+                .doesNotContain("bot-toggle-row")
+                .doesNotContain("disabled=\"disabled\"");
     }
 
     private ChannelPageData channelPageData(boolean isLive) {
