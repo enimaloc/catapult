@@ -46,7 +46,7 @@ public class MockData {
             "nova", "pixel", "comet", "ember", "quartz", "raven", "glitch", "vortex", "cinder", "haze"
     };
     private static final String EXAMPLE_UUID = "00000000-0000-0000-0000-000000000000";
-    private static final ObsData DEFAULT_OBS = new ObsData(true, "127.0.0.1", 4455, true);
+    private static final ObsData DEFAULT_OBS = new ObsData(false, "127.0.0.1", 4455, true);
     private static final LinkStateResponse MINECRAFT_UNLINKED = new LinkStateResponse("NONE", null, null);
 
     /** A session's initial Steam state. */
