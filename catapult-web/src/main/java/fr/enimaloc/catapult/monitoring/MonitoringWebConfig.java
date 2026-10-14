@@ -8,8 +8,9 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Counts pages and actions (see {@link InteractionMetricsInterceptor}); not in the MVC test slices
- * lacking what it needs.
+ * Names the member in Sentry reports (see {@link SentryUserInterceptor}), and counts pages and
+ * actions (see {@link InteractionMetricsInterceptor}); not in the MVC test slices lacking what they
+ * need.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -25,6 +26,7 @@ class MonitoringWebConfig implements WebMvcConfigurer {
         if (api == null) {
             return;
         }
+        registry.addInterceptor(new SentryUserInterceptor(api)).excludePathPatterns(STATIC);
         metrics.ifAvailable(interactions -> registry.addInterceptor(new InteractionMetricsInterceptor(interactions, api))
                 .excludePathPatterns(STATIC));
     }

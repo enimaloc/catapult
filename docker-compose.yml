@@ -41,6 +41,9 @@ services:
       # Empty = use relative URL for OAuth so nginx routes /oauth2/** to catapult-api correctly
       - CATAPULT_API_PUBLIC_URL=
       - REDIS_HOST=catapult-redis
+      # Empty = Sentry off
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-1.0}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8092/actuator/health || exit 1"]
       interval: 10s
