@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service;
 
 import fr.enimaloc.catapult.common.dto.*;
+import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -63,4 +64,18 @@ public interface ApiService {
     java.util.List<TwitchatValidationError> testTwitchatEvent(String username, String eventType, java.util.List<TwitchatEventActionDto> payloads);
     /** Runs the Catapult action behind a Twitchat button's token; false when used or expired. */
     boolean executeTwitchatAction(String token);
+
+    // --- admin: members (catapult-api refuses them to anyone but an admin) ---
+    /** Every member, and whether each one is live. */
+    AdminMembersPage adminMembers();
+    void adminToggleMemberBot(java.util.UUID memberId);
+    void adminUnlinkMemberSteam(java.util.UUID memberId);
+    /** Leaves the account inactive, without Twitch identity nor bot. */
+    void adminUnlinkMemberTwitch(java.util.UUID memberId);
+    /** Makes the member the account posting chat command replies, in place of the previous one. */
+    void adminPromoteMemberToSystem(java.util.UUID memberId);
+    void adminDeleteMember(java.util.UUID memberId);
+    /** Copies the chosen parts of a member's data onto another member. */
+    void adminMigrateMember(java.util.UUID memberId, java.util.UUID targetId,
+                            boolean settings, boolean getters, boolean bindings);
 }

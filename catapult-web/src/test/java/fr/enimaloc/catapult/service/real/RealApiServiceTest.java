@@ -373,4 +373,42 @@ class RealApiServiceTest {
         expect(HttpMethod.POST, "/api/twitchat/actions/tok").andRespond(withSuccess("{\"result\":\"EXECUTED\"}", MediaType.APPLICATION_JSON));
         assertThat(service.executeTwitchatAction("tok")).isTrue();
     }
+
+    // --- admin: members ------------------------------------------------------------------------
+
+    @Test
+    void adminMembers_readsTheAccountsLeavingTheirSecretsOut() {
+        respond(HttpMethod.GET, "/api/admin/members", """
+                {"members":[{"id":"00000000-0000-0000-0000-000000000001","twitchId":"1","twitchUsername":"enimaloc",
+                  "profileImageUrl":"img","steamId":"765","steamPersonalToken":"secret","systemAccount":false,
+                  "botEnabled":true,"status":"ACTIVE","createdAt":"2025-03-01T12:00:00Z"}],
+                 "liveStatus":{"00000000-0000-0000-0000-000000000001":true},"isMockProfile":false}""");
+
+        var page = service.adminMembers();
+
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        assertThat(page.members()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
+                id, "1", "enimaloc", "img", "765", false, true, "ACTIVE", java.time.Instant.parse("2025-03-01T12:00:00Z")));
+        assertThat(page.isLive(id)).isTrue();
+    }
+
+    @Test
+    void adminMemberActions() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        String base = "/api/admin/members/" + id;
+        expectPost(base + "/bot/toggle");
+        expectPost(base + "/steam/unlink");
+        expectPost(base + "/twitch/unlink");
+        expectPost(base + "/promote-to-system");
+        expectPost(base + "/delete");
+        expectPost(base + "/migrate", """
+                {"targetId":"00000000-0000-0000-0000-000000000002","migrateSettings":true,"migrateGetters":false,"migrateBindings":true}""");
+
+        service.adminToggleMemberBot(id);
+        service.adminUnlinkMemberSteam(id);
+        service.adminUnlinkMemberTwitch(id);
+        service.adminPromoteMemberToSystem(id);
+        service.adminDeleteMember(id);
+        service.adminMigrateMember(id, UUID.fromString("00000000-0000-0000-0000-000000000002"), true, false, true);
+    }
 }

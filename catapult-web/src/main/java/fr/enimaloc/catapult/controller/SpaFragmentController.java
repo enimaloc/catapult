@@ -69,6 +69,7 @@ public class SpaFragmentController {
             filler.error(model, refused);
             return "pages/error :: error";
         }
+        filler.admin(model);
         filler.defaultAttr(model, "admin");
         return "pages/admin :: admin";
     }

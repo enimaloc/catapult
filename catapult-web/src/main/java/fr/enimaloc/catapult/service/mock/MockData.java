@@ -98,6 +98,8 @@ public class MockData {
     @Setter
     @Getter
     private boolean admin;
+    /** The admin members page's accounts, built on its first visit from the channels as they are then. */
+    private MockMembers members;
     /** Each Twitchat event's payloads; only STREAM_STARTED starts with one, a greeting. */
     @Getter
     private final Map<String, List<TwitchatEventActionDto>> twitchatEvents = defaultTwitchatEvents();
@@ -239,6 +241,11 @@ public class MockData {
     }
 
     // --- reads ---------------------------------------------------------------------------------
+
+    public MockMembers getMembers() {
+        if (members == null) members = new MockMembers(channelDto, moderatedChannels);
+        return members;
+    }
 
     public ChannelListResponse getChannelList() {
         return new ChannelListResponse(channelDto.twitchId(), withFirst(channelDto, moderatedChannels));
