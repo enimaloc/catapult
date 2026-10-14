@@ -53,6 +53,8 @@ public interface ApiService {
     void dtddPropose(String igdbId, Long dtddId, String reason);
     /** The logged-in user's account id (the subject of their JWT); null when logged out. */
     java.util.UUID currentUserId();
+    /** Whether the logged-in user is a Catapult admin; false when logged out. */
+    boolean isAdmin();
     /** Every event's Twitchat payloads, by event name. */
     java.util.Map<String, java.util.List<TwitchatEventActionDto>> twitchatEvents(String username);
     /** Replaces an event's payloads; the validation errors, empty when saved. */

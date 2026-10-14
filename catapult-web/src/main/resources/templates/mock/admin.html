@@ -37,7 +37,7 @@
     </style>
 </head>
 <body>
-<main class="mock-admin" th:data-app-stale="${appStale}">
+<main class="mock-admin" th:data-app-stale="${appStale}" th:data-app-reload="${appReload}">
     <header>
         <h1>Config du membre</h1>
         <mdui-chip icon="person" th:text="${channel.twitchUsername()}">username</mdui-chip>
@@ -55,9 +55,13 @@
             <div class="mock-switches">
                 <label><mdui-switch name="live" th:checked="${channel.live()}"></mdui-switch> En live</label>
                 <label><mdui-switch name="botEnabled" th:checked="${botEnabled}"></mdui-switch> Bot actif</label>
+                <label><mdui-switch name="admin" th:checked="${admin}"></mdui-switch> Administrateur</label>
             </div>
             <mdui-text-field variant="outlined" name="avatarUrl" label="URL de l'avatar" th:value="${channel.profileImageUrl()}"></mdui-text-field>
-            <p class="mock-hint">Passer en live envoie « Début de stream » à Twitchat ; changer le bot, « Bot activé / désactivé ».</p>
+            <p class="mock-hint">
+                Passer en live envoie « Début de stream » à Twitchat ; changer le bot, « Bot activé / désactivé ».
+                Administrateur ajoute le menu admin à la barre de l'appli (qui se recharge).
+            </p>
         </section>
 
         <section class="mock-card">

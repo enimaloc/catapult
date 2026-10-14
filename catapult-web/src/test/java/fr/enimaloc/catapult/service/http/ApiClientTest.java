@@ -246,6 +246,17 @@ class ApiClientTest {
     }
 
     @Test
+    void currentRoles_readsTheJwtRoles_noneWithoutThem() {
+        assertThat(ApiClient.currentRoles()).isEmpty();
+
+        inSessionWithJwt(jwtWithPayload("{\"sub\":\"x\"}"));
+        assertThat(ApiClient.currentRoles()).isEmpty();
+
+        inSessionWithJwt(jwtWithPayload("{\"roles\":[\"ROLE_USER\",\"ROLE_ADMIN\"]}"));
+        assertThat(ApiClient.currentRoles()).containsExactly("ROLE_USER", "ROLE_ADMIN");
+    }
+
+    @Test
     void call_keepsTheStatus_whenTheBodyIsNotTheRequestedType() {
         server.enqueue(new MockResponse().setResponseCode(403).setHeader("Content-Type", "application/json")
                 .setBody("{\"detail\":\"nope\"}"));
