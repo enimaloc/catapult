@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -21,15 +22,18 @@ public class IndexController {
     private final ModelFiller filler;
 
     @GetMapping
-    String index(Model model, Locale locale) throws IOException {
-        return index(model, "", locale);
+    String index(Model model, Locale locale, HttpServletResponse response) throws IOException {
+        return index(model, "", locale, response);
     }
 
     @GetMapping("/{page}")
-    String index(Model model, @PathVariable String page, Locale locale) throws IOException {
+    String index(Model model, @PathVariable String page, Locale locale, HttpServletResponse response)
+            throws IOException {
         boolean unknownPage = !SiteCatalog.isPage(page);
         model.addAttribute("error", unknownPage);
         if (unknownPage) {
+            // A real 404, not a page saying so: search engines would index it as a page otherwise.
+            response.setStatus(HttpStatus.NOT_FOUND.value());
             filler.error(model, HttpStatus.NOT_FOUND.value());
         }
         filler.fill(model, page, locale);

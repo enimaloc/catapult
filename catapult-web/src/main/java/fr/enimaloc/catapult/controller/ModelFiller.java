@@ -16,6 +16,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.ui.Model;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +37,12 @@ public class ModelFiller {
     private static final Set<Integer> DESCRIBED_ERRORS = Set.of(400, 401, 403, 404, 405, 429, 500, 502, 503);
     private static final String DEFAULT_PRIVACY_LANGUAGE = "en";
 
+    /**
+     * What index.html's head tells search engines and link previews: the page's title, and for
+     * a public page its description and absolute canonical URL (null without a current request).
+     */
+    public record Seo(String title, String description, String canonicalUrl, boolean indexed) {}
+
     /** Static, page-independent data every template can read as ${app.*}. */
     public record AppModel(List<FeatureDto> features, List<PlatformDto> platforms, List<SpaPage> spa) {}
 
@@ -51,16 +59,47 @@ public class ModelFiller {
         model.addAttribute("page", page == null ? "" : page);
     }
 
-    /** Full-page variant: also the localized titles spa.js swaps in on client-side navigation. */
+    /**
+     * Full-page variant: also the head's {@link Seo} and the localized titles spa.js swaps in on
+     * client-side navigation.
+     */
     public void defaultAttr(Model model, String page, Locale locale) {
         defaultAttr(model, page);
         model.addAttribute("titles", titles(locale));
+        model.addAttribute("seo", seo(model, page == null ? "" : page, locale));
+    }
+
+    /** An error, a member's page or an unknown one is not indexed; the channel's title names it. */
+    private Seo seo(Model model, String page, Locale locale) {
+        if (Boolean.TRUE.equals(model.getAttribute("error"))) {
+            String error = message((String) model.getAttribute("errorTitle"), null, locale);
+            return new Seo(message("page.title.error", new Object[]{error}, locale), null, null, false);
+        }
+        SpaPage spaPage = SiteCatalog.page(page).orElseThrow();
+        Object[] titleArgs = spaPage.isDynamic() ? new Object[]{model.getAttribute("username")} : null;
+        String title = message(spaPage.getTitleKey(), titleArgs, locale);
+        if (!spaPage.isIndexed()) {
+            return new Seo(title, null, null, false);
+        }
+        return new Seo(title, message(spaPage.getDescriptionKey(), null, locale), absoluteUrl("/" + page), true);
+    }
+
+    private String message(String key, Object[] args, Locale locale) {
+        return messageSource.getMessage(key, args, key, locale);
+    }
+
+    /** {@code path} on this site's own origin, as the visitor (behind nginx) reached it; null outside a request. */
+    static String absoluteUrl(String path) {
+        if (RequestContextHolder.getRequestAttributes() == null) {
+            return null;
+        }
+        return ServletUriComponentsBuilder.fromCurrentContextPath().path(path).toUriString();
     }
 
     private Map<String, String> titles(Locale locale) {
         return SiteCatalog.PAGES.stream().collect(Collectors.toMap(
                 SpaPage::getId,
-                page -> messageSource.getMessage(page.getTitleKey(), null, page.getTitleKey(), locale)));
+                page -> message(page.getTitleKey(), null, locale)));
     }
 
     /** The page-specific model of a static page, then the shared one. */
