@@ -25,8 +25,8 @@ import java.util.Set;
  * Logs every HTTP request once it is answered: method, path, status, duration and client IP
  * (the real one behind nginx, through {@code server.forward-headers-strategy}). The query string
  * is left out, since it can carry the one-time login code. Health checks are skipped: docker
- * hits them every 10s. Long-lived responses (SSE) are logged when they close. Static assets
- * (css, js, _static) are logged at DEBUG only.
+ * and nginx hit them every few seconds. Long-lived responses (SSE) are logged when they close.
+ * Static assets (css, js, _static) are logged at DEBUG only.
  * <p>
  * Under the dev profile, each line is followed by the whole exchange the way {@code curl -v}
  * shows it.
@@ -45,7 +45,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/actuator/");
+        return request.getRequestURI().startsWith("/actuator/") || request.getRequestURI().equals("/healthz");
     }
 
     @Override
