@@ -193,4 +193,29 @@ class IndexControllerTest {
                 .doesNotContain("rel=\"canonical\"")
                 .doesNotContain("<meta name=\"description\"");
     }
+
+    @Test
+    void navbar_leavesRoomForTheMembersChannels_withoutWaitingForThem() throws Exception {
+        String html = mvc.perform(get("/").sessionAttr(fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andReturn().getResponse().getContentAsString();
+
+        org.assertj.core.api.Assertions.assertThat(html)
+                .containsPattern("<nav id=\"nav-channels\" class=\"nav-channels\" aria-label=\"[^\"]+\"></nav>");
+        org.assertj.core.api.Assertions.assertThat(barEnd(html)).doesNotContain("/oauth2/authorization/twitch");
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).channelList();
+    }
+
+    @Test
+    void navbar_offersToLogIn_whenLoggedOut() throws Exception {
+        String html = mvc.perform(get("/")).andReturn().getResponse().getContentAsString();
+
+        org.assertj.core.api.Assertions.assertThat(html).doesNotContain("nav-channels\"");
+        org.assertj.core.api.Assertions.assertThat(barEnd(html)).contains("href=\"/oauth2/authorization/twitch\"");
+    }
+
+    /** The navbar's end area (the landing page has login buttons of its own). */
+    private static String barEnd(String html) {
+        int start = html.indexOf("<div class=\"app-bar-end\">");
+        return html.substring(start, html.indexOf("</div>", start));
+    }
 }

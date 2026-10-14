@@ -18,16 +18,17 @@ window.CatapultMockPopout = (function () {
         return window.open(url, NAME, FEATURES);
     }
 
-    /** Logs the app in through `url` in the background: it goes to its channels, the popout back to the config. */
+    /** Logs the app in through `url` in the background: it lands where the login leads, the popout back to the config. */
     async function loginThrough(url, app, popout) {
+        let response;
         try {
-            await fetch(url, { credentials: "same-origin" });
+            response = await fetch(url, { credentials: "same-origin" });
         } catch (error) {
             console.warn("[mock] login failed", error);
             app.location.href = url; // the plain way, at least
             return;
         }
-        app.location.href = "/channels";
+        app.location.href = response.url || "/";
         popout.location.href = "/mock/admin";
     }
 

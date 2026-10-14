@@ -24,11 +24,10 @@ public final class SiteCatalog {
             new PlatformDto("sports_esports", "platforms.xbox")
     );
 
-    /** The member's own pages (channels, dashboards) have no description: they stay out of search engines. */
+    /** The member's dashboards have no description: they stay out of search engines. */
     public static final List<SpaPage> PAGES = List.of(
             new SpaPage("", "pages/landing", "landing", "/spa/landing", "page.title.landing", "page.description.landing"),
             new SpaPage("privacy", "pages/privacy", "privacy", "/spa/privacy", "page.title.privacy", "page.description.privacy"),
-            new SpaPage("channels", "pages/channels", "channels", "/spa/channels", "page.title.channels", null),
             new SpaPage("channel", "pages/channel", "channel", "/spa/channel", "page.title.channel", null, true)
     );
 

@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpSession;
@@ -10,7 +12,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-/** Completes the login: trades the OAuth code for a catapult-api JWT kept in the session. */
+/** Completes the login: trades the OAuth code for a catapult-api JWT kept in the session, then opens the member's channel. */
 @Slf4j
 @Controller
 @RequiredArgsConstructor
@@ -25,6 +27,18 @@ public class AuthController {
             return "redirect:/login?error";
         }
         session.setAttribute(ApiClient.SESSION_JWT_KEY, jwt.token());
-        return "redirect:/channels";
+        return "redirect:" + home(apiService.channelList());
+    }
+
+    /** The member's own channel, else the first they can act on; the landing page without any. */
+    static String home(ChannelListResponse list) {
+        if (list == null || list.channels().isEmpty()) {
+            return "/";
+        }
+        ChannelDto channel = list.channels().stream()
+                .filter(c -> c.twitchId().equals(list.viewerTwitchId()))
+                .findFirst()
+                .orElse(list.channels().getFirst());
+        return "/channel/" + channel.twitchUsername();
     }
 }

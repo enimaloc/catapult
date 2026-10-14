@@ -1,11 +1,14 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms;
 import fr.enimaloc.catapult.dto.index.FeatureDto;
 import fr.enimaloc.catapult.dto.index.PlatformDto;
 import fr.enimaloc.catapult.dto.index.SpaPage;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -60,13 +63,26 @@ public class ModelFiller {
     }
 
     /**
-     * Full-page variant: also the head's {@link Seo} and the localized titles spa.js swaps in on
-     * client-side navigation.
+     * Full-page variant: also the head's {@link Seo}, the localized titles spa.js swaps in on
+     * client-side navigation, and the navbar's login state (its channels come after, see
+     * {@link #navChannels(Model)}).
      */
     public void defaultAttr(Model model, String page, Locale locale) {
         defaultAttr(model, page);
         model.addAttribute("titles", titles(locale));
         model.addAttribute("seo", seo(model, page == null ? "" : page, locale));
+        model.addAttribute("loggedIn", ApiClient.hasSession());
+    }
+
+    /**
+     * The channels the member can act on, for the navbar; none when logged out or when the API
+     * fails. Fetched by the page once shown, so a full load never waits on catapult-api for them.
+     */
+    public List<ChannelDto> navChannels(Model model) {
+        ChannelListResponse list = ApiClient.hasSession() ? apiService.channelList() : null;
+        List<ChannelDto> channels = list == null ? List.of() : list.channels();
+        model.addAttribute("navChannels", channels);
+        return channels;
     }
 
     /** An error, a member's page or an unknown one is not indexed; the channel's title names it. */
@@ -106,7 +122,6 @@ public class ModelFiller {
     public void fill(Model model, String page, Locale locale) throws IOException {
         switch (page) {
             case "privacy" -> privacy(model, locale);
-            case "channels" -> channels(model);
             default -> { }
         }
         defaultAttr(model, page, locale);
@@ -136,10 +151,6 @@ public class ModelFiller {
 
     private static Resource privacyPolicy(String language) {
         return new ClassPathResource("lang/privacy/%s.html".formatted(language));
-    }
-
-    public void channels(Model model) {
-        model.addAttribute("channels", apiService.channelList().channels());
     }
 
     /** The dashboard model; settings, the DTDD mapping and the integration cards only for the channel's owner. */

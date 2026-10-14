@@ -91,6 +91,75 @@ mdui-top-app-bar {
     font-size: 1.2em;
 }
 
+/* Brand and end share the free space evenly, so the channels sit in the bar's center. */
+.app-bar > .brand-link,
+.app-bar > .app-bar-end {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.app-bar-end {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.nav-channels {
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.nav-channel {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 4px 4px;
+    border-radius: 999px;
+    color: var(--catapult-text-secondary);
+    text-decoration: none;
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.nav-channel:hover {
+    background: var(--catapult-surface);
+    color: var(--catapult-text);
+}
+
+.nav-channel.active {
+    background: rgba(139, 92, 246, 0.13);
+    color: var(--catapult-primary-hover);
+}
+
+.nav-channel mdui-avatar {
+    width: 28px;
+    height: 28px;
+    flex: none;
+}
+
+/* Live: a red ring around the avatar. */
+.nav-channel.live mdui-avatar {
+    outline: 2px solid #ef4444;
+    outline-offset: 1px;
+}
+
+@media (max-width: 650px) {
+    /* The rocket alone: the channels need the room. */
+    .app-bar .brand > span:not(.brand-icon) {
+        display: none;
+    }
+
+    .nav-channel {
+        padding: 4px;
+    }
+
+    .nav-channel span {
+        display: none;
+    }
+}
+
 
 /*
  * Hero
@@ -212,10 +281,10 @@ mdui-top-app-bar {
  * Cards
  *
  * Every content card shares one surface; each card's own rule only adds its
- * layout. The showcase cards (landing, channels picker) also lift on hover.
+ * layout. The landing's showcase cards also lift on hover.
  */
 
-:is(.feature-card, .channel-card, .platform-card, .privacy-card,
+:is(.feature-card, .platform-card, .privacy-card,
     .status-card, .connection-card, .settings-card) {
     border-radius: var(--catapult-radius);
     background: var(--catapult-surface);
@@ -223,11 +292,11 @@ mdui-top-app-bar {
     color: var(--catapult-text);
 }
 
-:is(.feature-card, .channel-card, .platform-card) {
+:is(.feature-card, .platform-card) {
     transition: transform 150ms ease, background-color 150ms ease, border-color 150ms ease;
 }
 
-:is(.feature-card, .channel-card, .platform-card):hover {
+:is(.feature-card, .platform-card):hover {
     transform: translateY(-4px);
     background: var(--catapult-surface-elevated);
     border-color: var(--catapult-border-hover);
@@ -235,7 +304,7 @@ mdui-top-app-bar {
 
 
 /*
- * Feature cards (also the channels picker's .channel-card)
+ * Feature cards
  */
 
 .features-grid {
@@ -244,14 +313,12 @@ mdui-top-app-bar {
     gap: 18px;
 }
 
-.feature-card,
-.channel-card {
+.feature-card {
     min-height: 230px;
     padding: 28px;
 }
 
-.feature-icon,
-.channel-icon {
+.feature-icon {
     width: 48px;
     height: 48px;
     display: flex;
@@ -267,16 +334,14 @@ mdui-top-app-bar {
     font-size: 24px;
 }
 
-.feature-card h3,
-.channel-card h3 {
+.feature-card h3 {
     margin: 0 0 10px;
     color: var(--catapult-text);
     font-size: 1.12rem;
     line-height: 1.3;
 }
 
-.feature-card p,
-.channel-card p {
+.feature-card p {
     margin: 0;
     color: var(--catapult-text-secondary);
     line-height: 1.65;
@@ -741,24 +806,6 @@ a[data-link].active {
         width: 100%;
     }
 
-}
-
-
-/*
- * Channels picker
- *
- * .channel-card shares .feature-card's look (see Feature cards above); only the
- * grid and the avatar slot are its own.
- */
-
-.channels-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 18px;
-}
-
-.channel-icon mdui-avatar {
-    font-size: 24px;
 }
 
 
