@@ -77,7 +77,8 @@ class AccessLogFilterTest {
 
         filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
 
-        assertThat(output).doesNotContain("> GET").doesNotContain("test-agent");
+        assertThat(output).containsPattern("GET /channels 200 \\d+ms \\S+ \\(UA: test-agent\\)")
+                .doesNotContain("> GET");
     }
 
     @Test

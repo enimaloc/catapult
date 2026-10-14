@@ -76,8 +76,8 @@ public class AccessLogFilter extends OncePerRequestFilter {
         Level level = compRoute ? Level.DEBUG : Level.INFO;
         if (log.isEnabledForLevel(level)) {
             log.atLevel(level)
-                    .log("{} {} {} {}ms {}", request.getMethod(), request.getRequestURI(), status,
-                            duration / 1_000_000, request.getRemoteAddr());
+                    .log("{} {} {} {}ms {} (UA: {})", request.getMethod(), request.getRequestURI(), status,
+                            duration / 1_000_000, request.getRemoteAddr(), request.getHeader("User-Agent"));
             moreLog(level, request, response, status);
         }
     }
