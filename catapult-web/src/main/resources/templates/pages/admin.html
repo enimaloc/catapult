@@ -13,8 +13,10 @@
                 <mdui-tab th:value="${tab}" th:text="#{|admin.tab.${tab}|}">admin.tab</mdui-tab>
             </th:block>
 
+            <th:block th:replace="~{pages/admin-tab/members::panel}"></th:block>
+
             <!--/* Not built yet: each panel only says so for now. */-->
-            <mdui-tab-panel slot="panel" th:each="tab : ${ {'members', 'ccl', 'process-rules', 'caches', 'data'} }" th:value="${tab}">
+            <mdui-tab-panel slot="panel" th:each="tab : ${ {'ccl', 'process-rules', 'caches', 'data'} }" th:value="${tab}">
                 <div class="section-header">
                     <h2 th:text="#{|admin.tab.${tab}|}">admin.tab</h2>
                 </div>

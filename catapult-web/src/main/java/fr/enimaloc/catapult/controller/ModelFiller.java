@@ -176,6 +176,15 @@ public class ModelFiller {
         }
     }
 
+    /**
+     * The admin page model: the members tab's accounts (null when catapult-api fails), and the
+     * admin's own account id, which the tab won't let them delete.
+     */
+    public void admin(Model model) {
+        model.addAttribute("adminMembers", apiService.adminMembers());
+        model.addAttribute("currentUserId", apiService.currentUserId());
+    }
+
     /** Error page model for the status the servlet container forwarded (500 when absent). */
     public void error(Model model, HttpServletRequest request) {
         Object status = request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);

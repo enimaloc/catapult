@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.service.real;
 
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
+import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
@@ -274,6 +276,41 @@ public class RealApiService implements ApiService {
         @SuppressWarnings("unchecked")
         Map<String, Object> result = client.post("/api/twitchat/actions/{token}", Map.class, token);
         return result != null && "EXECUTED".equals(result.get("result"));
+    }
+
+    @Override
+    public AdminMembersPage adminMembers() {
+        return client.get("/api/admin/members", AdminMembersPage.class);
+    }
+
+    @Override
+    public void adminToggleMemberBot(UUID memberId) {
+        client.postVoid("/api/admin/members/{id}/bot/toggle", null, memberId);
+    }
+
+    @Override
+    public void adminUnlinkMemberSteam(UUID memberId) {
+        client.postVoid("/api/admin/members/{id}/steam/unlink", null, memberId);
+    }
+
+    @Override
+    public void adminUnlinkMemberTwitch(UUID memberId) {
+        client.postVoid("/api/admin/members/{id}/twitch/unlink", null, memberId);
+    }
+
+    @Override
+    public void adminPromoteMemberToSystem(UUID memberId) {
+        client.postVoid("/api/admin/members/{id}/promote-to-system", null, memberId);
+    }
+
+    @Override
+    public void adminDeleteMember(UUID memberId) {
+        client.postVoid("/api/admin/members/{id}/delete", null, memberId);
+    }
+
+    @Override
+    public void adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
+        client.postVoid("/api/admin/members/{id}/migrate", new MigrateRequest(targetId, settings, getters, bindings), memberId);
     }
 
     /** No error when it went through; a 4xx/5xx without a list becomes one error naming the status. */
