@@ -1,9 +1,11 @@
 package fr.enimaloc.catapult.controller.mock;
 
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
+import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
@@ -94,6 +97,16 @@ class MockAdminControllerTest {
             if (!b.ccls().isEmpty()) fields.put(p + "ccls", String.join(",", b.ccls()));
             if (!b.tws().isEmpty()) fields.put(p + "tws", String.join(",", b.tws()));
         }
+        List<ChannelDto> moderated = data.getModeratedChannels();
+        for (int i = 0; i < moderated.size(); i++) {
+            ChannelDto c = moderated.get(i);
+            String p = "moderated[" + i + "].";
+            fields.put(p + "id", c.id().toString());
+            fields.put(p + "twitchId", c.twitchId());
+            fields.put(p + "twitchUsername", c.twitchUsername());
+            fields.put(p + "avatarUrl", c.profileImageUrl());
+            if (c.live()) fields.put(p + "live", "on");
+        }
         for (int i = 0; i < overrides.length; i += 2) {
             if (overrides[i + 1] == null) fields.remove(overrides[i]);
             else fields.put(overrides[i], overrides[i + 1]);
@@ -101,6 +114,10 @@ class MockAdminControllerTest {
         MockHttpServletRequestBuilder request = post("/mock/admin").with(csrf());
         fields.forEach((name, value) -> request.param(name, value.split(",")));
         return request;
+    }
+
+    private long navReloads() {
+        return events.stream(NavChannelsChangedEvent.class).count();
     }
 
     private long eventCount() {
@@ -115,6 +132,7 @@ class MockAdminControllerTest {
                 .andExpect(model().attribute("channel", data.getChannelDto()))
                 .andExpect(model().attribute("game", data.getGameDto()))
                 .andExpect(model().attribute("bindings", data.getBinding()))
+                .andExpect(model().attribute("moderated", data.getModeratedChannels()))
                 .andExpect(model().attribute("sourceTypes", MockPresets.SOURCE_TYPES))
                 .andExpect(model().attribute("availableTws", MockPresets.AVAILABLE_TWS));
     }
@@ -139,6 +157,8 @@ class MockAdminControllerTest {
         mvc.perform(form("live", data.getChannelDto().live() ? null : "on", "detectedSourceType", "XBOX",
                         "detectedSourceName", "Halo", "steamRateLimited", "on"))
                 .andExpect(flash().attributeCount(0));
+        // The live ring in the navbar follows the live event too: no reload for it.
+        assertThat(navReloads()).isZero();
     }
 
     @Test
@@ -148,6 +168,36 @@ class MockAdminControllerTest {
         mvc.perform(form("steamProfileCacheTtlMinutes", "30")).andExpect(flash().attribute("appStale", true));
         mvc.perform(form().param("addBinding", "true")).andExpect(flash().attribute("appStale", true));
         mvc.perform(form("bindings[0].delete", "on")).andExpect(flash().attribute("appStale", true));
+    }
+
+    @Test
+    void apply_addsRenamesAndRemovesModeratedChannels_reloadingTheSessionsNavbar() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+
+        mvc.perform(form().param("addModerated", "true").session(session)).andExpect(flash().attributeCount(0));
+        assertThat(data.getModeratedChannels()).extracting(ChannelDto::twitchUsername).containsExactly("moderee_1");
+
+        mvc.perform(form("moderated[0].twitchUsername", "renamed").session(session));
+        assertThat(data.getModeratedChannels()).extracting(ChannelDto::twitchUsername).containsExactly("renamed");
+
+        mvc.perform(form("moderated[0].delete", "on").session(session));
+        assertThat(data.getModeratedChannels()).isEmpty();
+
+        assertThat(events.stream(NavChannelsChangedEvent.class))
+                .containsExactly(new NavChannelsChangedEvent(session.getId()), new NavChannelsChangedEvent(session.getId()),
+                        new NavChannelsChangedEvent(session.getId()));
+        assertThat(eventCount()).isZero();
+    }
+
+    @Test
+    void apply_aModeratedChannelGoingLive_isThatChannelsLiveEvent() throws Exception {
+        data.addModeratedChannel();
+
+        mvc.perform(form("moderated[0].live", "on"));
+
+        assertThat(data.getModeratedChannels().getFirst().live()).isTrue();
+        assertThat(events.stream(ChannelLiveStateEvent.class)).containsExactly(new ChannelLiveStateEvent("moderee_1", true));
+        assertThat(navReloads()).isZero();
     }
 
     @Test

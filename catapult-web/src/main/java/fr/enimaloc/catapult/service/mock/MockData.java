@@ -61,7 +61,9 @@ public class MockData {
     @Getter
     private List<BindingDto> binding;
     private UserSettingsDto userSettingsDto;
-    private final List<ChannelDto> channelsList;
+    /** The other channels the member moderates; {@link #getChannelList()} puts their own first. */
+    @Getter
+    private List<ChannelDto> moderatedChannels;
     @Getter
     private boolean hasSteamProvider;
     @Getter
@@ -108,7 +110,7 @@ public class MockData {
         // No binding (e.g. a random session that drew none) means no detected game either.
         this.gameDto = bindings.isEmpty() ? null : detectedGameOf(bindings.getFirst());
         this.userSettingsDto = settings;
-        this.channelsList = channels.contains(channel) ? channels : withFirst(channel, channels);
+        this.moderatedChannels = channels.stream().filter(c -> !c.id().equals(channel.id())).toList();
         this.hasSteamProvider = steam != null;
         if (steam != null) {
             this.hasSteam = steam.connected();
@@ -235,7 +237,7 @@ public class MockData {
     // --- reads ---------------------------------------------------------------------------------
 
     public ChannelListResponse getChannelList() {
-        return new ChannelListResponse(channelDto.twitchId(), channelsList);
+        return new ChannelListResponse(channelDto.twitchId(), withFirst(channelDto, moderatedChannels));
     }
 
     /** The dashboard as {@code username} sees it, bindings filtered by status and/or source. */
@@ -244,9 +246,12 @@ public class MockData {
                 .filter(b -> status == null || status.equalsIgnoreCase(b.status()))
                 .filter(b -> source == null || source.equalsIgnoreCase(b.sourceType()))
                 .toList();
+        // A moderated channel shows as itself; its dashboard otherwise reuses the member's data.
+        ChannelDto shown = moderatedChannels.stream().filter(c -> c.twitchUsername().equals(username)).findFirst()
+                .orElse(channelDto);
         return new ChannelPageData(
-                getChannelUser(), username, username.equals(channelDto.twitchUsername()),
-                channelDto.live(), botEnabled, gameDto,
+                userOf(shown), username, username.equals(channelDto.twitchUsername()),
+                shown.live(), botEnabled, gameDto,
                 new PagedBindings(0, bindings.isEmpty() ? 0 : 1, bindings.size(), bindings),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
                 status, source, steamData(), hasXboxProvider ? new XboxData(hasXbox) : null, minecraftData(), obsData,
@@ -264,8 +269,12 @@ public class MockData {
     }
 
     public ChannelUserDto getChannelUser() {
-        return new ChannelUserDto(channelDto.id().toString(), channelDto.twitchId(), channelDto.twitchUsername(),
-                channelDto.profileImageUrl());
+        return userOf(channelDto);
+    }
+
+    private static ChannelUserDto userOf(ChannelDto channel) {
+        return new ChannelUserDto(channel.id().toString(), channel.twitchId(), channel.twitchUsername(),
+                channel.profileImageUrl());
     }
 
     public UserSettingsDto getUserSettings() {
@@ -443,6 +452,24 @@ public class MockData {
     }
 
     /** Adds a blank binding for the admin page to fill in: the UI has no "add binding" action. */
+    public void setModeratedChannels(List<ChannelDto> channels) {
+        moderatedChannels = List.copyOf(channels);
+    }
+
+    /** Adds a channel the member moderates, under a name no other channel of theirs has. */
+    public void addModeratedChannel() {
+        int n = moderatedChannels.size() + 1;
+        while (hasChannelNamed("moderee_" + n)) n++;
+        String username = "moderee_" + n;
+        moderatedChannels = Stream.concat(moderatedChannels.stream(), Stream.of(new ChannelDto(MockPresets.uuidOf(username),
+                String.valueOf(90_000_000 + n), username, MockPresets.AVATAR_URL, false))).toList();
+    }
+
+    private boolean hasChannelNamed(String username) {
+        return channelDto.twitchUsername().equals(username)
+                || moderatedChannels.stream().anyMatch(c -> c.twitchUsername().equals(username));
+    }
+
     public void addBinding() {
         binding = Stream.concat(binding.stream(), Stream.of(new BindingDto(UUID.randomUUID().toString(), "MANUAL", "STEAM",
                 "Nouveau jeu", "", "", false, true, Set.of(), true, false, Set.of()))).toList();

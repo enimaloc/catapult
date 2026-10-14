@@ -1,16 +1,19 @@
 package fr.enimaloc.catapult.controller.mock;
 
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
+import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
 import fr.enimaloc.catapult.service.mock.MockApiService;
 import fr.enimaloc.catapult.service.mock.MockData;
 import fr.enimaloc.catapult.service.mock.MockPresets;
+import jakarta.servlet.http.HttpSession;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -31,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Mock-only admin page — the member's config, opened in a popout next to the app — for state
@@ -74,6 +78,22 @@ public class MockAdminController {
         private String minecraftName;
         private String minecraftServiceAccount;
         private List<BindingForm> bindings = new ArrayList<>();
+        private List<ModeratedForm> moderated = new ArrayList<>();
+    }
+
+    /** One channel the member moderates; {@code delete} drops it. */
+    @Data
+    public static class ModeratedForm {
+        private UUID id;
+        private String twitchId;
+        private String twitchUsername;
+        private String avatarUrl;
+        private boolean live;
+        private boolean delete;
+
+        ChannelDto toDto() {
+            return new ChannelDto(id, twitchId, twitchUsername, avatarUrl, live);
+        }
     }
 
     /** One binding row; {@code delete} drops it. */
@@ -110,6 +130,7 @@ public class MockAdminController {
         model.addAttribute("botEnabled", data.isBotEnabled());
         model.addAttribute("game", data.getGameDto());
         model.addAttribute("bindings", data.getBinding());
+        model.addAttribute("moderated", data.getModeratedChannels());
         model.addAttribute("hasSteamProvider", data.isHasSteamProvider());
         model.addAttribute("hasSteam", data.isHasSteam());
         model.addAttribute("hasSteamPersonalToken", data.isHasSteamPersonalToken());
@@ -156,20 +177,26 @@ public class MockAdminController {
     }
 
     /**
-     * Applies the form; {@code addBinding} (its "add a binding" button) then appends a blank binding.
-     * Flags {@code appStale} when something changed that no event carries to the app.
+     * Applies the form; {@code addBinding} / {@code addModerated} (its "add" buttons) then append a
+     * blank binding / moderated channel. Flags {@code appStale} when something changed that no event
+     * carries to the app; a change of the navbar's channels is pushed to it like catapult-api would.
      */
     @PostMapping("/mock/admin")
     public String apply(@ModelAttribute AdminForm form, @RequestParam(defaultValue = "false") boolean addBinding,
+                        @RequestParam(defaultValue = "false") boolean addModerated, HttpSession session,
                         RedirectAttributes redirect) {
         MockData data = mockApiService.getData();
         if (data == null) {
             return REDIRECT_LOGIN;
         }
         Unpushed before = Unpushed.of(data);
+        var navBefore = data.getChannelList();
         String username = data.getChannelDto().twitchUsername();
 
         data.setBindings(form.getBindings().stream().filter(b -> !b.isDelete()).map(BindingForm::toDto).toList());
+        List<ChannelDto> moderated = form.getModerated().stream().filter(c -> !c.isDelete()).map(ModeratedForm::toDto).toList();
+        publishLiveChanges(data.getModeratedChannels(), moderated);
+        data.setModeratedChannels(moderated);
 
         if (data.getChannelDto().live() != form.isLive()) {
             data.setChannelLive(form.isLive());
@@ -219,10 +246,34 @@ public class MockAdminController {
         if (addBinding) {
             data.addBinding();
         }
+        if (addModerated) {
+            data.addModeratedChannel();
+        }
         if (!before.equals(Unpushed.of(data))) {
             redirect.addFlashAttribute("appStale", true);
         }
+        if (!sameChannelsBut(navBefore.channels(), data.getChannelList().channels())) {
+            eventPublisher.publishEvent(new NavChannelsChangedEvent(session.getId()));
+        }
         return REDIRECT_ADMIN;
+    }
+
+    /** A moderated channel kept but switched live/offline goes out as that channel's live event. */
+    private void publishLiveChanges(List<ChannelDto> before, List<ChannelDto> after) {
+        for (ChannelDto channel : after) {
+            before.stream().filter(c -> c.id().equals(channel.id()) && c.live() != channel.live()).findFirst()
+                    .ifPresent(c -> eventPublisher.publishEvent(new ChannelLiveStateEvent(channel.twitchUsername(), channel.live())));
+        }
+    }
+
+    /** Whether two navbar lists differ only by live states, which their own events carry. */
+    private static boolean sameChannelsBut(List<ChannelDto> before, List<ChannelDto> after) {
+        return offline(before).equals(offline(after));
+    }
+
+    private static List<ChannelDto> offline(List<ChannelDto> channels) {
+        return channels.stream()
+                .map(c -> new ChannelDto(c.id(), c.twitchId(), c.twitchUsername(), c.profileImageUrl(), false)).toList();
     }
 
     /**
