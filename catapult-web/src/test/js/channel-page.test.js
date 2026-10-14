@@ -130,7 +130,7 @@ describe("bindings list helpers", () => {
 
 describe("tab <-> location.hash", () => {
     function tabs(...values) {
-        html(`<mdui-tabs id="channel-tabs">${values.map(v => `<mdui-tab value="${v}"></mdui-tab>`).join("")}</mdui-tabs>`);
+        html(`<mdui-tabs id="channel-tabs" data-hash-tabs>${values.map(v => `<mdui-tab value="${v}"></mdui-tab>`).join("")}</mdui-tabs>`);
         const el = document.getElementById("channel-tabs");
         el.value = "overview";
         return el;
@@ -167,6 +167,19 @@ describe("tab <-> location.hash", () => {
         el.value = "overview";
         el.dispatchEvent(new Event("change"));
         expect(location.hash).toBe("");
+    });
+
+    it("clears the hash back on the first tab, whatever it is", () => {
+        html(`<mdui-tabs data-hash-tabs><mdui-tab value="members"></mdui-tab><mdui-tab value="caches"></mdui-tab></mdui-tabs>`);
+        const el = document.querySelector("mdui-tabs");
+        el.value = "members";
+        history.replaceState(null, "", "/admin#caches");
+        render();
+        expect(el.value).toBe("caches");
+
+        el.value = "members";
+        el.dispatchEvent(new Event("change"));
+        expect(location.pathname + location.hash).toBe("/admin");
     });
 
     it("does nothing on pages without tabs", () => {

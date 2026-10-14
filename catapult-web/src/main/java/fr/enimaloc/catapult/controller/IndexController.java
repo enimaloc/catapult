@@ -40,6 +40,19 @@ public class IndexController {
         return "index";
     }
 
+    /** The admin page, for admins only: anyone else gets the 401 / 403 error page in its place. */
+    @GetMapping("/admin")
+    String admin(Model model, Locale locale, HttpServletResponse response) throws IOException {
+        int refused = AdminAccess.refusal(filler);
+        model.addAttribute("error", refused != 0);
+        if (refused != 0) {
+            response.setStatus(refused);
+            filler.error(model, refused);
+        }
+        filler.fill(model, "admin", locale);
+        return "index";
+    }
+
     @GetMapping("/channel/{username}")
     String channel(Model model, @PathVariable String username,
                    @RequestParam(defaultValue = "0") int page,

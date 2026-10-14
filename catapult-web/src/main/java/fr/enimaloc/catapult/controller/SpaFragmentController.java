@@ -61,6 +61,18 @@ public class SpaFragmentController {
         return "pages/channel :: channel";
     }
 
+    @GetMapping("/admin")
+    String admin(Model model, HttpServletResponse response) {
+        int refused = AdminAccess.refusal(filler);
+        if (refused != 0) {
+            response.setStatus(refused);
+            filler.error(model, refused);
+            return "pages/error :: error";
+        }
+        filler.defaultAttr(model, "admin");
+        return "pages/admin :: admin";
+    }
+
     @GetMapping("/{page}")
     String unknown(Model model, HttpServletResponse response) {
         response.setStatus(HttpStatus.NOT_FOUND.value());

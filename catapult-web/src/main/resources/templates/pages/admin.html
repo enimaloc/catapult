@@ -1,0 +1,28 @@
+<!--/* Laid out like a channel's dashboard: a header, then one tab per admin section (mirrored in the hash). */-->
+<mdui-layout-main th:fragment="admin">
+    <section class="section channel-section">
+        <div class="section-header channel-header">
+            <div>
+                <span class="eyebrow" th:text="#{admin.eyebrow}">admin.eyebrow</span>
+                <h1 th:text="#{admin.title}">admin.title</h1>
+            </div>
+        </div>
+
+        <mdui-tabs id="admin-tabs" class="channel-tabs" value="members" placement="top" data-hash-tabs>
+            <th:block th:each="tab : ${ {'members', 'ccl', 'process-rules', 'caches', 'data'} }">
+                <mdui-tab th:value="${tab}" th:text="#{|admin.tab.${tab}|}">admin.tab</mdui-tab>
+            </th:block>
+
+            <!--/* Not built yet: each panel only says so for now. */-->
+            <mdui-tab-panel slot="panel" th:each="tab : ${ {'members', 'ccl', 'process-rules', 'caches', 'data'} }" th:value="${tab}">
+                <div class="section-header">
+                    <h2 th:text="#{|admin.tab.${tab}|}">admin.tab</h2>
+                </div>
+                <mdui-card class="settings-card admin-placeholder" variant="outlined">
+                    <mdui-icon name="construction"></mdui-icon>
+                    <span th:text="#{admin.placeholder}">admin.placeholder</span>
+                </mdui-card>
+            </mdui-tab-panel>
+        </mdui-tabs>
+    </section>
+</mdui-layout-main>
