@@ -13,7 +13,7 @@ import java.util.List;
 public class MockConfig {
     public String username = "enimaloc_stream";
     public String twitchId = "00000001";
-    public String avatarUrl = MockPresets.AVATAR_URL;
+    public String avatarUrl = MockPresets.getDefaultAvatar();
     public boolean live = true;
     public boolean botEnabled = true;
     public Steam steam = new Steam();
