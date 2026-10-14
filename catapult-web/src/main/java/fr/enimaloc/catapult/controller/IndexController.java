@@ -48,6 +48,8 @@ public class IndexController {
         if (refused != 0) {
             response.setStatus(refused);
             filler.error(model, refused);
+        } else {
+            filler.admin(model);
         }
         filler.fill(model, "admin", locale);
         return "index";

@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.mock;
 
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -346,6 +347,48 @@ public class MockApiService implements ApiService {
     public boolean isAdmin() {
         MockData current = currentData();
         return current != null && current.isAdmin();
+    }
+
+    @Override
+    public AdminMembersPage adminMembers() {
+        log.trace("adminMembers()");
+        return currentData().getMembers().page();
+    }
+
+    @Override
+    public void adminToggleMemberBot(UUID memberId) {
+        log.trace("adminToggleMemberBot({})", memberId);
+        currentData().getMembers().toggleBot(memberId);
+    }
+
+    @Override
+    public void adminUnlinkMemberSteam(UUID memberId) {
+        log.trace("adminUnlinkMemberSteam({})", memberId);
+        currentData().getMembers().unlinkSteam(memberId);
+    }
+
+    @Override
+    public void adminUnlinkMemberTwitch(UUID memberId) {
+        log.trace("adminUnlinkMemberTwitch({})", memberId);
+        currentData().getMembers().unlinkTwitch(memberId);
+    }
+
+    @Override
+    public void adminPromoteMemberToSystem(UUID memberId) {
+        log.trace("adminPromoteMemberToSystem({})", memberId);
+        currentData().getMembers().promoteToSystem(memberId);
+    }
+
+    @Override
+    public void adminDeleteMember(UUID memberId) {
+        log.trace("adminDeleteMember({})", memberId);
+        currentData().getMembers().delete(memberId);
+    }
+
+    @Override
+    public void adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
+        log.trace("adminMigrateMember({}, {}, {}, {}, {})", memberId, targetId, settings, getters, bindings);
+        // no-op in mock mode: a mock session holds a single channel's data
     }
 
     @Override

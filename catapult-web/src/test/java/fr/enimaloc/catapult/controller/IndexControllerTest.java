@@ -238,6 +238,40 @@ class IndexControllerTest {
     }
 
     @Test
+    void adminPage_listsTheMembers_withNoDeletingOneself() throws Exception {
+        org.mockito.Mockito.when(apiService.isAdmin()).thenReturn(true);
+        java.util.UUID self = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+        java.util.UUID other = java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
+        org.mockito.Mockito.when(apiService.currentUserId()).thenReturn(self);
+        org.mockito.Mockito.when(apiService.adminMembers()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMembersPage(List.of(
+                new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(self, "1", "enimaloc", "img", null, false, true, "ACTIVE",
+                        java.time.Instant.parse("2025-03-01T12:00:00Z")),
+                new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(other, "2", "viewer", "img", "765", false, false, "ACTIVE",
+                        java.time.Instant.parse("2025-03-01T12:00:00Z"))),
+                java.util.Map.of(), false));
+        String key = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
+
+        for (String url : List.of("/admin", "/spa/admin")) {
+            String html = mvc.perform(get(url).sessionAttr(key, "jwt")).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            org.assertj.core.api.Assertions.assertThat(html)
+                    .contains("id=\"admin-members\"", "data-member-id=\"" + self + "\"", "data-member-id=\"" + other + "\"")
+                    .containsPattern("data-action=\"delete\" data-confirm=\"[^\"]*\" disabled=\"disabled\"")
+                    .contains(">765<");
+        }
+    }
+
+    @Test
+    void adminPage_saysSo_whenTheMembersCantBeLoaded() throws Exception {
+        org.mockito.Mockito.when(apiService.isAdmin()).thenReturn(true);
+        String key = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
+
+        String html = mvc.perform(get("/spa/admin").sessionAttr(key, "jwt")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(html).doesNotContain("id=\"admin-members\"").contains("name=\"error_outline\"");
+    }
+
+    @Test
     void adminPage_isRefused_401LoggedOut_403ToAMember() throws Exception {
         String key = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
         for (String url : List.of("/admin", "/spa/admin")) {

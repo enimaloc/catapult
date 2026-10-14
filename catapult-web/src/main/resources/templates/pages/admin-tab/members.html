@@ -1,0 +1,115 @@
+<!--/*@thymesVar id="adminMembers" type="fr.enimaloc.catapult.common.dto.admin.AdminMembersPage"*/-->
+<!--/*@thymesVar id="currentUserId" type="java.util.UUID"*/-->
+<!--/*
+  Every account, one row each: who they are, their Steam link, their bot, their state, and a menu
+  of what an admin can do to them (admin-members.js posts it, then re-renders the page).
+  The system account (the chat bot) only gets its bot switch: the API refuses it the rest.
+*/-->
+<mdui-tab-panel slot="panel" value="members" th:fragment="panel" th:with="page=${adminMembers}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.members}">Membres</h2>
+        <span class="eyebrow" th:if="${page != null}"
+              th:text="#{admin.members.count(${page.members().size()})}">0 membres</span>
+    </div>
+
+    <mdui-card th:if="${page == null}" class="settings-card admin-placeholder" variant="outlined">
+        <mdui-icon name="error_outline"></mdui-icon>
+        <span th:text="#{admin.members.unavailable}">admin.members.unavailable</span>
+    </mdui-card>
+
+    <mdui-card th:if="${page != null and page.members().isEmpty()}" class="settings-card admin-placeholder" variant="outlined">
+        <mdui-icon name="group_off"></mdui-icon>
+        <span th:text="#{admin.members.empty}">admin.members.empty</span>
+    </mdui-card>
+
+    <mdui-card id="admin-members" th:if="${page != null and !page.members().isEmpty()}" class="admin-members" variant="outlined"
+               th:attr="data-confirm-text=#{admin.members.confirm},data-cancel-text=#{admin.members.cancel}">
+        <div class="admin-member admin-member-head" aria-hidden="true">
+            <span th:text="#{admin.members.column.member}">Membre</span>
+            <span th:text="#{admin.members.column.steam}">Steam</span>
+            <span th:text="#{admin.members.column.bot}">Bot</span>
+            <span th:text="#{admin.members.column.status}">Statut</span>
+            <span th:text="#{admin.members.column.created_at}">Inscrit le</span>
+            <span></span>
+        </div>
+
+        <div class="admin-member" th:each="m : ${page.members()}"
+             th:with="name=${m.twitchUsername() ?: '—'}, isSelf=${m.id() == currentUserId}"
+             th:attr="data-member-id=${m.id()},data-member-name=${name}"
+             th:classappend="${m.systemAccount()} ? 'admin-member-system'">
+            <div class="admin-member-identity">
+                <mdui-avatar th:src="${m.profileImageUrl()}" th:unless="${m.profileImageUrl() == null}"></mdui-avatar>
+                <mdui-avatar icon="person_off" th:if="${m.profileImageUrl() == null}"></mdui-avatar>
+                <div>
+                    <strong>
+                        <a th:if="${m.twitchUsername() != null and m.isActive()}" data-link
+                           th:href="@{/channel/{u}(u=${m.twitchUsername()})}" th:text="${name}">name</a>
+                        <span th:unless="${m.twitchUsername() != null and m.isActive()}" th:text="${name}">name</span>
+                    </strong>
+                    <div class="admin-member-badges">
+                        <mdui-chip th:if="${isSelf}" th:text="#{admin.members.badge.you}">Vous</mdui-chip>
+                        <mdui-chip th:if="${m.systemAccount()}" icon="smart_toy" th:text="#{admin.members.badge.system}">Système</mdui-chip>
+                        <mdui-chip th:if="${page.isLive(m.id())}" class="admin-member-live" th:text="#{channel.status.live}">Live</mdui-chip>
+                        <span class="admin-member-id" th:if="${m.twitchId() != null}" th:text="${m.twitchId()}">twitchId</span>
+                    </div>
+                </div>
+            </div>
+
+            <span class="admin-member-steam" th:text="${m.steamId() ?: '—'}">steamId</span>
+
+            <label class="admin-member-bot">
+                <mdui-switch class="admin-member-bot-toggle" th:checked="${m.botEnabled()}"
+                             th:disabled="${!m.isActive()}"
+                             th:attr="aria-label=#{admin.members.column.bot}"></mdui-switch>
+            </label>
+
+            <span class="admin-member-status">
+                <mdui-chip th:text="#{|admin.members.status.${m.status()}|}">ACTIVE</mdui-chip>
+            </span>
+
+            <span class="admin-member-created"
+                  th:text="${m.createdAt() == null ? '—' : #temporals.format(m.createdAt(), #messages.msg('format.date'))}">01/01/2025</span>
+
+            <mdui-dropdown placement="bottom-end" th:unless="${m.systemAccount()}">
+                <mdui-button-icon slot="trigger" icon="more_vert" th:attr="aria-label=#{admin.members.column.actions}"></mdui-button-icon>
+                <mdui-menu>
+                    <mdui-menu-item icon="smart_toy" data-action="promote-to-system"
+                                    th:disabled="${m.twitchId() == null}"
+                                    th:attr="data-confirm=#{admin.members.actions.promote_to_system.confirm(${name})}"
+                                    th:text="#{admin.members.actions.promote_to_system}">promote</mdui-menu-item>
+                    <mdui-menu-item icon="link_off" data-action="steam/unlink" th:if="${m.steamId() != null}"
+                                    th:attr="data-confirm=#{admin.members.actions.steam_unlink.confirm(${name})}"
+                                    th:text="#{admin.members.actions.steam_unlink}">steam</mdui-menu-item>
+                    <mdui-menu-item icon="link_off" data-action="twitch/unlink" th:if="${m.isActive()}"
+                                    th:attr="data-confirm=#{admin.members.actions.twitch_unlink.confirm(${name})}"
+                                    th:text="#{admin.members.actions.twitch_unlink}">twitch</mdui-menu-item>
+                    <mdui-menu-item icon="move_down" data-action="migrate"
+                                    th:text="#{admin.members.actions.migrate}">migrate</mdui-menu-item>
+                    <mdui-divider></mdui-divider>
+                    <mdui-menu-item icon="delete" class="admin-member-delete" data-action="delete" th:disabled="${isSelf}"
+                                    th:attr="data-confirm=#{admin.members.actions.delete.confirm(${name})}"
+                                    th:text="#{admin.members.actions.delete}">delete</mdui-menu-item>
+                </mdui-menu>
+            </mdui-dropdown>
+            <span th:if="${m.systemAccount()}"></span>
+        </div>
+    </mdui-card>
+
+    <!--/* Opened by the "migrate" action, on the member it was picked from. */-->
+    <mdui-dialog id="admin-migrate-dialog" th:if="${page != null}" close-on-overlay-click
+                 th:attr="data-headline=#{admin.members.migrate.title},data-incomplete=#{admin.members.migrate.incomplete}">
+        <span slot="headline" id="admin-migrate-headline"></span>
+        <div class="admin-migrate-form">
+            <mdui-select id="admin-migrate-target" th:attr="label=#{admin.members.migrate.target}" variant="outlined">
+                <mdui-menu-item th:each="m : ${page.members()}" th:unless="${m.systemAccount()}"
+                                th:value="${m.id()}" th:text="${m.twitchUsername() ?: m.id()}">member</mdui-menu-item>
+            </mdui-select>
+            <span class="eyebrow" th:text="#{admin.members.migrate.what}">Migrer</span>
+            <label><mdui-checkbox id="admin-migrate-settings"></mdui-checkbox><span th:text="#{admin.members.migrate.settings}">settings</span></label>
+            <label><mdui-checkbox id="admin-migrate-getters"></mdui-checkbox><span th:text="#{admin.members.migrate.getters}">getters</span></label>
+            <label><mdui-checkbox id="admin-migrate-bindings"></mdui-checkbox><span th:text="#{admin.members.migrate.bindings}">bindings</span></label>
+        </div>
+        <mdui-button slot="action" variant="text" id="admin-migrate-cancel" th:text="#{admin.members.cancel}">Annuler</mdui-button>
+        <mdui-button slot="action" id="admin-migrate-submit" th:text="#{admin.members.migrate.submit}">Migrer</mdui-button>
+    </mdui-dialog>
+</mdui-tab-panel>

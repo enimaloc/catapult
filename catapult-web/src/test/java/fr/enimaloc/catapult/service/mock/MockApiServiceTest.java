@@ -313,4 +313,36 @@ class MockApiServiceTest {
         org.mockito.Mockito.verify(hub).publish(org.mockito.ArgumentMatchers.eq(service.currentUserId()),
                 org.mockito.ArgumentMatchers.contains("\"eventType\":\"BOT_DISABLED\""));
     }
+
+    // --- admin: members ------------------------------------------------------------------------
+
+    @Test
+    void adminMembers_listsTheSessionsChannelFirst_thenTheSystemAccount() {
+        var members = service.adminMembers().members();
+
+        assertThat(members.getFirst().id()).isEqualTo(service.currentUserId());
+        assertThat(members).filteredOn(m -> m.systemAccount()).hasSize(1);
+    }
+
+    @Test
+    void adminMemberActions_changeTheList() {
+        java.util.UUID self = service.currentUserId();
+
+        service.adminToggleMemberBot(self);
+        service.adminUnlinkMemberSteam(self);
+        assertThat(service.adminMembers().members().getFirst())
+                .matches(m -> !m.botEnabled() && m.steamId() == null);
+
+        service.adminPromoteMemberToSystem(self);
+        assertThat(service.adminMembers().members()).filteredOn(m -> m.systemAccount())
+                .extracting(m -> m.id()).containsExactly(self);
+
+        service.adminUnlinkMemberTwitch(self);
+        assertThat(service.adminMembers().members().getFirst())
+                .matches(m -> m.twitchId() == null && "INACTIVE".equals(m.status()));
+        assertThat(service.adminMembers().isLive(self)).isFalse();
+
+        service.adminDeleteMember(self);
+        assertThat(service.adminMembers().members()).noneMatch(m -> m.id().equals(self));
+    }
 }
