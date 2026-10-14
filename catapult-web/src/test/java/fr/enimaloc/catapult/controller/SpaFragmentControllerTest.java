@@ -1,9 +1,11 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -13,7 +15,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -46,13 +52,33 @@ class SpaFragmentControllerTest {
     }
 
     @Test
-    void channels() throws Exception {
-        when(apiService.channelList()).thenReturn(new ChannelListResponse("1", List.of()));
+    void navChannels_listsTheMembersChannels_markingTheLiveOnes() throws Exception {
+        when(apiService.channelList()).thenReturn(new ChannelListResponse("1", List.of(
+                new ChannelDto(UUID.randomUUID(), "1", "enimaloc", "https://example.test/a.png", true),
+                new ChannelDto(UUID.randomUUID(), "2", "other", "https://example.test/b.png", false))));
 
-        mvc.perform(get("/spa/channels"))
+        String html = mvc.perform(get("/spa/nav-channels").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("pages/channels :: channels"))
-                .andExpect(model().attribute("channels", List.of()));
+                .andExpect(view().name("fragments/nav-channels :: channels"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html)
+                .containsPattern("class=\"nav-channel live\"\\s+href=\"/channel/enimaloc\"")
+                .containsPattern("class=\"nav-channel\"\\s+href=\"/channel/other\"");
+    }
+
+    @Test
+    void navChannels_isEmpty_whenLoggedOut() throws Exception {
+        String html = mvc.perform(get("/spa/nav-channels")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).isBlank();
+        verify(apiService, never()).channelList();
+    }
+
+    @Test
+    void channels_isGone_theNavbarListsThem() throws Exception {
+        mvc.perform(get("/spa/channels")).andExpect(status().isNotFound());
     }
 
     @Test

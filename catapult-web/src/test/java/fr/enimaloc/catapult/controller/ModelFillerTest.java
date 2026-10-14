@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
@@ -9,6 +10,7 @@ import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.twitchat.TwitchatCatalog;
 import fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -87,8 +90,8 @@ class ModelFillerTest {
         @SuppressWarnings("unchecked")
         Map<String, String> titles = (Map<String, String>) model.get("titles");
         assertThat(titles).containsEntry("privacy", "Confidentialité")
-                .containsEntry("channels", "page.title.channels")
-                .containsOnlyKeys("", "privacy", "channels", "channel");
+                .containsEntry("channel", "page.title.channel")
+                .containsOnlyKeys("", "privacy", "channel");
     }
 
     @Test
@@ -173,18 +176,55 @@ class ModelFillerTest {
 
     @Test
     void fill_addsThePageSpecificModelThenTheSharedOne() throws IOException {
-        when(api.channelList()).thenReturn(new ChannelListResponse("1", List.of()));
-
-        filler().fill(model, "channels", Locale.ENGLISH);
-        assertThat(model).containsKeys("channels", "app", "titles").containsEntry("page", "channels");
-
-        model = new ExtendedModelMap();
         filler().fill(model, "privacy", Locale.ENGLISH);
-        assertThat(model).containsKeys("privacy", "lastUpdate", "app");
+        assertThat(model).containsKeys("privacy", "lastUpdate", "app", "titles").containsEntry("page", "privacy");
 
         model = new ExtendedModelMap();
         filler().fill(model, "", Locale.ENGLISH);
-        assertThat(model).doesNotContainKeys("privacy", "channels").containsKey("app");
+        assertThat(model).doesNotContainKeys("privacy").containsKey("app");
+    }
+
+    @Test
+    void defaultAttr_withLocale_tellsWhetherTheVisitorIsLoggedIn_withoutCallingTheApi() {
+        filler().defaultAttr(model, "", Locale.FRENCH);
+        assertThat(model.get("loggedIn")).isEqualTo(false);
+
+        inSession(() -> filler().defaultAttr(model, "", Locale.FRENCH));
+        assertThat(model.get("loggedIn")).isEqualTo(true);
+        verifyNoMoreInteractions(api);
+    }
+
+    @Test
+    void navChannels_listsTheMembersChannels() {
+        List<ChannelDto> channels = List.of(new ChannelDto(UUID.randomUUID(), "1", "enimaloc", "img", true));
+        when(api.channelList()).thenReturn(new ChannelListResponse("1", channels));
+
+        inSession(() -> filler().navChannels(model));
+
+        assertThat(model.get("navChannels")).isEqualTo(channels);
+    }
+
+    @Test
+    void navChannels_listsNone_whenLoggedOutOrTheApiFails() {
+        filler().navChannels(model);
+        assertThat(model.get("navChannels")).isEqualTo(List.of());
+        verifyNoMoreInteractions(api);
+
+        when(api.channelList()).thenReturn(null);
+        inSession(() -> filler().navChannels(model));
+        assertThat(model.get("navChannels")).isEqualTo(List.of());
+    }
+
+    /** Runs {@code action} within a request whose session is logged in. */
+    private static void inSession(Runnable action) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.getSession().setAttribute(ApiClient.SESSION_JWT_KEY, "jwt");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        try {
+            action.run();
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
     }
 
     @Test

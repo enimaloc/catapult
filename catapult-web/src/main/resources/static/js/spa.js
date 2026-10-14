@@ -1,5 +1,6 @@
 const app = document.querySelector("#app");
 const progress = document.querySelector("#nav-progress");
+const navChannels = document.querySelector("#nav-channels");
 
 const config = window.Catapult;
 
@@ -89,10 +90,36 @@ async function navigate(path, push = true, search = "") {
     });
 }
 
-// The router's public surface, for the per-fragment scripts (channel-page.js's refresh()).
-window.CatapultSpa = { navigate, resolveRoute };
+function currentPath() {
+    return location.pathname.replace(/^\/+|\/+$/g, "");
+}
 
-updateActiveLink(config.page);
+/**
+ * Fills the navbar with the member's channels (absent when logged out). Fetched once the page
+ * is on its way rather than rendered with it: the page never waits on catapult-api for them.
+ */
+async function loadNavChannels() {
+    if (!navChannels) {
+        return;
+    }
+    try {
+        const response = await fetch("/spa/nav-channels");
+        if (!response.ok) {
+            return;
+        }
+        navChannels.innerHTML = await response.text();
+    } catch {
+        return; // the navbar just stays without them
+    }
+    // The full path, not config.page: a dynamic page's id ("channel") lacks its param.
+    updateActiveLink(currentPath());
+}
+
+// The router's public surface, for the per-fragment scripts (channel-page.js's refresh()).
+window.CatapultSpa = { navigate, resolveRoute, loadNavChannels };
+
+updateActiveLink(currentPath());
+loadNavChannels();
 
 document.addEventListener("click", event => {
     // composedPath() (rather than event.target) is required here: for a
@@ -115,8 +142,7 @@ document.addEventListener("click", event => {
 });
 
 window.addEventListener("popstate", () => {
-    const pathname = window.location.pathname.replace(/^\/+|\/+$/g, "");
-    navigate(pathname, false, window.location.search);
+    navigate(currentPath(), false, window.location.search);
 });
 
 // spa.js is loaded without defer/async, before the per-fragment scripts that follow it

@@ -79,6 +79,7 @@ describe("in the popout", () => {
     afterEach(() => { window.opener = null; });
 
     it("logs the app in with a quick account, staying in the popout on the config", async () => {
+        fetchMock.mockResolvedValueOnce({ ...response(200), url: "http://localhost/channel/enimaloc" });
         html('<a href="/auth/callback?code=1">1</a><span href="/mock/admin">admin</span>');
         tag({ "data-role": "popout" });
         await load("mock-popout");
@@ -88,7 +89,7 @@ describe("in the popout", () => {
         await flush();
 
         expect(fetchMock).toHaveBeenCalledWith("/auth/callback?code=1", { credentials: "same-origin" });
-        expect(app.location.href).toBe("/channels");
+        expect(app.location.href).toBe("http://localhost/channel/enimaloc");
         expect(self.href).toBe("/mock/admin");
     });
 
@@ -118,7 +119,7 @@ describe("in the popout", () => {
 
         expect(submit.defaultPrevented).toBe(true);
         expect(fetchMock).toHaveBeenCalledWith(`/auth/callback?code=${encodeURIComponent('{"username":"a b"}')}`, expect.anything());
-        expect(app.location.href).toBe("/channels");
+        expect(app.location.href).toBe("/");
     });
 
     /** The config page as /mock/admin renders it: both forms, a result line. */

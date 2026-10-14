@@ -132,9 +132,69 @@ describe("navigate", () => {
     });
 });
 
+describe("the navbar's channels", () => {
+    const NAV = '<a id="c1" data-link class="nav-channel" href="/channel/enimaloc">e</a>'
+        + '<a id="c2" data-link class="nav-channel" href="/channel/other">o</a>';
+
+    async function loadWithNav(path) {
+        document.body.insertAdjacentHTML("afterbegin", '<nav id="nav-channels"></nav>');
+        history.replaceState(null, "", path);
+        await load("spa");
+        await flush();
+    }
+
+    it("fills the navbar once the page is shown, marking the open channel", async () => {
+        fetchMock.mockImplementation(async () => response(200, NAV));
+
+        await loadWithNav("/channel/other");
+
+        expect(fetchMock).toHaveBeenCalledWith("/spa/nav-channels");
+        expect(document.querySelectorAll("#nav-channels a")).toHaveLength(2);
+        expect(document.getElementById("c2").classList.contains("active")).toBe(true);
+        expect(document.getElementById("c1").classList.contains("active")).toBe(false);
+    });
+
+    it("leaves the navbar empty when they can't be fetched", async () => {
+        fetchMock.mockImplementation(async () => response(500, NAV));
+        await loadWithNav("/");
+        expect(document.getElementById("nav-channels").innerHTML).toBe("");
+
+        fetchMock.mockImplementation(async () => { throw new TypeError("offline"); });
+        await CatapultSpa.loadNavChannels();
+        expect(document.getElementById("nav-channels").innerHTML).toBe("");
+    });
+
+    it("can be reloaded, keeping the open channel marked", async () => {
+        fetchMock.mockImplementation(async () => response(200, ""));
+        await loadWithNav("/channel/enimaloc");
+
+        fetchMock.mockImplementation(async () => response(200, NAV));
+        await CatapultSpa.loadNavChannels();
+
+        expect(document.getElementById("c1").classList.contains("active")).toBe(true);
+    });
+
+    it("isn't fetched without a navbar to fill (logged out)", async () => {
+        expect(fetchMock).not.toHaveBeenCalledWith("/spa/nav-channels");
+    });
+
+});
+
 describe("link and history handling", () => {
-    it("marks the initial page's link as active on load", () => {
+    it("marks the initial page's link as active on load, from its URL", async () => {
+        history.replaceState(null, "", "/privacy");
+        await load("spa");
+
         expect(document.getElementById("privacy").classList.contains("active")).toBe(true);
+    });
+
+    it("marks the open channel's navbar link as active on load", async () => {
+        document.body.insertAdjacentHTML("beforeend", '<a id="nav-chan" data-link href="/channel/enimaloc">e</a>');
+        window.Catapult.page = "channel";
+        history.replaceState(null, "", "/channel/enimaloc");
+        await load("spa");
+
+        expect(document.getElementById("nav-chan").classList.contains("active")).toBe(true);
     });
 
     it("intercepts clicks on same-origin data-link anchors", async () => {

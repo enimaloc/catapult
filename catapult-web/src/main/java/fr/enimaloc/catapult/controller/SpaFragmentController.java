@@ -35,10 +35,11 @@ public class SpaFragmentController {
         return "pages/privacy :: privacy";
     }
 
-    @GetMapping("/channels")
-    String channels(Model model) {
-        filler.channels(model);
-        return "pages/channels :: channels";
+    /** The navbar's channels, which spa.js loads once the page is shown. */
+    @GetMapping("/nav-channels")
+    String navChannels(Model model) {
+        filler.navChannels(model);
+        return "fragments/nav-channels :: channels";
     }
 
     @GetMapping("/channel/{username}")
