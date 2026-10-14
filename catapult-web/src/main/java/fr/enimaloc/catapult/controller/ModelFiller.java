@@ -64,14 +64,15 @@ public class ModelFiller {
 
     /**
      * Full-page variant: also the head's {@link Seo}, the localized titles spa.js swaps in on
-     * client-side navigation, and the navbar's login state (its channels come after, see
-     * {@link #navChannels(Model)}).
+     * client-side navigation, and the navbar's login and admin states (its channels come after,
+     * see {@link #navChannels(Model)}).
      */
     public void defaultAttr(Model model, String page, Locale locale) {
         defaultAttr(model, page);
         model.addAttribute("titles", titles(locale));
         model.addAttribute("seo", seo(model, page == null ? "" : page, locale));
         model.addAttribute("loggedIn", ApiClient.hasSession());
+        model.addAttribute("admin", ApiClient.hasSession() && apiService.isAdmin());
     }
 
     /**

@@ -191,7 +191,18 @@ class ModelFillerTest {
 
         inSession(() -> filler().defaultAttr(model, "", Locale.FRENCH));
         assertThat(model.get("loggedIn")).isEqualTo(true);
+        verify(api).isAdmin(); // read from the session, not asked to catapult-api
         verifyNoMoreInteractions(api);
+    }
+
+    @Test
+    void defaultAttr_withLocale_tellsWhetherTheMemberIsAnAdmin() {
+        when(api.isAdmin()).thenReturn(true);
+        filler().defaultAttr(model, "", Locale.FRENCH);
+        assertThat(model.get("admin")).isEqualTo(false); // logged out
+
+        inSession(() -> filler().defaultAttr(model, "", Locale.FRENCH));
+        assertThat(model.get("admin")).isEqualTo(true);
     }
 
     @Test

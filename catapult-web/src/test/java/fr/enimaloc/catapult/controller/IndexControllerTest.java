@@ -211,6 +211,17 @@ class IndexControllerTest {
         org.assertj.core.api.Assertions.assertThat(barEnd(html)).contains("href=\"/oauth2/authorization/twitch\"");
     }
 
+    @Test
+    void navbar_hasTheAdminMenu_forAdminsOnly() throws Exception {
+        String key = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
+        String member = mvc.perform(get("/").sessionAttr(key, "jwt")).andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(barEnd(member)).doesNotContain("id=\"nav-admin\"");
+
+        org.mockito.Mockito.when(apiService.isAdmin()).thenReturn(true);
+        String admin = mvc.perform(get("/").sessionAttr(key, "jwt")).andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(barEnd(admin)).contains("<mdui-dropdown id=\"nav-admin\"");
+    }
+
     /** The navbar's end area (the landing page has login buttons of its own). */
     private static String barEnd(String html) {
         int start = html.indexOf("<div class=\"app-bar-end\">");
