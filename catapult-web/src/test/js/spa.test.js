@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, response } from "./helpers.js";
 
 const ROUTES = [
@@ -178,6 +178,78 @@ describe("the navbar's channels", () => {
         expect(fetchMock).not.toHaveBeenCalledWith("/spa/nav-channels");
     });
 
+    describe("kept current", () => {
+        /** Minimal EventSource stand-in: the last one opened, and a way to fire its events. */
+        class FakeEventSource {
+            static last;
+            constructor(url) {
+                this.url = url;
+                this.listeners = {};
+                FakeEventSource.last = this;
+            }
+            addEventListener(type, listener) {
+                (this.listeners[type] ??= []).push(listener);
+            }
+            fire(type, data) {
+                (this.listeners[type] ?? []).forEach(listener => listener({ data: JSON.stringify(data) }));
+            }
+        }
+
+        const navFetches = () => fetchMock.mock.calls.filter(([url]) => url === "/spa/nav-channels").length;
+
+        beforeEach(async () => {
+            vi.stubGlobal("EventSource", FakeEventSource);
+            fetchMock.mockImplementation(async () => response(200, NAV));
+            await loadWithNav("/channel/enimaloc");
+        });
+
+        afterEach(() => vi.useRealTimers());
+
+        it("listens to the navbar's stream", () => {
+            expect(FakeEventSource.last.url).toBe("/events/nav");
+        });
+
+        it("flips a channel's live ring as it goes live or offline", () => {
+            FakeEventSource.last.fire("NavChannelLive", { username: "other", live: true });
+            expect(document.getElementById("c2").classList.contains("live")).toBe(true);
+
+            FakeEventSource.last.fire("NavChannelLive", { username: "other", live: false });
+            expect(document.getElementById("c2").classList.contains("live")).toBe(false);
+            expect(document.getElementById("c1").classList.contains("live")).toBe(false);
+        });
+
+        it("reloads them when the list changed", async () => {
+            const before = navFetches();
+            FakeEventSource.last.fire("NavChannelsChanged", {});
+            await flush();
+            expect(navFetches()).toBe(before + 1);
+        });
+
+        it("reloads them on a reconnection, not on the first connection", async () => {
+            const before = navFetches();
+            FakeEventSource.last.fire("open", {});
+            await flush();
+            expect(navFetches()).toBe(before);
+
+            FakeEventSource.last.fire("open", {});
+            await flush();
+            expect(navFetches()).toBe(before + 1);
+        });
+
+        it("catches up when its tab comes back after a while, and every few minutes", async () => {
+            vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setInterval"] });
+            const before = navFetches();
+
+            document.dispatchEvent(new Event("visibilitychange"));
+            await flush();
+            expect(navFetches()).toBe(before); // just loaded
+
+            vi.setSystemTime(Date.now() + 2 * 60_000);
+            document.dispatchEvent(new Event("visibilitychange"));
+            await flush();
+            expect(navFetches()).toBe(before + 1);
+        });
+    });
 });
 
 describe("link and history handling", () => {

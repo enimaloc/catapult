@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -22,6 +23,7 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class SpaFragmentController {
     private final ModelFiller filler;
+    private final NavEventStreamController navEvents;
 
     @GetMapping("/landing")
     String landing(Model model) {
@@ -35,10 +37,10 @@ public class SpaFragmentController {
         return "pages/privacy :: privacy";
     }
 
-    /** The navbar's channels, which spa.js loads once the page is shown. */
+    /** The navbar's channels, which spa.js loads once the page is shown; their live updates follow them. */
     @GetMapping("/nav-channels")
-    String navChannels(Model model) {
-        filler.navChannels(model);
+    String navChannels(Model model, HttpSession session) {
+        navEvents.remember(session.getId(), filler.navChannels(model));
         return "fragments/nav-channels :: channels";
     }
 

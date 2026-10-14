@@ -48,6 +48,7 @@ class ChannelVisibilityRenderingTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
+    @MockitoBean NavEventStreamController navEvents;
 
     /**
      * The channel template dereferences channelSettings unconditionally once isOwner()

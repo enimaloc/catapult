@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -33,6 +34,7 @@ class SpaFragmentControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
+    @MockitoBean NavEventStreamController navEvents;
 
     @Test
     void landing() throws Exception {
@@ -65,6 +67,18 @@ class SpaFragmentControllerTest {
         assertThat(html)
                 .containsPattern("class=\"nav-channel live\"\\s+href=\"/channel/enimaloc\"")
                 .containsPattern("class=\"nav-channel\"\\s+href=\"/channel/other\"");
+    }
+
+    @Test
+    void navChannels_areRememberedForTheirLiveUpdates() throws Exception {
+        List<ChannelDto> channels = List.of(new ChannelDto(UUID.randomUUID(), "1", "enimaloc", "img", true));
+        when(apiService.channelList()).thenReturn(new ChannelListResponse("1", channels));
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "jwt");
+
+        mvc.perform(get("/spa/nav-channels").session(session));
+
+        verify(navEvents).remember(session.getId(), channels);
     }
 
     @Test
