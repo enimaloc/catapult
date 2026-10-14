@@ -216,7 +216,7 @@ public class MockData {
         String username = RANDOM_NAME_PARTS[random.nextInt(RANDOM_NAME_PARTS.length)]
                 + "_" + Integer.toHexString(random.nextInt(0x10000));
         ChannelDto channel = new ChannelDto(new UUID(random.nextLong(), random.nextLong()),
-                String.valueOf(10_000_000 + random.nextInt(90_000_000)), username, MockPresets.AVATAR_URL,
+                String.valueOf(10_000_000 + random.nextInt(90_000_000)), username, MockPresets.getDefaultAvatar(random),
                 random.nextBoolean());
 
         boolean hasSteam = random.nextBoolean();
@@ -462,7 +462,7 @@ public class MockData {
         while (hasChannelNamed("moderee_" + n)) n++;
         String username = "moderee_" + n;
         moderatedChannels = Stream.concat(moderatedChannels.stream(), Stream.of(new ChannelDto(MockPresets.uuidOf(username),
-                String.valueOf(90_000_000 + n), username, MockPresets.AVATAR_URL, false))).toList();
+                String.valueOf(90_000_000 + n), username, MockPresets.getDefaultAvatar(), false))).toList();
     }
 
     private boolean hasChannelNamed(String username) {
