@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Boot's console logging, but for the access log: it stays on the console only, out of the
+appenders on the root logger (Sentry's), since its lines carry the visitor's IP. Sentry traces
+each request on its own.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+    <logger name="access" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+</configuration>

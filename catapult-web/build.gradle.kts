@@ -35,6 +35,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.webjars:webjars-locator-lite")
     implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation(platform("io.sentry:sentry-bom:8.60.0"))
+    implementation("io.sentry:sentry-spring-boot-4-starter")
+    implementation("io.sentry:sentry-logback")
 
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
