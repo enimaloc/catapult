@@ -28,7 +28,8 @@ public final class SiteCatalog {
     public static final List<SpaPage> PAGES = List.of(
             new SpaPage("", "pages/landing", "landing", "/spa/landing", "page.title.landing", "page.description.landing"),
             new SpaPage("privacy", "pages/privacy", "privacy", "/spa/privacy", "page.title.privacy", "page.description.privacy"),
-            new SpaPage("channel", "pages/channel", "channel", "/spa/channel", "page.title.channel", null, true)
+            new SpaPage("channel", "pages/channel", "channel", "/spa/channel", "page.title.channel", null, true),
+            new SpaPage("admin", "pages/admin", "admin", "/spa/admin", "page.title.admin", null)
     );
 
     private SiteCatalog() {

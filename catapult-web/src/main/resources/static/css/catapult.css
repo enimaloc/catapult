@@ -139,6 +139,11 @@ mdui-top-app-bar {
     flex: none;
 }
 
+.nav-admin {
+    margin-right: 8px;
+    padding-left: 8px;
+}
+
 /* Live: a red ring around the avatar. */
 .nav-channel.live mdui-avatar {
     outline: 2px solid #ef4444;
@@ -155,8 +160,7 @@ mdui-top-app-bar {
         padding: 4px;
     }
 
-    .nav-channel span,
-    .nav-admin-label {
+    .nav-channel span {
         display: none;
     }
 }
@@ -867,6 +871,13 @@ a[data-link].active {
 /* Each tab panel stacks its own section headers: space them like the old single page. */
 .channel-tabs mdui-tab-panel > * + .section-header {
     margin-top: 56px;
+}
+
+.admin-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--catapult-text-secondary);
 }
 
 /* Dashboard cards (surface shared via Cards above) */

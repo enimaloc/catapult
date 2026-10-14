@@ -212,14 +212,43 @@ class IndexControllerTest {
     }
 
     @Test
-    void navbar_hasTheAdminMenu_forAdminsOnly() throws Exception {
+    void navbar_linksToTheAdminPage_forAdminsOnly() throws Exception {
         String key = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
         String member = mvc.perform(get("/").sessionAttr(key, "jwt")).andReturn().getResponse().getContentAsString();
         org.assertj.core.api.Assertions.assertThat(barEnd(member)).doesNotContain("id=\"nav-admin\"");
 
         org.mockito.Mockito.when(apiService.isAdmin()).thenReturn(true);
         String admin = mvc.perform(get("/").sessionAttr(key, "jwt")).andReturn().getResponse().getContentAsString();
-        org.assertj.core.api.Assertions.assertThat(barEnd(admin)).contains("<mdui-dropdown id=\"nav-admin\"");
+        org.assertj.core.api.Assertions.assertThat(barEnd(admin)).containsPattern("<a id=\"nav-admin\" data-link [^>]*href=\"/admin\"");
+    }
+
+    @Test
+    void adminPage_rendersItsTabs_forAnAdmin() throws Exception {
+        org.mockito.Mockito.when(apiService.isAdmin()).thenReturn(true);
+        String key = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
+
+        for (String url : List.of("/admin", "/spa/admin")) {
+            String html = mvc.perform(get(url).sessionAttr(key, "jwt")).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            org.assertj.core.api.Assertions.assertThat(html)
+                    .contains("id=\"admin-tabs\"")
+                    .contains("<mdui-tab value=\"members\"", "<mdui-tab value=\"ccl\"", "<mdui-tab value=\"process-rules\"",
+                            "<mdui-tab value=\"caches\"", "<mdui-tab value=\"data\"");
+        }
+    }
+
+    @Test
+    void adminPage_isRefused_401LoggedOut_403ToAMember() throws Exception {
+        String key = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
+        for (String url : List.of("/admin", "/spa/admin")) {
+            String loggedOut = mvc.perform(get(url)).andExpect(status().isUnauthorized())
+                    .andReturn().getResponse().getContentAsString();
+            org.assertj.core.api.Assertions.assertThat(loggedOut).doesNotContain("admin-tabs");
+
+            String member = mvc.perform(get(url).sessionAttr(key, "jwt")).andExpect(status().isForbidden())
+                    .andReturn().getResponse().getContentAsString();
+            org.assertj.core.api.Assertions.assertThat(member).doesNotContain("admin-tabs");
+        }
     }
 
     /** The navbar's end area (the landing page has login buttons of its own). */
