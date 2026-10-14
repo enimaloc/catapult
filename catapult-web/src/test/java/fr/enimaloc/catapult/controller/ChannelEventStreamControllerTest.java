@@ -4,9 +4,12 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -30,11 +33,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = ChannelEventStreamController.class)
-@Import(WebSecurityConfig.class)
+@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class})
 class ChannelEventStreamControllerTest {
 
     @Autowired MockMvc mvc;
     @Autowired ChannelEventStreamController controller;
+    @Autowired MeterRegistry registry;
     @MockitoBean ApiService apiService;
 
     private MvcResult subscribe(String username) throws Exception {
@@ -114,20 +118,37 @@ class ChannelEventStreamControllerTest {
                 .andExpect(status().isUnauthorized()).andReturn();
 
         assertThat(result.getRequest().getSession(false)).isNull();
+        assertThat(registry.get("catapult.web.sse.refused").tags("stream", "channel", "reason", "unauthenticated")
+                .counter().count()).isPositive();
     }
 
     @Test
     void aSessionKeepsAtMostAFewStreams_closingItsOldest() throws Exception {
         MockHttpSession session = loggedIn();
+        double evicted = evicted();
         MvcResult oldest = subscribe("enimaloc", session);
         for (int i = 1; i < SessionStreams.MAX_PER_SESSION; i++) subscribe("enimaloc", session);
         MvcResult newest = subscribe("enimaloc", session);
+        assertThat(evicted()).isEqualTo(evicted + 1);
 
         controller.onChannelUpdated(new BotStateChangedEvent("enimaloc", true));
 
         assertThat(oldest.getAsyncResult(1000)).isNull();
         assertThat(oldest.getResponse().getContentAsString()).doesNotContain("BotStateChangedEvent");
         assertThat(newest.getResponse().getContentAsString()).contains("BotStateChangedEvent");
+    }
+
+    private double evicted() {
+        var counter = registry.find("catapult.web.sse.evicted").tag("stream", "channel").counter();
+        return counter == null ? 0 : counter.count();
+    }
+
+    @Test
+    void openStreams_areGauged() throws Exception {
+        double before = registry.get("catapult.web.sse.streams").tag("stream", "channel").gauge().value();
+        subscribe("enimaloc", loggedIn());
+
+        assertThat(registry.get("catapult.web.sse.streams").tag("stream", "channel").gauge().value()).isEqualTo(before + 1);
     }
 
     @Test
@@ -137,6 +158,8 @@ class ChannelEventStreamControllerTest {
         mvc.perform(get("/events/channel/{username}", "someone-else").session(loggedIn("enimaloc"))
                         .accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(status().isForbidden());
+        assertThat(registry.get("catapult.web.sse.refused").tags("stream", "channel", "reason", "forbidden")
+                .counter().count()).isPositive();
     }
 
     @Test

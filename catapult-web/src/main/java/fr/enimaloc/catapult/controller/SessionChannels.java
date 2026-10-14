@@ -6,13 +6,14 @@ import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.http.HttpSession;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The channels a logged-in session can act on (its member's own and those they moderate), as
  * catapult-api last listed them: what its navbar shows, and what its streams may follow. Kept in
  * the session, so it goes with it.
  */
-final class SessionChannels {
+public final class SessionChannels {
     static final String ATTRIBUTE = SessionChannels.class.getName();
 
     private SessionChannels() {
@@ -44,6 +45,18 @@ final class SessionChannels {
         }
         remember(session, fresh.channels());
         return lists(fresh.channels(), username);
+    }
+
+    /**
+     * The channel named {@code username} among those {@code session} last listed; empty when it
+     * lists none such, or once the session is gone.
+     */
+    public static Optional<ChannelDto> find(HttpSession session, String username) {
+        try {
+            return of(session).stream().filter(channel -> channel.twitchUsername().equalsIgnoreCase(username)).findFirst();
+        } catch (IllegalStateException e) {
+            return Optional.empty();
+        }
     }
 
     private static boolean lists(List<ChannelDto> channels, String username) {

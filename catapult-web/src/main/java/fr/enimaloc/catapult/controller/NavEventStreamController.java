@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
+import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.context.event.ContextClosedEvent;
@@ -42,12 +43,17 @@ public class NavEventStreamController {
 
     /** Only the sessions with a stream open. */
     private final Map<String, Nav> navsBySession = new ConcurrentHashMap<>();
-    private final SessionStreams streams = new SessionStreams();
+    private final SessionStreams streams;
+
+    public NavEventStreamController(InteractionMetrics metrics) {
+        streams = new SessionStreams("nav", metrics);
+    }
 
     @GetMapping(value = "/events/nav", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<SseEmitter> subscribe(HttpServletRequest request) {
         HttpSession session = SessionStreams.loggedIn(request);
         if (session == null) {
+            streams.refused("unauthenticated");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         String sessionId = session.getId();

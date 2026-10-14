@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
+import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
@@ -34,19 +34,25 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 @Slf4j
 @RestController
-@RequiredArgsConstructor
 public class ChannelEventStreamController {
     private final ApiService apiService;
     private final Map<String, List<SseEmitter>> emittersByUsername = new ConcurrentHashMap<>();
-    private final SessionStreams streams = new SessionStreams();
+    private final SessionStreams streams;
+
+    public ChannelEventStreamController(ApiService apiService, InteractionMetrics metrics) {
+        this.apiService = apiService;
+        streams = new SessionStreams("channel", metrics);
+    }
 
     @GetMapping(value = "/events/channel/{username}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<SseEmitter> subscribe(@PathVariable String username, HttpServletRequest request) {
         HttpSession session = SessionStreams.loggedIn(request);
         if (session == null) {
+            streams.refused("unauthenticated");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         if (!SessionChannels.canFollow(session, username, apiService)) {
+            streams.refused("forbidden");
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         String sessionId = session.getId();
