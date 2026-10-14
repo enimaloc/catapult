@@ -5,17 +5,54 @@ import fr.enimaloc.catapult.common.dto.channel.CclDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.TwDto;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import org.hibernate.validator.constraints.Range;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 
 /** The fixed data mock sessions are built from, and the value lists the mock forms offer. */
 public final class MockPresets {
 
-    public static final String AVATAR_URL =
-            "https://static-cdn.jtvnw.net/jtv_user_pictures/a69d9843-4cd4-4b3a-815d-0101b31e4790-profile_image-70x70.png";
+    public static final String DEFAULT_AVATAR_FMT =
+            "https://static-cdn.jtvnw.net/user-default-pictures-uv/%s-profile_image-%s.png";
+
+    public static final String[] DEFAULT_AVATAR_ID = new String[] {
+            "de130ab0-def7-11e9-b668-784f43822e80",
+            "dbdc9198-def8-11e9-8681-784f43822e80",
+            "41780b5a-def8-11e9-94d9-784f43822e80",
+            "998f01ae-def8-11e9-b95c-784f43822e80",
+            "215b7342-def9-11e9-9a66-784f43822e80",
+            "ce57700a-def9-11e9-842d-784f43822e80",
+            "13e5fa74-defa-11e9-809c-784f43822e80",
+            "294c98b5-e34d-42cd-a8f0-140b72fba9b0",
+            "75305d54-c7cc-40d1-bb9c-91fbe85943c7",
+            "ebb84563-db81-4b9c-8940-64ed33ccfc7b",
+            "ead5c8b2-a4c9-4724-b1dd-9f00b46cbd3d"
+    };
+
+    public static String getDefaultAvatar(int size) {
+        return getDefaultAvatar(new Random(), size);
+    }
+
+    public static String getDefaultAvatar(Random random) {
+        return getDefaultAvatar(random, 70);
+    }
+
+    public static String getDefaultAvatar() {
+        return getDefaultAvatar(new Random(), 70);
+    }
+
+    public static String getDefaultAvatar(Random random, int size) {
+        String sizeStr = switch (size) {
+            case 28, 50, 70, 150, 300, 600 -> size + "x" + size;
+            default -> throw new IllegalStateException("Unexpected value: " + size);
+        };
+        String id = DEFAULT_AVATAR_ID[random.nextInt(DEFAULT_AVATAR_ID.length)];
+        return DEFAULT_AVATAR_FMT.formatted(id, sizeStr);
+    }
 
     /** Fixed catalog the mock login form picks blocked entries from — not itself customizable. */
     public static final List<CclDto> AVAILABLE_CCLS = List.of(
@@ -49,8 +86,8 @@ public final class MockPresets {
 
     /** The quick-launch channels: "0" is live, "1" offline. */
     public static final List<ChannelDto> CHANNELS = List.of(
-            new ChannelDto(uuidOf("online"), "00000001", "enimaloc_stream", AVATAR_URL, true),
-            new ChannelDto(uuidOf("offline"), "00000002", "enimaloc", AVATAR_URL, false)
+            new ChannelDto(uuidOf("online"), "00000001", "enimaloc_stream", getDefaultAvatar(), true),
+            new ChannelDto(uuidOf("offline"), "00000002", "enimaloc", getDefaultAvatar(), false)
     );
 
     public static final List<BindingDto> BINDINGS = List.of(
