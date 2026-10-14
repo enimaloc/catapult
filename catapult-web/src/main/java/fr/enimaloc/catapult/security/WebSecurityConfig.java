@@ -37,7 +37,9 @@ public class WebSecurityConfig {
                         // cookie meant to be read once by csrf.js and replayed verbatim as a
                         // header on later requests. The plain handler keeps the cookie value
                         // stable and comparable, matching Spring's documented "SPA" CSRF setup.
-                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                        // The Sentry SDK posts its reports there without the token; relayed, they change nothing here.
+                        .ignoringRequestMatchers("/monitoring/tunnel"))
                 .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
                 .formLogin(FormLoginConfigurer::disable)
                 .httpBasic(HttpBasicConfigurer::disable)
