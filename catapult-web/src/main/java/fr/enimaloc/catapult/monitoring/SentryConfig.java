@@ -18,12 +18,13 @@ import java.util.regex.Pattern;
 @Configuration
 public class SentryConfig {
     /**
-     * Requests not worth a trace: the endless live update streams, health probes and static assets.
+     * Requests not worth a trace: the endless live update streams, health probes, static assets and
+     * the browser's own reports.
      */
     private static final Pattern UNTRACED = Pattern.compile(
-            "^/(events/|me/twitchat/events|healthz|actuator/|css/|js/|_static/|favicon).*");
+            "^/(events/|me/twitchat/events|healthz|actuator/|css/|js/|_static/|favicon|monitoring/tunnel).*");
 
-    /** {@code catapult-web@<commit>}, the commit catapult-web was built from. */
+    /** {@code catapult-web@<commit>}, the commit catapult-web was built from; the browser reports under it too. */
     public static Optional<String> release(Optional<BuildProperties> build) {
         return build.map(properties -> properties.get("git.commit"))
                 .filter(commit -> !commit.isBlank() && !commit.equals("unknown"))
