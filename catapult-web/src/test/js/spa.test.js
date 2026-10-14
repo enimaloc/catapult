@@ -61,6 +61,14 @@ describe("navigate", () => {
         expect(document.getElementById("nav-progress").hidden).toBe(true);
     });
 
+    it("names the dynamic param in the page's title", async () => {
+        window.Catapult.titles.channel = "{0} - Catapult";
+
+        await CatapultSpa.navigate("channel/enimaloc");
+
+        expect(document.title).toBe("enimaloc - Catapult");
+    });
+
     it("appends the dynamic param and the query string", async () => {
         await CatapultSpa.navigate("channel/enimaloc", true, "?page=2");
 

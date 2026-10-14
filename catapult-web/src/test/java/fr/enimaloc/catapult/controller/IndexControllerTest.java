@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.config.I18nConfiguration;
 import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
@@ -36,7 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * entirely instead of being threaded into the model.
  */
 @WebMvcTest(controllers = {IndexController.class, SpaFragmentController.class})
-@Import({ModelFiller.class, WebSecurityConfig.class, TwitchatCatalogConfig.class})
+// I18nConfiguration: titles like "{0} - #{app.brand}" need its message source, as in production.
+@Import({ModelFiller.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
 class IndexControllerTest {
 
     @Autowired MockMvc mvc;
@@ -150,5 +152,45 @@ class IndexControllerTest {
                 .contains("\"templateUrl\":\"/spa/channel\"")
                 .contains("\"dynamic\":true")
                 .contains("\"titleKey\":\"page.title.landing\"");
+    }
+
+    @Test
+    void unknownPage_isARealNotFound_keptOutOfSearchEngines() throws Exception {
+        mvc.perform(get("/nope"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<meta name=\"robots\" content=\"noindex\">")));
+    }
+
+    @Test
+    void publicPage_describesItselfWithItsCanonicalUrl() throws Exception {
+        String html = mvc.perform(get("/privacy").param("utm_source", "x"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        org.assertj.core.api.Assertions.assertThat(html)
+                .contains("<meta name=\"description\"")
+                .contains("<link rel=\"canonical\" href=\"http://localhost/privacy\">")
+                .contains("<meta property=\"og:url\" content=\"http://localhost/privacy\">")
+                .doesNotContain("noindex")
+                .doesNotContain("application/ld+json");
+    }
+
+    @Test
+    void landingPage_namesTheSiteForSearchResults() throws Exception {
+        String html = mvc.perform(get("/")).andReturn().getResponse().getContentAsString();
+
+        org.assertj.core.api.Assertions.assertThat(html)
+                .contains("<link rel=\"canonical\" href=\"http://localhost/\">")
+                .contains("\"@type\": \"WebSite\"");
+    }
+
+    @Test
+    void channelPage_isKeptOutOfSearchEngines() throws Exception {
+        String html = mvc.perform(get("/channel/enimaloc")).andReturn().getResponse().getContentAsString();
+
+        org.assertj.core.api.Assertions.assertThat(html)
+                .contains("<meta name=\"robots\" content=\"noindex\">")
+                .doesNotContain("rel=\"canonical\"")
+                .doesNotContain("<meta name=\"description\"");
     }
 }

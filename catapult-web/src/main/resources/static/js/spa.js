@@ -78,7 +78,8 @@ async function navigate(path, push = true, search = "") {
         return;
     }
 
-    document.title = config.titles[route?.id] ?? document.title;
+    // A dynamic page's title names its param (page.title.channel={0} - Catapult).
+    document.title = config.titles[route?.id]?.replace("{0}", param ?? "") ?? document.title;
     updateActiveLink(path);
 
     window.scrollTo({

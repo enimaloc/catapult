@@ -30,4 +30,16 @@ class SiteCatalogTest {
     void everyPageIsServedUnderSpa() {
         assertThat(SiteCatalog.PAGES).allSatisfy(page -> assertThat(page.getTemplateUrl()).startsWith("/spa/"));
     }
+
+    @Test
+    void onlyThePublicPagesAreIndexed() {
+        assertThat(SiteCatalog.PAGES).filteredOn(SpaPage::isIndexed).extracting(SpaPage::getId)
+                .containsExactly("", "privacy");
+    }
+
+    @Test
+    void page_findsAPageByItsId() {
+        assertThat(SiteCatalog.page("privacy")).map(SpaPage::getTitleKey).contains("page.title.privacy");
+        assertThat(SiteCatalog.page("nope")).isEmpty();
+    }
 }

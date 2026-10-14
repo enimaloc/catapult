@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.dto.index.PlatformDto;
 import fr.enimaloc.catapult.dto.index.SpaPage;
 
 import java.util.List;
+import java.util.Optional;
 
 /** The site's fixed content: landing-page features and platforms, and the SPA pages. */
 public final class SiteCatalog {
@@ -23,14 +24,19 @@ public final class SiteCatalog {
             new PlatformDto("sports_esports", "platforms.xbox")
     );
 
+    /** The member's own pages (channels, dashboards) have no description: they stay out of search engines. */
     public static final List<SpaPage> PAGES = List.of(
-            new SpaPage("", "pages/landing", "landing", "/spa/landing", "page.title.landing"),
-            new SpaPage("privacy", "pages/privacy", "privacy", "/spa/privacy", "page.title.privacy"),
-            new SpaPage("channels", "pages/channels", "channels", "/spa/channels", "page.title.channels"),
-            new SpaPage("channel", "pages/channel", "channel", "/spa/channel", "page.title.channel", true)
+            new SpaPage("", "pages/landing", "landing", "/spa/landing", "page.title.landing", "page.description.landing"),
+            new SpaPage("privacy", "pages/privacy", "privacy", "/spa/privacy", "page.title.privacy", "page.description.privacy"),
+            new SpaPage("channels", "pages/channels", "channels", "/spa/channels", "page.title.channels", null),
+            new SpaPage("channel", "pages/channel", "channel", "/spa/channel", "page.title.channel", null, true)
     );
 
     private SiteCatalog() {
+    }
+
+    public static Optional<SpaPage> page(String id) {
+        return PAGES.stream().filter(page -> page.getId().equals(id)).findFirst();
     }
 
     /** Whether {@code path} is one of the static SPA pages (dynamic ones have their own route). */
