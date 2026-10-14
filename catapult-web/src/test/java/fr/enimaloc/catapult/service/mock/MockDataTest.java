@@ -445,4 +445,43 @@ class MockDataTest {
             assertThat(data.getSteamProfileCacheTtlMinutes()).isEqualTo(60L);
         }
     }
+
+    @Nested
+    class ModeratedChannels {
+        private static final ChannelDto OFFLINE = MockPresets.CHANNELS.get(1);
+
+        @Test
+        void listsTheMembersOwnFirst_asItIsNow() {
+            MockData data = session();
+            data.setModeratedChannels(List.of(OFFLINE));
+            data.setChannelLive(false);
+
+            assertThat(data.getChannelList().channels()).containsExactly(data.getChannelDto(), OFFLINE);
+            assertThat(data.getChannelList().channels().getFirst().live()).isFalse();
+        }
+
+        @Test
+        void addsAChannelUnderAFreeName() {
+            MockData data = session();
+
+            data.addModeratedChannel();
+            data.addModeratedChannel();
+
+            assertThat(data.getModeratedChannels()).extracting(ChannelDto::twitchUsername)
+                    .containsExactly("moderee_1", "moderee_2");
+            assertThat(data.getModeratedChannels()).extracting(ChannelDto::id).doesNotHaveDuplicates();
+        }
+
+        @Test
+        void aModeratedChannelsPage_showsThatChannel_notTheMembers() {
+            MockData data = session();
+            data.setModeratedChannels(List.of(OFFLINE));
+
+            ChannelPageData page = data.getPage(OFFLINE.twitchUsername(), null, null);
+
+            assertThat(page.isOwner()).isFalse();
+            assertThat(page.channelUser().twitchUsername()).isEqualTo(OFFLINE.twitchUsername());
+            assertThat(page.isLive()).isFalse();
+        }
+    }
 }

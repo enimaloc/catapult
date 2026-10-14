@@ -61,6 +61,29 @@
         </section>
 
         <section class="mock-card">
+            <h2>Chaînes modérées</h2>
+            <p class="mock-hint" th:if="${moderated.isEmpty()}">Le membre ne modère aucune autre chaîne.</p>
+            <div class="mock-binding" th:each="c, it : ${moderated}" th:with="p=|moderated[${it.index}]|">
+                <input type="hidden" th:name="|${p}.id|" th:value="${c.id()}">
+                <input type="hidden" th:name="|${p}.twitchId|" th:value="${c.twitchId()}">
+                <div class="mock-row">
+                    <mdui-text-field variant="outlined" th:name="|${p}.twitchUsername|" label="Nom de la chaîne"
+                                     th:value="${c.twitchUsername()}" required></mdui-text-field>
+                    <mdui-text-field variant="outlined" th:name="|${p}.avatarUrl|" label="URL de l'avatar"
+                                     th:value="${c.profileImageUrl()}"></mdui-text-field>
+                </div>
+                <div class="mock-switches">
+                    <label><mdui-switch th:name="|${p}.live|" th:checked="${c.live()}"></mdui-switch> En live</label>
+                    <label><mdui-switch th:name="|${p}.delete|"></mdui-switch> Retirer cette chaîne</label>
+                </div>
+            </div>
+            <div>
+                <mdui-button variant="tonal" icon="add" type="submit" formaction="/mock/admin?addModerated=true">Ajouter une chaîne modérée</mdui-button>
+            </div>
+            <p class="mock-hint">Elles apparaissent dans la barre de l'appli, après la chaîne du membre.</p>
+        </section>
+
+        <section class="mock-card">
             <h2>Jeu détecté</h2>
             <div class="mock-row">
                 <mdui-select variant="outlined" name="detectedSourceType" label="Source" th:value="${game?.sourceType()}">
