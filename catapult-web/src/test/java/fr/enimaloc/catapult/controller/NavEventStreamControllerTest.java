@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = NavEventStreamController.class)
 @Import(WebSecurityConfig.class)
@@ -31,6 +33,12 @@ class NavEventStreamControllerTest {
     @Autowired MockMvc mvc;
     @Autowired NavEventStreamController controller;
 
+    private static MockHttpSession loggedIn() {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "jwt");
+        return session;
+    }
+
     private MvcResult subscribe(MockHttpSession session) throws Exception {
         return mvc.perform(get("/events/nav").session(session).accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(request().asyncStarted())
@@ -40,15 +48,15 @@ class NavEventStreamControllerTest {
 
     /** A session whose navbar lists {@code channels}, with a stream open. */
     private MvcResult navbar(MockHttpSession session, ChannelDto... channels) throws Exception {
-        controller.remember(session.getId(), List.of(channels));
+        controller.remember(session, List.of(channels));
         return subscribe(session);
     }
 
     @Test
     void aListedChannelGoingLive_flipsItInEveryNavbarListingIt() throws Exception {
-        MvcResult mine = navbar(new MockHttpSession(), OWN, MODERATED);
-        MvcResult another = navbar(new MockHttpSession(), OWN);
-        MvcResult unrelated = navbar(new MockHttpSession(), MODERATED);
+        MvcResult mine = navbar(loggedIn(), OWN, MODERATED);
+        MvcResult another = navbar(loggedIn(), OWN);
+        MvcResult unrelated = navbar(loggedIn(), MODERATED);
 
         controller.onChannelLive(new ChannelLiveStateEvent("enimaloc", true));
 
@@ -60,7 +68,7 @@ class NavEventStreamControllerTest {
 
     @Test
     void catapultApisLiveState_findsTheChannelByItsId() throws Exception {
-        MvcResult stream = navbar(new MockHttpSession(), OWN, MODERATED);
+        MvcResult stream = navbar(loggedIn(), OWN, MODERATED);
 
         controller.liveChanged(MODERATED.id(), false);
         controller.liveChanged(UUID.randomUUID(), true);
@@ -72,7 +80,7 @@ class NavEventStreamControllerTest {
 
     @Test
     void theNavbarRemembersTheLatestLiveState() throws Exception {
-        MvcResult stream = navbar(new MockHttpSession(), OWN);
+        MvcResult stream = navbar(loggedIn(), OWN);
 
         controller.onChannelLive(new ChannelLiveStateEvent("enimaloc", true));
         controller.liveChanged(OWN.id(), false);
@@ -83,10 +91,10 @@ class NavEventStreamControllerTest {
 
     @Test
     void aChangedList_reloadsThatSessionsNavbarOnly() throws Exception {
-        MockHttpSession session = new MockHttpSession();
+        MockHttpSession session = loggedIn();
         MvcResult first = navbar(session, OWN);
         MvcResult second = subscribe(session);
-        MvcResult other = navbar(new MockHttpSession(), OWN);
+        MvcResult other = navbar(loggedIn(), OWN);
 
         controller.onChannelsChanged(new NavChannelsChangedEvent(session.getId()));
 
@@ -103,10 +111,46 @@ class NavEventStreamControllerTest {
 
     @Test
     void shutdownCompletesTheOpenStreams() throws Exception {
-        MvcResult stream = navbar(new MockHttpSession(), OWN);
+        MvcResult stream = navbar(loggedIn(), OWN);
 
         controller.onContextClosed(null);
 
         assertThat(stream.getAsyncResult(1000)).isNull();
+    }
+
+    @Test
+    void aLoggedOutVisitor_cannotOpenAStream_norGetsASession() throws Exception {
+        MvcResult result = mvc.perform(get("/events/nav").accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isUnauthorized()).andReturn();
+
+        assertThat(result.getRequest().getSession(false)).isNull();
+    }
+
+    @Test
+    void aSessionKeepsAtMostAFewStreams_closingItsOldest() throws Exception {
+        MockHttpSession session = loggedIn();
+        controller.remember(session, List.of(OWN));
+        MvcResult oldest = subscribe(session);
+        for (int i = 1; i < SessionStreams.MAX_PER_SESSION; i++) subscribe(session);
+        MvcResult newest = subscribe(session);
+
+        controller.onChannelLive(new ChannelLiveStateEvent("enimaloc", true));
+
+        assertThat(oldest.getAsyncResult(1000)).isNull(); // completed
+        assertThat(oldest.getResponse().getContentAsString()).doesNotContain("NavChannelLive");
+        assertThat(newest.getResponse().getContentAsString()).contains("NavChannelLive");
+    }
+
+    @Test
+    void theListIsKeptInTheSession_andGoesWithIt() throws Exception {
+        MockHttpSession session = loggedIn();
+        MvcResult stream = navbar(session, OWN);
+        assertThat(session.getAttribute(NavEventStreamController.CHANNELS)).isEqualTo(List.of(OWN));
+
+        session.invalidate();
+        controller.onChannelLive(new ChannelLiveStateEvent("enimaloc", true));
+
+        assertThat(stream.getAsyncResult(1000)).isNull();
+        assertThat(stream.getResponse().getContentAsString()).doesNotContain("NavChannelLive");
     }
 }

@@ -21,6 +21,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -78,7 +79,7 @@ class SpaFragmentControllerTest {
 
         mvc.perform(get("/spa/nav-channels").session(session));
 
-        verify(navEvents).remember(session.getId(), channels);
+        verify(navEvents).remember(session, channels);
     }
 
     @Test
@@ -88,6 +89,7 @@ class SpaFragmentControllerTest {
 
         assertThat(html).isBlank();
         verify(apiService, never()).channelList();
+        verifyNoInteractions(navEvents);
     }
 
     @Test

@@ -3,11 +3,13 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -15,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = ChannelEventStreamController.class)
 @Import(WebSecurityConfig.class)
@@ -24,7 +27,17 @@ class ChannelEventStreamControllerTest {
     @Autowired ChannelEventStreamController controller;
 
     private MvcResult subscribe(String username) throws Exception {
-        return mvc.perform(get("/events/channel/{username}", username).accept(MediaType.TEXT_EVENT_STREAM))
+        return subscribe(username, loggedIn());
+    }
+
+    private static MockHttpSession loggedIn() {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "jwt");
+        return session;
+    }
+
+    private MvcResult subscribe(String username, MockHttpSession session) throws Exception {
+        return mvc.perform(get("/events/channel/{username}", username).session(session).accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(request().asyncStarted())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
                 .andReturn();
@@ -75,5 +88,27 @@ class ChannelEventStreamControllerTest {
         controller.onContextClosed(null);
 
         assertThat(stream.getAsyncResult(1000)).isNull();
+    }
+
+    @Test
+    void aLoggedOutVisitor_cannotOpenAStream_norGetsASession() throws Exception {
+        MvcResult result = mvc.perform(get("/events/channel/{username}", "enimaloc").accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isUnauthorized()).andReturn();
+
+        assertThat(result.getRequest().getSession(false)).isNull();
+    }
+
+    @Test
+    void aSessionKeepsAtMostAFewStreams_closingItsOldest() throws Exception {
+        MockHttpSession session = loggedIn();
+        MvcResult oldest = subscribe("enimaloc", session);
+        for (int i = 1; i < SessionStreams.MAX_PER_SESSION; i++) subscribe("enimaloc", session);
+        MvcResult newest = subscribe("enimaloc", session);
+
+        controller.onChannelUpdated(new BotStateChangedEvent("enimaloc", true));
+
+        assertThat(oldest.getAsyncResult(1000)).isNull();
+        assertThat(oldest.getResponse().getContentAsString()).doesNotContain("BotStateChangedEvent");
+        assertThat(newest.getResponse().getContentAsString()).contains("BotStateChangedEvent");
     }
 }
