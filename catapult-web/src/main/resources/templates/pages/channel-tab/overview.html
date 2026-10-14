@@ -104,7 +104,7 @@
         <mdui-collapse accordion th:if="${!ch.bindings().content().isEmpty()}"
                        th:value="${ch.currentGame()?.bindingId()}">
             <mdui-collapse-item th:each="b : ${ch.bindings().content()}"
-                                th:attr="data-binding-id=${b.id()},disabled=${!ch.isOwner()} ? 'disabled'"
+                                th:attr="data-binding-id=${b.id()}"
                                 th:value="${b.id()}"
                                 th:class="${ch.currentGame()?.bindingId() == b.id() ? 'is-open' : ''}">
                 <mdui-list-item slot="header">
@@ -119,7 +119,8 @@
                     <span class="binding-platform-chips" th:text="${b.sourceType()}"></span>
                     <span th:text="${b.status()}"></span>
                 </mdui-list-item>
-                <mdui-list-item th:if="${ch.isOwner()}">
+                <!--/* The owner and moderators alike, but for the TWs (see below). */-->
+                <mdui-list-item>
                     <div class="binding-toggle">
                         <mdui-switch th:id="'binding-ignored-toggle-' + ${b.id()}"
                                      class="binding-ignored-toggle"
@@ -159,7 +160,8 @@
                         </label>
                     </div>
 
-                    <div class="binding-tw-panel">
+                    <!--/* Owner only: catapult-api applies a binding's TWs to the caller's own channel. */-->
+                    <div class="binding-tw-panel" th:if="${ch.isOwner()}">
                         <label>
                             <mdui-switch class="binding-tw-enabled-checkbox"
                                          spa:value="checked:TwEnabledStateEvent.enabled"

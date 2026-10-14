@@ -13,10 +13,9 @@
         <!-- The active tab is mirrored into location.hash by channel-page.js, so a
              CatapultChannel.refresh() (which re-renders this whole fragment) lands back
              on the same tab instead of resetting to the overview. -->
-        <mdui-tabs id="channel-tabs" class="channel-tabs" value="overview" placement="top"
-                   th:classappend="${!channelPage.isOwner()} ? 'channel-tabs-single'">
+        <mdui-tabs id="channel-tabs" class="channel-tabs" value="overview" placement="top">
             <mdui-tab value="overview" th:text="#{channel.tab.overview}">channel.tab.overview</mdui-tab>
-            <mdui-tab value="settings" th:if="${channelPage.isOwner()}" th:text="#{channel.tab.settings}">channel.tab.settings</mdui-tab>
+            <mdui-tab value="settings" th:text="#{channel.tab.settings}">channel.tab.settings</mdui-tab>
             <mdui-tab value="integrations" th:if="${channelPage.isOwner()}" th:text="#{channel.tab.integrations}">channel.tab.integrations</mdui-tab>
 
             <th:block th:replace="~{pages/channel-tab/overview::panel}"></th:block>
