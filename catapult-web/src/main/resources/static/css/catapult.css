@@ -155,7 +155,8 @@ mdui-top-app-bar {
         padding: 4px;
     }
 
-    .nav-channel span {
+    .nav-channel span,
+    .nav-admin-label {
         display: none;
     }
 }
