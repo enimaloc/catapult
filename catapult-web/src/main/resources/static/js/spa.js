@@ -1,6 +1,11 @@
 const app = document.querySelector("#app");
 const progress = document.querySelector("#nav-progress");
 const navChannels = document.querySelector("#nav-channels");
+// Twitch tells no one when a member becomes or stops being a moderator: the navbar catches up
+// now and then, and when its tab comes back after a while.
+const NAV_REFRESH_MS = 5 * 60_000;
+const NAV_STALE_MS = 60_000;
+let navLoadedAt = 0;
 
 const config = window.Catapult;
 
@@ -108,6 +113,7 @@ async function loadNavChannels() {
             return;
         }
         navChannels.innerHTML = await response.text();
+        navLoadedAt = Date.now();
     } catch {
         return; // the navbar just stays without them
     }
@@ -115,11 +121,45 @@ async function loadNavChannels() {
     updateActiveLink(currentPath());
 }
 
+/**
+ * Keeps the navbar current from /events/nav (NavEventStreamController): a channel going live or
+ * offline flips its ring, a change of the list reloads it.
+ */
+function listenNavChannels() {
+    if (!navChannels) {
+        return;
+    }
+    if (typeof EventSource !== "undefined") {
+        const source = new EventSource("/events/nav");
+        let opened = false;
+        // A reconnection (e.g. the server restarted) may have missed events, and the server
+        // its record of this navbar: reloading it catches up on both.
+        source.addEventListener("open", () => {
+            if (opened) loadNavChannels();
+            opened = true;
+        });
+        source.addEventListener("NavChannelsChanged", () => loadNavChannels());
+        source.addEventListener("NavChannelLive", event => {
+            const { username, live } = JSON.parse(event.data);
+            [...navChannels.querySelectorAll(".nav-channel")]
+                .find(a => a.getAttribute("href") === `/channel/${username}`)
+                ?.classList.toggle("live", live);
+        });
+    }
+    setInterval(() => {
+        if (!document.hidden) loadNavChannels();
+    }, NAV_REFRESH_MS);
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && Date.now() - navLoadedAt > NAV_STALE_MS) loadNavChannels();
+    });
+}
+
 // The router's public surface, for the per-fragment scripts (channel-page.js's refresh()).
 window.CatapultSpa = { navigate, resolveRoute, loadNavChannels };
 
 updateActiveLink(currentPath());
 loadNavChannels();
+listenNavChannels();
 
 document.addEventListener("click", event => {
     // composedPath() (rather than event.target) is required here: for a
