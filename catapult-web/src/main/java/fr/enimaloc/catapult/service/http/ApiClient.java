@@ -139,6 +139,11 @@ public class ApiClient {
         }
     }
 
+    /** Whether the calling request's session is logged in (holds a catapult-api JWT). */
+    public static boolean hasSession() {
+        return currentJwt() != null;
+    }
+
     /** The subject (account id) of the calling session's JWT; null without one. Read, not verified: the session holds it server-side. */
     public static UUID currentSubject() {
         String jwt = currentJwt();

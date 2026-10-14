@@ -41,7 +41,7 @@
 <mdui-layout>
     <!-- Navigation -->
     <mdui-top-app-bar class="app-bar">
-        <a data-link href="/">
+        <a data-link href="/" class="brand-link">
             <mdui-top-app-bar-title>
             <span class="brand">
                 <span class="brand-icon">🚀</span>
@@ -50,13 +50,15 @@
             </mdui-top-app-bar-title>
         </a>
 
-        <!-- Mock profile only: reopens the member's config popout (mock-popout.js). -->
-        <mdui-button th:if="${mock}" id="mock-popout-btn" variant="text" icon="tune"
-                     style="margin-left: auto">Mock</mdui-button>
+        <!-- The channels the member can act on: spa.js fills it from /spa/nav-channels once the page is shown. -->
+        <nav th:if="${loggedIn}" id="nav-channels" class="nav-channels" th:aria-label="#{nav.channels}"></nav>
 
-        <div slot="end-icon">
-            <mdui-button variant="text" href="/oauth2/authorization/twitch" th:text="#{nav.login}">nav.login
-            </mdui-button>
+        <!--/* mdui-top-app-bar only has a default slot: this is a plain flex item, sized like the brand. */-->
+        <div class="app-bar-end">
+            <!-- Mock profile only: reopens the member's config popout (mock-popout.js). -->
+            <mdui-button th:if="${mock}" id="mock-popout-btn" variant="text" icon="tune">Mock</mdui-button>
+            <mdui-button th:unless="${loggedIn}" variant="text" href="/oauth2/authorization/twitch"
+                         th:text="#{nav.login}">nav.login</mdui-button>
         </div>
 
     </mdui-top-app-bar>
