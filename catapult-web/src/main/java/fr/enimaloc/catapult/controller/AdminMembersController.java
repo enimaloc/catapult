@@ -73,9 +73,6 @@ public class AdminMembersController {
     }
 
     private void requireAdmin() {
-        int refused = AdminAccess.refusal(filler);
-        if (refused != 0) {
-            throw new ResponseStatusException(HttpStatus.valueOf(refused));
-        }
+        AdminAccess.require(filler);
     }
 }

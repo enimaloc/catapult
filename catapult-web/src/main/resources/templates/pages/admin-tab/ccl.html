@@ -1,0 +1,35 @@
+<!--/*@thymesVar id="ccl" type="fr.enimaloc.catapult.common.dto.admin.AdminCclPage"*/-->
+<!--/*
+  Twitch's content classification labels, each with the IGDB rating descriptors that imply it:
+  admin-ccl.js selects a card's saved descriptors (data-saved), enables its Save once they
+  changed, and refreshes the CCLs from Twitch.
+*/-->
+<th:block th:fragment="content">
+    <div class="section-header">
+        <div>
+            <h2 th:text="#{admin.tab.ccl}">CCL</h2>
+            <span class="eyebrow" th:if="${ccl != null}" th:text="#{admin.ccl.count(${ccl.ccls().size()})}">0 CCL</span>
+        </div>
+        <mdui-button id="admin-ccl-refresh" variant="tonal" icon="sync" th:text="#{admin.ccl.refresh}">refresh</mdui-button>
+    </div>
+
+    <th:block th:if="${ccl == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${ccl != null and ccl.ccls().isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('label_off', #{admin.ccl.empty})}"></th:block>
+    </th:block>
+
+    <div class="admin-ccl-list" th:if="${ccl != null and !ccl.ccls().isEmpty()}">
+        <mdui-card class="settings-card admin-ccl" variant="outlined" th:each="c : ${ccl.ccls()}"
+                   th:attr="data-ccl-id=${c.id()},data-saved=${c.mappedIds()}">
+            <div class="admin-ccl-head">
+                <strong th:text="${c.name()}">name</strong>
+                <span class="admin-member-id" th:text="${c.id()}">id</span>
+            </div>
+            <p class="admin-ccl-description" th:text="${c.description()}">description</p>
+            <mdui-select class="admin-ccl-select" multiple variant="outlined" th:attr="label=#{admin.ccl.descriptors}">
+                <mdui-menu-item th:each="d : ${ccl.igdbDescriptors()}" th:value="${d.id()}" th:text="${d.label()}">descriptor</mdui-menu-item>
+            </mdui-select>
+            <mdui-button class="admin-ccl-save" disabled th:text="#{admin.ccl.save}">Save</mdui-button>
+        </mdui-card>
+    </div>
+</th:block>
