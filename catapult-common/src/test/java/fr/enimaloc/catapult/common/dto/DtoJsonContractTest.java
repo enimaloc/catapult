@@ -11,6 +11,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
@@ -81,6 +82,7 @@ class DtoJsonContractTest {
             if (Map.class.isAssignableFrom(raw)) return Map.of(sample(args[0]), sample(args[1]));
             return sample(raw);
         }
+        if (type instanceof TypeVariable<?> variable) return sample(variable.getBounds()[0]);
         Class<?> cls = (Class<?>) type;
         if (cls == String.class) return "value";
         if (cls == int.class || cls == Integer.class) return 7;
