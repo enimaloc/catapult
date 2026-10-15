@@ -1625,3 +1625,31 @@ mdui-select::part(menu) {
         flex-basis: 100%;
     }
 }
+
+.admin-ccl-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.admin-ccl {
+    gap: 12px;
+    margin-bottom: 0;
+}
+
+.admin-ccl-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.admin-ccl-description {
+    margin: 0;
+    color: var(--catapult-text-secondary);
+}
+
+.admin-ccl-save {
+    align-self: flex-end;
+}
