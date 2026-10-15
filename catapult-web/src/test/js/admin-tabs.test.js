@@ -136,6 +136,26 @@ describe("admin-tabs", () => {
         expect(results()).toBe("/spa/admin/caches/igdb-game-cache?q=doom&page=0");
     });
 
+    it("says so when a search or page can't be fetched, leaving the results as they were", async () => {
+        history.replaceState(null, "", "/admin#caches/igdb-game-cache");
+        page();
+        await flush();
+        fetched.mockRejectedValueOnce(new TypeError("offline"));
+
+        await click('[data-admin-page="2"]');
+
+        expect(document.querySelector("mdui-snackbar").textContent).toBe("Unavailable");
+        expect(results()).toBe("/spa/admin/caches/igdb-game-cache");
+    });
+
+    it("opens the view of a hash with a malformed escape, as typed", async () => {
+        history.replaceState(null, "", "/admin#caches/%E0%A4%A");
+        page();
+        await flush();
+
+        expect(urls()).toEqual(["/spa/admin/caches/%25E0%25A4%25A"]);
+    });
+
     it("pages with the current search", async () => {
         history.replaceState(null, "", "/admin#caches/igdb-game-cache");
         page();

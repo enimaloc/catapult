@@ -42,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class IndexControllerTest {
 
     @Autowired MockMvc mvc;
+    @Autowired org.springframework.context.MessageSource messages;
     @MockitoBean ApiService apiService;
     @MockitoBean NavEventStreamController navEvents;
 
@@ -220,6 +221,14 @@ class IndexControllerTest {
         org.mockito.Mockito.when(apiService.isAdmin()).thenReturn(true);
         String admin = mvc.perform(get("/").sessionAttr(key, "jwt")).andReturn().getResponse().getContentAsString();
         org.assertj.core.api.Assertions.assertThat(barEnd(admin)).containsPattern("<a id=\"nav-admin\" data-link [^>]*href=\"/admin\"");
+    }
+
+    /** Read without arguments (admin-tabs.js fills {0} itself), so MessageFormat's '' escape would show up literally. */
+    @Test
+    void adminErrorMessage_keepsASingleApostrophe_inFrench() {
+        org.assertj.core.api.Assertions.assertThat(
+                messages.getMessage("admin.error.generic", null, java.util.Locale.FRENCH))
+                .isEqualTo("L'action a échoué ({0}).");
     }
 
     @Test

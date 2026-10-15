@@ -12,7 +12,16 @@ window.CatapultAdminTabs = (function () {
     /** "#caches/igdb-game-cache" → { tab: "caches", sub: "igdb-game-cache" }. */
     function route() {
         const [tab, ...rest] = location.hash.slice(1).split("/");
-        return { tab, sub: rest.length ? decodeURIComponent(rest.join("/")) : null };
+        return { tab, sub: rest.length ? decode(rest.join("/")) : null };
+    }
+
+    /** A malformed escape in a hand-edited hash is kept as typed rather than breaking the page. */
+    function decode(text) {
+        try {
+            return decodeURIComponent(text);
+        } catch {
+            return text;
+        }
     }
 
     function tabOf(panel) {
@@ -76,10 +85,13 @@ window.CatapultAdminTabs = (function () {
         const url = fragmentUrl(tabOf(panel), panel.dataset.adminSub || null, { q, page });
         panel.dataset.adminResults = url;
         const html = await fetchHtml(url);
-        if (html === null || panel.dataset.adminResults !== url) return;
-        const fresh = new DOMParser().parseFromString(html, "text/html").querySelector("[data-admin-results]");
+        if (panel.dataset.adminResults !== url) return;
+        const fresh = html === null ? null : new DOMParser().parseFromString(html, "text/html").querySelector("[data-admin-results]");
         const current = panel.querySelector("[data-admin-results]");
-        if (!fresh || !current) return;
+        if (!fresh || !current) {
+            CatapultChannel.showError(panel.dataset.unavailable);
+            return;
+        }
         current.replaceWith(fresh);
         announce(panel);
     }
