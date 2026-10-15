@@ -353,7 +353,9 @@ class MockApiServiceTest {
         loginAs("{}");
         var first = service.adminCcl().ccls().getFirst();
 
-        service.adminSaveCclMappings(first.id(), Set.of(3L));
+        assertThat(service.adminSaveCclMappings(first.id(), Set.of(3L))).isEqualTo(204);
+        assertThat(service.adminSaveCclMappings("no-such-ccl", Set.of(3L))).isEqualTo(404);
+        assertThat(service.adminRefreshCcl()).isEqualTo(204);
 
         assertThat(service.adminCcl().ccls().getFirst().mappedIds()).isEqualTo("3");
         assertThat(service.adminCcl().igdbDescriptors()).isNotEmpty();

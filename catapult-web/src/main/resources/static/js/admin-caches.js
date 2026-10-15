@@ -1,23 +1,41 @@
 /**
  * The admin caches tab's entries: the detail button fetches the record behind an entry into the
  * dialog, the delete button evicts it once confirmed (AdminCachesController) and reloads the
- * results as they were. Listeners are delegated to the panel: its content comes and goes.
+ * results as they were. A failure is told with the view's data-error ({0}: the status, "—" when the
+ * request couldn't be sent). Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminCaches = (function () {
-    async function detail(root, dialog, name, query) {
-        const response = await fetch(`/spa/admin/caches/${name}/entry?${query}`);
-        if (!response.ok) {
-            CatapultChannel.showError(root.dataset.error.replace("{0}", response.status));
-            return;
+    function fail(root, status = "—") {
+        CatapultChannel.showError(root.dataset.error.replace("{0}", status));
+    }
+
+    /** `request`'s response when it went through; otherwise null, the failure told. */
+    async function attempt(root, request) {
+        let response;
+        try {
+            response = await request();
+        } catch {
+            fail(root);
+            return null;
         }
+        if (!response.ok) {
+            fail(root, response.status);
+            return null;
+        }
+        return response;
+    }
+
+    async function detail(root, dialog, name, query) {
+        const response = await attempt(root, () => fetch(`/spa/admin/caches/${name}/entry?${query}`));
+        if (!response) return;
         dialog.querySelector(".admin-dialog-body").innerHTML = await response.text();
         dialog.open = true;
     }
 
     async function evict(panel, root, button, name, query) {
         if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
-        const response = await CatapultChannel.postJson(`/admin/caches/${name}/delete?${query}`, {});
-        if (response.ok) await CatapultAdminTabs.reloadResults(panel);
+        const response = await attempt(root, () => CatapultCsrf.postJson(`/admin/caches/${name}/delete?${query}`, {}));
+        if (response) await CatapultAdminTabs.reloadResults(panel);
     }
 
     function attach() {

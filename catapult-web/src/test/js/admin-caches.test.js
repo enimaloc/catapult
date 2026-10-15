@@ -26,6 +26,8 @@ function page() {
     render();
 }
 
+const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
 async function click(selector) {
     document.querySelector(selector).click();
     await flush();
@@ -63,6 +65,24 @@ describe("admin-caches", () => {
 
         expect(document.querySelector("mdui-snackbar").textContent).toBe("Failed (502)");
         expect(document.getElementById("admin-cache-dialog").open).not.toBe(true);
+    });
+
+    it("says so when the record can't be fetched at all", async () => {
+        fetched.mockRejectedValue(new TypeError("offline"));
+        page();
+        await click(".admin-cache-detail");
+
+        expect(snackbars()).toEqual(["Failed (—)"]);
+        expect(document.getElementById("admin-cache-dialog").open).not.toBe(true);
+    });
+
+    it("says why an eviction failed, in the view's language, and keeps the results", async () => {
+        posted.mockResolvedValue(response(400));
+        page();
+        await click(".admin-cache-delete");
+
+        expect(snackbars()).toEqual(["Failed (400)"]);
+        expect(fetched).not.toHaveBeenCalled();
     });
 
     it("evicts a confirmed entry, then reloads the results", async () => {

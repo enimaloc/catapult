@@ -440,8 +440,17 @@ class RealApiServiceTest {
         expectPost("/api/admin/ccl/refresh");
         expectPost("/api/admin/ccl/Gambling/mappings", "{\"igdbCategoryIds\":[6]}");
 
-        service.adminRefreshCcl();
-        service.adminSaveCclMappings("Gambling", Set.of(6L));
+        assertThat(service.adminRefreshCcl()).isEqualTo(204);
+        assertThat(service.adminSaveCclMappings("Gambling", Set.of(6L))).isEqualTo(204);
+    }
+
+    @Test
+    void adminCclActions_relayAFailedStatus() {
+        expect(HttpMethod.POST, "/api/admin/ccl/refresh").andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        expect(HttpMethod.POST, "/api/admin/ccl/Gambling/mappings").andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        assertThat(service.adminRefreshCcl()).isEqualTo(503);
+        assertThat(service.adminSaveCclMappings("Gambling", Set.of(6L))).isEqualTo(403);
     }
 
     @Test

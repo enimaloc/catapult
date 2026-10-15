@@ -2,9 +2,9 @@
 <!--/*
   Twitch's content classification labels, each with the IGDB rating descriptors that imply it:
   admin-ccl.js selects a card's saved descriptors (data-saved), enables its Save once they
-  changed, and refreshes the CCLs from Twitch.
+  changed, and refreshes the CCLs from Twitch; a failed one is told with data-error.
 */-->
-<th:block th:fragment="content">
+<div th:fragment="content" class="admin-view" th:attr="data-error=#{admin.error.generic}">
     <div class="section-header">
         <div>
             <h2 th:text="#{admin.tab.ccl}">CCL</h2>
@@ -32,4 +32,4 @@
             <mdui-button class="admin-ccl-save" disabled th:text="#{admin.ccl.save}">Save</mdui-button>
         </mdui-card>
     </div>
-</th:block>
+</div>

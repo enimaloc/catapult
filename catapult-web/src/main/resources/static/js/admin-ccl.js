@@ -2,7 +2,8 @@
  * The admin CCL tab. A card's descriptors come selected from its data-saved (mdui-select only
  * takes a multiple value from JS), its Save is enabled while the selection differs from them,
  * and posts it to AdminCclController. Refresh asks catapult-api to reload the CCLs from Twitch,
- * then reloads the tab. Listeners are delegated to the panel: its content comes and goes.
+ * then reloads the tab. A failure is told with the view's data-error ({0}: the status, "—" when the
+ * request couldn't be sent). Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminCcl = (function () {
     const saved = card => (card.dataset.saved ? card.dataset.saved.split(",") : []);
@@ -15,11 +16,24 @@ window.CatapultAdminCcl = (function () {
         });
     }
 
-    async function save(card, button) {
+    /** Posts `body` to `url`: whether it went through, a failure told in the view's language. */
+    async function post(panel, url, body) {
+        let status = "—";
+        try {
+            const response = await CatapultCsrf.postJson(url, body);
+            if (response.ok) return true;
+            status = response.status;
+        } catch {
+            // not sent at all: no status to tell
+        }
+        CatapultChannel.showError(panel.querySelector("[data-error]").dataset.error.replace("{0}", status));
+        return false;
+    }
+
+    async function save(panel, card, button) {
         const ids = selected(card.querySelector(".admin-ccl-select"));
-        const response = await CatapultChannel.postJson(
-            `/admin/ccl/${encodeURIComponent(card.dataset.cclId)}/mappings`, { igdbCategoryIds: ids.map(Number) });
-        if (!response.ok) return;
+        const url = `/admin/ccl/${encodeURIComponent(card.dataset.cclId)}/mappings`;
+        if (!await post(panel, url, { igdbCategoryIds: ids.map(Number) })) return;
         card.dataset.saved = ids.join(",");
         button.disabled = true;
     }
@@ -27,8 +41,7 @@ window.CatapultAdminCcl = (function () {
     async function refresh(panel, button) {
         button.disabled = true;
         button.loading = true;
-        const response = await CatapultChannel.postJson("/admin/ccl/refresh", {});
-        if (response.ok) {
+        if (await post(panel, "/admin/ccl/refresh", {})) {
             await CatapultAdminTabs.reload(panel);
         } else {
             button.disabled = false;
@@ -50,7 +63,7 @@ window.CatapultAdminCcl = (function () {
             const button = event.target.closest(".admin-ccl-save, #admin-ccl-refresh");
             if (!button || button.disabled) return;
             if (button.id === "admin-ccl-refresh") refresh(panel, button);
-            else save(button.closest("[data-ccl-id]"), button);
+            else save(panel, button.closest("[data-ccl-id]"), button);
         });
     }
 

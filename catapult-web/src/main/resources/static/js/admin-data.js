@@ -2,21 +2,36 @@
  * The admin data tab's rows: a row (or "New") fetches its dialog, Save posts its fields to
  * AdminDataController (create or update), Delete removes it once confirmed; then the results are
  * reloaded as they were. A refusal is told by its status (data-error-400/404/409 on the view,
- * data-error for any other) and leaves the dialog open. Listeners are delegated to the panel.
+ * data-error for any other, its {0} "—" when the request couldn't be sent) and leaves the dialog
+ * open. Listeners are delegated to the panel.
  */
 window.CatapultAdminData = (function () {
-    function message(root, status) {
+    function message(root, status = "—") {
         return root.dataset[`error-${status}`] ?? root.dataset.error.replace("{0}", status);
+    }
+
+    /** `request`'s response when it went through; otherwise null, the failure told. */
+    async function attempt(root, request) {
+        let response;
+        try {
+            response = await request();
+        } catch {
+            CatapultChannel.showError(message(root));
+            return null;
+        }
+        if (!response.ok) {
+            CatapultChannel.showError(message(root, response.status));
+            return null;
+        }
+        return response;
     }
 
     const idQuery = id => (id ? `?id=${encodeURIComponent(id)}` : "");
 
     async function openRow(root, dialog, id) {
-        const response = await fetch(`/spa/admin/data/${encodeURIComponent(root.dataset.repo)}/row${idQuery(id)}`);
-        if (!response.ok) {
-            CatapultChannel.showError(message(root, response.status));
-            return;
-        }
+        const response = await attempt(root, () =>
+            fetch(`/spa/admin/data/${encodeURIComponent(root.dataset.repo)}/row${idQuery(id)}`));
+        if (!response) return;
         dialog.querySelector(".admin-dialog-body").innerHTML = await response.text();
         dialog.open = true;
     }
@@ -33,11 +48,7 @@ window.CatapultAdminData = (function () {
     }
 
     async function send(panel, root, dialog, url, body) {
-        const response = await CatapultCsrf.postJson(url, body);
-        if (!response.ok) {
-            CatapultChannel.showError(message(root, response.status));
-            return;
-        }
+        if (!await attempt(root, () => CatapultCsrf.postJson(url, body))) return;
         dialog.open = false;
         await CatapultAdminTabs.reloadResults(panel);
     }

@@ -91,9 +91,10 @@ public interface ApiService {
 
     /** Twitch's CCLs and the IGDB descriptors they map to; null when catapult-api fails. */
     AdminCclPage adminCcl();
-    /** Reloads the CCLs from Twitch. */
-    void adminRefreshCcl();
-    void adminSaveCclMappings(String cclId, java.util.Set<Long> igdbDescriptorIds);
+    /** Reloads the CCLs from Twitch: catapult-api's status (204), 502 when unreachable. */
+    int adminRefreshCcl();
+    /** Maps a CCL to IGDB descriptors: catapult-api's status (204; the mock's 404 for an unknown CCL), 502 when unreachable. */
+    int adminSaveCclMappings(String cclId, java.util.Set<Long> igdbDescriptorIds);
 
     /** catapult-api's in-memory caches; null when it fails. */
     List<CacheSummaryDto> adminCaches();
