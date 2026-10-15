@@ -1535,3 +1535,93 @@ mdui-select::part(menu) {
 .hidden {
     display: none !important;
 }
+
+/* Admin lazy tabs: shared list, sub-view and pagination layout (admin-tabs.js). */
+.admin-loading {
+    display: flex;
+    justify-content: center;
+    padding: 48px 0;
+}
+
+.admin-subheader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.admin-subheader h2 {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.admin-search {
+    flex: 0 1 320px;
+}
+
+.admin-table {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16px;
+    padding: 8px 0;
+    overflow: hidden;
+}
+
+.admin-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 24px;
+}
+
+.admin-row + .admin-row {
+    border-top: 1px solid var(--catapult-border);
+}
+
+.admin-row-head {
+    color: var(--catapult-text-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.admin-cell {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-row-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.admin-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.admin-list mdui-list-item {
+    --shape-corner: 12px;
+}
+
+@media (max-width: 650px) {
+    .admin-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: 10px 16px;
+    }
+
+    .admin-row-head {
+        display: none;
+    }
+
+    .admin-search {
+        flex-basis: 100%;
+    }
+}

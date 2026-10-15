@@ -1,0 +1,30 @@
+<!--/* Pieces shared by the admin tabs loaded by admin-tabs.js. */-->
+
+<!--/* catapult-api didn't answer: the tab says so and offers to try again. */-->
+<mdui-card th:fragment="unavailable" class="settings-card admin-placeholder" variant="outlined">
+    <mdui-icon name="error_outline"></mdui-icon>
+    <span th:text="#{admin.unavailable}">admin.unavailable</span>
+    <mdui-button variant="text" data-admin-retry th:text="#{admin.retry}">admin.retry</mdui-button>
+</mdui-card>
+
+<mdui-card th:fragment="empty(icon, message)" class="settings-card admin-placeholder" variant="outlined">
+    <mdui-icon th:attr="name=${icon}"></mdui-icon>
+    <span th:text="${message}">message</span>
+</mdui-card>
+
+<!--/* A sub-view's header: back to the tab's list, its title, and its search field. */-->
+<div th:fragment="subheader(title, q)" class="section-header admin-subheader">
+    <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
+    <h2 th:text="${title}">title</h2>
+    <mdui-text-field class="admin-search" data-admin-search variant="outlined" clearable icon="search"
+                     th:attr="label=#{admin.search},value=${q}"></mdui-text-field>
+</div>
+
+<!--/* ‹ n / N › under a page of results, only when there is more than one page. */-->
+<div th:fragment="pagination(page)" class="admin-pagination" th:if="${page.totalPages() > 1}">
+    <mdui-button-icon icon="chevron_left" th:disabled="${page.first()}"
+                      th:attr="data-admin-page=${page.number() - 1},aria-label=#{admin.pagination.previous}"></mdui-button-icon>
+    <span th:text="|${page.number() + 1} / ${page.totalPages()}|">1 / 1</span>
+    <mdui-button-icon icon="chevron_right" th:disabled="${page.last()}"
+                      th:attr="data-admin-page=${page.number() + 1},aria-label=#{admin.pagination.next}"></mdui-button-icon>
+</div>
