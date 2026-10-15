@@ -345,4 +345,66 @@ class MockApiServiceTest {
         service.adminDeleteMember(self);
         assertThat(service.adminMembers().members()).noneMatch(m -> m.id().equals(self));
     }
+
+    // --- admin: CCL, caches, data ---
+
+    @Test
+    void adminCcl_savesACclsMappings() {
+        loginAs("{}");
+        var first = service.adminCcl().ccls().getFirst();
+
+        service.adminSaveCclMappings(first.id(), Set.of(3L));
+
+        assertThat(service.adminCcl().ccls().getFirst().mappedIds()).isEqualTo("3");
+        assertThat(service.adminCcl().igdbDescriptors()).isNotEmpty();
+    }
+
+    @Test
+    void adminCaches_pageSearchAndEvict() {
+        loginAs("{}");
+        assertThat(service.adminCaches()).extracting(c -> c.name()).contains("igdb-game-cache", "tw-known-paths");
+
+        var entries = service.adminCacheEntries("igdb-game-cache", null, 0);
+        assertThat(entries.content()).hasSize(25);
+        assertThat(entries.totalPages()).isEqualTo(2);
+        assertThat(service.adminCacheEntries("igdb-game-cache", "", 1).content()).hasSize(5);
+
+        String key = entries.content().getFirst().key();
+        assertThat(service.adminCacheEntries("igdb-game-cache", "#1", 0).content()).extracting(e -> e.key()).contains(key);
+        assertThat(service.adminCacheEntry("igdb-game-cache", key).expiresInSeconds()).isPositive();
+        assertThat(service.adminCacheEntry("chat-command-user-cache",
+                service.adminCacheEntries("chat-command-user-cache", null, 0).content().getFirst().key()).detail())
+                .isInstanceOf(java.util.List.class);
+
+        assertThat(service.adminDeleteCacheEntry("igdb-game-cache", key)).isEqualTo(204);
+        assertThat(service.adminDeleteCacheEntry("igdb-game-cache", key)).isEqualTo(404);
+        assertThat(service.adminDeleteCacheEntry("tw-known-paths", "game.name")).isEqualTo(400);
+        assertThat(service.adminCacheEntries("nope", null, 0)).isNull();
+    }
+
+    @Test
+    void adminData_createUpdateDelete() {
+        loginAs("{}");
+        assertThat(service.adminDataRepos()).extracting(r -> r.name()).containsExactly("chat-command", "igdb-rating-descriptor");
+
+        assertThat(service.adminCreateDataRow("chat-command", Map.of("name", "!hi", "template", "hello"))).isEqualTo(201);
+        var created = service.adminDataRows("chat-command", "!hi", 0).content();
+        assertThat(created).hasSize(1);
+        String id = String.valueOf(created.getFirst().get("id"));
+
+        assertThat(service.adminUpdateDataRow("chat-command", id, Map.of("template", "hey"))).isEqualTo(200);
+        assertThat(service.adminDataRow("chat-command", id)).containsEntry("template", "hey").containsKey("aliases");
+
+        assertThat(service.adminDeleteDataRow("chat-command", id)).isEqualTo(204);
+        assertThat(service.adminDataRow("chat-command", id)).isNull();
+        assertThat(service.adminUpdateDataRow("chat-command", id, Map.of())).isEqualTo(404);
+    }
+
+    @Test
+    void adminData_refusesToDeleteADescriptorACclStillMaps() {
+        loginAs("{}");
+        String mapped = String.valueOf(service.adminCcl().ccls().getFirst().igdbMappings().getFirst().id());
+
+        assertThat(service.adminDeleteDataRow("igdb-rating-descriptor", mapped)).isEqualTo(409);
+    }
 }

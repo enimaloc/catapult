@@ -1,5 +1,9 @@
 package fr.enimaloc.catapult.service.real;
 
+import java.util.Map;
+import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -410,5 +414,96 @@ class RealApiServiceTest {
         service.adminPromoteMemberToSystem(id);
         service.adminDeleteMember(id);
         service.adminMigrateMember(id, UUID.fromString("00000000-0000-0000-0000-000000000002"), true, false, true);
+    }
+
+    // --- admin: CCL, caches, data --------------------------------------------------------------
+
+    @Test
+    void adminCcl_readsTheCclsWithTheirDescriptors() {
+        respond(HttpMethod.GET, "/api/admin/ccl", """
+                {"ccls":[{"id":"Gambling","name":"Gambling","description":"d","mappedDescriptions":["Simulated Gambling"],
+                  "igdbMappings":[{"id":6,"description":"Simulated Gambling","organizationId":1,"displayName":"ESRB — Simulated Gambling"},
+                                  {"id":2,"description":"Blood","organizationId":1,"displayName":"ESRB — Blood"}]}],
+                 "igdbDescriptors":[{"id":6,"description":"Simulated Gambling","organizationId":1,"displayName":"ESRB — Simulated Gambling"}]}""");
+
+        var page = service.adminCcl();
+
+        assertThat(page.ccls()).singleElement().satisfies(c -> {
+            assertThat(c.id()).isEqualTo("Gambling");
+            assertThat(c.mappedIds()).isEqualTo("2,6");
+        });
+        assertThat(page.igdbDescriptors()).extracting(d -> d.label()).containsExactly("ESRB — Simulated Gambling");
+    }
+
+    @Test
+    void adminCclActions() {
+        expectPost("/api/admin/ccl/refresh");
+        expectPost("/api/admin/ccl/Gambling/mappings", "{\"igdbCategoryIds\":[6]}");
+
+        service.adminRefreshCcl();
+        service.adminSaveCclMappings("Gambling", Set.of(6L));
+    }
+
+    @Test
+    void adminCaches_readsTheListAPageAndAnEntry() {
+        respond(HttpMethod.GET, "/api/admin/caches", "[{\"name\":\"igdb-game-cache\",\"size\":30,\"deletable\":true}]");
+        respond(HttpMethod.GET, "/api/admin/caches/igdb-game-cache?q=doom&page=1", """
+                {"content":[{"key":"1001","value":"Doom"}],"number":1,"size":25,"totalPages":2,
+                 "totalElements":26,"first":false,"last":true,"empty":false}""");
+        respond(HttpMethod.GET, "/api/admin/caches/igdb-game-cache/entry?key=a%20b",
+                "{\"key\":\"a b\",\"detail\":{\"name\":\"Doom\"},\"expiresInSeconds\":60}");
+
+        assertThat(service.adminCaches()).containsExactly(new CacheSummaryDto("igdb-game-cache", 30, true));
+        var entries = service.adminCacheEntries("igdb-game-cache", "doom", 1);
+        assertThat(entries.content()).containsExactly(new CacheEntryDto("1001", "Doom"));
+        assertThat(entries.last()).isTrue();
+        var entry = service.adminCacheEntry("igdb-game-cache", "a b");
+        assertThat(entry.detail()).isEqualTo(Map.of("name", "Doom"));
+        assertThat(entry.expiresInSeconds()).isEqualTo(60L);
+    }
+
+    @Test
+    void adminCacheEntries_sendsABlankSearchWhenThereIsNone() {
+        respond(HttpMethod.GET, "/api/admin/caches/igdb-game-cache?q=&page=0",
+                "{\"content\":[],\"number\":0,\"totalPages\":0,\"totalElements\":0}");
+
+        assertThat(service.adminCacheEntries("igdb-game-cache", null, 0).content()).isEmpty();
+    }
+
+    @Test
+    void adminDeleteCacheEntry_relaysTheStatus() {
+        expect(HttpMethod.DELETE, "/api/admin/caches/igdb-game-cache?key=1001").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/admin/caches/tw-known-paths?key=x").andRespond(withStatus(HttpStatus.BAD_REQUEST));
+
+        assertThat(service.adminDeleteCacheEntry("igdb-game-cache", "1001")).isEqualTo(204);
+        assertThat(service.adminDeleteCacheEntry("tw-known-paths", "x")).isEqualTo(400);
+    }
+
+    @Test
+    void adminData_readsAndWritesRows_relayingTheStatuses() {
+        respond(HttpMethod.GET, "/api/admin/data", "[{\"name\":\"chat-command\",\"size\":3}]");
+        respond(HttpMethod.GET, "/api/admin/data/chat-command?q=&page=0",
+                "{\"content\":[{\"id\":\"1\",\"name\":\"!lurk\"}],\"number\":0,\"totalPages\":1,\"totalElements\":1}");
+        respond(HttpMethod.GET, "/api/admin/data/chat-command/1", "{\"id\":\"1\",\"name\":\"!lurk\",\"aliases\":[]}");
+        expect(HttpMethod.POST, "/api/admin/data/chat-command").andExpect(content().json("{\"name\":\"!hi\"}"))
+                .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON).body("{\"id\":\"4\"}"));
+        expect(HttpMethod.PUT, "/api/admin/data/chat-command/1").andExpect(content().json("{\"name\":\"!hey\"}"))
+                .andRespond(withSuccess("{\"id\":\"1\"}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.DELETE, "/api/admin/data/chat-command/1").andRespond(withStatus(HttpStatus.CONFLICT));
+
+        assertThat(service.adminDataRepos()).containsExactly(new RepoSummaryDto("chat-command", 3));
+        assertThat(service.adminDataRows("chat-command", null, 0).content()).containsExactly(Map.of("id", "1", "name", "!lurk"));
+        assertThat(service.adminDataRow("chat-command", "1")).containsEntry("aliases", List.of());
+        assertThat(service.adminCreateDataRow("chat-command", Map.of("name", "!hi"))).isEqualTo(201);
+        assertThat(service.adminUpdateDataRow("chat-command", "1", Map.of("name", "!hey"))).isEqualTo(200);
+        assertThat(service.adminDeleteDataRow("chat-command", "1")).isEqualTo(409);
+    }
+
+    @Test
+    void adminDataRow_keepsAnEncodedIdAsOnePathSegment() {
+        // IdCodec ids are already percent-encoded: catapult-api decodes the segment once, IdCodec once more.
+        respond(HttpMethod.GET, "/api/admin/data/twitch-ccl/a~b%2520c", "{\"id\":\"a~b%20c\"}");
+
+        assertThat(service.adminDataRow("twitch-ccl", "a~b%20c")).containsEntry("id", "a~b%20c");
     }
 }

@@ -1,7 +1,15 @@
 package fr.enimaloc.catapult.service;
 
+import java.util.List;
+import java.util.Map;
 import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -78,4 +86,34 @@ public interface ApiService {
     /** Copies the chosen parts of a member's data onto another member. */
     void adminMigrateMember(java.util.UUID memberId, java.util.UUID targetId,
                             boolean settings, boolean getters, boolean bindings);
+
+    // --- admin: CCL, caches and data tabs (catapult-api refuses them to anyone but an admin) ---
+
+    /** Twitch's CCLs and the IGDB descriptors they map to; null when catapult-api fails. */
+    AdminCclPage adminCcl();
+    /** Reloads the CCLs from Twitch. */
+    void adminRefreshCcl();
+    void adminSaveCclMappings(String cclId, java.util.Set<Long> igdbDescriptorIds);
+
+    /** catapult-api's in-memory caches; null when it fails. */
+    List<CacheSummaryDto> adminCaches();
+    /** One page of a cache's entries matching {@code q} (all when blank); null when it fails or the cache is unknown. */
+    AdminPage<CacheEntryDto> adminCacheEntries(String name, String q, int page);
+    /** A cache entry and the record behind it; null when catapult-api fails. */
+    CacheEntryDetailDto adminCacheEntry(String name, String key);
+    /** Evicts a cache entry: catapult-api's status (204; 400 read-only cache; 404), 502 when unreachable. */
+    int adminDeleteCacheEntry(String name, String key);
+
+    /** The repositories the data tab can browse; null when catapult-api fails. */
+    List<RepoSummaryDto> adminDataRepos();
+    /** One page of a repository's rows matching {@code q}; null when it fails or the repository is unknown. */
+    AdminPage<Map<String, Object>> adminDataRows(String repo, String q, int page);
+    /** One row, its collection relations included; null when it fails or there is no such row. */
+    Map<String, Object> adminDataRow(String repo, String id);
+    /** catapult-api's status (201; 400 invalid value), 502 when unreachable. */
+    int adminCreateDataRow(String repo, Map<String, String> fields);
+    /** catapult-api's status (200; 400 invalid value; 404), 502 when unreachable. */
+    int adminUpdateDataRow(String repo, String id, Map<String, String> fields);
+    /** catapult-api's status (204; 404; 409 still referenced), 502 when unreachable. */
+    int adminDeleteDataRow(String repo, String id);
 }
