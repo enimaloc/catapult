@@ -1,0 +1,86 @@
+/**
+ * The admin data tab's rows: a row (or "New") fetches its dialog, Save posts its fields to
+ * AdminDataController (create or update), Delete removes it once confirmed; then the results are
+ * reloaded as they were. A refusal is told by its status (data-error-400/404/409 on the view,
+ * data-error for any other) and leaves the dialog open. Listeners are delegated to the panel.
+ */
+window.CatapultAdminData = (function () {
+    function message(root, status) {
+        return root.dataset[`error-${status}`] ?? root.dataset.error.replace("{0}", status);
+    }
+
+    const idQuery = id => (id ? `?id=${encodeURIComponent(id)}` : "");
+
+    async function openRow(root, dialog, id) {
+        const response = await fetch(`/spa/admin/data/${encodeURIComponent(root.dataset.repo)}/row${idQuery(id)}`);
+        if (!response.ok) {
+            CatapultChannel.showError(message(root, response.status));
+            return;
+        }
+        dialog.querySelector(".admin-dialog-body").innerHTML = await response.text();
+        dialog.open = true;
+    }
+
+    /** The dialog's fields by name; a new row's blank ones stay unset, for catapult-api's defaults. */
+    function fields(form, creating) {
+        const body = {};
+        form.querySelectorAll("mdui-text-field[name]").forEach(field => {
+            const value = field.value ?? "";
+            if (creating && value === "") return;
+            body[field.getAttribute("name")] = value;
+        });
+        return body;
+    }
+
+    async function send(panel, root, dialog, url, body) {
+        const response = await CatapultCsrf.postJson(url, body);
+        if (!response.ok) {
+            CatapultChannel.showError(message(root, response.status));
+            return;
+        }
+        dialog.open = false;
+        await CatapultAdminTabs.reloadResults(panel);
+    }
+
+    async function onClick(panel, target) {
+        const root = panel.querySelector(".admin-view[data-repo]");
+        const dialog = panel.querySelector("#admin-data-dialog");
+        const repo = encodeURIComponent(root.dataset.repo);
+        if (target.matches("#admin-data-new")) return openRow(root, dialog, null);
+        if (target.matches(".admin-data-row")) return openRow(root, dialog, target.dataset.id);
+        if (target.matches(".admin-dialog-close")) {
+            dialog.open = false;
+            return;
+        }
+        const form = target.closest(".admin-data-form");
+        const id = form.dataset.id || null;
+        if (target.matches(".admin-data-save")) {
+            const action = id ? "update" : "create";
+            return send(panel, root, dialog, `/admin/data/${repo}/${action}${idQuery(id)}`, fields(form, !id));
+        }
+        if (await CatapultAdminTabs.confirmed(root, target.dataset.confirm)) {
+            return send(panel, root, dialog, `/admin/data/${repo}/delete${idQuery(id)}`, {});
+        }
+    }
+
+    function attach() {
+        const panel = document.querySelector('mdui-tab-panel[value="data"]');
+        if (!panel) return;
+        panel.addEventListener("click", event => {
+            const target = event.target.closest(
+                "#admin-data-new, .admin-data-row, .admin-data-save, .admin-data-delete, .admin-dialog-close");
+            if (target) onClick(panel, target);
+        });
+        panel.addEventListener("keydown", event => {
+            const row = event.target.closest?.(".admin-data-row");
+            if (row && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                onClick(panel, row);
+            }
+        });
+    }
+
+    document.addEventListener("catapult:render", attach);
+
+    return { attach };
+})();

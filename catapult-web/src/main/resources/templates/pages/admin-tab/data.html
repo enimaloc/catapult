@@ -1,0 +1,78 @@
+<!--/*@thymesVar id="repos" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto>"*/-->
+<!--/*@thymesVar id="rows" type="fr.enimaloc.catapult.common.dto.admin.AdminPage"*/-->
+<!--/*@thymesVar id="table" type="fr.enimaloc.catapult.controller.AdminDataViews.Table"*/-->
+<!--/*@thymesVar id="form" type="fr.enimaloc.catapult.controller.AdminDataViews.Form"*/-->
+<!--/*
+  catapult-api's repositories (repos), one repository's rows (rows: searched and paged by
+  admin-tabs.js), and a row's dialog (row: edited, created and deleted by admin-data.js).
+*/-->
+
+<th:block th:fragment="repos">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.data}">Data</h2>
+        <span class="eyebrow" th:if="${repos != null}" th:text="#{admin.data.repos(${repos.size()})}">0</span>
+    </div>
+    <th:block th:if="${repos == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${repos != null and repos.isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('storage', #{admin.data.none})}"></th:block>
+    </th:block>
+    <mdui-card class="admin-table admin-list" variant="outlined" th:if="${repos != null and !repos.isEmpty()}">
+        <mdui-list>
+            <mdui-list-item th:each="r : ${repos}" end-icon="chevron_right" th:attr="data-admin-open=${r.name()}">
+                <span th:text="${r.name()}">name</span>
+                <span slot="description" th:text="#{admin.data.rows(${r.size()})}">0 rows</span>
+            </mdui-list-item>
+        </mdui-list>
+    </mdui-card>
+</th:block>
+
+<div th:fragment="rows" class="admin-view"
+     th:attr="data-repo=${repo},data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+              data-error=#{admin.error.generic},data-error-400=#{admin.data.error.400},
+              data-error-404=#{admin.data.error.404},data-error-409=#{admin.data.error.409}">
+    <th:block th:replace="~{pages/admin-tab/common :: subheader(${repo}, ${q})}"></th:block>
+    <div class="admin-toolbar">
+        <mdui-button id="admin-data-new" variant="tonal" icon="add" th:text="#{admin.data.new}">New</mdui-button>
+    </div>
+    <th:block th:if="${rows == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <div data-admin-results th:if="${rows != null}">
+        <th:block th:if="${table.rows().isEmpty()}">
+            <th:block th:replace="~{pages/admin-tab/common :: empty('inbox', ${#strings.isEmpty(q)} ? #{admin.data.empty} : #{admin.no_match})}"></th:block>
+        </th:block>
+        <mdui-card class="admin-table admin-data-table" variant="outlined" th:unless="${table.rows().isEmpty()}"
+                   th:style="|--admin-columns: ${table.columns().size()}|">
+            <div class="admin-row admin-row-head" aria-hidden="true">
+                <span class="admin-cell" th:each="c : ${table.columns()}" th:text="${c}">column</span>
+            </div>
+            <div class="admin-row admin-data-row" th:each="r : ${table.rows()}" th:attr="data-id=${r.id()}"
+                 role="button" tabindex="0" th:title="#{admin.data.edit}">
+                <span class="admin-cell" th:each="cell : ${r.cells()}" th:text="${cell}" th:title="${cell}">cell</span>
+            </div>
+        </mdui-card>
+        <th:block th:replace="~{pages/admin-tab/common :: pagination(${rows})}"></th:block>
+    </div>
+    <mdui-dialog id="admin-data-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-dialog-body"></div>
+    </mdui-dialog>
+</div>
+
+<div th:fragment="row" class="admin-data-form" th:attr="data-id=${form.id()}">
+    <h3 th:text="${form.creating()} ? #{admin.data.form.title.new(${form.repo()})} : #{admin.data.form.title.edit(${form.id()})}">Row</h3>
+    <mdui-text-field th:each="f : ${form.fields()}" variant="outlined"
+                     th:attr="name=${f.name()},label=${f.name()},value=${f.value()},helper=${f.label()}"></mdui-text-field>
+    <div class="admin-data-collection" th:each="c : ${form.collections()}">
+        <span class="eyebrow" th:text="${c.key}">relation</span>
+        <div class="admin-member-badges">
+            <mdui-chip th:each="l : ${c.value}" th:text="${l.label()}" th:title="${l.id()}">label</mdui-chip>
+            <span th:if="${c.value.isEmpty()}">—</span>
+        </div>
+    </div>
+    <div class="admin-data-actions">
+        <mdui-button variant="text" class="admin-data-delete" th:unless="${form.creating()}"
+                     th:attr="data-confirm=#{admin.data.form.delete.confirm}" th:text="#{admin.data.form.delete}">Delete</mdui-button>
+        <mdui-button variant="text" class="admin-dialog-close" th:text="#{admin.cancel}">Cancel</mdui-button>
+        <mdui-button class="admin-data-save" th:text="#{admin.data.form.save}">Save</mdui-button>
+    </div>
+</div>
+
+<p th:fragment="missing" class="admin-placeholder" th:text="#{admin.data.error.404}">gone</p>

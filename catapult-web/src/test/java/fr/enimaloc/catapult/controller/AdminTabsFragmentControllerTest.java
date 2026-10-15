@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminIgdbDescriptorDto;
 import fr.enimaloc.catapult.config.I18nConfiguration;
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -46,7 +48,8 @@ class AdminTabsFragmentControllerTest {
     @Test
     void everyFragment_isRefusedToAMember_andToAVisitor() throws Exception {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
-                "/spa/admin/caches/igdb-game-cache/entry?key=1")) {
+                "/spa/admin/caches/igdb-game-cache/entry?key=1",
+                "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
         }
@@ -55,6 +58,9 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminCaches();
         verify(apiService, never()).adminCacheEntries(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt());
         verify(apiService, never()).adminCacheEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(apiService, never()).adminDataRepos();
+        verify(apiService, never()).adminDataRows(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt());
+        verify(apiService, never()).adminDataRow(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -138,5 +144,60 @@ class AdminTabsFragmentControllerTest {
         String html = asAdmin("/spa/admin/caches/igdb-game-cache/entry?key=a b");
 
         assertThat(html).contains("&lt;b&gt;Doom&lt;/b&gt;", "Expires in 120 s").doesNotContain("<b>Doom</b>");
+    }
+
+    @Test
+    void data_listsEachRepositoryToOpen() throws Exception {
+        when(apiService.adminDataRepos()).thenReturn(List.of(new RepoSummaryDto("chat-command", 3)));
+
+        assertThat(asAdmin("/spa/admin/data")).contains("data-admin-open=\"chat-command\"");
+    }
+
+    @Test
+    void dataRows_listsAPageOfRows_eachOpeningItsDialog() throws Exception {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", "a~b%20c");
+        row.put("user", "42");
+        row.put("user_label", "enimaloc");
+        when(apiService.adminDataRows("chat-command", null, 0)).thenReturn(new AdminPage<>(List.of(row), 0, 1, 1));
+
+        String html = asAdmin("/spa/admin/data/chat-command");
+
+        assertThat(html).contains("data-repo=\"chat-command\"", "id=\"admin-data-new\"", "data-admin-results",
+                "class=\"admin-row admin-data-row\"", "data-id=\"a~b%20c\"", "42 · enimaloc")
+                .doesNotContain(">user_label<");
+    }
+
+    @Test
+    void dataRow_editsAnExistingRow() throws Exception {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", "1");
+        row.put("name", "!lurk");
+        row.put("aliases", List.of(Map.of("id", "7", "label", "!l")));
+        when(apiService.adminDataRow("chat-command", "1")).thenReturn(row);
+
+        String html = asAdmin("/spa/admin/data/chat-command/row?id=1");
+
+        assertThat(html).contains("data-id=\"1\"", "name=\"name\"", "value=\"!lurk\"", "!l", "admin-data-delete")
+                .doesNotContain("name=\"id\"");
+    }
+
+    @Test
+    void dataRow_isNotFound_whenTheRowIsGone() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminDataRow("chat-command", "9")).thenReturn(null); // a mock otherwise answers an empty map
+
+        mvc.perform(get("/spa/admin/data/chat-command/row?id=9").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void dataRow_withoutAnId_isANewRowLaidOutOnTheFirstOne() throws Exception {
+        when(apiService.adminDataRows("chat-command", null, 0)).thenReturn(
+                new AdminPage<>(List.of(Map.of("id", "1", "name", "!lurk")), 0, 1, 1));
+
+        String html = asAdmin("/spa/admin/data/chat-command/row");
+
+        assertThat(html).contains("name=\"id\"", "name=\"name\"").doesNotContain("!lurk", "admin-data-delete", "data-id=");
     }
 }
