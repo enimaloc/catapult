@@ -148,6 +148,18 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void cacheEntry_printsItsExpiryWithoutDigitGrouping() throws Exception {
+        when(apiService.adminCacheEntry("igdb-game-cache", "soon")).thenReturn(new CacheEntryDetailDto("soon", Map.of(), 3600L));
+        when(apiService.adminCacheEntry("igdb-game-cache", "gone")).thenReturn(new CacheEntryDetailDto("gone", Map.of(), -12345L));
+
+        assertThat(asAdmin("/spa/admin/caches/igdb-game-cache/entry?key=soon")).contains("Expires in 3600 s");
+        assertThat(asAdmin("/spa/admin/caches/igdb-game-cache/entry?key=gone")).contains("Expired 12345 s ago");
+        assertThat(mvc.perform(get("/spa/admin/caches/igdb-game-cache/entry?key=soon").locale(java.util.Locale.FRENCH)
+                        .sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andReturn().getResponse().getContentAsString()).contains("Expire dans 3600 s");
+    }
+
+    @Test
     void data_listsEachRepositoryToOpen() throws Exception {
         when(apiService.adminDataRepos()).thenReturn(List.of(new RepoSummaryDto("chat-command", 3)));
 
