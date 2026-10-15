@@ -1698,3 +1698,44 @@ mdui-select::part(menu) {
     border-bottom: 1px solid var(--catapult-border);
     text-align: left;
 }
+
+.admin-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.admin-data-table {
+    overflow-x: auto;
+}
+
+.admin-data-table .admin-row {
+    grid-template-columns: repeat(var(--admin-columns), minmax(120px, 1fr));
+    min-width: min-content;
+}
+
+.admin-data-row {
+    cursor: pointer;
+}
+
+.admin-data-row:hover,
+.admin-data-row:focus-visible {
+    background: var(--catapult-hover, rgba(127, 127, 127, 0.08));
+}
+
+.admin-data-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-data-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.admin-data-delete {
+    margin-right: auto;
+    color: #ef4444;
+}

@@ -1,9 +1,11 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 
 /**
@@ -62,6 +65,49 @@ public class AdminTabsFragmentController {
             model.addAttribute("entry", AdminCacheEntryView.of(apiService.adminCacheEntry(name, key)));
             return "pages/admin-tab/caches :: entry";
         });
+    }
+
+    @GetMapping("/data")
+    String data(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("repos", apiService.adminDataRepos());
+            return "pages/admin-tab/data :: repos";
+        });
+    }
+
+    @GetMapping("/data/{repo}")
+    String dataRows(Model model, HttpServletResponse response, @PathVariable String repo,
+                    @RequestParam(required = false) String q, @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            AdminPage<Map<String, Object>> rows = apiService.adminDataRows(repo, q, page);
+            model.addAttribute("repo", repo);
+            model.addAttribute("q", q == null ? "" : q);
+            model.addAttribute("rows", rows);
+            model.addAttribute("table", rows == null ? null : AdminDataViews.table(rows.content()));
+            return "pages/admin-tab/data :: rows";
+        });
+    }
+
+    /** A row's edit dialog; without an id, a new row's, laid out on the repository's first row. */
+    @GetMapping("/data/{repo}/row")
+    String dataRow(Model model, HttpServletResponse response, @PathVariable String repo,
+                   @RequestParam(required = false) String id) {
+        return guarded(model, response, () -> {
+            Map<String, Object> row = id == null ? template(repo) : apiService.adminDataRow(repo, id);
+            if (row == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/data :: missing";
+            }
+            model.addAttribute("form", AdminDataViews.form(repo, id, row));
+            return "pages/admin-tab/data :: row";
+        });
+    }
+
+    /** The repository's first row, to lay a new one out on; just an id when it has none. */
+    private Map<String, Object> template(String repo) {
+        AdminPage<Map<String, Object>> rows = apiService.adminDataRows(repo, null, 0);
+        if (rows == null) return null;
+        return rows.content().isEmpty() ? Map.of("id", "") : rows.content().getFirst();
     }
 
     /** {@code view}'s fragment for an admin; the 401 / 403 error fragment for anyone else. */
