@@ -1,6 +1,10 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminCclDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminIgdbDescriptorDto;
 import fr.enimaloc.catapult.config.I18nConfiguration;
@@ -16,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
@@ -40,12 +45,16 @@ class AdminTabsFragmentControllerTest {
 
     @Test
     void everyFragment_isRefusedToAMember_andToAVisitor() throws Exception {
-        for (String url : List.of("/spa/admin/ccl")) {
+        for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
+                "/spa/admin/caches/igdb-game-cache/entry?key=1")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
         }
         verify(apiService, org.mockito.Mockito.atLeastOnce()).isAdmin();
         verify(apiService, never()).adminCcl();
+        verify(apiService, never()).adminCaches();
+        verify(apiService, never()).adminCacheEntries(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt());
+        verify(apiService, never()).adminCacheEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -74,5 +83,48 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminCcl()).thenReturn(new AdminCclPage(List.of(), List.of()));
 
         assertThat(asAdmin("/spa/admin/ccl")).contains("id=\"admin-ccl-refresh\"", "admin-placeholder").doesNotContain("data-ccl-id");
+    }
+
+    @Test
+    void caches_listsEachCacheToOpen() throws Exception {
+        when(apiService.adminCaches()).thenReturn(List.of(
+                new CacheSummaryDto("igdb-game-cache", 30, true), new CacheSummaryDto("tw-known-paths", 2, false)));
+
+        String html = asAdmin("/spa/admin/caches");
+
+        assertThat(html).contains("data-admin-open=\"igdb-game-cache\"", "data-admin-open=\"tw-known-paths\"");
+    }
+
+    @Test
+    void cacheEntries_listsAPage_withDeleteOnlyForADeletableCache() throws Exception {
+        when(apiService.adminCaches()).thenReturn(List.of(new CacheSummaryDto("tw-known-paths", 2, false)));
+        when(apiService.adminCacheEntries("tw-known-paths", "game", 1)).thenReturn(
+                new AdminPage<>(List.of(new CacheEntryDto("game.name", "string")), 1, 3, 51));
+
+        String html = asAdmin("/spa/admin/caches/tw-known-paths?q=game&page=1");
+
+        assertThat(html).contains("data-admin-results", "data-key=\"game.name\"", "admin-cache-detail",
+                        "data-admin-page=\"0\"", "data-admin-page=\"2\"", "2 / 3", "value=\"game\"")
+                .doesNotContain("admin-cache-delete");
+    }
+
+    @Test
+    void cacheEntries_saysNothingMatches_whenASearchFindsNothing() throws Exception {
+        when(apiService.adminCaches()).thenReturn(List.of(new CacheSummaryDto("igdb-game-cache", 30, true)));
+        when(apiService.adminCacheEntries("igdb-game-cache", "zzz", 0)).thenReturn(new AdminPage<>(List.of(), 0, 0, 0));
+
+        String html = asAdmin("/spa/admin/caches/igdb-game-cache?q=zzz");
+
+        assertThat(html).contains("data-admin-results", "admin-placeholder").doesNotContain("admin-pagination");
+    }
+
+    @Test
+    void cacheEntry_showsTheRecordBehindIt() throws Exception {
+        when(apiService.adminCacheEntry("igdb-game-cache", "a b")).thenReturn(
+                new CacheEntryDetailDto("a b", Map.of("name", "<b>Doom</b>"), 120L));
+
+        String html = asAdmin("/spa/admin/caches/igdb-game-cache/entry?key=a b");
+
+        assertThat(html).contains("&lt;b&gt;Doom&lt;/b&gt;", "120").doesNotContain("<b>Doom</b>");
     }
 }

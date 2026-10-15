@@ -1,0 +1,83 @@
+<!--/*@thymesVar id="caches" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto>"*/-->
+<!--/*@thymesVar id="entries" type="fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.admin.CacheEntryDto>"*/-->
+<!--/*@thymesVar id="entry" type="fr.enimaloc.catapult.controller.AdminCacheEntryView"*/-->
+<!--/*
+  catapult-api's in-memory caches (list), one cache's entries (entries: searched and paged by
+  admin-tabs.js), and the record behind an entry (entry: the body of admin-caches.js' dialog).
+*/-->
+
+<th:block th:fragment="list">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.caches}">Caches</h2>
+        <span class="eyebrow" th:if="${caches != null}" th:text="#{admin.caches.count(${caches.size()})}">0 caches</span>
+    </div>
+    <th:block th:if="${caches == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${caches != null and caches.isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('inventory_2', #{admin.caches.none})}"></th:block>
+    </th:block>
+    <mdui-card class="admin-table admin-list" variant="outlined" th:if="${caches != null and !caches.isEmpty()}">
+        <mdui-list>
+            <mdui-list-item th:each="c : ${caches}" end-icon="chevron_right" th:attr="data-admin-open=${c.name()}">
+                <span th:text="${c.name()}">name</span>
+                <span slot="description">
+                    <span th:text="#{admin.caches.entries(${c.size()})}">0 entries</span>
+                    <span th:unless="${c.deletable()}" th:text="| · #{admin.caches.readonly}|">read-only</span>
+                </span>
+            </mdui-list-item>
+        </mdui-list>
+    </mdui-card>
+</th:block>
+
+<div th:fragment="entries" class="admin-view"
+     th:attr="data-name=${name},data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},data-error=#{admin.error.generic}">
+    <th:block th:replace="~{pages/admin-tab/common :: subheader(${name}, ${q})}"></th:block>
+    <th:block th:if="${entries == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <div data-admin-results th:if="${entries != null}">
+        <th:block th:if="${entries.content().isEmpty()}">
+            <th:block th:replace="~{pages/admin-tab/common :: empty('inbox', ${#strings.isEmpty(q)} ? #{admin.caches.empty} : #{admin.no_match})}"></th:block>
+        </th:block>
+        <mdui-card class="admin-table" variant="outlined" th:unless="${entries.content().isEmpty()}">
+            <div class="admin-row admin-row-head" aria-hidden="true">
+                <span th:text="#{admin.caches.column.key}">Key</span>
+                <span th:text="#{admin.caches.column.value}">Value</span>
+                <span></span>
+            </div>
+            <div class="admin-row" th:each="e : ${entries.content()}" th:attr="data-key=${e.key()}">
+                <span class="admin-cell" th:text="${e.key()}" th:title="${e.key()}">key</span>
+                <span class="admin-cell admin-cell-muted" th:text="${e.value()}" th:title="${e.value()}">value</span>
+                <span class="admin-row-actions">
+                    <mdui-button-icon icon="visibility" class="admin-cache-detail" th:attr="aria-label=#{admin.caches.detail}"></mdui-button-icon>
+                    <mdui-button-icon icon="delete" class="admin-cache-delete" th:if="${deletable}"
+                                      th:attr="aria-label=#{admin.caches.delete},data-confirm=#{admin.caches.delete.confirm(${e.key()})}"></mdui-button-icon>
+                </span>
+            </div>
+        </mdui-card>
+        <th:block th:replace="~{pages/admin-tab/common :: pagination(${entries})}"></th:block>
+    </div>
+    <mdui-dialog id="admin-cache-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-dialog-body"></div>
+        <mdui-button slot="action" variant="text" class="admin-dialog-close" th:text="#{admin.close}">Close</mdui-button>
+    </mdui-dialog>
+</div>
+
+<div th:fragment="entry" class="admin-detail">
+    <h3 th:text="#{admin.caches.entry.title(${key})}">Entry</h3>
+    <p class="admin-placeholder" th:if="${entry == null}" th:text="#{admin.unavailable}">unavailable</p>
+    <th:block th:if="${entry != null}">
+        <p th:if="${entry.expiresInSeconds() != null}"
+           th:text="${entry.expiresInSeconds() >= 0} ? #{admin.caches.entry.expires_in(${entry.expiresInSeconds()})} : #{admin.caches.entry.expired_since(${-entry.expiresInSeconds()})}">expires</p>
+        <p class="admin-placeholder" th:if="${entry.empty()}" th:text="#{admin.caches.entry.not_found}">not found</p>
+        <dl class="admin-fields" th:unless="${entry.fields().isEmpty()}">
+            <th:block th:each="f : ${entry.fields()}">
+                <dt th:text="${f.name()}">name</dt>
+                <dd th:text="${f.value()}">value</dd>
+            </th:block>
+        </dl>
+        <div class="admin-detail-table" th:unless="${entry.rows().isEmpty()}">
+            <table>
+                <thead><tr><th th:each="c : ${entry.columns()}" th:text="${c}">column</th></tr></thead>
+                <tbody><tr th:each="r : ${entry.rows()}"><td th:each="v : ${r}" th:text="${v}">value</td></tr></tbody>
+            </table>
+        </div>
+    </th:block>
+</div>
