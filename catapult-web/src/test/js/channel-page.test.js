@@ -192,6 +192,22 @@ describe("tab <-> location.hash", () => {
         expect(el.value).toBe("caches");
     });
 
+    it("keeps the hash when a field or select inside a panel changes", () => {
+        history.replaceState(null, "", "/admin#caches/igdb-game-cache");
+        html(`<mdui-tabs data-hash-tabs><mdui-tab value="members"></mdui-tab><mdui-tab value="caches"></mdui-tab>
+            <mdui-tab-panel value="caches"><mdui-text-field data-admin-search></mdui-text-field>
+                <mdui-dialog><mdui-text-field name="name"></mdui-text-field></mdui-dialog></mdui-tab-panel></mdui-tabs>`);
+        const el = document.querySelector("mdui-tabs");
+        el.value = "members";
+        render();
+
+        // mdui's text fields and selects emit a bubbling change on blur, Enter or clear.
+        document.querySelector("[data-admin-search]").dispatchEvent(new Event("change", { bubbles: true }));
+        document.querySelector('[name="name"]').dispatchEvent(new Event("change", { bubbles: true }));
+
+        expect(location.hash).toBe("#caches/igdb-game-cache");
+    });
+
     it("does nothing on pages without tabs", () => {
         expect(() => render()).not.toThrow();
     });
