@@ -75,8 +75,10 @@ public class MockAdminData {
                 .toList(), descriptors);
     }
 
-    public void saveCclMappings(String cclId, Set<Long> ids) {
-        ccls.computeIfPresent(cclId, (id, c) -> new Ccl(id, c.name(), c.description(), Set.copyOf(ids)));
+    /** 204, or 404 for an unknown CCL. */
+    public int saveCclMappings(String cclId, Set<Long> ids) {
+        Ccl saved = ccls.computeIfPresent(cclId, (id, c) -> new Ccl(id, c.name(), c.description(), Set.copyOf(ids)));
+        return saved == null ? 404 : 204;
     }
 
     // --- caches ---

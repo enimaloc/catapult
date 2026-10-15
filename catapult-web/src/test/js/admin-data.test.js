@@ -122,6 +122,26 @@ describe("admin-data", () => {
         expect(posted).not.toHaveBeenCalled();
     });
 
+    it("says so when a row can't be fetched at all", async () => {
+        fetched.mockRejectedValue(new TypeError("offline"));
+        page();
+        await click(".admin-data-row");
+
+        expect(document.querySelector("mdui-snackbar").textContent).toBe("Failed (—)");
+        expect(dialog().open).not.toBe(true);
+    });
+
+    it("says so when a save can't be sent at all, and keeps the dialog open", async () => {
+        page();
+        await click(".admin-data-row");
+        posted.mockRejectedValue(new TypeError("offline"));
+        fill("name", "!lurk");
+        await click(".admin-data-save");
+
+        expect(document.querySelector("mdui-snackbar").textContent).toBe("Failed (—)");
+        expect(dialog().open).toBe(true);
+    });
+
     it("falls back to the generic message for an unexpected status", async () => {
         fetched.mockResolvedValue(response(502, ""));
         page();

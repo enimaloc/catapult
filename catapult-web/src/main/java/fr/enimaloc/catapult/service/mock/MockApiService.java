@@ -404,15 +404,16 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void adminRefreshCcl() {
+    public int adminRefreshCcl() {
         log.trace("adminRefreshCcl()");
         // no-op in mock mode: there is no Twitch to reload the CCLs from
+        return 204;
     }
 
     @Override
-    public void adminSaveCclMappings(String cclId, Set<Long> igdbDescriptorIds) {
+    public int adminSaveCclMappings(String cclId, Set<Long> igdbDescriptorIds) {
         log.trace("adminSaveCclMappings({}, {})", cclId, igdbDescriptorIds);
-        currentData().getAdminData().saveCclMappings(cclId, igdbDescriptorIds);
+        return currentData().getAdminData().saveCclMappings(cclId, igdbDescriptorIds);
     }
 
     @Override

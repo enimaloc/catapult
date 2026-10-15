@@ -74,7 +74,8 @@ class AdminTabsFragmentControllerTest {
         String html = asAdmin("/spa/admin/ccl");
 
         assertThat(html).contains("id=\"admin-ccl-refresh\"", "data-ccl-id=\"ViolentGraphic\"", "data-saved=\"1,2\"",
-                "Graphic violence", "<mdui-menu-item value=\"1\">ESRB — Violence</mdui-menu-item>");
+                "Graphic violence", "<mdui-menu-item value=\"1\">ESRB — Violence</mdui-menu-item>",
+                "data-error=\"The action failed ({0}).\"");
     }
 
     @Test

@@ -330,13 +330,14 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public void adminRefreshCcl() {
-        client.postVoid("/api/admin/ccl/refresh", null);
+    public int adminRefreshCcl() {
+        return client.call(HttpMethod.POST, "/api/admin/ccl/refresh", null, Void.class).status();
     }
 
     @Override
-    public void adminSaveCclMappings(String cclId, Set<Long> igdbDescriptorIds) {
-        client.postVoid("/api/admin/ccl/{id}/mappings", new SaveMappingsRequest(igdbDescriptorIds), cclId);
+    public int adminSaveCclMappings(String cclId, Set<Long> igdbDescriptorIds) {
+        return client.call(HttpMethod.POST, "/api/admin/ccl/{id}/mappings",
+                new SaveMappingsRequest(igdbDescriptorIds), Void.class, cclId).status();
     }
 
     @Override

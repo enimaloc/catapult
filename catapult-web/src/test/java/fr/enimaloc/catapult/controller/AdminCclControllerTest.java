@@ -31,6 +31,8 @@ class AdminCclControllerTest {
     @Test
     void refreshAndSave_areForwardedForAnAdmin() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminRefreshCcl()).thenReturn(204);
+        when(apiService.adminSaveCclMappings(any(), any())).thenReturn(204);
 
         mvc.perform(post("/admin/ccl/refresh").with(csrf()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isNoContent());
@@ -44,6 +46,19 @@ class AdminCclControllerTest {
         verify(apiService).adminRefreshCcl();
         verify(apiService).adminSaveCclMappings("Gambling", Set.of(6L, 2L));
         verify(apiService).adminSaveCclMappings("Gambling", Set.of());
+    }
+
+    @Test
+    void relaysCatapultApisFailure() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminRefreshCcl()).thenReturn(502);
+        when(apiService.adminSaveCclMappings(any(), any())).thenReturn(502);
+
+        mvc.perform(post("/admin/ccl/refresh").with(csrf()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isBadGateway());
+        mvc.perform(post("/admin/ccl/Gambling/mappings").with(csrf()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"igdbCategoryIds\":[6]}"))
+                .andExpect(status().isBadGateway());
     }
 
     @Test

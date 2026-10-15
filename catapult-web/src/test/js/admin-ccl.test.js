@@ -10,6 +10,7 @@ let posted;
 function page() {
     html(`
         <mdui-tab-panel value="ccl" data-admin-lazy>
+          <div class="admin-view" data-error="Failed ({0})">
             <mdui-button id="admin-ccl-refresh"></mdui-button>
             <div data-ccl-id="Violent Graphic" data-saved="1,2">
                 <div class="admin-ccl-select"></div>
@@ -19,6 +20,7 @@ function page() {
                 <div class="admin-ccl-select"></div>
                 <button class="admin-ccl-save" disabled></button>
             </div>
+          </div>
         </mdui-tab-panel>`);
     render();
     const panel = document.querySelector("mdui-tab-panel");
@@ -26,6 +28,7 @@ function page() {
     return panel;
 }
 
+const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
 const card = id => document.querySelector(`[data-ccl-id="${id}"]`);
 
 function pick(id, values) {
@@ -81,6 +84,31 @@ describe("admin-ccl", () => {
 
         expect(card("Gambling").querySelector(".admin-ccl-save").disabled).toBe(false);
         expect(card("Gambling").dataset.saved).toBe("");
+        expect(snackbars()).toEqual(["Failed (502)"]);
+    });
+
+    it("says so when the save can't be sent at all", async () => {
+        posted.mockRejectedValue(new TypeError("offline"));
+        page();
+        pick("Gambling", ["6"]);
+        card("Gambling").querySelector(".admin-ccl-save").click();
+        await flush();
+
+        expect(card("Gambling").querySelector(".admin-ccl-save").disabled).toBe(false);
+        expect(snackbars()).toEqual(["Failed (—)"]);
+    });
+
+    it("says so when the refresh fails, and lets it be tried again", async () => {
+        posted.mockResolvedValue(response(503));
+        page();
+        const refresh = document.getElementById("admin-ccl-refresh");
+        refresh.click();
+        await flush();
+
+        expect(snackbars()).toEqual(["Failed (503)"]);
+        expect(refresh.disabled).toBe(false);
+        expect(refresh.loading).toBe(false);
+        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
     });
 
     it("refreshes from Twitch, then reloads the tab", async () => {
