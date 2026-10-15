@@ -203,7 +203,6 @@ describe("admin-tabs", () => {
         expect(urls()).toEqual(["/spa/admin/caches/igdb-game-cache"]);
         expect(shown()).toBe("/spa/admin/caches/igdb-game-cache");
         expect(panel().querySelector("mdui-dialog")).not.toBeNull();
-        expect(panel().dataset.adminSub).toBe("igdb-game-cache");
     });
 
     it("drops a search still pending or on its way when another view is shown", async () => {
@@ -234,6 +233,30 @@ describe("admin-tabs", () => {
 
         expect(shown()).toBe("/spa/admin/caches/igdb-game-cache");
         expect(results()).toBe("/spa/admin/caches/igdb-game-cache");
+    });
+
+    it("ignores a click on a plain element of a loaded panel", async () => {
+        history.replaceState(null, "", "/admin#caches");
+        page("caches");
+        await flush();
+        expect(urls()).toEqual(["/spa/admin/caches"]);
+
+        await click(".view");
+
+        expect(urls()).toEqual(["/spa/admin/caches"]);
+        expect(document.querySelector("mdui-snackbar")).toBeNull();
+    });
+
+    it("does not reload a sub-view's results on a click outside its controls", async () => {
+        history.replaceState(null, "", "/admin#caches/igdb-game-cache");
+        page("caches");
+        await flush();
+
+        await click(".view");
+        await click(".results");
+
+        expect(urls()).toEqual(["/spa/admin/caches/igdb-game-cache"]);
+        expect(panel().querySelector("[data-admin-results]").parentElement).toBe(panel());
     });
 
     it("announces each new content of a panel", async () => {

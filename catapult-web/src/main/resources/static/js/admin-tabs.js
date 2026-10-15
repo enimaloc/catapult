@@ -11,6 +11,24 @@ window.CatapultAdminTabs = (function () {
     /** Each panel's pending search (its debounce timer), dropped when the panel shows another view. */
     const searchTimers = new WeakMap();
 
+    /**
+     * Each panel's private view state (view url, sub-view, search, page, pending results url). Kept out
+     * of the panel's dataset: data-admin-page / data-admin-results there would match the fragment
+     * contract's selectors, the panel itself included. A panel never shown here yet takes its
+     * sub-view from the hash.
+     */
+    const states = new WeakMap();
+
+    function stateOf(panel) {
+        let state = states.get(panel);
+        if (!state) {
+            const current = route();
+            state = { view: null, sub: current.tab === panel.getAttribute("value") ? current.sub : null, q: "", page: 0, results: null };
+            states.set(panel, state);
+        }
+        return state;
+    }
+
     /** "#caches/igdb-game-cache" → { tab: "caches", sub: "igdb-game-cache" }. */
     function route() {
         const [tab, ...rest] = location.hash.slice(1).split("/");
@@ -56,17 +74,18 @@ window.CatapultAdminTabs = (function () {
         const current = route();
         const sub = current.tab === tab ? current.sub : null;
         const url = fragmentUrl(tab, sub);
-        if (!force && panel.dataset.adminView === url) return;
+        const state = stateOf(panel);
+        if (!force && state.view === url) return;
         clearTimeout(searchTimers.get(panel)); // a search typed in the previous view stays there
-        delete panel.dataset.adminResults; // and so do the results still on their way
-        panel.dataset.adminView = url;
-        panel.dataset.adminSub = sub ?? "";
-        panel.dataset.adminQ = "";
-        panel.dataset.adminPage = "0";
+        state.results = null; // and so do the results still on their way
+        state.view = url;
+        state.sub = sub;
+        state.q = "";
+        state.page = 0;
         const html = await fetchHtml(url);
-        if (panel.dataset.adminView !== url) return; // another view was asked for meanwhile
+        if (state.view !== url) return; // another view was asked for meanwhile
         if (html === null) {
-            delete panel.dataset.adminView; // shown again, it tries again
+            state.view = null; // shown again, it tries again
             CatapultChannel.showError(panel.dataset.unavailable);
             return;
         }
@@ -84,12 +103,13 @@ window.CatapultAdminTabs = (function () {
 
     /** Swaps the sub-view's results for those of `q` and `page`; an answer older than the last ask is dropped. */
     async function results(panel, q, page) {
-        panel.dataset.adminQ = q;
-        panel.dataset.adminPage = String(page);
-        const url = fragmentUrl(tabOf(panel), panel.dataset.adminSub || null, { q, page });
-        panel.dataset.adminResults = url;
+        const state = stateOf(panel);
+        state.q = q;
+        state.page = page;
+        const url = fragmentUrl(tabOf(panel), state.sub, { q, page });
+        state.results = url;
         const html = await fetchHtml(url);
-        if (panel.dataset.adminResults !== url) return;
+        if (state.results !== url) return;
         const fresh = html === null ? null : new DOMParser().parseFromString(html, "text/html").querySelector("[data-admin-results]");
         const current = panel.querySelector("[data-admin-results]");
         if (!fresh || !current) {
@@ -106,7 +126,8 @@ window.CatapultAdminTabs = (function () {
 
     /** Re-fetches the results as they are (same search, same page), after a change to them. */
     function reloadResults(panel) {
-        return results(panel, panel.dataset.adminQ ?? "", Number(panel.dataset.adminPage ?? 0));
+        const { q, page } = stateOf(panel);
+        return results(panel, q, page);
     }
 
     /** Resolves to whether the admin confirmed `message`, in `root`'s data-confirm-text / data-cancel-text. */
@@ -121,11 +142,11 @@ window.CatapultAdminTabs = (function () {
     function listen(panel) {
         panel.addEventListener("click", event => {
             const target = event.target.closest("[data-admin-open],[data-admin-back],[data-admin-page],[data-admin-retry]");
-            if (!target || target.disabled) return;
+            if (!target || target === panel || !panel.contains(target) || target.disabled) return;
             if (target.hasAttribute("data-admin-open")) open(panel, target.dataset.adminOpen);
             else if (target.hasAttribute("data-admin-back")) open(panel, null);
             else if (target.hasAttribute("data-admin-retry")) reload(panel);
-            else results(panel, panel.dataset.adminQ ?? "", Number(target.dataset.adminPage));
+            else results(panel, stateOf(panel).q, Number(target.dataset.adminPage));
         });
         panel.addEventListener("input", event => {
             if (!event.target.matches("[data-admin-search]")) return;
