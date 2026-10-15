@@ -187,6 +187,55 @@ describe("admin-tabs", () => {
         expect(shown()).toBe("/spa/admin/caches");
     });
 
+    it("keeps the view when a field inside the panel changes", async () => {
+        history.replaceState(null, "", "/admin#caches/igdb-game-cache");
+        page();
+        await flush();
+        panel().insertAdjacentHTML("beforeend", `<mdui-dialog><mdui-text-field name="name"></mdui-text-field></mdui-dialog>`);
+
+        // mdui's text fields and selects emit a bubbling change on blur, Enter or clear.
+        panel().querySelector("[data-admin-search]").dispatchEvent(new Event("change", { bubbles: true }));
+        await flush();
+        panel().querySelector('[name="name"]').dispatchEvent(new Event("change", { bubbles: true }));
+        await flush();
+
+        expect(location.hash).toBe("#caches/igdb-game-cache");
+        expect(urls()).toEqual(["/spa/admin/caches/igdb-game-cache"]);
+        expect(shown()).toBe("/spa/admin/caches/igdb-game-cache");
+        expect(panel().querySelector("mdui-dialog")).not.toBeNull();
+        expect(panel().dataset.adminSub).toBe("igdb-game-cache");
+    });
+
+    it("drops a search still pending or on its way when another view is shown", async () => {
+        history.replaceState(null, "", "/admin#caches/igdb-game-cache");
+        page();
+        await flush();
+        const field = panel().querySelector("[data-admin-search]");
+
+        vi.useFakeTimers();
+        field.value = "doom";
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(100);
+        panel().querySelector("[data-admin-back]").click();
+        await vi.advanceTimersByTimeAsync(300);
+        vi.useRealTimers();
+        await flush();
+
+        expect(urls()).toEqual(["/spa/admin/caches/igdb-game-cache", "/spa/admin/caches"]);
+        expect(shown()).toBe("/spa/admin/caches");
+
+        // A search already sent: its answer lands after the next view opened.
+        let answer;
+        fetched.mockImplementationOnce(url => new Promise(resolve => { answer = () => resolve(response(200, fragment(url))); }));
+        await click('[data-admin-page="2"]');
+        await click("[data-admin-open]");
+        answer();
+        await flush();
+
+        expect(shown()).toBe("/spa/admin/caches/igdb-game-cache");
+        expect(results()).toBe("/spa/admin/caches/igdb-game-cache");
+    });
+
     it("announces each new content of a panel", async () => {
         const announced = vi.fn();
         document.addEventListener("catapult:admin-panel", event => announced(event.detail.tab));

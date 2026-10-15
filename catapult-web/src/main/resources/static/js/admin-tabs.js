@@ -8,6 +8,8 @@
  */
 window.CatapultAdminTabs = (function () {
     const SEARCH_DELAY_MS = 300;
+    /** Each panel's pending search (its debounce timer), dropped when the panel shows another view. */
+    const searchTimers = new WeakMap();
 
     /** "#caches/igdb-game-cache" → { tab: "caches", sub: "igdb-game-cache" }. */
     function route() {
@@ -55,6 +57,8 @@ window.CatapultAdminTabs = (function () {
         const sub = current.tab === tab ? current.sub : null;
         const url = fragmentUrl(tab, sub);
         if (!force && panel.dataset.adminView === url) return;
+        clearTimeout(searchTimers.get(panel)); // a search typed in the previous view stays there
+        delete panel.dataset.adminResults; // and so do the results still on their way
         panel.dataset.adminView = url;
         panel.dataset.adminSub = sub ?? "";
         panel.dataset.adminQ = "";
@@ -115,7 +119,6 @@ window.CatapultAdminTabs = (function () {
     }
 
     function listen(panel) {
-        let searchTimer;
         panel.addEventListener("click", event => {
             const target = event.target.closest("[data-admin-open],[data-admin-back],[data-admin-page],[data-admin-retry]");
             if (!target || target.disabled) return;
@@ -126,8 +129,8 @@ window.CatapultAdminTabs = (function () {
         });
         panel.addEventListener("input", event => {
             if (!event.target.matches("[data-admin-search]")) return;
-            clearTimeout(searchTimer);
-            searchTimer = setTimeout(() => results(panel, event.target.value, 0), SEARCH_DELAY_MS);
+            clearTimeout(searchTimers.get(panel));
+            searchTimers.set(panel, setTimeout(() => results(panel, event.target.value, 0), SEARCH_DELAY_MS));
         });
     }
 
@@ -140,7 +143,11 @@ window.CatapultAdminTabs = (function () {
             const panel = panels.find(p => tabOf(p) === tabs.value);
             if (panel) show(panel);
         };
-        tabs.addEventListener("change", showActive);
+        // mdui's own change events bubble (composed): a field or select changing inside a panel
+        // is no tab switch.
+        tabs.addEventListener("change", event => {
+            if (event.target === tabs) showActive();
+        });
         showActive();
     }
 

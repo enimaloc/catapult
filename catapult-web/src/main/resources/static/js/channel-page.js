@@ -124,7 +124,10 @@ document.addEventListener("catapult:render", function () {
         tabs.value = wanted;
     }
 
-    tabs.addEventListener("change", () => {
+    // mdui's change events bubble (composed): only the tabs' own is a tab switch, not one of a
+    // field or select inside a panel, which would drop the sub-view from the hash.
+    tabs.addEventListener("change", event => {
+        if (event.target !== tabs) return;
         const hash = tabs.value === first ? "" : `#${tabs.value}`;
         history.replaceState(history.state, "", location.pathname + location.search + hash);
     });
