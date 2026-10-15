@@ -12,7 +12,7 @@ let confirmAnswer;
 function page() {
     html(`
         <mdui-tabs id="admin-tabs"></mdui-tabs>
-        <mdui-tab-panel value="caches" data-admin-sub="igdb-game-cache">
+        <mdui-tab-panel value="caches">
             <div class="admin-view" data-name="igdb-game-cache" data-confirm-text="OK" data-cancel-text="No" data-error="Failed ({0})">
                 <div data-admin-results>
                     <div class="admin-row" data-key="a b">

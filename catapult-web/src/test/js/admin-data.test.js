@@ -36,7 +36,7 @@ function form(id) {
 function page() {
     html(`
         <mdui-tabs id="admin-tabs"></mdui-tabs>
-        <mdui-tab-panel value="data" data-admin-sub="chat-command">
+        <mdui-tab-panel value="data">
             <div class="admin-view" data-repo="chat-command" data-confirm-text="OK" data-cancel-text="No"
                  data-error="Failed ({0})" data-error-400="Invalid" data-error-409="Still referenced">
                 <button id="admin-data-new"></button>
