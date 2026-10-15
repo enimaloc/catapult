@@ -2,6 +2,13 @@ package fr.enimaloc.catapult.service.real;
 
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.SaveMappingsRequest;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
@@ -48,6 +55,10 @@ import java.util.UUID;
 @Profile("!mock")
 public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<Map<String, List<TwitchatEventActionDto>>> EVENTS = new ParameterizedTypeReference<>() {};
+
+    private static final ParameterizedTypeReference<AdminPage<CacheEntryDto>> CACHE_ENTRIES = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<Map<String, Object>>> DATA_ROWS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<Map<String, Object>> DATA_ROW = new ParameterizedTypeReference<>() {};
 
     private final ApiClient client;
 
@@ -311,6 +322,73 @@ public class RealApiService implements ApiService {
     @Override
     public void adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
         client.postVoid("/api/admin/members/{id}/migrate", new MigrateRequest(targetId, settings, getters, bindings), memberId);
+    }
+
+    @Override
+    public AdminCclPage adminCcl() {
+        return client.get("/api/admin/ccl", AdminCclPage.class);
+    }
+
+    @Override
+    public void adminRefreshCcl() {
+        client.postVoid("/api/admin/ccl/refresh", null);
+    }
+
+    @Override
+    public void adminSaveCclMappings(String cclId, Set<Long> igdbDescriptorIds) {
+        client.postVoid("/api/admin/ccl/{id}/mappings", new SaveMappingsRequest(igdbDescriptorIds), cclId);
+    }
+
+    @Override
+    public List<CacheSummaryDto> adminCaches() {
+        CacheSummaryDto[] caches = client.get("/api/admin/caches", CacheSummaryDto[].class);
+        return caches == null ? null : List.of(caches);
+    }
+
+    @Override
+    public AdminPage<CacheEntryDto> adminCacheEntries(String name, String q, int page) {
+        return client.get("/api/admin/caches/{name}?q={q}&page={page}", CACHE_ENTRIES, name, q == null ? "" : q, page);
+    }
+
+    @Override
+    public CacheEntryDetailDto adminCacheEntry(String name, String key) {
+        return client.get("/api/admin/caches/{name}/entry?key={key}", CacheEntryDetailDto.class, name, key);
+    }
+
+    @Override
+    public int adminDeleteCacheEntry(String name, String key) {
+        return client.call(HttpMethod.DELETE, "/api/admin/caches/{name}?key={key}", null, Void.class, name, key).status();
+    }
+
+    @Override
+    public List<RepoSummaryDto> adminDataRepos() {
+        RepoSummaryDto[] repos = client.get("/api/admin/data", RepoSummaryDto[].class);
+        return repos == null ? null : List.of(repos);
+    }
+
+    @Override
+    public AdminPage<Map<String, Object>> adminDataRows(String repo, String q, int page) {
+        return client.get("/api/admin/data/{repo}?q={q}&page={page}", DATA_ROWS, repo, q == null ? "" : q, page);
+    }
+
+    @Override
+    public Map<String, Object> adminDataRow(String repo, String id) {
+        return client.get("/api/admin/data/{repo}/{id}", DATA_ROW, repo, id);
+    }
+
+    @Override
+    public int adminCreateDataRow(String repo, Map<String, String> fields) {
+        return client.call(HttpMethod.POST, "/api/admin/data/{repo}", fields, Void.class, repo).status();
+    }
+
+    @Override
+    public int adminUpdateDataRow(String repo, String id, Map<String, String> fields) {
+        return client.call(HttpMethod.PUT, "/api/admin/data/{repo}/{id}", fields, Void.class, repo, id).status();
+    }
+
+    @Override
+    public int adminDeleteDataRow(String repo, String id) {
+        return client.call(HttpMethod.DELETE, "/api/admin/data/{repo}/{id}", null, Void.class, repo, id).status();
     }
 
     /** No error when it went through; a 4xx/5xx without a list becomes one error naming the status. */

@@ -2,6 +2,12 @@ package fr.enimaloc.catapult.service.mock;
 
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -389,6 +395,84 @@ public class MockApiService implements ApiService {
     public void adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
         log.trace("adminMigrateMember({}, {}, {}, {}, {})", memberId, targetId, settings, getters, bindings);
         // no-op in mock mode: a mock session holds a single channel's data
+    }
+
+    @Override
+    public AdminCclPage adminCcl() {
+        log.trace("adminCcl()");
+        return currentData().getAdminData().ccl();
+    }
+
+    @Override
+    public void adminRefreshCcl() {
+        log.trace("adminRefreshCcl()");
+        // no-op in mock mode: there is no Twitch to reload the CCLs from
+    }
+
+    @Override
+    public void adminSaveCclMappings(String cclId, Set<Long> igdbDescriptorIds) {
+        log.trace("adminSaveCclMappings({}, {})", cclId, igdbDescriptorIds);
+        currentData().getAdminData().saveCclMappings(cclId, igdbDescriptorIds);
+    }
+
+    @Override
+    public List<CacheSummaryDto> adminCaches() {
+        log.trace("adminCaches()");
+        return currentData().getAdminData().caches();
+    }
+
+    @Override
+    public AdminPage<CacheEntryDto> adminCacheEntries(String name, String q, int page) {
+        log.trace("adminCacheEntries({}, {}, {})", name, q, page);
+        return currentData().getAdminData().cacheEntries(name, q, page);
+    }
+
+    @Override
+    public CacheEntryDetailDto adminCacheEntry(String name, String key) {
+        log.trace("adminCacheEntry({}, {})", name, key);
+        return currentData().getAdminData().cacheEntry(name, key);
+    }
+
+    @Override
+    public int adminDeleteCacheEntry(String name, String key) {
+        log.trace("adminDeleteCacheEntry({}, {})", name, key);
+        return currentData().getAdminData().deleteCacheEntry(name, key);
+    }
+
+    @Override
+    public List<RepoSummaryDto> adminDataRepos() {
+        log.trace("adminDataRepos()");
+        return currentData().getAdminData().repos();
+    }
+
+    @Override
+    public AdminPage<Map<String, Object>> adminDataRows(String repo, String q, int page) {
+        log.trace("adminDataRows({}, {}, {})", repo, q, page);
+        return currentData().getAdminData().rows(repo, q, page);
+    }
+
+    @Override
+    public Map<String, Object> adminDataRow(String repo, String id) {
+        log.trace("adminDataRow({}, {})", repo, id);
+        return currentData().getAdminData().row(repo, id);
+    }
+
+    @Override
+    public int adminCreateDataRow(String repo, Map<String, String> fields) {
+        log.trace("adminCreateDataRow({}, {})", repo, fields);
+        return currentData().getAdminData().create(repo, fields);
+    }
+
+    @Override
+    public int adminUpdateDataRow(String repo, String id, Map<String, String> fields) {
+        log.trace("adminUpdateDataRow({}, {}, {})", repo, id, fields);
+        return currentData().getAdminData().update(repo, id, fields);
+    }
+
+    @Override
+    public int adminDeleteDataRow(String repo, String id) {
+        log.trace("adminDeleteDataRow({}, {})", repo, id);
+        return currentData().getAdminData().delete(repo, id);
     }
 
     @Override
