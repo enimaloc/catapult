@@ -36,19 +36,29 @@ window.CatapultAdminData = (function () {
         dialog.open = true;
     }
 
-    /** The dialog's fields by name; a new row's blank ones stay unset, for catapult-api's defaults. */
+    /**
+     * The dialog's fields by name: a new row's blank ones stay unset, for catapult-api's defaults; an
+     * existing row's only when changed from their data-initial (the value rendered; none when blank),
+     * since a field left as it was may be blank for a null catapult-api can't read back from "" (a
+     * number, a date).
+     */
     function fields(form, creating) {
         const body = {};
         form.querySelectorAll("mdui-text-field[name]").forEach(field => {
             const value = field.value ?? "";
-            if (creating && value === "") return;
+            if (creating ? value === "" : value === (field.dataset.initial ?? "")) return;
             body[field.getAttribute("name")] = value;
         });
         return body;
     }
 
-    async function send(panel, root, dialog, url, body) {
-        if (!await attempt(root, () => CatapultCsrf.postJson(url, body))) return;
+    /** Posts with `button` disabled meanwhile (no second row from a double-click), again usable on failure. */
+    async function send(panel, root, dialog, button, url, body) {
+        button.disabled = true;
+        if (!await attempt(root, () => CatapultCsrf.postJson(url, body))) {
+            button.disabled = false;
+            return;
+        }
         dialog.open = false;
         await CatapultAdminTabs.reloadResults(panel);
     }
@@ -63,14 +73,15 @@ window.CatapultAdminData = (function () {
             dialog.open = false;
             return;
         }
+        if (target.disabled) return; // its request is on its way
         const form = target.closest(".admin-data-form");
         const id = form.dataset.id || null;
         if (target.matches(".admin-data-save")) {
             const action = id ? "update" : "create";
-            return send(panel, root, dialog, `/admin/data/${repo}/${action}${idQuery(id)}`, fields(form, !id));
+            return send(panel, root, dialog, target, `/admin/data/${repo}/${action}${idQuery(id)}`, fields(form, !id));
         }
         if (await CatapultAdminTabs.confirmed(root, target.dataset.confirm)) {
-            return send(panel, root, dialog, `/admin/data/${repo}/delete${idQuery(id)}`, {});
+            return send(panel, root, dialog, target, `/admin/data/${repo}/delete${idQuery(id)}`, {});
         }
     }
 

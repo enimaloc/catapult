@@ -59,7 +59,7 @@
 <div th:fragment="row" class="admin-data-form" th:attr="data-id=${form.id()}">
     <h3 th:text="${form.creating()} ? #{admin.data.form.title.new(${form.repo()})} : #{admin.data.form.title.edit(${form.id()})}">Row</h3>
     <mdui-text-field th:each="f : ${form.fields()}" variant="outlined"
-                     th:attr="name=${f.name()},label=${f.name()},value=${f.value()},helper=${f.label()}"></mdui-text-field>
+                     th:attr="name=${f.name()},label=${f.name()},value=${f.value()},data-initial=${f.value()},helper=${f.label()}"></mdui-text-field>
     <div class="admin-data-collection" th:each="c : ${form.collections()}">
         <span class="eyebrow" th:text="${c.key}">relation</span>
         <div class="admin-member-badges">
