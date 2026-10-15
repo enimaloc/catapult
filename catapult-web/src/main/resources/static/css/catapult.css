@@ -1653,3 +1653,48 @@ mdui-select::part(menu) {
 .admin-ccl-save {
     align-self: flex-end;
 }
+
+.admin-cell-muted {
+    color: var(--catapult-text-secondary);
+}
+
+.admin-dialog {
+    --mdui-comp-dialog-max-width: min(720px, 100vw - 32px);
+}
+
+.admin-detail h3 {
+    margin: 0 0 12px;
+    overflow-wrap: anywhere;
+}
+
+.admin-fields {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 6px 16px;
+    margin: 0;
+}
+
+.admin-fields dt {
+    color: var(--catapult-text-muted);
+}
+
+.admin-fields dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.admin-detail-table {
+    overflow-x: auto;
+}
+
+.admin-detail-table table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.admin-detail-table th,
+.admin-detail-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--catapult-border);
+    text-align: left;
+}
