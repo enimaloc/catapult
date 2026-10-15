@@ -109,6 +109,18 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void cacheEntries_offersEviction_forADeletableCache() throws Exception {
+        when(apiService.adminCaches()).thenReturn(List.of(new CacheSummaryDto("igdb-game-cache", 30, true)));
+        when(apiService.adminCacheEntries("igdb-game-cache", null, 0)).thenReturn(
+                new AdminPage<>(List.of(new CacheEntryDto("1001", "string")), 0, 1, 1));
+
+        String html = asAdmin("/spa/admin/caches/igdb-game-cache");
+
+        assertThat(html).contains("admin-cache-delete", "data-key=\"1001\"", "data-confirm=\"", "1001");
+        assertThat(html).containsPattern("data-confirm=\"[^\"]*1001[^\"]*\"");
+    }
+
+    @Test
     void cacheEntries_saysNothingMatches_whenASearchFindsNothing() throws Exception {
         when(apiService.adminCaches()).thenReturn(List.of(new CacheSummaryDto("igdb-game-cache", 30, true)));
         when(apiService.adminCacheEntries("igdb-game-cache", "zzz", 0)).thenReturn(new AdminPage<>(List.of(), 0, 0, 0));
@@ -125,6 +137,6 @@ class AdminTabsFragmentControllerTest {
 
         String html = asAdmin("/spa/admin/caches/igdb-game-cache/entry?key=a b");
 
-        assertThat(html).contains("&lt;b&gt;Doom&lt;/b&gt;", "120").doesNotContain("<b>Doom</b>");
+        assertThat(html).contains("&lt;b&gt;Doom&lt;/b&gt;", "Expires in 120 s").doesNotContain("<b>Doom</b>");
     }
 }
