@@ -174,6 +174,7 @@ class AdminTabsFragmentControllerTest {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", "1");
         row.put("name", "!lurk");
+        row.put("cooldown", null);
         row.put("aliases", List.of(Map.of("id", "7", "label", "!l")));
         when(apiService.adminDataRow("chat-command", "1")).thenReturn(row);
 
@@ -181,6 +182,10 @@ class AdminTabsFragmentControllerTest {
 
         assertThat(html).contains("data-id=\"1\"", "name=\"name\"", "value=\"!lurk\"", "!l", "admin-data-delete")
                 .doesNotContain("name=\"id\"");
+        // Each field keeps the value it was rendered with, for admin-data.js to send only the changed
+        // ones; a null one shows blank, without value nor data-initial (th:attr drops a blank one).
+        assertThat(html).contains("value=\"!lurk\" data-initial=\"!lurk\"",
+                "<mdui-text-field variant=\"outlined\" name=\"cooldown\" label=\"cooldown\"></mdui-text-field>");
     }
 
     @Test

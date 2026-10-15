@@ -13,12 +13,20 @@ let confirmAnswer;
 const fetchedUrls = () => fetched.mock.calls.map(([url]) => url);
 const dialog = () => document.getElementById("admin-data-dialog");
 
-/** The dialog body the server would render for `id` (none: a new row). */
+/**
+ * The dialog body the server would render for `id` (none: a new row), each field with the value
+ * it was rendered with as data-initial (jsdom has no mdui-text-field: its value is set by hand).
+ */
 function form(id) {
+    // th:attr drops a blank data-initial, as it does a blank value.
+    const field = (name, value) => (id && value
+        ? `<mdui-text-field name="${name}" data-initial="${value}"></mdui-text-field>`
+        : `<mdui-text-field name="${name}"></mdui-text-field>`);
     return `<div class="admin-data-form" ${id ? `data-id="${id}"` : ""}>
         ${id ? "" : '<mdui-text-field name="id"></mdui-text-field>'}
-        <mdui-text-field name="name"></mdui-text-field>
-        <mdui-text-field name="template"></mdui-text-field>
+        ${field("name", "!lurk")}
+        ${field("template", "hello")}
+        ${field("cooldown", "")}
         ${id ? '<button class="admin-data-delete" data-confirm="Delete it?"></button>' : ""}
         <button class="admin-dialog-close"></button>
         <button class="admin-data-save"></button>
@@ -48,6 +56,11 @@ function fill(name, value) {
     dialog().querySelector(`[name="${name}"]`).value = value;
 }
 
+/** Gives an opened row's fields their rendered values, as mdui-text-field does from its value attribute. */
+function rendered() {
+    dialog().querySelectorAll("[data-initial]").forEach(field => { field.value = field.dataset.initial; });
+}
+
 beforeEach(async () => {
     history.replaceState(null, "", "/admin#data/chat-command");
     fetched = vi.fn(async url => response(200, url.includes("/row?") ? form(ID) : url.includes("/row") ? form(null) : "<div data-admin-results></div>"));
@@ -61,20 +74,82 @@ beforeEach(async () => {
 });
 
 describe("admin-data", () => {
-    it("opens a row's dialog, then saves its fields, then reloads the results", async () => {
+    it("opens a row's dialog, then saves the fields changed, then reloads the results", async () => {
         page();
         await click(".admin-data-row .cell");
         expect(fetchedUrls()).toEqual([`/spa/admin/data/chat-command/row?id=${encodeURIComponent(ID)}`]);
         expect(dialog().open).toBe(true);
+        rendered();
 
-        fill("name", "!lurk");
+        fill("name", "!lurker");
         fill("template", "");
         await click(".admin-data-save");
 
+        // cooldown, blank (null) and left as it was, isn't sent: catapult-api can't read a number from "".
         expect(posted.mock.calls).toEqual([[`/admin/data/chat-command/update?id=${encodeURIComponent(ID)}`,
-            { name: "!lurk", template: "" }]]);
+            { name: "!lurker", template: "" }]]);
         expect(dialog().open).toBe(false);
         expect(fetchedUrls().at(-1)).toBe("/spa/admin/data/chat-command?q=&page=0");
+    });
+
+    it("sends no field left as it was", async () => {
+        page();
+        await click(".admin-data-row");
+        rendered();
+        fill("name", "!lurk");
+        await click(".admin-data-save");
+
+        expect(posted.mock.calls).toEqual([[`/admin/data/chat-command/update?id=${encodeURIComponent(ID)}`, {}]]);
+    });
+
+    it("sends a blank field once given a value", async () => {
+        page();
+        await click(".admin-data-row");
+        rendered();
+        fill("cooldown", "30");
+        await click(".admin-data-save");
+
+        expect(posted.mock.calls).toEqual([[`/admin/data/chat-command/update?id=${encodeURIComponent(ID)}`, { cooldown: "30" }]]);
+    });
+
+    it("creates a row once however fast Save is clicked, and lets it be tried again after a failure", async () => {
+        let answer;
+        posted.mockImplementationOnce(() => new Promise(resolve => { answer = resolve; }));
+        page();
+        await click("#admin-data-new");
+        fill("name", "!hi");
+        const save = dialog().querySelector(".admin-data-save");
+
+        save.click();
+        save.click();
+        await flush();
+        expect(posted).toHaveBeenCalledTimes(1);
+        expect(save.disabled).toBe(true);
+
+        answer(response(400));
+        await flush();
+        expect(save.disabled).toBe(false);
+
+        posted.mockResolvedValue(response(201));
+        await click(".admin-data-save");
+        expect(posted).toHaveBeenCalledTimes(2);
+    });
+
+    it("deletes a row once however fast Delete is confirmed", async () => {
+        let answer;
+        posted.mockImplementationOnce(() => new Promise(resolve => { answer = resolve; }));
+        page();
+        await click(".admin-data-row");
+        const remove = dialog().querySelector(".admin-data-delete");
+
+        remove.click();
+        await flush();
+        remove.click();
+        await flush();
+        answer(response(204));
+        await flush();
+
+        expect(posted).toHaveBeenCalledTimes(1);
     });
 
     it("creates a row, leaving its blank fields unset", async () => {
