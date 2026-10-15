@@ -232,8 +232,11 @@ class IndexControllerTest {
                     .andReturn().getResponse().getContentAsString();
             org.assertj.core.api.Assertions.assertThat(html)
                     .contains("id=\"admin-tabs\"")
-                    .contains("<mdui-tab value=\"members\"", "<mdui-tab value=\"ccl\"", "<mdui-tab value=\"process-rules\"",
-                            "<mdui-tab value=\"caches\"", "<mdui-tab value=\"data\"");
+                    .contains("<mdui-tab value=\"members\"", "<mdui-tab value=\"ccl\"",
+                            "<mdui-tab value=\"caches\"", "<mdui-tab value=\"data\"")
+                    .doesNotContain("process-rules")
+                    // Attribute order is Thymeleaf's business: only check each one is on the ccl panel.
+                    .containsPattern("<mdui-tab-panel(?=[^>]*value=\"ccl\")(?=[^>]*data-admin-lazy)(?=[^>]*data-unavailable=\"[^\"]+\")[^>]*>");
         }
     }
 
@@ -277,11 +280,11 @@ class IndexControllerTest {
         for (String url : List.of("/admin", "/spa/admin")) {
             String loggedOut = mvc.perform(get(url)).andExpect(status().isUnauthorized())
                     .andReturn().getResponse().getContentAsString();
-            org.assertj.core.api.Assertions.assertThat(loggedOut).doesNotContain("admin-tabs");
+            org.assertj.core.api.Assertions.assertThat(loggedOut).doesNotContain("id=\"admin-tabs\"");
 
             String member = mvc.perform(get(url).sessionAttr(key, "jwt")).andExpect(status().isForbidden())
                     .andReturn().getResponse().getContentAsString();
-            org.assertj.core.api.Assertions.assertThat(member).doesNotContain("admin-tabs");
+            org.assertj.core.api.Assertions.assertThat(member).doesNotContain("id=\"admin-tabs\"");
         }
     }
 

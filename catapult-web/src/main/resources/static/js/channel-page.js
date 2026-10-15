@@ -110,13 +110,15 @@ window.CatapultChannel = (function () {
 // page's) in location.hash. refresh() re-renders the whole fragment without pushing a history
 // entry, so the hash survives it and the restore below lands back on the tab the user was on
 // (e.g. after the mock popout's re-render) instead of resetting to the first one. Also makes
-// each tab directly linkable.
+// each tab directly linkable. A hash may go on with a sub-view after a slash (#caches/<name>, see
+// admin-tabs.js); picking another tab drops it.
 document.addEventListener("catapult:render", function () {
     const tabs = document.querySelector("mdui-tabs[data-hash-tabs]");
     if (!tabs) return;
     const first = tabs.value;
 
-    const wanted = location.hash.slice(1);
+    // "#caches/igdb-game-cache": the tab, then the sub-view admin-tabs.js opens in it.
+    const wanted = location.hash.slice(1).split("/")[0];
     // Non-owners only get the overview tab: ignore a hash naming one they don't have.
     if (wanted && tabs.querySelector(`mdui-tab[value="${CSS.escape(wanted)}"]`)) {
         tabs.value = wanted;

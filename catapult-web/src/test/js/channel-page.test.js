@@ -182,6 +182,16 @@ describe("tab <-> location.hash", () => {
         expect(location.pathname + location.hash).toBe("/admin");
     });
 
+    it("selects the tab of a hash naming a sub-view", () => {
+        history.replaceState(null, "", "/admin#caches/igdb-game-cache");
+        html(`<mdui-tabs data-hash-tabs><mdui-tab value="members"></mdui-tab><mdui-tab value="caches"></mdui-tab></mdui-tabs>`);
+        const el = document.querySelector("mdui-tabs");
+        el.value = "members";
+        render();
+
+        expect(el.value).toBe("caches");
+    });
+
     it("does nothing on pages without tabs", () => {
         expect(() => render()).not.toThrow();
     });

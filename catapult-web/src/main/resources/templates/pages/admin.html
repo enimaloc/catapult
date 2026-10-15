@@ -1,4 +1,4 @@
-<!--/* Laid out like a channel's dashboard: a header, then one tab per admin section (mirrored in the hash). */-->
+<!--/* Laid out like a channel's dashboard: a header, then one tab per admin section (mirrored in the hash). Members comes with the page; the other tabs load when first shown (admin-tabs.js). */-->
 <mdui-layout-main th:fragment="admin">
     <section class="section channel-section">
         <div class="section-header channel-header">
@@ -9,21 +9,16 @@
         </div>
 
         <mdui-tabs id="admin-tabs" class="channel-tabs" value="members" placement="top" data-hash-tabs>
-            <th:block th:each="tab : ${ {'members', 'ccl', 'process-rules', 'caches', 'data'} }">
+            <th:block th:each="tab : ${ {'members', 'ccl', 'caches', 'data'} }">
                 <mdui-tab th:value="${tab}" th:text="#{|admin.tab.${tab}|}">admin.tab</mdui-tab>
             </th:block>
 
             <th:block th:replace="~{pages/admin-tab/members::panel}"></th:block>
 
-            <!--/* Not built yet: each panel only says so for now. */-->
-            <mdui-tab-panel slot="panel" th:each="tab : ${ {'ccl', 'process-rules', 'caches', 'data'} }" th:value="${tab}">
-                <div class="section-header">
-                    <h2 th:text="#{|admin.tab.${tab}|}">admin.tab</h2>
-                </div>
-                <mdui-card class="settings-card admin-placeholder" variant="outlined">
-                    <mdui-icon name="construction"></mdui-icon>
-                    <span th:text="#{admin.placeholder}">admin.placeholder</span>
-                </mdui-card>
+            <!--/* Filled by admin-tabs.js from /spa/admin/{tab} the first time the tab is shown. */-->
+            <mdui-tab-panel slot="panel" th:each="tab : ${ {'ccl', 'caches', 'data'} }" th:value="${tab}"
+                            data-admin-lazy th:attr="data-unavailable=#{admin.unavailable}">
+                <div class="admin-loading"><mdui-circular-progress></mdui-circular-progress></div>
             </mdui-tab-panel>
         </mdui-tabs>
     </section>
