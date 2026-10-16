@@ -53,8 +53,16 @@ public class WellKnownServeController {
         return serve(WellKnownLocation.ROOT, name);
     }
 
+    /** A "." or ".." segment, which catapult-api refuses too; "foo..json" is a plain name. */
+    private static boolean traverses(String path) {
+        for (String segment : path.split("/", -1)) {
+            if (segment.equals(".") || segment.equals("..")) return true;
+        }
+        return false;
+    }
+
     private ResponseEntity<byte[]> serve(WellKnownLocation location, String path) {
-        if (path.isEmpty() || path.contains("..") || path.contains("%")) return ResponseEntity.notFound().build();
+        if (path.isEmpty() || traverses(path) || path.contains("%")) return ResponseEntity.notFound().build();
         WellKnownContent content = cache.get(location, path, () -> apiService.wellKnown(location, path));
         if (content.status() == 404) return ResponseEntity.notFound().build();
         if (content.status() != 200) return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
