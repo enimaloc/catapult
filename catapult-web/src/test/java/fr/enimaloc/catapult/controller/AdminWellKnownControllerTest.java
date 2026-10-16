@@ -85,4 +85,15 @@ class AdminWellKnownControllerTest {
         verify(apiService, never()).adminDeleteWellKnownFile(anyLong());
         verify(cache, never()).clear();
     }
+
+    @Test
+    void aBodyWithoutStatusOrHeaders_isForwardedAsIs() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminCreateWellKnownFile(any())).thenReturn(201);
+        mvc.perform(post("/admin/well-known").with(csrf()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"location\":\"ROOT\",\"path\":\"riot.txt\",\"contentType\":\"text/plain\",\"content\":\"x\"}"))
+                .andExpect(status().isCreated());
+        verify(apiService).adminCreateWellKnownFile(new WellKnownFileRequest(ROOT, "riot.txt", null, null, "text/plain", "x"));
+    }
 }

@@ -60,4 +60,24 @@ class MockWellKnownStoreTest {
         assertThat(store.create(new WellKnownFileRequest(ROOT, "big.txt", 200, List.of(), "text/plain", "x".repeat(65_537)))).isEqualTo(400);
         assertThat(store.create(new WellKnownFileRequest(ROOT, "ok.txt", 200, List.of(), "text/plain", "x".repeat(65_536)))).isEqualTo(201);
     }
+
+    @Test
+    void createAndUpdate_applyTheApiDefaults_whenStatusAndHeadersAreAbsent() {
+        var bare = new WellKnownFileRequest(WELL_KNOWN, "a.txt", null, null, "text/plain", "x");
+        assertThat(store.create(bare)).isEqualTo(201);
+        var created = store.list().stream().filter(f -> f.path().equals("a.txt")).findFirst().orElseThrow();
+        assertThat(created.status()).isEqualTo(200);
+        assertThat(store.get(created.id()).headers()).isEmpty();
+
+        assertThat(store.create(new WellKnownFileRequest(WELL_KNOWN, "b.txt", 302,
+                List.of(new fr.enimaloc.catapult.common.dto.admin.WellKnownHeader("Location", "/x")), "text/plain", ""))).isEqualTo(201);
+        var redirect = store.list().stream().filter(f -> f.path().equals("b.txt")).findFirst().orElseThrow();
+        assertThat(redirect.status()).isEqualTo(302);
+        assertThat(store.get(redirect.id()).headers()).containsExactly(
+                new fr.enimaloc.catapult.common.dto.admin.WellKnownHeader("Location", "/x"));
+
+        assertThat(store.update(redirect.id(), new WellKnownFileRequest(WELL_KNOWN, "b.txt", null, null, "text/plain", "y"))).isEqualTo(200);
+        assertThat(store.get(redirect.id()).status()).isEqualTo(200);
+        assertThat(store.get(redirect.id()).headers()).isEmpty();
+    }
 }
