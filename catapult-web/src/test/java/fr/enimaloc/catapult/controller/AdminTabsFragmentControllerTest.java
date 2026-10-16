@@ -293,6 +293,54 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void wellKnownFile_redirectFile_rendersItsStatusAndHeaders() throws Exception {
+        when(apiService.adminWellKnownFile(5)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto(
+                5, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "change-password", 302,
+                java.util.List.of(new fr.enimaloc.catapult.common.dto.admin.WellKnownHeader("Location", "/account")),
+                "text/plain", "", null));
+
+        String html = asAdmin("/spa/admin/well-known/file?id=5");
+
+        assertThat(html).contains("data-initial-status=\"302\"", "name=\"status\"", "value=\"302\"", "admin-well-known-header\"",
+                "data-header=\"name\"", "value=\"Location\"", "value=\"/account\"", "admin-well-known-redirect",
+                "admin-well-known-sections", "data-label-add=\"Add\"")
+                .doesNotContain("data-preset");
+    }
+
+    @Test
+    void wellKnownFile_okFile_hasNoHeaderRowAndOpensOnContent() throws Exception {
+        when(apiService.adminWellKnownFile(6)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto(
+                6, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "riot.txt", 200, java.util.List.of(), "text/plain", "hi", null));
+
+        String html = asAdmin("/spa/admin/well-known/file?id=6");
+
+        assertThat(html).contains("admin-well-known-sections", "admin-well-known-mode", "admin-well-known-fields", "admin-well-known-raw")
+                .containsPattern("admin-well-known-sections[^>]*value=\"content\"")
+                .doesNotContain("class=\"admin-well-known-header\"");
+    }
+
+    @Test
+    void wellKnownFile_changePasswordPreset_isARedirectWithAnEmptyLocation() throws Exception {
+        String html = asAdmin("/spa/admin/well-known/file?location=WELL_KNOWN&path=change-password");
+
+        assertThat(html).contains("data-preset=\"redirect\"", "data-initial-status=\"302\"", "data-header=\"name\"", "value=\"Location\"")
+                .containsPattern("admin-well-known-sections[^>]*value=\"response\"");
+    }
+
+    @Test
+    void wellKnown_listShowsTheStatusChipOfARedirect() throws Exception {
+        when(apiService.adminWellKnownFiles()).thenReturn(List.of(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto(
+                3, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "change-password", 302, "text/plain", 0, null),
+                new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto(
+                4, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "security.txt", 200, "text/plain", 5, null)));
+        when(apiService.adminIanaRegistry()).thenReturn(registry("LIVE"));
+
+        String html = asAdmin("/spa/admin/well-known");
+
+        assertThat(html).containsOnlyOnce("admin-well-known-status").contains(">302</mdui-chip>");
+    }
+
+    @Test
     void wellKnownSchema_isRelayedToAnAdmin_404WhenNone_andRefusedToOthers() throws Exception {
         mvc.perform(get("/spa/admin/well-known/schema?path=gpc.json")).andExpect(status().isUnauthorized());
         mvc.perform(get("/spa/admin/well-known/schema?path=gpc.json").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
