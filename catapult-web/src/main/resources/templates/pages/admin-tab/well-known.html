@@ -29,7 +29,7 @@
             <a class="admin-well-known-link" th:href="${url}" th:text="${url}" target="_blank" rel="noopener">url</a>
             <span class="admin-member-id" th:text="${f.contentType()}">type</span>
             <span class="admin-member-id" th:text="#{admin.well-known.size(${f.size()})}">0 B</span>
-            <span class="admin-member-id" th:text="${#temporals.format(f.updatedAt(), 'yyyy-MM-dd HH:mm')}">date</span>
+            <span class="admin-member-id" th:text="${f.updatedAt() == null ? '—' : #temporals.format(f.updatedAt(), #messages.msg('format.date'))}">date</span>
             <mdui-button-icon icon="edit" class="admin-well-known-edit" th:attr="aria-label=#{admin.well-known.edit}"></mdui-button-icon>
             <mdui-button-icon icon="delete" class="admin-well-known-delete"
                               th:attr="aria-label=#{admin.well-known.delete},data-confirm=#{admin.well-known.delete.confirm(${url})}"></mdui-button-icon>

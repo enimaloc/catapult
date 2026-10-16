@@ -210,4 +210,17 @@ describe("admin-well-known", () => {
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
         expect(CatapultAdminTabs.reload).toHaveBeenCalled();
     });
+
+    it("reloads the tab when a save or a delete finds the file gone", async () => {
+        page();
+        await click(".admin-well-known-edit");
+        posted.mockResolvedValue(response(404));
+        await click(".admin-well-known-save");
+        await vi.waitFor(() => expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1));
+        expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
+
+        await click(".admin-well-known-delete");
+        await vi.waitFor(() => expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(2));
+        expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
+    });
 });

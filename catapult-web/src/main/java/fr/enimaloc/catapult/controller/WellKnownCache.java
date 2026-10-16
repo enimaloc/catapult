@@ -26,6 +26,8 @@ public class WellKnownCache {
 
     private final Map<String, Entry> entries = new ConcurrentHashMap<>();
     private final Clock clock;
+    /** Bumped by {@link #clear()}: an answer loaded before it may predate the change and isn't kept. */
+    private final java.util.concurrent.atomic.AtomicLong generation = new java.util.concurrent.atomic.AtomicLong();
 
     public WellKnownCache() {
         this(Clock.systemUTC());
@@ -40,8 +42,9 @@ public class WellKnownCache {
         Instant now = clock.instant();
         Entry entry = entries.get(key);
         if (entry != null && now.isBefore(entry.until())) return entry.content();
+        long loadedAt = generation.get();
         WellKnownContent content = load.get();
-        if (content.status() == 200 || content.status() == 404) store(key, new Entry(content, now.plus(TTL)), now);
+        if ((content.status() == 200 || content.status() == 404) && generation.get() == loadedAt) store(key, new Entry(content, now.plus(TTL)), now);
         return content;
     }
 
@@ -54,6 +57,7 @@ public class WellKnownCache {
     }
 
     public void clear() {
+        generation.incrementAndGet();
         entries.clear();
     }
 }

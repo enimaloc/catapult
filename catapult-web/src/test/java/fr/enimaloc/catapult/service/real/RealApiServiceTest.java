@@ -559,4 +559,25 @@ class RealApiServiceTest {
         assertThat(service.adminWellKnownFile(3).content()).isEqualTo("code");
         assertThat(service.adminIanaRegistry().entries()).hasSize(1);
     }
+
+    @Test
+    void wellKnown_sendsNoAuthorizationEvenWithASessionJwt() {
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        var session = new org.springframework.mock.web.MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "expired.jwt.token");
+        request.setSession(session);
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(request));
+        try {
+            expect(HttpMethod.GET, "/api/well-known/serve?location=WELL_KNOWN&path=a.txt")
+                    .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers
+                            .headerDoesNotExist("Authorization"))
+                    .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers
+                            .headerDoesNotExist("X-Catapult-Anonymous"))
+                    .andRespond(withSuccess("x", MediaType.TEXT_PLAIN));
+            service.wellKnown(fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "a.txt");
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+    }
 }

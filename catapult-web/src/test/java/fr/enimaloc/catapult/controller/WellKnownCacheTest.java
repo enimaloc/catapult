@@ -63,4 +63,14 @@ class WellKnownCacheTest {
         cache.get(WELL_KNOWN, "new", () -> load(404));
         assertThat(loads).hasValue(1); // expired entries dropped, now stored
     }
+
+    @Test
+    void doesNotKeepAnAnswerLoadedAcrossAClear() {
+        cache.get(WELL_KNOWN, "a", () -> {
+            cache.clear(); // an admin write lands while the answer is being loaded
+            return load(200);
+        });
+        cache.get(WELL_KNOWN, "a", () -> load(200));
+        assertThat(loads).hasValue(2);
+    }
 }
