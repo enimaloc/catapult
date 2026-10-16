@@ -695,4 +695,59 @@ describe("admin-well-known response and forms", () => {
         await flush();
         expect(posted).toHaveBeenCalledTimes(1);
     });
+
+    describe("after a save that left the dialog open", () => {
+        const text = "# our policy\n\nContact: mailto:a@b.c\nContact: https://b.c/sec\nExpires: 2027-01-01T00:00:00.000Z\n";
+        const contact = () => items("Contact")[0];
+
+        it("posts the original text byte for byte once the edit is reverted after a refused save", async () => {
+            await open({ path: "security.txt", content: text });
+            await vi.waitFor(() => expect(mode().value).toBe("form"));
+            posted.mockResolvedValue(response(409));
+            contact().value = "mailto:new@b.c";
+            await save();
+            await vi.waitFor(() => expect(posted).toHaveBeenCalledTimes(1));
+            expect(savedBody().content).toContain("mailto:new@b.c");
+            expect(dialog().open).toBe(true);
+
+            contact().value = "mailto:a@b.c";
+            await save();
+            await vi.waitFor(() => expect(posted).toHaveBeenCalledTimes(2));
+            expect(savedBody().content).toBe(text);
+        });
+
+        it("posts the original text byte for byte once the edit is reverted after a cancelled schema confirm", async () => {
+            schemas["gpc.json"] = { type: "object", required: ["gpc", "zzz"], properties: { gpc: { type: "boolean" } } };
+            const json = '{  "gpc":true }';
+            await open({ path: "gpc.json", content: json });
+            await vi.waitFor(() => expect(mode().value).toBe("form"));
+            await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=gpc.json"));
+            await flush();
+            const box = fields().querySelector('mdui-checkbox[data-field="gpc"]');
+            box.checked = false;
+            confirmAnswer = false;
+            await save();
+            await vi.waitFor(() => expect(mdui.confirm).toHaveBeenCalledTimes(1));
+            expect(posted).not.toHaveBeenCalled();
+
+            box.checked = true;
+            confirmAnswer = true;
+            await save();
+            await vi.waitFor(() => expect(posted).toHaveBeenCalledTimes(1));
+            expect(savedBody().content).toBe(json);
+        });
+
+        it("shows the raw text matching the current form when switching to raw after a refused save", async () => {
+            await open({ path: "security.txt", content: text });
+            await vi.waitFor(() => expect(mode().value).toBe("form"));
+            posted.mockResolvedValue(response(409));
+            contact().value = "mailto:new@b.c";
+            await save();
+            await vi.waitFor(() => expect(posted).toHaveBeenCalledTimes(1));
+
+            contact().value = "mailto:a@b.c";
+            switchMode("raw");
+            expect(field("content").value).toBe(text);
+        });
+    });
 });

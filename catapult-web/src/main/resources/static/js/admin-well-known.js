@@ -409,8 +409,7 @@ window.CatapultAdminWellKnown = (function () {
         }
         if (target.matches(".admin-well-known-save")) {
             const id = form.dataset.id;
-            if (states.get(form)?.mode === "form") form.querySelector('[name="content"]').value = contentOf(form);
-            const content = value(form, "content");
+            const content = contentOf(form); // computed, never written back: the raw field and the snapshot stay in step
             const status = statusOf(form);
             if (status === null) return CatapultChannel.showError(message(root, 400));
             target.disabled = true; // one confirm, one post
