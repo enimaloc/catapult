@@ -120,7 +120,7 @@ window.CatapultAdminWellKnown = (function () {
     function readFields(scope, fields) {
         const values = {};
         for (const f of fields) {
-            const node = scope.querySelector(`:scope > [data-field="${f.key}"]`);
+            const node = [...scope.children].find(c => c.dataset.field === f.key); // no selector: keys are the schema's
             if (f.type === "list") {
                 values[f.key] = [...node.querySelectorAll(":scope > .admin-well-known-item > [data-item]")].map(i => i.value ?? "");
             } else if (f.type === "group") {
@@ -257,9 +257,12 @@ window.CatapultAdminWellKnown = (function () {
         return pick(form, true);
     }
 
+    /** The status to save: the common one chosen, or the integer 200–599 typed in statusOther; else null. */
     function statusOf(form) {
         const chosen = value(form, "status");
-        return Number(chosen === "other" ? value(form, "statusOther") : chosen) || 200;
+        const typed = String(chosen === "other" ? value(form, "statusOther") : chosen).trim();
+        const status = /^\d+$/.test(typed) ? Number(typed) : NaN;
+        return status >= 200 && status <= 599 ? status : null;
     }
 
     function headersOf(form) {
@@ -406,11 +409,17 @@ window.CatapultAdminWellKnown = (function () {
             const id = form.dataset.id;
             if (states.get(form)?.mode === "form") form.querySelector('[name="content"]').value = contentOf(form);
             const content = value(form, "content");
-            if (!await schemaAccepted(root, form, content)) return;
+            const status = statusOf(form);
+            if (status === null) return CatapultChannel.showError(message(root, 400));
+            target.disabled = true; // one confirm, one post
+            if (!await schemaAccepted(root, form, content)) {
+                target.disabled = false;
+                return;
+            }
             const body = {
                 location: value(form, "location"),
                 path: value(form, "path").trim(),
-                status: statusOf(form),
+                status,
                 headers: headersOf(form),
                 contentType: value(form, "contentType").trim(),
                 content

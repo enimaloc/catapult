@@ -139,6 +139,19 @@ describe("generated from a schema", () => {
         expect(JSON.parse(F.serialize(d, model))).toEqual({ gpc: true, other: 1 });
     });
 
+    it("leaves __proto__, constructor and prototype keys out of the form, keeping them in the content", () => {
+        const d = F.fromSchema({ type: "object", properties: JSON.parse(
+            '{"__proto__": {"type": "string"}, "constructor": {"type": "string"}, "prototype": {"type": "string"}, "a": {"type": "string"}}') });
+        expect(d.fields.map(f => f.key)).toEqual(["a"]);
+        const model = F.parse(d, '{"__proto__": "p", "constructor": "c", "a": "x"}');
+        model.values.a = "y";
+        const doc = JSON.parse(F.serialize(d, model));
+        expect(Object.getOwnPropertyDescriptor(doc, "__proto__").value).toBe("p");
+        expect(Object.getOwnPropertyDescriptor(doc, "constructor").value).toBe("c");
+        expect(doc.a).toBe("y");
+        expect(F.fromSchema({ type: "object", properties: JSON.parse('{"__proto__": {"type": "string"}}') })).toBeNull();
+    });
+
     it("has no form for a nested schema", () => {
         expect(F.fromSchema({ type: "object", properties: { a: { type: "object" } } })).toBeNull();
         expect(F.fromSchema({ type: "array" })).toBeNull();
