@@ -4,6 +4,11 @@
  * into form values and writing them back. What the form doesn't show is kept: JSON values are merged
  * into the parsed original (unknown keys and array entries stay), security.txt's comments and unknown
  * lines follow the known fields in their original order.
+ *
+ * Apple app-site details are order-sensitive (first match wins): each pure detail shown in the form
+ * carries `_origin`, its slot in the original array, and keeps that slot when written back (deleting
+ * one never moves another; reordering is not supported). UI code must keep `_origin` on the group items
+ * it reads back; items without it are appended.
  */
 window.CatapultWellKnownForms = (function () {
     const SECURITY_FIELDS = [
@@ -49,18 +54,20 @@ window.CatapultWellKnownForms = (function () {
         return out;
     }
 
-    const isMsEntry = a => isObject(a) && sameKeys(a, ["applicationId"]) && typeof a.applicationId === "string";
+    const isMsEntry = a => isObject(a) && sameKeys(a, ["applicationId"]) && typeof a.applicationId === "string" && a.applicationId !== "";
 
     const isAndroid = s => isObject(s) && sameKeys(s, ["relation", "target"])
         && Array.isArray(s.relation) && s.relation.length === 1 && s.relation[0] === HANDLE_ALL_URLS
         && isObject(s.target) && sameKeys(s.target, ["namespace", "package_name", "sha256_cert_fingerprints"])
         && s.target.namespace === "android_app" && typeof s.target.package_name === "string"
-        && isStrings(s.target.sha256_cert_fingerprints);
+        && s.target.package_name !== "" && isStrings(s.target.sha256_cert_fingerprints)
+        && s.target.sha256_cert_fingerprints.every(f => f !== "");
 
-    const isPath = c => isObject(c) && sameKeys(c, ["/"]) && typeof c["/"] === "string";
+    const isPath = c => isObject(c) && sameKeys(c, ["/"]) && typeof c["/"] === "string" && c["/"] !== "";
 
     const isDetail = d => isObject(d) && Object.keys(d).every(k => k === "appIDs" || k === "components")
-        && isStrings(d.appIDs) && (d.components === undefined || (Array.isArray(d.components) && d.components.every(isPath)));
+        && isStrings(d.appIDs) && d.appIDs.length > 0 && d.appIDs.every(x => x !== "")
+        && (d.components === undefined || (Array.isArray(d.components) && d.components.every(isPath)));
 
     const DEDICATED = {
         "security.txt": {
@@ -165,30 +172,45 @@ window.CatapultWellKnownForms = (function () {
                 if (doc.applinks !== undefined && !isObject(doc.applinks)) throw new Error("applinks: object expected");
                 const rawDetails = doc.applinks?.details ?? [];
                 if (!Array.isArray(rawDetails)) throw new Error("applinks.details: array expected");
-                if (doc.webcredentials !== undefined && (!isObject(doc.webcredentials)
-                    || (doc.webcredentials.apps !== undefined && !isStrings(doc.webcredentials.apps)))) {
+                if (doc.webcredentials !== undefined && !isObject(doc.webcredentials)) {
+                    throw new Error("webcredentials: object expected");
+                }
+                if (doc.webcredentials?.apps !== undefined && !isStrings(doc.webcredentials.apps)) {
                     throw new Error("webcredentials.apps: array expected");
                 }
-                const details = rawDetails.filter(isDetail).map(d => ({
-                    appIDs: [...d.appIDs],
-                    paths: (d.components ?? []).filter(isPath).map(c => c["/"])
-                }));
+                // _origin = the detail's slot in the original array; the UI must keep it on the items it reads back
+                const details = [];
+                rawDetails.forEach((d, i) => {
+                    if (isDetail(d)) details.push({ appIDs: [...d.appIDs], paths: (d.components ?? []).map(c => c["/"]), _origin: i });
+                });
                 return { values: { details, webcredentials: [...(doc.webcredentials?.apps ?? [])] }, original: doc };
             },
             serialize({ values, original }) {
                 const doc = clone(original);
                 const rows = values.details.map(d => ({
-                    appIDs: d.appIDs.filter(x => x !== ""), paths: d.paths.filter(x => x !== "")
+                    appIDs: d.appIDs.filter(x => x !== ""), paths: d.paths.filter(x => x !== ""), _origin: d._origin
                 })).filter(d => d.appIDs.length || d.paths.length);
-                const details = mergeInPlace(doc.applinks?.details ?? [], isDetail, rows, row => {
+                const build = row => {
                     const out = { appIDs: row.appIDs };
                     if (row.paths.length) out.components = row.paths.map(p => ({ "/": p }));
                     return out;
+                };
+                const claims = new Map();
+                const added = [];
+                for (const row of rows) {
+                    if (Number.isInteger(row._origin) && !claims.has(row._origin)) claims.set(row._origin, row);
+                    else added.push(row);
+                }
+                const details = [];
+                (doc.applinks?.details ?? []).forEach((d, i) => {
+                    if (!isDetail(d)) details.push(d);
+                    else if (claims.has(i)) details.push(build(claims.get(i)));
                 });
+                added.forEach(row => details.push(build(row)));
                 if (details.length || doc.applinks) doc.applinks = { ...(doc.applinks ?? {}), details };
                 const creds = values.webcredentials.filter(x => x !== "");
                 if (creds.length) doc.webcredentials = { ...(doc.webcredentials ?? {}), apps: creds };
-                else if (doc.webcredentials) {
+                else if (doc.webcredentials?.apps?.length) {
                     delete doc.webcredentials.apps;
                     if (!Object.keys(doc.webcredentials).length) delete doc.webcredentials;
                 }
@@ -270,7 +292,7 @@ window.CatapultWellKnownForms = (function () {
                     const v = values[f.key];
                     if (initial && JSON.stringify(v) === JSON.stringify(initial[f.key])) continue;
                     if (f.type === "list") {
-                        const items = v.filter(x => x !== "")
+                        const items = v.filter(x => (f.itemType === "number" ? String(x).trim() : x) !== "")
                             .map(x => (f.itemType === "number" && String(x).trim() !== "" && !Number.isNaN(Number(x)) ? Number(x) : x));
                         if (items.length) doc[f.key] = items; else delete doc[f.key];
                     } else if (f.type === "number") {
