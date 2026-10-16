@@ -50,4 +50,13 @@ class MockWellKnownStoreTest {
         assertThat(store.delete(id)).isEqualTo(204);
         assertThat(store.delete(id)).isEqualTo(404);
     }
+
+    @Test
+    void refusesReservedRootNamesAndOversizedContent() {
+        for (String name : new String[]{"robots.txt", "sitemap.xml", "favicon.ico"}) {
+            assertThat(store.create(req(ROOT, name))).isEqualTo(400);
+        }
+        assertThat(store.create(new WellKnownFileRequest(ROOT, "big.txt", "text/plain", "x".repeat(65_537)))).isEqualTo(400);
+        assertThat(store.create(new WellKnownFileRequest(ROOT, "ok.txt", "text/plain", "x".repeat(65_536)))).isEqualTo(201);
+    }
 }

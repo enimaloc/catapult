@@ -75,7 +75,11 @@ class MockWellKnownStore {
 
     private static boolean valid(WellKnownFileRequest r) {
         if (r.location() == null || r.path() == null || !r.path().matches("[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*")
-                || r.path().contains("..") || r.contentType() == null || r.contentType().isBlank() || r.content() == null) {
+                || r.path().contains("..") || r.contentType() == null || r.contentType().isBlank() || r.content() == null
+                || r.content().getBytes(StandardCharsets.UTF_8).length > 65_536) {
+            return false;
+        }
+        if (r.location() == WellKnownLocation.ROOT && Set.of("robots.txt", "sitemap.xml", "favicon.ico").contains(r.path())) {
             return false;
         }
         return r.location() == WellKnownLocation.WELL_KNOWN || (!r.path().contains("/") && r.path().indexOf('.') > 0);

@@ -28,6 +28,8 @@ public class WellKnownServeController {
     @GetMapping("/.well-known/**")
     public ResponseEntity<byte[]> wellKnown(HttpServletRequest request) {
         String uri = request.getRequestURI().substring(request.getContextPath().length());
+        // A bare /.well-known (no slash) is shorter than the prefix: nothing to serve.
+        if (uri.length() <= PREFIX.length()) return ResponseEntity.notFound().build();
         return serve(WellKnownLocation.WELL_KNOWN, uri.substring(PREFIX.length()));
     }
 
@@ -44,9 +46,11 @@ public class WellKnownServeController {
         MediaType type;
         try {
             type = MediaType.parseMediaType(content.contentType());
+            if (type.isWildcardType() || type.isWildcardSubtype()) type = MediaType.TEXT_PLAIN;
         } catch (RuntimeException e) {
             type = MediaType.TEXT_PLAIN;
         }
-        return ResponseEntity.ok().contentType(type).header("X-Content-Type-Options", "nosniff").body(content.body());
+        return ResponseEntity.ok().contentType(type).header("X-Content-Type-Options", "nosniff")
+                .header("Content-Security-Policy", "sandbox").body(content.body());
     }
 }

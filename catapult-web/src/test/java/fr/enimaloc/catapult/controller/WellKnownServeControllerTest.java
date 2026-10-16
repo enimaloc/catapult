@@ -91,4 +91,20 @@ class WellKnownServeControllerTest {
         mvc.perform(get("/no-such-page")).andExpect(status().isNotFound());
         verify(apiService, never()).wellKnown(any(), any());
     }
+
+    @Test
+    void aBareWellKnownIs404WithoutAskingTheApi() throws Exception {
+        mvc.perform(get("/.well-known")).andExpect(status().isNotFound());
+        mvc.perform(get("/.well-known/")).andExpect(status().isNotFound());
+        verify(apiService, never()).wellKnown(any(), any());
+    }
+
+    @Test
+    void sandboxesEveryFile_andNeverServesAWildcardType() throws Exception {
+        when(apiService.wellKnown(WELL_KNOWN, "w.txt")).thenReturn(ok("*/*", "w"));
+        mvc.perform(get("/.well-known/w.txt"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy", "sandbox"))
+                .andExpect(header().string("Content-Type", org.hamcrest.Matchers.startsWith("text/plain")));
+    }
 }
