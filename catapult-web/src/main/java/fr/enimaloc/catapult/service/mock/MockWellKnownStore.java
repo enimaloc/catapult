@@ -90,7 +90,7 @@ class MockWellKnownStore {
     private static WellKnownFileDetailDto detail(long id, WellKnownFileRequest r) {
         int status = r.status() == null || r.status() == 0 ? 200 : r.status();
         List<WellKnownHeader> headers = r.headers() == null ? List.of() : r.headers();
-        return new WellKnownFileDetailDto(id, r.location(), r.path(), status, headers, r.contentType(), r.content(), Instant.now());
+        return new WellKnownFileDetailDto(id, r.location(), r.path(), status, headers, r.contentType().isBlank() ? "text/plain; charset=utf-8" : r.contentType(), r.content(), Instant.now());
     }
 
     /** A subset of catapult-api's rules: a 200-599 status, no refused header, a Location for a 3xx. */
@@ -99,7 +99,7 @@ class MockWellKnownStore {
         if (status < 200 || status > 599) return false;
         List<WellKnownHeader> headers = r.headers() == null ? List.of() : r.headers();
         for (WellKnownHeader h : headers) {
-            if (h.name() == null || h.value() == null || REFUSED_HEADERS.contains(h.name().toLowerCase(Locale.ROOT))) return false;
+            if (h.name() == null || h.value() == null || h.value().isBlank() || REFUSED_HEADERS.contains(h.name().toLowerCase(Locale.ROOT))) return false;
         }
         return !Set.of(301, 302, 303, 307, 308).contains(status) || headers.stream().anyMatch(h -> h.name().equalsIgnoreCase("Location") && !h.value().isBlank());
     }
@@ -107,7 +107,7 @@ class MockWellKnownStore {
     private static boolean valid(WellKnownFileRequest r) {
         if (!validResponse(r)) return false;
         if (r.location() == null || r.path() == null || !r.path().matches("[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*")
-                || r.path().contains("..") || r.contentType() == null || r.contentType().isBlank() || r.content() == null
+                || r.path().contains("..") || r.contentType() == null || (r.contentType().isBlank() && r.content() != null && !r.content().isEmpty()) || r.content() == null
                 || r.content().getBytes(StandardCharsets.UTF_8).length > 65_536) {
             return false;
         }

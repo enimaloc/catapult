@@ -46,7 +46,7 @@ public final class WellKnownHeaders {
             String key = name.toLowerCase(Locale.ROOT);
             if (REFUSED.contains(key)) throw refused("Header not allowed: " + name);
             if (!seen.add(key)) throw refused("Duplicate header: " + name);
-            if (value == null || value.length() > MAX_VALUE || !fieldValue(value)) {
+            if (value == null || value.isBlank() || value.length() > MAX_VALUE || !fieldValue(value)) {
                 throw refused("Invalid header value: " + name);
             }
             if (key.equals("location")) location = value;
