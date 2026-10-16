@@ -49,7 +49,8 @@ class AdminTabsFragmentControllerTest {
     void everyFragment_isRefusedToAMember_andToAVisitor() throws Exception {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
-                "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1")) {
+                "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
+                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
         }
@@ -61,6 +62,9 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminDataRepos();
         verify(apiService, never()).adminDataRows(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt());
         verify(apiService, never()).adminDataRow(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(apiService, never()).adminWellKnownFiles();
+        verify(apiService, never()).adminIanaRegistry();
+        verify(apiService, never()).adminWellKnownFile(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
@@ -217,5 +221,74 @@ class AdminTabsFragmentControllerTest {
         String html = asAdmin("/spa/admin/data/chat-command/row");
 
         assertThat(html).contains("name=\"id\"", "name=\"name\"").doesNotContain("!lurk", "admin-data-delete", "data-id=");
+    }
+
+    private static fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto registry(String source) {
+        return new fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto(List.of(
+                new fr.enimaloc.catapult.common.dto.admin.IanaWellKnownDto("security.txt", "RFC9116", "permanent", "IETF"),
+                new fr.enimaloc.catapult.common.dto.admin.IanaWellKnownDto("Host-Meta", "https://example.org/hm", "permanent", "IETF")), source);
+    }
+
+    @Test
+    void wellKnown_rendersTheFilesAndTheRegistry() throws Exception {
+        when(apiService.adminWellKnownFiles()).thenReturn(List.of(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto(
+                3, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "security.txt", "text/plain", 12,
+                java.time.Instant.parse("2025-03-01T12:00:00Z"))));
+        when(apiService.adminIanaRegistry()).thenReturn(registry("LIVE"));
+
+        String html = asAdmin("/spa/admin/well-known");
+
+        assertThat(html).contains("admin-well-known", "id=\"admin-well-known-new\"", "data-id=\"3\"", ">/.well-known/security.txt</a>",
+                        "admin-well-known-edit", "admin-well-known-delete", "data-confirm=\"Delete /.well-known/security.txt?",
+                        "data-search=\"security.txt rfc9116\"", "data-search=\"host-meta https://example.org/hm\"",
+                        "data-path=\"security.txt\"", "id=\"admin-well-known-dialog\"", "data-well-known-filter",
+                        "data-error-400=\"", "data-error-too-large=\"", "Configured")
+                .doesNotContain("offline copy");
+    }
+
+    @Test
+    void wellKnown_notesAnOfflineRegistry() throws Exception {
+        when(apiService.adminWellKnownFiles()).thenReturn(List.of());
+        when(apiService.adminIanaRegistry()).thenReturn(registry("SNAPSHOT"));
+
+        assertThat(asAdmin("/spa/admin/well-known")).contains("offline copy", "No file configured").doesNotContain("Configured<");
+    }
+
+    @Test
+    void wellKnown_saysWhenTheApiOrTheRegistryIsUnavailable() throws Exception {
+        when(apiService.adminWellKnownFiles()).thenReturn(null);
+        when(apiService.adminIanaRegistry()).thenReturn(null);
+
+        assertThat(asAdmin("/spa/admin/well-known")).contains("admin-placeholder", "IANA registry unavailable")
+                .doesNotContain("admin-well-known-file");
+    }
+
+    @Test
+    void wellKnownFile_unknownId_is404WithTheMissingNote() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminWellKnownFile(9)).thenReturn(null);
+
+        String html = mvc.perform(get("/spa/admin/well-known/file?id=9").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound()).andReturn().getResponse().getContentAsString();
+        assertThat(html).contains("This file no longer exists.").doesNotContain("admin-well-known-form");
+    }
+
+    @Test
+    void wellKnownFile_newFromTheRegistry_isPrefilled() throws Exception {
+        String html = asAdmin("/spa/admin/well-known/file?location=WELL_KNOWN&path=assetlinks.json");
+
+        assertThat(html).contains("admin-well-known-form", "name=\"path\"", "value=\"assetlinks.json\"",
+                "value=\"application/json\"", "New file", "admin-well-known-save", "admin-well-known-import", "admin-dialog-close")
+                .doesNotContain("data-id=", "data-manual");
+    }
+
+    @Test
+    void wellKnownFile_edit_carriesTheIdAndTheManualType() throws Exception {
+        when(apiService.adminWellKnownFile(4)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto(
+                4, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "riot.txt", "text/plain", "hello", null));
+
+        String html = asAdmin("/spa/admin/well-known/file?id=4");
+
+        assertThat(html).contains("data-id=\"4\"", "data-manual=\"true\"", "value=\"hello\"", "value=\"ROOT\"", ">/riot.txt</");
     }
 }
