@@ -79,6 +79,15 @@ class WellKnownFileServiceTest {
     }
 
     @Test
+    void create_acceptsContentOfExactly65536Utf8Bytes() {
+        when(repository.findByLocationAndPath(WELL_KNOWN, "a.txt")).thenReturn(Optional.empty());
+        when(repository.save(any())).thenAnswer(i -> { WellKnownFile f = i.getArgument(0); f.setId(8L); return f; });
+        String content = "é".repeat(32_768); // 2 bytes each: 65 536 bytes exactly
+        assertThat(service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", "text/plain", content)).content())
+                .isEqualTo(content);
+    }
+
+    @Test
     void create_refusesATakenPath_with409() {
         when(repository.findByLocationAndPath(WELL_KNOWN, "security.txt")).thenReturn(Optional.of(file(1, "security.txt", "")));
         assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "security.txt", "text/plain", "x")))
@@ -90,7 +99,7 @@ class WellKnownFileServiceTest {
         WellKnownFile own = file(1, "security.txt", "old");
         when(repository.findById(1L)).thenReturn(Optional.of(own));
         when(repository.findByLocationAndPath(WELL_KNOWN, "security.txt")).thenReturn(Optional.of(own));
-        when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(repository.save(any())).thenAnswer(i -> { WellKnownFile f = i.getArgument(0); f.setId(8L); return f; });
 
         assertThat(service.update(1, new WellKnownFileRequest(WELL_KNOWN, "security.txt", "text/plain", "new")).content())
                 .isEqualTo("new");

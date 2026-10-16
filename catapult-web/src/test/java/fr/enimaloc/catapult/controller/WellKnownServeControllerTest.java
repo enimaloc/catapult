@@ -107,4 +107,10 @@ class WellKnownServeControllerTest {
                 .andExpect(header().string("Content-Security-Policy", "sandbox"))
                 .andExpect(header().string("Content-Type", org.hamcrest.Matchers.startsWith("text/plain")));
     }
+
+    @Test
+    void reservedRootNamesAre404WithoutAskingTheApi() throws Exception {
+        mvc.perform(get("/favicon.ico")).andExpect(status().isNotFound());
+        verify(apiService, never()).wellKnown(any(), any());
+    }
 }

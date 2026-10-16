@@ -34,6 +34,8 @@ public class ApiClient {
     static final String NOT_STARTED_MESSAGE = "502 Bad Gateway: \"<html><EOL><EOL><head><title>502 Bad Gateway</title></head><EOL><EOL><body><EOL><EOL><center><h1>502 Bad Gateway</h1></center><EOL><EOL><hr><center>openresty</center><EOL><EOL></body><EOL><EOL></html><EOL><EOL>\"";
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    /** Marks a call that must go out without the session's bearer; the interceptor removes it. */
+    private static final String ANONYMOUS_HEADER = "X-Catapult-Anonymous";
     private static final String AUTH_VALIDATE_PATH = "/api/auth/validate";
 
     private final RestClient client;
@@ -42,7 +44,8 @@ public class ApiClient {
         this.client = builder
                 .baseUrl(apiUrl)
                 .requestInterceptor((request, body, execution) -> {
-                    String token = currentJwt();
+                    boolean anonymous = request.getHeaders().remove(ANONYMOUS_HEADER) != null;
+                    String token = anonymous ? null : currentJwt();
                     if (token != null) request.getHeaders().setBearerAuth(token);
                     return execution.execute(request, body);
                 })
@@ -73,9 +76,10 @@ public class ApiClient {
     /** A GET answer kept raw (status, Content-Type, bytes), for content relayed as is; 502 when unreachable. */
     public record Raw(int status, String contentType, byte[] body) {}
 
+    /** Sent without the session's bearer: the content doesn't depend on who asks, and a stale JWT would be refused. */
     public Raw fetch(String path, Object... uriVars) {
         try {
-            return client.get().uri(path, uriVars).exchange((request, response) -> {
+            return client.get().uri(path, uriVars).header(ANONYMOUS_HEADER, "1").exchange((request, response) -> {
                 var type = response.getHeaders().getContentType();
                 return new Raw(response.getStatusCode().value(), type == null ? null : type.toString(),
                         response.getBody().readAllBytes());

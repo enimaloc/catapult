@@ -46,20 +46,20 @@ window.CatapultAdminWellKnown = (function () {
         dialog.open = true;
     }
 
-    /** Posts with `button` disabled meanwhile; true when it went through, the failure told otherwise. */
+    /** Posts with `button` disabled meanwhile; "ok" when it went through, else the status (null when not sent), told. */
     async function send(root, button, url, body) {
         button.disabled = true;
         let status;
         try {
             const response = await CatapultCsrf.postJson(url, body);
-            if (response.ok) return true;
+            if (response.ok) return "ok";
             status = response.status;
         } catch {
             // not sent at all: no status to tell
         }
         CatapultChannel.showError(message(root, status));
         button.disabled = false;
-        return false;
+        return status ?? null;
     }
 
     /** The file's text; read with a FileReader, as jsdom's File has no text(). */
@@ -108,9 +108,8 @@ window.CatapultAdminWellKnown = (function () {
         if (target.disabled) return; // its request is on its way
         if (target.matches(".admin-well-known-delete")) {
             if (!await CatapultAdminTabs.confirmed(root, target.dataset.confirm)) return;
-            if (await send(root, target, `/admin/well-known/${encodeURIComponent(row.dataset.id)}/delete`, {})) {
-                await CatapultAdminTabs.reload(panel);
-            }
+            const sent = await send(root, target, `/admin/well-known/${encodeURIComponent(row.dataset.id)}/delete`, {});
+            if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
             return;
         }
         const form = target.closest(".admin-well-known-form");
@@ -126,10 +125,9 @@ window.CatapultAdminWellKnown = (function () {
                 contentType: value(form, "contentType").trim(),
                 content: value(form, "content")
             };
-            if (await send(root, target, id ? `/admin/well-known/${encodeURIComponent(id)}` : "/admin/well-known", body)) {
-                dialog.open = false;
-                await CatapultAdminTabs.reload(panel);
-            }
+            const sent = await send(root, target, id ? `/admin/well-known/${encodeURIComponent(id)}` : "/admin/well-known", body);
+            if (sent === "ok") dialog.open = false;
+            if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
         }
     }
 

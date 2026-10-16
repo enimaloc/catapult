@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Set;
+
 /**
  * The well-known files the admin configured, served to anyone: under /.well-known/ (any depth), and
  * at the root for a dotted name (IndexController's pages have none). catapult-api decides what
@@ -21,6 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class WellKnownServeController {
     private static final String PREFIX = "/.well-known/";
+    /** Browsers and crawlers ask for these constantly; they are never admin files. */
+    private static final Set<String> RESERVED = Set.of("robots.txt", "sitemap.xml", "favicon.ico");
 
     private final ApiService apiService;
     private final WellKnownCache cache;
@@ -35,6 +39,7 @@ public class WellKnownServeController {
 
     @GetMapping("/{name:.+\\..+}")
     public ResponseEntity<byte[]> root(@PathVariable String name) {
+        if (RESERVED.contains(name)) return ResponseEntity.notFound().build();
         return serve(WellKnownLocation.ROOT, name);
     }
 
