@@ -578,4 +578,67 @@ describe("admin-well-known response and forms", () => {
         await click(".admin-well-known-save");
         expect(savedBody().content).toContain("Contact: mailto:typed@b.c\n");
     });
+
+    it("reads a generated form whose schema keys aren't selector-safe", async () => {
+        schemas["odd.json"] = { type: "object", properties: {
+            'a"b': { type: "string" }, "c\\d": { type: "boolean" }, "e\nf": { type: "string" }, ["__proto__"]: { type: "string" } } };
+        const content = '{"a\\"b": "v", "c\\\\d": false, "e\\nf": "w", "__proto__": "kept"}';
+        await open({ path: "odd.json", content });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        const byKey = key => [...fields().children].find(c => c.dataset.field === key);
+        expect(byKey("__proto__")).toBeUndefined();
+        byKey('a"b').value = "v2";
+        byKey("c\\d").checked = true;
+        switchMode("raw");
+        const doc = JSON.parse(field("content").value);
+        expect(doc['a"b']).toBe("v2");
+        expect(doc["c\\d"]).toBe(true);
+        expect(doc["e\nf"]).toBe("w");
+        expect(Object.getOwnPropertyDescriptor(doc, "__proto__").value).toBe("kept");
+        switchMode("form");
+        await save();
+        expect(JSON.parse(savedBody().content)['a"b']).toBe("v2");
+    });
+
+    it("refuses an other status that isn't an integer from 200 to 599", async () => {
+        await open({ path: "x" });
+        field("status").value = "other";
+        for (const bad of ["", "abc", "99", "600", "301.5"]) {
+            field("statusOther").value = bad;
+            await save();
+            expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Invalid");
+        }
+        expect(posted).not.toHaveBeenCalled();
+        field("statusOther").value = "599";
+        await save();
+        expect(savedBody().status).toBe(599);
+    });
+
+    it("disables Save while the schema warning is asked, re-enabling it on cancel", async () => {
+        schemas["gpc.json"] = { type: "object", required: ["gpc"], properties: { gpc: { type: "boolean" } } };
+        await open({ path: "gpc.json", content: "{}" });
+        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=gpc.json"));
+        await flush();
+        let answer;
+        mdui.confirm.mockImplementation(() => new Promise((resolve, reject) => { answer = { resolve, reject }; }));
+        const button = dialog().querySelector(".admin-well-known-save");
+        button.click();
+        button.click();
+        await flush();
+        expect(mdui.confirm).toHaveBeenCalledTimes(1);
+        expect(button.disabled).toBe(true);
+        answer.reject();
+        await flush();
+        expect(button.disabled).toBe(false);
+        expect(posted).not.toHaveBeenCalled();
+
+        button.click();
+        button.click();
+        await flush();
+        expect(mdui.confirm).toHaveBeenCalledTimes(2);
+        answer.resolve();
+        await vi.waitFor(() => expect(posted).toHaveBeenCalledTimes(1));
+        await flush();
+        expect(posted).toHaveBeenCalledTimes(1);
+    });
 });

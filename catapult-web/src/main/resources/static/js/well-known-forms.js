@@ -256,11 +256,14 @@ window.CatapultWellKnownForms = (function () {
         return ok ? null : `${f.key}: ${expected} expected`;
     }
 
+    const RESERVED = new Set(["__proto__", "constructor", "prototype"]);
+
     function fromSchema(schema) {
         if (!isObject(schema) || schema.type !== "object" || !isObject(schema.properties)) return null;
         const required = new Set(schema.required ?? []);
         const fields = [];
         for (const [key, property] of Object.entries(schema.properties)) {
+            if (RESERVED.has(key)) continue; // never a form field: kept as an unknown key
             const field = isObject(property) ? fieldOf(key, property, required.has(key)) : null;
             if (!field) return null;
             fields.push(field);
