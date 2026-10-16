@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.mock;
 
+import java.util.List;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
 import fr.enimaloc.catapult.service.WellKnownContent;
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,7 @@ class MockWellKnownStoreTest {
     private final MockWellKnownStore store = new MockWellKnownStore();
 
     private static WellKnownFileRequest req(fr.enimaloc.catapult.common.dto.admin.WellKnownLocation l, String path) {
-        return new WellKnownFileRequest(l, path, "text/plain", "body");
+        return new WellKnownFileRequest(l, path, 200, List.of(), "text/plain", "body");
     }
 
     @Test
@@ -56,7 +57,7 @@ class MockWellKnownStoreTest {
         for (String name : new String[]{"robots.txt", "sitemap.xml", "favicon.ico"}) {
             assertThat(store.create(req(ROOT, name))).isEqualTo(400);
         }
-        assertThat(store.create(new WellKnownFileRequest(ROOT, "big.txt", "text/plain", "x".repeat(65_537)))).isEqualTo(400);
-        assertThat(store.create(new WellKnownFileRequest(ROOT, "ok.txt", "text/plain", "x".repeat(65_536)))).isEqualTo(201);
+        assertThat(store.create(new WellKnownFileRequest(ROOT, "big.txt", 200, List.of(), "text/plain", "x".repeat(65_537)))).isEqualTo(400);
+        assertThat(store.create(new WellKnownFileRequest(ROOT, "ok.txt", 200, List.of(), "text/plain", "x".repeat(65_536)))).isEqualTo(201);
     }
 }

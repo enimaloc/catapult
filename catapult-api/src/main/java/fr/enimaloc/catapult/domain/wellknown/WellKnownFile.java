@@ -27,6 +27,13 @@ public class WellKnownFile {
     @Column(nullable = false)
     private String path;
 
+    @Column(name = "status_code", nullable = false)
+    private int status = 200;
+
+    /** JSON array of {"name","value"}; see WellKnownHeaders. */
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String headers = "[]";
+
     @Column(name = "content_type", nullable = false)
     private String contentType;
 

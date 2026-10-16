@@ -29,7 +29,7 @@ class MockWellKnownStore {
     }
 
     synchronized List<WellKnownFileDto> list() {
-        return files.values().stream().map(f -> new WellKnownFileDto(f.id(), f.location(), f.path(), f.contentType(),
+        return files.values().stream().map(f -> new WellKnownFileDto(f.id(), f.location(), f.path(), f.status(), f.contentType(),
                 f.content().getBytes(StandardCharsets.UTF_8).length, f.updatedAt())).toList();
     }
 
@@ -48,7 +48,7 @@ class MockWellKnownStore {
         if (!files.containsKey(id)) return 404;
         if (!valid(r)) return 400;
         if (find(r.location(), r.path()).filter(f -> f.id() != id).isPresent()) return 409;
-        files.put(id, new WellKnownFileDetailDto(id, r.location(), r.path(), r.contentType(), r.content(), Instant.now()));
+        files.put(id, new WellKnownFileDetailDto(id, r.location(), r.path(), r.status(), r.headers(), r.contentType(), r.content(), Instant.now()));
         return 200;
     }
 
@@ -70,7 +70,7 @@ class MockWellKnownStore {
 
     private void put(WellKnownLocation location, String path, String type, String content) {
         long id = ids.incrementAndGet();
-        files.put(id, new WellKnownFileDetailDto(id, location, path, type, content, Instant.now()));
+        files.put(id, new WellKnownFileDetailDto(id, location, path, 200, java.util.List.of(), type, content, Instant.now()));
     }
 
     private static boolean valid(WellKnownFileRequest r) {

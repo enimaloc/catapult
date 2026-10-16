@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.service.wellknown;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownHeader;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownResponseDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
 import fr.enimaloc.catapult.domain.wellknown.WellKnownFile;
 import fr.enimaloc.catapult.repository.wellknown.WellKnownFileRepository;
@@ -43,22 +45,22 @@ public class WellKnownFileService {
     }
 
     public WellKnownFileDetailDto create(WellKnownFileRequest request) {
-        validate(request);
+        Normalized normalized = validate(request);
         if (repository.findByLocationAndPath(request.location(), request.path()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Path already configured");
         }
-        return detail(repository.save(fill(new WellKnownFile(), request)));
+        return detail(repository.save(fill(new WellKnownFile(), request, normalized)));
     }
 
     public WellKnownFileDetailDto update(long id, WellKnownFileRequest request) {
         WellKnownFile file = existing(id);
-        validate(request);
+        Normalized normalized = validate(request);
         repository.findByLocationAndPath(request.location(), request.path())
                 .filter(other -> !other.getId().equals(file.getId()))
                 .ifPresent(other -> {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Path already configured");
                 });
-        return detail(repository.save(fill(file, request)));
+        return detail(repository.save(fill(file, request, normalized)));
     }
 
     public void delete(long id) {
@@ -76,41 +78,59 @@ public class WellKnownFileService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown well-known file"));
     }
 
-    private static void validate(WellKnownFileRequest request) {
+    /** The status and headers of a request once the defaults for old clients (no status, no headers) are applied. */
+    private record Normalized(int status, List<WellKnownHeader> headers) {}
+
+    private static Normalized validate(WellKnownFileRequest request) {
         if (!WellKnownPaths.valid(request.location(), request.path())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid path");
         }
-        String type = request.contentType();
-        if (type == null || type.isBlank() || type.length() > 255) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid content type");
-        }
-        try {
-            MediaType.parseMediaType(type);
-        } catch (InvalidMediaTypeException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid content type");
-        }
+        int status = request.status() == 0 ? 200 : request.status();
+        List<WellKnownHeader> headers = request.headers() == null ? List.of() : request.headers();
+        WellKnownHeaders.validate(status, headers);
         if (request.content() == null
                 || request.content().getBytes(StandardCharsets.UTF_8).length > WellKnownPaths.MAX_CONTENT_BYTES) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Content missing or too large");
         }
+        String type = request.contentType();
+        // A redirect has no body, so its type may be left blank (a default is stored); a body needs one.
+        if (type == null || (type.isBlank() && !request.content().isEmpty()) || type.length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid content type");
+        }
+        if (!type.isBlank()) {
+            try {
+                MediaType.parseMediaType(type);
+            } catch (InvalidMediaTypeException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid content type");
+            }
+        }
+        return new Normalized(status, headers);
     }
 
-    private WellKnownFile fill(WellKnownFile file, WellKnownFileRequest request) {
+    private WellKnownFile fill(WellKnownFile file, WellKnownFileRequest request, Normalized normalized) {
         file.setLocation(request.location());
         file.setPath(request.path());
-        file.setContentType(request.contentType().trim());
+        file.setStatus(normalized.status());
+        file.setHeaders(WellKnownHeaders.toJson(normalized.headers()));
+        file.setContentType(request.contentType().isBlank() ? "text/plain; charset=utf-8" : request.contentType().trim());
         file.setContent(request.content());
         file.setUpdatedAt(clock.instant());
         return file;
     }
 
+    /** What catapult-web must answer for {@code f}. */
+    public static WellKnownResponseDto response(WellKnownFile f) {
+        return new WellKnownResponseDto(f.getStatus(), f.getContentType(), WellKnownHeaders.fromJson(f.getHeaders()),
+                f.getContent());
+    }
+
     private static WellKnownFileDto summary(WellKnownFile f) {
-        return new WellKnownFileDto(f.getId(), f.getLocation(), f.getPath(), f.getContentType(),
-                f.getContent().getBytes(StandardCharsets.UTF_8).length, f.getUpdatedAt());
+        return new WellKnownFileDto(f.getId(), f.getLocation(), f.getPath(), f.getStatus(),
+                f.getContentType(), f.getContent().getBytes(StandardCharsets.UTF_8).length, f.getUpdatedAt());
     }
 
     private static WellKnownFileDetailDto detail(WellKnownFile f) {
-        return new WellKnownFileDetailDto(f.getId(), f.getLocation(), f.getPath(), f.getContentType(),
-                f.getContent(), f.getUpdatedAt());
+        return new WellKnownFileDetailDto(f.getId(), f.getLocation(), f.getPath(), f.getStatus(),
+                WellKnownHeaders.fromJson(f.getHeaders()), f.getContentType(), f.getContent(), f.getUpdatedAt());
     }
 }

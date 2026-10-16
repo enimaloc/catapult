@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.service.wellknown;
 
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownHeader;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownResponseDto;
 import fr.enimaloc.catapult.domain.wellknown.WellKnownFile;
 import fr.enimaloc.catapult.repository.wellknown.WellKnownFileRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +57,7 @@ class WellKnownFileServiceTest {
         when(repository.findByLocationAndPath(WELL_KNOWN, "security.txt")).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(i -> { WellKnownFile f = i.getArgument(0); f.setId(7L); return f; });
 
-        var created = service.create(new WellKnownFileRequest(WELL_KNOWN, "security.txt", "text/plain", "Contact: x"));
+        var created = service.create(new WellKnownFileRequest(WELL_KNOWN, "security.txt", 200, List.of(), "text/plain", "Contact: x"));
 
         assertThat(created.id()).isEqualTo(7L);
         assertThat(created.content()).isEqualTo("Contact: x");
@@ -64,16 +66,16 @@ class WellKnownFileServiceTest {
 
     @Test
     void create_refusesBadPathTypeOrSize_with400() {
-        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(ROOT, "riot", "text/plain", "x")))
+        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(ROOT, "riot", 200, List.of(), "text/plain", "x")))
                 .satisfies(t -> assertThat(status(t)).isEqualTo(400));
-        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", "not a type", "x")))
+        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", 200, List.of(), "not a type", "x")))
                 .satisfies(t -> assertThat(status(t)).isEqualTo(400));
-        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", " ", "x")))
+        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", 200, List.of(), " ", "x")))
                 .satisfies(t -> assertThat(status(t)).isEqualTo(400));
-        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", "text/plain", null)))
+        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", 200, List.of(), "text/plain", null)))
                 .satisfies(t -> assertThat(status(t)).isEqualTo(400));
         // 32 769 two-byte characters: under 65 536 chars, over 65 536 UTF-8 bytes.
-        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", "text/plain", "é".repeat(32_769))))
+        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", 200, List.of(), "text/plain", "é".repeat(32_769))))
                 .satisfies(t -> assertThat(status(t)).isEqualTo(400));
         verify(repository, never()).save(any());
     }
@@ -83,14 +85,14 @@ class WellKnownFileServiceTest {
         when(repository.findByLocationAndPath(WELL_KNOWN, "a.txt")).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(i -> { WellKnownFile f = i.getArgument(0); f.setId(8L); return f; });
         String content = "é".repeat(32_768); // 2 bytes each: 65 536 bytes exactly
-        assertThat(service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", "text/plain", content)).content())
+        assertThat(service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", 200, List.of(), "text/plain", content)).content())
                 .isEqualTo(content);
     }
 
     @Test
     void create_refusesATakenPath_with409() {
         when(repository.findByLocationAndPath(WELL_KNOWN, "security.txt")).thenReturn(Optional.of(file(1, "security.txt", "")));
-        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "security.txt", "text/plain", "x")))
+        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "security.txt", 200, List.of(), "text/plain", "x")))
                 .satisfies(t -> assertThat(status(t)).isEqualTo(409));
     }
 
@@ -101,11 +103,11 @@ class WellKnownFileServiceTest {
         when(repository.findByLocationAndPath(WELL_KNOWN, "security.txt")).thenReturn(Optional.of(own));
         when(repository.save(any())).thenAnswer(i -> { WellKnownFile f = i.getArgument(0); f.setId(8L); return f; });
 
-        assertThat(service.update(1, new WellKnownFileRequest(WELL_KNOWN, "security.txt", "text/plain", "new")).content())
+        assertThat(service.update(1, new WellKnownFileRequest(WELL_KNOWN, "security.txt", 200, List.of(), "text/plain", "new")).content())
                 .isEqualTo("new");
 
         when(repository.findByLocationAndPath(WELL_KNOWN, "other.txt")).thenReturn(Optional.of(file(2, "other.txt", "")));
-        assertThatThrownBy(() -> service.update(1, new WellKnownFileRequest(WELL_KNOWN, "other.txt", "text/plain", "x")))
+        assertThatThrownBy(() -> service.update(1, new WellKnownFileRequest(WELL_KNOWN, "other.txt", 200, List.of(), "text/plain", "x")))
                 .satisfies(t -> assertThat(status(t)).isEqualTo(409));
     }
 
@@ -113,7 +115,7 @@ class WellKnownFileServiceTest {
     void getUpdateDelete_unknownId_404() {
         when(repository.findById(9L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.get(9)).satisfies(t -> assertThat(status(t)).isEqualTo(404));
-        assertThatThrownBy(() -> service.update(9, new WellKnownFileRequest(WELL_KNOWN, "a.txt", "text/plain", "")))
+        assertThatThrownBy(() -> service.update(9, new WellKnownFileRequest(WELL_KNOWN, "a.txt", 200, List.of(), "text/plain", "")))
                 .satisfies(t -> assertThat(status(t)).isEqualTo(404));
         assertThatThrownBy(() -> service.delete(9)).satisfies(t -> assertThat(status(t)).isEqualTo(404));
     }
@@ -128,5 +130,39 @@ class WellKnownFileServiceTest {
     void find_neverQueriesABrokenPath() {
         assertThat(service.find(WELL_KNOWN, "../x")).isEmpty();
         verifyNoInteractions(repository);
+    }
+
+    @Test
+    void create_storesStatusAndHeaders_andDefaultsOldClients() {
+        when(repository.findByLocationAndPath(any(), any())).thenReturn(Optional.empty());
+        when(repository.save(any())).thenAnswer(i -> { WellKnownFile f = i.getArgument(0); f.setId(5L); return f; });
+
+        var redirect = service.create(new WellKnownFileRequest(WELL_KNOWN, "change-password", 302,
+                List.of(new WellKnownHeader("Location", "/settings/password")), "", ""));
+        assertThat(redirect.status()).isEqualTo(302);
+        assertThat(redirect.headers()).containsExactly(new WellKnownHeader("Location", "/settings/password"));
+        assertThat(redirect.contentType()).isEqualTo("text/plain; charset=utf-8");
+
+        var legacy = service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", 0, null, "text/plain", "x"));
+        assertThat(legacy.status()).isEqualTo(200);
+        assertThat(legacy.headers()).isEmpty();
+    }
+
+    @Test
+    void create_refusesBadHeaders_andAContentTypeMissingForContent() {
+        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", 302, List.of(), "text/plain", "")))
+                .satisfies(t -> assertThat(status(t)).isEqualTo(400));
+        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", 200, List.of(), "", "content")))
+                .satisfies(t -> assertThat(status(t)).isEqualTo(400));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void response_describesTheStoredFile() {
+        WellKnownFile f = file(1, "change-password", "");
+        f.setStatus(302);
+        f.setHeaders("[{\"name\":\"Location\",\"value\":\"/p\"}]");
+        assertThat(WellKnownFileService.response(f)).isEqualTo(new WellKnownResponseDto(302,
+                "text/plain; charset=utf-8", List.of(new WellKnownHeader("Location", "/p")), ""));
     }
 }

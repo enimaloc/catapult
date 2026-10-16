@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto;
 import fr.enimaloc.catapult.common.dto.admin.IanaWellKnownDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownHeader;
 import fr.enimaloc.catapult.service.wellknown.IanaWellKnownRegistry;
 import fr.enimaloc.catapult.service.wellknown.WellKnownFileService;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.List;
 
 import static fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,9 +42,9 @@ class ApiAdminWellKnownControllerTest {
     @MockitoBean WellKnownFileService service;
     @MockitoBean IanaWellKnownRegistry registry;
 
-    static final String BODY = "{\"location\":\"WELL_KNOWN\",\"path\":\"security.txt\",\"contentType\":\"text/plain\",\"content\":\"x\"}";
-    static final WellKnownFileDetailDto DETAIL = new WellKnownFileDetailDto(3, WELL_KNOWN, "security.txt", "text/plain", "x",
-            Instant.parse("2026-10-16T10:00:00Z"));
+    static final String BODY = "{\"location\":\"WELL_KNOWN\",\"path\":\"security.txt\",\"status\":302,\"headers\":[{\"name\":\"Location\",\"value\":\"/x\"}],\"contentType\":\"text/plain\",\"content\":\"x\"}";
+    static final WellKnownFileDetailDto DETAIL = new WellKnownFileDetailDto(3, WELL_KNOWN, "security.txt", 302,
+            List.of(new WellKnownHeader("Location", "/x")), "text/plain", "x", Instant.parse("2026-10-16T10:00:00Z"));
 
     @Test
     void createAnswers201WithTheFile() throws Exception {
@@ -51,7 +53,8 @@ class ApiAdminWellKnownControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(3))
                 .andExpect(jsonPath("$.location").value("WELL_KNOWN"));
-        verify(service).create(new WellKnownFileRequest(WELL_KNOWN, "security.txt", "text/plain", "x"));
+        verify(service).create(new WellKnownFileRequest(WELL_KNOWN, "security.txt", 302,
+                List.of(new WellKnownHeader("Location", "/x")), "text/plain", "x"));
     }
 
     @Test

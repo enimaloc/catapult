@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import java.util.List;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
@@ -27,8 +28,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = AdminWellKnownController.class)
 @Import({WebSecurityConfig.class, ModelFiller.class, WellKnownCache.class})
 class AdminWellKnownControllerTest {
-    static final String BODY = "{\"location\":\"ROOT\",\"path\":\"riot.txt\",\"contentType\":\"text/plain\",\"content\":\"x\"}";
-    static final WellKnownFileRequest REQUEST = new WellKnownFileRequest(ROOT, "riot.txt", "text/plain", "x");
+    static final String BODY = "{\"location\":\"ROOT\",\"path\":\"riot.txt\",\"status\":200,\"headers\":[],\"contentType\":\"text/plain\",\"content\":\"x\"}";
+    static final WellKnownFileRequest REQUEST = new WellKnownFileRequest(ROOT, "riot.txt", 200, List.of(), "text/plain", "x");
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
