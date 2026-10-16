@@ -1751,7 +1751,7 @@ mdui-select::part(menu) {
 .admin-well-known-url { overflow-wrap: anywhere; color: rgb(var(--mdui-color-on-surface-variant)); }
 .admin-well-known-status-row { display: flex; gap: 12px; flex-wrap: wrap; }
 .admin-well-known-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 8px; align-items: center; }
-.admin-well-known-response, .admin-well-known-content-panel { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
+.admin-well-known-response[active], .admin-well-known-content-panel[active] { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
 .admin-well-known-fields { display: flex; flex-direction: column; gap: 12px; }
 .admin-well-known-fields fieldset { border: 1px solid rgb(var(--mdui-color-outline-variant)); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .admin-well-known-mode-reason { color: rgb(var(--mdui-color-error)); }
