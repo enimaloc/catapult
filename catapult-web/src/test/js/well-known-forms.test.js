@@ -93,7 +93,7 @@ describe("JSON descriptors", () => {
             appclips: { apps: ["T.clip"] }
         });
         const model = F.parse(d, text);
-        expect(model.values.details).toEqual([{ appIDs: ["T.app"], paths: ["/a/*"] }]);
+        expect(model.values.details).toEqual([{ appIDs: ["T.app"], paths: ["/a/*"], _origin: 1 }]);
         model.values.webcredentials = ["T.app"];
         model.values.details[0].paths.push("/b/*");
         expect(JSON.parse(F.serialize(d, model))).toEqual({
@@ -197,7 +197,7 @@ describe("never loses content", () => {
         const first = { appIDs: ["T"], components: [{ "/": "/a" }, { "#": "c1", comment: "x" }, { "?": "q" }] };
         const doc = { applinks: { details: [first, { appIDs: ["U"], components: [{ "/": "/b" }] }] } };
         const model = F.parse(aasa(), JSON.stringify(doc));
-        expect(model.values.details).toEqual([{ appIDs: ["U"], paths: ["/b"] }]);
+        expect(model.values.details).toEqual([{ appIDs: ["U"], paths: ["/b"], _origin: 1 }]);
         model.values.details = [];
         expect(JSON.parse(F.serialize(aasa(), model)).applinks.details).toEqual([first]);
     });
@@ -254,5 +254,44 @@ describe("never loses content", () => {
             model.values.ids = ["1", "2", "3.5", "x"];
             expect(JSON.parse(F.serialize(d, model)).ids).toEqual([1, 2, 3.5, "x"]);
         });
+    });
+
+    it("keeps apple details in their slots when one is deleted or edited", () => {
+        const A = { appIDs: ["A"], components: [{ "/": "/a" }] };
+        const mixed = { appIDs: ["M"], components: [{ "#": "c" }] };
+        const B = { appIDs: ["B"], components: [{ "/": "/b" }] };
+        const text = JSON.stringify({ applinks: { details: [A, mixed, B] } });
+        let model = F.parse(aasa(), text);
+        model.values.details = model.values.details.filter(d => d.appIDs[0] !== "A");
+        expect(JSON.parse(F.serialize(aasa(), model)).applinks.details).toEqual([mixed, B]);
+        model = F.parse(aasa(), text);
+        model.values.details[1].paths = ["/b2"];
+        model.values.details.push({ appIDs: ["N"], paths: [] });
+        expect(JSON.parse(F.serialize(aasa(), model)).applinks.details)
+            .toEqual([A, mixed, { appIDs: ["B"], components: [{ "/": "/b2" }] }, { appIDs: ["N"] }]);
+    });
+
+    it("keeps degenerate entries untouched on a no-op round trip", () => {
+        const cases = [
+            [ms(), { associatedApplications: [{ applicationId: "" }, { applicationId: "x" }] }],
+            [F.forPath("WELL_KNOWN", "assetlinks.json"), [
+                { relation: ["delegate_permission/common.handle_all_urls"], target: { namespace: "android_app", package_name: "", sha256_cert_fingerprints: ["A"] } },
+                { relation: ["delegate_permission/common.handle_all_urls"], target: { namespace: "android_app", package_name: "p", sha256_cert_fingerprints: ["A", ""] } }]],
+            [aasa(), { applinks: { details: [{ appIDs: [] }, { appIDs: ["a", ""] }, { appIDs: ["a"], components: [{ "/": "" }] }] }, webcredentials: { apps: [] } }]
+        ];
+        for (const [d, doc] of cases) {
+            expect(JSON.parse(F.serialize(d, F.parse(d, JSON.stringify(doc))))).toEqual(doc);
+        }
+    });
+
+    it("refuses a webcredentials that is not an object", () => {
+        expect(() => F.parse(aasa(), JSON.stringify({ webcredentials: "abc" }))).toThrow("webcredentials: object expected");
+    });
+
+    it("drops whitespace-only items of a number list", () => {
+        const d = F.fromSchema({ type: "object", properties: { ids: { type: "array", items: { type: "number" } } } });
+        const model = F.parse(d, '{"ids": [1]}');
+        model.values.ids = ["1", "  ", "2"];
+        expect(JSON.parse(F.serialize(d, model)).ids).toEqual([1, 2]);
     });
 });
