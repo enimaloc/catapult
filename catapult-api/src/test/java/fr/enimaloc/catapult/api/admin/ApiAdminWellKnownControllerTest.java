@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownHeader;
 import fr.enimaloc.catapult.service.wellknown.IanaWellKnownRegistry;
+import fr.enimaloc.catapult.service.wellknown.SchemaStoreRegistry;
 import fr.enimaloc.catapult.service.wellknown.WellKnownFileService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,7 @@ class ApiAdminWellKnownControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean WellKnownFileService service;
     @MockitoBean IanaWellKnownRegistry registry;
+    @MockitoBean SchemaStoreRegistry schemas;
 
     static final String BODY = "{\"location\":\"WELL_KNOWN\",\"path\":\"security.txt\",\"status\":302,\"headers\":[{\"name\":\"Location\",\"value\":\"/x\"}],\"contentType\":\"text/plain\",\"content\":\"x\"}";
     static final WellKnownFileDetailDto DETAIL = new WellKnownFileDetailDto(3, WELL_KNOWN, "security.txt", 302,
@@ -82,6 +84,21 @@ class ApiAdminWellKnownControllerTest {
         when(service.create(any())).thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));
         mvc.perform(post("/api/admin/well-known").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void schemaAnswersSchemaStoresJson() throws Exception {
+        when(schemas.schemaFor("gpc.json")).thenReturn(java.util.Optional.of("{\"title\":\"gpc\"}"));
+        mvc.perform(get("/api/admin/well-known/schema").param("path", "gpc.json"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("gpc"));
+    }
+
+    @Test
+    void schemaIs404WhenThereIsNone() throws Exception {
+        when(schemas.schemaFor("x")).thenReturn(java.util.Optional.empty());
+        mvc.perform(get("/api/admin/well-known/schema").param("path", "x"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
