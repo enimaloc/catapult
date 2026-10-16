@@ -58,6 +58,15 @@ class ApiAdminWellKnownControllerTest {
     }
 
     @Test
+    void createWithoutStatusOrHeaders_isAccepted_forOlderClients() throws Exception {
+        when(service.create(any())).thenReturn(DETAIL);
+        mvc.perform(post("/api/admin/well-known").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"location\":\"WELL_KNOWN\",\"path\":\"a.txt\",\"contentType\":\"text/plain\",\"content\":\"x\"}"))
+                .andExpect(status().isCreated());
+        verify(service).create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", null, null, "text/plain", "x"));
+    }
+
+    @Test
     void updateGetDelete() throws Exception {
         when(service.update(eq(3L), any())).thenReturn(DETAIL);
         when(service.get(3L)).thenReturn(DETAIL);
