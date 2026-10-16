@@ -301,10 +301,11 @@ class AdminTabsFragmentControllerTest {
 
         String html = asAdmin("/spa/admin/well-known/file?id=5");
 
-        assertThat(html).contains("data-initial-status=\"302\"", "name=\"status\"", "value=\"302\"", "admin-well-known-header\"",
+        assertThat(html).contains("name=\"status\"", "value=\"302\"", "admin-well-known-header\"",
                 "data-header=\"name\"", "value=\"Location\"", "value=\"/account\"", "admin-well-known-redirect",
-                "admin-well-known-sections", "data-label-add=\"Add\"")
-                .doesNotContain("data-preset");
+                "admin-well-known-sections", "data-label-add=\"Add\"", "data-label-schema-more=")
+                .doesNotContain("data-preset", "data-initial-status")
+                .containsPattern("admin-well-known-sections[^>]*value=\"response\"");
     }
 
     @Test
@@ -326,7 +327,7 @@ class AdminTabsFragmentControllerTest {
     void wellKnownFile_changePasswordPreset_isARedirectWithAnEmptyLocation() throws Exception {
         String html = asAdmin("/spa/admin/well-known/file?location=WELL_KNOWN&path=change-password");
 
-        assertThat(html).contains("data-preset=\"redirect\"", "data-initial-status=\"302\"", "data-header=\"name\"", "value=\"Location\"")
+        assertThat(html).contains("data-header=\"name\"", "value=\"Location\"")
                 .containsPattern("admin-well-known-sections[^>]*value=\"response\"");
     }
 

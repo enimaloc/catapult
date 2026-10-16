@@ -143,6 +143,10 @@ public class AdminTabsFragmentController {
                     response.setStatus(HttpStatus.NOT_FOUND.value());
                     return "pages/admin-tab/well-known :: missing";
                 }
+                // a redirect or an empty file has no content to edit: it opens on the Response tab
+                if (file.status() >= 300 && file.status() < 400 || file.content() == null || file.content().isEmpty()) {
+                    preset = "redirect";
+                }
             } else {
                 String p = path == null ? "" : path;
                 WellKnownLocation where = location == null ? WellKnownLocation.WELL_KNOWN : location;
