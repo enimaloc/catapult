@@ -22,7 +22,8 @@ import java.util.UUID;
  * The browser's Sentry setup, for the full pages (index.html loads the SDK and monitoring.js only
  * with it): the same DSN, environment and release as the server's, and the request's trace, which
  * the page's own then continues, and the member's account id (as SentryUserInterceptor names them).
- * None without a DSN.
+ * Pages are replayed whole at {@code catapult.sentry.replays-session-sample-rate} (none by default,
+ * all of them in dev), else only those with an error. None without a DSN.
  */
 @ControllerAdvice(assignableTypes = {IndexController.class, ErrorPageController.class})
 public class SentryBrowser {
@@ -51,7 +52,7 @@ public class SentryBrowser {
      * {@code sdk}'s scripts and their hashes in the script tags loading them.
      */
     public record Config(String dsn, String environment, String release, double tracesSampleRate,
-                         String user, String trace, String baggage, Map<String, String> sdk) {
+                         double replaysSessionSampleRate, String user, String trace, String baggage, Map<String, String> sdk) {
         /** What monitoring.js reads, as window.Catapult.sentry: Thymeleaf writes a record as {}. */
         public Map<String, Object> script() {
             Map<String, Object> script = new LinkedHashMap<>();
@@ -59,6 +60,7 @@ public class SentryBrowser {
             script.put("environment", environment);
             script.put("release", release);
             script.put("tracesSampleRate", tracesSampleRate);
+            script.put("replaysSessionSampleRate", replaysSessionSampleRate);
             script.put("user", user);
             return script;
         }
@@ -68,15 +70,18 @@ public class SentryBrowser {
     private final String environment;
     private final Optional<String> release;
     private final double tracesSampleRate;
+    private final double replaysSessionSampleRate;
     private final ObjectProvider<ApiService> apiService;
 
     public SentryBrowser(@Value("${sentry.dsn:}") String dsn,
                          @Value("${sentry.environment:production}") String environment,
                          @Value("${sentry.traces-sample-rate:1.0}") double tracesSampleRate,
+                         @Value("${catapult.sentry.replays-session-sample-rate:0}") double replaysSessionSampleRate,
                          Optional<BuildProperties> build, ObjectProvider<ApiService> apiService) {
         this.dsn = dsn;
         this.environment = environment;
         this.tracesSampleRate = tracesSampleRate;
+        this.replaysSessionSampleRate = replaysSessionSampleRate;
         this.release = SentryConfig.release(build);
         this.apiService = apiService;
     }
@@ -90,7 +95,7 @@ public class SentryBrowser {
         BaggageHeader baggage = Sentry.getBaggage();
         ApiService api = apiService.getIfAvailable();
         UUID account = api == null ? null : api.currentUserId();
-        return new Config(dsn, environment, release.orElse(null), tracesSampleRate,
+        return new Config(dsn, environment, release.orElse(null), tracesSampleRate, replaysSessionSampleRate,
                 account == null ? null : account.toString(),
                 trace == null ? null : trace.getValue(), baggage == null ? null : baggage.getValue(), SDK);
     }

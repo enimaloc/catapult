@@ -57,6 +57,13 @@ describe("with a DSN", () => {
         expect(Sentry.setUser).toHaveBeenCalledWith({ id: CONFIG.user });
     });
 
+    it("replays whole sessions when the config asks for them", async () => {
+        window.Catapult = { sentry: { ...CONFIG, replaysSessionSampleRate: 1.0 } };
+        await load("monitoring");
+
+        expect(Sentry.init.mock.calls[0][0].replaysSessionSampleRate).toBe(1.0);
+    });
+
     it("names no one when logged out", async () => {
         window.Catapult = { sentry: { ...CONFIG, user: null, release: null } };
         await load("monitoring");
