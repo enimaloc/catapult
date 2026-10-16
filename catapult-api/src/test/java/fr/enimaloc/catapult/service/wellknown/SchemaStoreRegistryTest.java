@@ -32,13 +32,28 @@ class SchemaStoreRegistryTest {
 
     final List<String> fetched = new ArrayList<>();
 
-    Function<String, String> web(boolean up) {
+    static byte[] bytes(String s) { return s.getBytes(java.nio.charset.StandardCharsets.UTF_8); }
+
+    Function<String, byte[]> web(boolean up) {
         return url -> {
             fetched.add(url);
             if (!up) throw new IllegalStateException("offline");
-            if (url.endsWith("catalog.json")) return CATALOG;
-            return "{\"title\":\"" + url + "\"}";
+            if (url.endsWith("catalog.json")) return bytes(CATALOG);
+            return bytes("{\"title\":\"" + url + "\"}");
         };
+    }
+
+    static String catalogOf(String key, String url) {
+        return "{\"schemas\":[{\"name\":\"n\",\"fileMatch\":[\"" + key + "\"],\"url\":\"" + url + "\"}]}";
+    }
+
+    /** A JSON document of exactly {@code size} bytes (ASCII padding). */
+    static byte[] json(int size) {
+        byte[] b = new byte[size];
+        java.util.Arrays.fill(b, (byte) ' ');
+        b[0] = '{';
+        b[size - 1] = '}';
+        return b;
     }
 
     @Test
@@ -82,10 +97,82 @@ class SchemaStoreRegistryTest {
         assertThat(fetched.size()).isGreaterThan(calls);
     }
 
+    Function<String, byte[]> serving(String catalog, java.util.function.Supplier<byte[]> schema) {
+        return url -> {
+            fetched.add(url);
+            return url.endsWith("catalog.json") ? bytes(catalog) : schema.get();
+        };
+    }
+
     @Test
-    void refusesAnOversizedSchema() {
-        var registry = new SchemaStoreRegistry(url -> url.endsWith("catalog.json") ? CATALOG : "x".repeat(1024 * 1024 + 1),
-                new MovableClock());
+    void acceptsExactly1MiBAndRefusesOneByteMore() {
+        var ok = new SchemaStoreRegistry(serving(CATALOG, () -> json(1024 * 1024)), new MovableClock());
+        assertThat(ok.schemaFor("gpc.json")).isPresent();
+        var tooBig = new SchemaStoreRegistry(serving(CATALOG, () -> json(1024 * 1024 + 1)), new MovableClock());
+        assertThat(tooBig.schemaFor("gpc.json")).isEmpty();
+    }
+
+    @Test
+    void countsBytesNotChars() {
+        // 600_000 two-byte chars: < 1 MiB chars, > 1 MiB bytes
+        byte[] body = bytes("{\"a\":\"" + "é".repeat(600_000) + "\"}");
+        var registry = new SchemaStoreRegistry(serving(CATALOG, () -> body), new MovableClock());
         assertThat(registry.schemaFor("gpc.json")).isEmpty();
+    }
+
+    @Test
+    void onlyFetchesSchemaStoreHosts() {
+        for (String url : List.of("https://169.254.169.254/x.json", "https://evil.example/x.json",
+                "https://user@www.schemastore.org/x.json", "https://www.schemastore.org:8443/x.json")) {
+            fetched.clear();
+            var registry = new SchemaStoreRegistry(serving(catalogOf("**/.well-known/gpc.json", url), () -> bytes("{}")),
+                    new MovableClock());
+            assertThat(registry.schemaFor("gpc.json")).as(url).isEmpty();
+            assertThat(fetched).as(url).containsExactly(SchemaStoreRegistry.CATALOG_URL);
+        }
+        var registry = new SchemaStoreRegistry(serving(catalogOf("**/.well-known/gpc.json",
+                "https://raw.githubusercontent.com/x/y.json"), () -> bytes("{}")), new MovableClock());
+        assertThat(registry.schemaFor("gpc.json")).isPresent();
+    }
+
+    @Test
+    void aFailedSchemaDownloadIsNotRetriedBefore10Minutes_andTheSnapshotAnswers() {
+        MovableClock clock = new MovableClock();
+        var registry = new SchemaStoreRegistry(url -> {
+            fetched.add(url);
+            if (url.endsWith("catalog.json")) return bytes(CATALOG);
+            throw new IllegalStateException("boom");
+        }, clock);
+        assertThat(registry.schemaFor("assetlinks.json")).isPresent(); // bundled
+        assertThat(fetched).hasSize(2);
+        clock.advance(Duration.ofMinutes(5));
+        assertThat(registry.schemaFor("assetlinks.json")).isPresent();
+        assertThat(fetched).hasSize(2);
+        clock.advance(Duration.ofMinutes(6));
+        registry.schemaFor("assetlinks.json");
+        assertThat(fetched).hasSize(3);
+    }
+
+    @Test
+    void aBodyThatIsNotJsonIsUnavailable_andNotRetriedBefore10Minutes() {
+        MovableClock clock = new MovableClock();
+        var registry = new SchemaStoreRegistry(serving(CATALOG, () -> bytes("<html>oops</html>")), clock);
+        assertThat(registry.schemaFor("assetlinks.json")).isPresent();
+        assertThat(fetched).hasSize(2);
+        clock.advance(Duration.ofMinutes(5));
+        assertThat(registry.schemaFor("assetlinks.json")).isPresent();
+        assertThat(fetched).hasSize(2);
+        clock.advance(Duration.ofMinutes(6));
+        registry.schemaFor("assetlinks.json");
+        assertThat(fetched).hasSize(3);
+    }
+
+    @Test
+    void theBareNameOnlyStandsForASingleSegmentPath() {
+        var registry = new SchemaStoreRegistry(serving(catalogOf("package.json", "https://www.schemastore.org/package.json"),
+                () -> bytes("{}")), new MovableClock());
+        assertThat(registry.schemaFor("foo/package.json")).isEmpty();
+        assertThat(registry.schemaFor("package.json")).isPresent();
+        assertThat(new SchemaStoreRegistry(web(true), new MovableClock()).schemaFor("assetlinks.json")).isPresent();
     }
 }
