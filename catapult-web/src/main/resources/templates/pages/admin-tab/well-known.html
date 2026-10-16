@@ -1,0 +1,89 @@
+<!--/*@thymesVar id="files" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto>"*/-->
+<!--/*@thymesVar id="registry" type="fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto"*/-->
+<!--/*
+  The files served under /.well-known/ and at the root (content: edited, created and deleted by
+  admin-well-known.js through a file's dialog), then IANA's registry, filtered in the browser, each
+  suffix opening a new file's dialog with its path.
+*/-->
+<div th:fragment="content" class="admin-view admin-well-known"
+     th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+              data-error=#{admin.error.generic},data-error-400=#{admin.well-known.error.400},
+              data-error-404=#{admin.well-known.error.404},data-error-409=#{admin.well-known.error.409},
+              data-error-too-large=#{admin.well-known.import.too-large},data-error-binary=#{admin.well-known.import.binary}">
+    <div class="section-header">
+        <div>
+            <h2 th:text="#{admin.tab.well-known}">Well-known</h2>
+            <span class="eyebrow" th:if="${files != null}" th:text="#{admin.well-known.count(${files.size()})}">0 files</span>
+        </div>
+        <mdui-button id="admin-well-known-new" variant="tonal" icon="add" th:text="#{admin.well-known.new}">New</mdui-button>
+    </div>
+
+    <th:block th:if="${files == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${files != null and files.isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('travel_explore', #{admin.well-known.empty})}"></th:block>
+    </th:block>
+
+    <mdui-card class="admin-table" variant="outlined" th:if="${files != null and !files.isEmpty()}">
+        <div class="admin-row admin-well-known-file" th:each="f : ${files}" th:attr="data-id=${f.id()}"
+             th:with="url=${(f.location().name() == 'ROOT' ? '/' : '/.well-known/') + f.path()}">
+            <a class="admin-well-known-link" th:href="${url}" th:text="${url}" target="_blank" rel="noopener">url</a>
+            <span class="admin-member-id" th:text="${f.contentType()}">type</span>
+            <span class="admin-member-id" th:text="#{admin.well-known.size(${f.size()})}">0 B</span>
+            <span class="admin-member-id" th:text="${#temporals.format(f.updatedAt(), 'yyyy-MM-dd HH:mm')}">date</span>
+            <mdui-button-icon icon="edit" class="admin-well-known-edit" th:attr="aria-label=#{admin.well-known.edit}"></mdui-button-icon>
+            <mdui-button-icon icon="delete" class="admin-well-known-delete"
+                              th:attr="aria-label=#{admin.well-known.delete},data-confirm=#{admin.well-known.delete.confirm(${url})}"></mdui-button-icon>
+        </div>
+    </mdui-card>
+
+    <div class="section-header admin-subheader">
+        <h2 th:text="#{admin.well-known.registry}">IANA registry</h2>
+        <mdui-text-field class="admin-search" data-well-known-filter variant="outlined" clearable icon="search"
+                         th:attr="label=#{admin.search}"></mdui-text-field>
+    </div>
+    <p class="admin-placeholder" th:if="${registry == null}" th:text="#{admin.well-known.registry.unavailable}">unavailable</p>
+    <p class="eyebrow" th:if="${registry != null and registry.source() == 'SNAPSHOT'}"
+       th:text="#{admin.well-known.registry.snapshot}">offline copy</p>
+    <mdui-card class="admin-table" variant="outlined" th:if="${registry != null}">
+        <div class="admin-row admin-iana-row" th:each="e : ${registry.entries()}"
+             th:attr="data-search=${#strings.toLowerCase(e.suffix() + ' ' + e.reference())}">
+            <strong th:text="${e.suffix()}">suffix</strong>
+            <mdui-chip th:text="${e.status()}">permanent</mdui-chip>
+            <a th:if="${#strings.startsWith(e.reference(), 'http')}" th:href="${e.reference()}" th:text="${e.reference()}"
+               target="_blank" rel="noopener">ref</a>
+            <span th:unless="${#strings.startsWith(e.reference(), 'http')}" th:text="${e.reference()}">ref</span>
+            <mdui-chip th:if="${configured.contains(e.suffix())}" icon="check" th:text="#{admin.well-known.configured}">configured</mdui-chip>
+            <mdui-button variant="text" class="admin-well-known-configure" th:attr="data-path=${e.suffix()}"
+                         th:text="#{admin.well-known.configure}">Configure</mdui-button>
+        </div>
+    </mdui-card>
+
+    <mdui-dialog id="admin-well-known-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-dialog-body"></div>
+    </mdui-dialog>
+</div>
+
+<!--/*@thymesVar id="file" type="fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto"*/-->
+<div th:fragment="file" class="admin-well-known-form" th:attr="data-id=${creating ? null : file.id()}">
+    <h3 th:text="${creating} ? #{admin.well-known.form.title.new} : ${url}">title</h3>
+    <mdui-select name="location" variant="outlined" th:attr="label=#{admin.well-known.form.location},value=${file.location().name()}">
+        <mdui-menu-item value="WELL_KNOWN">/.well-known/</mdui-menu-item>
+        <mdui-menu-item value="ROOT" th:text="#{admin.well-known.form.location.root}">root</mdui-menu-item>
+    </mdui-select>
+    <mdui-text-field name="path" variant="outlined"
+                     th:attr="label=#{admin.well-known.form.path},value=${file.path()},helper=#{admin.well-known.form.path.helper}"></mdui-text-field>
+    <code class="admin-well-known-url" th:text="${url}">/.well-known/</code>
+    <mdui-text-field name="contentType" variant="outlined"
+                     th:attr="label=#{admin.well-known.form.type},value=${file.contentType()},data-manual=${creating ? null : 'true'}"></mdui-text-field>
+    <mdui-text-field name="content" class="admin-well-known-content" variant="outlined" rows="12"
+                     th:attr="label=#{admin.well-known.form.content},value=${file.content()}"></mdui-text-field>
+    <input type="file" class="admin-well-known-import" hidden>
+    <div class="admin-data-actions">
+        <mdui-button variant="text" icon="upload_file" class="admin-well-known-import-button"
+                     th:text="#{admin.well-known.form.import}">Import</mdui-button>
+        <mdui-button variant="text" class="admin-dialog-close" th:text="#{admin.cancel}">Cancel</mdui-button>
+        <mdui-button class="admin-well-known-save" th:text="#{admin.well-known.form.save}">Save</mdui-button>
+    </div>
+</div>
+
+<p th:fragment="missing" class="admin-placeholder" th:text="#{admin.well-known.error.404}">gone</p>

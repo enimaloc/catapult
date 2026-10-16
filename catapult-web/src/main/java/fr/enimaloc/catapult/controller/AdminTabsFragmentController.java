@@ -2,6 +2,9 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
 import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -108,6 +112,42 @@ public class AdminTabsFragmentController {
         AdminPage<Map<String, Object>> rows = apiService.adminDataRows(repo, null, 0);
         if (rows == null) return null;
         return rows.content().isEmpty() ? Map.of("id", "") : rows.content().getFirst();
+    }
+
+    @GetMapping("/well-known")
+    String wellKnown(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            List<WellKnownFileDto> files = apiService.adminWellKnownFiles();
+            model.addAttribute("files", files);
+            model.addAttribute("registry", apiService.adminIanaRegistry());
+            model.addAttribute("configured", files == null ? Set.of() : AdminWellKnownViews.configured(files));
+            return "pages/admin-tab/well-known :: content";
+        });
+    }
+
+    /** A file's dialog; without an id, a new file's, prefilled from the registry's {@code path} when given. */
+    @GetMapping("/well-known/file")
+    String wellKnownFile(Model model, HttpServletResponse response, @RequestParam(required = false) Long id,
+                         @RequestParam(required = false) WellKnownLocation location,
+                         @RequestParam(required = false) String path) {
+        return guarded(model, response, () -> {
+            WellKnownFileDetailDto file;
+            if (id != null) {
+                file = apiService.adminWellKnownFile(id);
+                if (file == null) {
+                    response.setStatus(HttpStatus.NOT_FOUND.value());
+                    return "pages/admin-tab/well-known :: missing";
+                }
+            } else {
+                String p = path == null ? "" : path;
+                file = new WellKnownFileDetailDto(0, location == null ? WellKnownLocation.WELL_KNOWN : location, p,
+                        AdminWellKnownViews.contentType(p), "", null);
+            }
+            model.addAttribute("file", file);
+            model.addAttribute("url", AdminWellKnownViews.url(file.location(), file.path()));
+            model.addAttribute("creating", id == null);
+            return "pages/admin-tab/well-known :: file";
+        });
     }
 
     /** {@code view}'s fragment for an admin; the 401 / 403 error fragment for anyone else. */
