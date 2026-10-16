@@ -78,7 +78,13 @@ window.CatapultAdminWellKnown = (function () {
             CatapultChannel.showError(root.dataset.errorTooLarge);
             return;
         }
-        const text = await readText(file);
+        let text;
+        try {
+            text = await readText(file);
+        } catch {
+            CatapultChannel.showError(message(root));
+            return;
+        }
         if (text.includes("\u0000")) {
             CatapultChannel.showError(root.dataset.errorBinary);
             return;
