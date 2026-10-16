@@ -20,6 +20,9 @@ window.CatapultWellKnownForms = (function () {
     const HANDLE_ALL_URLS = "delegate_permission/common.handle_all_urls";
 
     const clone = value => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
+    const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
+    const isStrings = value => Array.isArray(value) && value.every(x => typeof x === "string");
+    const sameKeys = (o, keys) => Object.keys(o).length === keys.length && keys.every(k => k in o);
 
     function readJson(text, fallback) {
         if (text.trim() === "") return clone(fallback);
@@ -30,7 +33,34 @@ window.CatapultWellKnownForms = (function () {
         }
     }
 
-    const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
+    /**
+     * Writes the form's values back into an original array: the entries the form fully represents ("pure")
+     * are replaced in order by the next value, the others stay untouched in place, surplus values are
+     * appended and pure entries beyond the values are dropped (deleted by the user).
+     */
+    function mergeInPlace(original, isPure, values, build) {
+        const out = [];
+        let i = 0;
+        for (const entry of original) {
+            if (!isPure(entry)) out.push(entry);
+            else if (i < values.length) out.push(build(values[i++], entry));
+        }
+        for (; i < values.length; i++) out.push(build(values[i], undefined));
+        return out;
+    }
+
+    const isMsEntry = a => isObject(a) && sameKeys(a, ["applicationId"]) && typeof a.applicationId === "string";
+
+    const isAndroid = s => isObject(s) && sameKeys(s, ["relation", "target"])
+        && Array.isArray(s.relation) && s.relation.length === 1 && s.relation[0] === HANDLE_ALL_URLS
+        && isObject(s.target) && sameKeys(s.target, ["namespace", "package_name", "sha256_cert_fingerprints"])
+        && s.target.namespace === "android_app" && typeof s.target.package_name === "string"
+        && isStrings(s.target.sha256_cert_fingerprints);
+
+    const isPath = c => isObject(c) && sameKeys(c, ["/"]) && typeof c["/"] === "string";
+
+    const isDetail = d => isObject(d) && Object.keys(d).every(k => k === "appIDs" || k === "components")
+        && isStrings(d.appIDs) && (d.components === undefined || Array.isArray(d.components));
 
     const DEDICATED = {
         "security.txt": {
@@ -38,20 +68,27 @@ window.CatapultWellKnownForms = (function () {
             format: "securitytxt",
             fields: SECURITY_FIELDS,
             parse(text) {
+                if (text.includes("-----BEGIN PGP SIGNED MESSAGE-----")) {
+                    throw new Error("signed security.txt: edit it as raw text");
+                }
                 const values = {};
                 const rest = [];
                 SECURITY_FIELDS.forEach(f => { values[f.key] = f.type === "list" ? [] : ""; });
+                const seen = new Set();
                 for (const line of text.split(/\r?\n/)) {
                     const match = /^([A-Za-z-]+):\s*(.*)$/.exec(line);
                     const field = match && SECURITY_FIELDS.find(f => f.key.toLowerCase() === match[1].toLowerCase());
-                    if (!field) {
+                    if (!field || match[2].trim() === "" || (field.type !== "list" && seen.has(field.key))) {
                         if (line.trim() !== "") rest.push(line);
                         continue;
                     }
                     if (field.type === "list") values[field.key].push(match[2]);
-                    else values[field.key] = match[2];
+                    else {
+                        values[field.key] = match[2];
+                        seen.add(field.key);
+                    }
                 }
-                return { values, original: rest };
+                return { values, original: { lines: rest, crlf: text.includes("\r\n") } };
             },
             serialize({ values, original }) {
                 const lines = [];
@@ -60,7 +97,7 @@ window.CatapultWellKnownForms = (function () {
                     if (f.type === "list") (v || []).filter(x => x !== "").forEach(x => lines.push(`${f.key}: ${x}`));
                     else if (v) lines.push(`${f.key}: ${v}`);
                 }
-                return [...lines, ...original, ""].join("\n");
+                return [...lines, ...original.lines, ""].join(original.crlf ? "\r\n" : "\n");
             }
         },
         "microsoft-identity-association.json": {
@@ -70,14 +107,14 @@ window.CatapultWellKnownForms = (function () {
             parse(text) {
                 const doc = readJson(text, { associatedApplications: [] });
                 if (!isObject(doc)) throw new Error("object expected");
-                const apps = Array.isArray(doc.associatedApplications) ? doc.associatedApplications : [];
-                return { values: { applicationIds: apps.map(a => a?.applicationId ?? "") }, original: doc };
+                const apps = doc.associatedApplications ?? [];
+                if (!Array.isArray(apps)) throw new Error("associatedApplications: array expected");
+                return { values: { applicationIds: apps.filter(isMsEntry).map(a => a.applicationId) }, original: doc };
             },
             serialize({ values, original }) {
                 const doc = clone(original);
-                const before = Array.isArray(doc.associatedApplications) ? doc.associatedApplications : [];
-                doc.associatedApplications = values.applicationIds.filter(x => x !== "")
-                    .map((id, i) => ({ ...(isObject(before[i]) ? before[i] : {}), applicationId: id }));
+                doc.associatedApplications = mergeInPlace(doc.associatedApplications ?? [], isMsEntry,
+                    values.applicationIds.filter(x => x !== ""), id => ({ applicationId: id }));
                 return JSON.stringify(doc, null, 2);
             }
         },
@@ -93,22 +130,21 @@ window.CatapultWellKnownForms = (function () {
             parse(text) {
                 const doc = readJson(text, []);
                 if (!Array.isArray(doc)) throw new Error("array expected");
-                const apps = doc.filter(s => s?.target?.namespace === "android_app").map(s => ({
-                    package_name: s.target.package_name ?? "",
-                    sha256_cert_fingerprints: [...(s.target.sha256_cert_fingerprints ?? [])]
+                const apps = doc.filter(isAndroid).map(s => ({
+                    package_name: s.target.package_name,
+                    sha256_cert_fingerprints: [...s.target.sha256_cert_fingerprints]
                 }));
                 return { values: { apps }, original: doc };
             },
             serialize({ values, original }) {
-                const androids = original.filter(s => s?.target?.namespace === "android_app");
-                const others = original.filter(s => s?.target?.namespace !== "android_app");
-                const apps = values.apps.filter(a => a.package_name !== "").map((a, i) => {
-                    const base = clone(androids[i]) ?? { relation: [HANDLE_ALL_URLS], target: { namespace: "android_app" } };
-                    base.target = { ...base.target, package_name: a.package_name,
-                        sha256_cert_fingerprints: a.sha256_cert_fingerprints.filter(x => x !== "") };
-                    return base;
-                });
-                return JSON.stringify([...others, ...apps], null, 2);
+                const apps = values.apps.filter(a => a.package_name !== "");
+                return JSON.stringify(mergeInPlace(original, isAndroid, apps, a => ({
+                    relation: [HANDLE_ALL_URLS],
+                    target: {
+                        namespace: "android_app", package_name: a.package_name,
+                        sha256_cert_fingerprints: a.sha256_cert_fingerprints.filter(x => x !== "")
+                    }
+                })), null, 2);
             }
         },
         "apple-app-site-association": {
@@ -126,36 +162,37 @@ window.CatapultWellKnownForms = (function () {
             parse(text) {
                 const doc = readJson(text, {});
                 if (!isObject(doc)) throw new Error("object expected");
-                const details = (doc.applinks?.details ?? []).map(d => ({
-                    appIDs: [...(d.appIDs ?? (d.appID ? [d.appID] : []))],
-                    paths: (d.components ?? []).filter(c => typeof c?.["/"] === "string").map(c => c["/"])
+                if (doc.applinks !== undefined && !isObject(doc.applinks)) throw new Error("applinks: object expected");
+                const rawDetails = doc.applinks?.details ?? [];
+                if (!Array.isArray(rawDetails)) throw new Error("applinks.details: array expected");
+                if (doc.webcredentials !== undefined && (!isObject(doc.webcredentials)
+                    || (doc.webcredentials.apps !== undefined && !isStrings(doc.webcredentials.apps)))) {
+                    throw new Error("webcredentials.apps: array expected");
+                }
+                const details = rawDetails.filter(isDetail).map(d => ({
+                    appIDs: [...d.appIDs],
+                    paths: (d.components ?? []).filter(isPath).map(c => c["/"])
                 }));
                 return { values: { details, webcredentials: [...(doc.webcredentials?.apps ?? [])] }, original: doc };
             },
             serialize({ values, original }) {
                 const doc = clone(original);
-                const before = doc.applinks?.details ?? [];
-                const details = values.details.filter(d => d.appIDs.some(x => x !== "")).map((d, i) => {
-                    const base = clone(before[i]) ?? {};
-                    const paths = d.paths.filter(x => x !== "");
-                    // existing path components keep their other keys, in place; new ones are appended
-                    const components = [];
-                    let p = 0;
-                    for (const c of base.components ?? []) {
-                        if (typeof c?.["/"] === "string") {
-                            if (p < paths.length) components.push({ ...c, "/": paths[p++] });
-                        } else components.push(c);
-                    }
-                    for (; p < paths.length; p++) components.push({ "/": paths[p] });
-                    const out = { ...base, appIDs: d.appIDs.filter(x => x !== "") };
-                    delete out.appID;
-                    if (components.length) out.components = components; else delete out.components;
+                const rows = values.details.map(d => ({
+                    appIDs: d.appIDs.filter(x => x !== ""), paths: d.paths.filter(x => x !== "")
+                })).filter(d => d.appIDs.length || d.paths.length);
+                const details = mergeInPlace(doc.applinks?.details ?? [], isDetail, rows, (row, orig) => {
+                    const components = mergeInPlace(orig?.components ?? [], isPath, row.paths, p => ({ "/": p }));
+                    const out = { appIDs: row.appIDs };
+                    if (components.length) out.components = components;
                     return out;
                 });
                 if (details.length || doc.applinks) doc.applinks = { ...(doc.applinks ?? {}), details };
                 const creds = values.webcredentials.filter(x => x !== "");
                 if (creds.length) doc.webcredentials = { ...(doc.webcredentials ?? {}), apps: creds };
-                else if (doc.webcredentials) delete doc.webcredentials.apps;
+                else if (doc.webcredentials) {
+                    delete doc.webcredentials.apps;
+                    if (!Object.keys(doc.webcredentials).length) delete doc.webcredentials;
+                }
                 return JSON.stringify(doc, null, 2);
             }
         }
@@ -175,10 +212,27 @@ window.CatapultWellKnownForms = (function () {
             case "string": return { ...base, type: "text" };
             case "number": case "integer": return { ...base, type: "number" };
             case "boolean": return { ...base, type: "boolean" };
-            case "array":
-                return ["string", "number", "integer"].includes(schema.items?.type) ? { ...base, type: "list" } : null;
+            case "array": {
+                const item = schema.items?.type;
+                return ["string", "number", "integer"].includes(item)
+                    ? { ...base, type: "list", itemType: item === "string" ? "string" : "number" } : null;
+            }
             default: return null;
         }
+    }
+
+    /** The human message when a present value doesn't fit its field, or null. */
+    function misfit(f, v) {
+        const expected = {
+            text: "string", number: "number", boolean: "boolean", list: "array",
+            enum: `one of ${(f.options || []).join(", ")}`
+        }[f.type];
+        const ok = f.type === "text" ? typeof v === "string"
+            : f.type === "number" ? typeof v === "number"
+            : f.type === "boolean" ? typeof v === "boolean"
+            : f.type === "enum" ? f.options.includes(v)
+            : Array.isArray(v) && v.every(x => typeof x === (f.itemType === "number" ? "number" : "string"));
+        return ok ? null : `${f.key}: ${expected} expected`;
     }
 
     function fromSchema(schema) {
@@ -201,18 +255,24 @@ window.CatapultWellKnownForms = (function () {
                 const values = {};
                 for (const f of fields) {
                     const v = doc[f.key];
-                    values[f.key] = f.type === "list" ? (Array.isArray(v) ? v.map(String) : [])
+                    if (v !== undefined) {
+                        const problem = misfit(f, v);
+                        if (problem) throw new Error(problem);
+                    }
+                    values[f.key] = f.type === "list" ? (v === undefined ? [] : v.map(String))
                         : f.type === "boolean" ? v === true
                         : v === undefined ? "" : v;
                 }
-                return { values, original: doc };
+                return { values, original: doc, initial: clone(values) };
             },
-            serialize({ values, original }) {
+            serialize({ values, original, initial }) {
                 const doc = clone(original);
                 for (const f of fields) {
                     const v = values[f.key];
+                    if (initial && JSON.stringify(v) === JSON.stringify(initial[f.key])) continue;
                     if (f.type === "list") {
-                        const items = v.filter(x => x !== "");
+                        const items = v.filter(x => x !== "")
+                            .map(x => (f.itemType === "number" && String(x).trim() !== "" && !Number.isNaN(Number(x)) ? Number(x) : x));
                         if (items.length) doc[f.key] = items; else delete doc[f.key];
                     } else if (f.type === "number") {
                         if (v === "" || v === null || Number.isNaN(Number(v))) delete doc[f.key]; else doc[f.key] = Number(v);
@@ -229,7 +289,14 @@ window.CatapultWellKnownForms = (function () {
         };
     }
 
-    const parse = (descriptor, text) => descriptor.parse(text ?? "");
+    function parse(descriptor, text) {
+        try {
+            return descriptor.parse(text ?? "");
+        } catch (e) {
+            if (e instanceof TypeError) throw new Error(`unreadable content: ${e.message}`);
+            throw e;
+        }
+    }
     const serialize = (descriptor, model) => descriptor.serialize(model);
 
     const TYPE_OF = { string: "string", number: "number", integer: "number", boolean: "boolean", array: "array", object: "object" };

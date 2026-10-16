@@ -60,12 +60,12 @@ describe("security.txt", () => {
 describe("JSON descriptors", () => {
     it("microsoft-identity-association.json keeps unknown keys", () => {
         const d = F.forPath("WELL_KNOWN", "microsoft-identity-association.json");
-        const text = JSON.stringify({ associatedApplications: [{ applicationId: "a", note: "x" }], extra: 1 });
+        const text = JSON.stringify({ associatedApplications: [{ applicationId: "a" }, { applicationId: "z", note: "x" }], extra: 1 });
         const model = F.parse(d, text);
         expect(model.values.applicationIds).toEqual(["a"]);
         model.values.applicationIds = ["a", "b"];
         expect(JSON.parse(F.serialize(d, model))).toEqual({
-            associatedApplications: [{ applicationId: "a", note: "x" }, { applicationId: "b" }], extra: 1
+            associatedApplications: [{ applicationId: "a" }, { applicationId: "z", note: "x" }, { applicationId: "b" }], extra: 1
         });
     });
 
@@ -147,5 +147,111 @@ describe("generated from a schema", () => {
         expect(F.checkSchema(FLAT, JSON.stringify({ gpc: true }))).toEqual([]);
         expect(F.checkSchema(FLAT, JSON.stringify({ lastUpdate: 3 }))).toEqual(["gpc: required", "lastUpdate: string expected"]);
         expect(F.checkSchema(FLAT, "not json")).toEqual([]);
+    });
+});
+
+describe("never loses content", () => {
+    const ms = () => F.forPath("WELL_KNOWN", "microsoft-identity-association.json");
+    const sec = () => F.forPath("WELL_KNOWN", "security.txt");
+    const aasa = () => F.forPath("WELL_KNOWN", "apple-app-site-association");
+
+    it("deleting the first of two MS entries with extra keys keeps both extra entries", () => {
+        const doc = { associatedApplications: [{ applicationId: "a", n: 1 }, { applicationId: "b", n: 2 }, { applicationId: "c" }, { applicationId: "d" }] };
+        const model = F.parse(ms(), JSON.stringify(doc));
+        expect(model.values.applicationIds).toEqual(["c", "d"]);
+        model.values.applicationIds = ["d"];
+        expect(JSON.parse(F.serialize(ms(), model)).associatedApplications)
+            .toEqual([{ applicationId: "a", n: 1 }, { applicationId: "b", n: 2 }, { applicationId: "d" }]);
+    });
+
+    it("keeps unrecognised assetlinks statements in order and does not move android ones", () => {
+        const d = F.forPath("WELL_KNOWN", "assetlinks.json");
+        const android = pkg => ({ relation: ["delegate_permission/common.handle_all_urls"],
+            target: { namespace: "android_app", package_name: pkg, sha256_cert_fingerprints: ["AA"] } });
+        const odd = { relation: ["other"], target: { namespace: "android_app", package_name: "x", sha256_cert_fingerprints: ["AA"] } };
+        const web = { relation: ["r"], target: { namespace: "web", site: "https://x" } };
+        const model = F.parse(d, JSON.stringify([android("one"), odd, web, android("two")]));
+        expect(model.values.apps.map(a => a.package_name)).toEqual(["one", "two"]);
+        model.values.apps[1].package_name = "three";
+        expect(JSON.parse(F.serialize(d, model))).toEqual([android("one"), odd, web, android("three")]);
+    });
+
+    it("refuses a PGP-signed security.txt", () => {
+        expect(() => F.parse(sec(), "-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\nContact: a\n")).toThrow("signed security.txt");
+    });
+
+    it("keeps a repeated Expires and an empty Contact line", () => {
+        const model = F.parse(sec(), "Expires: 2027-01-01T00:00:00Z\nExpires: 2030-01-01T00:00:00Z\nContact:\nContact: mailto:a\n");
+        expect(model.values.Expires).toBe("2027-01-01T00:00:00Z");
+        expect(model.values.Contact).toEqual(["mailto:a"]);
+        expect(F.serialize(sec(), model)).toBe("Contact: mailto:a\nExpires: 2027-01-01T00:00:00Z\nExpires: 2030-01-01T00:00:00Z\nContact:\n");
+    });
+
+    it("keeps CRLF line endings", () => {
+        const model = F.parse(sec(), "Contact: mailto:a\r\nExpires: 2027-01-01T00:00:00Z\r\n");
+        expect(F.serialize(sec(), model)).toBe("Contact: mailto:a\r\nExpires: 2027-01-01T00:00:00Z\r\n");
+    });
+
+    it("deleting a path between components keeps the comments and other components", () => {
+        const doc = { applinks: { details: [{ appIDs: ["T"], components: [{ "#": "c1", comment: "x" }, { "/": "/a" }, { "/": "/b" }, { "?": "q" }] }] } };
+        const model = F.parse(aasa(), JSON.stringify(doc));
+        expect(model.values.details[0].paths).toEqual(["/a", "/b"]);
+        model.values.details[0].paths = ["/b"];
+        expect(JSON.parse(F.serialize(aasa(), model)).applinks.details[0].components)
+            .toEqual([{ "#": "c1", comment: "x" }, { "/": "/b" }, { "?": "q" }]);
+    });
+
+    it("keeps legacy AASA details untouched and removes emptied webcredentials", () => {
+        const doc = { applinks: { details: [{ appID: "T.old", paths: ["/x"] }] }, webcredentials: { apps: ["T.a"] } };
+        const model = F.parse(aasa(), JSON.stringify(doc));
+        expect(model.values.details).toEqual([]);
+        model.values.webcredentials = [];
+        expect(JSON.parse(F.serialize(aasa(), model))).toEqual({ applinks: { details: [{ appID: "T.old", paths: ["/x"] }] } });
+    });
+
+    it("never spreads a string into characters: wrong shapes are refused or kept aside", () => {
+        expect(() => F.parse(ms(), JSON.stringify({ associatedApplications: "abc" }))).toThrow("associatedApplications: array expected");
+        expect(() => F.parse(aasa(), JSON.stringify({ applinks: { details: "abc" } }))).toThrow("applinks.details: array expected");
+        expect(() => F.parse(aasa(), JSON.stringify({ webcredentials: { apps: "abc" } }))).toThrow("webcredentials.apps: array expected");
+        const model = F.parse(aasa(), JSON.stringify({ applinks: { details: [{ appIDs: "T" }] } }));
+        expect(model.values.details).toEqual([]);
+    });
+
+    it("never leaks a TypeError", () => {
+        const d = F.forPath("WELL_KNOWN", "assetlinks.json");
+        expect(() => F.parse(d, "[null, 3, {\"target\": 4}]")).not.toThrow();
+        expect(() => F.parse(aasa(), "null")).toThrow(/object expected/);
+    });
+
+    describe("generated forms", () => {
+        const SCHEMA = { type: "object", properties: {
+            gpc: { type: "boolean" }, name: { type: "string" }, n: { type: "number" },
+            level: { enum: ["a", "b"] }, ids: { type: "array", items: { type: "number" } }
+        } };
+
+        it("writes nothing for untouched values", () => {
+            const d = F.fromSchema(SCHEMA);
+            const text = JSON.stringify({ name: "x", ids: [1, 2], level: "a" });
+            const model = F.parse(d, text);
+            expect(JSON.parse(F.serialize(d, model))).toEqual({ name: "x", ids: [1, 2], level: "a" });
+        });
+
+        it("refuses values of the wrong type", () => {
+            const d = F.fromSchema(SCHEMA);
+            expect(() => F.parse(d, '{"name": 3}')).toThrow("name: string expected");
+            expect(() => F.parse(d, '{"gpc": "yes"}')).toThrow("gpc: boolean expected");
+            expect(() => F.parse(d, '{"n": "1"}')).toThrow("n: number expected");
+            expect(() => F.parse(d, '{"ids": "1"}')).toThrow("ids: array expected");
+            expect(() => F.parse(d, '{"ids": ["1"]}')).toThrow("ids: array expected");
+            expect(() => F.parse(d, '{"level": "z"}')).toThrow("level: one of a, b expected");
+        });
+
+        it("round-trips number lists as numbers, keeping non-numeric items as strings", () => {
+            const d = F.fromSchema(SCHEMA);
+            const model = F.parse(d, '{"ids": [1, 2]}');
+            expect(model.values.ids).toEqual(["1", "2"]);
+            model.values.ids = ["1", "2", "3.5", "x"];
+            expect(JSON.parse(F.serialize(d, model)).ids).toEqual([1, 2, 3.5, "x"]);
+        });
     });
 });
