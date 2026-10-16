@@ -70,6 +70,22 @@ public class ApiClient {
         }
     }
 
+    /** A GET answer kept raw (status, Content-Type, bytes), for content relayed as is; 502 when unreachable. */
+    public record Raw(int status, String contentType, byte[] body) {}
+
+    public Raw fetch(String path, Object... uriVars) {
+        try {
+            return client.get().uri(path, uriVars).exchange((request, response) -> {
+                var type = response.getHeaders().getContentType();
+                return new Raw(response.getStatusCode().value(), type == null ? null : type.toString(),
+                        response.getBody().readAllBytes());
+            });
+        } catch (Exception e) {
+            logFailure(HttpMethod.GET, path, e);
+            return new Raw(502, null, null);
+        }
+    }
+
     /** A call's HTTP status and its body read as {@code type} (null when empty); status 502 when the call itself failed. */
     public record Result<T>(int status, T body) {
         public boolean ok() {

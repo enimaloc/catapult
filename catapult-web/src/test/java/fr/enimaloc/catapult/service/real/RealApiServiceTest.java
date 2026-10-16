@@ -515,4 +515,48 @@ class RealApiServiceTest {
 
         assertThat(service.adminDataRow("twitch-ccl", "a~b%20c")).containsEntry("id", "a~b%20c");
     }
+
+    @Test
+    void wellKnown_mapsTheRawAnswer() {
+        expect(HttpMethod.GET, "/api/well-known/serve?location=WELL_KNOWN&path=acme-challenge%2Fabc")
+                .andRespond(withSuccess("token", MediaType.TEXT_PLAIN));
+
+        var content = service.wellKnown(fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "acme-challenge/abc");
+
+        assertThat(content.status()).isEqualTo(200);
+        assertThat(content.contentType()).startsWith("text/plain");
+        assertThat(new String(content.body())).isEqualTo("token");
+    }
+
+    @Test
+    void wellKnown_relaysA404() {
+        expect(HttpMethod.GET, "/api/well-known/serve?location=ROOT&path=nope.txt").andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(service.wellKnown(fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "nope.txt").status())
+                .isEqualTo(404);
+    }
+
+    @Test
+    void adminWellKnown_writesAndReads() {
+        var request = new fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest(
+                fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "riot.txt", "text/plain", "code");
+        String json = "{\"location\":\"ROOT\",\"path\":\"riot.txt\",\"contentType\":\"text/plain\",\"content\":\"code\"}";
+        expect(HttpMethod.POST, "/api/admin/well-known").andExpect(content().json(json))
+                .andRespond(withStatus(HttpStatus.CREATED));
+        expect(HttpMethod.PUT, "/api/admin/well-known/3").andExpect(content().json(json)).andRespond(withSuccess());
+        expect(HttpMethod.DELETE, "/api/admin/well-known/3").andRespond(withNoContent());
+        respond(HttpMethod.GET, "/api/admin/well-known", "[{\"id\":3,\"location\":\"ROOT\",\"path\":\"riot.txt\","
+                + "\"contentType\":\"text/plain\",\"size\":4,\"updatedAt\":\"2026-10-16T00:00:00Z\"}]");
+        respond(HttpMethod.GET, "/api/admin/well-known/3", "{\"id\":3,\"location\":\"ROOT\",\"path\":\"riot.txt\","
+                + "\"contentType\":\"text/plain\",\"content\":\"code\",\"updatedAt\":\"2026-10-16T00:00:00Z\"}");
+        respond(HttpMethod.GET, "/api/admin/well-known/iana", "{\"entries\":[{\"suffix\":\"security.txt\","
+                + "\"reference\":\"RFC 9116\",\"status\":\"permanent\",\"changeController\":\"IETF\"}],\"source\":\"LIVE\"}");
+
+        assertThat(service.adminCreateWellKnownFile(request)).isEqualTo(201);
+        assertThat(service.adminUpdateWellKnownFile(3, request)).isEqualTo(200);
+        assertThat(service.adminDeleteWellKnownFile(3)).isEqualTo(204);
+        assertThat(service.adminWellKnownFiles()).extracting("path").containsExactly("riot.txt");
+        assertThat(service.adminWellKnownFile(3).content()).isEqualTo("code");
+        assertThat(service.adminIanaRegistry().entries()).hasSize(1);
+    }
 }

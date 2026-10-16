@@ -8,6 +8,12 @@ import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
+import fr.enimaloc.catapult.service.WellKnownContent;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -80,6 +86,7 @@ public class MockApiService implements ApiService {
      * isolated mock state instead of every tab sharing one global instance.
      */
     private final Map<String, MockData> data = new ConcurrentHashMap<>();
+    private final MockWellKnownStore wellKnown = new MockWellKnownStore();
 
     /**
      * Resolves the calling session's data the same way {@link ApiClient} resolves its JWT.
@@ -474,6 +481,48 @@ public class MockApiService implements ApiService {
     public int adminDeleteDataRow(String repo, String id) {
         log.trace("adminDeleteDataRow({}, {})", repo, id);
         return currentData().getAdminData().delete(repo, id);
+    }
+
+    @Override
+    public WellKnownContent wellKnown(WellKnownLocation location, String path) {
+        log.trace("wellKnown({}, {})", location, path);
+        return wellKnown.serve(location, path);
+    }
+
+    @Override
+    public List<WellKnownFileDto> adminWellKnownFiles() {
+        log.trace("adminWellKnownFiles()");
+        return wellKnown.list();
+    }
+
+    @Override
+    public WellKnownFileDetailDto adminWellKnownFile(long id) {
+        log.trace("adminWellKnownFile({})", id);
+        return wellKnown.get(id);
+    }
+
+    @Override
+    public IanaRegistryDto adminIanaRegistry() {
+        log.trace("adminIanaRegistry()");
+        return wellKnown.registry();
+    }
+
+    @Override
+    public int adminCreateWellKnownFile(WellKnownFileRequest request) {
+        log.trace("adminCreateWellKnownFile({})", request);
+        return wellKnown.create(request);
+    }
+
+    @Override
+    public int adminUpdateWellKnownFile(long id, WellKnownFileRequest request) {
+        log.trace("adminUpdateWellKnownFile({}, {})", id, request);
+        return wellKnown.update(id, request);
+    }
+
+    @Override
+    public int adminDeleteWellKnownFile(long id) {
+        log.trace("adminDeleteWellKnownFile({})", id);
+        return wellKnown.delete(id);
     }
 
     @Override

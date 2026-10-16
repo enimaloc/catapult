@@ -8,6 +8,12 @@ import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
+import fr.enimaloc.catapult.service.WellKnownContent;
 import fr.enimaloc.catapult.common.dto.admin.SaveMappingsRequest;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
@@ -57,6 +63,7 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<Map<String, List<TwitchatEventActionDto>>> EVENTS = new ParameterizedTypeReference<>() {};
 
     private static final ParameterizedTypeReference<AdminPage<CacheEntryDto>> CACHE_ENTRIES = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<WellKnownFileDto>> WELL_KNOWN_FILES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<Map<String, Object>>> DATA_ROWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<Map<String, Object>> DATA_ROW = new ParameterizedTypeReference<>() {};
 
@@ -385,6 +392,42 @@ public class RealApiService implements ApiService {
     @Override
     public int adminUpdateDataRow(String repo, String id, Map<String, String> fields) {
         return client.call(HttpMethod.PUT, "/api/admin/data/{repo}/{id}", fields, Void.class, repo, id).status();
+    }
+
+    @Override
+    public WellKnownContent wellKnown(WellKnownLocation location, String path) {
+        ApiClient.Raw raw = client.fetch("/api/well-known/serve?location={location}&path={path}", location.name(), path);
+        return new WellKnownContent(raw.status(), raw.contentType(), raw.body());
+    }
+
+    @Override
+    public List<WellKnownFileDto> adminWellKnownFiles() {
+        return client.get("/api/admin/well-known", WELL_KNOWN_FILES);
+    }
+
+    @Override
+    public WellKnownFileDetailDto adminWellKnownFile(long id) {
+        return client.get("/api/admin/well-known/{id}", WellKnownFileDetailDto.class, id);
+    }
+
+    @Override
+    public IanaRegistryDto adminIanaRegistry() {
+        return client.get("/api/admin/well-known/iana", IanaRegistryDto.class);
+    }
+
+    @Override
+    public int adminCreateWellKnownFile(WellKnownFileRequest request) {
+        return client.call(HttpMethod.POST, "/api/admin/well-known", request, Void.class).status();
+    }
+
+    @Override
+    public int adminUpdateWellKnownFile(long id, WellKnownFileRequest request) {
+        return client.call(HttpMethod.PUT, "/api/admin/well-known/{id}", request, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteWellKnownFile(long id) {
+        return client.call(HttpMethod.DELETE, "/api/admin/well-known/{id}", null, Void.class, id).status();
     }
 
     @Override

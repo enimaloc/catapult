@@ -26,7 +26,8 @@ public class IndexController {
         return index(model, "", locale, response);
     }
 
-    @GetMapping("/{page}")
+    // No page name has a dot: dotted names are WellKnownServeController's root files.
+    @GetMapping("/{page:[^.]+}")
     String index(Model model, @PathVariable String page, Locale locale, HttpServletResponse response)
             throws IOException {
         boolean unknownPage = !SiteCatalog.isPage(page);

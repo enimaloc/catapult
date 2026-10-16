@@ -10,6 +10,11 @@ import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -117,4 +122,21 @@ public interface ApiService {
     int adminUpdateDataRow(String repo, String id, Map<String, String> fields);
     /** catapult-api's status (204; 404; 409 still referenced), 502 when unreachable. */
     int adminDeleteDataRow(String repo, String id);
+
+    // --- well-known files: served to anyone, edited from the admin page ---
+
+    /** The file configured at {@code path}: catapult-api's answer (200 / 404), 502 when unreachable. */
+    WellKnownContent wellKnown(WellKnownLocation location, String path);
+    /** The configured well-known files; null when catapult-api fails. */
+    List<WellKnownFileDto> adminWellKnownFiles();
+    /** One configured file with its content; null when it fails or there is none. */
+    WellKnownFileDetailDto adminWellKnownFile(long id);
+    /** IANA's registry (live or catapult-api's bundled copy); null when catapult-api fails. */
+    IanaRegistryDto adminIanaRegistry();
+    /** catapult-api's status (201; 400 invalid; 409 path taken), 502 when unreachable. */
+    int adminCreateWellKnownFile(WellKnownFileRequest request);
+    /** catapult-api's status (200; 400; 404; 409), 502 when unreachable. */
+    int adminUpdateWellKnownFile(long id, WellKnownFileRequest request);
+    /** catapult-api's status (204; 404), 502 when unreachable. */
+    int adminDeleteWellKnownFile(long id);
 }
