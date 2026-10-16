@@ -112,4 +112,9 @@ class MockWellKnownStoreTest {
         assertThat(store.schema("gpc.json")).contains("\"gpc\"");
         assertThat(store.schema("x")).isNull();
     }
+
+    @Test
+    void a304WithoutLocationIsAccepted() {
+        assertThat(store.create(new WellKnownFileRequest(WELL_KNOWN, "nm.txt", 304, List.of(), "text/plain", ""))).isEqualTo(201);
+    }
 }

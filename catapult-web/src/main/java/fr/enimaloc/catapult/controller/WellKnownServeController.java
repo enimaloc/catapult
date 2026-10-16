@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -30,6 +32,9 @@ public class WellKnownServeController {
     private static final String PREFIX = "/.well-known/";
     /** Browsers and crawlers ask for these constantly; they are never admin files. */
     private static final Set<String> RESERVED = Set.of("robots.txt", "sitemap.xml", "favicon.ico");
+
+    private static final Set<String> REFUSED_HEADERS = Set.of("content-length", "transfer-encoding", "connection",
+            "content-type", "set-cookie", "x-content-type-options");
 
     private final ApiService apiService;
     private final WellKnownCache cache;
@@ -63,8 +68,10 @@ public class WellKnownServeController {
         }
         HttpHeaders headers = new HttpHeaders();
         boolean ownCsp = false;
-        for (WellKnownHeader header : response.headers()) {
-            if (header.name().equalsIgnoreCase("X-Content-Type-Options")) continue; // forced below
+        List<WellKnownHeader> stored = response.headers() == null ? List.of() : response.headers();
+        for (WellKnownHeader header : stored) {
+            // Defence in depth: the API refuses these; a row that bypassed it must not plant cookies or mis-frame the answer.
+            if (REFUSED_HEADERS.contains(header.name().toLowerCase(Locale.ROOT))) continue;
             if (header.name().equalsIgnoreCase("Content-Security-Policy")) ownCsp = true;
             headers.add(header.name(), header.value());
         }
@@ -73,7 +80,7 @@ public class WellKnownServeController {
         int status = response.status();
         boolean bodyless = status == 204 || status == 304;
         if (!bodyless) headers.setContentType(type);
-        byte[] body = bodyless || response.content() == null ? new byte[0] : response.content().getBytes(StandardCharsets.UTF_8);
+        byte[] body = bodyless ? null : response.content() == null ? new byte[0] : response.content().getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.status(status).headers(headers).body(body);
     }
 }

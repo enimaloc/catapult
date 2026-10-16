@@ -14,8 +14,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * (a root name needs a dot); catapult-api's are the real ones.
  */
 class MockWellKnownStore {
-    private static final Set<String> REFUSED_HEADERS = Set.of("set-cookie", "set-cookie2", "content-type", "content-length",
-            "transfer-encoding", "connection", "host", "content-encoding", "x-content-type-options");
+    private static final Set<String> REFUSED_HEADERS = Set.of("content-length", "transfer-encoding", "connection",
+            "content-type", "set-cookie", "x-content-type-options");
     private final Map<Long, WellKnownFileDetailDto> files = new LinkedHashMap<>();
     private final AtomicLong ids = new AtomicLong();
 
@@ -101,7 +101,7 @@ class MockWellKnownStore {
         for (WellKnownHeader h : headers) {
             if (h.name() == null || h.value() == null || REFUSED_HEADERS.contains(h.name().toLowerCase(Locale.ROOT))) return false;
         }
-        return status < 300 || status > 399 || headers.stream().anyMatch(h -> h.name().equalsIgnoreCase("Location") && !h.value().isBlank());
+        return !Set.of(301, 302, 303, 307, 308).contains(status) || headers.stream().anyMatch(h -> h.name().equalsIgnoreCase("Location") && !h.value().isBlank());
     }
 
     private static boolean valid(WellKnownFileRequest r) {

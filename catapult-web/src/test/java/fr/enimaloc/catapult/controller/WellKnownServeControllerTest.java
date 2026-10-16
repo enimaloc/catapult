@@ -157,4 +157,35 @@ class WellKnownServeControllerTest {
         mvc.perform(get("/favicon.ico")).andExpect(status().isNotFound());
         verify(apiService, never()).wellKnown(any(), any());
     }
+
+    @Test
+    void doesNotSendRefusedStoredHeaders() throws Exception {
+        when(apiService.wellKnown(WELL_KNOWN, "c.txt")).thenReturn(response(200, List.of(
+                new WellKnownHeader("Set-Cookie", "a=b"), new WellKnownHeader("Content-Length", "999")), "text/plain", "hi"));
+        mvc.perform(get("/.well-known/c.txt"))
+                .andExpect(cookie().doesNotExist("a"))
+                .andExpect(header().string("Content-Length", "2"));
+    }
+
+    @Test
+    void toleratesNullHeaders() throws Exception {
+        when(apiService.wellKnown(WELL_KNOWN, "n.txt")).thenReturn(response(200, null, "text/plain", "hi"));
+        mvc.perform(get("/.well-known/n.txt")).andExpect(status().isOk()).andExpect(content().string("hi"));
+    }
+
+    @Test
+    void bodylessStatusesSendNoContentType() throws Exception {
+        when(apiService.wellKnown(WELL_KNOWN, "s304")).thenReturn(response(304, List.of(), "text/plain", "x"));
+        when(apiService.wellKnown(WELL_KNOWN, "s204")).thenReturn(response(204, List.of(), "text/plain", "x"));
+        mvc.perform(get("/.well-known/s304")).andExpect(status().isNotModified())
+                .andExpect(header().doesNotExist("Content-Type")).andExpect(content().string(""));
+        mvc.perform(get("/.well-known/s204")).andExpect(status().isNoContent()).andExpect(header().doesNotExist("Content-Type"));
+    }
+
+    @Test
+    void reportOnlyCspDoesNotReplaceTheSandbox() throws Exception {
+        when(apiService.wellKnown(WELL_KNOWN, "r.html")).thenReturn(response(200,
+                List.of(new WellKnownHeader("Content-Security-Policy-Report-Only", "default-src 'none'")), "text/html", "x"));
+        mvc.perform(get("/.well-known/r.html")).andExpect(header().string("Content-Security-Policy", "sandbox"));
+    }
 }
