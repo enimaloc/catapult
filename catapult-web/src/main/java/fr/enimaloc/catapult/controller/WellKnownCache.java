@@ -44,16 +44,21 @@ public class WellKnownCache {
         if (entry != null && now.isBefore(entry.until())) return entry.content();
         long loadedAt = generation.get();
         WellKnownContent content = load.get();
-        if ((content.status() == 200 || content.status() == 404) && generation.get() == loadedAt) store(key, new Entry(content, now.plus(TTL)), now);
+        if (content.status() == 200 || content.status() == 404) store(key, new Entry(content, now.plus(TTL)), now, loadedAt);
         return content;
     }
 
-    private void store(String key, Entry entry, Instant now) {
+    /**
+     * Kept unless a {@link #clear()} came since it was loaded. Checked once it is in: a clear before
+     * the check is seen by it, one after empties the map itself, so no answer outlives the change.
+     */
+    private void store(String key, Entry entry, Instant now, long loadedAt) {
         if (!entries.containsKey(key) && entries.size() >= MAX_ENTRIES) {
             entries.values().removeIf(e -> !now.isBefore(e.until()));
             if (entries.size() >= MAX_ENTRIES) return;
         }
         entries.put(key, entry);
+        if (generation.get() != loadedAt) entries.remove(key, entry);
     }
 
     public void clear() {
