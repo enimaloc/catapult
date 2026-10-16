@@ -1741,7 +1741,7 @@ mdui-select::part(menu) {
     color: #ef4444;
 }
 
-.admin-well-known-file { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto auto auto auto; align-items: center; }
+.admin-well-known-file { grid-template-columns: minmax(0, 2fr) auto minmax(0, 1fr) auto auto auto auto; align-items: center; }
 .admin-well-known-link { overflow-wrap: anywhere; }
 .admin-iana-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
 .admin-iana-row[hidden] { display: none; }
@@ -1749,7 +1749,16 @@ mdui-select::part(menu) {
 .admin-well-known-import-button { margin-right: auto; }
 .admin-well-known-content { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .admin-well-known-url { overflow-wrap: anywhere; color: rgb(var(--mdui-color-on-surface-variant)); }
+.admin-well-known-status-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.admin-well-known-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 8px; align-items: center; }
+.admin-well-known-response, .admin-well-known-content-panel { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
+.admin-well-known-fields { display: flex; flex-direction: column; gap: 12px; }
+.admin-well-known-fields fieldset { border: 1px solid rgb(var(--mdui-color-outline-variant)); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.admin-well-known-list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.admin-well-known-mode-reason { color: rgb(var(--mdui-color-error)); }
 @media (max-width: 600px) {
     .admin-well-known-file { grid-template-columns: 1fr auto auto; }
-    .admin-well-known-file > .admin-member-id { display: none; }
+    .admin-well-known-file > .admin-member-id, .admin-well-known-file > .admin-well-known-status { display: none; }
+    .admin-well-known-header { grid-template-columns: minmax(0, 1fr) auto; }
+    .admin-well-known-header [data-header=value] { grid-column: 1 / -1; grid-row: 2; }
 }

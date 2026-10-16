@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownHeader;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
 import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -135,6 +136,7 @@ public class AdminTabsFragmentController {
                          @RequestParam(required = false) String path) {
         return guarded(model, response, () -> {
             WellKnownFileDetailDto file;
+            String preset = null;
             if (id != null) {
                 file = apiService.adminWellKnownFile(id);
                 if (file == null) {
@@ -143,10 +145,15 @@ public class AdminTabsFragmentController {
                 }
             } else {
                 String p = path == null ? "" : path;
-                file = new WellKnownFileDetailDto(0, location == null ? WellKnownLocation.WELL_KNOWN : location, p,
-                        200, java.util.List.of(), AdminWellKnownViews.contentType(p), "", null);
+                WellKnownLocation where = location == null ? WellKnownLocation.WELL_KNOWN : location;
+                boolean redirect = where == WellKnownLocation.WELL_KNOWN && "change-password".equals(p);
+                if (redirect) preset = "redirect";
+                file = new WellKnownFileDetailDto(0, where, p, redirect ? 302 : 200,
+                        redirect ? List.of(new WellKnownHeader("Location", "")) : List.of(),
+                        AdminWellKnownViews.contentType(p), "", null);
             }
             model.addAttribute("file", file);
+            model.addAttribute("preset", preset);
             model.addAttribute("url", AdminWellKnownViews.url(file.location(), file.path()));
             model.addAttribute("creating", id == null);
             return "pages/admin-tab/well-known :: file";
