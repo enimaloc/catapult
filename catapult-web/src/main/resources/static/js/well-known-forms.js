@@ -60,7 +60,7 @@ window.CatapultWellKnownForms = (function () {
     const isPath = c => isObject(c) && sameKeys(c, ["/"]) && typeof c["/"] === "string";
 
     const isDetail = d => isObject(d) && Object.keys(d).every(k => k === "appIDs" || k === "components")
-        && isStrings(d.appIDs) && (d.components === undefined || Array.isArray(d.components));
+        && isStrings(d.appIDs) && (d.components === undefined || (Array.isArray(d.components) && d.components.every(isPath)));
 
     const DEDICATED = {
         "security.txt": {
@@ -180,10 +180,9 @@ window.CatapultWellKnownForms = (function () {
                 const rows = values.details.map(d => ({
                     appIDs: d.appIDs.filter(x => x !== ""), paths: d.paths.filter(x => x !== "")
                 })).filter(d => d.appIDs.length || d.paths.length);
-                const details = mergeInPlace(doc.applinks?.details ?? [], isDetail, rows, (row, orig) => {
-                    const components = mergeInPlace(orig?.components ?? [], isPath, row.paths, p => ({ "/": p }));
+                const details = mergeInPlace(doc.applinks?.details ?? [], isDetail, rows, row => {
                     const out = { appIDs: row.appIDs };
-                    if (components.length) out.components = components;
+                    if (row.paths.length) out.components = row.paths.map(p => ({ "/": p }));
                     return out;
                 });
                 if (details.length || doc.applinks) doc.applinks = { ...(doc.applinks ?? {}), details };
