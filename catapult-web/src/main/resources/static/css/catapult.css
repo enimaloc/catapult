@@ -1733,6 +1733,7 @@ mdui-select::part(menu) {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .admin-data-delete {
@@ -1745,6 +1746,7 @@ mdui-select::part(menu) {
 .admin-iana-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
 .admin-iana-row[hidden] { display: none; }
 .admin-well-known-form { display: flex; flex-direction: column; gap: 12px; min-width: min(640px, 100%); }
+.admin-well-known-import-button { margin-right: auto; }
 .admin-well-known-content { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .admin-well-known-url { overflow-wrap: anywhere; color: rgb(var(--mdui-color-on-surface-variant)); }
 @media (max-width: 600px) {
