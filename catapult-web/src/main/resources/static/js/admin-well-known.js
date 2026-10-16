@@ -10,11 +10,11 @@
  * Response tab: the status (a common one, or "other" typed in statusOther), header rows added / removed
  * (blank names not sent), Redirect = 302 + a Location row. Content tab: Form | Raw. A path with a
  * CatapultWellKnownForms descriptor (dedicated, else generated from the route's SchemaStore schema,
- * /.well-known/ only) opens as a form when its raw text parses, else as raw with the reason and the Form
+ * /.well-known/ only; the schema is fetched for dedicated forms too, for the save-time check) opens as a form when its raw text parses, else as raw with the reason and the Form
  * segment disabled until the raw text changes; without one, Form is hidden. A path or location changed
  * picks again (the form serialized into raw first, the schema fetched once typing pauses, the latest
  * answer winning) and never switches to the form by itself. Switching to raw writes the
- * form's serialization; Save does too in form mode, then asks before posting content the schema flags.
+ * form's serialization, and Save does too in form mode, unless no field changed since the form opened (the text then stays as written); then asks before posting content the schema flags.
  * Form state (descriptor, model, schema, mode) lives per form root in a WeakMap; group items keep their
  * `_origin` (data-origin) so apple details stay in their slots.
  */
@@ -69,9 +69,9 @@ window.CatapultAdminWellKnown = (function () {
         return el("mdui-button", { variant: "text", icon: "add", class: "admin-well-known-item-add" }, { textContent: labels.add });
     }
 
-    function listRow(value, labels) {
+    function listRow(value, labels, help) {
         const row = el("div", { class: "admin-well-known-item" });
-        row.append(el("mdui-text-field", { variant: "outlined", "data-item": true }, { value: value ?? "" }),
+        row.append(el("mdui-text-field", { variant: "outlined", "data-item": true, helper: help }, { value: value ?? "" }),
             removeButton(labels));
         return row;
     }
@@ -88,7 +88,7 @@ window.CatapultAdminWellKnown = (function () {
             const set = el("fieldset", { "data-field": f.key, class: `admin-well-known-${f.type}` });
             descriptors.set(set, f);
             set.append(el("legend", {}, { textContent: f.label }));
-            (v || []).forEach(x => set.append(f.type === "list" ? listRow(x, labels) : groupItem(f, x, labels)));
+            (v || []).forEach(x => set.append(f.type === "list" ? listRow(x, labels, f.help) : groupItem(f, x, labels)));
             set.append(addButton(labels));
             return set;
         }
@@ -178,6 +178,7 @@ window.CatapultAdminWellKnown = (function () {
         state.model = model;
         const fields = form.querySelector(".admin-well-known-fields");
         render(fields, state.descriptor, model.values, labelsOf(form));
+        state.pristine = JSON.stringify(read(fields, state.descriptor));
         showMode(form, "form");
         checkExpires(form);
     }
@@ -187,6 +188,7 @@ window.CatapultAdminWellKnown = (function () {
         const state = states.get(form);
         if (state?.mode !== "form") return value(form, "content");
         const values = read(form.querySelector(".admin-well-known-fields"), state.descriptor);
+        if (JSON.stringify(values) === state.pristine) return value(form, "content"); // untouched: the text stays as written
         return CatapultWellKnownForms.serialize(state.descriptor, { ...state.model, values });
     }
 
@@ -238,14 +240,14 @@ window.CatapultAdminWellKnown = (function () {
         formSegment(form).disabled = false;
         reasonOf(form).textContent = "";
         formSegment(form).hidden = !state.descriptor;
-        if (!state.descriptor && location === "WELL_KNOWN" && path) {
+        if (location === "WELL_KNOWN" && path) {
             if (!opening) await new Promise(resolve => { state.timer = setTimeout(resolve, SCHEMA_DELAY_MS); });
             const current = () => state.token === token && form.isConnected; // not typed over, nor replaced
             if (!current()) return;
             const schema = await schemaOf(path);
             if (!current()) return;
             state.schema = schema;
-            state.descriptor = schema ? CatapultWellKnownForms.fromSchema(schema) : null;
+            if (!state.descriptor && schema) state.descriptor = CatapultWellKnownForms.fromSchema(schema); // a dedicated one still renders
             formSegment(form).hidden = !state.descriptor;
         }
         if (state.descriptor && opening) toForm(form);
@@ -292,7 +294,7 @@ window.CatapultAdminWellKnown = (function () {
         if (!schema) return true;
         const problems = CatapultWellKnownForms.checkSchema(schema, content);
         if (!problems.length) return true;
-        const more = problems.length > 5 ? `, … (+${problems.length - 5})` : "";
+        const more = problems.length > 5 ? `, ${(form.dataset.labelSchemaMore ?? "+{0}").replace("{0}", problems.length - 5)}` : "";
         return CatapultAdminTabs.confirmed(root, form.dataset.labelSchemaWarnings.replace("{0}", problems.slice(0, 5).join(", ") + more));
     }
 
@@ -402,7 +404,7 @@ window.CatapultAdminWellKnown = (function () {
         if (target.matches(".admin-well-known-item-add")) {
             const set = target.parentElement;
             const f = descriptors.get(set);
-            set.insertBefore(f.type === "group" ? groupItem(f, {}, labelsOf(form)) : listRow("", labelsOf(form)), target);
+            set.insertBefore(f.type === "group" ? groupItem(f, {}, labelsOf(form)) : listRow("", labelsOf(form), f.help), target);
             return;
         }
         if (target.matches(".admin-well-known-save")) {
