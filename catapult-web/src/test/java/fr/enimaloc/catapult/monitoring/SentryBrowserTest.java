@@ -38,24 +38,25 @@ class SentryBrowserTest {
 
     @Test
     void noneWithoutADsn() {
-        assertThat(new SentryBrowser("", "production", 1.0, build("abc"), api(MEMBER)).config()).isNull();
+        assertThat(new SentryBrowser("", "production", 1.0, 0, build("abc"), api(MEMBER)).config()).isNull();
     }
 
     @Test
     void theServersDsnEnvironmentAndRelease_andTheMembersAccount() {
-        SentryBrowser.Config config = new SentryBrowser("https://key@sentry.test/1", "staging", 0.2, build("abc"), api(MEMBER)).config();
+        SentryBrowser.Config config = new SentryBrowser("https://key@sentry.test/1", "staging", 0.2, 1.0, build("abc"), api(MEMBER)).config();
 
         assertThat(config.script()).containsEntry("dsn", "https://key@sentry.test/1")
                 .containsEntry("environment", "staging")
                 .containsEntry("release", "catapult-web@abc")
                 .containsEntry("tracesSampleRate", 0.2)
+                .containsEntry("replaysSessionSampleRate", 1.0)
                 .containsEntry("user", MEMBER.toString());
         assertThat(config.sdk()).isSameAs(SentryBrowser.SDK);
     }
 
     @Test
     void noReleaseFromAnUnknownCommit_andNoOneWhenLoggedOut() {
-        SentryBrowser.Config config = new SentryBrowser("https://key@sentry.test/1", "production", 1.0, build("unknown"), api(null)).config();
+        SentryBrowser.Config config = new SentryBrowser("https://key@sentry.test/1", "production", 1.0, 0, build("unknown"), api(null)).config();
 
         assertThat(config.script()).containsEntry("release", null).containsEntry("user", null);
     }

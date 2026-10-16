@@ -5,7 +5,8 @@
  * last minute of the page as a replay. Loaded with the SDK only when a DSN is set (see SentryBrowser).
  *
  * Replays show the page's text, which is the member's own dashboard, but never what is typed in a
- * field (a Steam token...), nor anything of a page without an error.
+ * field (a Steam token...), nor anything of a page without an error, but where the config asks for
+ * whole sessions (replaysSessionSampleRate: dev only).
  */
 (function () {
     const config = window.Catapult?.sentry;
@@ -36,7 +37,7 @@
             }),
         ],
         tracesSampleRate: config.tracesSampleRate,
-        replaysSessionSampleRate: 0,
+        replaysSessionSampleRate: config.replaysSessionSampleRate ?? 0,
         replaysOnErrorSampleRate: 1.0,
     });
     if (config.user) {
