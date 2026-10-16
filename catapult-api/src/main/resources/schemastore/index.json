@@ -1,0 +1,8 @@
+{
+  "**/.well-known/first-party-set.json": "google-chrome-related-website-sets.json",
+  "**/.well-known/fursona": "well-known-fursona.json",
+  "**/.well-known/fursona.json": "well-known-fursona.json",
+  "**/.well-known/gpc.json": "global-privacy-control.json",
+  "apple-app-site-association": "apple-app-site-association.json",
+  "assetlinks.json": "google-digital-assetlinks.json"
+}

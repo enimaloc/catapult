@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.security;
 import fr.enimaloc.catapult.api.ApiWellKnownController;
 import fr.enimaloc.catapult.api.admin.ApiAdminWellKnownController;
 import fr.enimaloc.catapult.service.wellknown.IanaWellKnownRegistry;
+import fr.enimaloc.catapult.service.wellknown.SchemaStoreRegistry;
 import fr.enimaloc.catapult.service.wellknown.WellKnownFileService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,7 @@ class ApiSecurityConfigWellKnownTest {
     @Autowired MockMvc mvc;
     @MockitoBean WellKnownFileService service;
     @MockitoBean IanaWellKnownRegistry registry;
+    @MockitoBean SchemaStoreRegistry schemas;
 
     @Test
     void theServeRouteIsPublic() throws Exception {

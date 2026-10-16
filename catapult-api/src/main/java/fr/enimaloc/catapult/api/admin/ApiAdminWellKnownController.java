@@ -5,9 +5,12 @@ import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
 import fr.enimaloc.catapult.service.wellknown.IanaWellKnownRegistry;
+import fr.enimaloc.catapult.service.wellknown.SchemaStoreRegistry;
 import fr.enimaloc.catapult.service.wellknown.WellKnownFileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +24,7 @@ import java.util.List;
 public class ApiAdminWellKnownController {
     private final WellKnownFileService service;
     private final IanaWellKnownRegistry registry;
+    private final SchemaStoreRegistry schemas;
 
     @GetMapping
     public List<WellKnownFileDto> list() {
@@ -31,6 +35,12 @@ public class ApiAdminWellKnownController {
     @GetMapping("/iana")
     public IanaRegistryDto iana() {
         return registry.registry();
+    }
+
+    /** SchemaStore's JSON Schema for {@code path}, for the admin's generated form; 404 when there is none. */
+    @GetMapping(value = "/schema", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> schema(@RequestParam String path) {
+        return schemas.schemaFor(path).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{id}")
