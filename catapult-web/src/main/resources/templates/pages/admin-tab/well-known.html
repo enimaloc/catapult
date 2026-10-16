@@ -28,6 +28,7 @@
              th:with="url=${(f.location().name() == 'ROOT' ? '/' : '/.well-known/') + f.path()}">
             <a class="admin-well-known-link" th:href="${url}" th:text="${url}" target="_blank" rel="noopener">url</a>
             <mdui-chip class="admin-well-known-status" th:if="${f.status() != 200}" th:text="${f.status()}">302</mdui-chip>
+            <span class="admin-well-known-status" th:unless="${f.status() != 200}"></span>
             <span class="admin-member-id" th:text="${f.contentType()}">type</span>
             <span class="admin-member-id" th:text="#{admin.well-known.size(${f.size()})}">0 B</span>
             <span class="admin-member-id" th:text="${f.updatedAt() == null ? '—' : #temporals.format(f.updatedAt(), #messages.msg('format.date'))}">date</span>
