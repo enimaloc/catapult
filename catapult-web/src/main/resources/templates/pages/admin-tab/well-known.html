@@ -67,9 +67,9 @@
 
 <!--/*@thymesVar id="file" type="fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto"*/-->
 <div th:fragment="file" class="admin-well-known-form"
-     th:attr="data-id=${creating ? null : file.id()},data-initial-status=${file.status()},data-preset=${preset},
+     th:attr="data-id=${creating ? null : file.id()},
               data-label-add=#{admin.well-known.form.add},data-label-remove=#{admin.well-known.form.remove},
-              data-label-invalid-json=#{admin.well-known.form.invalid},data-label-schema-warnings=#{admin.well-known.form.schema-warnings},
+              data-label-invalid-json=#{admin.well-known.form.invalid},data-label-schema-warnings=#{admin.well-known.form.schema-warnings},data-label-schema-more=#{admin.well-known.form.schema-more},
               data-label-expires-far=#{admin.well-known.form.expires-far},data-label-header-name=#{admin.well-known.form.header.name},
               data-label-header-value=#{admin.well-known.form.header.value},data-label-header-remove=#{admin.well-known.form.header.remove}">
     <h3 th:text="${creating} ? #{admin.well-known.form.title.new} : ${url}">title</h3>
