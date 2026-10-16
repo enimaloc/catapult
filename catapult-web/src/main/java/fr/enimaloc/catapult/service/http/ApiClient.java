@@ -84,6 +84,7 @@ public class ApiClient {
                 try {
                     return new Result<>(status, status == 200 ? response.bodyTo(type) : null);
                 } catch (Exception e) {
+                    logFailure(HttpMethod.GET, path, e);
                     return new Result<T>(status, null);
                 }
             });
