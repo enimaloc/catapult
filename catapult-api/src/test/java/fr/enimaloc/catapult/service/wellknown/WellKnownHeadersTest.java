@@ -73,6 +73,12 @@ class WellKnownHeadersTest {
     }
 
     @Test
+    void aBlankHeaderValueIsRefused() {
+        // an empty Content-Security-Policy would silently drop the sandbox
+        for (String blank : new String[]{"", "  ", "\t"}) refused(200, List.of(h("Content-Security-Policy", blank)));
+    }
+
+    @Test
     void aNullHeaderIsRefused() {
         refused(200, java.util.Arrays.asList(h("X-A", "1"), null));
     }

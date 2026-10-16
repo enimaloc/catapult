@@ -82,6 +82,20 @@ class MockWellKnownStoreTest {
     }
 
     @Test
+    void refusesABlankHeaderValue() {
+        var blank = List.of(new fr.enimaloc.catapult.common.dto.admin.WellKnownHeader("Content-Security-Policy", " "));
+        assertThat(store.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", 200, blank, "text/plain", "x"))).isEqualTo(400);
+    }
+
+    @Test
+    void aBlankContentTypeIsAcceptedWithoutContent_andDefaulted() {
+        assertThat(store.create(new WellKnownFileRequest(WELL_KNOWN, "c.txt", 200, List.of(), " ", "x"))).isEqualTo(400);
+        assertThat(store.create(new WellKnownFileRequest(WELL_KNOWN, "c.txt", 200, List.of(), " ", ""))).isEqualTo(201);
+        var file = store.list().stream().filter(f -> f.path().equals("c.txt")).findFirst().orElseThrow();
+        assertThat(store.get(file.id()).contentType()).isEqualTo("text/plain; charset=utf-8");
+    }
+
+    @Test
     void servesTheSeededRedirect() {
         WellKnownContent c = store.serve(WELL_KNOWN, "change-password");
         assertThat(c.status()).isEqualTo(200);
