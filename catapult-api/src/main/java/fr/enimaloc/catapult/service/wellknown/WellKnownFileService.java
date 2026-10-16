@@ -85,7 +85,7 @@ public class WellKnownFileService {
         if (!WellKnownPaths.valid(request.location(), request.path())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid path");
         }
-        int status = request.status() == 0 ? 200 : request.status();
+        int status = request.status() == null || request.status() == 0 ? 200 : request.status();
         List<WellKnownHeader> headers = request.headers() == null ? List.of() : request.headers();
         WellKnownHeaders.validate(status, headers);
         if (request.content() == null
