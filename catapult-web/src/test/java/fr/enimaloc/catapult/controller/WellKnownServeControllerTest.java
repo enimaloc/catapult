@@ -111,6 +111,14 @@ class WellKnownServeControllerTest {
     }
 
     @Test
+    void servesANameThatMerelyContainsTwoDots() throws Exception {
+        when(apiService.wellKnown(WELL_KNOWN, "foo..json")).thenReturn(ok("application/json", "{}"));
+        when(apiService.wellKnown(WELL_KNOWN, "a..b/token")).thenReturn(ok("text/plain", "t"));
+        mvc.perform(get("/.well-known/foo..json")).andExpect(status().isOk()).andExpect(content().string("{}"));
+        mvc.perform(get("/.well-known/a..b/token")).andExpect(status().isOk()).andExpect(content().string("t"));
+    }
+
+    @Test
     void cachesAnswersUntilCleared() throws Exception {
         when(apiService.wellKnown(WELL_KNOWN, "security.txt")).thenReturn(ok("text/plain", "v1"));
         mvc.perform(get("/.well-known/security.txt")).andExpect(content().string("v1"));
