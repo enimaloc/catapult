@@ -24,7 +24,7 @@ function form(id) {
     const { location = "WELL_KNOWN", path = "", content = "", status = "200", headers = [] } = served;
     const known = ["200", "204", "301", "302", "307", "308", "404", "410"].includes(String(status));
     return `<div class="admin-well-known-form" ${id ? `data-id="${id}"` : ""} data-label-add="Add" data-label-remove="Remove"
-                 data-label-invalid-json="No form: {0}" data-label-schema-warnings="Schema: {0}. Save?"
+                 data-label-invalid-json="No form: {0}" data-label-schema-warnings="Schema: {0}. Save?" data-label-schema-more="and {0} more"
                  data-label-expires-far="Too far" data-label-header-name="Header" data-label-header-value="Value"
                  data-label-header-remove="Remove this header">
         <select name="location"><option value="WELL_KNOWN">w</option>
@@ -428,6 +428,60 @@ describe("admin-well-known response and forms", () => {
         expect(JSON.parse(savedBody().content)).toEqual({ associatedApplications: [{ applicationId: "b" }], x: 1 });
     });
 
+    it("saves an untouched security.txt byte for byte when only a header changed", async () => {
+        const text = "# our policy\n\nContact: mailto:a@b.c\nExpires: 2027-01-01T00:00:00.000Z\n\n# end\n";
+        await open({ path: "security.txt", content: text });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        type("status", "404");
+        await save();
+        expect(savedBody().status).toBe(404);
+        expect(savedBody().content).toBe(text);
+    });
+
+    it("saves untouched compact JSON as written, and re-serializes once a field is edited", async () => {
+        const text = '[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"a.b","sha256_cert_fingerprints":["AA"]}}]';
+        await open({ path: "assetlinks.json", content: text });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        await save();
+        expect(savedBody().content).toBe(text);
+
+        fields().querySelector('[data-field="apps"] [data-field="package_name"]').value = "a.c";
+        await save();
+        expect(savedBody().content).not.toBe(text);
+        expect(JSON.parse(savedBody().content)[0].target.package_name).toBe("a.c");
+    });
+
+    it("hints the GUID and SHA-256 formats on the list rows", async () => {
+        await open({ path: "microsoft-identity-association.json", content: '{"associatedApplications":[{"applicationId":"a"}]}' });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        expect(items("applicationIds")[0].getAttribute("helper")).toContain("GUID");
+        await save();
+        await open({ path: "assetlinks.json", content: "[]" });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        fields().querySelector('fieldset[data-field="apps"] > .admin-well-known-item-add').click();
+        fields().querySelector('fieldset[data-field="sha256_cert_fingerprints"] > .admin-well-known-item-add').click();
+        const row = fields().querySelector('[data-field="sha256_cert_fingerprints"] [data-item]');
+        expect(row.getAttribute("helper")).toContain("SHA-256");
+    });
+
+    it("switches to raw without rewriting an untouched form", async () => {
+        const text = "# c\n\nContact: mailto:a@b.c\nExpires: 2027-01-01T00:00:00.000Z\n";
+        await open({ path: "security.txt", content: text });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        switchMode("raw");
+        expect(dialog().querySelector('[name="content"]').value).toBe(text);
+    });
+
+    it("checks a dedicated form's content against the route's schema too", async () => {
+        schemas["assetlinks.json"] = { type: "object", required: ["zzz"] };
+        await open({ path: "assetlinks.json", content: "{}" });
+        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=assetlinks.json"));
+        await flush();
+        confirmAnswer = false;
+        await save();
+        expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({ headline: "Schema: zzz: required. Save?" }));
+    });
+
     it("keeps an apple detail the form doesn't show in its slot when another is edited or removed", async () => {
         const A = { appIDs: ["A"], components: [{ "/": "/a" }] };
         const mixed = { appIDs: ["M"], components: [{ "#": "c" }] };
@@ -480,7 +534,7 @@ describe("admin-well-known response and forms", () => {
         confirmAnswer = false;
         await save();
         expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({
-            headline: "Schema: a: required, b: required, c: required, d: required, e: required, … (+2). Save?"
+            headline: "Schema: a: required, b: required, c: required, d: required, e: required, and 2 more. Save?"
         }));
     });
 

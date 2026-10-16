@@ -110,7 +110,7 @@ window.CatapultWellKnownForms = (function () {
         "microsoft-identity-association.json": {
             id: "microsoft-identity-association.json",
             format: "json",
-            fields: [{ key: "applicationIds", label: "applicationId", type: "list", required: true }],
+            fields: [{ key: "applicationIds", label: "applicationId", type: "list", required: true, help: "GUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)" }],
             parse(text) {
                 const doc = readJson(text, { associatedApplications: [] });
                 if (!isObject(doc)) throw new Error("object expected");
@@ -131,7 +131,7 @@ window.CatapultWellKnownForms = (function () {
             fields: [{
                 key: "apps", label: "Android", type: "group", fields: [
                     { key: "package_name", label: "package_name", type: "text", required: true },
-                    { key: "sha256_cert_fingerprints", label: "sha256_cert_fingerprints", type: "list", required: true }
+                    { key: "sha256_cert_fingerprints", label: "sha256_cert_fingerprints", type: "list", required: true, help: "SHA-256 AA:BB:… (32 bytes)" }
                 ]
             }],
             parse(text) {
