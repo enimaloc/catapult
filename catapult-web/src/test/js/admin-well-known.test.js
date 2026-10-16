@@ -124,8 +124,7 @@ describe("admin-well-known", () => {
         page();
         await click("#admin-well-known-new");
         importFile(new File(["Contact: mailto:a@b.c\n"], "security.txt", { type: "text/plain" }));
-        await flush();
-        expect(field("content").value).toBe("Contact: mailto:a@b.c\n");
+        await vi.waitFor(() => expect(field("content").value).toBe("Contact: mailto:a@b.c\n"));
     });
 
     it("refuses a binary or too large file, leaving the content as it was", async () => {
@@ -134,14 +133,12 @@ describe("admin-well-known", () => {
         field("content").value = "kept";
 
         importFile(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01])], "a.png"));
-        await flush();
+        await vi.waitFor(() => expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Not text"));
         expect(field("content").value).toBe("kept");
-        expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Not text");
 
         importFile(new File(["x".repeat(65_537)], "big.txt"));
-        await flush();
+        await vi.waitFor(() => expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Too large"));
         expect(field("content").value).toBe("kept");
-        expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Too large");
     });
 
     it("creates a file then reloads the tab", async () => {
