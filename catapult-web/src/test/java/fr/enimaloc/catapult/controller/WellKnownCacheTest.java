@@ -25,7 +25,7 @@ class WellKnownCacheTest {
 
     private WellKnownContent load(int status) {
         loads.incrementAndGet();
-        return new WellKnownContent(status, null, null);
+        return new WellKnownContent(status, null);
     }
 
     @Test

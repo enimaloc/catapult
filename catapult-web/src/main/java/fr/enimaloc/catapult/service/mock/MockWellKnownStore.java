@@ -14,18 +14,30 @@ import java.util.concurrent.atomic.AtomicLong;
  * (a root name needs a dot); catapult-api's are the real ones.
  */
 class MockWellKnownStore {
+    private static final Set<String> REFUSED_HEADERS = Set.of("set-cookie", "set-cookie2", "content-type", "content-length",
+            "transfer-encoding", "connection", "host", "content-encoding", "x-content-type-options");
     private final Map<Long, WellKnownFileDetailDto> files = new LinkedHashMap<>();
     private final AtomicLong ids = new AtomicLong();
 
     MockWellKnownStore() {
         put(WellKnownLocation.WELL_KNOWN, "security.txt", "text/plain; charset=utf-8",
                 "Contact: mailto:security@example.org\nExpires: 2027-10-16T00:00:00Z\n");
+        files.put(ids.incrementAndGet(), new WellKnownFileDetailDto(ids.get(), WellKnownLocation.WELL_KNOWN, "change-password", 302,
+                List.of(new WellKnownHeader("Location", "/settings")), "text/plain", "", Instant.now()));
+    }
+
+    /** A small flat schema for {@code gpc.json}, standing in for SchemaStore's; null for any other path. */
+    String schema(String path) {
+        return "gpc.json".equals(path)
+                ? "{\"type\":\"object\",\"properties\":{\"gpc\":{\"type\":\"boolean\",\"title\":\"GPC\"},"
+                + "\"lastUpdate\":{\"type\":\"string\",\"description\":\"ISO date\"}},\"required\":[\"gpc\"]}"
+                : null;
     }
 
     synchronized WellKnownContent serve(WellKnownLocation location, String path) {
         return find(location, path)
-                .map(f -> new WellKnownContent(200, f.contentType(), f.content().getBytes(StandardCharsets.UTF_8)))
-                .orElse(new WellKnownContent(404, null, null));
+                .map(f -> new WellKnownContent(200, new WellKnownResponseDto(f.status(), f.contentType(), f.headers(), f.content())))
+                .orElse(new WellKnownContent(404, null));
     }
 
     synchronized List<WellKnownFileDto> list() {
@@ -77,11 +89,23 @@ class MockWellKnownStore {
     /** The stored file for a request, with the API's defaults: no status is 200, no headers is none. */
     private static WellKnownFileDetailDto detail(long id, WellKnownFileRequest r) {
         int status = r.status() == null || r.status() == 0 ? 200 : r.status();
-        List<fr.enimaloc.catapult.common.dto.admin.WellKnownHeader> headers = r.headers() == null ? List.of() : r.headers();
+        List<WellKnownHeader> headers = r.headers() == null ? List.of() : r.headers();
         return new WellKnownFileDetailDto(id, r.location(), r.path(), status, headers, r.contentType(), r.content(), Instant.now());
     }
 
+    /** A subset of catapult-api's rules: a 200-599 status, no refused header, a Location for a 3xx. */
+    private static boolean validResponse(WellKnownFileRequest r) {
+        int status = r.status() == null || r.status() == 0 ? 200 : r.status();
+        if (status < 200 || status > 599) return false;
+        List<WellKnownHeader> headers = r.headers() == null ? List.of() : r.headers();
+        for (WellKnownHeader h : headers) {
+            if (h.name() == null || h.value() == null || REFUSED_HEADERS.contains(h.name().toLowerCase(Locale.ROOT))) return false;
+        }
+        return status < 300 || status > 399 || headers.stream().anyMatch(h -> h.name().equalsIgnoreCase("Location") && !h.value().isBlank());
+    }
+
     private static boolean valid(WellKnownFileRequest r) {
+        if (!validResponse(r)) return false;
         if (r.location() == null || r.path() == null || !r.path().matches("[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*")
                 || r.path().contains("..") || r.contentType() == null || r.contentType().isBlank() || r.content() == null
                 || r.content().getBytes(StandardCharsets.UTF_8).length > 65_536) {

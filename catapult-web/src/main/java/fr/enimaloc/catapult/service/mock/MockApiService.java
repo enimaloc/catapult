@@ -490,6 +490,12 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public String adminWellKnownSchema(String path) {
+        log.trace("adminWellKnownSchema({})", path);
+        return wellKnown.schema(path);
+    }
+
+    @Override
     public List<WellKnownFileDto> adminWellKnownFiles() {
         log.trace("adminWellKnownFiles()");
         return wellKnown.list();

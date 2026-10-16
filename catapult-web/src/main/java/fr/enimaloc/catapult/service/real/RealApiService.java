@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownResponseDto;
 import fr.enimaloc.catapult.service.WellKnownContent;
 import fr.enimaloc.catapult.common.dto.admin.SaveMappingsRequest;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
@@ -396,8 +397,15 @@ public class RealApiService implements ApiService {
 
     @Override
     public WellKnownContent wellKnown(WellKnownLocation location, String path) {
-        ApiClient.Raw raw = client.fetch("/api/well-known/serve?location={location}&path={path}", location.name(), path);
-        return new WellKnownContent(raw.status(), raw.contentType(), raw.body());
+        ApiClient.Result<WellKnownResponseDto> result = client.getAnonymous(
+                "/api/well-known/serve?location={location}&path={path}", WellKnownResponseDto.class, location.name(), path);
+        if (result.status() == 200 && result.body() == null) return new WellKnownContent(502, null);
+        return new WellKnownContent(result.status(), result.body());
+    }
+
+    @Override
+    public String adminWellKnownSchema(String path) {
+        return client.get("/api/admin/well-known/schema?path={path}", String.class, path);
     }
 
     @Override

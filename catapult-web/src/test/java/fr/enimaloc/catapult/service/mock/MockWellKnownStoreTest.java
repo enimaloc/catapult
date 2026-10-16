@@ -20,13 +20,13 @@ class MockWellKnownStoreTest {
     void servesTheSeededSecurityTxt() {
         WellKnownContent c = store.serve(WELL_KNOWN, "security.txt");
         assertThat(c.status()).isEqualTo(200);
-        assertThat(c.contentType()).isEqualTo("text/plain; charset=utf-8");
+        assertThat(c.response().contentType()).isEqualTo("text/plain; charset=utf-8");
     }
 
     @Test
     void createsThenServes() {
         assertThat(store.create(req(WELL_KNOWN, "acme-challenge/abc"))).isEqualTo(201);
-        assertThat(new String(store.serve(WELL_KNOWN, "acme-challenge/abc").body())).isEqualTo("body");
+        assertThat(store.serve(WELL_KNOWN, "acme-challenge/abc").response().content()).isEqualTo("body");
         assertThat(store.serve(WELL_KNOWN, "other").status()).isEqualTo(404);
     }
 
@@ -79,5 +79,37 @@ class MockWellKnownStoreTest {
         assertThat(store.update(redirect.id(), new WellKnownFileRequest(WELL_KNOWN, "b.txt", null, null, "text/plain", "y"))).isEqualTo(200);
         assertThat(store.get(redirect.id()).status()).isEqualTo(200);
         assertThat(store.get(redirect.id()).headers()).isEmpty();
+    }
+
+    @Test
+    void servesTheSeededRedirect() {
+        WellKnownContent c = store.serve(WELL_KNOWN, "change-password");
+        assertThat(c.status()).isEqualTo(200);
+        assertThat(c.response().status()).isEqualTo(302);
+        assertThat(c.response().headers()).containsExactly(
+                new fr.enimaloc.catapult.common.dto.admin.WellKnownHeader("Location", "/settings"));
+    }
+
+    @Test
+    void refusesARedirectWithoutLocation_andARefusedHeader_andABadStatus() {
+        assertThat(store.create(new WellKnownFileRequest(WELL_KNOWN, "r.txt", 302, List.of(), "text/plain", ""))).isEqualTo(400);
+        assertThat(store.create(new WellKnownFileRequest(WELL_KNOWN, "c.txt", 200, List.of(
+                new fr.enimaloc.catapult.common.dto.admin.WellKnownHeader("Set-Cookie", "a=b")), "text/plain", ""))).isEqualTo(400);
+        assertThat(store.create(new WellKnownFileRequest(WELL_KNOWN, "s.txt", 99, List.of(), "text/plain", ""))).isEqualTo(400);
+    }
+
+    @Test
+    void servesTheStoredStatusAndHeaders() {
+        store.create(new WellKnownFileRequest(WELL_KNOWN, "g.txt", 410, List.of(
+                new fr.enimaloc.catapult.common.dto.admin.WellKnownHeader("Cache-Control", "no-store")), "text/plain", "gone"));
+        var r = store.serve(WELL_KNOWN, "g.txt").response();
+        assertThat(r.status()).isEqualTo(410);
+        assertThat(r.headers()).hasSize(1);
+    }
+
+    @Test
+    void schema_existsForGpcJsonOnly() {
+        assertThat(store.schema("gpc.json")).contains("\"gpc\"");
+        assertThat(store.schema("x")).isNull();
     }
 }

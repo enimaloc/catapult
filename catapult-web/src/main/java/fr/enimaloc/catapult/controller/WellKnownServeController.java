@@ -5,6 +5,9 @@ import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.WellKnownContent;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownHeader;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownResponseDto;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -12,12 +15,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 /**
  * The well-known files the admin configured, served to anyone: under /.well-known/ (any depth), and
  * at the root for a dotted name (IndexController's pages have none). catapult-api decides what
- * exists; a path breaking its rules is a 404 there.
+ * exists; a path breaking its rules is a 404 there. The status and headers are the file's; nosniff is
+ * always sent, and CSP {@code sandbox} unless the file sets its own Content-Security-Policy.
  */
 @RestController
 @RequiredArgsConstructor
@@ -48,14 +53,27 @@ public class WellKnownServeController {
         WellKnownContent content = cache.get(location, path, () -> apiService.wellKnown(location, path));
         if (content.status() == 404) return ResponseEntity.notFound().build();
         if (content.status() != 200) return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
+        WellKnownResponseDto response = content.response();
         MediaType type;
         try {
-            type = MediaType.parseMediaType(content.contentType());
+            type = MediaType.parseMediaType(response.contentType());
             if (type.isWildcardType() || type.isWildcardSubtype()) type = MediaType.TEXT_PLAIN;
         } catch (RuntimeException e) {
             type = MediaType.TEXT_PLAIN;
         }
-        return ResponseEntity.ok().contentType(type).header("X-Content-Type-Options", "nosniff")
-                .header("Content-Security-Policy", "sandbox").body(content.body());
+        HttpHeaders headers = new HttpHeaders();
+        boolean ownCsp = false;
+        for (WellKnownHeader header : response.headers()) {
+            if (header.name().equalsIgnoreCase("X-Content-Type-Options")) continue; // forced below
+            if (header.name().equalsIgnoreCase("Content-Security-Policy")) ownCsp = true;
+            headers.add(header.name(), header.value());
+        }
+        headers.set("X-Content-Type-Options", "nosniff");
+        if (!ownCsp) headers.set("Content-Security-Policy", "sandbox");
+        int status = response.status();
+        boolean bodyless = status == 204 || status == 304;
+        if (!bodyless) headers.setContentType(type);
+        byte[] body = bodyless || response.content() == null ? new byte[0] : response.content().getBytes(StandardCharsets.UTF_8);
+        return ResponseEntity.status(status).headers(headers).body(body);
     }
 }

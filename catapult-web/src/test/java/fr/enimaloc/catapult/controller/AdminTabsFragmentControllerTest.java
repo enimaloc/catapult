@@ -291,4 +291,19 @@ class AdminTabsFragmentControllerTest {
 
         assertThat(html).contains("data-id=\"4\"", "data-manual=\"true\"", "value=\"hello\"", "value=\"ROOT\"", ">/riot.txt</");
     }
+
+    @Test
+    void wellKnownSchema_isRelayedToAnAdmin_404WhenNone_andRefusedToOthers() throws Exception {
+        mvc.perform(get("/spa/admin/well-known/schema?path=gpc.json")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/spa/admin/well-known/schema?path=gpc.json").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isForbidden());
+
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminWellKnownSchema("gpc.json")).thenReturn("{\"type\":\"object\"}");
+        mvc.perform(get("/spa/admin/well-known/schema?path=gpc.json").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().json("{\"type\":\"object\"}"));
+        mvc.perform(get("/spa/admin/well-known/schema?path=none").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound());
+    }
 }
