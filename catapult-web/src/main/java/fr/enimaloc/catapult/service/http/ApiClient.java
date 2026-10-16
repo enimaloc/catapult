@@ -73,20 +73,23 @@ public class ApiClient {
         }
     }
 
-    /** A GET answer kept raw (status, Content-Type, bytes), for content relayed as is; 502 when unreachable. */
-    public record Raw(int status, String contentType, byte[] body) {}
-
-    /** Sent without the session's bearer: the content doesn't depend on who asks, and a stale JWT would be refused. */
-    public Raw fetch(String path, Object... uriVars) {
+    /**
+     * GET {@code path} without the session's bearer (for public content: an expired JWT would make
+     * catapult-api refuse it), keeping the status and the body read as {@code type}; 502 when unreachable.
+     */
+    public <T> Result<T> getAnonymous(String path, Class<T> type, Object... uriVars) {
         try {
             return client.get().uri(path, uriVars).header(ANONYMOUS_HEADER, "1").exchange((request, response) -> {
-                var type = response.getHeaders().getContentType();
-                return new Raw(response.getStatusCode().value(), type == null ? null : type.toString(),
-                        response.getBody().readAllBytes());
+                int status = response.getStatusCode().value();
+                try {
+                    return new Result<>(status, status == 200 ? response.bodyTo(type) : null);
+                } catch (Exception e) {
+                    return new Result<T>(status, null);
+                }
             });
         } catch (Exception e) {
             logFailure(HttpMethod.GET, path, e);
-            return new Raw(502, null, null);
+            return new Result<>(502, null);
         }
     }
 

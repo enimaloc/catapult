@@ -517,15 +517,23 @@ class RealApiServiceTest {
     }
 
     @Test
-    void wellKnown_mapsTheRawAnswer() {
-        expect(HttpMethod.GET, "/api/well-known/serve?location=WELL_KNOWN&path=acme-challenge%2Fabc")
-                .andRespond(withSuccess("token", MediaType.TEXT_PLAIN));
+    void wellKnown_mapsTheEnvelope_withoutTheBearer() {
+        expect(HttpMethod.GET, "/api/well-known/serve?location=WELL_KNOWN&path=change-password")
+                .andRespond(withSuccess("{\"status\":302,\"contentType\":\"text/plain\",\"headers\":"
+                        + "[{\"name\":\"Location\",\"value\":\"/x\"}],\"content\":\"\"}", MediaType.APPLICATION_JSON));
 
-        var content = service.wellKnown(fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "acme-challenge/abc");
+        var content = service.wellKnown(fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "change-password");
 
-        assertThat(content.status()).isEqualTo(200);
-        assertThat(content.contentType()).startsWith("text/plain");
-        assertThat(new String(content.body())).isEqualTo("token");
+        assertThat(content).isEqualTo(new fr.enimaloc.catapult.service.WellKnownContent(200,
+                new fr.enimaloc.catapult.common.dto.admin.WellKnownResponseDto(302, "text/plain",
+                        java.util.List.of(new fr.enimaloc.catapult.common.dto.admin.WellKnownHeader("Location", "/x")), "")));
+    }
+
+    @Test
+    void adminWellKnownSchema_readsTheSchemaText() {
+        respond(HttpMethod.GET, "/api/admin/well-known/schema?path=gpc.json", "{\"type\":\"object\"}");
+
+        assertThat(service.adminWellKnownSchema("gpc.json")).isEqualTo("{\"type\":\"object\"}");
     }
 
     @Test
@@ -574,7 +582,7 @@ class RealApiServiceTest {
                             .headerDoesNotExist("Authorization"))
                     .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers
                             .headerDoesNotExist("X-Catapult-Anonymous"))
-                    .andRespond(withSuccess("x", MediaType.TEXT_PLAIN));
+                    .andRespond(withSuccess("{\"status\":200,\"contentType\":\"text/plain\",\"headers\":[],\"content\":\"x\"}", MediaType.APPLICATION_JSON));
             service.wellKnown(fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "a.txt");
         } finally {
             org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();

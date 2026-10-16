@@ -9,12 +9,15 @@ import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.List;
 import java.util.Map;
@@ -148,6 +151,16 @@ public class AdminTabsFragmentController {
             model.addAttribute("creating", id == null);
             return "pages/admin-tab/well-known :: file";
         });
+    }
+
+    /** SchemaStore's schema for a well-known path, for the dialog's generated form; 404 when none. */
+    @GetMapping(value = "/well-known/schema", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    ResponseEntity<String> wellKnownSchema(@RequestParam String path) {
+        int refused = AdminAccess.refusal(filler);
+        if (refused != 0) return ResponseEntity.status(refused).build();
+        String schema = apiService.adminWellKnownSchema(path);
+        return schema == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(schema);
     }
 
     /** {@code view}'s fragment for an admin; the 401 / 403 error fragment for anyone else. */

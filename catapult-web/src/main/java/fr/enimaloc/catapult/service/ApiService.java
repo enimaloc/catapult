@@ -127,6 +127,8 @@ public interface ApiService {
 
     /** The file configured at {@code path}: catapult-api's answer (200 / 404), 502 when unreachable. */
     WellKnownContent wellKnown(WellKnownLocation location, String path);
+    /** SchemaStore's schema for {@code path}; null when none or catapult-api fails. */
+    String adminWellKnownSchema(String path);
     /** The configured well-known files; null when catapult-api fails. */
     List<WellKnownFileDto> adminWellKnownFiles();
     /** One configured file with its content; null when it fails or there is none. */
