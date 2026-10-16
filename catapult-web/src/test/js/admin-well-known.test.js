@@ -1,7 +1,8 @@
 /*
  * The admin Well-known tab: a file's dialog (new, from the registry, or an existing one), its
  * Content-Type following the path until edited, a file imported as text, Save / Delete; the
- * registry filtered as typed.
+ * registry filtered as typed; the Response tab's status and headers, the content edited through a form
+ * (dedicated or generated from a schema) or as raw text.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
@@ -14,15 +15,39 @@ const dialog = () => document.getElementById("admin-well-known-dialog");
 const field = name => dialog().querySelector(`[name="${name}"]`);
 const fetchedUrls = () => fetched.mock.calls.map(([url]) => url);
 
+let served; // the file the dialog fragment shows: { path, location, content, status, headers }
+let schemas; // path → the schema served by /spa/admin/well-known/schema
+
+const esc = text => String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
 function form(id) {
-    return `<div class="admin-well-known-form" ${id ? `data-id="${id}"` : ""}>
-        <select name="location"><option value="WELL_KNOWN">w</option><option value="ROOT">r</option></select>
-        <input name="path">
+    const { location = "WELL_KNOWN", path = "", content = "", status = "200", headers = [] } = served;
+    const known = ["200", "204", "301", "302", "307", "308", "404", "410"].includes(String(status));
+    return `<div class="admin-well-known-form" ${id ? `data-id="${id}"` : ""} data-label-add="Add" data-label-remove="Remove"
+                 data-label-invalid-json="No form: {0}" data-label-schema-warnings="Schema: {0}. Save?"
+                 data-label-expires-far="Too far">
+        <select name="location"><option value="WELL_KNOWN">w</option>
+            <option value="ROOT" ${location === "ROOT" ? "selected" : ""}>r</option></select>
+        <input name="path" value="${esc(path)}">
         <code class="admin-well-known-url"></code>
+        <div class="admin-well-known-sections"></div>
+        <select name="status">${["200", "204", "301", "302", "307", "308", "404", "410", "other"]
+            .map(s => `<option value="${s}" ${(known ? String(status) : "other") === s ? "selected" : ""}>${s}</option>`).join("")}</select>
+        <input name="statusOther" value="${known ? "" : status}" ${known ? "hidden" : ""}>
         <input name="contentType" ${id ? 'data-manual="true"' : ""}>
-        <textarea name="content"></textarea>
-        <input type="file" class="admin-well-known-import">
-        <button class="admin-well-known-import-button"></button>
+        <div class="admin-well-known-headers">${headers.map(h => `<div class="admin-well-known-header">
+            <input data-header="name" value="${esc(h.name)}"><input data-header="value" value="${esc(h.value)}">
+            <button class="admin-well-known-header-remove"></button></div>`).join("")}</div>
+        <button class="admin-well-known-header-add"></button>
+        <button class="admin-well-known-redirect"></button>
+        <div class="admin-well-known-mode"><button value="form"></button><button value="raw"></button></div>
+        <small class="admin-well-known-mode-reason"></small>
+        <div class="admin-well-known-fields" hidden></div>
+        <div class="admin-well-known-raw">
+            <textarea name="content">${esc(content)}</textarea>
+            <input type="file" class="admin-well-known-import">
+            <button class="admin-well-known-import-button"></button>
+        </div>
         <button class="admin-dialog-close"></button>
         <button class="admin-well-known-save"></button>
     </div>`;
@@ -68,13 +93,21 @@ function importFile(file) {
 
 beforeEach(async () => {
     history.replaceState(null, "", "/admin#well-known");
-    fetched = vi.fn(async url => response(200, url.includes("?id=") ? form(4) : form(null)));
+    served = {};
+    schemas = {};
+    fetched = vi.fn(async url => {
+        if (url.startsWith("/spa/admin/well-known/schema?path=")) {
+            const schema = schemas[decodeURIComponent(url.split("=")[1])];
+            return schema ? response(200, schema) : response(404);
+        }
+        return response(200, url.includes("?id=") ? form(4) : form(null));
+    });
     posted = vi.fn(async () => response(201));
     confirmAnswer = true;
     window.fetch = fetched;
     window.CatapultCsrf = { postJson: posted };
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())) };
-    await load("admin-tabs", "admin-well-known");
+    await load("admin-tabs", "well-known-forms", "admin-well-known");
     window.CatapultChannel = { showError: vi.fn() }; // after load: channel-page.js isn't loaded, nothing overrides it
     window.CatapultAdminTabs.reload = vi.fn(async () => {});
 });
@@ -91,7 +124,7 @@ describe("admin-well-known", () => {
     it("opens a registry suffix's dialog with its path", async () => {
         page();
         await click(".admin-well-known-configure");
-        expect(fetchedUrls()).toEqual(["/spa/admin/well-known/file?location=WELL_KNOWN&path=security.txt"]);
+        expect(fetchedUrls()[0]).toBe("/spa/admin/well-known/file?location=WELL_KNOWN&path=security.txt");
         expect(dialog().open).toBe(true);
     });
 
@@ -114,7 +147,7 @@ describe("admin-well-known", () => {
     it("keeps an existing file's type when its path changes", async () => {
         page();
         await click(".admin-well-known-edit");
-        expect(fetchedUrls()).toEqual(["/spa/admin/well-known/file?id=4"]);
+        expect(fetchedUrls()[0]).toBe("/spa/admin/well-known/file?id=4");
         field("contentType").value = "text/plain";
         type("path", "x.json");
         expect(field("contentType").value).toBe("text/plain");
@@ -150,7 +183,7 @@ describe("admin-well-known", () => {
         await click(".admin-well-known-save");
 
         expect(posted.mock.calls).toEqual([["/admin/well-known",
-            { location: "ROOT", path: "riot.txt", contentType: "text/plain; charset=utf-8", content: "code" }]]);
+            { location: "ROOT", path: "riot.txt", status: 200, headers: [], contentType: "text/plain; charset=utf-8", content: "code" }]]);
         expect(dialog().open).toBe(false);
         expect(CatapultAdminTabs.reload).toHaveBeenCalled();
     });
@@ -222,5 +255,254 @@ describe("admin-well-known", () => {
         await click(".admin-well-known-delete");
         await vi.waitFor(() => expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(2));
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
+    });
+});
+
+describe("admin-well-known response and forms", () => {
+    const mode = () => dialog().querySelector(".admin-well-known-mode");
+    const formSegment = () => mode().querySelector('[value="form"]');
+    const fields = () => dialog().querySelector(".admin-well-known-fields");
+    const raw = () => dialog().querySelector(".admin-well-known-raw");
+    const reason = () => dialog().querySelector(".admin-well-known-mode-reason").textContent;
+    const items = key => [...fields().querySelectorAll(`fieldset[data-field="${key}"] > .admin-well-known-item [data-item]`)];
+    const savedBody = () => posted.mock.calls.at(-1)[1];
+
+    /** Saves; Save is re-enabled first, as a successful save leaves it disabled (the dialog closes then). */
+    async function save() {
+        dialog().querySelector(".admin-well-known-save").disabled = false;
+        await click(".admin-well-known-save");
+    }
+
+    function switchMode(to) {
+        mode().value = to;
+        mode().dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    async function open(file) {
+        served = { location: "WELL_KNOWN", ...file };
+        page();
+        await click(".admin-well-known-edit");
+    }
+
+    const SECURITY = "Contact: mailto:a@b.c\nContact: https://b.c/sec\nExpires: 2027-01-01T00:00:00.000Z\n";
+
+    it("opens security.txt as a form with its Contact rows; raw gets the serialized text", async () => {
+        await open({ path: "security.txt", content: SECURITY });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        expect(fields().hidden).toBe(false);
+        expect(raw().hidden).toBe(true);
+        expect(items("Contact").map(i => i.value)).toEqual(["mailto:a@b.c", "https://b.c/sec"]);
+
+        items("Contact")[0].value = "mailto:new@b.c";
+        switchMode("raw");
+        expect(raw().hidden).toBe(false);
+        expect(fields().hidden).toBe(true);
+        expect(field("content").value).toBe("Contact: mailto:new@b.c\nContact: https://b.c/sec\nExpires: 2027-01-01T00:00:00.000Z\n");
+    });
+
+    it("adds and removes list rows", async () => {
+        await open({ path: "security.txt", content: SECURITY });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        fields().querySelector('fieldset[data-field="Contact"] > .admin-well-known-item-add').click();
+        expect(items("Contact")).toHaveLength(3);
+        items("Contact")[2].value = "mailto:c@b.c";
+        items("Contact")[0].closest(".admin-well-known-item").querySelector(".admin-well-known-item-remove").click();
+        switchMode("raw");
+        expect(field("content").value).toContain("Contact: https://b.c/sec\nContact: mailto:c@b.c\n");
+        expect(field("content").value).not.toContain("a@b.c");
+    });
+
+    it("falls back to raw with the reason on unreadable JSON, offering the form again once edited", async () => {
+        await open({ path: "assetlinks.json", content: "{oops" });
+        await vi.waitFor(() => expect(formSegment().disabled).toBe(true));
+        expect(mode().value).toBe("raw");
+        expect(raw().hidden).toBe(false);
+        expect(reason()).toMatch(/^No form: .*JSON/);
+
+        type("content", "[]");
+        expect(formSegment().disabled).toBe(false);
+        expect(reason()).toBe("");
+        switchMode("form");
+        expect(mode().value).toBe("form");
+        expect(fields().querySelector('fieldset[data-field="apps"]')).not.toBeNull();
+    });
+
+    it("goes back to raw when switching to the form fails", async () => {
+        await open({ path: "assetlinks.json", content: "[]" });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        switchMode("raw");
+        field("content").value = "{";
+        switchMode("form");
+        expect(mode().value).toBe("raw");
+        expect(formSegment().disabled).toBe(true);
+        expect(reason()).toMatch(/^No form: /);
+    });
+
+    it("generates a form from the route's schema, hides the Form segment without one", async () => {
+        schemas["gpc.json"] = { type: "object", required: ["gpc"], properties: { gpc: { type: "boolean" }, lastUpdate: { type: "string" } } };
+        await open({ path: "gpc.json", content: '{"gpc": true}' });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=gpc.json");
+        const box = fields().querySelector('mdui-checkbox[data-field="gpc"]');
+        expect(box.checked).toBe(true);
+        box.checked = false;
+        await save();
+        expect(JSON.parse(savedBody().content)).toEqual({ gpc: false });
+
+        await open({ path: "unknown.json", content: "{}" });
+        await vi.waitFor(() => expect(formSegment().hidden).toBe(true));
+        expect(mode().value).toBe("raw");
+        expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=unknown.json");
+    });
+
+    it("asks no schema for a root file", async () => {
+        await open({ path: "gpc.json", location: "ROOT", content: "{}" });
+        await vi.waitFor(() => expect(formSegment().hidden).toBe(true));
+        expect(fetchedUrls().some(u => u.includes("/schema"))).toBe(false);
+    });
+
+    it("turns the response into a redirect", async () => {
+        await open({ path: "change-password", headers: [{ name: "Cache-Control", value: "no-store" }] });
+        const focus = vi.spyOn(HTMLElement.prototype, "focus"); // jsdom can't focus an unknown element: spied
+        await click(".admin-well-known-redirect");
+        expect(field("status").value).toBe("302");
+        expect(dialog().querySelector(".admin-well-known-sections").value).toBe("response");
+        const rows = [...dialog().querySelectorAll(".admin-well-known-header")];
+        expect(rows.map(r => r.querySelector('[data-header="name"]').value)).toEqual(["Cache-Control", "Location"]);
+        expect(focus.mock.contexts).toEqual([rows[1].querySelector('[data-header="value"]')]);
+        focus.mockRestore();
+
+        await click(".admin-well-known-redirect");
+        expect(dialog().querySelectorAll(".admin-well-known-header")).toHaveLength(2);
+    });
+
+    it("keeps an existing Location header on redirect, whatever its case", async () => {
+        await open({ path: "x", headers: [{ name: "location", value: "/y" }] });
+        await click(".admin-well-known-redirect");
+        expect(dialog().querySelectorAll(".admin-well-known-header")).toHaveLength(1);
+    });
+
+    it("adds and removes header rows, saving the status and the named headers", async () => {
+        await open({ path: "x", headers: [{ name: "X-A", value: "1" }, { name: "X-B", value: "2" }] });
+        await click(".admin-well-known-header-add");
+        await click(".admin-well-known-header-add");
+        const rows = () => [...dialog().querySelectorAll(".admin-well-known-header")];
+        expect(rows()).toHaveLength(4);
+        rows()[2].querySelector('[data-header="name"]').value = "X-C";
+        rows()[2].querySelector('[data-header="value"]').value = "3";
+        rows()[0].querySelector(".admin-well-known-header-remove").click();
+        expect(rows()).toHaveLength(3);
+        await save();
+        expect(savedBody().status).toBe(200);
+        expect(savedBody().headers).toEqual([{ name: "X-B", value: "2" }, { name: "X-C", value: "3" }]);
+    });
+
+    it("shows the other status field and saves its number", async () => {
+        await open({ path: "x" });
+        field("status").value = "other";
+        field("status").dispatchEvent(new Event("change", { bubbles: true }));
+        expect(field("statusOther").hidden).toBe(false);
+        field("statusOther").value = "418";
+        await save();
+        expect(savedBody().status).toBe(418);
+
+        field("status").value = "404";
+        field("status").dispatchEvent(new Event("change", { bubbles: true }));
+        expect(field("statusOther").hidden).toBe(true);
+        await save();
+        expect(savedBody().status).toBe(404);
+    });
+
+    it("opens an uncommon status as other", async () => {
+        await open({ path: "x", status: "418" });
+        await save();
+        expect(savedBody().status).toBe(418);
+    });
+
+    it("serializes the form before saving", async () => {
+        await open({ path: "microsoft-identity-association.json", content: '{"associatedApplications":[{"applicationId":"a"}],"x":1}' });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        items("applicationIds")[0].value = "b";
+        await save();
+        expect(JSON.parse(savedBody().content)).toEqual({ associatedApplications: [{ applicationId: "b" }], x: 1 });
+    });
+
+    it("keeps an apple detail the form doesn't show in its slot when another is edited or removed", async () => {
+        const A = { appIDs: ["A"], components: [{ "/": "/a" }] };
+        const mixed = { appIDs: ["M"], components: [{ "#": "c" }] };
+        const B = { appIDs: ["B"], components: [{ "/": "/b" }] };
+        await open({ path: "apple-app-site-association", content: JSON.stringify({ applinks: { details: [A, mixed, B] } }) });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        const details = () => [...fields().querySelectorAll('fieldset[data-field="details"] > .admin-well-known-group-item')];
+        expect(details()).toHaveLength(2);
+        details()[1].querySelector('fieldset[data-field="paths"] [data-item]').value = "/b2";
+        await save();
+        expect(JSON.parse(savedBody().content).applinks.details).toEqual([A, mixed, { appIDs: ["B"], components: [{ "/": "/b2" }] }]);
+
+        details()[0].querySelector(":scope > .admin-well-known-item-remove").click();
+        await save();
+        expect(JSON.parse(savedBody().content).applinks.details).toEqual([mixed, { appIDs: ["B"], components: [{ "/": "/b2" }] }]);
+    });
+
+    it("adds a group entry", async () => {
+        await open({ path: "assetlinks.json", content: "[]" });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        fields().querySelector('fieldset[data-field="apps"] > .admin-well-known-item-add').click();
+        const item = fields().querySelector(".admin-well-known-group-item");
+        item.querySelector('[data-field="package_name"]').value = "com.x";
+        item.querySelector('fieldset[data-field="sha256_cert_fingerprints"] > .admin-well-known-item-add').click();
+        item.querySelector("[data-item]").value = "AB:CD";
+        await save();
+        expect(JSON.parse(savedBody().content)).toEqual([{ relation: ["delegate_permission/common.handle_all_urls"],
+            target: { namespace: "android_app", package_name: "com.x", sha256_cert_fingerprints: ["AB:CD"] } }]);
+    });
+
+    it("asks before saving content that breaks the schema", async () => {
+        schemas["gpc.json"] = { type: "object", required: ["gpc"], properties: { gpc: { type: "boolean" } } };
+        await open({ path: "gpc.json", content: '{"gpc": "yes"}' });
+        await vi.waitFor(() => expect(formSegment().disabled).toBe(true));
+        confirmAnswer = false;
+        await save();
+        expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({ headline: "Schema: gpc: boolean expected. Save?" }));
+        expect(posted).not.toHaveBeenCalled();
+
+        confirmAnswer = true;
+        await save();
+        await vi.waitFor(() => expect(posted).toHaveBeenCalledTimes(1));
+    });
+
+    it("lists five schema problems at most", async () => {
+        schemas["many.json"] = { type: "object", required: ["a", "b", "c", "d", "e", "f", "g"], properties: { a: { type: "object" } } };
+        await open({ path: "many.json", content: "{}" });
+        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=many.json"));
+        await flush();
+        confirmAnswer = false;
+        await save();
+        expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({
+            headline: "Schema: a: required, b: required, c: required, d: required, e: required, … (+2). Save?"
+        }));
+    });
+
+    it("warns when security.txt expires more than a year ahead", async () => {
+        await open({ path: "security.txt", content: `Contact: mailto:a@b.c\nExpires: ${new Date(Date.now() + 30 * 864e5).toISOString()}\n` });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        const expires = fields().querySelector('[data-field="Expires"]');
+        expect(expires.getAttribute("type")).toBe("datetime-local");
+        expect(expires.getAttribute("helper")).not.toBe("Too far");
+
+        const far = new Date(Date.now() + 730 * 864e5);
+        const pad = n => String(n).padStart(2, "0");
+        expires.value = `${far.getFullYear()}-${pad(far.getMonth() + 1)}-${pad(far.getDate())}T${pad(far.getHours())}:${pad(far.getMinutes())}`;
+        expires.dispatchEvent(new Event("input", { bubbles: true }));
+        expect(expires.getAttribute("helper")).toBe("Too far");
+    });
+
+    it("switches to raw before importing in form mode", async () => {
+        await open({ path: "security.txt", content: SECURITY });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        importFile(new File(["Contact: mailto:z@b.c\n"], "security.txt", { type: "text/plain" }));
+        await vi.waitFor(() => expect(field("content").value).toBe("Contact: mailto:z@b.c\n"));
+        expect(mode().value).toBe("raw");
+        expect(raw().hidden).toBe(false);
     });
 });
