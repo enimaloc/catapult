@@ -317,6 +317,9 @@ class AdminTabsFragmentControllerTest {
         assertThat(html).contains("admin-well-known-sections", "admin-well-known-mode", "admin-well-known-fields", "admin-well-known-raw")
                 .containsPattern("admin-well-known-sections[^>]*value=\"content\"")
                 .doesNotContain("class=\"admin-well-known-header\"");
+        // new header rows are built from these labels, there being no row to copy them from
+        assertThat(html).contains("data-label-header-name=\"Header\"", "data-label-header-value=\"Value\"",
+                "data-label-header-remove=\"Remove this header\"");
     }
 
     @Test
