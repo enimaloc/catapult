@@ -14,15 +14,26 @@ import java.util.function.Supplier;
 /**
  * catapult-api's well-known answers kept 60 s (absences included, not a failure to reach it), so a
  * crawler polling them doesn't reach the API each time; emptied when the admin changes a file.
+ * Bounded to {@link #MAX_ENTRIES}: the paths are chosen by whoever asks, so when full, expired entries
+ * are dropped and, if it is still full, a new answer is returned without being kept.
  */
 @Component
 public class WellKnownCache {
     static final Duration TTL = Duration.ofSeconds(60);
+    static final int MAX_ENTRIES = 1000;
 
     private record Entry(WellKnownContent content, Instant until) {}
 
     private final Map<String, Entry> entries = new ConcurrentHashMap<>();
-    private final Clock clock = Clock.systemUTC();
+    private final Clock clock;
+
+    public WellKnownCache() {
+        this(Clock.systemUTC());
+    }
+
+    WellKnownCache(Clock clock) {
+        this.clock = clock;
+    }
 
     public WellKnownContent get(WellKnownLocation location, String path, Supplier<WellKnownContent> load) {
         String key = location + ":" + path;
@@ -30,8 +41,16 @@ public class WellKnownCache {
         Entry entry = entries.get(key);
         if (entry != null && now.isBefore(entry.until())) return entry.content();
         WellKnownContent content = load.get();
-        if (content.status() == 200 || content.status() == 404) entries.put(key, new Entry(content, now.plus(TTL)));
+        if (content.status() == 200 || content.status() == 404) store(key, new Entry(content, now.plus(TTL)), now);
         return content;
+    }
+
+    private void store(String key, Entry entry, Instant now) {
+        if (!entries.containsKey(key) && entries.size() >= MAX_ENTRIES) {
+            entries.values().removeIf(e -> !now.isBefore(e.until()));
+            if (entries.size() >= MAX_ENTRIES) return;
+        }
+        entries.put(key, entry);
     }
 
     public void clear() {
