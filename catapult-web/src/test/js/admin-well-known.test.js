@@ -25,7 +25,8 @@ function form(id) {
     const known = ["200", "204", "301", "302", "307", "308", "404", "410"].includes(String(status));
     return `<div class="admin-well-known-form" ${id ? `data-id="${id}"` : ""} data-label-add="Add" data-label-remove="Remove"
                  data-label-invalid-json="No form: {0}" data-label-schema-warnings="Schema: {0}. Save?"
-                 data-label-expires-far="Too far">
+                 data-label-expires-far="Too far" data-label-header-name="Header" data-label-header-value="Value"
+                 data-label-header-remove="Remove this header">
         <select name="location"><option value="WELL_KNOWN">w</option>
             <option value="ROOT" ${location === "ROOT" ? "selected" : ""}>r</option></select>
         <input name="path" value="${esc(path)}">
@@ -504,5 +505,77 @@ describe("admin-well-known response and forms", () => {
         await vi.waitFor(() => expect(field("content").value).toBe("Contact: mailto:z@b.c\n"));
         expect(mode().value).toBe("raw");
         expect(raw().hidden).toBe(false);
+    });
+
+    it("labels a new header row from the form's labels", async () => {
+        await open({ path: "change-password" });
+        await click(".admin-well-known-redirect");
+        const row = dialog().querySelector(".admin-well-known-header");
+        expect(row.querySelector('[data-header="name"]').getAttribute("label")).toBe("Header");
+        expect(row.querySelector('[data-header="value"]').getAttribute("label")).toBe("Value");
+        expect(row.querySelector(".admin-well-known-header-remove").getAttribute("aria-label")).toBe("Remove this header");
+    });
+
+    it("offers the form once a known path is typed in a new file, staying raw", async () => {
+        page();
+        await click("#admin-well-known-new");
+        await vi.waitFor(() => expect(formSegment().hidden).toBe(true));
+        field("content").value = "Contact: mailto:a@b.c\n";
+        type("path", "security.txt");
+        expect(formSegment().hidden).toBe(false);
+        expect(formSegment().disabled).toBe(false);
+        expect(mode().value).toBe("raw");
+        expect(field("content").value).toBe("Contact: mailto:a@b.c\n");
+        switchMode("form");
+        expect(items("Contact").map(i => i.value)).toEqual(["mailto:a@b.c"]);
+
+        field("location").value = "ROOT";
+        field("location").dispatchEvent(new Event("change", { bubbles: true }));
+        expect(formSegment().hidden).toBe(true);
+        expect(mode().value).toBe("raw");
+        expect(field("content").value).toBe("Contact: mailto:a@b.c\n");
+    });
+
+    it("fetches the typed path's schema once typing pauses", async () => {
+        schemas["gpc.json"] = { type: "object", properties: { gpc: { type: "boolean" } } };
+        page();
+        await click("#admin-well-known-new");
+        type("path", "g");
+        type("path", "gpc");
+        type("path", "gpc.json");
+        await vi.waitFor(() => expect(formSegment().hidden).toBe(false));
+        expect(fetchedUrls().filter(u => u.includes("/schema"))).toEqual(["/spa/admin/well-known/schema?path=gpc.json"]);
+        expect(mode().value).toBe("raw");
+    });
+
+    it("ignores the schema answer of a path typed over", async () => {
+        let answerOld;
+        const base = fetched.getMockImplementation();
+        fetched.mockImplementation(url => (url.endsWith("path=old.json")
+            ? new Promise(resolve => { answerOld = resolve; })
+            : base(url)));
+        page();
+        await click("#admin-well-known-new");
+        type("path", "old.json");
+        await vi.waitFor(() => expect(answerOld).toBeDefined());
+        type("path", "new.json");
+        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=new.json"));
+        await flush();
+        answerOld(response(200, { type: "object", properties: { gpc: { type: "boolean" } } }));
+        await flush();
+        expect(formSegment().hidden).toBe(true);
+    });
+
+    it("keeps the form's content, now raw, when the path changes", async () => {
+        await open({ path: "security.txt", content: SECURITY });
+        await vi.waitFor(() => expect(mode().value).toBe("form"));
+        items("Contact")[0].value = "mailto:typed@b.c";
+        type("path", "other.txt");
+        expect(mode().value).toBe("raw");
+        expect(raw().hidden).toBe(false);
+        expect(formSegment().hidden).toBe(true);
+        expect(field("content").value).toContain("Contact: mailto:typed@b.c\n");
+        await click(".admin-well-known-save");
+        expect(savedBody().content).toContain("Contact: mailto:typed@b.c\n");
     });
 });

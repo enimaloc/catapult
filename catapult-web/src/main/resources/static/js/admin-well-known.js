@@ -11,13 +11,16 @@
  * (blank names not sent), Redirect = 302 + a Location row. Content tab: Form | Raw. A path with a
  * CatapultWellKnownForms descriptor (dedicated, else generated from the route's SchemaStore schema,
  * /.well-known/ only) opens as a form when its raw text parses, else as raw with the reason and the Form
- * segment disabled until the raw text changes; without one, Form is hidden. Switching to raw writes the
+ * segment disabled until the raw text changes; without one, Form is hidden. A path or location changed
+ * picks again (the form serialized into raw first, the schema fetched once typing pauses, the latest
+ * answer winning) and never switches to the form by itself. Switching to raw writes the
  * form's serialization; Save does too in form mode, then asks before posting content the schema flags.
  * Form state (descriptor, model, schema, mode) lives per form root in a WeakMap; group items keep their
  * `_origin` (data-origin) so apple details stay in their slots.
  */
 window.CatapultAdminWellKnown = (function () {
     const MAX_BYTES = 65_536;
+    const SCHEMA_DELAY_MS = 300;
 
     function contentType(path) {
         const p = (path || "").toLowerCase();
@@ -138,17 +141,12 @@ window.CatapultAdminWellKnown = (function () {
     const read = (container, descriptor) => readFields(container, descriptor.fields);
 
     function headerRow(form, name = "", headerValue = "") {
-        const first = form.querySelector(".admin-well-known-header");
-        const labelOf = which => first?.querySelector(`[data-header="${which}"]`)?.getAttribute("label")
-            ?? form.dataset[`labelHeader${which === "name" ? "Name" : "Value"}`];
+        const { labelHeaderName, labelHeaderValue, labelHeaderRemove } = form.dataset;
         const row = el("div", { class: "admin-well-known-header" });
         row.append(
-            el("mdui-text-field", { "data-header": "name", variant: "outlined", label: labelOf("name") }, { value: name }),
-            el("mdui-text-field", { "data-header": "value", variant: "outlined", label: labelOf("value") }, { value: headerValue }),
-            el("mdui-button-icon", {
-                icon: "close", class: "admin-well-known-header-remove",
-                "aria-label": first?.querySelector(".admin-well-known-header-remove")?.getAttribute("aria-label")
-            }));
+            el("mdui-text-field", { "data-header": "name", variant: "outlined", label: labelHeaderName }, { value: name }),
+            el("mdui-text-field", { "data-header": "value", variant: "outlined", label: labelHeaderValue }, { value: headerValue }),
+            el("mdui-button-icon", { icon: "close", class: "admin-well-known-header-remove", "aria-label": labelHeaderRemove }));
         form.querySelector(".admin-well-known-headers").append(row);
         return row;
     }
@@ -222,23 +220,41 @@ window.CatapultAdminWellKnown = (function () {
         }
     }
 
-    async function setupForm(form) {
-        const state = { descriptor: null, model: null, schema: null, mode: "raw" };
-        states.set(form, state);
+    /**
+     * Picks the descriptor for the form's location and path, when they changed. On opening the schema is
+     * fetched at once and the form shown when the text parses; afterwards the editor is put in raw first
+     * (the form serialized into it), the schema fetched once typing pauses, and only a later answer counts.
+     */
+    async function pick(form, opening) {
+        const state = states.get(form);
         const location = value(form, "location");
         const path = value(form, "path").trim();
-        formSegment(form).hidden = true;
-        showMode(form, "raw");
-        state.descriptor = CatapultWellKnownForms.forPath(location, path);
+        if (state.key === `${location}|${path}`) return;
+        state.key = `${location}|${path}`;
+        const token = ++state.token;
+        clearTimeout(state.timer);
+        toRaw(form);
+        Object.assign(state, { descriptor: CatapultWellKnownForms.forPath(location, path), model: null, schema: null });
+        formSegment(form).disabled = false;
+        reasonOf(form).textContent = "";
+        formSegment(form).hidden = !state.descriptor;
         if (!state.descriptor && location === "WELL_KNOWN" && path) {
+            if (!opening) await new Promise(resolve => { state.timer = setTimeout(resolve, SCHEMA_DELAY_MS); });
+            const current = () => state.token === token && form.isConnected; // not typed over, nor replaced
+            if (!current()) return;
             const schema = await schemaOf(path);
-            if (!form.isConnected || states.get(form) !== state) return;
+            if (!current()) return;
             state.schema = schema;
             state.descriptor = schema ? CatapultWellKnownForms.fromSchema(schema) : null;
+            formSegment(form).hidden = !state.descriptor;
         }
-        if (!state.descriptor) return;
-        formSegment(form).hidden = false;
-        toForm(form);
+        if (state.descriptor && opening) toForm(form);
+    }
+
+    function setupForm(form) {
+        states.set(form, { descriptor: null, model: null, schema: null, mode: "raw", key: null, token: 0, timer: null });
+        showMode(form, "raw");
+        return pick(form, true);
     }
 
     function statusOf(form) {
@@ -424,7 +440,10 @@ window.CatapultAdminWellKnown = (function () {
             const typeField = form.querySelector('[name="contentType"]');
             if (!typeField.dataset.manual) typeField.value = contentType(target.value);
         }
-        if (name === "path" || name === "location") preview(form);
+        if (name === "path" || name === "location") {
+            preview(form);
+            if (states.has(form)) pick(form, false);
+        }
     }
 
     /** Follows the Form | Raw group; deselecting (single selects allow it) keeps the current mode. */
