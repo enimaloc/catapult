@@ -87,8 +87,9 @@ describe("JSON descriptors", () => {
 
     it("apple-app-site-association edits applinks details and webcredentials", () => {
         const d = F.forPath("WELL_KNOWN", "apple-app-site-association");
+        const mixed = { appIDs: ["T.mixed"], components: [{ "/": "/m/*" }, { "#": "x" }] };
         const text = JSON.stringify({
-            applinks: { details: [{ appIDs: ["T.app"], components: [{ "/": "/a/*" }, { "#": "x" }] }] },
+            applinks: { details: [mixed, { appIDs: ["T.app"], components: [{ "/": "/a/*" }] }] },
             appclips: { apps: ["T.clip"] }
         });
         const model = F.parse(d, text);
@@ -96,7 +97,7 @@ describe("JSON descriptors", () => {
         model.values.webcredentials = ["T.app"];
         model.values.details[0].paths.push("/b/*");
         expect(JSON.parse(F.serialize(d, model))).toEqual({
-            applinks: { details: [{ appIDs: ["T.app"], components: [{ "/": "/a/*" }, { "#": "x" }, { "/": "/b/*" }] }] },
+            applinks: { details: [mixed, { appIDs: ["T.app"], components: [{ "/": "/a/*" }, { "/": "/b/*" }] }] },
             appclips: { apps: ["T.clip"] },
             webcredentials: { apps: ["T.app"] }
         });
@@ -192,13 +193,13 @@ describe("never loses content", () => {
         expect(F.serialize(sec(), model)).toBe("Contact: mailto:a\r\nExpires: 2027-01-01T00:00:00Z\r\n");
     });
 
-    it("deleting a path between components keeps the comments and other components", () => {
-        const doc = { applinks: { details: [{ appIDs: ["T"], components: [{ "#": "c1", comment: "x" }, { "/": "/a" }, { "/": "/b" }, { "?": "q" }] }] } };
+    it("a detail with a comment component is kept byte-identical when the pure one is deleted", () => {
+        const first = { appIDs: ["T"], components: [{ "/": "/a" }, { "#": "c1", comment: "x" }, { "?": "q" }] };
+        const doc = { applinks: { details: [first, { appIDs: ["U"], components: [{ "/": "/b" }] }] } };
         const model = F.parse(aasa(), JSON.stringify(doc));
-        expect(model.values.details[0].paths).toEqual(["/a", "/b"]);
-        model.values.details[0].paths = ["/b"];
-        expect(JSON.parse(F.serialize(aasa(), model)).applinks.details[0].components)
-            .toEqual([{ "#": "c1", comment: "x" }, { "/": "/b" }, { "?": "q" }]);
+        expect(model.values.details).toEqual([{ appIDs: ["U"], paths: ["/b"] }]);
+        model.values.details = [];
+        expect(JSON.parse(F.serialize(aasa(), model)).applinks.details).toEqual([first]);
     });
 
     it("keeps legacy AASA details untouched and removes emptied webcredentials", () => {
