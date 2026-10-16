@@ -539,16 +539,16 @@ class RealApiServiceTest {
     @Test
     void adminWellKnown_writesAndReads() {
         var request = new fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest(
-                fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "riot.txt", "text/plain", "code");
-        String json = "{\"location\":\"ROOT\",\"path\":\"riot.txt\",\"contentType\":\"text/plain\",\"content\":\"code\"}";
+                fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "riot.txt", 200, java.util.List.of(), "text/plain", "code");
+        String json = "{\"location\":\"ROOT\",\"path\":\"riot.txt\",\"status\":200,\"headers\":[],\"contentType\":\"text/plain\",\"content\":\"code\"}";
         expect(HttpMethod.POST, "/api/admin/well-known").andExpect(content().json(json))
                 .andRespond(withStatus(HttpStatus.CREATED));
         expect(HttpMethod.PUT, "/api/admin/well-known/3").andExpect(content().json(json)).andRespond(withSuccess());
         expect(HttpMethod.DELETE, "/api/admin/well-known/3").andRespond(withNoContent());
         respond(HttpMethod.GET, "/api/admin/well-known", "[{\"id\":3,\"location\":\"ROOT\",\"path\":\"riot.txt\","
-                + "\"contentType\":\"text/plain\",\"size\":4,\"updatedAt\":\"2026-10-16T00:00:00Z\"}]");
+                + "\"status\":200,\"contentType\":\"text/plain\",\"size\":4,\"updatedAt\":\"2026-10-16T00:00:00Z\"}]");
         respond(HttpMethod.GET, "/api/admin/well-known/3", "{\"id\":3,\"location\":\"ROOT\",\"path\":\"riot.txt\","
-                + "\"contentType\":\"text/plain\",\"content\":\"code\",\"updatedAt\":\"2026-10-16T00:00:00Z\"}");
+                + "\"status\":200,\"headers\":[],\"contentType\":\"text/plain\",\"content\":\"code\",\"updatedAt\":\"2026-10-16T00:00:00Z\"}");
         respond(HttpMethod.GET, "/api/admin/well-known/iana", "{\"entries\":[{\"suffix\":\"security.txt\","
                 + "\"reference\":\"RFC 9116\",\"status\":\"permanent\",\"changeController\":\"IETF\"}],\"source\":\"LIVE\"}");
 

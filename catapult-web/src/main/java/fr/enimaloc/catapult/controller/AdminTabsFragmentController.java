@@ -141,7 +141,7 @@ public class AdminTabsFragmentController {
             } else {
                 String p = path == null ? "" : path;
                 file = new WellKnownFileDetailDto(0, location == null ? WellKnownLocation.WELL_KNOWN : location, p,
-                        AdminWellKnownViews.contentType(p), "", null);
+                        200, java.util.List.of(), AdminWellKnownViews.contentType(p), "", null);
             }
             model.addAttribute("file", file);
             model.addAttribute("url", AdminWellKnownViews.url(file.location(), file.path()));

@@ -30,18 +30,23 @@ class ApiWellKnownControllerTest {
     @MockitoBean WellKnownFileService service;
 
     @Test
-    void servesTheContentWithItsType() throws Exception {
+    void describesTheResponseAsJson() throws Exception {
         WellKnownFile f = new WellKnownFile();
         f.setLocation(WELL_KNOWN);
-        f.setPath("acme-challenge/abc");
-        f.setContentType("application/json");
-        f.setContent("{\"a\":1}");
-        when(service.find(WELL_KNOWN, "acme-challenge/abc")).thenReturn(Optional.of(f));
+        f.setPath("change-password");
+        f.setStatus(302);
+        f.setHeaders("[{\"name\":\"Location\",\"value\":\"/settings/password\"}]");
+        f.setContentType("text/plain; charset=utf-8");
+        f.setContent("");
+        when(service.find(WELL_KNOWN, "change-password")).thenReturn(Optional.of(f));
 
-        mvc.perform(get("/api/well-known/serve").param("location", "WELL_KNOWN").param("path", "acme-challenge/abc"))
+        mvc.perform(get("/api/well-known/serve").param("location", "WELL_KNOWN").param("path", "change-password"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Content-Type", "application/json"))
-                .andExpect(content().string("{\"a\":1}"));
+                .andExpect(jsonPath("$.status").value(302))
+                .andExpect(jsonPath("$.contentType").value("text/plain; charset=utf-8"))
+                .andExpect(jsonPath("$.headers[0].name").value("Location"))
+                .andExpect(jsonPath("$.headers[0].value").value("/settings/password"))
+                .andExpect(jsonPath("$.content").value(""));
     }
 
     @Test

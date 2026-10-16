@@ -232,7 +232,7 @@ class AdminTabsFragmentControllerTest {
     @Test
     void wellKnown_rendersTheFilesAndTheRegistry() throws Exception {
         when(apiService.adminWellKnownFiles()).thenReturn(List.of(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto(
-                3, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "security.txt", "text/plain", 12,
+                3, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "security.txt", 200, "text/plain", 12,
                 java.time.Instant.parse("2025-03-01T12:00:00Z"))));
         when(apiService.adminIanaRegistry()).thenReturn(registry("LIVE"));
 
@@ -285,7 +285,7 @@ class AdminTabsFragmentControllerTest {
     @Test
     void wellKnownFile_edit_carriesTheIdAndTheManualType() throws Exception {
         when(apiService.adminWellKnownFile(4)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto(
-                4, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "riot.txt", "text/plain", "hello", null));
+                4, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "riot.txt", 200, java.util.List.of(), "text/plain", "hello", null));
 
         String html = asAdmin("/spa/admin/well-known/file?id=4");
 

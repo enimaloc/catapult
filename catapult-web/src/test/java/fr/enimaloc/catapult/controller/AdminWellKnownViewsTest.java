@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AdminWellKnownViewsTest {
     static WellKnownFileDto file(String path, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation l) {
-        return new WellKnownFileDto(1, l, path, "text/plain", 1, Instant.EPOCH);
+        return new WellKnownFileDto(1, l, path, 200, "text/plain", 1, Instant.EPOCH);
     }
 
     @Test
