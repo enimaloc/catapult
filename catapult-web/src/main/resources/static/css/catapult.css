@@ -1754,7 +1754,6 @@ mdui-select::part(menu) {
 .admin-well-known-response, .admin-well-known-content-panel { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
 .admin-well-known-fields { display: flex; flex-direction: column; gap: 12px; }
 .admin-well-known-fields fieldset { border: 1px solid rgb(var(--mdui-color-outline-variant)); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.admin-well-known-list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .admin-well-known-mode-reason { color: rgb(var(--mdui-color-error)); }
 @media (max-width: 600px) {
     .admin-well-known-file { grid-template-columns: 1fr auto auto; }

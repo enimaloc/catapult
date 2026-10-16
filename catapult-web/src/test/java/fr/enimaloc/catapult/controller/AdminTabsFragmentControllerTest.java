@@ -337,7 +337,45 @@ class AdminTabsFragmentControllerTest {
 
         String html = asAdmin("/spa/admin/well-known");
 
-        assertThat(html).containsOnlyOnce("admin-well-known-status").contains(">302</mdui-chip>");
+        assertThat(html).contains(">302</mdui-chip>");
+    }
+
+    @Test
+    void wellKnown_everyRowHasTheSameNumberOfCells() throws Exception {
+        when(apiService.adminWellKnownFiles()).thenReturn(List.of(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto(
+                3, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "change-password", 302, "text/plain", 0, null),
+                new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto(
+                4, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "security.txt", 200, "text/plain", 5, null)));
+        when(apiService.adminIanaRegistry()).thenReturn(registry("LIVE"));
+
+        String html = asAdmin("/spa/admin/well-known");
+        String list = html.substring(html.indexOf("admin-well-known-file"), html.indexOf("admin-iana-row"));
+        String[] rows = list.split("admin-well-known-file\"");
+
+        // each row: link, status cell, type, size, date, edit, delete
+        assertThat(rows).hasSize(3);
+        for (int i = 1; i < rows.length; i++) {
+            assertThat(rows[i]).containsOnlyOnce("admin-well-known-link").containsOnlyOnce("admin-well-known-status")
+                    .containsOnlyOnce("admin-well-known-edit").containsOnlyOnce("admin-well-known-delete");
+            assertThat(rows[i].split("admin-member-id", -1)).hasSize(4);
+        }
+        assertThat(rows[1].indexOf("admin-well-known-status")).isLessThan(rows[1].indexOf("admin-member-id"));
+        assertThat(rows[2].indexOf("admin-well-known-status")).isLessThan(rows[2].indexOf("admin-member-id"));
+    }
+
+    @Test
+    void wellKnownFile_unusualStatus_selectsOtherAndShowsTheCode() throws Exception {
+        when(apiService.adminWellKnownFile(7)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto(
+                7, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "teapot", 418, java.util.List.of(), "text/plain", "", null));
+
+        String html = asAdmin("/spa/admin/well-known/file?id=7");
+        String select = html.substring(html.indexOf("<mdui-select name=\"status\""));
+        select = select.substring(0, select.indexOf(">"));
+        String other = html.substring(html.indexOf("<mdui-text-field name=\"statusOther\""));
+        other = other.substring(0, other.indexOf(">"));
+
+        assertThat(select).contains("value=\"other\"");
+        assertThat(other).contains("value=\"418\"").doesNotContain("hidden");
     }
 
     @Test
