@@ -1,7 +1,10 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto;
+import fr.enimaloc.catapult.common.dto.admin.IanaWellKnownDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
+import fr.enimaloc.catapult.service.wellknown.IanaWellKnownRegistry;
 import fr.enimaloc.catapult.service.wellknown.WellKnownFileService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ApiAdminWellKnownControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean WellKnownFileService service;
+    @MockitoBean IanaWellKnownRegistry registry;
 
     static final String BODY = "{\"location\":\"WELL_KNOWN\",\"path\":\"security.txt\",\"contentType\":\"text/plain\",\"content\":\"x\"}";
     static final WellKnownFileDetailDto DETAIL = new WellKnownFileDetailDto(3, WELL_KNOWN, "security.txt", "text/plain", "x",
@@ -66,5 +70,14 @@ class ApiAdminWellKnownControllerTest {
         when(service.create(any())).thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));
         mvc.perform(post("/api/admin/well-known").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void ianaAnswersTheRegistry() throws Exception {
+        when(registry.registry()).thenReturn(new IanaRegistryDto(
+                java.util.List.of(new IanaWellKnownDto("security.txt", "RFC 9116", "permanent", "IETF")), "LIVE"));
+        mvc.perform(get("/api/admin/well-known/iana"))
+                .andExpect(jsonPath("$.source").value("LIVE"))
+                .andExpect(jsonPath("$.entries[0].suffix").value("security.txt"));
     }
 }

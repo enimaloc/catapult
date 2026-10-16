@@ -1,8 +1,10 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
+import fr.enimaloc.catapult.service.wellknown.IanaWellKnownRegistry;
 import fr.enimaloc.catapult.service.wellknown.WellKnownFileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,10 +20,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ApiAdminWellKnownController {
     private final WellKnownFileService service;
+    private final IanaWellKnownRegistry registry;
 
     @GetMapping
     public List<WellKnownFileDto> list() {
         return service.list();
+    }
+
+    /** IANA's registry, live or the bundled copy (see {@link IanaWellKnownRegistry}). */
+    @GetMapping("/iana")
+    public IanaRegistryDto iana() {
+        return registry.registry();
     }
 
     @GetMapping("/{id}")
