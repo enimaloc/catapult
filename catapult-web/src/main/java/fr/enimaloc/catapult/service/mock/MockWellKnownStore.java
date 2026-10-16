@@ -40,7 +40,8 @@ class MockWellKnownStore {
     synchronized int create(WellKnownFileRequest r) {
         if (!valid(r)) return 400;
         if (find(r.location(), r.path()).isPresent()) return 409;
-        put(r.location(), r.path(), r.contentType(), r.content());
+        long id = ids.incrementAndGet();
+        files.put(id, detail(id, r));
         return 201;
     }
 
@@ -48,7 +49,7 @@ class MockWellKnownStore {
         if (!files.containsKey(id)) return 404;
         if (!valid(r)) return 400;
         if (find(r.location(), r.path()).filter(f -> f.id() != id).isPresent()) return 409;
-        files.put(id, new WellKnownFileDetailDto(id, r.location(), r.path(), r.status(), r.headers(), r.contentType(), r.content(), Instant.now()));
+        files.put(id, detail(id, r));
         return 200;
     }
 
@@ -71,6 +72,13 @@ class MockWellKnownStore {
     private void put(WellKnownLocation location, String path, String type, String content) {
         long id = ids.incrementAndGet();
         files.put(id, new WellKnownFileDetailDto(id, location, path, 200, java.util.List.of(), type, content, Instant.now()));
+    }
+
+    /** The stored file for a request, with the API's defaults: no status is 200, no headers is none. */
+    private static WellKnownFileDetailDto detail(long id, WellKnownFileRequest r) {
+        int status = r.status() == null || r.status() == 0 ? 200 : r.status();
+        List<fr.enimaloc.catapult.common.dto.admin.WellKnownHeader> headers = r.headers() == null ? List.of() : r.headers();
+        return new WellKnownFileDetailDto(id, r.location(), r.path(), status, headers, r.contentType(), r.content(), Instant.now());
     }
 
     private static boolean valid(WellKnownFileRequest r) {

@@ -60,9 +60,21 @@ class WellKnownHeadersTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"//evil.example", "javascript:alert(1)", "ftp://x", "relative/path", "", "https://", "http:// x"})
+    @ValueSource(strings = {"//evil.example", "javascript:alert(1)", "ftp://x", "relative/path", "", "https://", "http:// x", "/\\evil.example", "/\t/evil.example", "/a\\b"})
     void refusesABadLocationOnARedirect(String location) {
         refused(302, List.of(h("Location", location)));
+    }
+
+    @Test
+    void headerValuesAreRfc9110FieldValues() {
+        for (String bad : new String[]{"a\u0001b", "a\u007Fb", "a\u20ACb"}) refused(200, List.of(h("X-A", bad)));
+        assertThatCode(() -> WellKnownHeaders.validate(200, List.of(h("X-A", "a b\tc"), h("X-B", "caf\u00e9"))))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void aNullHeaderIsRefused() {
+        refused(200, java.util.Arrays.asList(h("X-A", "1"), null));
     }
 
     @Test

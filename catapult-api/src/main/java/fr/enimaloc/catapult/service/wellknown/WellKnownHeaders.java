@@ -39,14 +39,14 @@ public final class WellKnownHeaders {
         Set<String> seen = new HashSet<>();
         String location = null;
         for (WellKnownHeader header : headers) {
+            if (header == null) throw refused("Invalid header");
             String name = header.name();
             String value = header.value();
             if (name == null || !TOKEN.matcher(name).matches()) throw refused("Invalid header name");
             String key = name.toLowerCase(Locale.ROOT);
             if (REFUSED.contains(key)) throw refused("Header not allowed: " + name);
             if (!seen.add(key)) throw refused("Duplicate header: " + name);
-            if (value == null || value.length() > MAX_VALUE
-                    || value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\0') >= 0) {
+            if (value == null || value.length() > MAX_VALUE || !fieldValue(value)) {
                 throw refused("Invalid header value: " + name);
             }
             if (key.equals("location")) location = value;
@@ -54,8 +54,23 @@ public final class WellKnownHeaders {
         if (REDIRECTS.contains(status) && !safeLocation(location)) throw refused("A redirect needs a valid Location");
     }
 
+    /** RFC 9110 field-value characters: VCHAR, SP, HTAB and obs-text (0x80-0xFF). */
+    private static boolean fieldValue(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            boolean ok = c == ' ' || c == '\t' || (c >= 0x21 && c <= 0x7E) || (c >= 0x80 && c <= 0xFF);
+            if (!ok) return false;
+        }
+        return true;
+    }
+
     private static boolean safeLocation(String location) {
         if (location == null) return false;
+        // Browsers read a backslash as a slash and drop tabs and newlines, so neither may hide a "//".
+        for (int i = 0; i < location.length(); i++) {
+            char c = location.charAt(i);
+            if (c == '\\' || c < 0x20 || c == 0x7F) return false;
+        }
         if (ABSOLUTE.matcher(location).matches()) return true;
         return location.startsWith("/") && !location.startsWith("//");
     }
