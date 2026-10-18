@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -72,6 +73,20 @@ public class SpaFragmentController {
         filler.admin(model);
         filler.defaultAttr(model, "admin");
         return "pages/admin :: admin";
+    }
+
+    /** The notifications page; only "logged in" matters, every member sees their own. */
+    @GetMapping("/notifications")
+    String notifications(Model model, @RequestParam(defaultValue = "0") int page, HttpServletResponse response) {
+        if (!ApiClient.hasSession()) {
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            filler.error(model, HttpStatus.UNAUTHORIZED.value());
+            return "pages/error :: error";
+        }
+        filler.notifications(model, Math.max(page, 0));
+        filler.defaultAttr(model, "notifications");
+        model.addAttribute("page", Math.max(page, 0));
+        return "pages/notifications :: notifications";
     }
 
     @GetMapping("/{page}")

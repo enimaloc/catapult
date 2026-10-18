@@ -185,6 +185,11 @@ public class ModelFiller {
         model.addAttribute("currentUserId", apiService.currentUserId());
     }
 
+    /** The notifications page model: the member's page of history, null when catapult-api fails. */
+    public void notifications(Model model, int page) {
+        model.addAttribute("notifications", apiService.notifications(page));
+    }
+
     /** Error page model for the status the servlet container forwarded (500 when absent). */
     public void error(Model model, HttpServletRequest request) {
         Object status = request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);

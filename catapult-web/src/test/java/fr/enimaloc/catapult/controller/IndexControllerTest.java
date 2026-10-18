@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.BeforeEach;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -301,5 +302,74 @@ class IndexControllerTest {
     private static String barEnd(String html) {
         int start = html.indexOf("<div class=\"app-bar-end\">");
         return html.substring(start, html.indexOf("</mdui-top-app-bar>", start));
+    }
+
+    private fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.notification.NotificationDto> notificationsPage(int number, int totalPages) {
+        var n = new fr.enimaloc.catapult.common.dto.notification.NotificationDto(java.util.UUID.randomUUID(), "Hello <b>", "<i>body</i>",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, java.time.Instant.parse("2026-10-18T10:00:00Z"), false);
+        return new fr.enimaloc.catapult.common.dto.admin.AdminPage<>(List.of(n), number, totalPages, 41);
+    }
+
+    @Test
+    void notificationsFragment_rendersThePage_forAMember() throws Exception {
+        var page = notificationsPage(1, 3);
+        org.mockito.Mockito.when(apiService.notifications(1)).thenReturn(page);
+
+        String html = mvc.perform(get("/spa/notifications").param("page", "1").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("pages/notifications :: notifications"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.model().attribute("notifications", page))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.model().attribute("page", 1))
+                .andReturn().getResponse().getContentAsString();
+
+        org.assertj.core.api.Assertions.assertThat(html)
+                .contains("id=\"notifications-page\"", "data-notifications-read-all", "Hello &lt;b&gt;", "<i>body</i>",
+                        "href=\"/notifications?page=0\"", "href=\"/notifications?page=2\"", "2 / 3");
+    }
+
+    @Test
+    void notificationsPage_isServedFullAndAsAFragment_withoutBeingSwallowedByTheCatchAlls() throws Exception {
+        org.mockito.Mockito.when(apiService.notifications(0)).thenReturn(notificationsPage(0, 1));
+
+        String html = mvc.perform(get("/notifications").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("index"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.model().attribute("page", "notifications"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.model().attribute("error", false))
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(html).contains("id=\"notifications-page\"").doesNotContain("href=\"/notifications?page=");
+    }
+
+    @Test
+    void notificationsPage_refusesAVisitorWhoIsLoggedOut() throws Exception {
+        mvc.perform(get("/notifications"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("index"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.model().attribute("error", true));
+        mvc.perform(get("/spa/notifications"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("pages/error :: error"));
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).notifications(org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void notificationsPage_saysSo_whenCatapultApiFails() throws Exception {
+        org.mockito.Mockito.when(apiService.notifications(0)).thenReturn(null);
+
+        for (String url : List.of("/notifications", "/spa/notifications")) {
+            String html = mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            org.assertj.core.api.Assertions.assertThat(html).contains("id=\"notifications-page-unavailable\"")
+                    .doesNotContain("id=\"notifications-page\"");
+        }
+    }
+
+    @Test
+    void notificationsPage_showsItsEmptyState() throws Exception {
+        org.mockito.Mockito.when(apiService.notifications(0))
+                .thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminPage<>(List.of(), 0, 0, 0));
+        String html = mvc.perform(get("/spa/notifications").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(html).containsPattern("class=\"notification-empty\"(?![^>]*hidden)");
     }
 }

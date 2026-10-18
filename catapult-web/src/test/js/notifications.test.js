@@ -52,9 +52,9 @@ function setMenu(body) {
     menuBody = body;
 }
 
-async function boot(body) {
+async function boot(body, page = "") {
     setMenu(body);
-    html(`<mdui-dropdown id="notifications-bell" hidden>
+    html(`${page}<mdui-dropdown id="notifications-bell" hidden>
         <mdui-button-icon slot="trigger"><mdui-badge id="notifications-badge" hidden></mdui-badge></mdui-button-icon>
         <div id="notifications-dropdown"></div></mdui-dropdown>`);
     await load("csrf", "live", "notifications");
@@ -64,6 +64,10 @@ async function boot(body) {
 const badge = () => document.getElementById("notifications-badge");
 const bell = () => document.getElementById("notifications-bell");
 const items = () => Array.from(document.querySelectorAll("#notifications-dropdown .notification-item"));
+const pageItems = () => Array.from(document.querySelectorAll("#notifications-page .notification-item"));
+const pageMarkup = (number, ids = []) => `<div id="notifications-page" data-page="${number}">${ids.map(id => item(id)).join("")}
+    <p class="notification-empty" ${ids.length ? "hidden" : ""}>none</p><mdui-button data-notifications-read-all>all</mdui-button></div>`;
+const created = id => ({ id, title: "t" + id, bodyHtml: "", severity: "INFO", createdAt: "2026-10-18T10:00:00Z", read: false });
 const stream = () => FakeEventSource.instances[0];
 const posts = () => fetched.mock.calls.filter(([, init]) => init?.method === "POST").map(([url]) => url);
 
@@ -246,5 +250,65 @@ describe("notifications.js", () => {
 
         expect(posts()).toEqual(["/spa/notifications/a/read"]);
         expect(fetched.mock.calls.filter(([url]) => url === "/spa/notifications/menu")).toHaveLength(2);
+    });
+
+    describe("on the /notifications page", () => {
+        it("fills the relative dates of the rendered items", async () => {
+            await boot(menu(0), pageMarkup(0, ["a"]));
+            document.dispatchEvent(new CustomEvent("catapult:render"));
+            expect(pageItems()[0].querySelector(".notification-date").textContent).not.toBe("");
+        });
+
+        it("marks an item read with the same POST", async () => {
+            await boot(menu(1, [item("b")]), pageMarkup(0, ["a"]));
+            pageItems()[0].click();
+            await flush();
+            expect(pageItems()[0].dataset.read).toBe("true");
+            expect(posts()).toEqual(["/spa/notifications/a/read"]);
+        });
+
+        it("marks everything read from its own button", async () => {
+            await boot(menu(2, [item("b")]), pageMarkup(0, ["a", "c"]));
+            document.querySelector("#notifications-page [data-notifications-read-all]").click();
+            await flush();
+            expect(pageItems().every(n => n.dataset.read === "true")).toBe(true);
+            expect(posts()).toEqual(["/spa/notifications/read-all"]);
+            expect(badge().hidden).toBe(true);
+        });
+
+        it("prepends a created notification on page 0 only", async () => {
+            await boot(menu(0), pageMarkup(0, ["a"]));
+            stream().fire("NotificationCreated", created("n1"));
+            expect(pageItems().map(n => n.dataset.id)).toEqual(["n1", "a"]);
+            expect(document.querySelector("#notifications-page .notification-empty").hidden).toBe(true);
+            expect(pageItems()[0].querySelector(".notification-date").textContent).not.toBe("");
+        });
+
+        it("leaves page 1 alone when a notification is created", async () => {
+            await boot(menu(0), pageMarkup(1, ["a"]));
+            stream().fire("NotificationCreated", created("n1"));
+            expect(pageItems().map(n => n.dataset.id)).toEqual(["a"]);
+            expect(document.querySelector("mdui-snackbar")).not.toBeNull();
+        });
+
+        it("shows the empty state back once its last item is deleted", async () => {
+            await boot(menu(0), pageMarkup(0, ["a"]));
+            stream().fire("NotificationDeleted", { notificationId: "a", unreadCount: 0 });
+            expect(pageItems()).toHaveLength(0);
+            expect(document.querySelector("#notifications-page .notification-empty").hidden).toBe(false);
+        });
+
+        it("removes a deleted notification from the page too", async () => {
+            await boot(menu(0, [item("a")]), pageMarkup(0, ["a", "b"]));
+            stream().fire("NotificationDeleted", { notificationId: "a", unreadCount: 0 });
+            expect(pageItems().map(n => n.dataset.id)).toEqual(["b"]);
+            expect(items()).toHaveLength(0);
+        });
+
+        it("marks an item read on the page when the stream says so", async () => {
+            await boot(menu(1), pageMarkup(0, ["a"]));
+            stream().fire("NotificationRead", { notificationId: "a", unreadCount: 0 });
+            expect(pageItems()[0].dataset.read).toBe("true");
+        });
     });
 });

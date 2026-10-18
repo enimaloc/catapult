@@ -76,9 +76,12 @@ window.CatapultNotifications = (function () {
 
     const itemsOf = id => Array.from(document.querySelectorAll(".notification-item[data-id]")).filter(n => n.dataset.id === id);
 
+    /** Shows each list's empty text only while the list has no item. */
     function syncEmpty() {
-        const empty = document.querySelector("#notifications-dropdown .notification-empty");
-        if (empty) empty.hidden = document.querySelectorAll("#notifications-dropdown .notification-item").length > 0;
+        document.querySelectorAll(CONTAINERS).forEach(container => {
+            const empty = container.querySelector(".notification-empty");
+            if (empty) empty.hidden = container.querySelectorAll(".notification-item").length > 0;
+        });
     }
 
     function showSnackbar(text) {
@@ -156,17 +159,23 @@ window.CatapultNotifications = (function () {
         followCta(node, node);
     }
 
+    /** Puts a live item on top of a list (the menu keeps its newest MENU_SIZE), unless the list already shows it. */
+    function prepend(container, dto, max = Infinity) {
+        if (!container || Array.from(container.querySelectorAll(".notification-item")).some(n => n.dataset.id === dto.id)) return false;
+        const node = buildItem(dto);
+        if (!node) return false;
+        container.prepend(node);
+        container.querySelectorAll(".notification-item").forEach((n, i) => { if (i >= max) n.remove(); });
+        return true;
+    }
+
     function onCreated(dto) {
-        const container = list();
-        if (itemsOf(dto.id).length) return;
-        if (container) {
-            const node = buildItem(dto);
-            if (node) {
-                container.prepend(node);
-                container.querySelectorAll(".notification-item").forEach((n, i) => { if (i >= MENU_SIZE) n.remove(); });
-                syncEmpty();
-            }
-        }
+        // The page lists the newest first: a notification only belongs on top of its first page.
+        const page = document.getElementById("notifications-page");
+        const onPage = page?.dataset.page === "0" ? prepend(page, dto) : false;
+        const inMenu = prepend(list(), dto, MENU_SIZE);
+        if (!onPage && !inMenu && itemsOf(dto.id).length) return;
+        syncEmpty();
         if (!dto.read && unread >= 0) setUnread(unread + 1);
         const template = document.getElementById("notifications-menu")?.dataset.new;
         showSnackbar(template ? template.replace("{0}", dto.title) : dto.title);
@@ -188,6 +197,10 @@ window.CatapultNotifications = (function () {
         CatapultLive.on("NotificationsAllRead", () => {
             document.querySelectorAll(".notification-item").forEach(n => { n.dataset.read = "true"; });
             setUnread(0);
+        });
+        document.addEventListener("catapult:render", () => {
+            const page = document.getElementById("notifications-page");
+            if (page) fillDates(page);
         });
         CatapultLive.onReopen(refresh);
         refresh();
