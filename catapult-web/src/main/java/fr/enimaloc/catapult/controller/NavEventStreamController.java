@@ -15,6 +15,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -29,6 +30,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * The live stream every page opens, over Server-Sent Events, logged in or not:
@@ -47,6 +49,10 @@ import java.util.function.Predicate;
  * A session keeps at most a few streams ({@link SessionStreams}); visitors' streams are bounded per
  * address and overall, and closed after a while ({@link AnonymousStreams}): past the overall bound
  * the answer is 503.
+ * <p>
+ * Behind nginx: the response asks it not to buffer the stream ({@code X-Accel-Buffering: no}), and
+ * every open stream gets a comment every {@link #HEARTBEAT_MILLIS} ms so that an idle one is not cut
+ * by the proxy's read timeout; a stream that cannot take it is dropped as after any failed send.
  */
 @RestController
 public class NavEventStreamController {
@@ -54,6 +60,9 @@ public class NavEventStreamController {
     static final String CHANGED = "NavChannelsChanged";
     static final String BROADCAST = "Broadcast";
     static final String IMMINENT = "maintenance.imminent";
+    /** Below nginx's default 60 s read timeout. */
+    static final long HEARTBEAT_MILLIS = 30_000;
+    private static final String HEARTBEAT = "heartbeat";
 
     /** A {@link #LIVE} event's data. */
     record NavChannelLive(String username, boolean live) {}
@@ -62,10 +71,10 @@ public class NavEventStreamController {
     record Broadcast(String name, Map<String, Object> data) {}
 
     /**
-     * A session with streams open, the account it was logged in as then (null if unknown), the token
+     * A session with streams open (its id kept: an invalidated session may not tell it), the account it was logged in as then (null if unknown), the token
      * of that login (a login in the same session replaces it), and those streams.
      */
-    private record Nav(HttpSession session, UUID account, String token, List<SseEmitter> emitters) {}
+    private record Nav(String sessionId, HttpSession session, UUID account, String token, List<SseEmitter> emitters) {}
 
     /** Only the sessions with a stream open. */
     private final Map<String, Nav> navsBySession = new ConcurrentHashMap<>();
@@ -92,7 +101,7 @@ public class NavEventStreamController {
         }
         broadcastState.maintenance().ifPresent(maintenance ->
                 send(emitter, BROADCAST, new Broadcast(BroadcastState.SCHEDULED, maintenance)));
-        return ResponseEntity.ok(emitter);
+        return ResponseEntity.ok().header("X-Accel-Buffering", "no").body(emitter);
     }
 
     private SseEmitter subscribe(HttpSession session) {
@@ -107,7 +116,7 @@ public class NavEventStreamController {
             Nav current = nav;
             if (current == null || !Objects.equals(current.account(), account) || !Objects.equals(current.token(), token)) {
                 if (current != null) former.addAll(current.emitters());
-                current = new Nav(session, account, token, new CopyOnWriteArrayList<>());
+                current = new Nav(sessionId, session, account, token, new CopyOnWriteArrayList<>());
             }
             current.emitters().add(emitter);
             return current;
@@ -175,10 +184,21 @@ public class NavEventStreamController {
                 .forEach(nav -> send(nav, event.name(), event.data()));
     }
 
+    /** A comment to every open stream, one task for them all; those it cannot reach are dropped. */
+    @Scheduled(fixedRate = HEARTBEAT_MILLIS, initialDelay = HEARTBEAT_MILLIS)
+    public void heartbeat() {
+        toAll(() -> SseEmitter.event().comment(HEARTBEAT));
+    }
+
     private void broadcastToAll(Broadcast broadcast) {
-        navsBySession.values().forEach(nav -> send(nav, BROADCAST, broadcast));
+        toAll(() -> SseEmitter.event().name(BROADCAST).data(broadcast));
+    }
+
+    /** {@code event} (a new one per stream: a builder is not reusable) to every stream. */
+    private void toAll(Supplier<SseEmitter.SseEventBuilder> event) {
+        navsBySession.values().forEach(nav -> send(nav, event));
         anonymous.forEach((emitter, ip) -> {
-            if (!send(emitter, BROADCAST, broadcast)) removeAnonymous(ip, emitter);
+            if (!send(emitter, event.get())) removeAnonymous(ip, emitter);
         });
     }
 
@@ -224,16 +244,25 @@ public class NavEventStreamController {
         }
     }
 
-    private static void send(Nav nav, String name, Object data) {
+    private void send(Nav nav, String name, Object data) {
+        send(nav, () -> SseEmitter.event().name(name).data(data));
+    }
+
+    private void send(Nav nav, Supplier<SseEmitter.SseEventBuilder> event) {
         for (SseEmitter emitter : nav.emitters()) {
-            if (!send(emitter, name, data)) nav.emitters().remove(emitter);
+            if (!send(emitter, event.get())) remove(nav.sessionId(), emitter);
         }
     }
 
     /** False when {@code emitter} is gone. */
     private static boolean send(SseEmitter emitter, String name, Object data) {
+        return send(emitter, SseEmitter.event().name(name).data(data));
+    }
+
+    /** False when {@code emitter} is gone. */
+    private static boolean send(SseEmitter emitter, SseEmitter.SseEventBuilder event) {
         try {
-            emitter.send(SseEmitter.event().name(name).data(data));
+            emitter.send(event);
             return true;
         } catch (IOException | IllegalStateException e) {
             return false;
