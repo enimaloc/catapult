@@ -15,16 +15,23 @@ import fr.enimaloc.catapult.repository.notification.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Instant;
+import java.util.stream.Stream;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -131,6 +138,86 @@ class NotificationServiceTest {
         service.delete(userId, notifId);
 
         verify(publisher).publishEvent(new NotificationDeletedEvent(userId, notifId, 3L));
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidRequests")
+    void createRefusesAnInvalidRequest(NotificationService.CreateRequest request) {
+        assertThatThrownBy(() -> service.create(request, admin))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value()).isEqualTo(400);
+        verify(notifRepo, never()).save(any());
+    }
+
+    static Stream<NotificationService.CreateRequest> invalidRequests() {
+        return Stream.of(
+                new NotificationService.CreateRequest(null, "b", Severity.INFO, null, null, null, null),
+                new NotificationService.CreateRequest("  ", "b", Severity.INFO, null, null, null, null),
+                new NotificationService.CreateRequest("x".repeat(256), "b", Severity.INFO, null, null, null, null),
+                new NotificationService.CreateRequest("t", null, Severity.INFO, null, null, null, null),
+                new NotificationService.CreateRequest("t", " ", Severity.INFO, null, null, null, null),
+                new NotificationService.CreateRequest("t", "b", null, null, null, null, null),
+                new NotificationService.CreateRequest("t", "b", Severity.INFO, "https://a.b", null, null, null),
+                new NotificationService.CreateRequest("t", "b", Severity.INFO, null, "Open", null, null),
+                new NotificationService.CreateRequest("t", "b", Severity.INFO, "https://a.b", "x".repeat(65), null, null),
+                new NotificationService.CreateRequest("t", "b", Severity.INFO, "https://a.b/" + "x".repeat(510), "Open", null, null),
+                new NotificationService.CreateRequest("t", "b", Severity.INFO, "javascript:alert(1)", "Open", null, null),
+                new NotificationService.CreateRequest("t", "b", Severity.INFO, null, null, Instant.now().minusSeconds(1), null));
+    }
+
+    @Test
+    void createRefusesAnUnknownTarget() {
+        UUID ghost = UUID.randomUUID();
+        when(userRepo.findById(ghost)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.create(new NotificationService.CreateRequest("t", "b", Severity.INFO, null, null, null, ghost), admin))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value()).isEqualTo(400);
+        verify(notifRepo, never()).save(any());
+    }
+
+    @Test
+    void createStoresBlankCtaFieldsAsNull() {
+        when(userRepo.findByStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of());
+        when(notifRepo.save(any())).thenAnswer(inv -> {
+            Notification n = inv.getArgument(0);
+            n.setId(UUID.randomUUID());
+            return n;
+        });
+        service.create(new NotificationService.CreateRequest("t", "b", Severity.INFO, " ", "", null, null), admin);
+        ArgumentCaptor<Notification> cap = ArgumentCaptor.forClass(Notification.class);
+        verify(notifRepo).save(cap.capture());
+        assertThat(cap.getValue().getCtaUrl()).isNull();
+        assertThat(cap.getValue().getCtaLabel()).isNull();
+    }
+
+    @Test
+    void adminPageResolvesTheTargetOfATargetedNotification() {
+        UserAccount target = new UserAccount();
+        target.setId(UUID.randomUUID());
+        target.setTwitchUsername("someone");
+        Notification n = new Notification();
+        n.setId(UUID.randomUUID());
+        n.setTitle("t");
+        n.setBody("b");
+        n.setSeverity(Severity.INFO);
+        n.setAudience(Notification.Audience.TARGETED);
+        Notification all = new Notification();
+        all.setId(UUID.randomUUID());
+        all.setBody("b");
+        all.setSeverity(Severity.INFO);
+        all.setAudience(Notification.Audience.BROADCAST);
+        NotificationRecipient r = new NotificationRecipient();
+        r.setUser(target);
+        when(notifRepo.findAllByOrderByCreatedAtDesc(any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(n, all)));
+        when(recipientRepo.findByIdNotificationId(n.getId())).thenReturn(List.of(r));
+
+        var page = service.adminPage(org.springframework.data.domain.Pageable.unpaged());
+
+        assertThat(page.getContent().get(0).targetUserId()).isEqualTo(target.getId());
+        assertThat(page.getContent().get(0).targetLogin()).isEqualTo("someone");
+        assertThat(page.getContent().get(0).bodyHtml()).isEqualTo("<p>b</p>");
+        assertThat(page.getContent().get(1).targetLogin()).isNull();
+        verify(recipientRepo, never()).findByIdNotificationId(all.getId());
     }
 
     private UserAccount userWithStatus(UserAccount.Status s) {

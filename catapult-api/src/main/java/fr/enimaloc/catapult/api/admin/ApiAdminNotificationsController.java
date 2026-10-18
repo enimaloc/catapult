@@ -2,7 +2,10 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
+import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationPreviewDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationPreviewRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.notification.Notification;
 import fr.enimaloc.catapult.repository.notification.NotificationRepository;
@@ -48,8 +51,13 @@ public class ApiAdminNotificationsController {
     }
 
     @GetMapping
-    public Page<Notification> list(Pageable pageable) {
-        return repo.findAllByOrderByCreatedAtDesc(pageable);
+    public Page<AdminNotificationDto> list(Pageable pageable) {
+        return service.adminPage(pageable);
+    }
+
+    @PostMapping("/preview")
+    public NotificationPreviewDto preview(@RequestBody NotificationPreviewRequest body) {
+        return service.preview(body.body());
     }
 
     @DeleteMapping("/{id}")
