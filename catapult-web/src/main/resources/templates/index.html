@@ -83,6 +83,8 @@
 
     </mdui-top-app-bar>
 
+    <div th:replace="~{fragments/broadcasts :: banner}"></div>
+
     <mdui-linear-progress id="nav-progress" hidden></mdui-linear-progress>
 
     <div id="app">
@@ -105,6 +107,7 @@
             <span class="version" th:text="#{footer.version('TODO: Fetch version')}">footer.version</span>
         </div>
     </footer>
+    <div th:replace="~{fragments/broadcasts :: veil}"></div>
 </mdui-layout>
 
 <!--/* First, so that it sees every other script's errors and live update streams. */-->
@@ -116,6 +119,7 @@
 <script src="/js/catapult.js"></script>
 <script src="/js/live.js"></script>
 <script src="/js/spa.js"></script>
+<script src="/js/broadcasts.js"></script>
 <script th:if="${loggedIn}" src="/js/notifications.js"></script>
 <!-- Page-wide, not per-fragment: the OBS connection must survive SPA navigation. -->
 <script src="/js/suggest.js"></script>
