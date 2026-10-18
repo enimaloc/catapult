@@ -1840,6 +1840,14 @@ mdui-select::part(menu) {
     .admin-notification-row > .admin-notification-audience, .admin-notification-row > .admin-member-id { grid-column: 2 / -1; }
 }
 
+/* The admin Broadcast tab. */
+.admin-broadcast-current { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 16px; margin-bottom: 16px; }
+.admin-broadcast-forms { display: flex; flex-direction: column; gap: 12px; max-width: 640px; }
+.admin-broadcast-forms form { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.admin-broadcast-forms form > mdui-text-field { width: 100%; }
+.admin-broadcast-forms form[hidden] { display: none; }
+.admin-broadcast-switch { display: flex; align-items: center; gap: 8px; }
+
 /* Broadcasts shown to every visitor (broadcasts.js). */
 .broadcast-banner { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: rgb(var(--mdui-color-surface-container-high)); color: rgb(var(--mdui-color-on-surface)); }
 .broadcast-banner[hidden], .broadcast-veil[hidden] { display: none; }
