@@ -183,4 +183,68 @@ describe("notifications.js", () => {
         const expected = new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(-5, "minute");
         expect(document.querySelector(".notification-date").textContent).toBe(expected);
     });
+
+    it("opens the CTA when the item itself is clicked, once, and not twice from the button", async () => {
+        const open = vi.fn();
+        vi.stubGlobal("open", open);
+        await boot(menu(2, [item("a", { cta: true }), item("b")]));
+
+        document.querySelector(".notification-title").click();
+        await flush();
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(open).toHaveBeenCalledWith("https://example.com", "_blank", "noopener");
+        expect(posts()).toEqual(["/spa/notifications/a/read"]);
+
+        open.mockClear();
+        document.querySelector(".notification-cta").click();
+        expect(open).not.toHaveBeenCalled();
+
+        items()[1].click();
+        expect(open).not.toHaveBeenCalled();
+    });
+
+    it("reads an item with Enter or Space, following its CTA", async () => {
+        const open = vi.fn();
+        vi.stubGlobal("open", open);
+        await boot(menu(2, [item("a", { cta: true }), item("b")]));
+
+        items()[0].dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+        items()[1].dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true }));
+        await flush();
+
+        expect(posts()).toEqual(["/spa/notifications/a/read", "/spa/notifications/b/read"]);
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(badge().hidden).toBe(true);
+    });
+
+    it("gives items built from events a tab stop", async () => {
+        await boot(menu(0));
+        stream().fire("NotificationCreated", { id: "n1", title: "t", bodyHtml: "", severity: "INFO", createdAt: "2026-10-18T10:00:00Z", read: false });
+        expect(items()[0].tabIndex).toBe(0);
+    });
+
+    it("ignores a created event for an item already shown", async () => {
+        await boot(menu(1, [item("n1")]));
+        stream().fire("NotificationCreated", { id: "n1", title: "t", bodyHtml: "", severity: "INFO", createdAt: "2026-10-18T10:00:00Z", read: false });
+        expect(items()).toHaveLength(1);
+        expect(badge().textContent).toBe("1");
+        expect(document.querySelector("mdui-snackbar")).toBeNull();
+    });
+
+    it("removes a snackbar once it closed", async () => {
+        await boot(menu(0));
+        stream().fire("NotificationCreated", { id: "n1", title: "t", bodyHtml: "", severity: "INFO", createdAt: "2026-10-18T10:00:00Z", read: false });
+        document.querySelector("mdui-snackbar").dispatchEvent(new Event("closed"));
+        expect(document.querySelector("mdui-snackbar")).toBeNull();
+    });
+
+    it("posts once per click (no handler survives from an earlier load) and refetches the menu when a read fails", async () => {
+        await boot(menu(1, [item("a")]));
+        fetched.mockImplementation(async (url, init) => (init?.method === "POST" ? response(500) : response(200, menuBody)));
+        items()[0].click();
+        await flush();
+
+        expect(posts()).toEqual(["/spa/notifications/a/read"]);
+        expect(fetched.mock.calls.filter(([url]) => url === "/spa/notifications/menu")).toHaveLength(2);
+    });
 });
