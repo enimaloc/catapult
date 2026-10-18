@@ -64,10 +64,13 @@
         <div class="app-bar-end">
             <!--/* Members: notifications.js fills the dropdown and shows the bell once it has the count. */-->
             <mdui-dropdown th:if="${loggedIn}" id="notifications-bell" placement="bottom-end" hidden>
-                <mdui-button-icon slot="trigger" class="notifications-trigger" th:attr="aria-label=#{notifications.bell}">
-                    <mdui-icon name="notifications"></mdui-icon>
+                <!--/* The badge sits beside the button, not in it: the button clips its content. */-->
+                <span slot="trigger" class="notifications-trigger">
+                    <mdui-button-icon th:attr="aria-label=#{notifications.bell}">
+                        <mdui-icon name="notifications"></mdui-icon>
+                    </mdui-button-icon>
                     <mdui-badge id="notifications-badge" hidden></mdui-badge>
-                </mdui-button-icon>
+                </span>
                 <div class="notifications-dropdown" id="notifications-dropdown"></div>
             </mdui-dropdown>
             <!--/* Admins only (ROLE_ADMIN): opens the admin page, marked active there by spa.js like a channel. */-->

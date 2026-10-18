@@ -55,7 +55,7 @@ function setMenu(body) {
 async function boot(body, page = "") {
     setMenu(body);
     html(`${page}<mdui-dropdown id="notifications-bell" hidden>
-        <mdui-button-icon slot="trigger"><mdui-badge id="notifications-badge" hidden></mdui-badge></mdui-button-icon>
+        <span slot="trigger"><mdui-button-icon></mdui-button-icon><mdui-badge id="notifications-badge" hidden></mdui-badge></span>
         <div id="notifications-dropdown"></div></mdui-dropdown>`);
     await load("csrf", "live", "notifications");
     await flush();

@@ -140,15 +140,19 @@ mdui-top-app-bar {
     flex: none;
 }
 
-/* The bell: the badge sits on the icon's top-right corner. */
+/* The bell: as Material 3 places it, the badge starts at the icon's middle (the 24px icon is
+   centred in the 40px button) and grows rightwards, so "99+" never covers the bell. Clicks go
+   through it to the button. */
 .notifications-trigger {
     position: relative;
+    display: inline-flex;
 }
 
 .notifications-trigger mdui-badge {
     position: absolute;
     top: 4px;
-    right: 4px;
+    left: 20px;
+    pointer-events: none;
 }
 
 .notifications-dropdown {
