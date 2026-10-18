@@ -48,6 +48,8 @@
         se modifie depuis la page de la chaîne elle-même. Appliquer met à jour la page de l'appli.
     </p>
     <p class="mock-result" th:if="${twitchatResult}" th:text="${twitchatResult}"></p>
+    <p class="mock-result" th:if="${notificationResult}" th:text="${notificationResult}"></p>
+    <p class="mock-result" th:if="${broadcastResult}" th:text="${broadcastResult}"></p>
 
     <form id="mock-admin-form" method="post" th:action="@{/mock/admin}">
         <section class="mock-card">
@@ -203,6 +205,61 @@
                 <mdui-text-field variant="outlined" name="previousGameName" label="{{previousGameName}}" value="Jeu précédent"></mdui-text-field>
             </div>
             <div><mdui-button variant="tonal" icon="send" type="submit">Envoyer</mdui-button></div>
+        </section>
+    </form>
+
+    <form id="mock-notification-form" method="post" th:action="@{/mock/admin/notification}">
+        <section class="mock-card">
+            <h2>Envoyer une notification</h2>
+            <p class="mock-hint">Arrive dans la cloche en direct, chez le membre ou chez tous les comptes de la maquette.</p>
+            <mdui-text-field variant="outlined" name="title" label="Titre" value="Notification de test" maxlength="120" required></mdui-text-field>
+            <mdui-text-field variant="outlined" name="body" label="Message" value="Un message de test" rows="3" required></mdui-text-field>
+            <mdui-select variant="outlined" name="severity" label="Sévérité" value="INFO">
+                <mdui-menu-item value="INFO">Info</mdui-menu-item>
+                <mdui-menu-item value="SUCCESS">Succès</mdui-menu-item>
+                <mdui-menu-item value="WARNING">Avertissement</mdui-menu-item>
+                <mdui-menu-item value="ERROR">Erreur</mdui-menu-item>
+            </mdui-select>
+            <div class="mock-switches">
+                <label><mdui-switch name="everyone" value="true"></mdui-switch> Pour tout le monde</label>
+            </div>
+            <div><mdui-button variant="tonal" icon="send" type="submit">Envoyer</mdui-button></div>
+        </section>
+    </form>
+
+    <form id="mock-broadcast-form" method="post" th:action="@{/mock/admin/broadcast}">
+        <section class="mock-card">
+            <h2>Envoyer une annonce</h2>
+            <p class="mock-hint">
+                Diffusée à tous les visiteurs, connectés ou non. Seuls les champs du type choisi sont lus.
+                Dates au format ISO (ex. 2030-01-01T10:00:00Z).
+            </p>
+            <mdui-select variant="outlined" name="name" label="Type" value="alert.info">
+                <mdui-menu-item value="maintenance.scheduled">maintenance.scheduled</mdui-menu-item>
+                <mdui-menu-item value="maintenance.cancelled">maintenance.cancelled</mdui-menu-item>
+                <mdui-menu-item value="version.deployed">version.deployed</mdui-menu-item>
+                <mdui-menu-item value="alert.info">alert.info</mdui-menu-item>
+                <mdui-menu-item value="alert.warning">alert.warning</mdui-menu-item>
+            </mdui-select>
+            <div class="mock-row">
+                <mdui-text-field variant="outlined" name="startsAt" label="startsAt" value="2030-01-01T10:00:00Z"></mdui-text-field>
+                <mdui-text-field variant="outlined" name="durationMinutes" label="durationMinutes" type="number" value="30"></mdui-text-field>
+            </div>
+            <mdui-text-field variant="outlined" name="message" label="message" value="Maintenance de test"></mdui-text-field>
+            <div class="mock-row">
+                <mdui-text-field variant="outlined" name="originalStartsAt" label="originalStartsAt" value="2030-01-01T10:00:00Z"></mdui-text-field>
+                <mdui-text-field variant="outlined" name="reason" label="reason" value="Reportée"></mdui-text-field>
+            </div>
+            <div class="mock-row">
+                <mdui-text-field variant="outlined" name="version" label="version" value="1.2.3"></mdui-text-field>
+                <label><mdui-switch name="promptReload" value="true"></mdui-switch> promptReload</label>
+            </div>
+            <div class="mock-row">
+                <mdui-text-field variant="outlined" name="title" label="title" value="Annonce de test"></mdui-text-field>
+                <mdui-text-field variant="outlined" name="ttlSeconds" label="ttlSeconds" type="number" value="0"></mdui-text-field>
+            </div>
+            <mdui-text-field variant="outlined" name="body" label="body" value="Un message de test" rows="2"></mdui-text-field>
+            <div><mdui-button variant="tonal" icon="campaign" type="submit">Envoyer</mdui-button></div>
         </section>
     </form>
 </main>

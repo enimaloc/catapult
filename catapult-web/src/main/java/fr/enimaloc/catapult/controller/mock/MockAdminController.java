@@ -1,9 +1,12 @@
 package fr.enimaloc.catapult.controller.mock;
 
+import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -318,6 +322,55 @@ public class MockAdminController {
         redirect.addFlashAttribute("twitchatResult", sent == 0
                 ? "Rien envoyé : aucun payload actif pour cet événement."
                 : sent + " payload(s) envoyé(s) à Twitchat.");
+        return REDIRECT_ADMIN;
+    }
+
+    /** A notification for the signed-in account, or for every account when {@code everyone} is on. */
+    @PostMapping("/mock/admin/notification")
+    public String sendNotification(@RequestParam(defaultValue = "") String title, @RequestParam(defaultValue = "") String body,
+                                   @RequestParam(defaultValue = "INFO") Severity severity,
+                                   @RequestParam(defaultValue = "false") boolean everyone, RedirectAttributes redirect) {
+        if (mockApiService.getData() == null) {
+            return REDIRECT_LOGIN;
+        }
+        UUID target = everyone ? null : mockApiService.currentUserId();
+        int status = mockApiService.adminCreateNotification(
+                new AdminNotificationCreateBody(title, body, severity, null, null, null, target));
+        redirect.addFlashAttribute("notificationResult", status < 300 ? "Notification envoyée." : "Refusée (" + status + ").");
+        return REDIRECT_ADMIN;
+    }
+
+    /** A broadcast of the given type, built from the same form params the real admin dialog sends as JSON. */
+    @PostMapping("/mock/admin/broadcast")
+    public String sendBroadcast(@RequestParam String name, @RequestParam Map<String, String> fields, RedirectAttributes redirect) {
+        if (mockApiService.getData() == null) {
+            return REDIRECT_LOGIN;
+        }
+        BroadcastRequestDto dto;
+        try {
+            dto = switch (name) {
+                case "maintenance.scheduled" -> new BroadcastRequestDto.MaintenanceScheduled(
+                        Instant.parse(fields.get("startsAt")), Integer.parseInt(fields.get("durationMinutes")), fields.get("message"));
+                case "maintenance.cancelled" -> new BroadcastRequestDto.MaintenanceCancelled(
+                        Instant.parse(fields.get("originalStartsAt")), fields.get("reason"));
+                case "version.deployed" -> new BroadcastRequestDto.VersionDeployed(
+                        fields.get("version"), fields.containsKey("promptReload"));
+                case "alert.info" -> new BroadcastRequestDto.AlertInfo(
+                        fields.get("title"), fields.get("body"), Integer.parseInt(fields.get("ttlSeconds")));
+                case "alert.warning" -> new BroadcastRequestDto.AlertWarning(
+                        fields.get("title"), fields.get("body"), Integer.parseInt(fields.get("ttlSeconds")));
+                default -> null;
+            };
+        } catch (RuntimeException e) { // missing or unparsable number / date
+            redirect.addFlashAttribute("broadcastResult", "Champ invalide.");
+            return REDIRECT_ADMIN;
+        }
+        if (dto == null) {
+            redirect.addFlashAttribute("broadcastResult", "Annonce inconnue : " + name);
+            return REDIRECT_ADMIN;
+        }
+        int status = mockApiService.adminBroadcast(dto);
+        redirect.addFlashAttribute("broadcastResult", status < 300 ? "Annonce envoyée." : "Refusée (" + status + ").");
         return REDIRECT_ADMIN;
     }
 }
