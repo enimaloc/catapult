@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationPreviewDto;
 import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.notification.Notification;
@@ -34,6 +36,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NotificationService {
 
+    private static final int TITLE_MAX = 255, CTA_LABEL_MAX = 64, CTA_URL_MAX = 512;
+
     private final NotificationRepository notifRepo;
     private final NotificationRecipientRepository recipientRepo;
     private final UserAccountRepository userRepo;
@@ -45,28 +49,27 @@ public class NotificationService {
 
     @Transactional
     public NotificationDto create(CreateRequest req, UserAccount actor) {
-        if (req.ctaUrl() != null && !NotificationRenderer.isValidCtaUrl(req.ctaUrl())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid CTA URL");
+        validate(req);
+        List<UserAccount> recipients;
+        if (req.targetUserId() != null) {
+            recipients = List.of(userRepo.findById(req.targetUserId())
+                    .orElseThrow(() -> bad("Unknown member")));
+        } else {
+            recipients = userRepo.findByStatus(UserAccount.Status.ACTIVE);
         }
+        boolean hasCta = req.ctaUrl() != null && !req.ctaUrl().isBlank();
         Notification n = new Notification();
         n.setTitle(req.title());
         n.setBody(req.body());
         n.setSeverity(req.severity());
-        n.setCtaUrl(req.ctaUrl());
-        n.setCtaLabel(req.ctaLabel());
+        n.setCtaUrl(hasCta ? req.ctaUrl() : null);
+        n.setCtaLabel(hasCta ? req.ctaLabel() : null);
         n.setExpiresAt(req.expiresAt());
         n.setCreatedAt(Instant.now());
         n.setCreatedBy(actor.getId());
         n.setAudience(req.targetUserId() == null ? Notification.Audience.BROADCAST : Notification.Audience.TARGETED);
         notifRepo.save(n);
 
-        List<UserAccount> recipients;
-        if (req.targetUserId() != null) {
-            recipients = List.of(userRepo.findById(req.targetUserId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND)));
-        } else {
-            recipients = userRepo.findByStatus(UserAccount.Status.ACTIVE);
-        }
         List<NotificationRecipient> rows = new ArrayList<>(recipients.size());
         for (UserAccount user : recipients) {
             NotificationRecipient r = new NotificationRecipient();
@@ -133,6 +136,32 @@ public class NotificationService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public Page<AdminNotificationDto> adminPage(Pageable pageable) {
+        return notifRepo.findAllByOrderByCreatedAtDesc(pageable).map(this::toAdminDto);
+    }
+
+    public NotificationPreviewDto preview(String body) {
+        return new NotificationPreviewDto(renderer.render(body));
+    }
+
+    private AdminNotificationDto toAdminDto(Notification n) {
+        UUID targetId = null;
+        String targetLogin = null;
+        if (n.getAudience() == Notification.Audience.TARGETED) {
+            // a targeted notification has exactly one recipient
+            UserAccount target = recipientRepo.findByIdNotificationId(n.getId()).stream()
+                    .findFirst().map(NotificationRecipient::getUser).orElse(null);
+            if (target != null) {
+                targetId = target.getId();
+                targetLogin = target.getTwitchUsername();
+            }
+        }
+        return new AdminNotificationDto(n.getId(), n.getTitle(), n.getBody(), renderer.render(n.getBody()),
+                n.getSeverity(), n.getCtaUrl(), n.getCtaLabel(), n.getExpiresAt(), n.getCreatedAt(),
+                n.getAudience().name(), targetId, targetLogin);
+    }
+
     private NotificationDto toDto(Notification n, boolean read) {
         return new NotificationDto(
                 n.getId(),
@@ -145,6 +174,23 @@ public class NotificationService {
                 n.getCreatedAt(),
                 read
         );
+    }
+
+    private static void validate(CreateRequest req) {
+        if (req.title() == null || req.title().isBlank()) throw bad("A title is required");
+        if (req.title().length() > TITLE_MAX) throw bad("The title is longer than " + TITLE_MAX + " characters");
+        if (req.body() == null || req.body().isBlank()) throw bad("A body is required");
+        if (req.severity() == null) throw bad("A severity is required");
+        boolean url = req.ctaUrl() != null && !req.ctaUrl().isBlank();
+        boolean label = req.ctaLabel() != null && !req.ctaLabel().isBlank();
+        if (url != label) throw bad("A call to action needs both a label and a URL");
+        if (label && req.ctaLabel().length() > CTA_LABEL_MAX) throw bad("The call to action label is longer than " + CTA_LABEL_MAX + " characters");
+        if (url && (req.ctaUrl().length() > CTA_URL_MAX || !NotificationRenderer.isValidCtaUrl(req.ctaUrl()))) throw bad("Invalid CTA URL");
+        if (req.expiresAt() != null && !req.expiresAt().isAfter(Instant.now())) throw bad("The expiry must be in the future");
+    }
+
+    private static ResponseStatusException bad(String message) {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
     }
 
     public record CreateRequest(
