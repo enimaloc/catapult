@@ -38,6 +38,7 @@ class AdminTabsFragmentControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
+    @MockitoBean BroadcastState broadcastState;
 
     private String asAdmin(String url) throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
@@ -50,7 +51,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1")) {
+                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
         }
@@ -439,5 +440,27 @@ class AdminTabsFragmentControllerTest {
     void notifications_saysWhenThereAreNone() throws Exception {
         when(apiService.adminNotifications(0)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminPage<>(List.of(), 0, 0, 0));
         assertThat(asAdmin("/spa/admin/notifications")).contains("No notification yet");
+    }
+
+    @Test
+    void broadcast_showsTheRememberedMaintenance_withTheTypeForms() throws Exception {
+        when(broadcastState.maintenance()).thenReturn(java.util.Optional.of(new LinkedHashMap<>(Map.of(
+                "startsAt", "2026-10-20T20:00:00Z", "durationMinutes", 30, "message", "Planned <b>work</b>"))));
+
+        String html = asAdmin("/spa/admin/broadcast");
+
+        assertThat(html).contains("admin-broadcast", "data-current-starts-at=\"2026-10-20T20:00:00Z\"", "Planned &lt;b&gt;work&lt;/b&gt;",
+                "id=\"admin-broadcast-cancel-current\"", "data-broadcast=\"maintenance.scheduled\"", "data-broadcast=\"maintenance.cancelled\"",
+                "data-broadcast=\"version.deployed\"", "data-broadcast=\"alert.info\"", "data-broadcast=\"alert.warning\"",
+                "maxlength=\"500\"", "maxlength=\"64\"", "maxlength=\"120\"", "maxlength=\"2000\"",
+                "data-label-sent=\"", "data-label-invalid=\"", "data-label-rate=\"", "data-label-unavailable=\"");
+    }
+
+    @Test
+    void broadcast_hidesTheCurrentCard_whenNoMaintenanceIsAnnounced() throws Exception {
+        when(broadcastState.maintenance()).thenReturn(java.util.Optional.empty());
+
+        assertThat(asAdmin("/spa/admin/broadcast")).contains("data-broadcast=\"alert.info\"")
+                .doesNotContain("admin-broadcast-cancel-current");
     }
 }

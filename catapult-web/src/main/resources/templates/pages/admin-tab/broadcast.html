@@ -1,0 +1,58 @@
+<!--/*@thymesVar id="maintenance" type="java.util.Map<String,Object>"*/-->
+<!--/*
+  Sends a broadcast to every visitor: the type picked in the select shows its form only. The
+  maintenance catapult-web remembers (when one is announced) is shown on top with a shortcut that
+  prefills the "maintenance cancelled" form. Driven by admin-broadcast.js.
+*/-->
+<div th:fragment="content" class="admin-view admin-broadcast"
+     th:attr="data-label-sent=#{admin.broadcast.sent},data-label-invalid=#{admin.broadcast.invalid},
+              data-label-rate=#{admin.broadcast.rate},data-label-unavailable=#{admin.broadcast.unavailable}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.broadcast}">Broadcast</h2>
+    </div>
+
+    <mdui-card class="admin-broadcast-current" variant="outlined" th:if="${maintenance != null}"
+               th:attr="data-current-starts-at=${maintenance.get('startsAt')}">
+        <strong th:text="#{admin.broadcast.current}">Announced maintenance</strong>
+        <div><time class="admin-broadcast-current-start" th:attr="datetime=${maintenance.get('startsAt')}" th:text="${maintenance.get('startsAt')}">start</time>
+            · <span th:text="${maintenance.get('durationMinutes')}">30</span> min</div>
+        <div class="admin-cell-muted" th:text="${maintenance.get('message')}">message</div>
+        <mdui-button id="admin-broadcast-cancel-current" variant="tonal" th:text="#{admin.broadcast.cancel-current}">Cancel it</mdui-button>
+    </mdui-card>
+
+    <div class="admin-broadcast-forms">
+        <mdui-select id="admin-broadcast-type" name="type" variant="outlined" value="maintenance.scheduled" th:attr="label=#{admin.broadcast.type}">
+            <mdui-menu-item value="maintenance.scheduled" th:text="#{admin.broadcast.type.maintenance-scheduled}">Maintenance scheduled</mdui-menu-item>
+            <mdui-menu-item value="maintenance.cancelled" th:text="#{admin.broadcast.type.maintenance-cancelled}">Maintenance cancelled</mdui-menu-item>
+            <mdui-menu-item value="version.deployed" th:text="#{admin.broadcast.type.version-deployed}">New version</mdui-menu-item>
+            <mdui-menu-item value="alert.info" th:text="#{admin.broadcast.type.alert-info}">Info alert</mdui-menu-item>
+            <mdui-menu-item value="alert.warning" th:text="#{admin.broadcast.type.alert-warning}">Warning alert</mdui-menu-item>
+        </mdui-select>
+
+        <form data-broadcast="maintenance.scheduled">
+            <mdui-text-field name="startsAt" type="datetime-local" variant="outlined" required th:attr="label=#{admin.broadcast.starts-at}"></mdui-text-field>
+            <mdui-text-field name="durationMinutes" type="number" min="1" variant="outlined" required th:attr="label=#{admin.broadcast.duration}"></mdui-text-field>
+            <mdui-text-field name="message" variant="outlined" required maxlength="500" rows="3" autosize th:attr="label=#{admin.broadcast.message}"></mdui-text-field>
+            <mdui-button type="button" variant="filled" class="admin-broadcast-send" th:text="#{admin.broadcast.send}">Send</mdui-button>
+        </form>
+
+        <form data-broadcast="maintenance.cancelled" hidden>
+            <mdui-text-field name="originalStartsAt" type="datetime-local" step="1" variant="outlined" required th:attr="label=#{admin.broadcast.original-starts-at}"></mdui-text-field>
+            <mdui-text-field name="reason" variant="outlined" required maxlength="500" rows="3" autosize th:attr="label=#{admin.broadcast.reason}"></mdui-text-field>
+            <mdui-button type="button" variant="filled" class="admin-broadcast-send" th:text="#{admin.broadcast.send}">Send</mdui-button>
+        </form>
+
+        <form data-broadcast="version.deployed" hidden>
+            <mdui-text-field name="version" variant="outlined" required maxlength="64" th:attr="label=#{admin.broadcast.version}"></mdui-text-field>
+            <label class="admin-broadcast-switch"><mdui-switch name="promptReload"></mdui-switch> <span th:text="#{admin.broadcast.prompt-reload}">Ask to reload</span></label>
+            <mdui-button type="button" variant="filled" class="admin-broadcast-send" th:text="#{admin.broadcast.send}">Send</mdui-button>
+        </form>
+
+        <form th:each="alert : ${ {'alert.info', 'alert.warning'} }" th:attr="data-broadcast=${alert}" hidden>
+            <mdui-text-field name="title" variant="outlined" required maxlength="120" th:attr="label=#{admin.broadcast.alert-title}"></mdui-text-field>
+            <mdui-text-field name="body" variant="outlined" required maxlength="2000" rows="4" autosize th:attr="label=#{admin.broadcast.alert-body}"></mdui-text-field>
+            <mdui-text-field name="ttlSeconds" type="number" min="0" value="0" variant="outlined" required th:attr="label=#{admin.broadcast.ttl}"></mdui-text-field>
+            <mdui-button type="button" variant="filled" class="admin-broadcast-send" th:text="#{admin.broadcast.send}">Send</mdui-button>
+        </form>
+    </div>
+</div>

@@ -36,6 +36,7 @@ import java.util.function.Supplier;
 public class AdminTabsFragmentController {
     private final ModelFiller filler;
     private final ApiService apiService;
+    private final BroadcastState broadcastState;
 
     @GetMapping("/ccl")
     String ccl(Model model, HttpServletResponse response) {
@@ -182,6 +183,14 @@ public class AdminTabsFragmentController {
             model.addAttribute("notifications", apiService.adminNotifications(page));
             model.addAttribute("members", members == null ? null : members.members());
             return "pages/admin-tab/notifications :: content";
+        });
+    }
+
+    @GetMapping("/broadcast")
+    String broadcast(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("maintenance", broadcastState.maintenance().orElse(null));
+            return "pages/admin-tab/broadcast :: content";
         });
     }
 
