@@ -96,13 +96,16 @@ public class MockApiService implements ApiService {
     /** Application-wide, like the well-known files: a notification sent in one session reaches the others. */
     private MockNotificationStore notifications;
 
-    private boolean isMockMember(UUID id) {
+    /** The calling session's mock member {@code id}'s login; null when it has no such member. */
+    private String mockMemberLogin(UUID id) {
         MockData current = currentData();
-        return current != null && current.getMembers().page().members().stream().anyMatch(m -> id.equals(m.id()));
+        if (current == null) return null;
+        return current.getMembers().page().members().stream().filter(m -> id.equals(m.id()))
+                .map(m -> m.twitchUsername()).findFirst().orElse(null);
     }
 
     private synchronized MockNotificationStore notifications() {
-        if (notifications == null) notifications = new MockNotificationStore(eventPublisher, Clock.systemUTC(), this::isMockMember);
+        if (notifications == null) notifications = new MockNotificationStore(eventPublisher, Clock.systemUTC(), this::mockMemberLogin);
         return notifications;
     }
 

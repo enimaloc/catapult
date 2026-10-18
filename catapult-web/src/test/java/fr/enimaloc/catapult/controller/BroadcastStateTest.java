@@ -36,6 +36,17 @@ class BroadcastStateTest {
     }
 
     @Test
+    void acceptsInstants_asTheMockPublishesThem_andKeepsTheIsoString() {
+        state.accept("maintenance.scheduled", Map.of("startsAt", startsAt, "durationMinutes", 30, "message", "m"));
+
+        assertThat(state.maintenance()).contains(scheduled(startsAt, "m"));
+        assertThat(state.maintenance().orElseThrow().get("startsAt")).isEqualTo(startsAt.toString());
+
+        state.accept("maintenance.cancelled", Map.of("originalStartsAt", startsAt));
+        assertThat(state.maintenance()).isEmpty();
+    }
+
+    @Test
     void aNewerScheduleReplacesIt() {
         state.accept("maintenance.scheduled", scheduled(startsAt, "m"));
         Map<String, Object> newer = scheduled(startsAt.plus(Duration.ofHours(2)), "later");
