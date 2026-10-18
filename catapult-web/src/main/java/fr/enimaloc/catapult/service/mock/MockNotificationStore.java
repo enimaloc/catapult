@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Predicate;
+import java.util.function.Function;
 
 /**
  * The mock's notifications and broadcasts: one store for the whole application, so what an admin
@@ -41,17 +41,17 @@ class MockNotificationStore {
     private final Deque<Instant> broadcasts = new ArrayDeque<>();
 
     private final Clock clock;
-    /** Whether an account the store has not seen yet is a mock member. */
-    private final Predicate<UUID> knownMember;
+    /** A mock member's login, null for an account that is not one. */
+    private final Function<UUID, String> memberLogin;
 
     MockNotificationStore(ApplicationEventPublisher publisher) {
-        this(publisher, Clock.systemUTC(), id -> false);
+        this(publisher, Clock.systemUTC(), id -> null);
     }
 
-    MockNotificationStore(ApplicationEventPublisher publisher, Clock clock, Predicate<UUID> knownMember) {
+    MockNotificationStore(ApplicationEventPublisher publisher, Clock clock, Function<UUID, String> memberLogin) {
         this.publisher = publisher;
         this.clock = clock;
-        this.knownMember = knownMember;
+        this.memberLogin = memberLogin;
     }
 
     synchronized NotificationSnapshotDto snapshot(UUID account) {
@@ -86,7 +86,7 @@ class MockNotificationStore {
     synchronized int create(String title, String body, Severity severity, String ctaUrl, String ctaLabel,
                             Instant expiresAt, UUID target) {
         if (!valid(title, body, severity, ctaUrl, ctaLabel, expiresAt)) return 400;
-        if (target != null && !byAccount.containsKey(target) && !knownMember.test(target)) return 400;
+        if (target != null && !byAccount.containsKey(target) && memberLogin.apply(target) == null) return 400;
         ctaUrl = blankToNull(ctaUrl);
         ctaLabel = blankToNull(ctaLabel);
         UUID id = UUID.randomUUID();
@@ -99,7 +99,7 @@ class MockNotificationStore {
             publish(account, NotificationStreamEvent.CREATED, dto);
         }
         sent.add(new AdminNotificationDto(id, title, body, html, severity, ctaUrl, ctaLabel, expiresAt, now,
-                target == null ? "ALL" : "USER", target, null));
+                target == null ? "BROADCAST" : "TARGETED", target, target == null ? null : memberLogin.apply(target)));
         return 201;
     }
 

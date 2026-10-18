@@ -25,7 +25,7 @@ class MockNotificationStoreTest {
     private final MutableClock clock = new MutableClock(Instant.parse("2026-10-18T10:00:00Z"));
     private final UUID member = UUID.randomUUID();
     private final MockNotificationStore store = new MockNotificationStore(events::add, clock,
-            id -> id.equals(this.member) || id.equals(this.a) || id.equals(this.b));
+            id -> id.equals(this.member) ? "member" : id.equals(this.a) ? "alice" : id.equals(this.b) ? "bob" : null);
 
     /** A clock the test moves by hand. */
     private static final class MutableClock extends Clock {
@@ -162,9 +162,12 @@ class MockNotificationStoreTest {
         var page = store.adminPage(0);
 
         assertThat(page.content()).extracting("title").containsExactly("deux", "un");
-        assertThat(page.content().get(0).audience()).isEqualTo("ALL");
-        assertThat(page.content().get(1).audience()).isEqualTo("USER");
+        // catapult-api's audiences, which the admin tab tells apart
+        assertThat(page.content().get(0).audience()).isEqualTo("BROADCAST");
+        assertThat(page.content().get(0).targetLogin()).isNull();
+        assertThat(page.content().get(1).audience()).isEqualTo("TARGETED");
         assertThat(page.content().get(1).targetUserId()).isEqualTo(a);
+        assertThat(page.content().get(1).targetLogin()).isEqualTo("alice");
         assertThat(page.content().get(1).body()).isEqualTo("**x**");
     }
 

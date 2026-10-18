@@ -634,13 +634,15 @@ class RealApiServiceTest {
     @Test
     void adminNotifications_readsAPageOfAdminDtos() {
         respond(HttpMethod.GET, "/api/admin/notifications?page=0&size=20", "{\"content\":[{\"id\":\"" + NOTIF_ID
-                + "\",\"title\":\"t\",\"body\":\"b\",\"bodyHtml\":\"<p>b</p>\",\"severity\":\"WARNING\",\"audience\":\"ALL\","
+                + "\",\"title\":\"t\",\"body\":\"b\",\"bodyHtml\":\"<p>b</p>\",\"severity\":\"WARNING\",\"audience\":\"TARGETED\","
+                + "\"targetUserId\":\"" + NOTIF_ID + "\",\"targetLogin\":\"alice\","
                 + "\"createdAt\":\"2026-10-18T10:00:00Z\"}],\"number\":0,\"totalPages\":1,\"totalElements\":1}");
 
         var page = service.adminNotifications(0);
 
         assertThat(page.content()).extracting("body").containsExactly("b");
-        assertThat(page.content().get(0).audience()).isEqualTo("ALL");
+        assertThat(page.content().get(0).audience()).isEqualTo("TARGETED");
+        assertThat(page.content().get(0).targetLogin()).isEqualTo("alice");
     }
 
     @Test

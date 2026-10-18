@@ -17,6 +17,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * {@code maintenance.scheduled} ({@code {startsAt, durationMinutes, message}}), until a
  * {@code maintenance.cancelled} names its {@code originalStartsAt} or its window ends. Other
  * broadcasts are momentary and not kept.
+ * <p>
+ * The instants come as ISO strings from catapult-api (through Redis) but as {@link Instant}s from the
+ * mock; the data kept always carries {@code startsAt} as its ISO string.
  */
 @Slf4j
 @Component
@@ -42,16 +45,23 @@ public class BroadcastState {
         if (data == null) return;
         try {
             if (SCHEDULED.equals(name)) {
-                Instant startsAt = Instant.parse((String) data.get("startsAt"));
+                Instant startsAt = instant(data.get("startsAt"));
                 long minutes = ((Number) data.get("durationMinutes")).longValue();
-                maintenance.set(new Maintenance(Collections.unmodifiableMap(new LinkedHashMap<>(data)), startsAt, startsAt.plus(Duration.ofMinutes(minutes))));
+                Map<String, Object> kept = new LinkedHashMap<>(data);
+                kept.put("startsAt", startsAt.toString());
+                maintenance.set(new Maintenance(Collections.unmodifiableMap(kept), startsAt, startsAt.plus(Duration.ofMinutes(minutes))));
             } else if (CANCELLED.equals(name)) {
-                Instant original = Instant.parse((String) data.get("originalStartsAt"));
+                Instant original = instant(data.get("originalStartsAt"));
                 maintenance.updateAndGet(current -> current != null && current.startsAt().equals(original) ? null : current);
             }
         } catch (RuntimeException e) {
             log.warn("Ignored a malformed {} broadcast: {}", name, e.getMessage());
         }
+    }
+
+    /** An {@link Instant} as is, or parsed from its ISO string. */
+    private static Instant instant(Object value) {
+        return value instanceof Instant instant ? instant : Instant.parse((String) value);
     }
 
     /** The maintenance announced and not yet over; empty once cancelled or ended. */
