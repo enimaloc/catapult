@@ -2,7 +2,7 @@
  * The admin Broadcast tab. The select shows the form of the broadcast type picked (the others stay
  * hidden); Send checks the fields as catapult-api does, posts the type's JSON to
  * AdminBroadcastController and tells the outcome by its status (202 sent, 400 data-label-invalid,
- * 429 data-label-rate, else data-label-unavailable). "Cancel it" on the announced maintenance
+ * 429 data-label-rate, else data-label-unavailable); once sent, the tab reloads. "Cancel it" on the announced maintenance
  * selects the cancel form with that maintenance's start filled in. Listeners are delegated to the
  * panel: its content comes and goes.
  */
@@ -78,19 +78,9 @@ window.CatapultAdminBroadcast = (function () {
         return { name, title: textOf(form, "title"), body: fieldOf(form, "body").value, ttlSeconds };
     }
 
-    function reset(form) {
-        form.querySelectorAll("[name]").forEach(field => {
-            field.removeAttribute("invalid");
-            if (field.matches('[name="promptReload"]')) field.checked = false;
-            else field.value = field.matches('[name="ttlSeconds"]') ? "0" : "";
-        });
-        delete form.dataset.originalIso;
-        delete form.dataset.originalLocal;
-    }
-
     const labelOf = status => ({ 400: "labelInvalid", 429: "labelRate" })[status] ?? "labelUnavailable";
 
-    async function send(root, form, button) {
+    async function send(panel, root, form, button) {
         const body = bodyOf(form);
         if (body === null) return;
         button.disabled = true; // synchronously: a second click finds it disabled
@@ -103,8 +93,10 @@ window.CatapultAdminBroadcast = (function () {
             button.disabled = false;
         }
         if (status === 202) {
-            reset(form);
             window.mdui?.snackbar?.({ message: root.dataset.labelSent });
+            // Reloaded rather than reset: a reset leaves the required fields marked, and the
+            // "Announced maintenance" card would not show what was just sent.
+            await CatapultAdminTabs.reload(panel);
         } else {
             CatapultChannel.showError(root.dataset[labelOf(status)]);
         }
@@ -132,7 +124,7 @@ window.CatapultAdminBroadcast = (function () {
             if (target.matches("#admin-broadcast-cancel-current")) {
                 cancelCurrent(root, target.closest("[data-current-starts-at]"));
             } else {
-                send(root, target.closest("form[data-broadcast]"), target);
+                send(panel, root, target.closest("form[data-broadcast]"), target);
             }
         });
         panel.addEventListener("input", event => event.target.removeAttribute?.("invalid"));

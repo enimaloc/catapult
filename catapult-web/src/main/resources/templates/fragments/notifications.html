@@ -15,18 +15,7 @@
         <mdui-button variant="text" data-link href="/notifications"
                      th:text="#{notifications.see_all}">notifications.see_all</mdui-button>
     </div>
-    <template id="notification-item-template">
-        <div class="notification-item" tabindex="0" data-id="" data-read="false" data-severity="INFO">
-            <mdui-icon class="notification-icon" name="info"
-                       th:attr="data-label-info=#{notifications.severity.info},data-label-warning=#{notifications.severity.warning},data-label-error=#{notifications.severity.error}"></mdui-icon>
-            <div class="notification-content">
-                <div class="notification-title"></div>
-                <div class="notification-body"></div>
-                <time class="notification-date" datetime=""></time>
-                <mdui-button class="notification-cta" variant="text" target="_blank" rel="noopener" hidden></mdui-button>
-            </div>
-        </div>
-    </template>
+    <th:block th:replace="~{this :: itemTemplate('notification-item-template')}"></th:block>
 </div>
 
 <!--/* One notification; the markup notifications.js's item builder mirrors for live events. bodyHtml is sanitized by catapult-api. */-->
@@ -41,3 +30,17 @@
                      th:href="${n.ctaUrl()}" th:text="${n.ctaLabel() != null ? n.ctaLabel() : n.ctaUrl()}">cta</mdui-button>
     </div>
 </div>
+
+<!--/* What notifications.js builds live items from: in the menu, and on the /notifications page under another id, which it falls back to while the menu has not loaded. */-->
+<template th:fragment="itemTemplate(templateId)" th:id="${templateId}">
+    <div class="notification-item" tabindex="0" data-id="" data-read="false" data-severity="INFO">
+        <mdui-icon class="notification-icon" name="info"
+                   th:attr="data-label-info=#{notifications.severity.info},data-label-warning=#{notifications.severity.warning},data-label-error=#{notifications.severity.error}"></mdui-icon>
+        <div class="notification-content">
+            <div class="notification-title"></div>
+            <div class="notification-body"></div>
+            <time class="notification-date" datetime=""></time>
+            <mdui-button class="notification-cta" variant="text" target="_blank" rel="noopener" hidden></mdui-button>
+        </div>
+    </div>
+</template>

@@ -115,10 +115,16 @@ window.CatapultAdminNotifications = (function () {
     }
 
     async function remove(panel, root, button) {
-        if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
-        const status = await post(button, `/admin/notifications/${encodeURIComponent(button.dataset.delete)}/delete`, {});
-        if (ok(status)) await CatapultAdminTabs.reload(panel);
-        else CatapultChannel.showError(refusal(root, status));
+        button.disabled = true; // before the confirmation: a second click must not open another
+        try {
+            if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
+            const status = await post(button, `/admin/notifications/${encodeURIComponent(button.dataset.delete)}/delete`, {});
+            button.disabled = true; // post() re-enabled it; still busy until the tab reloads
+            if (ok(status)) await CatapultAdminTabs.reload(panel);
+            else CatapultChannel.showError(refusal(root, status));
+        } finally {
+            button.disabled = false;
+        }
     }
 
     let previewing = 0; // the latest preview asked: an older answer is dropped

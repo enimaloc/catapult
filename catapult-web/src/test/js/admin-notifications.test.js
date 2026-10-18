@@ -254,6 +254,21 @@ describe("admin-notifications", () => {
         expect(CatapultAdminTabs.reload).toHaveBeenCalled();
     });
 
+    it("opens one confirmation and posts once on a double click", async () => {
+        const button = document.querySelector(".admin-notification-delete");
+        button.click();
+        button.click();
+        await flush();
+        expect(mdui.confirm).toHaveBeenCalledTimes(1);
+        expect(posted).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-enables the delete button when the confirmation is declined", async () => {
+        confirmAnswer = false;
+        await click(".admin-notification-delete");
+        expect(document.querySelector(".admin-notification-delete").disabled).toBe(false);
+    });
+
     it("does not delete when the confirmation is declined", async () => {
         confirmAnswer = false;
         await click(".admin-notification-delete");

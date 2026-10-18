@@ -39,10 +39,10 @@ function item(id, { read = false, cta = false, createdAt = "2026-10-18T10:00:00Z
     </div>`;
 }
 
-function menu(unread, items = []) {
+function menu(unread, items = [], template = TEMPLATE) {
     return `<div id="notifications-menu" data-unread="${unread}" data-new="New: {0}">
         <div class="notification-list">${items.join("")}<p class="notification-empty" ${items.length ? "hidden" : ""}>none</p></div>
-        <mdui-button data-notifications-read-all>all</mdui-button>${TEMPLATE}</div>`;
+        <mdui-button data-notifications-read-all>all</mdui-button>${template}</div>`;
 }
 
 let fetched;
@@ -157,6 +157,12 @@ describe("notifications.js", () => {
         expect(document.getElementById("notifications-menu").querySelector('[data-id="o9"]')).toBeNull();
         expect(badge().textContent).toBe("11");
         expect(document.querySelector("mdui-snackbar").textContent).toBe("New: <b>Hi</b>");
+    });
+
+    it("shows a title with replacement patterns literally in the snackbar", async () => {
+        await boot(menu(0));
+        stream().fire("NotificationCreated", { ...created("n1"), title: "a $& b $` c" });
+        expect(document.querySelector("mdui-snackbar").textContent).toBe("New: a $& b $` c");
     });
 
     it("updates items and the badge from read, all-read and deleted events", async () => {
@@ -284,6 +290,13 @@ describe("notifications.js", () => {
             expect(pageItems().map(n => n.dataset.id)).toEqual(["n1", "a"]);
             expect(document.querySelector("#notifications-page .notification-empty").hidden).toBe(true);
             expect(pageItems()[0].querySelector(".notification-date").textContent).not.toBe("");
+        });
+
+        it("builds live items from its own template when the menu has none", async () => {
+            const own = TEMPLATE.replace('id="notification-item-template"', 'id="notification-page-item-template"');
+            await boot(menu(0, [], ""), pageMarkup(0, ["a"]) + own);
+            stream().fire("NotificationCreated", created("n1"));
+            expect(pageItems().map(n => n.dataset.id)).toEqual(["n1", "a"]);
         });
 
         it("keeps the page at twenty items when a notification is created", async () => {

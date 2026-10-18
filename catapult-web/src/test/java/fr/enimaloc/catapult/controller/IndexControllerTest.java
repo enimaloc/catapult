@@ -332,7 +332,9 @@ class IndexControllerTest {
 
         assertThat(html)
                 .contains("id=\"notifications-page\"", "data-notifications-read-all", "Hello &lt;b&gt;", "<i>body</i>",
-                        "href=\"/notifications?page=0\"", "href=\"/notifications?page=2\"", "2 / 3");
+                        "href=\"/notifications?page=0\"", "href=\"/notifications?page=2\"", "2 / 3",
+                        // its own template for live items, should the bell's menu not have loaded
+                        "<template id=\"notification-page-item-template\">", "class=\"notification-cta\"");
     }
 
     @Test

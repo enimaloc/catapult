@@ -15,7 +15,8 @@ window.CatapultBroadcasts = (function () {
     const banner = () => document.getElementById("broadcast-banner");
     const veil = () => document.getElementById("broadcast-veil");
     const lang = () => document.documentElement.lang || undefined;
-    const label = (name, value) => (banner()?.dataset[name] ?? "").replace("{0}", value ?? "");
+    // A function replacement: a string one would interpret "$&" and the like in the value.
+    const label = (name, value) => (banner()?.dataset[name] ?? "").replace("{0}", () => value ?? "");
 
     function isDismissed(startsAt) {
         if (dismissed.has(startsAt)) return true;
