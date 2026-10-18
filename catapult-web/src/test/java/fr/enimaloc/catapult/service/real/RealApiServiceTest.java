@@ -608,7 +608,9 @@ class RealApiServiceTest {
 
     @Test
     void notifications_mapsASpringPage() {
-        respond(HttpMethod.GET, "/api/notifications?page=2&size=20&sort=createdAt,desc", "{\"content\":[" + NOTIF + "],"
+        // No sort parameter: catapult-api's repository already orders newest first and would reject
+        // a Pageable sort on a property NotificationRecipient does not have.
+        respond(HttpMethod.GET, "/api/notifications?page=2&size=20", "{\"content\":[" + NOTIF + "],"
                 + "\"number\":2,\"totalPages\":3,\"totalElements\":41,\"size\":20,\"pageable\":{\"pageNumber\":2,\"paged\":true},"
                 + "\"first\":false,\"last\":true}");
 
