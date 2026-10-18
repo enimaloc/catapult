@@ -6,6 +6,7 @@
  */
 window.CatapultNotifications = (function () {
     const MENU_SIZE = 10;
+    const PAGE_SIZE = 20;
     const CONTAINERS = "#notifications-dropdown, #notifications-page";
     const ICONS = { INFO: "info", WARNING: "warning", ERROR: "error" };
     let unread = -1;
@@ -136,13 +137,15 @@ window.CatapultNotifications = (function () {
     }
 
     function onClick(event) {
-        if (!(event.target instanceof Element) || !event.target.closest(CONTAINERS)) return;
+        if (!(event.target instanceof Element)) return;
+        // The page's button sits in its header, outside the list: it works wherever it is.
         if (event.target.closest("[data-notifications-read-all]")) {
             document.querySelectorAll(".notification-item").forEach(n => { n.dataset.read = "true"; });
             setUnread(0);
             post("/spa/notifications/read-all");
             return;
         }
+        if (!event.target.closest(CONTAINERS)) return;
         const node = event.target.closest(".notification-item");
         if (event.target.closest("[data-link]") && bell()) bell().open = false;
         if (!node) return;
@@ -172,7 +175,7 @@ window.CatapultNotifications = (function () {
     function onCreated(dto) {
         // The page lists the newest first: a notification only belongs on top of its first page.
         const page = document.getElementById("notifications-page");
-        const onPage = page?.dataset.page === "0" ? prepend(page, dto) : false;
+        const onPage = page?.dataset.page === "0" ? prepend(page, dto, PAGE_SIZE) : false;
         const inMenu = prepend(list(), dto, MENU_SIZE);
         if (!onPage && !inMenu && itemsOf(dto.id).length) return;
         syncEmpty();
