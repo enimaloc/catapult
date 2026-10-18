@@ -100,6 +100,7 @@ mdui-top-app-bar {
 
 .app-bar-end {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
 }
 
@@ -137,6 +138,56 @@ mdui-top-app-bar {
     width: 28px;
     height: 28px;
     flex: none;
+}
+
+/* The bell: the badge sits on the icon's top-right corner. */
+.notifications-trigger {
+    position: relative;
+}
+
+.notifications-trigger mdui-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+}
+
+.notifications-dropdown {
+    width: min(360px, calc(100vw - 32px));
+    max-height: 70vh;
+    overflow: auto;
+    background: var(--mdui-color-surface-container);
+    border-radius: var(--mdui-shape-corner-medium);
+}
+
+.notification-item {
+    --notification-color: var(--mdui-color-primary);
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+}
+
+.notification-item[data-severity="WARNING"] { --notification-color: var(--mdui-color-tertiary); }
+.notification-item[data-severity="ERROR"] { --notification-color: var(--mdui-color-error); }
+
+.notification-item .notification-icon { color: var(--notification-color); flex: none; }
+
+.notification-item[data-read="false"] {
+    border-left-color: var(--notification-color);
+}
+
+.notification-item[data-read="false"] .notification-title { font-weight: 700; }
+
+.notification-content { min-width: 0; }
+.notification-body { overflow-wrap: anywhere; }
+.notification-date { display: block; color: var(--catapult-text-secondary); font-size: 0.8em; }
+.notification-empty { padding: 16px; text-align: center; color: var(--catapult-text-secondary); }
+
+.notification-actions {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 8px;
 }
 
 .nav-admin {

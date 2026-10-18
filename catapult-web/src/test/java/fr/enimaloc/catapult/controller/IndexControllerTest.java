@@ -297,9 +297,9 @@ class IndexControllerTest {
         }
     }
 
-    /** The navbar's end area (the landing page has login buttons of its own). */
+    /** The navbar's end area, up to the bar's close (the landing page has login buttons of its own). */
     private static String barEnd(String html) {
         int start = html.indexOf("<div class=\"app-bar-end\">");
-        return html.substring(start, html.indexOf("</div>", start));
+        return html.substring(start, html.indexOf("</mdui-top-app-bar>", start));
     }
 }
