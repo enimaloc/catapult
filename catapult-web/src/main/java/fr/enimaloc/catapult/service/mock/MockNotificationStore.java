@@ -10,14 +10,18 @@ import fr.enimaloc.catapult.event.notification.BroadcastStreamEvent;
 import fr.enimaloc.catapult.event.notification.NotificationStreamEvent;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 /**
  * The mock's notifications and broadcasts: one store for the whole application, so what an admin
@@ -36,8 +40,18 @@ class MockNotificationStore {
     private final List<AdminNotificationDto> sent = new ArrayList<>();
     private final Deque<Instant> broadcasts = new ArrayDeque<>();
 
+    private final Clock clock;
+    /** Whether an account the store has not seen yet is a mock member. */
+    private final Predicate<UUID> knownMember;
+
     MockNotificationStore(ApplicationEventPublisher publisher) {
+        this(publisher, Clock.systemUTC(), id -> false);
+    }
+
+    MockNotificationStore(ApplicationEventPublisher publisher, Clock clock, Predicate<UUID> knownMember) {
         this.publisher = publisher;
+        this.clock = clock;
+        this.knownMember = knownMember;
     }
 
     synchronized NotificationSnapshotDto snapshot(UUID account) {
@@ -72,8 +86,11 @@ class MockNotificationStore {
     synchronized int create(String title, String body, Severity severity, String ctaUrl, String ctaLabel,
                             Instant expiresAt, UUID target) {
         if (!valid(title, body, severity, ctaUrl, ctaLabel, expiresAt)) return 400;
+        if (target != null && !byAccount.containsKey(target) && !knownMember.test(target)) return 400;
+        ctaUrl = blankToNull(ctaUrl);
+        ctaLabel = blankToNull(ctaLabel);
         UUID id = UUID.randomUUID();
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         String html = html(body);
         NotificationDto dto = new NotificationDto(id, title, html, severity, ctaUrl, ctaLabel, expiresAt, now, false);
         List<UUID> recipients = target == null ? List.copyOf(byAccount.keySet()) : List.of(target);
@@ -98,7 +115,7 @@ class MockNotificationStore {
 
     synchronized AdminPage<AdminNotificationDto> adminPage(int page) {
         List<AdminNotificationDto> newestFirst = new ArrayList<>(sent);
-        java.util.Collections.reverse(newestFirst);
+        Collections.reverse(newestFirst);
         return paged(newestFirst, page);
     }
 
@@ -109,7 +126,7 @@ class MockNotificationStore {
 
     /** Publishes the broadcast to every stream; 429 past ten a minute, as the API. */
     synchronized int broadcast(BroadcastRequestDto request) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         while (!broadcasts.isEmpty() && broadcasts.peekFirst().isBefore(now.minusSeconds(60))) broadcasts.pollFirst();
         if (broadcasts.size() >= BROADCASTS_PER_MINUTE) return 429;
         broadcasts.addLast(now);
@@ -124,17 +141,17 @@ class MockNotificationStore {
         return byAccount.computeIfAbsent(account, a -> {
             List<NotificationDto> list = new ArrayList<>();
             list.add(new NotificationDto(UUID.randomUUID(), "Bienvenue sur Catapult", "Ceci est une notification de test.",
-                    Severity.INFO, null, null, null, Instant.now(), false));
+                    Severity.INFO, null, null, null, clock.instant(), false));
             return list;
         });
     }
 
     /** The account's unexpired notifications, newest first. */
     private List<NotificationDto> live(UUID account) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         List<NotificationDto> live = new ArrayList<>(notifications(account).stream()
                 .filter(n -> n.expiresAt() == null || n.expiresAt().isAfter(now)).toList());
-        java.util.Collections.reverse(live);
+        Collections.reverse(live);
         return live;
     }
 
@@ -151,8 +168,9 @@ class MockNotificationStore {
         return Map.of("notificationId", id.toString(), "unreadCount", unreadCount);
     }
 
-    private static <T> AdminPage<T> paged(List<T> all, int page) {
-        int from = Math.min(Math.max(page, 0) * PAGE_SIZE, all.size());
+    private static <T> AdminPage<T> paged(List<T> all, int requestedPage) {
+        int page = Math.max(requestedPage, 0);
+        int from = Math.min(page * PAGE_SIZE, all.size());
         int totalPages = (all.size() + PAGE_SIZE - 1) / PAGE_SIZE;
         return new AdminPage<>(all.subList(from, Math.min(from + PAGE_SIZE, all.size())), page, totalPages, all.size());
     }
@@ -161,18 +179,22 @@ class MockNotificationStore {
         publisher.publishEvent(new NotificationStreamEvent(account, name, data));
     }
 
-    private static boolean valid(String title, String body, Severity severity, String ctaUrl, String ctaLabel, Instant expiresAt) {
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private boolean valid(String title, String body, Severity severity, String ctaUrl, String ctaLabel, Instant expiresAt) {
         if (title == null || title.isBlank() || title.length() > 255) return false;
         if (body == null || body.isBlank() || severity == null) return false;
         boolean hasUrl = ctaUrl != null && !ctaUrl.isBlank();
         boolean hasLabel = ctaLabel != null && !ctaLabel.isBlank();
         if (hasUrl != hasLabel) return false;
         if (hasUrl && (ctaUrl.length() > 512 || ctaLabel.length() > 64 || !isHttp(ctaUrl))) return false;
-        return expiresAt == null || expiresAt.isAfter(Instant.now());
+        return expiresAt == null || expiresAt.isAfter(clock.instant());
     }
 
     private static boolean isHttp(String url) {
-        String lower = url.toLowerCase(java.util.Locale.ROOT);
+        String lower = url.toLowerCase(Locale.ROOT);
         return lower.startsWith("http://") || lower.startsWith("https://");
     }
 
