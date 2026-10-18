@@ -66,6 +66,8 @@ class NotificationRedisBridgeTest {
         forward(user, "{\"data\":{}}");
         forward("catapult:events:global", "{\"data\":{}}");
         forward(user, "[1,2]");
+        forward(user, "{\"name\":\"notification.created\",\"data\":\"x\"}");
+        forward(user, "{\"name\":\"notification.all.read\",\"data\":[0]}");
         forward("catapult:events:global", "{\"name\":\"alert.info\",\"data\":\"text\"}");
         verifyNoInteractions(events);
     }

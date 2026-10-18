@@ -86,7 +86,7 @@ public class NotificationRedisBridge {
                 Map<?, ?> envelope = JSON.readValue(body, Map.class);
                 String name = envelope.get("name") instanceof String n ? NOTIFICATIONS.get(n) : null;
                 Object data = envelope.get("data");
-                if (name == null || data == null) return;
+                if (name == null || !(data instanceof Map)) return;
                 events.publishEvent(new NotificationStreamEvent(account, name, data));
             }
         } catch (RuntimeException e) {

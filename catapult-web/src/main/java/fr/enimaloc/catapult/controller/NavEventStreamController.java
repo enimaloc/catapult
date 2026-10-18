@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -62,13 +61,16 @@ public class NavEventStreamController {
     /** A {@link #BROADCAST} event's data: catapult-api's broadcast name and data. */
     record Broadcast(String name, Map<String, Object> data) {}
 
-    /** A session with streams open, the account it was logged in as then (null if unknown), and those streams. */
-    private record Nav(HttpSession session, UUID account, List<SseEmitter> emitters) {}
+    /**
+     * A session with streams open, the account it was logged in as then (null if unknown), the token
+     * of that login (a login in the same session replaces it), and those streams.
+     */
+    private record Nav(HttpSession session, UUID account, String token, List<SseEmitter> emitters) {}
 
     /** Only the sessions with a stream open. */
     private final Map<String, Nav> navsBySession = new ConcurrentHashMap<>();
-    /** The streams opened without a session. */
-    private final Set<SseEmitter> anonymous = ConcurrentHashMap.newKeySet();
+    /** The streams opened without a session, and the address each counts against. */
+    private final Map<SseEmitter, String> anonymous = new ConcurrentHashMap<>();
     private final SessionStreams streams;
     private final AnonymousStreams anonymousStreams;
     private final ApiService apiService;
@@ -96,15 +98,16 @@ public class NavEventStreamController {
     private SseEmitter subscribe(HttpSession session) {
         String sessionId = session.getId();
         UUID account = apiService.currentUserId();
+        String token = tokenOf(session);
         SseEmitter emitter = new SseEmitter(0L);
         List<SseEmitter> former = new ArrayList<>();
         // Added within compute: remove() drops an emptied Nav atomically too. A session now logged in
-        // as another account drops the streams of the former, which must not get the new one's events.
+        // again drops the streams of the former login, which must not get the new one's events.
         navsBySession.compute(sessionId, (id, nav) -> {
             Nav current = nav;
-            if (current == null || !Objects.equals(current.account(), account)) {
+            if (current == null || !Objects.equals(current.account(), account) || !Objects.equals(current.token(), token)) {
                 if (current != null) former.addAll(current.emitters());
-                current = new Nav(session, account, new CopyOnWriteArrayList<>());
+                current = new Nav(session, account, token, new CopyOnWriteArrayList<>());
             }
             current.emitters().add(emitter);
             return current;
@@ -120,7 +123,7 @@ public class NavEventStreamController {
     /** A visitor's stream; null when too many are open already. */
     private SseEmitter subscribeAnonymous(String ip) {
         SseEmitter emitter = new SseEmitter(AnonymousStreams.TIMEOUT.toMillis());
-        anonymous.add(emitter);
+        anonymous.put(emitter, ip);
         emitter.onCompletion(() -> removeAnonymous(ip, emitter));
         emitter.onTimeout(emitter::complete);
         emitter.onError(e -> removeAnonymous(ip, emitter));
@@ -162,7 +165,7 @@ public class NavEventStreamController {
         broadcastToAll(new Broadcast(event.name(), event.data()));
     }
 
-    /** An account's notification changes: to the streams of the sessions logged in as it, still logged in. */
+    /** An account's notification changes: to the streams of the sessions still logged in as it, by the same login. */
     @EventListener
     public void onNotification(NotificationStreamEvent event) {
         if (event.accountId() == null) return;
@@ -174,8 +177,8 @@ public class NavEventStreamController {
 
     private void broadcastToAll(Broadcast broadcast) {
         navsBySession.values().forEach(nav -> send(nav, BROADCAST, broadcast));
-        anonymous.forEach(emitter -> {
-            if (!send(emitter, BROADCAST, broadcast)) anonymous.remove(emitter);
+        anonymous.forEach((emitter, ip) -> {
+            if (!send(emitter, BROADCAST, broadcast)) removeAnonymous(ip, emitter);
         });
     }
 
@@ -200,16 +203,25 @@ public class NavEventStreamController {
         }
     }
 
-    /** Whether {@code nav}'s session still holds a login; if not, its streams close. */
+    /**
+     * Whether {@code nav}'s session still holds the login its streams were opened with; if not
+     * (logged out, or logged in again, possibly as another account), its streams close. The token
+     * is compared rather than its subject: the mock's tokens are not JWTs.
+     */
     private static boolean stillLoggedIn(Nav nav) {
-        boolean loggedIn;
+        String token = tokenOf(nav.session());
+        boolean same = token != null && token.equals(nav.token());
+        if (!same) nav.emitters().forEach(SseEmitter::complete);
+        return same;
+    }
+
+    /** The login token {@code session} holds; null without one or once invalidated. */
+    private static String tokenOf(HttpSession session) {
         try {
-            loggedIn = nav.session().getAttribute(ApiClient.SESSION_JWT_KEY) != null;
+            return session.getAttribute(ApiClient.SESSION_JWT_KEY) instanceof String token ? token : null;
         } catch (IllegalStateException e) {
-            loggedIn = false; // invalidated
+            return null; // invalidated
         }
-        if (!loggedIn) nav.emitters().forEach(SseEmitter::complete);
-        return loggedIn;
     }
 
     private static void send(Nav nav, String name, Object data) {
@@ -246,6 +258,6 @@ public class NavEventStreamController {
     public void onContextClosed(ContextClosedEvent event) {
         broadcastToAll(new Broadcast(IMMINENT, Collections.singletonMap("etaSeconds", null)));
         navsBySession.values().forEach(nav -> nav.emitters().forEach(SseEmitter::complete));
-        anonymous.forEach(SseEmitter::complete);
+        anonymous.keySet().forEach(SseEmitter::complete);
     }
 }
