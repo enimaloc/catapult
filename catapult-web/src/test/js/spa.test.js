@@ -21,7 +21,7 @@ beforeEach(async () => {
     fetchMock = vi.fn(async () => response(200, "<p>page</p>"));
     vi.stubGlobal("fetch", fetchMock);
     window.scrollTo = vi.fn();
-    await load("spa");
+    await load("live", "spa");
 });
 
 describe("resolveRoute", () => {
@@ -139,7 +139,7 @@ describe("the navbar's channels", () => {
     async function loadWithNav(path) {
         document.body.insertAdjacentHTML("afterbegin", '<nav id="nav-channels"></nav>');
         history.replaceState(null, "", path);
-        await load("spa");
+        await load("live", "spa");
         await flush();
     }
 
@@ -255,7 +255,7 @@ describe("the navbar's channels", () => {
 describe("link and history handling", () => {
     it("marks the initial page's link as active on load, from its URL", async () => {
         history.replaceState(null, "", "/privacy");
-        await load("spa");
+        await load("live", "spa");
 
         expect(document.getElementById("privacy").classList.contains("active")).toBe(true);
     });
@@ -264,7 +264,7 @@ describe("link and history handling", () => {
         document.body.insertAdjacentHTML("beforeend", '<a id="nav-chan" data-link href="/channel/enimaloc">e</a>');
         window.Catapult.page = "channel";
         history.replaceState(null, "", "/channel/enimaloc");
-        await load("spa");
+        await load("live", "spa");
 
         expect(document.getElementById("nav-chan").classList.contains("active")).toBe(true);
     });

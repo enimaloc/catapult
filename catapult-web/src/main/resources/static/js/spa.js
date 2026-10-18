@@ -129,23 +129,15 @@ function listenNavChannels() {
     if (!navChannels) {
         return;
     }
-    if (typeof EventSource !== "undefined") {
-        const source = new EventSource("/events/nav");
-        let opened = false;
-        // A reconnection (e.g. the server restarted) may have missed events, and the server
-        // its record of this navbar: reloading it catches up on both.
-        source.addEventListener("open", () => {
-            if (opened) loadNavChannels();
-            opened = true;
-        });
-        source.addEventListener("NavChannelsChanged", () => loadNavChannels());
-        source.addEventListener("NavChannelLive", event => {
-            const { username, live } = JSON.parse(event.data);
-            [...navChannels.querySelectorAll(".nav-channel")]
-                .find(a => a.getAttribute("href") === `/channel/${username}`)
-                ?.classList.toggle("live", live);
-        });
-    }
+    // A reconnection (e.g. the server restarted) may have missed events, and the server
+    // its record of this navbar: reloading it catches up on both.
+    CatapultLive.onReopen(loadNavChannels);
+    CatapultLive.on("NavChannelsChanged", () => loadNavChannels());
+    CatapultLive.on("NavChannelLive", ({ username, live }) => {
+        [...navChannels.querySelectorAll(".nav-channel")]
+            .find(a => a.getAttribute("href") === `/channel/${username}`)
+            ?.classList.toggle("live", live);
+    });
     setInterval(() => {
         if (!document.hidden) loadNavChannels();
     }, NAV_REFRESH_MS);
