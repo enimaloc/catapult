@@ -20,7 +20,8 @@ import java.util.function.IntSupplier;
  *     <li>{@code catapult.web.logins}: a login completed or refused;</li>
  *     <li>{@code catapult.web.sse.streams}: the live update streams open, by {@code stream}, and
  *     {@code catapult.web.sse.refused} / {@code catapult.web.sse.evicted}: those turned away (logged
- *     out, not their channel) or closed for a newer one of the same session.</li>
+ *     out, not their channel, or {@code capacity} when too many visitors' streams are open) or closed
+ *     for a newer one of the same session, or of the same address for a visitor's.</li>
  * </ul>
  * A role is {@code anonymous}, {@code member} or {@code admin}, or on a channel its {@code owner}
  * or a {@code moderator} (see InteractionMetricsInterceptor).
@@ -62,7 +63,7 @@ public class InteractionMetrics {
                 .register(registry);
     }
 
-    /** A {@code stream} stream turned away: {@code unauthenticated} or {@code forbidden}. */
+    /** A {@code stream} stream turned away: {@code unauthenticated}, {@code forbidden} or {@code capacity}. */
     public void streamRefused(String stream, String reason) {
         Counter.builder("catapult.web.sse.refused")
                 .description("Live update streams refused")
@@ -71,10 +72,10 @@ public class InteractionMetrics {
                 .increment();
     }
 
-    /** A {@code stream} stream closed because its session opened one too many. */
+    /** A {@code stream} stream closed because its session (or a visitor's address) opened one too many. */
     public void streamEvicted(String stream) {
         Counter.builder("catapult.web.sse.evicted")
-                .description("Live update streams closed for a newer one of the same session")
+                .description("Live update streams closed for a newer one of the same session or address")
                 .tag("stream", stream)
                 .register(registry)
                 .increment();

@@ -79,6 +79,10 @@ class NavEventStreamControllerTest {
                 .andReturn();
     }
 
+    private double anonymousOpen() {
+        return registry.get("catapult.web.sse.streams").tag("stream", "nav-anonymous").gauge().value();
+    }
+
     private static String sent(MvcResult stream) throws Exception {
         return stream.getResponse().getContentAsString();
     }
@@ -240,6 +244,31 @@ class NavEventStreamControllerTest {
 
         assertThat(stream.getAsyncResult(1000)).isNull();
         assertThat(sent(stream)).doesNotContain("Notification");
+    }
+
+    @Test
+    void aSessionLoggedInAgainAsAnotherAccount_closesTheFormerAccountsStreams() throws Exception {
+        UUID a = UUID.randomUUID();
+        MockHttpSession session = loggedIn();
+        MvcResult stream = memberStream(session, a);
+
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "jwt-of-b"); // AuthController.callback keeps the session
+        controller.onNotification(new NotificationStreamEvent(a, NotificationStreamEvent.CREATED, Map.of("title", "x")));
+
+        assertThat(stream.getAsyncResult(1000)).isNull();
+        assertThat(sent(stream)).doesNotContain("Notification");
+    }
+
+    @Test
+    void aVisitorStreamThatCannotBeWritten_freesItsSlot() throws Exception {
+        MvcResult visitor = anonymous("5.5.5.5");
+        double before = anonymousOpen();
+
+        visitor.getResponse().setOutputStreamAccessAllowed(false);
+        visitor.getResponse().setWriterAccessAllowed(false);
+        controller.onBroadcast(new BroadcastStreamEvent("alert.info", Map.of("title", "t")));
+
+        assertThat(anonymousOpen()).isEqualTo(before - 1);
     }
 
     @Test
