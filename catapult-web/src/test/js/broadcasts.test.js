@@ -155,9 +155,16 @@ describe("alerts", () => {
         expect(snackbar.classList.contains("broadcast-warning")).toBe(false);
     });
 
-    it("does not auto close with a ttl of 0", () => {
+    it("does not auto close with a ttl of 0, and can then be closed by hand", () => {
         send("alert.info", { title: "T", body: "b", ttlSeconds: 0 });
         expect(snackbars()[0].getAttribute("auto-close-delay")).toBe("0");
+        expect(snackbars()[0].hasAttribute("closeable")).toBe(true);
+    });
+
+    it("can always be closed by hand", () => {
+        send("alert.info", { title: "T", body: "b", ttlSeconds: 5 });
+        send("version.deployed", { version: "1.2", promptReload: false });
+        expect(snackbars().map(s => s.hasAttribute("closeable"))).toEqual([true, true]);
     });
 
     it("marks warnings", () => {
