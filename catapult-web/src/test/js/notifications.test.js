@@ -65,8 +65,10 @@ const badge = () => document.getElementById("notifications-badge");
 const bell = () => document.getElementById("notifications-bell");
 const items = () => Array.from(document.querySelectorAll("#notifications-dropdown .notification-item"));
 const pageItems = () => Array.from(document.querySelectorAll("#notifications-page .notification-item"));
-const pageMarkup = (number, ids = []) => `<div id="notifications-page" data-page="${number}">${ids.map(id => item(id)).join("")}
-    <p class="notification-empty" ${ids.length ? "hidden" : ""}>none</p><mdui-button data-notifications-read-all>all</mdui-button></div>`;
+// As pages/notifications.html lays it out: the read-all button is in the header, outside the list.
+const pageMarkup = (number, ids = []) => `<div class="section-header"><mdui-button id="page-read-all" data-notifications-read-all>all</mdui-button></div>
+    <div id="notifications-page" data-page="${number}">${ids.map(id => item(id)).join("")}
+    <p class="notification-empty" ${ids.length ? "hidden" : ""}>none</p></div>`;
 const created = id => ({ id, title: "t" + id, bodyHtml: "", severity: "INFO", createdAt: "2026-10-18T10:00:00Z", read: false });
 const stream = () => FakeEventSource.instances[0];
 const posts = () => fetched.mock.calls.filter(([, init]) => init?.method === "POST").map(([url]) => url);
@@ -269,7 +271,7 @@ describe("notifications.js", () => {
 
         it("marks everything read from its own button", async () => {
             await boot(menu(2, [item("b")]), pageMarkup(0, ["a", "c"]));
-            document.querySelector("#notifications-page [data-notifications-read-all]").click();
+            document.getElementById("page-read-all").click();
             await flush();
             expect(pageItems().every(n => n.dataset.read === "true")).toBe(true);
             expect(posts()).toEqual(["/spa/notifications/read-all"]);
@@ -282,6 +284,14 @@ describe("notifications.js", () => {
             expect(pageItems().map(n => n.dataset.id)).toEqual(["n1", "a"]);
             expect(document.querySelector("#notifications-page .notification-empty").hidden).toBe(true);
             expect(pageItems()[0].querySelector(".notification-date").textContent).not.toBe("");
+        });
+
+        it("keeps the page at twenty items when a notification is created", async () => {
+            await boot(menu(0), pageMarkup(0, Array.from({ length: 20 }, (_, i) => "p" + i)));
+            stream().fire("NotificationCreated", created("n1"));
+            expect(pageItems()).toHaveLength(20);
+            expect(pageItems()[0].dataset.id).toBe("n1");
+            expect(pageItems().at(-1).dataset.id).toBe("p18");
         });
 
         it("leaves page 1 alone when a notification is created", async () => {
