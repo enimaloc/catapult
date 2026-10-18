@@ -1,0 +1,20 @@
+<!--/* Broadcasts shown to every visitor (broadcasts.js fills and shows them). All texts are labels: the JS has none of its own. */-->
+<div id="broadcast-banner" class="broadcast-banner" th:fragment="banner" hidden role="status"
+     th:attr="data-label-duration=#{broadcast.maintenance.duration('{0}')},data-label-cancelled=#{broadcast.cancelled('{0}')},data-label-version=#{broadcast.version('{0}')},data-label-reload=#{broadcast.reload}">
+    <mdui-icon name="schedule"></mdui-icon>
+    <div class="broadcast-banner-text">
+        <strong th:text="#{broadcast.maintenance.title}">broadcast.maintenance.title</strong>
+        <span data-banner-time></span>
+        <span data-banner-countdown></span>
+        <span data-banner-duration></span>
+        <span data-banner-message></span>
+    </div>
+    <mdui-button-icon icon="close" data-banner-dismiss
+                      th:attr="aria-label=#{broadcast.dismiss}"></mdui-button-icon>
+</div>
+
+<!--/* Informs, does not block: pointer-events none. Shown when catapult-web is about to restart. */-->
+<div id="broadcast-veil" class="broadcast-veil" th:fragment="veil" hidden role="status">
+    <mdui-circular-progress></mdui-circular-progress>
+    <span th:text="#{broadcast.veil}">broadcast.veil</span>
+</div>
