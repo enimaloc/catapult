@@ -155,12 +155,12 @@ mdui-top-app-bar {
     width: min(360px, calc(100vw - 32px));
     max-height: 70vh;
     overflow: auto;
-    background: var(--mdui-color-surface-container);
+    background: rgb(var(--mdui-color-surface-container));
     border-radius: var(--mdui-shape-corner-medium);
 }
 
 .notification-item {
-    --notification-color: var(--mdui-color-primary);
+    --notification-color: rgb(var(--mdui-color-primary));
     display: flex;
     gap: 12px;
     padding: 12px 16px;
@@ -168,8 +168,8 @@ mdui-top-app-bar {
     cursor: pointer;
 }
 
-.notification-item[data-severity="WARNING"] { --notification-color: var(--mdui-color-tertiary); }
-.notification-item[data-severity="ERROR"] { --notification-color: var(--mdui-color-error); }
+.notification-item[data-severity="WARNING"] { --notification-color: rgb(var(--mdui-color-tertiary)); }
+.notification-item[data-severity="ERROR"] { --notification-color: rgb(var(--mdui-color-error)); }
 
 .notification-item .notification-icon { color: var(--notification-color); flex: none; }
 
@@ -190,15 +190,28 @@ mdui-top-app-bar {
     padding: 4px 8px;
 }
 
+/* A phone: anchored to the bell, the panel would run off the left edge; pinned under the bar instead. */
+@media (max-width: 600px) {
+    #notifications-bell::part(panel) {
+        position: fixed !important;
+        left: 16px !important;
+        right: 16px !important;
+        top: 64px !important;
+        transform: none !important;
+    }
+
+    .notifications-dropdown { width: auto; }
+}
+
 /* The /notifications page: the same items as the menu, in a card-like list. */
 #notifications-page {
-    background: var(--mdui-color-surface-container);
+    background: rgb(var(--mdui-color-surface-container));
     border-radius: var(--mdui-shape-corner-medium);
     overflow: hidden;
 }
 
 #notifications-page .notification-item + .notification-item {
-    border-top: 1px solid var(--mdui-color-outline-variant);
+    border-top: 1px solid rgb(var(--mdui-color-outline-variant));
 }
 
 .nav-admin {
@@ -1849,7 +1862,14 @@ mdui-select::part(menu) {
 .admin-broadcast-switch { display: flex; align-items: center; gap: 8px; }
 
 /* Broadcasts shown to every visitor (broadcasts.js). */
-.broadcast-banner { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: rgb(var(--mdui-color-surface-container-high)); color: rgb(var(--mdui-color-on-surface)); }
+/*
+ * The banner sits under the app bar, which mdui-layout positions absolutely over the page's top
+ * padding: an mdui-layout-item would be placed there too, but nothing here is padded for it (the
+ * pages' mdui-layout-main is not a direct child of mdui-layout). In the flow instead, pushed below
+ * the bar by its height and pulling the page back up by as much, so the page moves down by the
+ * banner's own height only; above the page, which follows it.
+ */
+.broadcast-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: rgb(var(--mdui-color-surface-container-high)); color: rgb(var(--mdui-color-on-surface)); }
 .broadcast-banner[hidden], .broadcast-veil[hidden] { display: none; }
 .broadcast-banner-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; overflow-wrap: anywhere; }
 mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color-error-container); --mdui-color-inverse-on-surface: var(--mdui-color-on-error-container); }
