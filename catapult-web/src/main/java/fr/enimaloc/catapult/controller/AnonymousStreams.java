@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 /**
  * Bounds the SSE streams opened without a session, which anyone may open: at most
  * {@link #MAX_PER_IP} per address, an IPv6 one counted by its /64 (a new one beyond that closing
- * its oldest), {@link #MAX_TOTAL}
+ * its oldest, told so first as {@link SessionStreams} does), {@link #MAX_TOTAL}
  * overall (beyond that refused), each closed after {@link #TIMEOUT} (the browser reconnects).
  * The counterpart of {@link SessionStreams} for visitors who are not logged in.
  * <p>
@@ -65,7 +65,7 @@ final class AnonymousStreams {
         // Completed outside compute: its completion callback comes back to closed().
         for (SseEmitter oldest : evicted) {
             total.decrementAndGet();
-            oldest.complete();
+            SessionStreams.evict(oldest);
             metrics.streamEvicted(STREAM);
         }
         return true;

@@ -3,12 +3,15 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -37,6 +40,20 @@ class AnonymousStreamsTest {
         assertThat(registry.get("catapult.web.sse.evicted").tag("stream", "nav-anonymous").counter().count()).isEqualTo(1);
         assertThat(streams.open("5.6.7.8", new SseEmitter())).isTrue();
         assertThat(open()).isEqualTo(AnonymousStreams.MAX_PER_IP + 1);
+    }
+
+    @Test
+    void anEvictedStream_isToldSoBeforeItCloses() throws Exception {
+        SseEmitter oldest = spy(new SseEmitter());
+        streams.open("1.2.3.4", oldest);
+        for (int i = 0; i < AnonymousStreams.MAX_PER_IP; i++) streams.open("1.2.3.4", new SseEmitter());
+
+        ArgumentCaptor<SseEmitter.SseEventBuilder> event = ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        InOrder order = inOrder(oldest);
+        order.verify(oldest).send(event.capture());
+        order.verify(oldest).complete();
+        assertThat(event.getValue().build()).extracting(d -> d.getData().toString()).first()
+                .asString().startsWith("event:" + SessionStreams.EVICTED + "\n");
     }
 
     @Test
