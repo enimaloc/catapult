@@ -52,6 +52,7 @@ beforeEach(async () => {
     window.CatapultCsrf = { postJson: posted };
     window.CatapultChannel = { showError: vi.fn() };
     window.mdui = { snackbar: vi.fn() };
+    window.CatapultAdminTabs = { reload: vi.fn(async () => {}) };
     await load("admin-broadcast");
     page();
 });
@@ -109,14 +110,13 @@ describe("admin-broadcast", () => {
         expect(field("maintenance.scheduled", "message").hasAttribute("invalid")).toBe(true);
     });
 
-    it("tells a 202 with a snackbar and resets the form", async () => {
+    it("tells a 202 with a snackbar and reloads the tab, so the form and the announced maintenance are fresh", async () => {
         set("alert.info", "title", "T");
         set("alert.info", "body", "B");
         await send("alert.info");
 
         expect(window.mdui.snackbar).toHaveBeenCalledWith({ message: "Sent" });
-        expect(field("alert.info", "title").value).toBe("");
-        expect(field("alert.info", "ttlSeconds").value).toBe("0");
+        expect(window.CatapultAdminTabs.reload).toHaveBeenCalledWith(document.querySelector('mdui-tab-panel[value="broadcast"]'));
     });
 
     it.each([[400, "Refused"], [429, "Slow down"], [502, "Down"]])("tells a %i", async (code, label) => {
@@ -127,6 +127,7 @@ describe("admin-broadcast", () => {
 
         expect(window.CatapultChannel.showError).toHaveBeenCalledWith(label);
         expect(field("alert.info", "title").value).toBe("T");
+        expect(window.CatapultAdminTabs.reload).not.toHaveBeenCalled();
     });
 
     it("tells an unreachable server", async () => {

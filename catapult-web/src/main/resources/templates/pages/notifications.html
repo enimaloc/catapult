@@ -17,7 +17,8 @@
         </mdui-card>
 
         <th:block th:if="${notifications != null}">
-            <!--/* The dropdown's template lives in the bell's menu fragment, which a logged-in page always has: notifications.js builds live items from it. */-->
+            <!--/* notifications.js builds live items from the bell menu's template, or this one while the menu has not loaded. */-->
+            <th:block th:replace="~{fragments/notifications :: itemTemplate('notification-page-item-template')}"></th:block>
             <div id="notifications-page" class="notification-list" th:attr="data-page=${notifications.number()}">
                 <th:block th:each="n : ${notifications.content()}"><th:block th:replace="~{fragments/notifications :: item(${n})}"></th:block></th:block>
                 <p class="notification-empty" th:hidden="${!#lists.isEmpty(notifications.content())}"

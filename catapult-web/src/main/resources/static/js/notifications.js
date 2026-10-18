@@ -44,11 +44,13 @@ window.CatapultNotifications = (function () {
     }
 
     /**
-     * An item node for a NotificationDto (as the stream carries it) from the menu's template. Title and
-     * label are text; bodyHtml is markup, sanitized by catapult-api.
+     * An item node for a NotificationDto (as the stream carries it) from the menu's template, or the
+     * /notifications page's own when the menu has not loaded. Title and label are text; bodyHtml is
+     * markup, sanitized by catapult-api.
      */
     function buildItem(dto) {
-        const template = document.getElementById("notification-item-template");
+        const template = document.getElementById("notification-item-template")
+            ?? document.getElementById("notification-page-item-template");
         if (!template) return null;
         const node = template.content.firstElementChild.cloneNode(true);
         node.dataset.id = dto.id;
@@ -181,7 +183,7 @@ window.CatapultNotifications = (function () {
         syncEmpty();
         if (!dto.read && unread >= 0) setUnread(unread + 1);
         const template = document.getElementById("notifications-menu")?.dataset.new;
-        showSnackbar(template ? template.replace("{0}", dto.title) : dto.title);
+        showSnackbar(template ? template.replace("{0}", () => dto.title ?? "") : dto.title);
     }
 
     if (document.getElementById("notifications-dropdown")) {

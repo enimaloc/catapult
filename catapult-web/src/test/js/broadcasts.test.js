@@ -119,6 +119,13 @@ describe("maintenance.cancelled", () => {
         expect(snackbars()[0].querySelector("i")).toBeNull();
     });
 
+    it("shows a reason with replacement patterns literally", () => {
+        const startsAt = iso(HOUR);
+        send("maintenance.scheduled", { startsAt, durationMinutes: 30, message: "m" });
+        send("maintenance.cancelled", { originalStartsAt: startsAt, reason: "a $& b $' c" });
+        expect(snackbars()[0].textContent).toBe("Maintenance cancelled: a $& b $' c");
+    });
+
     it("keeps the banner for another maintenance", () => {
         send("maintenance.scheduled", { startsAt: iso(HOUR), durationMinutes: 30, message: "m" });
         send("maintenance.cancelled", { originalStartsAt: iso(5 * HOUR), reason: "r" });
