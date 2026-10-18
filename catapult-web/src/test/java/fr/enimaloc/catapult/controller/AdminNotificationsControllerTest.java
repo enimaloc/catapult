@@ -65,17 +65,20 @@ class AdminNotificationsControllerTest {
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminCreateNotification(any())).thenReturn(400);
         when(apiService.adminDeleteNotification(ID)).thenReturn(502);
-        when(apiService.adminPreviewNotification(any())).thenReturn(null);
+        when(apiService.adminPreviewNotification("x")).thenReturn(new ApiClient.Result<>(502, null));
+        // an older catapult-api without the route: its 404, not a 502 reported as a server error
+        when(apiService.adminPreviewNotification("y")).thenReturn(new ApiClient.Result<>(404, null));
 
         mvc.perform(admin(post("/admin/notifications"), BODY)).andExpect(status().isBadRequest());
         mvc.perform(admin(post("/admin/notifications/" + ID + "/delete"), "{}")).andExpect(status().isBadGateway());
         mvc.perform(admin(post("/admin/notifications/preview"), "{\"body\":\"x\"}")).andExpect(status().isBadGateway());
+        mvc.perform(admin(post("/admin/notifications/preview"), "{\"body\":\"y\"}")).andExpect(status().isNotFound());
     }
 
     @Test
     void preview_answersTheRenderedHtmlAsText() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminPreviewNotification("**x**")).thenReturn("<p><strong>x</strong></p>");
+        when(apiService.adminPreviewNotification("**x**")).thenReturn(new ApiClient.Result<>(200, "<p><strong>x</strong></p>"));
 
         mvc.perform(admin(post("/admin/notifications/preview"), "{\"body\":\"**x**\"}"))
                 .andExpect(status().isOk())

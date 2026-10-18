@@ -495,10 +495,13 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public String adminPreviewNotification(String body) {
+    public ApiClient.Result<String> adminPreviewNotification(String body) {
         ApiClient.Result<NotificationPreviewDto> result = client.call(HttpMethod.POST, "/api/admin/notifications/preview",
                 new NotificationPreviewRequest(body), NotificationPreviewDto.class);
-        return result.ok() && result.body() != null ? result.body().bodyHtml() : null;
+        if (!result.ok()) return new ApiClient.Result<>(result.status(), null);
+        return result.body() != null && result.body().bodyHtml() != null
+                ? new ApiClient.Result<>(result.status(), result.body().bodyHtml())
+                : new ApiClient.Result<>(502, null);
     }
 
     @Override

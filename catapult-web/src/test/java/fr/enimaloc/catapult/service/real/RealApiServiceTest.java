@@ -667,14 +667,24 @@ class RealApiServiceTest {
         expect(HttpMethod.POST, "/api/admin/notifications/preview").andExpect(content().json("{\"body\":\"**a**\"}"))
                 .andRespond(withSuccess("{\"bodyHtml\":\"<p><strong>a</strong></p>\"}", MediaType.APPLICATION_JSON));
 
-        assertThat(service.adminPreviewNotification("**a**")).isEqualTo("<p><strong>a</strong></p>");
+        assertThat(service.adminPreviewNotification("**a**"))
+                .isEqualTo(new ApiClient.Result<>(200, "<p><strong>a</strong></p>"));
     }
 
     @Test
-    void adminPreviewNotification_isNullWhenRefused() {
+    void adminPreviewNotification_keepsTheRefusalsStatus() {
         expect(HttpMethod.POST, "/api/admin/notifications/preview").andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.POST, "/api/admin/notifications/preview").andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        assertThat(service.adminPreviewNotification("")).isNull();
+        assertThat(service.adminPreviewNotification("")).isEqualTo(new ApiClient.Result<>(400, null));
+        assertThat(service.adminPreviewNotification("x")).isEqualTo(new ApiClient.Result<>(404, null));
+    }
+
+    @Test
+    void adminPreviewNotification_isBadGatewayWithoutHtml() {
+        expect(HttpMethod.POST, "/api/admin/notifications/preview").andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.adminPreviewNotification("x")).isEqualTo(new ApiClient.Result<>(502, null));
     }
 
     @Test
