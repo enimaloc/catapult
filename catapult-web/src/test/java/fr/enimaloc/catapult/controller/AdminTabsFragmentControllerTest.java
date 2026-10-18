@@ -50,7 +50,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1")) {
+                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
         }
@@ -65,6 +65,8 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminWellKnownFiles();
         verify(apiService, never()).adminIanaRegistry();
         verify(apiService, never()).adminWellKnownFile(org.mockito.ArgumentMatchers.anyLong());
+        verify(apiService, never()).adminNotifications(org.mockito.ArgumentMatchers.anyInt());
+        verify(apiService, never()).adminMembers();
     }
 
     @Test
@@ -395,5 +397,47 @@ class AdminTabsFragmentControllerTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().json("{\"type\":\"object\"}"));
         mvc.perform(get("/spa/admin/well-known/schema?path=none").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isNotFound());
+    }
+
+    private static fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto notification(
+            String audience, String login, String body) {
+        return new fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto(
+                java.util.UUID.fromString("00000000-0000-0000-0000-000000000042"), "Maintenance <b>", body, "<p>x</p>",
+                fr.enimaloc.catapult.common.dto.notification.Severity.WARNING, null, null, null,
+                java.time.Instant.parse("2025-03-01T12:00:00Z"), audience, null, login);
+    }
+
+    @Test
+    void notifications_rendersTheListTheDialogAndTheMembers() throws Exception {
+        when(apiService.adminNotifications(2)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminPage<>(
+                List.of(notification("BROADCAST", null, "y".repeat(200)), notification("TARGETED", "alice", "short")), 2, 3, 41));
+        when(apiService.adminMembers()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMembersPage(
+                List.of(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
+                        java.util.UUID.fromString("00000000-0000-0000-0000-000000000007"), "1", "bob", null, null, false, false,
+                        "ACTIVE", null)), java.util.Map.of(), false));
+
+        String html = asAdmin("/spa/admin/notifications?page=2");
+
+        assertThat(html).contains("admin-notifications", "id=\"admin-notifications-new\"", "data-delete=\"00000000-0000-0000-0000-000000000042\"",
+                        "Maintenance &lt;b&gt;", "Everyone", "alice", "id=\"admin-notifications-dialog\"", "maxlength=\"255\"",
+                        "maxlength=\"64\"", "maxlength=\"512\"", "data-member-id=\"00000000-0000-0000-0000-000000000007\"", "bob",
+                        "data-admin-results", "data-admin-page=\"1\"", "data-label-cta-pair=\"", "data-label-invalid=\"",
+                        "data-label-unavailable=\"", "notification-preview")
+                .contains("y".repeat(120)).doesNotContain("y".repeat(121));
+    }
+
+    @Test
+    void notifications_saysSoWhenTheApiIsUnavailable_andToleratesNoMembers() throws Exception {
+        when(apiService.adminNotifications(0)).thenReturn(null);
+        when(apiService.adminMembers()).thenReturn(null);
+
+        assertThat(asAdmin("/spa/admin/notifications")).contains("admin-placeholder", "id=\"admin-notifications-new\"")
+                .doesNotContain("data-delete");
+    }
+
+    @Test
+    void notifications_saysWhenThereAreNone() throws Exception {
+        when(apiService.adminNotifications(0)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminPage<>(List.of(), 0, 0, 0));
+        assertThat(asAdmin("/spa/admin/notifications")).contains("No notification yet");
     }
 }
