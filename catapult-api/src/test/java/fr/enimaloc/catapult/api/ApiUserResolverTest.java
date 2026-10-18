@@ -65,6 +65,13 @@ class ApiUserResolverTest {
     }
 
     @Test
+    void noTokenIsUnauthorized() {
+        assertStatus(() -> resolver.viewer(null), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> resolver.viewerByTwitchId(null), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> resolver.ownChannel("streamer", null), HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     void channel_unknownIsNotFound() {
         assertStatus(() -> resolver.channel("nope"), HttpStatus.NOT_FOUND);
     }

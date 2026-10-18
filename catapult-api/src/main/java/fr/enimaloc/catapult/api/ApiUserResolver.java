@@ -24,14 +24,25 @@ public class ApiUserResolver {
 
     /** The caller, by the JWT's subject (their account id). */
     public UserAccount viewer(Jwt jwt) {
-        return userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
+        return userAccountRepository.findById(UUID.fromString(token(jwt).getSubject()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     /** The caller, by the JWT's {@code twitchId} claim. */
     public UserAccount viewerByTwitchId(Jwt jwt) {
-        return userAccountRepository.findByTwitchId(jwt.getClaimAsString("twitchId"))
+        return userAccountRepository.findByTwitchId(token(jwt).getClaimAsString("twitchId"))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+    }
+
+    /**
+     * {@code jwt}, or 401 when the request carries none — the chain lets token-less requests
+     * through in dev and from localhost, so a missing token reaches the controllers.
+     */
+    private static Jwt token(Jwt jwt) {
+        if (jwt == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        return jwt;
     }
 
     /** The channel named {@code username}. */
