@@ -466,7 +466,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public AdminPage<NotificationDto> notifications(int page) {
-        return client.get("/api/notifications?page={page}&size=20&sort=createdAt,desc", NOTIFICATIONS, page);
+        return client.get("/api/notifications?page={page}&size=20", NOTIFICATIONS, page);
     }
 
     @Override
