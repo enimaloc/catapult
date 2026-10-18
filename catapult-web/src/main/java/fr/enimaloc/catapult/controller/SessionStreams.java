@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,11 +18,16 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  * An endless stream holds a connection and its state on the server: unbounded, any visitor could
  * open them until it runs out.
  * <p>
+ * A stream closed for a newer one is sent {@value #EVICTED} first, so that its page does not
+ * reconnect at once and close the next oldest in turn (live.js waits until its tab is shown again).
+ * <p>
  * Its streams, the newer ones closing older and those turned away, show in {@link InteractionMetrics}
  * under the stream's name.
  */
 final class SessionStreams {
     static final int MAX_PER_SESSION = 8;
+    /** The event a stream closed for a newer one gets before it closes. */
+    static final String EVICTED = "Evicted";
 
     private final Map<String, Deque<SseEmitter>> bySession = new ConcurrentHashMap<>();
     private final String stream;
@@ -50,10 +56,20 @@ final class SessionStreams {
         while (streams.size() > MAX_PER_SESSION) {
             SseEmitter oldest = streams.pollFirst();
             if (oldest != null) {
-                oldest.complete();
+                evict(oldest);
                 metrics.streamEvicted(stream);
             }
         }
+    }
+
+    /** Tells {@code emitter} it is closed for a newer stream ({@value #EVICTED}), then closes it. */
+    static void evict(SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event().name(EVICTED).data(Map.of()));
+        } catch (IOException | IllegalStateException e) {
+            // gone already: closing it is all that is left
+        }
+        emitter.complete();
     }
 
     /** A stream turned away: {@code unauthenticated} (logged out) or {@code forbidden}. */

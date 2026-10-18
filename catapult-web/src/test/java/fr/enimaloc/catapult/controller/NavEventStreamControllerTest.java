@@ -310,8 +310,10 @@ class NavEventStreamControllerTest {
         controller.onBroadcast(new BroadcastStreamEvent("alert.info", Map.of("title", "t")));
 
         assertThat(oldest.getAsyncResult(1000)).isNull();
+        assertThat(sent(oldest)).endsWith("event:Evicted\ndata:{}\n\n"); // told why, so it does not reconnect at once
         assertThat(sent(oldest)).doesNotContain("alert.info");
         assertThat(sent(newest)).contains("alert.info");
+        assertThat(sent(newest)).doesNotContain("Evicted");
     }
 
     @Test
@@ -338,6 +340,7 @@ class NavEventStreamControllerTest {
         controller.onChannelLive(new ChannelLiveStateEvent("enimaloc", true));
 
         assertThat(oldest.getAsyncResult(1000)).isNull(); // completed
+        assertThat(sent(oldest)).endsWith("event:Evicted\ndata:{}\n\n");
         assertThat(oldest.getResponse().getContentAsString()).doesNotContain("NavChannelLive");
         assertThat(newest.getResponse().getContentAsString()).contains("NavChannelLive");
     }
