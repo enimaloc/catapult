@@ -1,0 +1,83 @@
+<!--/*@thymesVar id="notifications" type="fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto>"*/-->
+<!--/*@thymesVar id="members" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.AdminMemberDto>"*/-->
+<!--/*
+  The notifications sent, newest first (the page swaps through the tab's sub-view pagination), and the
+  dialog creating one: Markdown body with a preview rendered by catapult-api, severity, an optional
+  call to action and expiry, everyone or one member picked from the members listed. Driven by
+  admin-notifications.js, which checks the fields as catapult-api does before posting.
+*/-->
+<div th:fragment="content" class="admin-view admin-notifications"
+     th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+              data-label-invalid=#{admin.notifications.invalid},data-label-cta-pair=#{admin.notifications.cta-pair},
+              data-label-past-expiry=#{admin.notifications.past-expiry},data-label-member-required=#{admin.notifications.member-required},
+              data-label-unavailable=#{admin.notifications.unavailable},data-label-created=#{admin.notifications.created}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.notifications}">Notifications</h2>
+        <mdui-button id="admin-notifications-new" variant="tonal" icon="add" th:text="#{admin.notifications.new}">New</mdui-button>
+    </div>
+
+    <div data-admin-results>
+        <th:block th:if="${notifications == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+        <th:block th:if="${notifications != null and notifications.content().isEmpty()}">
+            <th:block th:replace="~{pages/admin-tab/common :: empty('notifications_off', #{admin.notifications.empty})}"></th:block>
+        </th:block>
+
+        <mdui-card class="admin-table" variant="outlined" th:if="${notifications != null and !notifications.content().isEmpty()}">
+            <div class="admin-row admin-notification-row" th:each="n : ${notifications.content()}" th:attr="data-id=${n.id()}">
+                <mdui-icon class="admin-notification-severity" th:attr="data-severity=${n.severity()},
+                           name=${n.severity().name() == 'ERROR' ? 'error' : (n.severity().name() == 'WARNING' ? 'warning' : 'info')},
+                           title=#{${'notifications.severity.' + #strings.toLowerCase(n.severity().name())}}"></mdui-icon>
+                <div class="admin-notification-text">
+                    <strong th:text="${n.title()}">title</strong>
+                    <div class="admin-cell-muted admin-notification-excerpt"
+                         th:text="${#strings.length(n.body()) > 120 ? #strings.substring(n.body(), 0, 120) + '…' : n.body()}">body</div>
+                </div>
+                <span class="admin-notification-audience" th:text="${n.audience() == 'TARGETED' ? n.targetLogin() : #messages.msg('admin.notifications.everyone')}">audience</span>
+                <span class="admin-member-id" th:text="${#temporals.format(n.createdAt(), #messages.msg('format.date'))}">created</span>
+                <span class="admin-member-id" th:text="${n.expiresAt() == null ? #messages.msg('admin.notifications.expires-never') : #temporals.format(n.expiresAt(), #messages.msg('format.date'))}">expiry</span>
+                <mdui-button-icon icon="delete" class="admin-notification-delete" th:attr="data-delete=${n.id()},aria-label=#{admin.notifications.delete},
+                                  data-confirm=#{admin.notifications.delete-confirm(${n.title()})}"></mdui-button-icon>
+            </div>
+        </mdui-card>
+
+        <th:block th:if="${notifications != null}"><th:block th:replace="~{pages/admin-tab/common :: pagination(${notifications})}"></th:block></th:block>
+    </div>
+
+    <mdui-dialog id="admin-notifications-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-notifications-form">
+            <h3 th:text="#{admin.notifications.new}">New notification</h3>
+            <mdui-text-field name="title" variant="outlined" required maxlength="255" th:attr="label=#{admin.notifications.title}"></mdui-text-field>
+            <mdui-segmented-button-group name="mode" selects="single" value="edit" full-width>
+                <mdui-segmented-button value="edit" th:text="#{admin.notifications.edit}">Edit</mdui-segmented-button>
+                <mdui-segmented-button value="preview" th:text="#{admin.notifications.preview}">Preview</mdui-segmented-button>
+            </mdui-segmented-button-group>
+            <mdui-text-field name="body" variant="outlined" required rows="5" autosize th:attr="label=#{admin.notifications.body}"></mdui-text-field>
+            <div class="notification-preview" hidden></div>
+            <mdui-select name="severity" variant="outlined" value="INFO" th:attr="label=#{admin.notifications.severity}">
+                <mdui-menu-item value="INFO" th:text="#{notifications.severity.info}">Information</mdui-menu-item>
+                <mdui-menu-item value="WARNING" th:text="#{notifications.severity.warning}">Warning</mdui-menu-item>
+                <mdui-menu-item value="ERROR" th:text="#{notifications.severity.error}">Error</mdui-menu-item>
+            </mdui-select>
+            <mdui-text-field name="ctaLabel" variant="outlined" maxlength="64" th:attr="label=#{admin.notifications.cta-label}"></mdui-text-field>
+            <mdui-text-field name="ctaUrl" type="url" variant="outlined" maxlength="512" th:attr="label=#{admin.notifications.cta-url}"></mdui-text-field>
+            <mdui-text-field name="expiresAt" type="datetime-local" variant="outlined" th:attr="label=#{admin.notifications.expires}"></mdui-text-field>
+            <mdui-radio-group name="audience" value="ALL">
+                <mdui-radio value="ALL" th:text="#{admin.notifications.everyone}">All members</mdui-radio>
+                <mdui-radio value="ONE" th:text="#{admin.notifications.one-member}">One member</mdui-radio>
+            </mdui-radio-group>
+            <div class="admin-notifications-member" hidden>
+                <mdui-text-field name="memberSearch" variant="outlined" clearable icon="search" th:attr="label=#{admin.notifications.member}"></mdui-text-field>
+                <div class="admin-notifications-members">
+                    <mdui-list-item class="admin-notifications-member-option" th:each="m : ${members}" hidden
+                                    th:if="${m.twitchUsername() != null}"
+                                    th:attr="data-member-id=${m.id()},data-login=${m.twitchUsername()},data-search=${#strings.toLowerCase(m.twitchUsername())}"
+                                    th:text="${m.twitchUsername()}">login</mdui-list-item>
+                </div>
+            </div>
+            <div class="admin-data-actions">
+                <mdui-button variant="text" class="admin-dialog-close" th:text="#{admin.notifications.cancel}">Cancel</mdui-button>
+                <mdui-button variant="filled" class="admin-notifications-save" th:text="#{admin.notifications.save}">Send</mdui-button>
+            </div>
+        </div>
+    </mdui-dialog>
+</div>

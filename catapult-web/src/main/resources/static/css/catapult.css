@@ -1824,6 +1824,22 @@ mdui-select::part(menu) {
     .admin-well-known-header [data-header=value] { grid-column: 1 / -1; grid-row: 2; }
 }
 
+/* The admin Notifications tab. */
+.admin-notification-row { grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr) auto auto auto; }
+.admin-notification-severity { color: var(--catapult-text-secondary); }
+.admin-notification-severity[data-severity="WARNING"] { color: rgb(var(--mdui-color-tertiary)); }
+.admin-notification-severity[data-severity="ERROR"] { color: rgb(var(--mdui-color-error)); }
+.admin-notification-text { min-width: 0; overflow-wrap: anywhere; }
+.admin-notification-excerpt { font-size: 0.85em; }
+.admin-notifications-form { display: flex; flex-direction: column; gap: 12px; min-width: min(640px, 100%); }
+.admin-notifications-form .notification-preview { padding: 12px; border: 1px solid rgb(var(--mdui-color-outline-variant)); border-radius: 12px; overflow-wrap: anywhere; }
+.admin-notifications-form [hidden] { display: none; }
+.admin-notifications-member { display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 600px) {
+    .admin-notification-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .admin-notification-row > .admin-notification-audience, .admin-notification-row > .admin-member-id { grid-column: 2 / -1; }
+}
+
 /* Broadcasts shown to every visitor (broadcasts.js). */
 .broadcast-banner { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: rgb(var(--mdui-color-surface-container-high)); color: rgb(var(--mdui-color-on-surface)); }
 .broadcast-banner[hidden], .broadcast-veil[hidden] { display: none; }

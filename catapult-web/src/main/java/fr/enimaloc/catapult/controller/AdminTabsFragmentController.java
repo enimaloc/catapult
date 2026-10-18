@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
@@ -172,6 +173,16 @@ public class AdminTabsFragmentController {
         if (refused != 0) return ResponseEntity.status(refused).build();
         String schema = apiService.adminWellKnownSchema(path);
         return schema == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(schema);
+    }
+
+    @GetMapping("/notifications")
+    String notifications(Model model, HttpServletResponse response, @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            AdminMembersPage members = apiService.adminMembers();
+            model.addAttribute("notifications", apiService.adminNotifications(page));
+            model.addAttribute("members", members == null ? null : members.members());
+            return "pages/admin-tab/notifications :: content";
+        });
     }
 
     /** {@code view}'s fragment for an admin; the 401 / 403 error fragment for anyone else. */
