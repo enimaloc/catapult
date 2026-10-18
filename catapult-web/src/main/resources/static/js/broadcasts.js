@@ -83,6 +83,8 @@ window.CatapultBroadcasts = (function () {
     function showSnackbar(text, { action, onAction, ttlSeconds, warning } = {}) {
         const snackbar = document.createElement("mdui-snackbar");
         snackbar.textContent = text;
+        // Always closeable by hand: one that never closes by itself (a ttl of 0) would stay for good.
+        snackbar.setAttribute("closeable", "");
         if (warning) snackbar.classList.add("broadcast-warning");
         if (Number.isFinite(ttlSeconds)) snackbar.setAttribute("auto-close-delay", String(Math.max(ttlSeconds, 0) * 1000));
         if (action) {
