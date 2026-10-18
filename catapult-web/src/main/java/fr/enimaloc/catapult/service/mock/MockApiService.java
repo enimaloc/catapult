@@ -64,6 +64,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -95,8 +96,13 @@ public class MockApiService implements ApiService {
     /** Application-wide, like the well-known files: a notification sent in one session reaches the others. */
     private MockNotificationStore notifications;
 
+    private boolean isMockMember(UUID id) {
+        MockData current = currentData();
+        return current != null && current.getMembers().page().members().stream().anyMatch(m -> id.equals(m.id()));
+    }
+
     private synchronized MockNotificationStore notifications() {
-        if (notifications == null) notifications = new MockNotificationStore(eventPublisher);
+        if (notifications == null) notifications = new MockNotificationStore(eventPublisher, Clock.systemUTC(), this::isMockMember);
         return notifications;
     }
 

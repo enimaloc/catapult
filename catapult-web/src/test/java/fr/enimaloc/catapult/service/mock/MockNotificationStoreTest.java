@@ -7,7 +7,11 @@ import fr.enimaloc.catapult.event.notification.BroadcastStreamEvent;
 import fr.enimaloc.catapult.event.notification.NotificationStreamEvent;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +22,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class MockNotificationStoreTest {
     private final List<Object> events = new ArrayList<>();
-    private final MockNotificationStore store = new MockNotificationStore(events::add);
+    private final MutableClock clock = new MutableClock(Instant.parse("2026-10-18T10:00:00Z"));
+    private final UUID member = UUID.randomUUID();
+    private final MockNotificationStore store = new MockNotificationStore(events::add, clock,
+            id -> id.equals(this.member) || id.equals(this.a) || id.equals(this.b));
+
+    /** A clock the test moves by hand. */
+    private static final class MutableClock extends Clock {
+        private Instant now;
+
+        MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration d) {
+            now = now.plus(d);
+        }
+
+        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(ZoneId zone) { return this; }
+        @Override public Instant instant() { return now; }
+    }
     private final UUID a = UUID.randomUUID();
     private final UUID b = UUID.randomUUID();
 
@@ -146,7 +170,7 @@ class MockNotificationStoreTest {
 
     @Test
     void validationMirrorsTheApi_andPublishesNothing() {
-        Instant future = Instant.now().plus(1, ChronoUnit.DAYS);
+        Instant future = clock.instant().plus(1, ChronoUnit.DAYS);
         assertThat(store.create("", "b", Severity.INFO, null, null, null, null)).isEqualTo(400);
         assertThat(store.create("t".repeat(256), "b", Severity.INFO, null, null, null, null)).isEqualTo(400);
         assertThat(store.create("t", " ", Severity.INFO, null, null, null, null)).isEqualTo(400);
@@ -156,7 +180,7 @@ class MockNotificationStoreTest {
         assertThat(store.create("t", "b", Severity.INFO, "ftp://x.test", "Go", null, null)).isEqualTo(400);
         assertThat(store.create("t", "b", Severity.INFO, "https://x.test/" + "a".repeat(500), "Go", null, null)).isEqualTo(400);
         assertThat(store.create("t", "b", Severity.INFO, "https://x.test", "l".repeat(65), null, null)).isEqualTo(400);
-        assertThat(store.create("t", "b", Severity.INFO, null, null, Instant.now().minusSeconds(5), null)).isEqualTo(400);
+        assertThat(store.create("t", "b", Severity.INFO, null, null, clock.instant().minusSeconds(5), null)).isEqualTo(400);
         assertThat(events).isEmpty();
         assertThat(store.adminPage(0).content()).isEmpty();
 
@@ -168,11 +192,36 @@ class MockNotificationStoreTest {
     }
 
     @Test
-    void expiredNotificationsAreNotListed() throws Exception {
-        store.create("t", "b", Severity.INFO, null, null, Instant.now().plusMillis(30), a);
-        Thread.sleep(60);
+    void expiredNotificationsAreNotListed() {
+        assertThat(store.create("t", "b", Severity.INFO, null, null, clock.instant().plusSeconds(60), a)).isEqualTo(201);
+        assertThat(store.snapshot(a).items()).extracting(NotificationDto::title).contains("t");
+
+        clock.advance(Duration.ofSeconds(61));
 
         assertThat(store.snapshot(a).items()).extracting(NotificationDto::title).containsExactly("Bienvenue sur Catapult");
+        assertThat(store.snapshot(a).unreadCount()).isEqualTo(1);
+    }
+
+    @Test
+    void anUnknownTargetIsRefused_aKnownOneIsNot() {
+        assertThat(send(UUID.randomUUID())).isEqualTo(400);
+        assertThat(events).isEmpty();
+        assertThat(store.adminPage(0).content()).isEmpty();
+
+        assertThat(send(member)).isEqualTo(201);
+        store.snapshot(b);
+        assertThat(send(b)).isEqualTo(201);
+    }
+
+    @Test
+    void blankCtaFieldsBecomeNull_andANegativePageIsTheFirst() {
+        assertThat(store.create("t", "b", Severity.INFO, " ", "", null, a)).isEqualTo(201);
+
+        var created = store.snapshot(a).items().get(0);
+        assertThat(created.ctaUrl()).isNull();
+        assertThat(created.ctaLabel()).isNull();
+        assertThat(store.page(a, -3).number()).isZero();
+        assertThat(store.page(a, -3).content()).hasSize(2);
     }
 
     @Test
