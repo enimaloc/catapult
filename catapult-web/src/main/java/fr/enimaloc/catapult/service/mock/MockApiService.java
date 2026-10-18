@@ -3,7 +3,12 @@ package fr.enimaloc.catapult.service.mock;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
@@ -87,6 +92,13 @@ public class MockApiService implements ApiService {
      */
     private final Map<String, MockData> data = new ConcurrentHashMap<>();
     private final MockWellKnownStore wellKnown = new MockWellKnownStore();
+    /** Application-wide, like the well-known files: a notification sent in one session reaches the others. */
+    private MockNotificationStore notifications;
+
+    private synchronized MockNotificationStore notifications() {
+        if (notifications == null) notifications = new MockNotificationStore(eventPublisher);
+        return notifications;
+    }
 
     /**
      * Resolves the calling session's data the same way {@link ApiClient} resolves its JWT.
@@ -529,6 +541,68 @@ public class MockApiService implements ApiService {
     public int adminDeleteWellKnownFile(long id) {
         log.trace("adminDeleteWellKnownFile({})", id);
         return wellKnown.delete(id);
+    }
+
+    @Override
+    public NotificationSnapshotDto notificationSnapshot() {
+        log.trace("notificationSnapshot()");
+        UUID account = currentUserId();
+        return account == null ? null : notifications().snapshot(account);
+    }
+
+    @Override
+    public AdminPage<NotificationDto> notifications(int page) {
+        log.trace("notifications({})", page);
+        UUID account = currentUserId();
+        return account == null ? null : notifications().page(account, page);
+    }
+
+    @Override
+    public int markNotificationRead(UUID id) {
+        log.trace("markNotificationRead({})", id);
+        UUID account = currentUserId();
+        return account == null ? 401 : notifications().markRead(account, id);
+    }
+
+    @Override
+    public int markAllNotificationsRead() {
+        log.trace("markAllNotificationsRead()");
+        UUID account = currentUserId();
+        return account == null ? 401 : notifications().markAllRead(account);
+    }
+
+    @Override
+    public AdminPage<AdminNotificationDto> adminNotifications(int page) {
+        log.trace("adminNotifications({})", page);
+        return notifications().adminPage(page);
+    }
+
+    @Override
+    public int adminCreateNotification(AdminNotificationCreateBody body) {
+        log.trace("adminCreateNotification({})", body);
+        UUID creator = currentUserId();
+        // The creator's bell exists before an "everyone" notification goes out, so it reaches them too.
+        if (creator != null) notifications().snapshot(creator);
+        return notifications().create(body.title(), body.body(), body.severity(), body.ctaUrl(), body.ctaLabel(),
+                body.expiresAt(), body.targetUserId());
+    }
+
+    @Override
+    public int adminDeleteNotification(UUID id) {
+        log.trace("adminDeleteNotification({})", id);
+        return notifications().delete(id);
+    }
+
+    @Override
+    public String adminPreviewNotification(String body) {
+        log.trace("adminPreviewNotification()");
+        return body == null || body.isBlank() ? null : notifications().preview(body);
+    }
+
+    @Override
+    public int adminBroadcast(BroadcastRequestDto body) {
+        log.trace("adminBroadcast({})", body);
+        return notifications().broadcast(body);
     }
 
     @Override

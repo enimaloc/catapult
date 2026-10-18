@@ -3,7 +3,14 @@ package fr.enimaloc.catapult.service.real;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationPreviewDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationPreviewRequest;
+import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
@@ -67,6 +74,8 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<List<WellKnownFileDto>> WELL_KNOWN_FILES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<Map<String, Object>>> DATA_ROWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<Map<String, Object>> DATA_ROW = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<NotificationDto>> NOTIFICATIONS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<AdminNotificationDto>> ADMIN_NOTIFICATIONS = new ParameterizedTypeReference<>() {};
 
     private final ApiClient client;
 
@@ -448,5 +457,52 @@ public class RealApiService implements ApiService {
         if (result.ok()) return List.of();
         if (result.body() != null) return List.of(result.body());
         return List.of(new TwitchatValidationError(-1, "", "HTTP " + result.status()));
+    }
+
+    @Override
+    public NotificationSnapshotDto notificationSnapshot() {
+        return client.get("/api/notifications/snapshot", NotificationSnapshotDto.class);
+    }
+
+    @Override
+    public AdminPage<NotificationDto> notifications(int page) {
+        return client.get("/api/notifications?page={page}&size=20&sort=createdAt,desc", NOTIFICATIONS, page);
+    }
+
+    @Override
+    public int markNotificationRead(UUID id) {
+        return client.call(HttpMethod.POST, "/api/notifications/{id}/read", null, Void.class, id).status();
+    }
+
+    @Override
+    public int markAllNotificationsRead() {
+        return client.call(HttpMethod.POST, "/api/notifications/read-all", null, Void.class).status();
+    }
+
+    @Override
+    public AdminPage<AdminNotificationDto> adminNotifications(int page) {
+        return client.get("/api/admin/notifications?page={page}&size=20", ADMIN_NOTIFICATIONS, page);
+    }
+
+    @Override
+    public int adminCreateNotification(AdminNotificationCreateBody body) {
+        return client.call(HttpMethod.POST, "/api/admin/notifications", body, Void.class).status();
+    }
+
+    @Override
+    public int adminDeleteNotification(UUID id) {
+        return client.call(HttpMethod.DELETE, "/api/admin/notifications/{id}", null, Void.class, id).status();
+    }
+
+    @Override
+    public String adminPreviewNotification(String body) {
+        ApiClient.Result<NotificationPreviewDto> result = client.call(HttpMethod.POST, "/api/admin/notifications/preview",
+                new NotificationPreviewRequest(body), NotificationPreviewDto.class);
+        return result.ok() && result.body() != null ? result.body().bodyHtml() : null;
+    }
+
+    @Override
+    public int adminBroadcast(BroadcastRequestDto body) {
+        return client.call(HttpMethod.POST, "/api/admin/broadcast", body, Void.class).status();
     }
 }

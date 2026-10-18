@@ -5,7 +5,14 @@ import java.util.Map;
 import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationPreviewDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationPreviewRequest;
+import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
@@ -141,4 +148,25 @@ public interface ApiService {
     int adminUpdateWellKnownFile(long id, WellKnownFileRequest request);
     /** catapult-api's status (204; 404), 502 when unreachable. */
     int adminDeleteWellKnownFile(long id);
+
+    // --- notifications and broadcasts ---
+
+    /** The bell's content: the newest notifications and the unread count; null when catapult-api fails. */
+    NotificationSnapshotDto notificationSnapshot();
+    /** One page (20, newest first) of the logged-in user's notifications; null when catapult-api fails. */
+    AdminPage<NotificationDto> notifications(int page);
+    /** catapult-api's status (204; 404), 502 when unreachable. */
+    int markNotificationRead(java.util.UUID id);
+    /** catapult-api's status (204), 502 when unreachable. */
+    int markAllNotificationsRead();
+    /** One page (20, newest first) of every notification sent; null when catapult-api fails. */
+    AdminPage<AdminNotificationDto> adminNotifications(int page);
+    /** catapult-api's status (201; 400 invalid), 502 when unreachable. */
+    int adminCreateNotification(AdminNotificationCreateBody body);
+    /** catapult-api's status (204; 404), 502 when unreachable. */
+    int adminDeleteNotification(java.util.UUID id);
+    /** The sanitized HTML catapult-api renders for a Markdown body; null when refused or unreachable. */
+    String adminPreviewNotification(String body);
+    /** catapult-api's status (202; 400 invalid; 429 rate-limited), 502 when unreachable. */
+    int adminBroadcast(BroadcastRequestDto body);
 }
