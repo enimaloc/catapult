@@ -603,9 +603,11 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public String adminPreviewNotification(String body) {
+    public ApiClient.Result<String> adminPreviewNotification(String body) {
         log.trace("adminPreviewNotification()");
-        return body == null || body.isBlank() ? null : notifications().preview(body);
+        return body == null || body.isBlank()
+                ? new ApiClient.Result<>(400, null)
+                : new ApiClient.Result<>(200, notifications().preview(body));
     }
 
     @Override

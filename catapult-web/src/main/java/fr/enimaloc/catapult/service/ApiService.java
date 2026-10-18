@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
@@ -164,8 +165,11 @@ public interface ApiService {
     int adminCreateNotification(AdminNotificationCreateBody body);
     /** catapult-api's status (204; 404), 502 when unreachable. */
     int adminDeleteNotification(UUID id);
-    /** The sanitized HTML catapult-api renders for a Markdown body; null when refused or unreachable. */
-    String adminPreviewNotification(String body);
+    /**
+     * The sanitized HTML catapult-api renders for a Markdown body, with its status (200; 400 empty
+     * body; 404 an older catapult-api without the route), 502 when unreachable or answered without HTML.
+     */
+    ApiClient.Result<String> adminPreviewNotification(String body);
     /** catapult-api's status (202; 400 invalid; 429 rate-limited), 502 when unreachable. */
     int adminBroadcast(BroadcastRequestDto body);
 }

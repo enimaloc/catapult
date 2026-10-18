@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -40,9 +41,9 @@ public class AdminNotificationsController {
     @PostMapping("/preview")
     public ResponseEntity<String> preview(@RequestBody Map<String, String> request) {
         AdminAccess.require(filler);
-        String html = apiService.adminPreviewNotification(request.get("body"));
-        if (html == null) return ResponseEntity.status(502).build();
-        return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html);
+        ApiClient.Result<String> result = apiService.adminPreviewNotification(request.get("body"));
+        if (!result.ok()) return ResponseEntity.status(result.status()).build();
+        return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(result.body());
     }
 
     private ResponseEntity<Void> relay(IntSupplier action) {
