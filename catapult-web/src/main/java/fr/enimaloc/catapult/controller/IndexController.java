@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -53,6 +54,22 @@ public class IndexController {
             filler.admin(model);
         }
         filler.fill(model, "admin", locale);
+        return "index";
+    }
+
+    /** The member's notification history; a visitor who is logged out gets the 401 error page in its place. */
+    @GetMapping("/notifications")
+    String notifications(Model model, @RequestParam(defaultValue = "0") int page, Locale locale,
+                         HttpServletResponse response) throws IOException {
+        boolean refused = !ApiClient.hasSession();
+        model.addAttribute("error", refused);
+        if (refused) {
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            filler.error(model, HttpStatus.UNAUTHORIZED.value());
+        } else {
+            filler.notifications(model, Math.max(page, 0));
+        }
+        filler.fill(model, "notifications", locale);
         return "index";
     }
 

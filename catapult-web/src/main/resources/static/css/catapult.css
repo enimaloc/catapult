@@ -190,6 +190,17 @@ mdui-top-app-bar {
     padding: 4px 8px;
 }
 
+/* The /notifications page: the same items as the menu, in a card-like list. */
+#notifications-page {
+    background: var(--mdui-color-surface-container);
+    border-radius: var(--mdui-shape-corner-medium);
+    overflow: hidden;
+}
+
+#notifications-page .notification-item + .notification-item {
+    border-top: 1px solid var(--mdui-color-outline-variant);
+}
+
 .nav-admin {
     margin-right: 8px;
     padding-left: 8px;

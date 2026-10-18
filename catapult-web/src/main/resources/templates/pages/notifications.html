@@ -1,0 +1,36 @@
+<!--/*@thymesVar id="notifications" type="fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.notification.NotificationDto>"*/-->
+<!--/* The member's notification history, 20 a page, newest first. Items are the bell's (fragments/notifications :: item) and notifications.js drives both; data-page tells it whether live notifications belong on top of this page. */-->
+<mdui-layout-main th:fragment="notifications">
+    <section class="section channel-section">
+        <div class="section-header channel-header">
+            <div>
+                <span class="eyebrow" th:text="#{notifications.page.eyebrow}">notifications.page.eyebrow</span>
+                <h1 th:text="#{notifications.page.title}">notifications.page.title</h1>
+            </div>
+            <mdui-button th:if="${notifications != null}" variant="tonal" icon="done_all" data-notifications-read-all
+                         th:text="#{notifications.mark_all_read}">notifications.mark_all_read</mdui-button>
+        </div>
+
+        <mdui-card th:if="${notifications == null}" id="notifications-page-unavailable" class="settings-card admin-placeholder" variant="outlined">
+            <mdui-icon name="error_outline"></mdui-icon>
+            <span th:text="#{notifications.unavailable}">notifications.unavailable</span>
+        </mdui-card>
+
+        <th:block th:if="${notifications != null}">
+            <!--/* The dropdown's template lives in the bell's menu fragment, which a logged-in page always has: notifications.js builds live items from it. */-->
+            <div id="notifications-page" class="notification-list" th:attr="data-page=${notifications.number()}">
+                <th:block th:each="n : ${notifications.content()}"><th:block th:replace="~{fragments/notifications :: item(${n})}"></th:block></th:block>
+                <p class="notification-empty" th:hidden="${!#lists.isEmpty(notifications.content())}"
+                   th:text="#{notifications.empty}">notifications.empty</p>
+            </div>
+
+            <div class="admin-pagination" th:if="${notifications.totalPages() > 1}">
+                <mdui-button-icon icon="chevron_left" data-link th:disabled="${notifications.first()}"
+                                  th:attr="href=@{/notifications(page=${notifications.number() - 1})},aria-label=#{admin.pagination.previous}"></mdui-button-icon>
+                <span th:text="|${notifications.number() + 1} / ${notifications.totalPages()}|">1 / 1</span>
+                <mdui-button-icon icon="chevron_right" data-link th:disabled="${notifications.last()}"
+                                  th:attr="href=@{/notifications(page=${notifications.number() + 1})},aria-label=#{admin.pagination.next}"></mdui-button-icon>
+            </div>
+        </th:block>
+    </section>
+</mdui-layout-main>
