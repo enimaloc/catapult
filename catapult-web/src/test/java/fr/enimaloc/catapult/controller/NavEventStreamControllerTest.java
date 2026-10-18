@@ -22,15 +22,21 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -93,6 +99,27 @@ class NavEventStreamControllerTest {
         data.put("durationMinutes", 30);
         data.put("message", "m");
         return data;
+    }
+
+    /** The streams opened from now on, spied on so that a test can make their writes fail. */
+    private final List<SseEmitter> spied = new ArrayList<>();
+
+    private void failing() {
+        controller.emitters = timeout -> {
+            SseEmitter emitter = spy(new SseEmitter(timeout));
+            spied.add(emitter);
+            return emitter;
+        };
+    }
+
+    /** The last stream opened can no longer be written to, as once its client has gone. */
+    private void breakLastStream() throws IOException {
+        doThrow(new IOException("gone")).when(spied.getLast()).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @AfterEach
+    void restoreTheStreams() {
+        controller.emitters = SseEmitter::new;
     }
 
     @AfterEach
@@ -261,11 +288,11 @@ class NavEventStreamControllerTest {
 
     @Test
     void aVisitorStreamThatCannotBeWritten_freesItsSlot() throws Exception {
-        MvcResult visitor = anonymous("5.5.5.5");
+        failing();
+        anonymous("5.5.5.5");
         double before = anonymousOpen();
 
-        visitor.getResponse().setOutputStreamAccessAllowed(false);
-        visitor.getResponse().setWriterAccessAllowed(false);
+        breakLastStream();
         controller.onBroadcast(new BroadcastStreamEvent("alert.info", Map.of("title", "t")));
 
         assertThat(anonymousOpen()).isEqualTo(before - 1);
@@ -275,6 +302,12 @@ class NavEventStreamControllerTest {
     void theStreamAsksProxiesNotToBufferIt() throws Exception {
         assertThat(anonymous("1.2.3.10").getResponse().getHeader("X-Accel-Buffering")).isEqualTo("no");
         assertThat(memberStream(loggedIn(), UUID.randomUUID()).getResponse().getHeader("X-Accel-Buffering")).isEqualTo("no");
+    }
+
+    @Test
+    void aNewStream_getsAHeartbeatAtOnce_soThatItsHeadersGoOutAndThePageSeesItOpen() throws Exception {
+        assertThat(sent(anonymous("1.2.3.12"))).isEqualTo(":heartbeat\n\n");
+        assertThat(sent(memberStream(loggedIn(), UUID.randomUUID()))).isEqualTo(":heartbeat\n\n");
     }
 
     @Test
@@ -290,11 +323,11 @@ class NavEventStreamControllerTest {
 
     @Test
     void aVisitorStreamThatCannotTakeAHeartbeat_freesItsSlot() throws Exception {
-        MvcResult visitor = anonymous("5.5.5.6");
+        failing();
+        anonymous("5.5.5.6");
         double before = anonymousOpen();
 
-        visitor.getResponse().setOutputStreamAccessAllowed(false);
-        visitor.getResponse().setWriterAccessAllowed(false);
+        breakLastStream();
         controller.heartbeat();
 
         assertThat(anonymousOpen()).isEqualTo(before - 1);
@@ -302,11 +335,11 @@ class NavEventStreamControllerTest {
 
     @Test
     void aMemberStreamThatCannotTakeAHeartbeat_freesItsSlot() throws Exception {
-        MvcResult member = memberStream(loggedIn(), UUID.randomUUID());
+        failing();
+        memberStream(loggedIn(), UUID.randomUUID());
         double before = registry.get("catapult.web.sse.streams").tag("stream", "nav").gauge().value();
 
-        member.getResponse().setOutputStreamAccessAllowed(false);
-        member.getResponse().setWriterAccessAllowed(false);
+        breakLastStream();
         controller.heartbeat();
 
         assertThat(registry.get("catapult.web.sse.streams").tag("stream", "nav").gauge().value()).isEqualTo(before - 1);

@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.LongFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -51,7 +52,7 @@ import java.util.function.Supplier;
  * the answer is 503.
  * <p>
  * Behind nginx: the response asks it not to buffer the stream ({@code X-Accel-Buffering: no}), and
- * every open stream gets a comment every {@link #HEARTBEAT_MILLIS} ms so that an idle one is not cut
+ * every open stream gets a comment on opening and every {@link #HEARTBEAT_MILLIS} ms so that an idle one is not cut
  * by the proxy's read timeout; a stream that cannot take it is dropped as after any failed send.
  */
 @RestController
@@ -84,6 +85,8 @@ public class NavEventStreamController {
     private final AnonymousStreams anonymousStreams;
     private final ApiService apiService;
     private final BroadcastState broadcastState;
+    /** Makes the streams, by timeout; tests swap it for one whose writes can be made to fail. */
+    LongFunction<SseEmitter> emitters = SseEmitter::new;
 
     public NavEventStreamController(InteractionMetrics metrics, ApiService apiService, BroadcastState broadcastState) {
         streams = new SessionStreams("nav", metrics);
@@ -101,6 +104,9 @@ public class NavEventStreamController {
         }
         broadcastState.maintenance().ifPresent(maintenance ->
                 send(emitter, BROADCAST, new Broadcast(BroadcastState.SCHEDULED, maintenance)));
+        // Something written at once: the headers only go out with the first write, and the page
+        // only sees the stream open (live.js's onOpen, lifting the restart veil) once they do.
+        send(emitter, SseEmitter.event().comment(HEARTBEAT));
         return ResponseEntity.ok().header("X-Accel-Buffering", "no").body(emitter);
     }
 
@@ -108,7 +114,7 @@ public class NavEventStreamController {
         String sessionId = session.getId();
         UUID account = apiService.currentUserId();
         String token = tokenOf(session);
-        SseEmitter emitter = new SseEmitter(0L);
+        SseEmitter emitter = emitters.apply(0L);
         List<SseEmitter> former = new ArrayList<>();
         // Added within compute: remove() drops an emptied Nav atomically too. A session now logged in
         // again drops the streams of the former login, which must not get the new one's events.
@@ -131,7 +137,7 @@ public class NavEventStreamController {
 
     /** A visitor's stream; null when too many are open already. */
     private SseEmitter subscribeAnonymous(String ip) {
-        SseEmitter emitter = new SseEmitter(AnonymousStreams.TIMEOUT.toMillis());
+        SseEmitter emitter = emitters.apply(AnonymousStreams.TIMEOUT.toMillis());
         anonymous.put(emitter, ip);
         emitter.onCompletion(() -> removeAnonymous(ip, emitter));
         emitter.onTimeout(emitter::complete);
