@@ -1,8 +1,11 @@
 package fr.enimaloc.catapult.controller.mock;
 
+import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
@@ -15,6 +18,7 @@ import fr.enimaloc.catapult.service.mock.MockData;
 import fr.enimaloc.catapult.service.mock.MockPresets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -26,14 +30,18 @@ import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -344,5 +352,76 @@ class MockAdminControllerTest {
                 .andExpect(flash().attribute("twitchatResult", "Événement inconnu : NOPE"));
         mvc.perform(post("/mock/admin/twitchat").with(csrf()).param("event", "STREAM_STARTED"))
                 .andExpect(flash().attribute("twitchatResult", "Rien envoyé : aucun payload actif pour cet événement."));
+    }
+
+    @Test
+    void sendNotification_toTheCurrentAccount_orToEveryone() throws Exception {
+        UUID me = UUID.randomUUID();
+        when(mockApiService.currentUserId()).thenReturn(me);
+        when(mockApiService.adminCreateNotification(any())).thenReturn(201);
+
+        mvc.perform(post("/mock/admin/notification").with(csrf()).param("title", "T").param("body", "B")
+                        .param("severity", "WARNING"))
+                .andExpect(redirectedUrl("/mock/admin"))
+                .andExpect(flash().attribute("notificationResult", "Notification envoyée."));
+        mvc.perform(post("/mock/admin/notification").with(csrf()).param("title", "T2").param("body", "B2")
+                .param("severity", "INFO").param("everyone", "on"));
+
+        ArgumentCaptor<AdminNotificationCreateBody> sent = ArgumentCaptor.forClass(AdminNotificationCreateBody.class);
+        verify(mockApiService, times(2)).adminCreateNotification(sent.capture());
+        assertThat(sent.getAllValues()).containsExactly(
+                new AdminNotificationCreateBody("T", "B", Severity.WARNING, null, null, null, me),
+                new AdminNotificationCreateBody("T2", "B2", Severity.INFO, null, null, null, null));
+    }
+
+    @Test
+    void sendNotification_rejectedByTheStore_saysSo() throws Exception {
+        when(mockApiService.adminCreateNotification(any())).thenReturn(400);
+
+        mvc.perform(post("/mock/admin/notification").with(csrf()).param("title", "").param("body", "B")
+                        .param("severity", "INFO").param("everyone", "on"))
+                .andExpect(redirectedUrl("/mock/admin"))
+                .andExpect(flash().attribute("notificationResult", "Refusée (400)."));
+    }
+
+    @Test
+    void sendBroadcast_buildsEachType() throws Exception {
+        when(mockApiService.adminBroadcast(any())).thenReturn(204);
+        String at = "2030-01-01T10:00:00Z";
+
+        mvc.perform(post("/mock/admin/broadcast").with(csrf()).param("name", "maintenance.scheduled")
+                        .param("startsAt", at).param("durationMinutes", "30").param("message", "M"))
+                .andExpect(redirectedUrl("/mock/admin"))
+                .andExpect(flash().attribute("broadcastResult", "Annonce envoyée."));
+        mvc.perform(post("/mock/admin/broadcast").with(csrf()).param("name", "maintenance.cancelled")
+                .param("originalStartsAt", at).param("reason", "R"));
+        mvc.perform(post("/mock/admin/broadcast").with(csrf()).param("name", "version.deployed")
+                .param("version", "1.2").param("promptReload", "on"));
+        mvc.perform(post("/mock/admin/broadcast").with(csrf()).param("name", "alert.info")
+                .param("title", "T").param("body", "B").param("ttlSeconds", "5"));
+        mvc.perform(post("/mock/admin/broadcast").with(csrf()).param("name", "alert.warning")
+                .param("title", "T").param("body", "<b>B</b>").param("ttlSeconds", "0"));
+
+        ArgumentCaptor<BroadcastRequestDto> sent = ArgumentCaptor.forClass(BroadcastRequestDto.class);
+        verify(mockApiService, times(5)).adminBroadcast(sent.capture());
+        Instant when = Instant.parse(at);
+        assertThat(sent.getAllValues()).containsExactly(
+                new BroadcastRequestDto.MaintenanceScheduled(when, 30, "M"),
+                new BroadcastRequestDto.MaintenanceCancelled(when, "R"),
+                new BroadcastRequestDto.VersionDeployed("1.2", true),
+                new BroadcastRequestDto.AlertInfo("T", "B", 5),
+                new BroadcastRequestDto.AlertWarning("T", "<b>B</b>", 0));
+    }
+
+    @Test
+    void sendBroadcast_unknownNameOrBadField_isReportedNotSent() throws Exception {
+        mvc.perform(post("/mock/admin/broadcast").with(csrf()).param("name", "nope"))
+                .andExpect(redirectedUrl("/mock/admin"))
+                .andExpect(flash().attribute("broadcastResult", "Annonce inconnue : nope"));
+        mvc.perform(post("/mock/admin/broadcast").with(csrf()).param("name", "alert.info")
+                        .param("title", "T").param("body", "B").param("ttlSeconds", "abc"))
+                .andExpect(flash().attribute("broadcastResult", "Champ invalide."));
+
+        verify(mockApiService, never()).adminBroadcast(any());
     }
 }
