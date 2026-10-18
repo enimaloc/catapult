@@ -51,6 +51,7 @@ window.CatapultNotifications = (function () {
         if (!template) return null;
         const node = template.content.firstElementChild.cloneNode(true);
         node.dataset.id = dto.id;
+        node.tabIndex = 0;
         node.dataset.read = String(Boolean(dto.read));
         node.dataset.severity = dto.severity;
         const icon = node.querySelector(".notification-icon");
@@ -84,6 +85,7 @@ window.CatapultNotifications = (function () {
         const snackbar = document.createElement("mdui-snackbar");
         snackbar.textContent = text;
         snackbar.open = true;
+        snackbar.addEventListener("closed", () => snackbar.remove());
         document.body.appendChild(snackbar);
     }
 
@@ -114,6 +116,22 @@ window.CatapultNotifications = (function () {
         itemsOf(id).forEach(n => { n.dataset.read = "true"; });
     }
 
+    /** Marks an item read (once) and tells catapult-api. */
+    function read(node) {
+        if (node.dataset.read === "true") return;
+        markRead(node.dataset.id);
+        if (unread > 0) setUnread(unread - 1);
+        post(`/spa/notifications/${encodeURIComponent(node.dataset.id)}/read`);
+    }
+
+    /** Opens the item's CTA like its button does (new tab, noopener) unless the click was on the button itself. */
+    function followCta(node, target) {
+        const cta = node.querySelector(".notification-cta[href]");
+        if (cta && !target.closest(".notification-cta")) {
+            window.open(cta.getAttribute("href"), "_blank", "noopener");
+        }
+    }
+
     function onClick(event) {
         if (!(event.target instanceof Element) || !event.target.closest(CONTAINERS)) return;
         if (event.target.closest("[data-notifications-read-all]")) {
@@ -124,14 +142,23 @@ window.CatapultNotifications = (function () {
         }
         const node = event.target.closest(".notification-item");
         if (event.target.closest("[data-link]") && bell()) bell().open = false;
-        if (!node || node.dataset.read === "true") return;
-        markRead(node.dataset.id);
-        if (unread > 0) setUnread(unread - 1);
-        post(`/spa/notifications/${encodeURIComponent(node.dataset.id)}/read`);
+        if (!node) return;
+        read(node);
+        followCta(node, event.target);
+    }
+
+    function onKeydown(event) {
+        if ((event.key !== "Enter" && event.key !== " ") || !(event.target instanceof Element)) return;
+        const node = event.target.closest(CONTAINERS) && event.target.closest(".notification-item");
+        if (!node || event.target !== node) return;
+        event.preventDefault();
+        read(node);
+        followCta(node, node);
     }
 
     function onCreated(dto) {
         const container = list();
+        if (itemsOf(dto.id).length) return;
         if (container) {
             const node = buildItem(dto);
             if (node) {
@@ -147,6 +174,7 @@ window.CatapultNotifications = (function () {
 
     if (document.getElementById("notifications-dropdown")) {
         document.addEventListener("click", onClick);
+        document.addEventListener("keydown", onKeydown);
         CatapultLive.on("NotificationCreated", onCreated);
         CatapultLive.on("NotificationRead", data => {
             markRead(data.notificationId);

@@ -16,7 +16,7 @@
                      th:text="#{notifications.see_all}">notifications.see_all</mdui-button>
     </div>
     <template id="notification-item-template">
-        <div class="notification-item" data-id="" data-read="false" data-severity="INFO">
+        <div class="notification-item" tabindex="0" data-id="" data-read="false" data-severity="INFO">
             <mdui-icon class="notification-icon" name="info"
                        th:attr="data-label-info=#{notifications.severity.info},data-label-warning=#{notifications.severity.warning},data-label-error=#{notifications.severity.error}"></mdui-icon>
             <div class="notification-content">
@@ -30,7 +30,7 @@
 </div>
 
 <!--/* One notification; the markup notifications.js's item builder mirrors for live events. bodyHtml is sanitized by catapult-api. */-->
-<div th:fragment="item(n)" class="notification-item" th:attr="data-id=${n.id()},data-read=${n.read()},data-severity=${n.severity()}">
+<div th:fragment="item(n)" class="notification-item" tabindex="0" th:attr="data-id=${n.id()},data-read=${n.read()},data-severity=${n.severity()}">
     <mdui-icon class="notification-icon"
                th:attr="name=${n.severity().name() == 'ERROR' ? 'error' : (n.severity().name() == 'WARNING' ? 'warning' : 'info')},title=#{${'notifications.severity.' + #strings.toLowerCase(n.severity().name())}}"></mdui-icon>
     <div class="notification-content">
