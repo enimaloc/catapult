@@ -588,4 +588,98 @@ class RealApiServiceTest {
             org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
         }
     }
+
+    // --- notifications and broadcasts ---------------------------------------------------------
+
+    private static final String NOTIF = "{\"id\":\"00000000-0000-0000-0000-000000000009\",\"title\":\"t\",\"bodyHtml\":\"<p>b</p>\","
+            + "\"severity\":\"INFO\",\"ctaUrl\":null,\"ctaLabel\":null,\"expiresAt\":null,"
+            + "\"createdAt\":\"2026-10-18T10:00:00Z\",\"read\":false}";
+    private static final UUID NOTIF_ID = UUID.fromString("00000000-0000-0000-0000-000000000009");
+
+    @Test
+    void notificationSnapshot_readsTheSnapshot() {
+        respond(HttpMethod.GET, "/api/notifications/snapshot", "{\"items\":[" + NOTIF + "],\"unreadCount\":4}");
+
+        var snapshot = service.notificationSnapshot();
+
+        assertThat(snapshot.unreadCount()).isEqualTo(4);
+        assertThat(snapshot.items()).extracting("id").containsExactly(NOTIF_ID);
+    }
+
+    @Test
+    void notifications_mapsASpringPage() {
+        respond(HttpMethod.GET, "/api/notifications?page=2&size=20&sort=createdAt,desc", "{\"content\":[" + NOTIF + "],"
+                + "\"number\":2,\"totalPages\":3,\"totalElements\":41,\"size\":20,\"pageable\":{\"pageNumber\":2,\"paged\":true},"
+                + "\"first\":false,\"last\":true}");
+
+        var page = service.notifications(2);
+
+        assertThat(page.number()).isEqualTo(2);
+        assertThat(page.totalPages()).isEqualTo(3);
+        assertThat(page.totalElements()).isEqualTo(41);
+        assertThat(page.content()).hasSize(1);
+    }
+
+    @Test
+    void markNotificationRead_andReadAll_returnTheStatus() {
+        expect(HttpMethod.POST, "/api/notifications/" + NOTIF_ID + "/read").andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/notifications/read-all").andRespond(withNoContent());
+
+        assertThat(service.markNotificationRead(NOTIF_ID)).isEqualTo(204);
+        assertThat(service.markAllNotificationsRead()).isEqualTo(204);
+    }
+
+    @Test
+    void adminNotifications_readsAPageOfAdminDtos() {
+        respond(HttpMethod.GET, "/api/admin/notifications?page=0&size=20", "{\"content\":[{\"id\":\"" + NOTIF_ID
+                + "\",\"title\":\"t\",\"body\":\"b\",\"bodyHtml\":\"<p>b</p>\",\"severity\":\"WARNING\",\"audience\":\"ALL\","
+                + "\"createdAt\":\"2026-10-18T10:00:00Z\"}],\"number\":0,\"totalPages\":1,\"totalElements\":1}");
+
+        var page = service.adminNotifications(0);
+
+        assertThat(page.content()).extracting("body").containsExactly("b");
+        assertThat(page.content().get(0).audience()).isEqualTo("ALL");
+    }
+
+    @Test
+    void adminCreateNotification_postsTheBody() {
+        var body = new fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody("t", "b",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null);
+        expect(HttpMethod.POST, "/api/admin/notifications").andExpect(content().json("{\"title\":\"t\",\"body\":\"b\",\"severity\":\"INFO\"}"))
+                .andRespond(withStatus(HttpStatus.CREATED));
+
+        assertThat(service.adminCreateNotification(body)).isEqualTo(201);
+    }
+
+    @Test
+    void adminDeleteNotification_returnsTheStatus() {
+        expect(HttpMethod.DELETE, "/api/admin/notifications/" + NOTIF_ID).andRespond(withNoContent());
+
+        assertThat(service.adminDeleteNotification(NOTIF_ID)).isEqualTo(204);
+    }
+
+    @Test
+    void adminPreviewNotification_returnsTheBodyHtml() {
+        expect(HttpMethod.POST, "/api/admin/notifications/preview").andExpect(content().json("{\"body\":\"**a**\"}"))
+                .andRespond(withSuccess("{\"bodyHtml\":\"<p><strong>a</strong></p>\"}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.adminPreviewNotification("**a**")).isEqualTo("<p><strong>a</strong></p>");
+    }
+
+    @Test
+    void adminPreviewNotification_isNullWhenRefused() {
+        expect(HttpMethod.POST, "/api/admin/notifications/preview").andRespond(withStatus(HttpStatus.BAD_REQUEST));
+
+        assertThat(service.adminPreviewNotification("")).isNull();
+    }
+
+    @Test
+    void adminBroadcast_sendsTheNameDiscriminator_andRelaysA429() {
+        expect(HttpMethod.POST, "/api/admin/broadcast")
+                .andExpect(content().json("{\"name\":\"alert.info\",\"title\":\"t\",\"body\":\"b\",\"ttlSeconds\":0}"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThat(service.adminBroadcast(new fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto.AlertInfo("t", "b", 0)))
+                .isEqualTo(429);
+    }
 }
