@@ -62,6 +62,14 @@
 
         <!--/* mdui-top-app-bar only has a default slot: this is a plain flex item, sized like the brand. */-->
         <div class="app-bar-end">
+            <!--/* Members: notifications.js fills the dropdown and shows the bell once it has the count. */-->
+            <mdui-dropdown th:if="${loggedIn}" id="notifications-bell" placement="bottom-end" hidden>
+                <mdui-button-icon slot="trigger" class="notifications-trigger" th:attr="aria-label=#{notifications.bell}">
+                    <mdui-icon name="notifications"></mdui-icon>
+                    <mdui-badge id="notifications-badge" hidden></mdui-badge>
+                </mdui-button-icon>
+                <div class="notifications-dropdown" id="notifications-dropdown"></div>
+            </mdui-dropdown>
             <!--/* Admins only (ROLE_ADMIN): opens the admin page, marked active there by spa.js like a channel. */-->
             <a th:if="${admin}" id="nav-admin" data-link class="nav-channel nav-admin" href="/admin" th:title="#{nav.admin}">
                 <mdui-icon name="admin_panel_settings"></mdui-icon>
@@ -108,6 +116,7 @@
 <script src="/js/catapult.js"></script>
 <script src="/js/live.js"></script>
 <script src="/js/spa.js"></script>
+<script th:if="${loggedIn}" src="/js/notifications.js"></script>
 <!-- Page-wide, not per-fragment: the OBS connection must survive SPA navigation. -->
 <script src="/js/suggest.js"></script>
 <script src="/js/obs.js"></script>
