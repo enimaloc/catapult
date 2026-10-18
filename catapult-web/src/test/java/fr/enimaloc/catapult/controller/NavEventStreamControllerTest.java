@@ -3,31 +3,42 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
+import fr.enimaloc.catapult.event.notification.BroadcastStreamEvent;
+import fr.enimaloc.catapult.event.notification.NotificationStreamEvent;
 import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
+import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = NavEventStreamController.class)
-@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class})
+@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class, BroadcastState.class})
 class NavEventStreamControllerTest {
 
     private static final ChannelDto OWN = new ChannelDto(UUID.randomUUID(), "1", "enimaloc", "img", false);
@@ -36,6 +47,10 @@ class NavEventStreamControllerTest {
     @Autowired MockMvc mvc;
     @Autowired NavEventStreamController controller;
     @Autowired MeterRegistry registry;
+    @Autowired BroadcastState broadcastState;
+    @MockitoBean ApiService apiService;
+
+    private static final Instant STARTS_AT = Instant.now().plus(Duration.ofHours(1));
 
     private static MockHttpSession loggedIn() {
         MockHttpSession session = new MockHttpSession();
@@ -48,6 +63,37 @@ class NavEventStreamControllerTest {
                 .andExpect(request().asyncStarted())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
                 .andReturn();
+    }
+
+    /** A logged-in session of {@code account}, with a stream open. */
+    private MvcResult memberStream(MockHttpSession session, UUID account) throws Exception {
+        when(apiService.currentUserId()).thenReturn(account);
+        return subscribe(session);
+    }
+
+    private MvcResult anonymous(String ip) throws Exception {
+        return mvc.perform(get("/events/nav").with(r -> { r.setRemoteAddr(ip); return r; })
+                        .accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(request().asyncStarted())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andReturn();
+    }
+
+    private static String sent(MvcResult stream) throws Exception {
+        return stream.getResponse().getContentAsString();
+    }
+
+    private static Map<String, Object> maintenance() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("startsAt", STARTS_AT.toString());
+        data.put("durationMinutes", 30);
+        data.put("message", "m");
+        return data;
+    }
+
+    @AfterEach
+    void forgetTheMaintenance() {
+        broadcastState.accept("maintenance.cancelled", Map.of("originalStartsAt", STARTS_AT.toString()));
     }
 
     /** A session whose navbar lists {@code channels}, with a stream open. */
@@ -123,12 +169,132 @@ class NavEventStreamControllerTest {
     }
 
     @Test
-    void aLoggedOutVisitor_cannotOpenAStream_norGetsASession() throws Exception {
-        MvcResult result = mvc.perform(get("/events/nav").accept(MediaType.TEXT_EVENT_STREAM))
-                .andExpect(status().isUnauthorized()).andReturn();
+    void aLoggedOutVisitor_opensAStream_withoutGettingASession() throws Exception {
+        MvcResult result = anonymous("1.2.3.4");
 
+        assertThat(result.getResponse().getStatus()).isEqualTo(200);
         assertThat(result.getRequest().getSession(false)).isNull();
-        assertThat(registry.get("catapult.web.sse.refused").tags("stream", "nav", "reason", "unauthenticated")
+    }
+
+    @Test
+    void aBroadcast_reachesMembersAndVisitorsAlike() throws Exception {
+        MvcResult member = memberStream(loggedIn(), UUID.randomUUID());
+        MvcResult visitor = anonymous("1.2.3.5");
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("title", "t");
+        data.put("body", "b");
+        controller.onBroadcast(new BroadcastStreamEvent("alert.info", data));
+
+        String event = "event:Broadcast\ndata:{\"name\":\"alert.info\",\"data\":{\"title\":\"t\",\"body\":\"b\"}}";
+        assertThat(sent(member)).contains(event);
+        assertThat(sent(visitor)).contains(event);
+    }
+
+    @Test
+    void aNotification_reachesItsAccountsStreamsOnly() throws Exception {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        MockHttpSession aSession = loggedIn();
+        MvcResult aFirst = memberStream(aSession, a);
+        MvcResult aSecond = memberStream(aSession, a);
+        MvcResult aElsewhere = memberStream(loggedIn(), a);
+        MvcResult bStream = memberStream(loggedIn(), b);
+        MvcResult nobody = memberStream(loggedIn(), null);
+        MvcResult visitor = anonymous("1.2.3.6");
+
+        controller.onNotification(new NotificationStreamEvent(a, NotificationStreamEvent.CREATED, Map.of("title", "hello")));
+
+        String event = "event:NotificationCreated\ndata:{\"title\":\"hello\"}";
+        assertThat(sent(aFirst)).contains(event);
+        assertThat(sent(aSecond)).contains(event);
+        assertThat(sent(aElsewhere)).contains(event);
+        assertThat(sent(bStream)).doesNotContain("Notification");
+        assertThat(sent(nobody)).doesNotContain("Notification");
+        assertThat(sent(visitor)).doesNotContain("Notification");
+    }
+
+    @Test
+    void aSessionLoggedInAsAnotherAccount_closesItsFormerStreams() throws Exception {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        MockHttpSession session = loggedIn();
+        MvcResult asA = memberStream(session, a);
+        MvcResult asB = memberStream(session, b);
+
+        controller.onNotification(new NotificationStreamEvent(b, NotificationStreamEvent.READ, Map.of("unreadCount", 0)));
+
+        assertThat(asA.getAsyncResult(1000)).isNull(); // completed
+        assertThat(sent(asA)).doesNotContain("Notification");
+        assertThat(sent(asB)).contains("event:NotificationRead");
+    }
+
+    @Test
+    void aLoggedOutSession_getsNoMoreNotifications() throws Exception {
+        UUID a = UUID.randomUUID();
+        MockHttpSession session = loggedIn();
+        MvcResult stream = memberStream(session, a);
+
+        session.invalidate();
+        controller.onNotification(new NotificationStreamEvent(a, NotificationStreamEvent.CREATED, Map.of("title", "x")));
+
+        assertThat(stream.getAsyncResult(1000)).isNull();
+        assertThat(sent(stream)).doesNotContain("Notification");
+    }
+
+    @Test
+    void aRememberedMaintenance_isTheFirstThingANewStreamReceives() throws Exception {
+        MvcResult before = anonymous("1.2.3.7");
+        assertThat(sent(before)).doesNotContain("maintenance");
+
+        controller.onBroadcast(new BroadcastStreamEvent("maintenance.scheduled", maintenance()));
+        MvcResult member = memberStream(loggedIn(), UUID.randomUUID());
+        MvcResult visitor = anonymous("1.2.3.8");
+
+        String event = "event:Broadcast\ndata:{\"name\":\"maintenance.scheduled\",\"data\":{\"startsAt\":\""
+                + STARTS_AT + "\",\"durationMinutes\":30,\"message\":\"m\"}}";
+        assertThat(sent(member)).startsWith(event);
+        assertThat(sent(visitor)).startsWith(event);
+        assertThat(sent(before)).contains(event); // live, as any broadcast
+    }
+
+    @Test
+    void shutdownWarnsEveryStreamBeforeClosingIt() throws Exception {
+        MvcResult member = memberStream(loggedIn(), UUID.randomUUID());
+        MvcResult visitor = anonymous("1.2.3.9");
+
+        controller.onContextClosed(null);
+
+        String event = "event:Broadcast\ndata:{\"name\":\"maintenance.imminent\",\"data\":{\"etaSeconds\":null}}";
+        assertThat(member.getAsyncResult(1000)).isNull();
+        assertThat(visitor.getAsyncResult(1000)).isNull();
+        assertThat(sent(member)).contains(event);
+        assertThat(sent(visitor)).contains(event);
+    }
+
+    @Test
+    void anAddressKeepsAtMostAFewAnonymousStreams_closingItsOldest() throws Exception {
+        MvcResult oldest = anonymous("4.4.4.4");
+        for (int i = 1; i < AnonymousStreams.MAX_PER_IP; i++) anonymous("4.4.4.4");
+        MvcResult newest = anonymous("4.4.4.4");
+
+        controller.onBroadcast(new BroadcastStreamEvent("alert.info", Map.of("title", "t")));
+
+        assertThat(oldest.getAsyncResult(1000)).isNull();
+        assertThat(sent(oldest)).doesNotContain("alert.info");
+        assertThat(sent(newest)).contains("alert.info");
+    }
+
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void pastTheOverallLimit_anonymousStreamsAreRefused() throws Exception {
+        int open = (int) registry.get("catapult.web.sse.streams").tag("stream", "nav-anonymous").gauge().value();
+        for (int i = open; i < AnonymousStreams.MAX_TOTAL; i++) anonymous("10.1." + i / 250 + "." + i % 250);
+
+        mvc.perform(get("/events/nav").with(r -> { r.setRemoteAddr("9.9.9.9"); return r; })
+                        .accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isServiceUnavailable());
+        assertThat(registry.get("catapult.web.sse.refused").tags("stream", "nav-anonymous", "reason", "capacity")
                 .counter().count()).isPositive();
     }
 
