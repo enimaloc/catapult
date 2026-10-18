@@ -272,6 +272,47 @@ class NavEventStreamControllerTest {
     }
 
     @Test
+    void theStreamAsksProxiesNotToBufferIt() throws Exception {
+        assertThat(anonymous("1.2.3.10").getResponse().getHeader("X-Accel-Buffering")).isEqualTo("no");
+        assertThat(memberStream(loggedIn(), UUID.randomUUID()).getResponse().getHeader("X-Accel-Buffering")).isEqualTo("no");
+    }
+
+    @Test
+    void aHeartbeat_reachesMembersAndVisitorsAlike_asAComment() throws Exception {
+        MvcResult member = memberStream(loggedIn(), UUID.randomUUID());
+        MvcResult visitor = anonymous("1.2.3.11");
+
+        controller.heartbeat();
+
+        assertThat(sent(member)).contains(":heartbeat\n\n");
+        assertThat(sent(visitor)).contains(":heartbeat\n\n");
+    }
+
+    @Test
+    void aVisitorStreamThatCannotTakeAHeartbeat_freesItsSlot() throws Exception {
+        MvcResult visitor = anonymous("5.5.5.6");
+        double before = anonymousOpen();
+
+        visitor.getResponse().setOutputStreamAccessAllowed(false);
+        visitor.getResponse().setWriterAccessAllowed(false);
+        controller.heartbeat();
+
+        assertThat(anonymousOpen()).isEqualTo(before - 1);
+    }
+
+    @Test
+    void aMemberStreamThatCannotTakeAHeartbeat_freesItsSlot() throws Exception {
+        MvcResult member = memberStream(loggedIn(), UUID.randomUUID());
+        double before = registry.get("catapult.web.sse.streams").tag("stream", "nav").gauge().value();
+
+        member.getResponse().setOutputStreamAccessAllowed(false);
+        member.getResponse().setWriterAccessAllowed(false);
+        controller.heartbeat();
+
+        assertThat(registry.get("catapult.web.sse.streams").tag("stream", "nav").gauge().value()).isEqualTo(before - 1);
+    }
+
+    @Test
     void aRememberedMaintenance_isTheFirstThingANewStreamReceives() throws Exception {
         MvcResult before = anonymous("1.2.3.7");
         assertThat(sent(before)).doesNotContain("maintenance");
