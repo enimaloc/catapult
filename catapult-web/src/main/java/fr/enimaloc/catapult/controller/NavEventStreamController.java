@@ -154,6 +154,17 @@ public class NavEventStreamController {
         SessionChannels.remember(session, channels);
     }
 
+    /**
+     * Forgets what {@code session} was told as its former login (ImpersonationController swaps it):
+     * the channels its navbar listed, and its streams, which close (their pages reconnect as the new
+     * login).
+     */
+    public void forget(HttpSession session) {
+        session.removeAttribute(SessionChannels.ATTRIBUTE);
+        Nav nav = navsBySession.remove(session.getId());
+        if (nav != null) nav.emitters().forEach(SseEmitter::complete);
+    }
+
     /** The mock's channels go live by name (MockAdminController). */
     @EventListener
     public void onChannelLive(ChannelLiveStateEvent event) {

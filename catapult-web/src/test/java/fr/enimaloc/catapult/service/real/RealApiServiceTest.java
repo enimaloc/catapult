@@ -819,6 +819,17 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminImpersonate_postsTheUsername_andReadsTheToken_nullWhenRefused() {
+        expect(HttpMethod.POST, "/api/admin/impersonate")
+                .andExpect(content().json("{\"username\":\"alice\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"token\":\"target-token\"}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        assertThat(service.adminImpersonate("alice")).isEqualTo("target-token");
+        assertThat(service.adminImpersonate("alice")).isNull();
+    }
+
+    @Test
     void adminPreviewNotification_returnsTheBodyHtml() {
         expect(HttpMethod.POST, "/api/admin/notifications/preview").andExpect(content().json("{\"body\":\"**a**\"}"))
                 .andRespond(withSuccess("{\"bodyHtml\":\"<p><strong>a</strong></p>\"}", MediaType.APPLICATION_JSON));

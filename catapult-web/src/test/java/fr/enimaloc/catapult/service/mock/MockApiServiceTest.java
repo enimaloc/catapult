@@ -406,6 +406,28 @@ class MockApiServiceTest {
 
     // --- admin: members ------------------------------------------------------------------------
 
+    /** As catapult-api: an active member other than the admin, never the system account; the token logs in as them. */
+    @Test
+    void adminImpersonate_mintsATokenForTheMember_refusesSelfSystemAndUnknown() {
+        data.addModeratedChannel();
+        var members = service.adminMembers().members();
+        var target = members.get(1);
+        assertThat(target.systemAccount()).isFalse();
+
+        assertThat(service.adminImpersonate(members.getFirst().twitchUsername())).isNull();
+        assertThat(service.adminImpersonate("catapult_bot")).isNull();
+        assertThat(service.adminImpersonate("nobody")).isNull();
+        String token = service.adminImpersonate(target.twitchUsername());
+        assertThat(token).isNotNull();
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.getSession(true).setAttribute(ApiClient.SESSION_JWT_KEY, token);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        assertThat(service.getData().getChannelDto().twitchUsername()).isEqualTo(target.twitchUsername());
+        assertThat(ApiClient.currentLogin()).isEqualTo(target.twitchUsername());
+        assertThat(service.isAdmin()).isFalse();
+    }
+
     @Test
     void adminMembers_listsTheSessionsChannelFirst_thenTheSystemAccount() {
         var members = service.adminMembers().members();

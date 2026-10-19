@@ -90,6 +90,17 @@
 
     </mdui-top-app-bar>
 
+    <!--/* An admin impersonating a member (ImpersonationController): whom they act as, and the way back,
+         a plain POST (Thymeleaf adds the CSRF field) like the log-out. */-->
+    <div th:if="${impersonatedLogin != null}" id="impersonation-banner" class="impersonation-banner" role="status">
+        <mdui-icon name="supervisor_account"></mdui-icon>
+        <span class="impersonation-banner-text"><span th:text="#{nav.impersonate_as}">nav.impersonate_as</span>
+            <strong th:text="${impersonatedLogin}">login</strong></span>
+        <form th:action="@{/admin/impersonate/exit}" method="post">
+            <mdui-button type="submit" variant="tonal" icon="undo" th:text="#{nav.back_to_admin}">nav.back_to_admin</mdui-button>
+        </form>
+    </div>
+
     <div th:replace="~{fragments/broadcasts :: banner}"></div>
 
     <mdui-linear-progress id="nav-progress" hidden></mdui-linear-progress>

@@ -257,6 +257,17 @@ class ApiClientTest {
     }
 
     @Test
+    void currentLogin_readsTheJwtUsername_noneWithoutIt() {
+        assertThat(ApiClient.currentLogin()).isNull();
+
+        inSessionWithJwt(jwtWithPayload("{\"sub\":\"x\"}"));
+        assertThat(ApiClient.currentLogin()).isNull();
+
+        inSessionWithJwt(jwtWithPayload("{\"sub\":\"x\",\"username\":\"alice\"}"));
+        assertThat(ApiClient.currentLogin()).isEqualTo("alice");
+    }
+
+    @Test
     void call_keepsTheStatus_whenTheBodyIsNotTheRequestedType() {
         server.enqueue(new MockResponse().setResponseCode(403).setHeader("Content-Type", "application/json")
                 .setBody("{\"detail\":\"nope\"}"));

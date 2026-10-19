@@ -1880,6 +1880,9 @@ mdui-select::part(menu) {
  */
 .broadcast-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: rgb(var(--mdui-color-surface-container-high)); color: rgb(var(--mdui-color-on-surface)); }
 .broadcast-banner[hidden], .broadcast-veil[hidden] { display: none; }
+/* As the broadcast banner, above it; a warning: the admin acts as someone else. Wraps at phone width. */
+.impersonation-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; background: rgb(var(--mdui-color-tertiary-container)); color: rgb(var(--mdui-color-on-tertiary-container)); }
+.impersonation-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .broadcast-banner-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; overflow-wrap: anywhere; }
 mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color-error-container); --mdui-color-inverse-on-surface: var(--mdui-color-on-error-container); }
 /* Informs, does not block. Above the content, below the dialogs. */

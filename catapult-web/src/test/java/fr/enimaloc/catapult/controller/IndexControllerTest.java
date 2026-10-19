@@ -262,6 +262,30 @@ class IndexControllerTest {
     }
 
     @Test
+    void banner_showsTheLogin_whileImpersonating() throws Exception {
+        String payload = java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("{\"sub\":\"x\",\"username\":\"alice\"}".getBytes());
+        org.springframework.mock.web.MockHttpSession session = new org.springframework.mock.web.MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "h." + payload + ".sig");
+
+        String member = mvc.perform(get("/").session(session).locale(java.util.Locale.ENGLISH))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(member).doesNotContain("impersonation-banner");
+
+        session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin");
+        String impersonating = mvc.perform(get("/").session(session).locale(java.util.Locale.ENGLISH))
+                .andExpect(model().attribute("impersonatedLogin", "alice"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(impersonating)
+                .contains("Logged in as")
+                .contains("<strong>alice</strong>")
+                .containsPattern("<form [^>]*action=\"/admin/impersonate/exit\" method=\"post\"");
+        int form = impersonating.indexOf("action=\"/admin/impersonate/exit\"");
+        assertThat(impersonating.substring(form, impersonating.indexOf("</form>", form)))
+                .containsPattern("<input type=\"hidden\" name=\"_csrf\" value=\"[^\"]+\"");
+    }
+
+    @Test
     void logout_endsTheSession_andGoesHome() throws Exception {
         org.springframework.mock.web.MockHttpSession session = new org.springframework.mock.web.MockHttpSession();
         session.setAttribute(fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY, "jwt");

@@ -180,6 +180,12 @@ public class ApiClient {
         }
     }
 
+    /** The Twitch login ({@code username} claim) of the calling session's JWT; null without one. */
+    public static String currentLogin() {
+        Map<?, ?> claims = currentClaims();
+        return claims != null && claims.get("username") instanceof String login && !login.isBlank() ? login : null;
+    }
+
     /** The roles (e.g. ROLE_ADMIN) of the calling session's JWT; empty without one. */
     public static List<String> currentRoles() {
         Map<?, ?> claims = currentClaims();

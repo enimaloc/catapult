@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.MessageSource;
@@ -20,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.ui.Model;
 import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
@@ -74,6 +76,23 @@ public class ModelFiller {
         model.addAttribute("seo", seo(model, page == null ? "" : page, locale));
         model.addAttribute("loggedIn", ApiClient.hasSession());
         model.addAttribute("admin", isAdmin());
+        model.addAttribute("impersonatedLogin", impersonatedLogin());
+    }
+
+    /**
+     * Whom an admin impersonating a member is logged in as (the banner under the app bar), "—" when
+     * their JWT tells no login; null when the session isn't impersonating (see ImpersonationController).
+     */
+    static String impersonatedLogin() {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) return null;
+        HttpSession session = attributes.getRequest().getSession(false);
+        try {
+            if (session == null || session.getAttribute(ImpersonationController.ORIGINAL_JWT_KEY) == null) return null;
+        } catch (IllegalStateException e) {
+            return null; // invalidated meanwhile
+        }
+        String login = ApiClient.currentLogin();
+        return login == null ? "—" : login;
     }
 
     /** Whether the visitor is logged in as a Catapult admin: they get the admin button and page. */

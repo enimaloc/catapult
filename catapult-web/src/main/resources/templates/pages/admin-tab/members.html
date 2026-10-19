@@ -3,7 +3,8 @@
 <!--/*
   Every account, one row each: who they are, their Steam link, their bot, their state, and a menu
   of what an admin can do to them (admin-members.js posts it, then re-renders the page).
-  The system account (the chat bot) only gets its bot switch and a link to its settings: the API refuses it the rest.
+  The system account (the chat bot) only gets its bot switch and a link to its settings: the API refuses it the rest
+  (impersonation included).
 */-->
 <mdui-tab-panel slot="panel" value="members" th:fragment="panel" data-admin-prerendered
                 th:attr="data-unavailable=#{admin.unavailable}">
@@ -25,7 +26,9 @@
     </mdui-card>
 
     <mdui-card id="admin-members" th:if="${page != null and !page.members().isEmpty()}" class="admin-members" variant="outlined"
-               th:attr="data-confirm-text=#{admin.members.confirm},data-cancel-text=#{admin.members.cancel}">
+               th:attr="data-confirm-text=#{admin.members.confirm},data-cancel-text=#{admin.members.cancel},
+               data-label-impersonate-refused=#{admin.members.impersonate.error},
+               data-label-impersonate-unavailable=#{admin.members.impersonate.unavailable}">
         <div class="admin-member admin-member-head" aria-hidden="true">
             <span th:text="#{admin.members.column.member}">Membre</span>
             <span th:text="#{admin.members.column.steam}">Steam</span>
@@ -77,6 +80,11 @@
                 <mdui-menu>
                     <mdui-menu-item icon="rule" th:attr="data-admin-open=${m.id()}"
                                     th:text="#{admin.members.actions.targeting}">targeting</mdui-menu-item>
+                    <!--/* catapult-api refuses an inactive account, the admin themself and one without Twitch. */-->
+                    <mdui-menu-item icon="supervisor_account"
+                                    th:disabled="${!m.isActive() or isSelf or m.twitchId() == null or m.twitchUsername() == null}"
+                                    th:attr="data-impersonate=${m.twitchUsername()}"
+                                    th:text="#{admin.members.actions.impersonate}">impersonate</mdui-menu-item>
                     <mdui-menu-item icon="smart_toy" data-action="promote-to-system"
                                     th:disabled="${m.twitchId() == null}"
                                     th:attr="data-confirm=#{admin.members.actions.promote_to_system.confirm(${name})}"

@@ -574,6 +574,29 @@ class AdminTabsFragmentControllerTest {
                 .doesNotContain("data-admin-open=\"" + MEMBER + "\"");
     }
 
+    /** Enabled only for another active member with a Twitch account; the system account has none. */
+    @Test
+    void impersonateItem_isDisabledForSelfInactiveAndTwitchless_andHiddenForTheSystemAccount() throws Exception {
+        UUID other = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        UUID inactive = UUID.fromString("00000000-0000-0000-0000-000000000003");
+        UUID bot = UUID.fromString("00000000-0000-0000-0000-000000000004");
+        Instant at = Instant.parse("2025-03-01T12:00:00Z");
+        when(apiService.currentUserId()).thenReturn(MEMBER);
+        when(apiService.adminMembers()).thenReturn(new AdminMembersPage(List.of(
+                new AdminMemberDto(MEMBER, "1", "me", "img", null, false, true, "ACTIVE", at),
+                new AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE", at),
+                new AdminMemberDto(inactive, "3", "gone", "img", null, false, false, "INACTIVE", at),
+                new AdminMemberDto(bot, "4", "catapult_bot", "img", null, true, true, "ACTIVE", at)), Map.of(), false));
+
+        String html = asAdmin("/spa/admin/members");
+
+        assertThat(html).containsPattern("icon=\"supervisor_account\"\\s+data-impersonate=\"viewer\">")
+                .containsPattern("icon=\"supervisor_account\"\\s+data-impersonate=\"me\" disabled=\"disabled\">")
+                .containsPattern("icon=\"supervisor_account\"\\s+data-impersonate=\"gone\" disabled=\"disabled\">")
+                .doesNotContain("data-impersonate=\"catapult_bot\"")
+                .contains("data-label-impersonate-refused=");
+    }
+
     @Test
     void systemAccount_getsOnlyEditSettings() throws Exception {
         when(apiService.currentUserId()).thenReturn(MEMBER);
