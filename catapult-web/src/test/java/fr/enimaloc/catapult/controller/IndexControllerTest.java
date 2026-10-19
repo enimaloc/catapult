@@ -283,6 +283,19 @@ class IndexControllerTest {
         assertThat(session.isInvalid()).isFalse();
     }
 
+    @Test
+    void everyDescribedError_hasItsTitleAndDescription() {
+        for (java.util.Locale locale : List.of(java.util.Locale.FRENCH, java.util.Locale.ENGLISH)) {
+            for (int code : ModelFiller.DESCRIBED_ERRORS) {
+                for (String part : List.of("title", "description")) {
+                    String key = "error." + code + "." + part;
+                    assertThat(messages.getMessage(key, null, null, locale)).as(key + " (" + locale + ")")
+                            .isNotNull().isNotEqualTo(key);
+                }
+            }
+        }
+    }
+
     /** Read without arguments (admin-tabs.js fills {0} itself), so MessageFormat's '' escape would show up literally. */
     @Test
     void adminErrorMessage_keepsASingleApostrophe_inFrench() {

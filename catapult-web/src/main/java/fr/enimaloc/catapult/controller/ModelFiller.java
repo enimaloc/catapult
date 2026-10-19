@@ -37,7 +37,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ModelFiller {
     /** Error codes with their own error.<code>.* messages; anything else uses error.generic.*. */
-    private static final Set<Integer> DESCRIBED_ERRORS = Set.of(400, 401, 403, 404, 405, 429, 500, 502, 503);
+    /** The statuses with their own title and description (error.{code}.*); the others get error.generic.*. */
+    static final Set<Integer> DESCRIBED_ERRORS = Set.of(400, 401, 403, 404, 405, 429, 500, 502, 503);
     private static final String DEFAULT_PRIVACY_LANGUAGE = "en";
 
     /**
