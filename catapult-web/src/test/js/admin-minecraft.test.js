@@ -21,7 +21,7 @@ function page() {
                              data-label-unavailable="Down" data-label-updated="Updated" data-label-deleted="Deleted"
                              data-label-created="Created" data-label-reauthed="Reauthed" data-label-code="Enter the code"
                              data-label-pending="Waiting" data-label-insecure="Unsafe link" data-label-failed="Failed"
-                             data-label-expired="Expired">
+                             data-label-expired="Expired" data-label-expires-in="expires in {0}">
                             <div class="admin-minecraft-row">
                                 <button class="admin-minecraft-reauth" data-id="${ID}"></button>
                                 <button class="admin-minecraft-toggle" data-id="${ID}" data-enabled="true"></button>
@@ -68,7 +68,8 @@ beforeEach(async () => {
     });
     window.CatapultCsrf = { postJson: posted };
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())), snackbar: vi.fn() };
-    await load("admin-tabs", "admin-minecraft");
+    document.documentElement.lang = "en";
+    await load("time", "admin-tabs", "admin-minecraft");
     window.CatapultChannel = { showError: vi.fn() };
     window.CatapultAdminTabs.reload = vi.fn(async () => {});
     page();
@@ -107,6 +108,31 @@ describe("admin-minecraft device-code flow", () => {
 
         await vi.advanceTimersByTimeAsync(30000);
         expect(polls()).toHaveLength(2);
+    });
+
+    it("counts the code's time left down, then ends the flow once it has expired", async () => {
+        routes["/admin/minecraft-accounts/device-code"] = [response(200, {
+            deviceCode: "dc-1", userCode: "ABCD-1234", verificationUri: "https://www.microsoft.com/link", interval: 5, expiresIn: 900 })];
+        routes["/admin/minecraft-accounts/create"] = [response(202, {})];
+
+        await click(".admin-minecraft-add");
+        const left = addFlow().querySelector(".admin-minecraft-expires");
+        expect(left.textContent).toBe("expires in 15m");
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(left.textContent).toBe("expires in 14m 59s");
+
+        await vi.advanceTimersByTimeAsync(899000);
+        expect(addFlow().querySelector(".admin-minecraft-error").textContent).toBe("Expired");
+        expect(document.querySelector(".admin-minecraft-add").disabled).toBe(false);
+        const before = polls().length;
+        await vi.advanceTimersByTimeAsync(30000);
+        expect(polls()).toHaveLength(before);
+    });
+
+    it("shows no countdown when the code's lifetime is unknown", async () => {
+        await click(".admin-minecraft-add");
+        expect(addFlow().querySelector(".admin-minecraft-expires")).toBeNull();
+        expect(addFlow().textContent).toContain("Waiting");
     });
 
     it("keeps a longer interval as given", async () => {

@@ -66,14 +66,14 @@ class AdminMinecraftControllerTest {
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminMinecraftDeviceCode())
                 .thenReturn(new ApiService.MinecraftDeviceCodeStart(200,
-                        new MinecraftDeviceCodeDto("dc-1", "ABCD-1234", "https://www.microsoft.com/link", 5), null))
+                        new MinecraftDeviceCodeDto("dc-1", "ABCD-1234", "https://www.microsoft.com/link", 5, 900), null))
                 .thenReturn(new ApiService.MinecraftDeviceCodeStart(502, null, "Device-code Microsoft refusé: AADSTS70002"))
                 .thenReturn(new ApiService.MinecraftDeviceCodeStart(502, null, null))
                 .thenReturn(new ApiService.MinecraftDeviceCodeStart(200, null, null));
 
         mvc.perform(admin(post(BASE + "/device-code"), "{}")).andExpect(status().isOk())
                 .andExpect(content().json("{\"deviceCode\":\"dc-1\",\"userCode\":\"ABCD-1234\","
-                        + "\"verificationUri\":\"https://www.microsoft.com/link\",\"interval\":5}", org.springframework.test.json.JsonCompareMode.STRICT));
+                        + "\"verificationUri\":\"https://www.microsoft.com/link\",\"interval\":5,\"expiresIn\":900}", org.springframework.test.json.JsonCompareMode.STRICT));
         mvc.perform(admin(post(BASE + "/device-code"), "{}")).andExpect(status().isBadGateway())
                 .andExpect(content().json("{\"message\":\"Device-code Microsoft refusé: AADSTS70002\"}", org.springframework.test.json.JsonCompareMode.STRICT));
         mvc.perform(admin(post(BASE + "/device-code"), "{}")).andExpect(status().isBadGateway())

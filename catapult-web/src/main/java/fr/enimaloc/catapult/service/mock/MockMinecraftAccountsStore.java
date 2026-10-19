@@ -38,7 +38,7 @@ class MockMinecraftAccountsStore {
     synchronized MinecraftDeviceCodeDto deviceCode() {
         String code = UUID.randomUUID().toString();
         polls.put(code, 0);
-        return new MinecraftDeviceCodeDto(code, "MOCK-" + code.substring(0, 4).toUpperCase(), "https://www.microsoft.com/link", 5);
+        return new MinecraftDeviceCodeDto(code, "MOCK-" + code.substring(0, 4).toUpperCase(), "https://www.microsoft.com/link", 5, 900);
     }
 
     synchronized ApiClient.Result<Map<String, Object>> create(String deviceCode, String label) {

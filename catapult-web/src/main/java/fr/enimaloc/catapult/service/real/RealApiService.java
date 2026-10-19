@@ -795,7 +795,8 @@ public class RealApiService implements ApiService {
                 return new MinecraftDeviceCodeStart(502, null, null);
             }
             return new MinecraftDeviceCodeStart(200, new MinecraftDeviceCodeDto(deviceCode, text(body.get("user_code")),
-                    text(body.get("verification_uri")), body.get("interval") instanceof Number n ? n.intValue() : 0), null);
+                    text(body.get("verification_uri")), body.get("interval") instanceof Number n ? n.intValue() : 0,
+                    body.get("expires_in") instanceof Number n ? n.intValue() : 0), null);
         }
         return new MinecraftDeviceCodeStart(result.ok() ? 502 : result.status(), null, text(body.get("message")));
     }

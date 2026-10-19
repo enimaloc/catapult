@@ -1145,7 +1145,7 @@ class RealApiServiceTest {
         expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code").andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         assertThat(service.adminMinecraftDeviceCode()).isEqualTo(new fr.enimaloc.catapult.service.ApiService.MinecraftDeviceCodeStart(200,
-                new fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto("dc-1", "ABCD-1234", "https://www.microsoft.com/link", 5), null));
+                new fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto("dc-1", "ABCD-1234", "https://www.microsoft.com/link", 5, 900), null));
         assertThat(service.adminMinecraftDeviceCode()).isEqualTo(new fr.enimaloc.catapult.service.ApiService.MinecraftDeviceCodeStart(502,
                 null, "Device-code Microsoft refusé: AADSTS70002"));
         assertThat(service.adminMinecraftDeviceCode()).isEqualTo(new fr.enimaloc.catapult.service.ApiService.MinecraftDeviceCodeStart(404, null, null));
