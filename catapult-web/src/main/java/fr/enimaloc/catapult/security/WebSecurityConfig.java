@@ -41,6 +41,12 @@ public class WebSecurityConfig {
                         // The Sentry SDK posts its reports there without the token; relayed, they change nothing here.
                         .ignoringRequestMatchers("/monitoring/tunnel"))
                 .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
+                // POST with the CSRF token only: a cross-site link or image can't log a member out.
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/")
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID"))
                 .formLogin(FormLoginConfigurer::disable)
                 .httpBasic(HttpBasicConfigurer::disable)
                 .build();

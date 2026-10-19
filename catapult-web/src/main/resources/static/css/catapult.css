@@ -223,6 +223,11 @@ mdui-top-app-bar {
     padding-left: 8px;
 }
 
+/* The log-out button sits in the bar like the bell: the form adds no box of its own. */
+.nav-logout {
+    display: contents;
+}
+
 /* Live: a red ring around the avatar. */
 .nav-channel.live mdui-avatar {
     outline: 2px solid #ef4444;
