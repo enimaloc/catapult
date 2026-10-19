@@ -52,8 +52,11 @@
                             </span>
                             <span class="admin-cell" th:attr="data-label=#{admin.keys.column.status}">
                                 <span th:unless="${key.blocked()}" th:text="#{admin.keys.status.available}">Available</span>
-                                <span th:if="${key.blocked()}" class="admin-keys-blocked"
-                                      th:text="#{admin.keys.status.blocked(${key.blockedForSeconds()})}">Blocked</span>
+                                <!--/* Kept current by time.js: once the block is over, it reads as available. */-->
+                                <span th:if="${key.blocked()}" class="admin-keys-blocked" data-live-time="countdown"
+                                      th:attr="data-live-in=${key.blockedForSeconds()},data-label-future=#{admin.keys.status.blocked('{0}')},
+                                               data-label-done=#{admin.keys.status.available}"
+                                      th:text="#{admin.keys.status.blocked(${key.blockedForSeconds() + 's'})}">Blocked</span>
                             </span>
                             <span class="admin-row-actions">
                                 <mdui-button-icon icon="delete" class="admin-keys-delete"

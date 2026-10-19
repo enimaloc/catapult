@@ -25,18 +25,13 @@ window.CatapultNotifications = (function () {
         el.textContent = unread > 99 ? "99+" : String(Math.max(unread, 0));
     }
 
+    /** An ISO time in words relative to now (time.js); empty when it isn't one. */
     function formatRelative(iso) {
-        const seconds = (new Date(iso).getTime() - Date.now()) / 1000;
-        if (Number.isNaN(seconds)) return "";
-        const units = [["year", 31536000], ["month", 2592000], ["day", 86400], ["hour", 3600], ["minute", 60]];
-        const format = new Intl.RelativeTimeFormat(document.documentElement.lang || undefined, { numeric: "auto" });
-        for (const [unit, size] of units) {
-            if (Math.abs(seconds) >= size) return format.format(Math.round(seconds / size), unit);
-        }
-        return format.format(Math.round(seconds), "second");
+        const at = Date.parse(iso);
+        return Number.isNaN(at) ? "" : CatapultTime.relative(at - Date.now());
     }
 
-    /** Writes the relative text of every `<time datetime>` under root. */
+    /** Writes the relative text of every `<time datetime>` under root at once; time.js then keeps it current. */
     function fillDates(root = document) {
         root.querySelectorAll(".notification-date[datetime]").forEach(time => {
             time.textContent = formatRelative(time.getAttribute("datetime"));

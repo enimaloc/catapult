@@ -2005,7 +2005,7 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-keys-add { display: flex; gap: 12px; align-items: start; margin: 16px 0; }
 .admin-keys-add mdui-text-field { flex: 1; max-width: 24rem; }
 .admin-keys-row, .admin-table:has(> .admin-keys-row) { grid-template-columns: minmax(0, 1fr) 10rem 10rem auto; }
-.admin-keys-blocked { color: rgb(var(--mdui-color-error)); }
+.admin-keys-blocked:not([data-live-done]) { color: rgb(var(--mdui-color-error)); }
 @media (max-width: 600px) {
     .admin-keys-add { flex-direction: column; align-items: stretch; }
     .admin-keys-add mdui-text-field { max-width: none; }

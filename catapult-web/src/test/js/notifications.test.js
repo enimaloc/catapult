@@ -25,7 +25,7 @@ const TEMPLATE = `
             <div class="notification-content">
                 <div class="notification-title"></div>
                 <div class="notification-body"></div>
-                <time class="notification-date" datetime=""></time>
+                <time class="notification-date" data-live-time="relative" datetime=""></time>
                 <mdui-button class="notification-cta" hidden></mdui-button>
             </div>
         </div>
@@ -34,7 +34,7 @@ const TEMPLATE = `
 function item(id, { read = false, cta = false, createdAt = "2026-10-18T10:00:00Z" } = {}) {
     return `<div class="notification-item" data-id="${id}" data-read="${read}" data-severity="INFO">
         <div class="notification-title">T${id}</div>
-        <time class="notification-date" datetime="${createdAt}"></time>
+        <time class="notification-date" data-live-time="relative" datetime="${createdAt}"></time>
         ${cta ? `<mdui-button class="notification-cta" href="https://example.com">Go</mdui-button>` : ""}
     </div>`;
 }
@@ -57,7 +57,7 @@ async function boot(body, page = "") {
     html(`${page}<mdui-dropdown id="notifications-bell" hidden>
         <span slot="trigger"><mdui-button-icon></mdui-button-icon><mdui-badge id="notifications-badge" hidden></mdui-badge></span>
         <div id="notifications-dropdown"></div></mdui-dropdown>`);
-    await load("csrf", "live", "notifications");
+    await load("csrf", "live", "time", "notifications");
     await flush();
 }
 
@@ -194,6 +194,14 @@ describe("notifications.js", () => {
         await boot(menu(1, [item("a", { createdAt })]));
         const expected = new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(-5, "minute");
         expect(document.querySelector(".notification-date").textContent).toBe(expected);
+    });
+
+    it("keeps the dates current as time goes by", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const createdAt = new Date(Date.now() - 59_000).toISOString();
+        await boot(menu(1, [item("a", { createdAt })]));
+        vi.advanceTimersByTime(2_000);
+        expect(document.querySelector(".notification-date").textContent).toBe("1 minute ago");
     });
 
     it("opens the CTA when the item itself is clicked, once, and not twice from the button", async () => {

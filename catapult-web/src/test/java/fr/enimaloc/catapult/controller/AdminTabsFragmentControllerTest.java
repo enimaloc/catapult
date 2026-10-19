@@ -167,7 +167,7 @@ class AdminTabsFragmentControllerTest {
 
         String html = asAdmin("/spa/admin/caches/igdb-game-cache/entry?key=a b");
 
-        assertThat(html).contains("&lt;b&gt;Doom&lt;/b&gt;", "Expires in 120 s").doesNotContain("<b>Doom</b>");
+        assertThat(html).contains("&lt;b&gt;Doom&lt;/b&gt;", "Expires in 120s").doesNotContain("<b>Doom</b>");
     }
 
     @Test
@@ -175,11 +175,11 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminCacheEntry("igdb-game-cache", "soon")).thenReturn(new CacheEntryDetailDto("soon", Map.of(), 3600L));
         when(apiService.adminCacheEntry("igdb-game-cache", "gone")).thenReturn(new CacheEntryDetailDto("gone", Map.of(), -12345L));
 
-        assertThat(asAdmin("/spa/admin/caches/igdb-game-cache/entry?key=soon")).contains("Expires in 3600 s");
-        assertThat(asAdmin("/spa/admin/caches/igdb-game-cache/entry?key=gone")).contains("Expired 12345 s ago");
+        assertThat(asAdmin("/spa/admin/caches/igdb-game-cache/entry?key=soon")).contains("Expires in 3600s");
+        assertThat(asAdmin("/spa/admin/caches/igdb-game-cache/entry?key=gone")).contains("Expired 12345s ago");
         assertThat(mvc.perform(get("/spa/admin/caches/igdb-game-cache/entry?key=soon").locale(java.util.Locale.FRENCH)
                         .sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
-                .andReturn().getResponse().getContentAsString()).contains("Expire dans 3600 s");
+                .andReturn().getResponse().getContentAsString()).contains("Expire dans 3600s", "data-live-in=\"3600\"", "data-label-future=\"Expire dans {0}\"");
     }
 
     @Test

@@ -5,19 +5,23 @@ import { html, load } from "./helpers.js";
 
 const NOW = new Date("2026-10-18T10:00:00Z");
 const iso = offsetMs => new Date(NOW.getTime() + offsetMs).toISOString();
-const HOUR = 3600_000;
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
 
 const PAGE = `
     <div id="broadcast-banner" hidden
          data-label-duration="{0} min" data-label-cancelled="Maintenance cancelled: {0}"
          data-label-version="Version {0} deployed" data-label-reload="Reload">
-        <span data-banner-time></span> <span data-banner-countdown></span>
+        <span data-banner-time></span>
+        <span data-banner-countdown data-live-time="countdown" data-label-future="in {0}" data-label-past="under way for {0}"></span>
         <span data-banner-duration></span> <span data-banner-message></span>
         <button data-banner-dismiss></button>
     </div>
     <div id="broadcast-veil" hidden></div>`;
 
 let handlers;
+/** The timers running with no banner shown: time.js's ticker. */
+let idleTimers;
 let openListeners;
 const send = (name, data) => handlers.Broadcast({ name, data });
 const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"));
@@ -31,7 +35,8 @@ async function boot() {
         onOpen: listener => openListeners.push(listener),
         onReopen: () => {},
     };
-    await load("broadcasts");
+    await load("time", "broadcasts");
+    idleTimers = vi.getTimerCount();
 }
 
 beforeEach(async () => {
@@ -52,15 +57,19 @@ describe("maintenance.scheduled", () => {
         expect(message.querySelector("b")).toBeNull();
         const expected = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso(2 * HOUR)));
         expect(banner().querySelector("[data-banner-time]").textContent).toBe(expected);
-        expect(banner().querySelector("[data-banner-countdown]").textContent).toBe("in 2 hours");
+        expect(banner().querySelector("[data-banner-countdown]").textContent).toBe("in 2h");
         expect(banner().querySelector("[data-banner-duration]").textContent).toBe("30 min");
     });
 
-    it("updates the countdown every 30 seconds", () => {
-        send("maintenance.scheduled", { startsAt: iso(2 * HOUR), durationMinutes: 30, message: "" });
-        vi.setSystemTime(new Date(NOW.getTime() + HOUR + 60_000));
-        vi.advanceTimersByTime(30_000);
-        expect(banner().querySelector("[data-banner-countdown]").textContent).toBe("in 59 minutes");
+    it("keeps the countdown current to the second, then counts the window under way", () => {
+        send("maintenance.scheduled", { startsAt: iso(2 * MINUTE), durationMinutes: 30, message: "" });
+        const countdown = banner().querySelector("[data-banner-countdown]");
+        expect(countdown.textContent).toBe("in 2m");
+        vi.advanceTimersByTime(1000);
+        expect(countdown.textContent).toBe("in 1m 59s");
+        vi.advanceTimersByTime(2 * MINUTE + 4000);
+        expect(countdown.textContent).toBe("under way for 5s");
+        expect(banner().hidden).toBe(false);
     });
 
     it("hides the banner once the window has ended", () => {
@@ -68,7 +77,7 @@ describe("maintenance.scheduled", () => {
         vi.setSystemTime(new Date(NOW.getTime() + HOUR + 30 * 60_000));
         vi.advanceTimersByTime(30_000);
         expect(banner().hidden).toBe(true);
-        expect(vi.getTimerCount()).toBe(0);
+        expect(vi.getTimerCount()).toBe(idleTimers);
     });
 
     it("is idempotent: the same maintenance twice keeps one banner and a dismissal", () => {
@@ -113,7 +122,7 @@ describe("maintenance.cancelled", () => {
         send("maintenance.scheduled", { startsAt, durationMinutes: 30, message: "m" });
         send("maintenance.cancelled", { originalStartsAt: startsAt, reason: "<i>r</i>" });
         expect(banner().hidden).toBe(true);
-        expect(vi.getTimerCount()).toBe(0);
+        expect(vi.getTimerCount()).toBe(idleTimers);
         expect(snackbars()).toHaveLength(1);
         expect(snackbars()[0].textContent).toBe("Maintenance cancelled: <i>r</i>");
         expect(snackbars()[0].querySelector("i")).toBeNull();

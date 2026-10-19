@@ -14,8 +14,9 @@
     <mdui-card class="admin-broadcast-current" variant="outlined" th:if="${maintenance != null}"
                th:attr="data-current-starts-at=${maintenance.get('startsAt')}">
         <strong th:text="#{admin.broadcast.current}">Announced maintenance</strong>
-        <div><time class="admin-broadcast-current-start" th:attr="datetime=${maintenance.get('startsAt')}" th:text="${maintenance.get('startsAt')}">start</time>
-            · <span th:text="${maintenance.get('durationMinutes')}">30</span> min</div>
+        <div><time class="admin-broadcast-current-start" data-live-time="datetime" th:attr="datetime=${maintenance.get('startsAt')}" th:text="${maintenance.get('startsAt')}">start</time>
+            · <span data-live-time="countdown" th:attr="datetime=${maintenance.get('startsAt')},data-label-future=#{broadcast.maintenance.countdown('{0}')},data-label-past=#{broadcast.maintenance.ongoing('{0}')}"></span>
+            · <span th:text="#{broadcast.maintenance.duration(${maintenance.get('durationMinutes')})}">30 min</span></div>
         <div class="admin-cell-muted" th:text="${maintenance.get('message')}">message</div>
         <mdui-button id="admin-broadcast-cancel-current" variant="tonal" th:text="#{admin.broadcast.cancel-current}">Cancel it</mdui-button>
     </mdui-card>

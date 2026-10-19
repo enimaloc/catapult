@@ -25,7 +25,7 @@
     <div class="notification-content">
         <div class="notification-title" th:text="${n.title()}">title</div>
         <div class="notification-body" th:utext="${n.bodyHtml()}">body</div>
-        <time class="notification-date" th:datetime="${n.createdAt()}"></time>
+        <time class="notification-date" data-live-time="relative" th:datetime="${n.createdAt()}"></time>
         <mdui-button th:if="${n.ctaUrl() != null}" class="notification-cta" variant="text" target="_blank" rel="noopener"
                      th:href="${n.ctaUrl()}" th:text="${n.ctaLabel() != null ? n.ctaLabel() : n.ctaUrl()}">cta</mdui-button>
     </div>
@@ -39,7 +39,7 @@
         <div class="notification-content">
             <div class="notification-title"></div>
             <div class="notification-body"></div>
-            <time class="notification-date" datetime=""></time>
+            <time class="notification-date" data-live-time="relative" datetime=""></time>
             <mdui-button class="notification-cta" variant="text" target="_blank" rel="noopener" hidden></mdui-button>
         </div>
     </div>
