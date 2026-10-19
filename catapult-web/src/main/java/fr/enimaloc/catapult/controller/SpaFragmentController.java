@@ -56,8 +56,13 @@ public class SpaFragmentController {
     String channel(Model model, @PathVariable String username,
                    @RequestParam(defaultValue = "0") int page,
                    @RequestParam(required = false) String status,
-                   @RequestParam(required = false) String source) {
-        filler.channel(model, username, page, status, source);
+                   @RequestParam(required = false) String source, HttpServletResponse response) {
+        int refused = filler.channel(model, username, page, status, source);
+        if (refused != 0) {
+            response.setStatus(refused);
+            filler.error(model, refused);
+            return "pages/error :: error";
+        }
         filler.defaultAttr(model, "channel");
         return "pages/channel :: channel";
     }

@@ -152,7 +152,8 @@ public class MockApiService implements ApiService {
     @Override
     public ChannelPageData channelPage(String username, int page, String status, String source) {
         log.trace("channelPage({}, {}, {}, {})", username, page, status, source);
-        return currentData().getPage(username, status, source);
+        MockData current = currentData();
+        return current != null ? current.getPage(username, status, source) : null; // a visitor: catapult-api's 401
     }
 
     @Override
