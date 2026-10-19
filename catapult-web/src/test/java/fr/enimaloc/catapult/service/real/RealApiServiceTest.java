@@ -240,6 +240,22 @@ class RealApiServiceTest {
     }
 
     @Test
+    void help_forwardsTheLocale() {
+        expect(HttpMethod.GET, "/api/help/status")
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("Accept-Language", "fr-FR"))
+                .andRespond(withSuccess("{\"title\":\"Statut\",\"body\":\"<p>x</p>\"}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.help("status", java.util.Locale.FRANCE))
+                .isEqualTo(new fr.enimaloc.catapult.common.dto.HelpContent("Statut", "<p>x</p>"));
+    }
+
+    @Test
+    void help_isNullWhenUnreachable() {
+        expect(HttpMethod.GET, "/api/help/status").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        assertThat(service.help("status", java.util.Locale.ENGLISH)).isNull();
+    }
+
+    @Test
     void widgetObsConfig_isNullWhenUnknownDisabledOrUnreachable() {
         UUID token = UUID.randomUUID();
         expect(HttpMethod.GET, "/api/twitchat/widget/" + token).andRespond(withStatus(HttpStatus.NOT_FOUND));

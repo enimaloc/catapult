@@ -7,7 +7,10 @@
     </div>
 
     <mdui-card id="channel-ccl-settings-form" class="settings-card" variant="outlined">
-        <h3 th:text="#{channel.settings.ccl.title}">Filtres de contenu</h3>
+        <div class="title-row">
+            <h3 th:text="#{channel.settings.ccl.title}">Filtres de contenu</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('ccl-settings')}"></mdui-button-icon>
+        </div>
         <label th:replace="~{fragments/controls :: labelledSwitch('ccl-enabled-checkbox',
                 ${settings.cclFeatureEnabled()}, 'channel.settings.ccl.enable', 'settings-master-toggle')}"></label>
         <span class="eyebrow" th:text="#{channel.settings.ccl.select_disable}"></span>
@@ -17,7 +20,10 @@
     </mdui-card>
 
     <mdui-card id="channel-tw-settings-form" class="settings-card" variant="outlined">
-        <h3 th:text="#{channel.settings.tw.title}">Avertissements</h3>
+        <div class="title-row">
+            <h3 th:text="#{channel.settings.tw.title}">Avertissements</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('tw-settings')}"></mdui-button-icon>
+        </div>
         <label th:replace="~{fragments/controls :: labelledSwitch('tw-enabled-checkbox',
                 ${settings.twFeatureEnabled()}, 'channel.settings.tw.enable', 'settings-master-toggle')}"></label>
         <span class="eyebrow" th:text="#{channel.settings.tw.select_disable}"></span>
@@ -27,7 +33,10 @@
     </mdui-card>
 
     <mdui-card id="channel-no-game-settings-form" class="settings-card" variant="outlined">
-        <h3 th:text="#{channel.settings.no_game.title}">Aucun jeu détecté</h3>
+        <div class="title-row">
+            <h3 th:text="#{channel.settings.no_game.title}">Aucun jeu détecté</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('no-game')}"></mdui-button-icon>
+        </div>
         <th:block th:replace="~{fragments/controls :: gamePicker('no-game',
                 ${settings.noGameTwitchGameId()}, ${settings.noGameTwitchGameName()})}"></th:block>
         <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()}, 'no-game-ccl-checkbox',
@@ -55,7 +64,10 @@
     <!--/* The owner's alone: catapult-api refuses anyone else, so the card isn't offered to a moderator. */-->
     <mdui-card id="channel-danger-zone" class="settings-card danger-zone-card" variant="outlined"
                th:if="${channelPage.isOwner() and dangerZone != null}" th:attr="data-username=${username}">
-        <h3 th:text="${dangerZone.pending()} ? #{channel.settings.danger.pending_title} : #{channel.settings.danger.title}">Zone danger</h3>
+        <div class="title-row">
+            <h3 th:text="${dangerZone.pending()} ? #{channel.settings.danger.pending_title} : #{channel.settings.danger.title}">Zone danger</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('danger-zone')}"></mdui-button-icon>
+        </div>
         <th:block th:if="${dangerZone.pending()}">
             <p th:if="${dangerZone.deletesAt() != null}"
                th:text="#{channel.settings.danger.pending_description(${#temporals.format(dangerZone.deletesAt(), #messages.msg('format.date'))})}">Ton compte sera supprimé le</p>

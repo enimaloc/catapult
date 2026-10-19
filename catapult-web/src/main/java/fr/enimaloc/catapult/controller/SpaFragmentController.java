@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.HelpContent;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * The fragments spa.js swaps into #app on client-side navigation — one per
@@ -26,7 +29,10 @@ import java.util.Locale;
 @RequestMapping("/spa")
 @RequiredArgsConstructor
 public class SpaFragmentController {
+    private static final Pattern HELP_CARD_ID = Pattern.compile("[a-z-]{1,40}");
+
     private final ModelFiller filler;
+    private final ApiService apiService;
     private final NavEventStreamController navEvents;
 
     @GetMapping("/landing")
@@ -115,6 +121,24 @@ public class SpaFragmentController {
         filler.join(model, invite, error);
         filler.defaultAttr(model, "join");
         return "pages/join :: join";
+    }
+
+    /**
+     * A card's help, in the visitor's language, for the side sheet help.js fills. catapult-api's answer
+     * is its own message bundles, so its HTML is rendered as is ({@code th:utext}); the card id (checked
+     * here, it reaches a catapult-api path) is the only thing the visitor chooses.
+     */
+    @GetMapping("/help/{cardId}")
+    String help(Model model, @PathVariable String cardId, Locale locale, HttpServletResponse response) {
+        if (!HELP_CARD_ID.matcher(cardId).matches()) {
+            response.setStatus(HttpStatus.NOT_FOUND.value());
+            filler.error(model, HttpStatus.NOT_FOUND.value());
+            return "pages/error :: error";
+        }
+        HelpContent help = apiService.help(cardId, locale);
+        model.addAttribute("helpTitle", help != null ? help.title() : cardId);
+        model.addAttribute("helpBody", help != null ? help.body() : "");
+        return "fragments/help :: content";
     }
 
     @GetMapping("/{page}")

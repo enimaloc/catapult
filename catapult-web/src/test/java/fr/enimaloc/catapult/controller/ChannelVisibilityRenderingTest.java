@@ -248,6 +248,22 @@ class ChannelVisibilityRenderingTest {
         assertThat(noObs).doesNotContain("obs-widget", "11111111-2222-3333-4444-555555555555");
     }
 
+    @Test
+    void channel_cardsCarryTheirHelpButtons() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+        when(apiService.accountInfo()).thenReturn(new fr.enimaloc.catapult.common.dto.UserInfoResponse(
+                null, "1", "enimaloc", null, "ACTIVE", List.of(), null));
+        when(apiService.accountDeletionDelayDays()).thenReturn(7);
+
+        String html = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        for (String card : List.of("status", "bindings", "ccl-settings", "no-game", "tw-settings", "connections", "danger-zone")) {
+            assertThat(countOccurrences(html, "data-help=\"" + card + "\"")).as(card).isEqualTo(1);
+        }
+        assertThat(html).contains("icon=\"help_outline\"");
+    }
+
     private ChannelPageData channelPageData(boolean isLive) {
         return channelPageData(isLive, null);
     }
