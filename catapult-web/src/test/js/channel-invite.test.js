@@ -9,13 +9,14 @@ let postJson;
 let refresh;
 let release;
 let writeText;
+let showError;
 
 const dialog = () => document.getElementById("invite-regenerate-dialog");
 const confirm = () => dialog().querySelector(".invite-regenerate-confirm");
 
 function page() {
     html(`
-        <mdui-card id="channel-invite">
+        <mdui-card id="channel-invite" data-label-refused="refused" data-label-rate-limited="slow" data-label-unavailable="down" data-label-copied="copied" data-label-copy-failed="nocopy">
             <mdui-text-field id="invite-link" readonly value="https://catapult.test/join?invite=ABC234"></mdui-text-field>
             <mdui-button id="invite-copy-btn"></mdui-button>
             <mdui-button id="invite-regenerate-btn"></mdui-button>
@@ -28,12 +29,14 @@ function page() {
 }
 
 beforeEach(async () => {
+    showError = vi.fn();
     postJson = vi.fn(() => new Promise(resolve => { release = () => resolve(response(204)); }));
     refresh = vi.fn(async () => {});
     writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     await load("channel-invite");
-    window.CatapultChannel = { baseUrl: () => "/channel/me", postJson, refresh, showError: vi.fn() };
+    window.CatapultChannel = { baseUrl: () => "/channel/me", refresh, showError };
+    window.CatapultCsrf = { postJson };
 });
 
 describe("channel-invite", () => {
@@ -44,6 +47,17 @@ describe("channel-invite", () => {
         await flush();
 
         expect(writeText).toHaveBeenCalledWith("https://catapult.test/join?invite=ABC234");
+        expect(showError).toHaveBeenCalledWith("copied");
+    });
+
+    it("says so when the clipboard refuses", async () => {
+        writeText.mockRejectedValue(new Error("denied"));
+        page();
+
+        document.getElementById("invite-copy-btn").click();
+        await flush();
+
+        expect(showError).toHaveBeenCalledWith("nocopy");
     });
 
     it("asks before regenerating, then refreshes", async () => {
@@ -75,13 +89,16 @@ describe("channel-invite", () => {
         expect(postJson).not.toHaveBeenCalled();
     });
 
-    it("keeps the page and frees the button when the request fails", async () => {
-        postJson.mockImplementation(async () => response(502));
+    it.each([[403, "refused"], [429, "slow"], [502, "down"]])("tells the member about a %i, closes the dialog and frees the button", async (status, label) => {
+        postJson.mockImplementation(async () => response(status));
         page();
+        document.getElementById("invite-regenerate-btn").click();
 
         confirm().click();
         await flush();
 
+        expect(showError).toHaveBeenCalledWith(label);
+        expect(dialog().open).toBe(false);
         expect(refresh).not.toHaveBeenCalled();
         expect(confirm().disabled).toBe(false);
     });

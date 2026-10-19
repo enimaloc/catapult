@@ -25,12 +25,14 @@ import lombok.Setter;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
@@ -111,7 +113,7 @@ public class MockData {
     private String inviteCode = newInviteCode();
     private Instant inviteRegeneratedAt = Instant.now();
     private final List<InviteRedemptionDto> inviteRedemptions = List.of(
-            new InviteRedemptionDto("4242", Instant.now().minus(3, java.time.temporal.ChronoUnit.DAYS)));
+            new InviteRedemptionDto("4242", Instant.now().minus(3, ChronoUnit.DAYS)));
     /** The admin members page's accounts, built on its first visit from the channels as they are then. */
     private MockMembers members;
     /** The admin page's CCL, caches and data tabs, built on their first visit. */
@@ -437,7 +439,7 @@ public class MockData {
     /** Eight characters of the join page's alphabet, {@code [A-Z2-9]}. */
     private static String newInviteCode() {
         String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ23456789";
-        java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+        ThreadLocalRandom random = ThreadLocalRandom.current();
         StringBuilder code = new StringBuilder();
         for (int i = 0; i < 8; i++) code.append(alphabet.charAt(random.nextInt(alphabet.length())));
         return code.toString();
