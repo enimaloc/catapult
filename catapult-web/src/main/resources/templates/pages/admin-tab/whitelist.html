@@ -1,0 +1,124 @@
+<!--/*@thymesVar id="whitelist" type="fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto"*/-->
+<!--/*
+  The whitelist: its switch and status, a card adding a Twitch id, then (whitelist on) the Invitations card with its
+  own switch and, when on, the global settings, the "cap reached" warning and every invite with a Quota dialog;
+  finally the entries (Twitch id, resolved login or an em dash, Delete confirmed). Driven by admin-whitelist.js.
+*/-->
+<div th:fragment="content" class="admin-view admin-whitelist"
+     th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+              data-label-invalid=#{admin.whitelist.invalid},data-label-unknown=#{admin.whitelist.unknown},
+              data-label-unavailable=#{admin.whitelist.unavailable},data-label-added=#{admin.whitelist.added},
+              data-label-deleted=#{admin.whitelist.deleted},data-label-toggled=#{admin.whitelist.toggled},
+              data-label-invites-toggled=#{admin.whitelist.invite.toggled},data-label-settings-saved=#{admin.whitelist.invite.settings.saved},
+              data-label-quota-saved=#{admin.whitelist.invite.quota.saved}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.whitelist}">Whitelist</h2>
+    </div>
+
+    <th:block th:if="${whitelist == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+
+    <th:block th:if="${whitelist != null}">
+        <mdui-card class="admin-whitelist-card" variant="outlined">
+            <div class="admin-whitelist-head">
+                <p th:text="${whitelist.whitelistEnabled()} ? #{admin.whitelist.status.enabled} : #{admin.whitelist.status.disabled}">status</p>
+                <mdui-button variant="tonal" class="admin-whitelist-toggle" data-whitelist-toggle
+                             th:text="${whitelist.whitelistEnabled()} ? #{admin.whitelist.toggle.disable} : #{admin.whitelist.toggle.enable}">Toggle</mdui-button>
+            </div>
+        </mdui-card>
+
+        <mdui-card class="admin-whitelist-card" variant="outlined">
+            <div class="admin-whitelist-add">
+                <mdui-text-field name="twitchId" variant="outlined" required inputmode="numeric" maxlength="20"
+                                 th:attr="label=#{admin.whitelist.add.label}"></mdui-text-field>
+                <mdui-button variant="filled" icon="add" class="admin-whitelist-add-save" th:text="#{admin.whitelist.add.button}">Add</mdui-button>
+            </div>
+        </mdui-card>
+
+        <mdui-card class="admin-whitelist-card admin-whitelist-invites" variant="outlined" th:if="${whitelist.whitelistEnabled()}">
+            <div class="admin-whitelist-head">
+                <h3 th:text="#{admin.whitelist.invite.title}">Invitations</h3>
+                <mdui-button variant="tonal" class="admin-whitelist-invites-toggle" data-invites-toggle
+                             th:text="${whitelist.inviteEnabled()} ? #{admin.whitelist.invite.toggle.disable} : #{admin.whitelist.invite.toggle.enable}">Toggle</mdui-button>
+            </div>
+
+            <th:block th:if="${whitelist.inviteEnabled()}">
+                <div class="admin-whitelist-settings">
+                    <mdui-text-field name="globalMaxMembers" type="number" min="1" variant="outlined"
+                                     th:attr="label=#{admin.whitelist.invite.settings.global-max},value=${whitelist.globalMaxMembers()}"></mdui-text-field>
+                    <mdui-text-field name="defaultMaxUses" type="number" min="0" variant="outlined"
+                                     th:attr="label=#{admin.whitelist.invite.settings.default-max-uses},value=${whitelist.defaultMaxUses()}"></mdui-text-field>
+                    <mdui-checkbox name="defaultCanReinvite" th:attr="checked=${whitelist.defaultCanReinvite()} ? 'checked' : null"
+                                   th:text="#{admin.whitelist.invite.settings.default-can-reinvite}">Invitees can invite</mdui-checkbox>
+                    <mdui-button variant="filled" class="admin-whitelist-settings-save" th:text="#{admin.whitelist.invite.settings.save}">Save</mdui-button>
+                </div>
+                <p class="admin-whitelist-cap" th:if="${whitelist.globalCapReached()}" th:text="#{admin.whitelist.invite.cap-reached}">Cap reached</p>
+
+                <p class="admin-cell-muted" th:if="${whitelist.invites().isEmpty()}" th:text="#{admin.whitelist.invite.empty}">No invitation.</p>
+                <div class="admin-table" th:unless="${whitelist.invites().isEmpty()}">
+                    <div class="admin-row admin-whitelist-invite-row admin-row-head" aria-hidden="true">
+                        <span th:text="#{admin.whitelist.invite.column.owner}">Owner</span>
+                        <span th:text="#{admin.whitelist.invite.column.code}">Code</span>
+                        <span th:text="#{admin.whitelist.invite.column.uses}">Uses</span>
+                        <span th:text="#{admin.whitelist.invite.column.max-uses}">Max</span>
+                        <span th:text="#{admin.whitelist.invite.column.can-reinvite}">Reinvite</span>
+                        <span></span>
+                    </div>
+                    <div class="admin-row admin-whitelist-invite-row" th:each="inv : ${whitelist.invites()}" th:attr="data-invite=${inv.id()}">
+                        <span class="admin-cell" th:attr="data-label=#{admin.whitelist.invite.column.owner}" th:text="${inv.ownerUsername()}">owner</span>
+                        <span class="admin-member-id" th:attr="data-label=#{admin.whitelist.invite.column.code}" th:text="${inv.code()}">CODE</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.whitelist.invite.column.uses}" th:text="${inv.useCount()}">1</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.whitelist.invite.column.max-uses}">
+                            <span th:if="${inv.maxUses() == null}" class="admin-cell-muted" th:text="|(#{admin.whitelist.invite.default})|">(default)</span>
+                            <span th:unless="${inv.maxUses() == null}" th:classappend="${inv.maxUses() == 0} ? 'admin-whitelist-zero'" th:text="${inv.maxUses()}">5</span>
+                        </span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.whitelist.invite.column.can-reinvite}"
+                              th:text="${inv.canReinvite() == null ? '—' : (inv.canReinvite() ? '✓' : '✗')}">✓</span>
+                        <span class="admin-row-actions">
+                            <mdui-button variant="text" class="admin-whitelist-quota"
+                                         th:attr="data-quota=${inv.id()},data-max-uses=${inv.maxUses()},data-can-reinvite=${inv.canReinvite() == null ? '' : inv.canReinvite()}"
+                                         th:text="#{admin.whitelist.invite.quota.open}">Quota</mdui-button>
+                        </span>
+                    </div>
+                </div>
+            </th:block>
+        </mdui-card>
+
+        <th:block th:if="${whitelist.entries().isEmpty()}">
+            <th:block th:replace="~{pages/admin-tab/common :: empty('person_off', #{admin.whitelist.empty})}"></th:block>
+        </th:block>
+        <mdui-card class="admin-table" variant="outlined" th:unless="${whitelist.entries().isEmpty()}">
+            <div class="admin-row admin-whitelist-row admin-row-head" aria-hidden="true">
+                <span th:text="#{admin.whitelist.column.twitch-id}">Twitch ID</span>
+                <span th:text="#{admin.whitelist.column.username}">Username</span>
+                <span></span>
+            </div>
+            <div class="admin-row admin-whitelist-row" th:each="entry : ${whitelist.entries()}">
+                <span class="admin-member-id" th:attr="data-label=#{admin.whitelist.column.twitch-id}" th:text="${entry.twitchId()}">1</span>
+                <span class="admin-cell" th:attr="data-label=#{admin.whitelist.column.username}"
+                      th:text="${whitelist.resolvedUsernames().get(entry.twitchId()) ?: '—'}">login</span>
+                <span class="admin-row-actions">
+                    <mdui-button-icon icon="delete" class="admin-whitelist-delete"
+                                      th:attr="data-delete=${entry.twitchId()},aria-label=#{admin.whitelist.action.delete},
+                                      data-confirm=#{admin.whitelist.action.delete-confirm(${entry.twitchId()})}"></mdui-button-icon>
+                </span>
+            </div>
+        </mdui-card>
+
+        <mdui-dialog id="admin-whitelist-quota-dialog" class="admin-dialog" close-on-overlay-click>
+            <div class="admin-whitelist-form">
+                <h3 th:text="#{admin.whitelist.invite.quota.title}">Quota</h3>
+                <mdui-text-field name="maxUses" type="number" min="0" variant="outlined"
+                                 th:attr="label=#{admin.whitelist.invite.column.max-uses},helper=#{admin.whitelist.invite.quota.helper}"></mdui-text-field>
+                <mdui-select name="canReinvite" variant="outlined" th:attr="label=#{admin.whitelist.invite.column.can-reinvite}" value="">
+                    <mdui-menu-item value="" th:text="#{admin.whitelist.invite.quota.reinvite-default}">Default</mdui-menu-item>
+                    <mdui-menu-item value="true" th:text="#{admin.whitelist.invite.quota.reinvite-yes}">Yes</mdui-menu-item>
+                    <mdui-menu-item value="false" th:text="#{admin.whitelist.invite.quota.reinvite-no}">No</mdui-menu-item>
+                </mdui-select>
+                <div class="admin-data-actions">
+                    <mdui-button variant="text" class="admin-dialog-close" th:text="#{admin.cancel}">Cancel</mdui-button>
+                    <mdui-button variant="filled" class="admin-whitelist-quota-save" th:text="#{admin.whitelist.invite.quota.save}">Save</mdui-button>
+                </div>
+            </div>
+        </mdui-dialog>
+    </th:block>
+</div>

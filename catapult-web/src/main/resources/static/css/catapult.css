@@ -1949,3 +1949,26 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     .admin-targeting-form { grid-template-columns: minmax(0, 1fr); }
     .admin-targeting-form > mdui-select:only-of-type { grid-column: auto; }
 }
+
+/* The admin Whitelist tab. */
+.admin-whitelist-card { padding: 16px; margin-bottom: 16px; }
+.admin-whitelist-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.admin-whitelist-head p, .admin-whitelist-head h3 { margin: 0; }
+.admin-whitelist-add { display: flex; gap: 12px; align-items: start; }
+.admin-whitelist-add mdui-text-field { flex: 1; max-width: 20rem; }
+.admin-whitelist-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: center; margin: 16px 0 8px; }
+.admin-whitelist-settings mdui-checkbox, .admin-whitelist-settings mdui-button { justify-self: start; }
+.admin-whitelist-cap { color: rgb(var(--mdui-color-error)); margin: 8px 0; }
+.admin-whitelist-zero { color: rgb(var(--mdui-color-error)); font-weight: 600; }
+.admin-whitelist-invite-row { grid-template-columns: minmax(0, 1fr) 8rem 5rem 7rem 7rem auto; }
+.admin-whitelist-row { grid-template-columns: 12rem minmax(0, 1fr) auto; }
+.admin-whitelist-form { display: flex; flex-direction: column; gap: 12px; min-width: min(480px, 100%); }
+@media (max-width: 650px) {
+    .admin-whitelist-add { flex-direction: column; align-items: stretch; }
+    .admin-whitelist-add mdui-text-field { max-width: none; }
+    .admin-whitelist-settings { grid-template-columns: minmax(0, 1fr); }
+    .admin-whitelist-invite-row, .admin-whitelist-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-whitelist-invite-row > [data-label]::before, .admin-whitelist-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-whitelist-invite-row > .admin-row-actions { grid-column: 1 / -1; }
+    .admin-whitelist-invite-row > .admin-cell, .admin-whitelist-row > .admin-cell { white-space: normal; }
+}
