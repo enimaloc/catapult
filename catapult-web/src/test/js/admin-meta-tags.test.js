@@ -122,8 +122,17 @@ describe("admin-meta-tags", () => {
 
     it("saves with Enter in a field", async () => {
         field("key").value = "author";
+        field("content").value = "Jane";
         field("content").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
         await flush();
-        expect(posted).toHaveBeenCalledWith("/admin/meta/tags", { attribute: "NAME", key: "author", content: "" });
+        expect(posted).toHaveBeenCalledWith("/admin/meta/tags", { attribute: "NAME", key: "author", content: "Jane" });
+    });
+
+    it("doesn't save on the Enter that confirms an IME's conversion", async () => {
+        field("key").value = "author";
+        field("content").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true }));
+        field("content").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", keyCode: 229, bubbles: true }));
+        await flush();
+        expect(posted).not.toHaveBeenCalled();
     });
 });

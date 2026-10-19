@@ -79,6 +79,7 @@ window.CatapultAdminMetaTags = (function () {
         });
         panel.addEventListener("keydown", event => {
             if (event.key !== "Enter" || !event.target.closest?.(".admin-meta-tags-form mdui-text-field")) return;
+            if (event.isComposing || event.keyCode === 229) return; // confirming an IME's conversion
             event.preventDefault();
             panel.querySelector(".admin-meta-tag-save")?.click();
         });
