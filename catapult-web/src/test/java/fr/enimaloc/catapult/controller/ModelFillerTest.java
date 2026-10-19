@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -44,10 +45,14 @@ class ModelFillerTest {
 
     private final ApiService api = mock(ApiService.class);
     private final StaticMessageSource messages = new StaticMessageSource();
+    private final SiteMetaTags siteMetaTags = mock(SiteMetaTags.class);
     private ExtendedModelMap model;
 
     private ModelFiller filler(Optional<BuildProperties> buildProperties) {
-        return new ModelFiller(buildProperties, messages, api, new TwitchatEventForms(TwitchatCatalog.load()));
+        @SuppressWarnings("unchecked")
+        ObjectProvider<SiteMetaTags> metaTags = mock(ObjectProvider.class);
+        when(metaTags.getIfAvailable()).thenReturn(siteMetaTags);
+        return new ModelFiller(buildProperties, messages, api, new TwitchatEventForms(TwitchatCatalog.load()), metaTags);
     }
 
     private ModelFiller filler() {
@@ -72,6 +77,20 @@ class ModelFillerTest {
         assertThat(model.get("page")).isEqualTo("privacy");
         assertThat(model.get("app")).isEqualTo(
                 new ModelFiller.AppModel(SiteCatalog.FEATURES, SiteCatalog.PLATFORMS, SiteCatalog.PAGES));
+    }
+
+    @Test
+    void defaultAttr_withLocale_addsTheAdminsMetaTags_theFragmentVariantDoesnt() {
+        var tag = new fr.enimaloc.catapult.common.dto.admin.MetaTagDto(1,
+                fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute.NAME, "author", "x", null);
+        when(siteMetaTags.tags()).thenReturn(List.of(tag));
+
+        filler().defaultAttr(model, "privacy");
+        assertThat(model).doesNotContainKey("metaTags");
+        verifyNoMoreInteractions(siteMetaTags);
+
+        filler().defaultAttr(model, "", Locale.FRENCH);
+        assertThat(model.get("metaTags")).isEqualTo(List.of(tag));
     }
 
     @Test

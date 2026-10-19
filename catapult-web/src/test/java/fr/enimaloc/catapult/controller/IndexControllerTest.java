@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = {IndexController.class, SpaFragmentController.class})
 // I18nConfiguration: titles like "{0} - #{app.brand}" need its message source, as in production.
-@Import({ModelFiller.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
+@Import({ModelFiller.class, SiteMetaTags.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
 class IndexControllerTest {
 
     @Autowired MockMvc mvc;
@@ -221,6 +221,13 @@ class IndexControllerTest {
         } finally {
             siteMetaTags.clear();
         }
+    }
+
+    @Test
+    void anSpaFragment_doesntLoadTheAdminsMetaTags() throws Exception {
+        siteMetaTags.clear();
+        mvc.perform(get("/spa/landing")).andExpect(status().isOk());
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).metaTags();
     }
 
     @Test

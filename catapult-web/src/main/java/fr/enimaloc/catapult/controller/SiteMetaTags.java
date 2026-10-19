@@ -4,30 +4,38 @@ import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.service.ApiService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * The meta tags the admin configured (Meta tab), written into the head of every page by index.html.
- * catapult-api's list is kept 60 s, so a page doesn't reach it each time, and emptied when the admin
- * changes a tag. When catapult-api fails, the last list known is kept showing (none before the first).
+ * The meta tags the admin configured (Meta tab), written into the head of every page by index.html
+ * (see ModelFiller#defaultAttr). catapult-api's list is kept 60 s, so a page doesn't reach it each time,
+ * and marked stale when the admin changes a tag. One page at a time loads it, the others meanwhile get
+ * the last list known; that list also keeps showing when catapult-api fails, tried again 10 s later.
  */
-@ControllerAdvice(assignableTypes = {IndexController.class, ErrorPageController.class})
+@Component
 public class SiteMetaTags {
     static final Duration TTL = Duration.ofSeconds(60);
+    static final Duration RETRY = Duration.ofSeconds(10);
 
-    private record Entry(List<MetaTagDto> tags, Instant until) {}
+    private record Entry(List<MetaTagDto> tags, Instant until) {
+        Entry stale() {
+            return new Entry(tags, Instant.MIN);
+        }
+    }
 
     private final ObjectProvider<ApiService> apiService;
     private final Clock clock;
-    private volatile Entry entry;
-    /** Bumped by {@link #clear()}: a list loaded before it may predate the change and isn't kept. */
+    private final AtomicReference<Entry> entry = new AtomicReference<>(new Entry(List.of(), Instant.MIN));
+    private final ReentrantLock loading = new ReentrantLock();
+    /** Bumped by {@link #clear()}: a list loaded before it may predate the change and is kept stale. */
     private final AtomicLong generation = new AtomicLong();
 
     @Autowired
@@ -40,24 +48,30 @@ public class SiteMetaTags {
         this.clock = clock;
     }
 
-    @ModelAttribute("metaTags")
-    public List<MetaTagDto> metaTags() {
-        Instant now = clock.instant();
-        Entry current = entry;
-        if (current != null && now.isBefore(current.until())) return current.tags();
-        long loadedAt = generation.get();
-        ApiService api = apiService.getIfAvailable();
-        List<MetaTagDto> tags = api == null ? null : api.metaTags();
-        if (tags == null) return current == null ? List.of() : current.tags();
-        Entry loaded = new Entry(List.copyOf(tags), now.plus(TTL));
-        entry = loaded;
-        // a clear() since the load: this list may predate the change, the next page loads it again
-        if (generation.get() != loadedAt && entry == loaded) entry = null;
-        return loaded.tags();
+    public List<MetaTagDto> tags() {
+        Entry current = entry.get();
+        if (clock.instant().isBefore(current.until()) || !loading.tryLock()) return current.tags();
+        try {
+            current = entry.get();
+            Instant now = clock.instant();
+            if (now.isBefore(current.until())) return current.tags();
+            long loadedAt = generation.get();
+            ApiService api = apiService.getIfAvailable();
+            List<MetaTagDto> tags = api == null ? null : api.metaTags();
+            Entry loaded = tags == null
+                    ? new Entry(current.tags(), now.plus(RETRY))
+                    : new Entry(List.copyOf(tags), now.plus(TTL));
+            entry.set(loaded);
+            // a clear() during the load: this list may predate the change, the next page loads it again
+            if (generation.get() != loadedAt) entry.compareAndSet(loaded, loaded.stale());
+            return loaded.tags();
+        } finally {
+            loading.unlock();
+        }
     }
 
     public void clear() {
         generation.incrementAndGet();
-        entry = null;
+        entry.updateAndGet(Entry::stale);
     }
 }

@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.MessageSource;
 import org.springframework.core.io.ClassPathResource;
@@ -59,6 +60,7 @@ public class ModelFiller {
     private final MessageSource messageSource;
     private final ApiService apiService;
     private final TwitchatEventForms twitchatEventForms;
+    private final ObjectProvider<SiteMetaTags> siteMetaTags;
 
     public void defaultAttr(Model model, String page) {
         model.addAttribute("app", APP_MODEL);
@@ -66,14 +68,16 @@ public class ModelFiller {
     }
 
     /**
-     * Full-page variant: also the head's {@link Seo}, the localized titles spa.js swaps in on
-     * client-side navigation, and the navbar's login and admin states (its channels come after,
-     * see {@link #navChannels(Model)}).
+     * Full-page variant: also the head's {@link Seo} and admin-configured meta tags, the localized
+     * titles spa.js swaps in on client-side navigation, and the navbar's login and admin states (its
+     * channels come after, see {@link #navChannels(Model)}).
      */
     public void defaultAttr(Model model, String page, Locale locale) {
         defaultAttr(model, page);
         model.addAttribute("titles", titles(locale));
         model.addAttribute("seo", seo(model, page == null ? "" : page, locale));
+        SiteMetaTags metaTags = siteMetaTags.getIfAvailable();
+        model.addAttribute("metaTags", metaTags == null ? List.of() : metaTags.tags());
         model.addAttribute("loggedIn", ApiClient.hasSession());
         model.addAttribute("admin", isAdmin());
         model.addAttribute("impersonatedLogin", impersonatedLogin());
