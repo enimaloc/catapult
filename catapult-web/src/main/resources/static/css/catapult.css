@@ -311,6 +311,12 @@ mdui-top-app-bar {
     line-height: 1.7;
 }
 
+.hero-error {
+    margin: 24px auto 0;
+    max-width: 650px;
+    color: rgb(var(--mdui-color-error));
+}
+
 .hero-actions {
     display: flex;
     justify-content: center;

@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SiteCatalogTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "privacy", "channel", "admin", "notifications"})
+    @ValueSource(strings = {"", "privacy", "channel", "admin", "notifications", "login", "join"})
     void knowsEveryPage(String path) {
         assertThat(SiteCatalog.isPage(path)).isTrue();
     }
