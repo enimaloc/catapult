@@ -303,4 +303,42 @@ class ChannelActionsControllerTest {
 
         verify(apiService).dtddPropose("100", 4521L, "wrong game");
     }
+
+    @Test
+    void deleteAccount_relaysTheStatus_andNeedsCsrf() throws Exception {
+        when(apiService.deleteAccount("me", "Me")).thenReturn(204);
+
+        mvc.perform(post("/channel/me/settings/delete-account").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"confirmUsername\":\"Me\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/me/settings/delete-account")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"confirmUsername\":\"Me\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(apiService, org.mockito.Mockito.times(1)).deleteAccount("me", "Me");
+    }
+
+    @Test
+    void deleteAccount_relaysARefusal() throws Exception {
+        when(apiService.deleteAccount("other", "x")).thenReturn(403);
+
+        mvc.perform(post("/channel/other/settings/delete-account").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"confirmUsername\":\"x\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancelDeletion_relaysTheStatus_andNeedsCsrf() throws Exception {
+        when(apiService.cancelAccountDeletion("me")).thenReturn(204);
+
+        mvc.perform(post("/channel/me/settings/cancel-deletion").with(csrf()))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/me/settings/cancel-deletion"))
+                .andExpect(status().isForbidden());
+
+        verify(apiService, org.mockito.Mockito.times(1)).cancelAccountDeletion("me");
+    }
 }

@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
+import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
@@ -23,6 +24,7 @@ import fr.enimaloc.catapult.service.ApiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -113,6 +115,17 @@ public class ChannelActionsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void toggleTwEnabled(@PathVariable String bindingId, @RequestBody TwEnabledBody body) {
         apiService.toggleTwEnabled(bindingId, body.enabled());
+    }
+
+    /** Answered with catapult-api's status: the account's deletion is the one action the page must not guess at. */
+    @PostMapping("/channel/{username}/settings/delete-account")
+    public ResponseEntity<Void> deleteAccount(@PathVariable String username, @RequestBody DeleteAccountRequest body) {
+        return ResponseEntity.status(apiService.deleteAccount(username, body.confirmUsername())).build();
+    }
+
+    @PostMapping("/channel/{username}/settings/cancel-deletion")
+    public ResponseEntity<Void> cancelDeletion(@PathVariable String username) {
+        return ResponseEntity.status(apiService.cancelAccountDeletion(username)).build();
     }
 
     @PostMapping("/channel/{username}/settings/steam-personal-token")

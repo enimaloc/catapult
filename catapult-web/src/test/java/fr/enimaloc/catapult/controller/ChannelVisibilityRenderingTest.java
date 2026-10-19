@@ -129,6 +129,44 @@ class ChannelVisibilityRenderingTest {
                 .doesNotContain("disabled=\"disabled\"");
     }
 
+    @Test
+    void dangerZone_ownerOnly_andPendingShowsTheDate() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+        when(apiService.accountInfo()).thenReturn(new fr.enimaloc.catapult.common.dto.UserInfoResponse(
+                null, "1", "enimaloc", null, "ACTIVE", List.of(), null));
+        when(apiService.accountDeletionDelayDays()).thenReturn(7);
+
+        String active = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(active).contains("id=\"channel-danger-zone\"", "id=\"danger-zone-delete-dialog\"")
+                .doesNotContain("danger-zone-cancel-btn");
+
+        when(apiService.accountInfo()).thenReturn(new fr.enimaloc.catapult.common.dto.UserInfoResponse(
+                null, "1", "enimaloc", null, "PENDING_DELETION", List.of(), "2026-10-01T10:00:00Z"));
+
+        String pending = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(pending).contains("id=\"channel-danger-zone\"", "danger-zone-cancel-btn")
+                .containsAnyOf("08/10/2026", "10/08/2026")
+                .doesNotContain("danger-zone-delete-btn");
+
+        BindingDto binding = new BindingDto("binding-1", "AUTO", "STEAM", "Game A", null, "Game A",
+                false, true, Set.of(), true, false, Set.of());
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 1, List.of(binding)),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, "uuid"));
+
+        String moderator = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(moderator).doesNotContain("channel-danger-zone");
+    }
+
     private ChannelPageData channelPageData(boolean isLive) {
         return channelPageData(isLive, null);
     }

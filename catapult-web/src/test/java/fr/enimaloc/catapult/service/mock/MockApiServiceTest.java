@@ -76,6 +76,35 @@ class MockApiServiceTest {
         assertThat(service.channelPage("anyone", 0, null, null)).isNull();
     }
 
+    @Test
+    void deleteAccount_onlyWhenTheNameMatches_ignoringCase() {
+        assertThat(service.accountInfo().status()).isEqualTo("ACTIVE");
+
+        assertThat(service.deleteAccount(username, "WRONG")).isEqualTo(204);
+        assertThat(service.accountInfo().status()).isEqualTo("ACTIVE");
+
+        assertThat(service.deleteAccount(username, username.toUpperCase())).isEqualTo(204);
+        var pending = service.accountInfo();
+        assertThat(pending.status()).isEqualTo("PENDING_DELETION");
+        assertThat(pending.deletionRequestedAt()).isNotBlank();
+
+        assertThat(service.cancelAccountDeletion(username)).isEqualTo(204);
+        assertThat(service.accountInfo().status()).isEqualTo("ACTIVE");
+        assertThat(service.accountInfo().deletionRequestedAt()).isNull();
+    }
+
+    @Test
+    void deleteAccount_isRefusedForAnotherChannel() {
+        assertThat(service.deleteAccount("someone-else", "someone-else")).isEqualTo(403);
+        assertThat(service.cancelAccountDeletion("someone-else")).isEqualTo(403);
+        assertThat(service.accountInfo().status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void accountDeletionDelayDays_isTheApiDefault() {
+        assertThat(service.accountDeletionDelayDays()).isEqualTo(7);
+    }
+
     private BindingDto binding() {
         return data.getPrimaryBinding();
     }

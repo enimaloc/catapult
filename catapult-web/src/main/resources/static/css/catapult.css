@@ -1884,3 +1884,22 @@ mdui-select::part(menu) {
 mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color-error-container); --mdui-color-inverse-on-surface: var(--mdui-color-on-error-container); }
 /* Informs, does not block. Above the content, below the dialogs. */
 .broadcast-veil { position: fixed; inset: 0; z-index: 1500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: rgb(var(--mdui-color-surface) / 0.7); pointer-events: none; }
+
+/* Settings tab's danger zone: the card and its delete button read as destructive. */
+.danger-zone-card {
+    border-color: rgb(var(--mdui-color-error));
+}
+
+.danger-zone-card h3 {
+    color: rgb(var(--mdui-color-error));
+}
+
+.danger-zone-card p {
+    margin: 0;
+}
+
+#danger-zone-delete-btn,
+.danger-zone-confirm {
+    --mdui-color-primary: var(--mdui-color-error);
+    --mdui-color-on-primary: var(--mdui-color-on-error);
+}

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.mock;
 
+import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
@@ -687,5 +688,42 @@ public class MockApiService implements ApiService {
     public boolean executeTwitchatAction(String token) {
         log.trace("executeTwitchatAction({})", token);
         return true;
+    }
+
+    @Override
+    public UserInfoResponse accountInfo() {
+        log.trace("accountInfo()");
+        MockData current = currentData();
+        if (current == null) return null;
+        var channel = current.getChannelDto();
+        return new UserInfoResponse(channel.id(), channel.twitchId(), channel.twitchUsername(),
+                channel.profileImageUrl(), current.getAccountStatus(),
+                current.isAdmin() ? List.of("ROLE_USER", "ROLE_ADMIN") : List.of("ROLE_USER"),
+                current.getDeletionRequestedAt() == null ? null : current.getDeletionRequestedAt().toString());
+    }
+
+    @Override
+    public int accountDeletionDelayDays() {
+        return 7;
+    }
+
+    @Override
+    public int deleteAccount(String username, String confirmUsername) {
+        log.trace("deleteAccount({})", username);
+        MockData current = currentData();
+        if (current == null) return 401;
+        if (!current.getChannelDto().twitchUsername().equals(username)) return 403;
+        current.requestAccountDeletion(confirmUsername);
+        return 204;
+    }
+
+    @Override
+    public int cancelAccountDeletion(String username) {
+        log.trace("cancelAccountDeletion({})", username);
+        MockData current = currentData();
+        if (current == null) return 401;
+        if (!current.getChannelDto().twitchUsername().equals(username)) return 403;
+        current.cancelAccountDeletion();
+        return 204;
     }
 }

@@ -21,6 +21,7 @@ import lombok.Getter;
 import lombok.Setter;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -98,6 +99,11 @@ public class MockData {
     @Setter
     @Getter
     private boolean admin;
+    /** The account's lifecycle as catapult-api keeps it: ACTIVE, or PENDING_DELETION since {@link #deletionRequestedAt}. */
+    @Getter
+    private String accountStatus = "ACTIVE";
+    @Getter
+    private Instant deletionRequestedAt;
     /** The admin members page's accounts, built on its first visit from the channels as they are then. */
     private MockMembers members;
     /** The admin page's CCL, caches and data tabs, built on their first visit. */
@@ -393,6 +399,18 @@ public class MockData {
     public void deleteSteamToken() {
         hasSteamPersonalToken = false;
         steamTokenShared = false;
+    }
+
+    /** Mirrors catapult-api: only the channel's own name (case-insensitive) starts the deletion, anything else is ignored. */
+    public void requestAccountDeletion(String confirmUsername) {
+        if (!channelDto.twitchUsername().equalsIgnoreCase(confirmUsername)) return;
+        accountStatus = "PENDING_DELETION";
+        deletionRequestedAt = Instant.now();
+    }
+
+    public void cancelAccountDeletion() {
+        accountStatus = "ACTIVE";
+        deletionRequestedAt = null;
     }
 
     /** Mirrors catapult-api: blank host/port fall back to the defaults, a null password keeps the stored one. */

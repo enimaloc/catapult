@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.service.real;
 
+import fr.enimaloc.catapult.common.dto.UserInfoResponse;
+import fr.enimaloc.catapult.common.dto.AppConfigResponse;
+import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
@@ -68,6 +71,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Profile("!mock")
 public class RealApiService implements ApiService {
+    /** catapult-api's own default, used when its config can't be read. */
+    private static final int DEFAULT_DELETION_DELAY_DAYS = 7;
     private static final ParameterizedTypeReference<Map<String, List<TwitchatEventActionDto>>> EVENTS = new ParameterizedTypeReference<>() {};
 
     private static final ParameterizedTypeReference<AdminPage<CacheEntryDto>> CACHE_ENTRIES = new ParameterizedTypeReference<>() {};
@@ -507,5 +512,28 @@ public class RealApiService implements ApiService {
     @Override
     public int adminBroadcast(BroadcastRequestDto body) {
         return client.call(HttpMethod.POST, "/api/admin/broadcast", body, Void.class).status();
+    }
+
+    @Override
+    public UserInfoResponse accountInfo() {
+        return client.get("/api/auth/validate", UserInfoResponse.class);
+    }
+
+    @Override
+    public int accountDeletionDelayDays() {
+        AppConfigResponse config = client.get("/api/config/app", AppConfigResponse.class);
+        return config == null || config.deletionDelayDays() <= 0 ? DEFAULT_DELETION_DELAY_DAYS : config.deletionDelayDays();
+    }
+
+    @Override
+    public int deleteAccount(String username, String confirmUsername) {
+        return client.call(HttpMethod.POST, "/api/channels/{username}/settings/delete-account",
+                new DeleteAccountRequest(confirmUsername), Void.class, username).status();
+    }
+
+    @Override
+    public int cancelAccountDeletion(String username) {
+        return client.call(HttpMethod.POST, "/api/channels/{username}/settings/cancel-deletion", null, Void.class,
+                username).status();
     }
 }
