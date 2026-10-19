@@ -704,17 +704,27 @@ class RealApiServiceTest {
     }
 
     @Test
-    void metaTags_areReadWithoutTheBearer_andNullWhenCatapultApiFails() {
-        expect(HttpMethod.GET, "/api/meta-tags")
-                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist("Authorization"))
-                .andRespond(withSuccess("[{\"id\":1,\"attribute\":\"PROPERTY\",\"key\":\"og:image\",\"content\":\"https://x/y.png\","
-                        + "\"updatedAt\":\"2026-10-19T10:00:00Z\"}]", MediaType.APPLICATION_JSON));
-        expect(HttpMethod.GET, "/api/meta-tags").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+    void metaTags_areReadWithoutTheBearerEvenWithASessionJwt_andNullWhenCatapultApiFails() {
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        var session = new org.springframework.mock.web.MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "expired.jwt.token");
+        request.setSession(session);
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(request));
+        try {
+            expect(HttpMethod.GET, "/api/meta-tags")
+                    .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist("Authorization"))
+                    .andRespond(withSuccess("[{\"id\":1,\"attribute\":\"PROPERTY\",\"key\":\"og:image\",\"content\":\"https://x/y.png\","
+                            + "\"updatedAt\":\"2026-10-19T10:00:00Z\"}]", MediaType.APPLICATION_JSON));
+            expect(HttpMethod.GET, "/api/meta-tags").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
 
-        assertThat(service.metaTags()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.MetaTagDto(1,
-                fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute.PROPERTY, "og:image", "https://x/y.png",
-                java.time.Instant.parse("2026-10-19T10:00:00Z")));
-        assertThat(service.metaTags()).isNull();
+            assertThat(service.metaTags()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.MetaTagDto(1,
+                    fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute.PROPERTY, "og:image", "https://x/y.png",
+                    java.time.Instant.parse("2026-10-19T10:00:00Z")));
+            assertThat(service.metaTags()).isNull();
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
     }
 
     @Test
