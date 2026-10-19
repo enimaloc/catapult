@@ -251,10 +251,8 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public TwitchatWidgetAccessResponse widgetAccess(UUID token) {
-        ApiClient.Result<TwitchatWidgetAccessResponse> result =
-                client.getAnonymous("/api/twitchat/widget/{token}/access", TwitchatWidgetAccessResponse.class, token);
-        return result.status() == 200 ? result.body() : null;
+    public ApiClient.Result<TwitchatWidgetAccessResponse> widgetAccess(UUID token) {
+        return client.getAnonymous("/api/twitchat/widget/{token}/access", TwitchatWidgetAccessResponse.class, token);
     }
 
     @Override

@@ -6,6 +6,8 @@
     <title>Catapult — relais Twitchat</title>
     <!--/* Its URL carries the widget token. */-->
     <meta name="robots" content="noindex">
+    <!--/* Off or unknown: checked again every minute, so switching the widget on reaches OBS without touching the source. */-->
+    <meta th:if="${token == null}" http-equiv="refresh" content="60">
     <!--
     Hidden by default: this page is meant to be added as an OBS Browser Source and show
     nothing on stream. The streamer can reveal the activity log for debugging by adding

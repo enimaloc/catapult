@@ -80,8 +80,11 @@ public interface ApiService {
      * null when the token is unknown, the widget is off, or catapult-api is unreachable.
      */
     TwitchatWidgetConfig widgetObsConfig(UUID token);
-    /** The owner of the widget {@code token} and whether it is on (anonymous); null when unknown or unreachable. */
-    TwitchatWidgetAccessResponse widgetAccess(UUID token);
+    /**
+     * The owner of the widget {@code token} and whether it is on (anonymous): catapult-api's status
+     * (404 unknown), 502 when unreachable; the body only on a 200.
+     */
+    ApiClient.Result<TwitchatWidgetAccessResponse> widgetAccess(UUID token);
     /** The channel's Twitchat widget settings (the owner's); null when refused or unreachable. */
     TwitchatSettingsResponse twitchatSettings(String username);
     /**

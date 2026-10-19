@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.twitchat.TwitchatDispatchHub;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -25,7 +26,9 @@ import java.util.UUID;
  * relays the owner's Twitchat dispatches to OBS like a dashboard would, through the same
  * scripts reading this widget's config and stream instead of /me/obs and /me/twitchat/events.
  * A token that isn't a UUID, is unknown or whose widget is off gets the same bare page with no
- * OBS connection, its config 204 and its stream 404: never an error page. The stream closes
+ * OBS connection, its config 204 and its stream 404: never an error page; it reloads itself every
+ * minute, so switching the widget on reaches OBS. While catapult-api is unreachable the page keeps
+ * its scripts, which retry the config until it answers. The stream closes
  * every {@link #STREAM_TIMEOUT}, so revoking the link takes effect on the reconnection.
  */
 @Controller
@@ -44,7 +47,13 @@ public class WidgetObsController {
     @GetMapping("/widget/obs/{token}")
     public String page(@PathVariable String token, Model model) {
         UUID uuid = uuid(token);
-        model.addAttribute("token", uuid != null && owner(uuid) != null ? uuid.toString() : null);
+        boolean relays = false;
+        if (uuid != null) {
+            ApiClient.Result<TwitchatWidgetAccessResponse> access = apiService.widgetAccess(uuid);
+            // catapult-api unreachable: the scripts are kept, retrying the config until it answers.
+            relays = owner(access) != null || access.status() >= 500;
+        }
+        model.addAttribute("token", relays ? uuid.toString() : null);
         return "widget/obs";
     }
 
@@ -64,7 +73,7 @@ public class WidgetObsController {
     @ResponseBody
     public ResponseEntity<SseEmitter> events(@PathVariable String token) {
         UUID uuid = uuid(token);
-        UUID owner = uuid == null ? null : owner(uuid);
+        UUID owner = uuid == null ? null : owner(apiService.widgetAccess(uuid));
         return owner == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(hub.subscribe(owner, STREAM_TIMEOUT));
     }
 
@@ -77,9 +86,9 @@ public class WidgetObsController {
     }
 
     /** The widget's owner when it is on; null when unknown, off or catapult-api unreachable. */
-    private UUID owner(UUID token) {
-        TwitchatWidgetAccessResponse access = apiService.widgetAccess(token);
-        return access == null || !access.enabled() ? null : uuid(access.ownerId());
+    private static UUID owner(ApiClient.Result<TwitchatWidgetAccessResponse> access) {
+        TwitchatWidgetAccessResponse body = access.ok() ? access.body() : null;
+        return body == null || !body.enabled() ? null : uuid(body.ownerId());
     }
 
     private static UUID uuid(String value) {
