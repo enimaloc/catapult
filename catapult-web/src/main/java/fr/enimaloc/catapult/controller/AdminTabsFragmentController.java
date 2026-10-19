@@ -1,8 +1,11 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownHeader;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
@@ -37,6 +41,37 @@ public class AdminTabsFragmentController {
     private final ModelFiller filler;
     private final ApiService apiService;
     private final BroadcastState broadcastState;
+
+    /** The members list, for the way back from a member's targeting; the page itself comes with it already. */
+    @GetMapping("/members")
+    String members(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            filler.admin(model);
+            return "pages/admin-tab/members :: content";
+        });
+    }
+
+    /** One member's targeting: custom flags and groups, with the groups still to join; 404 when the member is unknown. */
+    @GetMapping("/members/{id}")
+    String memberTargeting(Model model, HttpServletResponse response, @PathVariable UUID id) {
+        return guarded(model, response, () -> {
+            AdminMemberSummaryDto member = apiService.adminMember(id);
+            if (member == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/members :: missing";
+            }
+            List<GroupSummaryDto> groups = apiService.adminGroups();
+            MemberTargetingDto targeting = apiService.adminMemberTargeting(id);
+            model.addAttribute("member", member);
+            model.addAttribute("targeting", targeting);
+            model.addAttribute("groups", groups == null ? List.of() : groups);
+            model.addAttribute("groupIds", groups == null ? Map.of()
+                    : groups.stream().collect(java.util.stream.Collectors.toMap(GroupSummaryDto::key, GroupSummaryDto::id, (a, b) -> a)));
+            model.addAttribute("joinable", groups == null || targeting == null ? List.of()
+                    : groups.stream().filter(g -> !targeting.groupKeys().contains(g.key())).toList());
+            return "pages/admin-tab/members :: targeting";
+        });
+    }
 
     @GetMapping("/ccl")
     String ccl(Model model, HttpServletResponse response) {

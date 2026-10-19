@@ -51,7 +51,7 @@ beforeEach(async () => {
     window.CatapultCsrf = { postJson: posted };
     window.CatapultSpa = { navigate: vi.fn(async () => {}) };
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())) };
-    await load("channel-page", "admin-members");
+    await load("channel-page", "admin-tabs", "admin-members");
 });
 
 describe("admin-members", () => {
@@ -114,5 +114,174 @@ describe("admin-members", () => {
         expect(posts()).toEqual([[`/admin/members/${ID}/migrate`,
             { targetId: OTHER, migrateSettings: false, migrateGetters: false, migrateBindings: true }]]);
         expect(dialog.open).toBe(false);
+    });
+
+    describe("targeting", () => {
+        let fetched;
+
+        const targeting = (extra = "") => `
+            <div class="admin-view admin-targeting" data-member-id="${ID}" data-confirm-text="OK" data-cancel-text="No"
+                 data-label-invalid="Refused" data-label-unknown="Gone" data-label-unavailable="Down"
+                 data-label-flag-saved="Saved" data-label-flag-deleted="Flag gone" data-label-group-added="Joined"
+                 data-label-group-removed="Left">
+                <button data-admin-back></button>
+                <div class="admin-targeting-row" data-flag="a/b %é">
+                    <button class="admin-targeting-flag-delete" data-flag-delete="a/b %é" data-confirm="Delete a/b?"></button>
+                </div>
+                <div class="admin-targeting-form" id="flag-form"><input name="key"><input name="value">
+                    <button class="admin-targeting-flag-save"></button></div>
+                <div class="admin-targeting-row" data-group="staff">
+                    <button class="admin-targeting-group-remove" data-group-id="g/1" data-confirm="Remove staff?"></button>
+                </div>
+                <div class="admin-targeting-form" id="group-form"><div name="groupKey"></div>
+                    <button class="admin-targeting-group-save"></button></div>
+                ${extra}
+            </div>`;
+
+        function listPage() {
+            html(`
+                <mdui-tabs id="admin-tabs" value="members">
+                    <mdui-tab-panel value="members" data-admin-prerendered data-unavailable="Unavailable">
+                        <div id="admin-members" data-confirm-text="OK" data-cancel-text="No">
+                            <div class="admin-member" data-member-id="${ID}" data-member-name="enimaloc">
+                                <mdui-menu-item id="targeting-item" data-admin-open="${ID}"></mdui-menu-item>
+                                <mdui-menu-item data-action="delete" data-confirm="Delete enimaloc?"></mdui-menu-item>
+                            </div>
+                        </div>
+                    </mdui-tab-panel>
+                </mdui-tabs>`);
+            document.getElementById("admin-tabs").value = "members";
+            render();
+        }
+
+        function subView() {
+            html(`<mdui-tabs id="admin-tabs" value="members">
+                <mdui-tab-panel value="members" data-admin-prerendered data-unavailable="Unavailable">${targeting()}</mdui-tab-panel>
+            </mdui-tabs>`);
+            render();
+            window.CatapultAdminTabs.reload = vi.fn(async () => {});
+        }
+
+        const field = (form, name) => document.querySelector(`#${form} [name="${name}"]`);
+        const fill = (el, value) => { el.value = value; el.dispatchEvent(new Event("input", { bubbles: true })); };
+
+        beforeEach(() => {
+            fetched = vi.fn(async url => response(200, url.endsWith("/members")
+                ? `<div id="admin-members" data-confirm-text="OK" data-cancel-text="No"><p class="view">list</p></div>`
+                : targeting()));
+            window.fetch = fetched;
+            window.CatapultChannel = { showError: vi.fn(), postJson: vi.fn(), refresh: vi.fn() };
+            window.mdui.snackbar = vi.fn();
+        });
+
+        it("opens #members/{id} from the Targeting item and comes back", async () => {
+            listPage();
+            await flush();
+            expect(fetched).not.toHaveBeenCalled(); // the list came with the page
+
+            await click("#targeting-item");
+
+            expect(fetched).toHaveBeenLastCalledWith(`/spa/admin/members/${ID}`);
+            expect(location.hash).toBe(`#members/${ID}`);
+            expect(document.querySelector(".admin-targeting")).not.toBeNull();
+
+            await click("[data-admin-back]");
+
+            expect(fetched).toHaveBeenLastCalledWith("/spa/admin/members");
+            expect(location.hash).toBe("#members");
+            expect(document.querySelector(".view").textContent).toBe("list");
+        });
+
+        it("opens the sub-view named in the hash when the page loads", async () => {
+            history.replaceState(null, "", `/admin#members/${ID}`);
+            listPage();
+            await flush();
+
+            expect(fetched).toHaveBeenCalledWith(`/spa/admin/members/${ID}`);
+        });
+
+        it("adds and deletes a flag, adds and removes a group, then reloads the sub-view", async () => {
+            subView();
+
+            fill(field("flag-form", "key"), "  tier ");
+            fill(field("flag-form", "value"), "2");
+            await click(".admin-targeting-flag-save");
+            expect(posts()).toEqual([[`/admin/members/${ID}/flags`, { key: "tier", value: "2" }]]);
+            expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+
+            await click(".admin-targeting-flag-delete");
+            expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({ headline: "Delete a/b?" }));
+            expect(posts().at(-1)).toEqual([`/admin/members/${ID}/flags/delete`, { key: "a/b %é" }]);
+
+            field("group-form", "groupKey").value = "beta";
+            await click(".admin-targeting-group-save");
+            expect(posts().at(-1)).toEqual([`/admin/members/${ID}/groups`, { groupKey: "beta" }]);
+
+            await click(".admin-targeting-group-remove");
+            expect(posts().at(-1)).toEqual([`/admin/members/${ID}/groups/g%2F1/delete`, {}]);
+            expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(4);
+        });
+
+        it("sends an empty value as none, and refuses a missing key or group without posting", async () => {
+            subView();
+
+            await click(".admin-targeting-flag-save");
+            await click(".admin-targeting-group-save");
+            expect(posts()).toEqual([]);
+            expect(field("flag-form", "key").hasAttribute("invalid")).toBe(true);
+            expect(field("group-form", "groupKey").hasAttribute("invalid")).toBe(true);
+
+            fill(field("flag-form", "key"), "beta");
+            await click(".admin-targeting-flag-save");
+            expect(posts()).toEqual([[`/admin/members/${ID}/flags`, { key: "beta", value: null }]]);
+        });
+
+        it("posts nothing when the admin cancels a deletion", async () => {
+            confirmAnswer = false;
+            subView();
+
+            await click(".admin-targeting-flag-delete");
+            await click(".admin-targeting-group-remove");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a refusal by its status, and reloads when the member or group is gone", async () => {
+            subView();
+            fill(field("flag-form", "key"), "beta");
+
+            posted.mockResolvedValue(response(400));
+            await click(".admin-targeting-flag-save");
+            expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Refused");
+            expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+
+            posted.mockResolvedValue(response(404));
+            await click(".admin-targeting-flag-save");
+            expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
+            expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+
+            posted.mockResolvedValue(response(502));
+            await click(".admin-targeting-flag-save");
+            expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
+        });
+
+        it("disables an action's button while it runs: a double click posts once", async () => {
+            subView();
+            fill(field("flag-form", "key"), "beta");
+            let release;
+            posted.mockImplementation(() => new Promise(resolve => { release = () => resolve(response(204)); }));
+
+            const button = document.querySelector(".admin-targeting-flag-save");
+            button.click();
+            await flush();
+            expect(button.disabled).toBe(true);
+            button.click();
+            await flush();
+            release();
+            await flush();
+
+            expect(posts()).toHaveLength(1);
+            expect(button.disabled).toBe(false);
+        });
     });
 });

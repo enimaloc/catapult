@@ -6,7 +6,9 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -101,6 +103,8 @@ public class MockApiService implements ApiService {
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
     /** Application-wide: the groups an admin creates are the same for every mock session. */
     private final MockGroupsStore groups = new MockGroupsStore();
+    /** Application-wide too: a member's custom flags are the same for every mock session. */
+    private final MockTargetingStore targeting = new MockTargetingStore();
 
     /** The calling session's mock member {@code id}'s login; null when it has no such member. */
     private String mockMemberLogin(UUID id) {
@@ -418,6 +422,51 @@ public class MockApiService implements ApiService {
                 .filter(m -> m.twitchUsername() != null && m.twitchUsername().equalsIgnoreCase(wanted))
                 .map(m -> m.id()).findFirst().orElse(null);
         return memberId == null ? 404 : groups.addMember(id, memberId);
+    }
+
+    private boolean mockMemberExists(UUID id) {
+        MockData current = currentData();
+        return current != null && current.getMembers().page().members().stream().anyMatch(m -> id.equals(m.id()));
+    }
+
+    @Override
+    public AdminMemberSummaryDto adminMember(UUID id) {
+        log.trace("adminMember({})", id);
+        MockData current = currentData();
+        if (current == null) return null;
+        return current.getMembers().page().members().stream().filter(m -> id.equals(m.id()))
+                .map(m -> new AdminMemberSummaryDto(m.id(), m.twitchUsername())).findFirst().orElse(null);
+    }
+
+    @Override
+    public MemberTargetingDto adminMemberTargeting(UUID id) {
+        log.trace("adminMemberTargeting({})", id);
+        return mockMemberExists(id) ? new MemberTargetingDto(targeting.flagsOf(id), groups.keysOf(id)) : null;
+    }
+
+    @Override
+    public int adminSetMemberFlag(UUID id, String key, String value) {
+        log.trace("adminSetMemberFlag({}, {})", id, key);
+        return mockMemberExists(id) ? targeting.setFlag(id, key, value) : 404;
+    }
+
+    @Override
+    public int adminDeleteMemberFlag(UUID id, String key) {
+        log.trace("adminDeleteMemberFlag({}, {})", id, key);
+        return mockMemberExists(id) ? targeting.deleteFlag(id, key) : 404;
+    }
+
+    @Override
+    public int adminAddMemberToGroup(UUID id, String groupKey) {
+        log.trace("adminAddMemberToGroup({}, {})", id, groupKey);
+        if (!mockMemberExists(id)) return 404;
+        return groups.find(groupKey).map(g -> groups.addMember(g.id(), id)).orElse(404);
+    }
+
+    @Override
+    public int adminRemoveMemberFromGroup(UUID id, UUID groupId) {
+        log.trace("adminRemoveMemberFromGroup({}, {})", id, groupId);
+        return groups.removeMember(groupId, id);
     }
 
     @Override

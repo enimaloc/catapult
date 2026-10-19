@@ -2,6 +2,11 @@
  * The admin page's members tab. Each action posts to AdminMembersController, then re-renders the
  * page: a deletion, a promotion or an unlink changes more than its own row (the previous system
  * account, the migrate dialog's targets). The bot switch alone only posts, it already shows its state.
+ *
+ * A member's targeting sub-view (#members/{id}, loaded by admin-tabs.js) edits their custom flags and
+ * groups: every button posts with itself disabled meanwhile and a success reloads the sub-view. A
+ * refusal is told by its status (400, 404, else unavailable), never by catapult-api's message. Its
+ * listeners are delegated to the panel: the sub-view comes and goes inside it.
  */
 window.CatapultAdminMembers = (function () {
     function memberUrl(row, action) {
@@ -58,7 +63,111 @@ window.CatapultAdminMembers = (function () {
         if (response.ok) dialog.open = false;
     }
 
+    // --- targeting ---------------------------------------------------------------------------
+
+    const ok = status => status >= 200 && status < 300;
+    const fieldOf = (scope, name) => scope.querySelector(`[name="${name}"]`);
+    const valueOf = (scope, name) => (fieldOf(scope, name).value ?? "").trim();
+    const targetingUrl = (root, action) => `/admin/members/${encodeURIComponent(root.dataset.memberId)}/${action}`;
+
+    function mark(field) {
+        field.setAttribute("invalid", "");
+        field.reportValidity?.();
+    }
+
+    /** The status of a POST (0 when it couldn't be sent). */
+    async function post(url, body) {
+        try {
+            return (await CatapultCsrf.postJson(url, body)).status;
+        } catch {
+            return 0;
+        }
+    }
+
+    /** Tells the outcome of `status`: done (snackbar, reload) or refused; a vanished member or group also reloads. */
+    async function settle(panel, root, status, doneLabel) {
+        if (ok(status)) {
+            window.mdui?.snackbar?.({ message: root.dataset[doneLabel] });
+            await CatapultAdminTabs.reload(panel);
+            return;
+        }
+        CatapultChannel.showError(status === 400 ? root.dataset.labelInvalid
+            : status === 404 ? root.dataset.labelUnknown : root.dataset.labelUnavailable);
+        if (status === 404) await CatapultAdminTabs.reload(panel);
+    }
+
+    /** Runs `action` with `button` disabled until it is done, the reload included; a second click is ignored. */
+    async function busy(button, action) {
+        button.disabled = true;
+        try {
+            await action();
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    async function saveFlag(panel, root, button) {
+        const form = button.closest(".admin-targeting-form");
+        const key = valueOf(form, "key");
+        if (key === "") return mark(fieldOf(form, "key"));
+        const value = valueOf(form, "value");
+        await busy(button, async () => settle(panel, root,
+            await post(targetingUrl(root, "flags"), { key, value: value || null }), "labelFlagSaved"));
+    }
+
+    async function deleteFlag(panel, root, button) {
+        await busy(button, async () => {
+            if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
+            // the key travels in the body: it may hold a "/" or a "%", which a path can't carry
+            await settle(panel, root, await post(targetingUrl(root, "flags/delete"), { key: button.dataset.flagDelete }), "labelFlagDeleted");
+        });
+    }
+
+    async function addGroup(panel, root, button) {
+        const form = button.closest(".admin-targeting-form");
+        const select = fieldOf(form, "groupKey");
+        const groupKey = (select.value ?? "").trim();
+        if (groupKey === "") return mark(select);
+        await busy(button, async () => settle(panel, root,
+            await post(targetingUrl(root, "groups"), { groupKey }), "labelGroupAdded"));
+    }
+
+    async function removeGroup(panel, root, button) {
+        await busy(button, async () => {
+            if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
+            const url = targetingUrl(root, `groups/${encodeURIComponent(button.dataset.groupId)}/delete`);
+            await settle(panel, root, await post(url, {}), "labelGroupRemoved");
+        });
+    }
+
+    const listening = new WeakSet();
+
+    function attachTargeting(panel) {
+        if (listening.has(panel)) return;
+        listening.add(panel);
+        panel.addEventListener("click", event => {
+            const target = event.target.closest?.(".admin-targeting-flag-save, .admin-targeting-flag-delete,"
+                + " .admin-targeting-group-save, .admin-targeting-group-remove");
+            const root = target?.closest(".admin-targeting");
+            if (!target || !root || !panel.contains(target) || target.disabled) return;
+            if (target.matches(".admin-targeting-flag-save")) saveFlag(panel, root, target);
+            else if (target.matches(".admin-targeting-flag-delete")) deleteFlag(panel, root, target);
+            else if (target.matches(".admin-targeting-group-save")) addGroup(panel, root, target);
+            else removeGroup(panel, root, target);
+        });
+        panel.addEventListener("input", event => event.target.removeAttribute?.("invalid"));
+        panel.addEventListener("change", event => event.target.removeAttribute?.("invalid"));
+    }
+
+    // --- the list ----------------------------------------------------------------------------
+
     function attach() {
+        const panel = document.querySelector('mdui-tab-panel[value="members"]');
+        if (panel) attachTargeting(panel);
+        attachList();
+    }
+
+    function attachList() {
         const card = document.getElementById("admin-members");
         if (!card) return;
         const dialog = document.getElementById("admin-migrate-dialog");
@@ -89,6 +198,10 @@ window.CatapultAdminMembers = (function () {
     }
 
     document.addEventListener("catapult:render", attach);
+    // back from a member's targeting, the list is a new content
+    document.addEventListener("catapult:admin-panel", event => {
+        if (event.detail.tab === "members") attachList();
+    });
 
     return { attach };
 })();

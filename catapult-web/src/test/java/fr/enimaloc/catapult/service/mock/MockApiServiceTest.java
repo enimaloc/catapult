@@ -207,6 +207,32 @@ class MockApiServiceTest {
     }
 
     @Test
+    void targeting_flagsAndGroups_followTheActions() {
+        var member = service.adminMembers().members().getFirst();
+        var group = service.adminGroups().getFirst();
+
+        assertThat(service.adminMember(member.id()).twitchUsername()).isEqualTo(member.twitchUsername());
+        assertThat(service.adminMember(java.util.UUID.randomUUID())).isNull();
+        assertThat(service.adminMemberTargeting(java.util.UUID.randomUUID())).isNull();
+
+        assertThat(service.adminSetMemberFlag(member.id(), "tier", "2")).isEqualTo(204);
+        assertThat(service.adminSetMemberFlag(member.id(), " ", "2")).isEqualTo(400);
+        assertThat(service.adminSetMemberFlag(java.util.UUID.randomUUID(), "tier", "2")).isEqualTo(404);
+        assertThat(service.adminAddMemberToGroup(member.id(), group.key())).isEqualTo(204);
+        assertThat(service.adminAddMemberToGroup(member.id(), "nope")).isEqualTo(404);
+
+        var targeting = service.adminMemberTargeting(member.id());
+        assertThat(targeting.flags()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto.Flag("tier", "2"));
+        assertThat(targeting.groupKeys()).containsExactly(group.key());
+
+        assertThat(service.adminRemoveMemberFromGroup(member.id(), group.id())).isEqualTo(204);
+        assertThat(service.adminRemoveMemberFromGroup(member.id(), java.util.UUID.randomUUID())).isEqualTo(404);
+        assertThat(service.adminDeleteMemberFlag(member.id(), "tier")).isEqualTo(204);
+        assertThat(service.adminMemberTargeting(member.id()).flags()).isEmpty();
+        assertThat(service.adminMemberTargeting(member.id()).groupKeys()).isEmpty();
+    }
+
+    @Test
     void noOpActions_changeNothing() {
         service.recheckGame(username);
         service.refreshSteamProfileCache(username);

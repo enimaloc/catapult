@@ -51,7 +51,8 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups")) {
+                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups",
+                "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
         }
@@ -70,6 +71,8 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminDtddProposals(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminGroups();
         verify(apiService, never()).adminMembers();
+        verify(apiService, never()).adminMember(org.mockito.ArgumentMatchers.any());
+        verify(apiService, never()).adminMemberTargeting(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -508,6 +511,74 @@ class AdminTabsFragmentControllerTest {
 
         when(apiService.adminGroups()).thenReturn(null);
         assertThat(asAdmin("/spa/admin/groups")).contains("admin-placeholder").doesNotContain("data-rename=");
+    }
+
+    private static final java.util.UUID MEMBER = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    @Test
+    void targeting_rendersFlags_groups_andTheGroupSelect() throws Exception {
+        when(apiService.adminMember(MEMBER)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto(MEMBER, "ali<ce>"));
+        when(apiService.adminMemberTargeting(MEMBER)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto(
+                List.of(new fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto.Flag("a/b %é", "<v>"),
+                        new fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto.Flag("beta", null)),
+                List.of("staff", "ghost")));
+        when(apiService.adminGroups()).thenReturn(List.of(group("staff", null, 1), group("beta", null, 0)));
+
+        String html = asAdmin("/spa/admin/members/" + MEMBER);
+
+        assertThat(html).contains("ali&lt;ce&gt;", "data-admin-back", "admin-targeting",
+                "data-flag=\"a/b %é\"", "&lt;v&gt;", "data-flag=\"beta\"",
+                "data-group-id=\"00000000-0000-0000-0000-000000000042\"", "ghost", "admin-targeting-flag-save", "admin-targeting-group-save")
+                .contains("value=\"beta\"")  // beta is offered; staff, already joined, is not
+                .doesNotContain("value=\"staff\"");
+        assertThat(html.indexOf("data-group-id=")).isEqualTo(html.lastIndexOf("data-group-id="));  // ghost has no remove button
+        assertThat(html).contains("data-member-id=\"" + MEMBER + "\"");
+    }
+
+    @Test
+    void targeting_whenTheTargetingCantBeLoaded_saysSo() throws Exception {
+        when(apiService.adminMember(MEMBER)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto(MEMBER, "alice"));
+
+        assertThat(asAdmin("/spa/admin/members/" + MEMBER)).contains("admin-placeholder").doesNotContain("admin-targeting-flag-save");
+    }
+
+    @Test
+    void targeting_unknownMember_isTheMissingFragment() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+
+        String html = mvc.perform(get("/spa/admin/members/" + MEMBER).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("admin-placeholder").doesNotContain("admin-targeting-flag-save");
+    }
+
+    @Test
+    void membersFragment_isThePanelContent_withTheTargetingItem() throws Exception {
+        java.util.UUID other = java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
+        when(apiService.currentUserId()).thenReturn(MEMBER);
+        when(apiService.adminMembers()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMembersPage(List.of(
+                new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE",
+                        java.time.Instant.parse("2025-03-01T12:00:00Z")),
+                new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(MEMBER, "1", "catapult_bot", "img", null, true, true, "ACTIVE",
+                        java.time.Instant.parse("2025-03-01T12:00:00Z"))), java.util.Map.of(), false));
+
+        String html = asAdmin("/spa/admin/members");
+
+        assertThat(html).doesNotContain("<mdui-tab-panel").contains("id=\"admin-members\"", "data-admin-open=\"" + other + "\"")
+                .doesNotContain("data-admin-open=\"" + MEMBER + "\"");
+    }
+
+    @Test
+    void systemAccount_getsOnlyEditSettings() throws Exception {
+        when(apiService.currentUserId()).thenReturn(MEMBER);
+        when(apiService.adminMembers()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMembersPage(List.of(
+                new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(MEMBER, "1", "catapult_bot", "img", null, true, true, "ACTIVE",
+                        java.time.Instant.parse("2025-03-01T12:00:00Z"))), java.util.Map.of(), false));
+
+        String html = asAdmin("/spa/admin/members");
+
+        assertThat(html).contains("href=\"/channel/catapult_bot\"")
+                .doesNotContain("data-action=", "data-admin-open=");
     }
 
     @Test
