@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.AfterEach;
@@ -256,7 +257,7 @@ class RealApiServiceTest {
                 .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist("Authorization"))
                 .andRespond(withSuccess("{\"ownerId\":\"99999999-8888-7777-6666-555555555555\",\"enabled\":true}", MediaType.APPLICATION_JSON));
 
-        assertThat(service.widgetAccess(token)).isEqualTo(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse(
+        assertThat(service.widgetAccess(token)).isEqualTo(new TwitchatWidgetAccessResponse(
                 "99999999-8888-7777-6666-555555555555", true));
     }
 

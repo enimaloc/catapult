@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +43,16 @@ class TwitchatDispatchHubTest {
         hub.publish(owner, "{}");
 
         assertThat(hub.subscriberCount(owner)).isZero();
+    }
+
+    @Test
+    void subscribe_withATimeout_closesTheStreamAfterIt_andTheOpenEndedOneNever() {
+        TwitchatDispatchHub hub = new TwitchatDispatchHub();
+        UUID owner = UUID.randomUUID();
+
+        assertThat(hub.subscribe(owner, Duration.ofMinutes(10)).getTimeout()).isEqualTo(600_000L);
+        assertThat(hub.subscribe(owner).getTimeout()).isZero();
+        assertThat(hub.subscriberCount(owner)).isEqualTo(2);
     }
 
     @Test

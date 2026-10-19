@@ -13,8 +13,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.Duration;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,6 +51,7 @@ class WidgetObsControllerTest {
                 .andExpect(content().string(containsString("data-twitchat-events-url=\"/widget/obs/" + TOKEN + "/events\"")))
                 .andExpect(content().string(containsString("<div id=\"log\"></div>")))
                 .andExpect(content().string(containsString("#log{display:block}")))
+                .andExpect(content().string(containsString("src=\"/js/suggest.js\"")))
                 .andExpect(content().string(containsString("src=\"/js/obs.js\"")))
                 .andExpect(content().string(containsString("src=\"/js/obs-session.js\"")))
                 .andExpect(content().string(containsString("src=\"/js/twitchat-protocol.js\"")))
@@ -83,7 +86,7 @@ class WidgetObsControllerTest {
         when(apiService.widgetAccess(TOKEN)).thenReturn(new TwitchatWidgetAccessResponse("oops", true));
         mvc.perform(get("/widget/obs/" + TOKEN + "/events")).andExpect(status().isNotFound());
 
-        verify(hub, never()).subscribe(any());
+        verify(hub, never()).subscribe(any(), any(Duration.class));
     }
 
     @Test
@@ -108,10 +111,13 @@ class WidgetObsControllerTest {
     @Test
     void events_subscribeTheOwner_whenEnabled() throws Exception {
         when(apiService.widgetAccess(TOKEN)).thenReturn(new TwitchatWidgetAccessResponse(OWNER.toString(), true));
-        when(hub.subscribe(OWNER)).thenReturn(new SseEmitter(0L));
+        when(hub.subscribe(OWNER, WidgetObsController.STREAM_TIMEOUT)).thenReturn(new SseEmitter(600_000L));
 
         mvc.perform(get("/widget/obs/" + TOKEN + "/events")).andExpect(request().asyncStarted());
-        verify(hub).subscribe(OWNER);
+        // Finite, unlike /me/twitchat/events: a revoked link stops at the next reconnection.
+        assertThat(WidgetObsController.STREAM_TIMEOUT).isEqualTo(Duration.ofMinutes(10));
+        verify(hub).subscribe(OWNER, WidgetObsController.STREAM_TIMEOUT);
+        verify(hub, never()).subscribe(any(UUID.class));
     }
 
     @Test

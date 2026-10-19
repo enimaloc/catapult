@@ -78,9 +78,9 @@ public interface ApiService {
      * The OBS connection of the widget {@code token} (anonymous), on Twitchat branch "auto";
      * null when the token is unknown, the widget is off, or catapult-api is unreachable.
      */
-    TwitchatWidgetConfig widgetObsConfig(java.util.UUID token);
+    TwitchatWidgetConfig widgetObsConfig(UUID token);
     /** The owner of the widget {@code token} and whether it is on (anonymous); null when unknown or unreachable. */
-    TwitchatWidgetAccessResponse widgetAccess(java.util.UUID token);
+    TwitchatWidgetAccessResponse widgetAccess(UUID token);
     void saveObsSettings(String username, boolean enabled, String host, Integer port, String password);
     /** "auto" or one of TwitchatData.SUPPORTED_BRANCHES. */
     void saveTwitchatBranch(String username, String branch);

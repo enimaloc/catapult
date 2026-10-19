@@ -26,6 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -152,7 +153,7 @@ public class MockData {
         this.hasMinecraftProvider = minecraft != null;
         this.minecraftLink = minecraft;
         this.obsData = obs;
-        this.widgetToken = UUID.nameUUIDFromBytes(("catapult-widget:" + channel.id()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        this.widgetToken = UUID.nameUUIDFromBytes(("catapult-widget:" + channel.id()).getBytes(StandardCharsets.UTF_8));
     }
 
     private static Map<String, List<TwitchatEventActionDto>> defaultTwitchatEvents() {

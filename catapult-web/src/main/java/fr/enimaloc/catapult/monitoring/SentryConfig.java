@@ -22,7 +22,7 @@ public class SentryConfig {
      * the browser's own reports.
      */
     private static final Pattern UNTRACED = Pattern.compile(
-            "^/(events/|me/twitchat/events|widget/obs/.+/events|healthz|actuator/|css/|js/|_static/|favicon|monitoring/tunnel).*");
+            "^/(events/|me/twitchat/events|widget/|healthz|actuator/|css/|js/|_static/|favicon|monitoring/tunnel).*");
 
     /** {@code catapult-web@<commit>}, the commit catapult-web was built from; the browser reports under it too. */
     public static Optional<String> release(Optional<BuildProperties> build) {

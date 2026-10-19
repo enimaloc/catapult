@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Duration;
 import java.util.UUID;
 
 /**
@@ -24,11 +25,18 @@ import java.util.UUID;
  * relays the owner's Twitchat dispatches to OBS like a dashboard would, through the same
  * scripts reading this widget's config and stream instead of /me/obs and /me/twitchat/events.
  * A token that isn't a UUID, is unknown or whose widget is off gets the same bare page with no
- * OBS connection, its config 204 and its stream 404: never an error page.
+ * OBS connection, its config 204 and its stream 404: never an error page. The stream closes
+ * every {@link #STREAM_TIMEOUT}, so revoking the link takes effect on the reconnection.
  */
 @Controller
 @RequiredArgsConstructor
 public class WidgetObsController {
+
+    /**
+     * How long a widget stream stays open: its EventSource then reconnects and the token is checked
+     * again, so a regenerated or disabled link stops receiving dispatches within that time.
+     */
+    static final Duration STREAM_TIMEOUT = Duration.ofMinutes(10);
 
     private final ApiService apiService;
     private final TwitchatDispatchHub hub;
@@ -57,7 +65,7 @@ public class WidgetObsController {
     public ResponseEntity<SseEmitter> events(@PathVariable String token) {
         UUID uuid = uuid(token);
         UUID owner = uuid == null ? null : owner(uuid);
-        return owner == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(hub.subscribe(owner));
+        return owner == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(hub.subscribe(owner, STREAM_TIMEOUT));
     }
 
     /** The link OBS sources were set up with before /widget/obs. */

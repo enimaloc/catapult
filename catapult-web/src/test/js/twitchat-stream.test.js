@@ -8,7 +8,11 @@ import { load } from "./helpers.js";
 let sources;
 
 class FakeEventSource {
+    static CONNECTING = 0;
+    static OPEN = 1;
+    static CLOSED = 2;
     constructor(url) {
+        this.readyState = FakeEventSource.CONNECTING;
         this.url = url;
         this.listeners = {};
         this.closed = false;
@@ -35,20 +39,42 @@ describe("twitchat-stream", () => {
         expect(sources.map((s) => s.url)).toEqual(["/me/twitchat/events"]);
     });
 
-    it("opens the page's events URL, /me/twitchat/events by default", async () => {
+    it("opens the page's events URL, /me/twitchat/events by default", () => {
         obs("connected");
-        expect(sources.at(-1).url).toBe("/me/twitchat/events");
+        expect(sources.map((s) => s.url)).toEqual(["/me/twitchat/events"]);
         obs("disconnected");
 
+        sources = [];
         document.body.dataset.twitchatEventsUrl = "/widget/obs/t-1/events";
-        try {
-            sources = [];
-            await load("twitchat-stream");
-            obs("connected");
-            expect(sources.map((s) => s.url)).toContain("/widget/obs/t-1/events");
-        } finally {
-            delete document.body.dataset.twitchatEventsUrl;
-        }
+        obs("connected");
+        expect(sources.map((s) => s.url)).toEqual(["/widget/obs/t-1/events"]);
+    });
+
+    it("lets the browser reconnect a stream the server closed (the widget's timeout)", () => {
+        vi.useFakeTimers();
+        obs("connected");
+        sources[0].readyState = FakeEventSource.CONNECTING;
+        sources[0].listeners.error({});
+        vi.advanceTimersByTime(60000);
+        expect(sources).toHaveLength(1);
+        expect(sources[0].closed).toBe(false);
+    });
+
+    it("reopens a refused stream (revoked link, catapult-api restarting) every 30s while OBS is connected", () => {
+        vi.useFakeTimers();
+        obs("connected");
+        sources[0].readyState = FakeEventSource.CLOSED;
+        sources[0].listeners.error({});
+        vi.advanceTimersByTime(29999);
+        expect(sources).toHaveLength(1);
+        vi.advanceTimersByTime(1);
+        expect(sources).toHaveLength(2);
+
+        sources[1].readyState = FakeEventSource.CLOSED;
+        sources[1].listeners.error({});
+        obs("disconnected");
+        vi.advanceTimersByTime(60000);
+        expect(sources).toHaveLength(2);
     });
 
     it("re-emits each dispatch for twitchat.js", () => {

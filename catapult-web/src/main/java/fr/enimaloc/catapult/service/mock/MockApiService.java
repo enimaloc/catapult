@@ -89,6 +89,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -390,7 +391,7 @@ public class MockApiService implements ApiService {
     }
 
     /** The session whose widget link {@code token} is: an OBS browser source has no session of its own. */
-    private java.util.Optional<MockData> widgetOwner(UUID token) {
+    private Optional<MockData> widgetOwner(UUID token) {
         return data.values().stream().filter(d -> token.equals(d.getWidgetToken())).findFirst();
     }
 
