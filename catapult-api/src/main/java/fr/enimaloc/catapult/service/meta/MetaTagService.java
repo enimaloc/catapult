@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.common.dto.admin.MetaTagRules;
 import fr.enimaloc.catapult.domain.meta.MetaTag;
 import fr.enimaloc.catapult.repository.meta.MetaTagRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -15,7 +17,9 @@ import java.util.List;
 
 /**
  * The meta tags the admin configures and catapult-web adds to every page, checked against
- * {@link MetaTagRules}; a key is unique per attribute whatever its case.
+ * {@link MetaTagRules}. A key is unique per attribute whatever its case: a second one is a 409, also
+ * when two admins add it at once (the table's unique constraint), and an update of a tag deleted
+ * meanwhile is a 404.
  */
 @Service
 public class MetaTagService {
@@ -42,7 +46,7 @@ public class MetaTagService {
         if (repository.findByAttributeAndKeyIgnoreCase(request.attribute(), request.key()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Meta tag already configured");
         }
-        return dto(repository.save(fill(new MetaTag(), request)));
+        return save(fill(new MetaTag(), request));
     }
 
     public MetaTagDto update(long id, MetaTagRequest request) {
@@ -53,11 +57,21 @@ public class MetaTagService {
                 .ifPresent(other -> {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Meta tag already configured");
                 });
-        return dto(repository.save(fill(tag, request)));
+        return save(fill(tag, request));
     }
 
     public void delete(long id) {
         repository.delete(existing(id));
+    }
+
+    private MetaTagDto save(MetaTag tag) {
+        try {
+            return dto(repository.save(tag));
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Meta tag already configured");
+        } catch (OptimisticLockingFailureException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown meta tag");
+        }
     }
 
     private MetaTag existing(long id) {
