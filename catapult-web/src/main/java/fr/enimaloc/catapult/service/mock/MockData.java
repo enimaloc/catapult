@@ -119,8 +119,6 @@ public class MockData {
     private Instant inviteRegeneratedAt = Instant.now();
     private final List<InviteRedemptionDto> inviteRedemptions = List.of(
             new InviteRedemptionDto("4242", Instant.now().minus(3, ChronoUnit.DAYS)));
-    /** The admin members page's accounts, built on its first visit from the channels as they are then. */
-    private MockMembers members;
     /** The admin page's CCL, caches and data tabs, built on their first visit. */
     private MockAdminData adminData;
     /** Each Twitchat event's payloads; only STREAM_STARTED starts with one, a greeting. */
@@ -278,11 +276,6 @@ public class MockData {
     }
 
     // --- reads ---------------------------------------------------------------------------------
-
-    public MockMembers getMembers() {
-        if (members == null) members = new MockMembers(channelDto, moderatedChannels);
-        return members;
-    }
 
     public MockAdminData getAdminData() {
         if (adminData == null) adminData = new MockAdminData(channelDto.id().toString());

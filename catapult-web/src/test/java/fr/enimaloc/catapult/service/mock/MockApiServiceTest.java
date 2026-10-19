@@ -501,6 +501,33 @@ class MockApiServiceTest {
         assertThat(service.isAdmin()).isFalse();
     }
 
+    /** As catapult-api: every account that logged in is a member, whichever session the admin looks from. */
+    @Test
+    void adminMembers_listsTheAccountsOfOtherMockSessions_soTheAdminCanImpersonateThem() {
+        String other = username;
+        loginAs("1");
+
+        var members = service.adminMembers().members();
+        assertThat(members.getFirst().twitchUsername()).isEqualTo(username);
+        assertThat(members).extracting(m -> m.twitchUsername()).contains(other);
+        assertThat(service.adminImpersonate(other).status()).isEqualTo(200);
+    }
+
+    /** A deleted member stays deleted, even once their session is used again. */
+    @Test
+    void adminDeleteMember_isNotUndoneByTheMembersNextRequest() {
+        UUID other = service.currentUserId();
+        String otherToken = (String) ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes())
+                .getRequest().getSession().getAttribute(ApiClient.SESSION_JWT_KEY);
+        loginAs("1");
+        service.adminDeleteMember(other);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.getSession(true).setAttribute(ApiClient.SESSION_JWT_KEY, otherToken);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        assertThat(service.adminMembers().members()).noneMatch(m -> m.id().equals(other));
+    }
+
     @Test
     void adminMembers_listsTheSessionsChannelFirst_thenTheSystemAccount() {
         var members = service.adminMembers().members();
