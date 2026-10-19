@@ -130,3 +130,124 @@ describe("admin-tw", () => {
         expect(posted).toHaveBeenCalledTimes(1);
     });
 });
+
+describe("admin-tw keywords", () => {
+    const kw = name => document.querySelector(`.admin-tw-kw [name="${name}"]`);
+    const result = () => document.querySelector(".admin-tw-test-result");
+
+    function keywordsPage() {
+        html(`
+            <mdui-tab-panel value="tw">
+                <div class="admin-view admin-tw-kw" data-tw-id="violence" data-confirm-text="OK" data-cancel-text="No"
+                     data-label-invalid="Invalid" data-label-unknown="Gone" data-label-unavailable="Down" data-label-disabled="Off"
+                     data-label-added="Added" data-label-removed="Removed"
+                     data-label-matched-keywords="Matching keywords:" data-label-matched-ids="Matching ids:"
+                     data-label-draft-match="Draft matches" data-label-draft-no-match="Draft does not match"
+                     data-label-notes="Notes:" data-label-none="None" data-label-test-error="Test failed">
+                    <div class="admin-tw-kw-row" data-keyword="gore/blood é">
+                        <button class="admin-tw-keyword-remove" data-confirm="Remove it?"></button>
+                    </div>
+                    <input name="keyword"><button class="admin-tw-keyword-add"></button>
+                    <input name="appId"><button class="admin-tw-test-run"></button>
+                    <div class="admin-tw-test-result"></div>
+                </div>
+            </mdui-tab-panel>`);
+        render();
+    }
+
+    beforeEach(() => keywordsPage());
+
+    it("tests with the keyword being typed as draft and renders matches, draft result and notes as text", async () => {
+        posted.mockResolvedValueOnce(response(200, {
+            matchedKeywords: ["gore"], matchedContentDescriptorIds: [1, 5], draftKeywordMatch: true,
+            notes: "<img src=x onerror=alert(1)> gore",
+        }));
+        fill(kw("keyword"), "  Blood ");
+        fill(kw("appId"), " 730 ");
+        await click(".admin-tw-test-run");
+
+        expect(posted).toHaveBeenCalledWith("/admin/tw/violence/keywords/test", { appId: "730", draftKeyword: "Blood" });
+        const text = result().textContent;
+        expect(text).toContain("Matching keywords:");
+        expect(text).toContain("gore");
+        expect(text).toContain("Matching ids:");
+        expect(text).toContain("1, 5");
+        expect(text).toContain("Draft matches");
+        expect(text).toContain("<img src=x onerror=alert(1)> gore");
+        expect(result().querySelector("img")).toBeNull();
+        expect(document.querySelector(".admin-tw-test-run").disabled).toBe(false);
+    });
+
+    it("shows none for empty lists and notes, and says when the draft does not match", async () => {
+        posted.mockResolvedValueOnce(response(200, {
+            matchedKeywords: [], matchedContentDescriptorIds: [], draftKeywordMatch: false, notes: "",
+        }));
+        fill(kw("appId"), "730");
+        await click(".admin-tw-test-run");
+
+        expect(posted).toHaveBeenCalledWith("/admin/tw/violence/keywords/test", { appId: "730", draftKeyword: "" });
+        expect(result().textContent).toContain("Draft does not match");
+        expect(result().textContent.match(/None/g)).toHaveLength(3);
+    });
+
+    it("shows the error text when the test fails, and does not post a bad app id", async () => {
+        posted.mockResolvedValueOnce(response(502));
+        fill(kw("appId"), "730");
+        await click(".admin-tw-test-run");
+        expect(result().textContent).toBe("Test failed");
+
+        posted.mockClear();
+        fill(kw("appId"), "abc");
+        await click(".admin-tw-test-run");
+        expect(posted).not.toHaveBeenCalled();
+        expect(kw("appId").hasAttribute("invalid")).toBe(true);
+    });
+
+    it("confirms before removing a keyword, sending it in the body", async () => {
+        confirmAnswer = false;
+        await click(".admin-tw-keyword-remove");
+        expect(posted).not.toHaveBeenCalled();
+        expect(document.querySelector(".admin-tw-keyword-remove").disabled).toBe(false);
+
+        confirmAnswer = true;
+        posted.mockResolvedValueOnce(response(204));
+        await click(".admin-tw-keyword-remove");
+
+        expect(mdui.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ headline: "Remove it?" }));
+        expect(posted).toHaveBeenCalledWith("/admin/tw/violence/keywords/remove", { keyword: "gore/blood é" });
+        expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Removed" });
+        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("adds a keyword of 2 to 50 characters and reloads; refuses others without posting", async () => {
+        for (const bad of ["a", " a ", "x".repeat(51), ""]) {
+            fill(kw("keyword"), bad);
+            await click(".admin-tw-keyword-add");
+            expect(kw("keyword").hasAttribute("invalid")).toBe(true);
+        }
+        expect(posted).not.toHaveBeenCalled();
+
+        posted.mockResolvedValueOnce(response(204));
+        fill(kw("keyword"), " blood ");
+        await click(".admin-tw-keyword-add");
+        expect(posted).toHaveBeenCalledWith("/admin/tw/violence/keywords", { keyword: "blood" });
+        expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Added" });
+        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("tells the refusal by status and posts once on a double click", async () => {
+        posted.mockResolvedValueOnce(response(404));
+        fill(kw("keyword"), "blood");
+        await click(".admin-tw-keyword-add");
+        expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
+        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+
+        posted.mockClear();
+        const button = document.querySelector(".admin-tw-keyword-add");
+        button.click();
+        button.click();
+        await flush();
+        expect(posted).toHaveBeenCalledTimes(1);
+    });
+});
+

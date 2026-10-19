@@ -62,3 +62,60 @@
         </div>
     </mdui-card>
 </div>
+
+<!--/*
+  One definition's Steam keywords (#tw/{id}): the list with a confirmed remove, an add field (2 to 50
+  characters) and the tester against a Steam app, whose answer admin-tw.js builds as text. The keywords
+  are free text: kept in data-keyword and sent in the body, never in a path. Driven by admin-tw.js.
+*/-->
+<div th:fragment="keywords" class="admin-view admin-tw-kw" th:attr="data-tw-id=${definition.id()},
+        data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+        data-label-invalid=#{admin.tw.kw.invalid},data-label-unknown=#{admin.tw.kw.unknown},
+        data-label-unavailable=#{admin.tw.unavailable},data-label-disabled=#{admin.tw.disabled},
+        data-label-added=#{admin.tw.kw.added},data-label-removed=#{admin.tw.kw.removed},
+        data-label-matched-keywords=#{admin.tw.kw.test.matched-keywords},data-label-matched-ids=#{admin.tw.kw.test.matched-ids},
+        data-label-draft-match=#{admin.tw.kw.test.draft-match},data-label-draft-no-match=#{admin.tw.kw.test.draft-no-match},
+        data-label-notes=#{admin.tw.kw.test.notes},data-label-none=#{admin.tw.kw.test.none},
+        data-label-test-error=#{admin.tw.kw.test.error}">
+    <div class="section-header admin-subheader">
+        <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
+        <h2 th:text="#{admin.tw.kw.title(${definition.label()})}">Trigger warning</h2>
+    </div>
+
+    <th:block th:if="${keywords == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+
+    <th:block th:if="${keywords != null}">
+        <mdui-card class="admin-tw-kw-card" variant="outlined">
+            <p class="admin-cell-muted" th:if="${keywords.isEmpty()}" th:text="#{admin.tw.kw.empty}">No keyword.</p>
+            <div class="admin-tw-kw-rows" th:unless="${keywords.isEmpty()}">
+                <div class="admin-tw-kw-row" th:each="k : ${keywords}" th:attr="data-keyword=${k}">
+                    <span class="admin-member-id" th:text="${k}">keyword</span>
+                    <mdui-button-icon icon="delete" class="admin-tw-keyword-remove"
+                                      th:attr="aria-label=#{admin.tw.kw.remove},data-confirm=#{admin.tw.kw.remove-confirm(${k})}"></mdui-button-icon>
+                </div>
+            </div>
+            <div class="admin-tw-kw-form">
+                <mdui-text-field name="keyword" variant="outlined" required minlength="2" maxlength="50"
+                                 th:attr="label=#{admin.tw.kw.add.label},placeholder=#{admin.tw.kw.add.placeholder}"></mdui-text-field>
+                <mdui-button variant="filled" icon="add" class="admin-tw-keyword-add" th:text="#{admin.tw.kw.add.button}">Add</mdui-button>
+            </div>
+        </mdui-card>
+
+        <mdui-card class="admin-tw-kw-card admin-tw-test" variant="outlined">
+            <h3 th:text="#{admin.tw.kw.test.title}">Test against a Steam game</h3>
+            <div class="admin-tw-kw-form">
+                <mdui-text-field name="appId" variant="outlined" inputmode="numeric" maxlength="12"
+                                 th:attr="label=#{admin.tw.kw.test.app-id}"></mdui-text-field>
+                <mdui-button variant="tonal" icon="science" class="admin-tw-test-run" th:text="#{admin.tw.kw.test.button}">Test</mdui-button>
+            </div>
+            <div class="admin-tw-test-result" aria-live="polite"></div>
+        </mdui-card>
+    </th:block>
+</div>
+
+<div th:fragment="missing" class="admin-view">
+    <div class="section-header admin-subheader">
+        <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
+    </div>
+    <p class="admin-placeholder" th:text="#{admin.tw.kw.missing}">This trigger warning no longer exists.</p>
+</div>

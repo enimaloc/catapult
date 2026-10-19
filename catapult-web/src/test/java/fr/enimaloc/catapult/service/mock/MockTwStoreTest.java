@@ -32,4 +32,37 @@ class MockTwStoreTest {
     void rebuild_isAccepted() {
         assertThat(store.rebuild()).isEqualTo(202);
     }
+
+    @Test
+    void keywords_areNormalizedSortedAndDeduplicated() {
+        assertThat(store.addKeyword("violence", "  Zed ")).isEqualTo(204);
+        assertThat(store.addKeyword("violence", "zed")).isEqualTo(204);
+
+        assertThat(store.keywords("violence")).containsExactly("blood", "gore", "zed");
+        assertThat(store.removeKeyword("violence", "ZED")).isEqualTo(204);
+        assertThat(store.removeKeyword("violence", "never-there")).isEqualTo(204);
+        assertThat(store.keywords("violence")).containsExactly("blood", "gore");
+    }
+
+    @Test
+    void keywords_refuseTooShortTooLongAndUnknown() {
+        assertThat(store.addKeyword("violence", "a")).isEqualTo(400);
+        assertThat(store.addKeyword("violence", "x".repeat(51))).isEqualTo(400);
+        assertThat(store.addKeyword("nope", "gore")).isEqualTo(404);
+        assertThat(store.removeKeyword("nope", "gore")).isEqualTo(404);
+        assertThat(store.keywords("nope")).isNull();
+    }
+
+    @Test
+    void test_matchesTheSavedKeywordsAndTheDraftAgainstTheAppsNotes() {
+        var result = store.test("violence", "730", "Blood");
+
+        assertThat(result.matchedKeywords()).containsExactly("blood", "gore");
+        assertThat(result.draftKeywordMatch()).isTrue();
+        assertThat(result.notes()).isNotBlank();
+        assertThat(store.test("violence", "730", "spiders").draftKeywordMatch()).isFalse();
+        assertThat(store.test("violence", "730", "").draftKeywordMatch()).isNull();
+        assertThat(store.test("violence", "999", null).matchedKeywords()).isEmpty();
+        assertThat(store.test("nope", "730", null)).isNull();
+    }
 }

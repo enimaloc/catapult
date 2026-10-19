@@ -1121,4 +1121,37 @@ class RealApiServiceTest {
         assertThat(service.adminRebuildTws(fr.enimaloc.catapult.common.dto.admin.TwRebuild.UNTOUCHED)).isEqualTo(204);
         assertThat(service.adminRebuildTws(fr.enimaloc.catapult.common.dto.admin.TwRebuild.FORCE_PINNED)).isEqualTo(503);
     }
+
+    @Test
+    void twKeywords_listAddAndTest_useTheSteamKeywordRoutes() {
+        respond(HttpMethod.GET, "/api/admin/tw/violence/steam-keywords", "[\"blood\",\"gore\"]");
+        expect(HttpMethod.POST, "/api/admin/tw/violence/steam-keywords")
+                .andExpect(content().json("{\"keyword\":\"blood\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/tw/violence/steam-keywords/test")
+                .andExpect(content().json("{\"appId\":\"730\",\"draftKeyword\":\"gor\"}", true))
+                .andRespond(withSuccess("{\"notes\":\"gore\",\"matchedKeywords\":[\"gore\"],"
+                        + "\"draftKeywordMatch\":null,\"matchedContentDescriptorIds\":[1,5]}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.adminTwKeywords("violence")).containsExactly("blood", "gore");
+        assertThat(service.adminAddTwKeyword("violence", "blood")).isEqualTo(204);
+        var test = service.adminTestTwKeyword("violence", "730", "gor");
+        assertThat(test.matchedKeywords()).containsExactly("gore");
+        assertThat(test.matchedContentDescriptorIds()).containsExactly(1, 5);
+        assertThat(test.draftKeywordMatch()).isNull();
+        assertThat(test.notes()).isEqualTo("gore");
+    }
+
+    @Test
+    void twTest_whenTheApiRefuses_isNull() {
+        expect(HttpMethod.POST, "/api/admin/tw/violence/steam-keywords/test").andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        assertThat(service.adminTestTwKeyword("violence", "730", null)).isNull();
+    }
+
+    @Test
+    void removeKeyword_encodesIt() {
+        expect(HttpMethod.DELETE, "/api/admin/tw/violence/steam-keywords/gore%2Fblood%20%C3%A9").andRespond(withNoContent());
+
+        assertThat(service.adminRemoveTwKeyword("violence", "gore/blood é")).isEqualTo(204);
+    }
 }

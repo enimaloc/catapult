@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
@@ -1031,5 +1032,29 @@ public class MockApiService implements ApiService {
     public int adminRebuildTws(TwRebuild mode) {
         log.trace("adminRebuildTws({})", mode);
         return tws.rebuild();
+    }
+
+    @Override
+    public List<String> adminTwKeywords(String id) {
+        log.trace("adminTwKeywords({})", id);
+        return tws.keywords(id);
+    }
+
+    @Override
+    public int adminAddTwKeyword(String id, String keyword) {
+        log.trace("adminAddTwKeyword({}, {})", id, keyword);
+        return tws.addKeyword(id, keyword);
+    }
+
+    @Override
+    public int adminRemoveTwKeyword(String id, String keyword) {
+        log.trace("adminRemoveTwKeyword({}, {})", id, keyword);
+        return tws.removeKeyword(id, keyword);
+    }
+
+    @Override
+    public TwKeywordTestDto adminTestTwKeyword(String id, String appId, String draftKeyword) {
+        log.trace("adminTestTwKeyword({}, {}, {})", id, appId, draftKeyword);
+        return tws.test(id, appId, draftKeyword);
     }
 }

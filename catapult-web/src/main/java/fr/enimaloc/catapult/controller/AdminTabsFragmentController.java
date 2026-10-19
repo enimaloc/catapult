@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
@@ -250,12 +251,27 @@ public class AdminTabsFragmentController {
         });
     }
 
-    /** The trigger warning definitions; the keywords sub-view is added by the keywords task. */
+    /** The trigger warning definitions. */
     @GetMapping("/tw")
     String tw(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {
             model.addAttribute("definitions", apiService.adminTws());
             return "pages/admin-tab/tw :: content";
+        });
+    }
+
+    /** One definition's Steam keywords and the tester; the missing fragment (404) when it is unknown. */
+    @GetMapping("/tw/{id}")
+    String twKeywords(Model model, HttpServletResponse response, @PathVariable String id) {
+        return guarded(model, response, () -> {
+            TwDefinitionDto definition = apiService.adminTw(id);
+            if (definition == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/tw :: missing";
+            }
+            model.addAttribute("definition", definition);
+            model.addAttribute("keywords", apiService.adminTwKeywords(id));
+            return "pages/admin-tab/tw :: keywords";
         });
     }
 
