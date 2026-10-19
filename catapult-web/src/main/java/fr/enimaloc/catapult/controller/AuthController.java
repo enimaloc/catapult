@@ -30,6 +30,8 @@ public class AuthController {
             return "redirect:/login?error";
         }
         session.setAttribute(ApiClient.SESSION_JWT_KEY, jwt.token());
+        // A new login ends any impersonation: "Back to admin" mustn't restore an older admin session.
+        session.removeAttribute(ImpersonationController.ORIGINAL_JWT_KEY);
         return "redirect:" + home(apiService.channelList());
     }
 
