@@ -2100,7 +2100,8 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 
 /* Fixed to the viewport (!important: mdui-layout places its items with inline styles): as an absolutely
    placed drawer it spans the whole scrolling page, and its content would sit at the top, out of sight.
-   Modal, the host is the full-screen overlay and the sheet is its panel part: the width goes there. */
+   Modal, the host is the full-screen overlay and the sheet is its panel part: the width goes there,
+   kept under mdui's 80% so that a phone still has a strip of overlay to tap it closed. */
 .help-panel {
     position: fixed !important;
     top: 0 !important;
@@ -2109,7 +2110,6 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 
 .help-panel::part(panel) {
     width: min(420px, 100vw);
-    max-width: 100%;
 }
 
 .help-panel-header {
