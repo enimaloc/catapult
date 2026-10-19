@@ -20,6 +20,8 @@ import fr.enimaloc.catapult.event.tw.TwEnabledStateEvent;
 import fr.enimaloc.catapult.event.tw.TwResetEvent;
 import fr.enimaloc.catapult.event.tw.TwUpdatedEvent;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.twitchat.TwitchatDispatchHub;
 import org.junit.jupiter.api.AfterEach;
@@ -33,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -353,23 +356,23 @@ class MockApiServiceTest {
 
     @Test
     void widget_resolvesItsTokenAcrossSessions_andFollowsTheObsToggle() {
-        java.util.UUID token = data.getWidgetToken();
-        java.util.UUID owner = data.getChannelDto().id();
+        UUID token = data.getWidgetToken();
+        UUID owner = data.getChannelDto().id();
         service.saveObsSettings(username, true, "10.0.0.2", 4456, "pw");
         // Read from another (anonymous) request, like an OBS browser source.
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
 
         assertThat(service.widgetAccess(token))
-                .isEqualTo(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse(owner.toString(), true));
+                .isEqualTo(new TwitchatWidgetAccessResponse(owner.toString(), true));
         assertThat(service.widgetObsConfig(token))
-                .isEqualTo(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
+                .isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
 
         data.saveObsSettings(false, "10.0.0.2", 4456, null);
         assertThat(service.widgetAccess(token))
-                .isEqualTo(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse(owner.toString(), false));
+                .isEqualTo(new TwitchatWidgetAccessResponse(owner.toString(), false));
         assertThat(service.widgetObsConfig(token)).isNull();
 
-        java.util.UUID unknown = java.util.UUID.randomUUID();
+        UUID unknown = UUID.randomUUID();
         assertThat(service.widgetAccess(unknown)).isNull();
         assertThat(service.widgetObsConfig(unknown)).isNull();
     }

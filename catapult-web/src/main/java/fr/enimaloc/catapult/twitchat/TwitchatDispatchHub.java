@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,6 +24,23 @@ public class TwitchatDispatchHub {
 
     public SseEmitter subscribe(UUID userId) {
         return subscribe(userId, new SseEmitter(0L));
+    }
+
+    /**
+     * A stream closed after {@code timeout}, for a client whose right to it can be revoked (the
+     * OBS widget link): its EventSource reconnects, so that right is checked again. Opened with a
+     * comment, so the response is committed at once and its end reads as a closed stream to
+     * reconnect to, not as an error.
+     */
+    public SseEmitter subscribe(UUID userId, Duration timeout) {
+        SseEmitter emitter = subscribe(userId, new SseEmitter(timeout.toMillis()));
+        emitter.onTimeout(emitter::complete);
+        try {
+            emitter.send(SseEmitter.event().comment("open"));
+        } catch (IOException | IllegalStateException e) {
+            remove(userId, emitter);
+        }
+        return emitter;
     }
 
     SseEmitter subscribe(UUID userId, SseEmitter emitter) {
