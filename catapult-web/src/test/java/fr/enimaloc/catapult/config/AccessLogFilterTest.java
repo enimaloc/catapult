@@ -105,4 +105,36 @@ class AccessLogFilterTest {
                 .contains("< Set-Cookie: ***")
                 .doesNotContain("abc").doesNotContain("def");
     }
+
+    @Test
+    void masksTheWidgetToken(CapturedOutput output) throws Exception {
+        String token = "11111111-2222-3333-4444-555555555555";
+        filter.doFilter(request("GET", "/widget/obs/" + token + "/events"), new MockHttpServletResponse(), new MockFilterChain());
+        filter.doFilter(request("GET", "/widget/obs/" + token), new MockHttpServletResponse(), new MockFilterChain());
+
+        assertThat(output).containsPattern("GET /widget/obs/\\*\\*\\*/events 200 \\d+ms")
+                .containsPattern("GET /widget/obs/\\*\\*\\* 200 \\d+ms")
+                .doesNotContain(token);
+    }
+
+    @Test
+    void masksTheWidgetToken_inTheDevExchangeToo(CapturedOutput output) throws Exception {
+        String token = "11111111-2222-3333-4444-555555555555";
+        MockHttpServletRequest request = request("GET", "/widget/twitchat/" + token);
+        // The widget page's own scripts are asked with it as their referrer.
+        request.addHeader("Referer", "https://catapult.test/widget/obs/" + token);
+
+        devFilter().doFilter(request, new MockHttpServletResponse(), (req, res) -> {
+            HttpServletResponse r = (HttpServletResponse) res;
+            r.setStatus(301);
+            r.setHeader("Location", "/widget/obs/" + token);
+        });
+
+        assertThat(output)
+                .contains("GET /widget/twitchat/*** 301")
+                .contains("> GET /widget/twitchat/*** HTTP/1.1")
+                .contains("> Referer: https://catapult.test/widget/obs/***")
+                .contains("< Location: /widget/obs/***")
+                .doesNotContain(token);
+    }
 }

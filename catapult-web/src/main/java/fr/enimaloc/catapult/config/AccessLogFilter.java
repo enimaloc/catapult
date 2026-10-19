@@ -20,13 +20,15 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Logs every HTTP request once it is answered: method, path, status, duration and client IP
  * (the real one behind nginx, through {@code server.forward-headers-strategy}). The query string
  * is left out, since it can carry the one-time login code. Health checks are skipped: docker
  * and nginx hit them every few seconds. Long-lived responses (SSE) are logged when they close.
- * Static assets (css, js, _static) are logged at DEBUG only.
+ * Static assets (css, js, _static) are logged at DEBUG only. An OBS widget link's token is a
+ * capability: it is masked wherever it shows (path, Referer, Location).
  * <p>
  * Under the dev profile, each line is followed by the whole exchange the way {@code curl -v}
  * shows it.
@@ -40,6 +42,8 @@ public class AccessLogFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger("access");
     /** Headers whose value never reaches the logs, even in dev. */
     private static final Set<String> SENSITIVE_HEADERS = Set.of("authorization", "cookie", "set-cookie", "x-xsrf-token");
+    /** The token segment of a widget link (/widget/obs/{token}, and the older /widget/twitchat/{token}). */
+    private static final Pattern WIDGET_TOKEN = Pattern.compile("(/widget/(?:obs|twitchat)/)[^/?#]+");
 
     private final Environment environment;
 
@@ -76,7 +80,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
         Level level = compRoute ? Level.DEBUG : Level.INFO;
         if (log.isEnabledForLevel(level)) {
             log.atLevel(level)
-                    .log("{} {} {} {}ms {} (UA: {})", request.getMethod(), request.getRequestURI(), status,
+                    .log("{} {} {} {}ms {} (UA: {})", request.getMethod(), maskTokens(request.getRequestURI()), status,
                             duration / 1_000_000, request.getRemoteAddr(), request.getHeader("User-Agent"));
             moreLog(level, request, response, status);
         }
@@ -92,7 +96,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
         StringBuilder out = new StringBuilder("* Connected from ").append(request.getRemoteAddr())
                 .append(':').append(request.getRemotePort()).append('\n');
         String query = request.getQueryString();
-        out.append("> ").append(request.getMethod()).append(' ').append(request.getRequestURI())
+        out.append("> ").append(request.getMethod()).append(' ').append(maskTokens(request.getRequestURI()))
                 .append(query == null ? "" : "?" + query).append(' ').append(request.getProtocol()).append('\n');
         for (String name : Collections.list(request.getHeaderNames())) {
             for (String value : Collections.list(request.getHeaders(name))) {
@@ -110,6 +114,10 @@ public class AccessLogFilter extends OncePerRequestFilter {
     }
 
     private static String mask(String header, String value) {
-        return SENSITIVE_HEADERS.contains(header.toLowerCase(Locale.ROOT)) ? "***" : value;
+        return SENSITIVE_HEADERS.contains(header.toLowerCase(Locale.ROOT)) ? "***" : maskTokens(value);
+    }
+
+    private static String maskTokens(String value) {
+        return value == null ? null : WIDGET_TOKEN.matcher(value).replaceAll("$1***");
     }
 }
