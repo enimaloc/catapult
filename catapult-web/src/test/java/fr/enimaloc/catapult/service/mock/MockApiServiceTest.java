@@ -111,6 +111,14 @@ class MockApiServiceTest {
 
     // --- sessions --------------------------------------------------------------------------------
 
+    /** Shaped as catapult-api's JWT, so that ApiClient reads the login's claims in the mock too. */
+    @Test
+    void exchangeCode_mintsAJwtShapedToken_withTheMembersLogin() {
+        assertThat(ApiClient.currentLogin()).isEqualTo(username);
+        assertThat(ApiClient.currentSubject()).isEqualTo(data.getChannelDto().id());
+        assertThat(ApiClient.currentRoles()).containsExactly("ROLE_USER");
+    }
+
     @Test
     void exchangeCode_mintsADistinctTokenPerLogin() {
         assertThat(service.exchangeCode("{}").token()).isNotEqualTo(service.exchangeCode("{}").token());
@@ -414,10 +422,12 @@ class MockApiServiceTest {
         var target = members.get(1);
         assertThat(target.systemAccount()).isFalse();
 
-        assertThat(service.adminImpersonate(members.getFirst().twitchUsername())).isNull();
-        assertThat(service.adminImpersonate("catapult_bot")).isNull();
-        assertThat(service.adminImpersonate("nobody")).isNull();
-        String token = service.adminImpersonate(target.twitchUsername());
+        assertThat(service.adminImpersonate(members.getFirst().twitchUsername())).isEqualTo(new ApiClient.Result<>(403, null));
+        assertThat(service.adminImpersonate("catapult_bot")).isEqualTo(new ApiClient.Result<>(403, null));
+        assertThat(service.adminImpersonate("nobody")).isEqualTo(new ApiClient.Result<>(404, null));
+        var result = service.adminImpersonate(target.twitchUsername());
+        assertThat(result.status()).isEqualTo(200);
+        String token = result.body();
         assertThat(token).isNotNull();
 
         MockHttpServletRequest request = new MockHttpServletRequest();

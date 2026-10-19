@@ -177,7 +177,8 @@ window.CatapultAdminMembers = (function () {
             return;
         }
         item.disabled = false;
-        CatapultChannel.showError(status === 403 ? card.dataset.labelImpersonateRefused
+        // catapult-api's refusals (403, or 404 for a member gone meanwhile) share the old page's text
+        CatapultChannel.showError(status === 403 || status === 404 ? card.dataset.labelImpersonateRefused
             : card.dataset.labelImpersonateUnavailable);
     }
 

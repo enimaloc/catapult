@@ -153,6 +153,10 @@ describe("admin-members", () => {
             await click("#impersonate");
             expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Refused");
 
+            posted.mockResolvedValue(response(404));
+            await click("#impersonate");
+            expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Refused");
+
             posted.mockResolvedValue(response(502));
             await click("#impersonate");
             expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");

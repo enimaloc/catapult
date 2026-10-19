@@ -518,11 +518,13 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public String adminImpersonate(String username) {
+    public ApiClient.Result<String> adminImpersonate(String username) {
         ApiClient.Result<ImpersonateResponse> result = client.call(HttpMethod.POST, "/api/admin/impersonate",
                 new ImpersonateRequest(username), ImpersonateResponse.class);
-        return result.ok() && result.body() != null && result.body().token() != null && !result.body().token().isBlank()
-                ? result.body().token() : null;
+        if (!result.ok()) return new ApiClient.Result<>(result.status(), null);
+        return result.body() != null && result.body().token() != null && !result.body().token().isBlank()
+                ? new ApiClient.Result<>(result.status(), result.body().token())
+                : new ApiClient.Result<>(502, null);
     }
 
     @Override

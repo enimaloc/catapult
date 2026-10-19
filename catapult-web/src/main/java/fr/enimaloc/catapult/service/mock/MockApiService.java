@@ -124,7 +124,7 @@ public class MockApiService implements ApiService {
 
     /**
      * Resolves the calling session's data the same way {@link ApiClient} resolves its JWT.
-     * The token is a random UUID minted in {@link #exchangeCode}, not a JWT, so it can't be
+     * The token is minted in {@link #exchangeCode} (JWT-shaped, unsigned), not a mock config, so it can't be
      * fed to {@link MockData#fromJwt} — if the entry is missing (e.g. the server restarted and
      * lost its in-memory state while the browser session cookie survived), data is regenerated
      * deterministically from the token via {@link MockData#randomFrom} so it stays the same
@@ -151,33 +151,46 @@ public class MockApiService implements ApiService {
         // reproducible; anything else (the digit quick-launch links) gets fresh random data
         // instead of always reusing the same fixed preset.
         MockData mockData = code != null && code.startsWith("{") ? MockData.fromJwt(code) : MockData.random();
-        String token = UUID.randomUUID().toString();
-        data.put(token, mockData);
-        return new TokenResponse(token);
+        return new TokenResponse(mint(mockData, List.of("ROLE_USER")));
     }
 
     /**
-     * As catapult-api: a token for an active member other than the admin, never the system account.
-     * Shaped as a JWT (unsigned, its claims as catapult-api's) so that ApiClient reads its login,
-     * and keyed to the member's own mock session as {@link #exchangeCode} keys a login's.
+     * A token for {@code session}'s member, keyed to it: shaped as a JWT (unsigned, its claims as
+     * catapult-api's, a random signature keeping each login distinct) so that ApiClient reads its
+     * login. Whether the member is an admin stays the session's (the mock admin page changes it).
      */
-    @Override
-    public String adminImpersonate(String username) {
-        log.trace("adminImpersonate({})", username);
-        MockData current = currentData();
-        if (current == null || username == null) return null;
-        UUID self = current.getChannelDto().id();
-        AdminMemberDto target = current.getMembers().page().members().stream()
-                .filter(m -> username.equals(m.twitchUsername())).findFirst().orElse(null);
-        if (target == null || target.twitchId() == null || target.systemAccount() || target.id().equals(self)
-                || !target.isActive()) return null;
-        Map<String, Object> claims = Map.of("sub", target.id().toString(), "twitchId", target.twitchId(),
-                "username", target.twitchUsername(), "roles", List.of("ROLE_USER", "ROLE_PREVIOUS_ADMINISTRATOR"));
+    private String mint(MockData session, List<String> roles) {
+        var channel = session.getChannelDto();
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("sub", channel.id().toString());
+        claims.put("twitchId", channel.twitchId());
+        claims.put("username", channel.twitchUsername());
+        claims.put("roles", roles);
         Base64.Encoder base64 = Base64.getUrlEncoder().withoutPadding();
         String token = base64.encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8)) + "."
                 + base64.encodeToString(JSON.writeValueAsBytes(claims)) + "." + UUID.randomUUID();
-        data.put(token, MockData.impersonating(target));
+        data.put(token, session);
         return token;
+    }
+
+    /**
+     * As catapult-api: a token for an active member other than the admin (404 unknown, 403 for the
+     * admin themself, an inactive or a system account; 401 without a session), keyed to the member's
+     * own mock session.
+     */
+    @Override
+    public ApiClient.Result<String> adminImpersonate(String username) {
+        log.trace("adminImpersonate({})", username);
+        MockData current = currentData();
+        if (current == null) return new ApiClient.Result<>(401, null);
+        UUID self = current.getChannelDto().id();
+        AdminMemberDto target = current.getMembers().page().members().stream()
+                .filter(m -> username != null && username.equals(m.twitchUsername())).findFirst().orElse(null);
+        if (target == null) return new ApiClient.Result<>(404, null);
+        if (target.twitchId() == null || target.systemAccount() || target.id().equals(self) || !target.isActive()) {
+            return new ApiClient.Result<>(403, null);
+        }
+        return new ApiClient.Result<>(200, mint(MockData.impersonating(target), List.of("ROLE_USER", "ROLE_PREVIOUS_ADMINISTRATOR")));
     }
 
     @Override

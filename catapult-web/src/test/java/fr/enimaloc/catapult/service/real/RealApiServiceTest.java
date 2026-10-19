@@ -819,14 +819,34 @@ class RealApiServiceTest {
     }
 
     @Test
-    void adminImpersonate_postsTheUsername_andReadsTheToken_nullWhenRefused() {
+    void adminImpersonate_postsTheUsername_andReadsTheToken_keepingARefusalsStatus() {
         expect(HttpMethod.POST, "/api/admin/impersonate")
                 .andExpect(content().json("{\"username\":\"alice\"}", org.springframework.test.json.JsonCompareMode.STRICT))
                 .andRespond(withSuccess("{\"token\":\"target-token\"}", MediaType.APPLICATION_JSON));
         expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(withStatus(HttpStatus.FORBIDDEN));
+        expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        assertThat(service.adminImpersonate("alice")).isEqualTo("target-token");
-        assertThat(service.adminImpersonate("alice")).isNull();
+        assertThat(service.adminImpersonate("alice")).isEqualTo(new ApiClient.Result<>(200, "target-token"));
+        assertThat(service.adminImpersonate("alice")).isEqualTo(new ApiClient.Result<>(403, null));
+        assertThat(service.adminImpersonate("ghost")).isEqualTo(new ApiClient.Result<>(404, null));
+    }
+
+    @Test
+    void adminImpersonate_isBadGateway_withoutAToken() {
+        expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(withSuccess("{\"token\":\" \"}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.adminImpersonate("alice")).isEqualTo(new ApiClient.Result<>(502, null));
+        assertThat(service.adminImpersonate("alice")).isEqualTo(new ApiClient.Result<>(502, null));
+    }
+
+    @Test
+    void adminImpersonate_unreachable_is502() {
+        expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(request -> {
+            throw new java.io.IOException("connection refused");
+        });
+
+        assertThat(service.adminImpersonate("alice")).isEqualTo(new ApiClient.Result<>(502, null));
     }
 
     @Test

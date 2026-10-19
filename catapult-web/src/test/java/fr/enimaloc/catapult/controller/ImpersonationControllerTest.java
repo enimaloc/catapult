@@ -32,6 +32,15 @@ class ImpersonationControllerTest {
     @MockitoBean NavEventStreamController navEvents;
     @MockitoBean fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms twitchatEventForms;
 
+    /** The session ids forget() was called under: before the swap rotates them. */
+    private final java.util.List<String> forgottenIds = new java.util.ArrayList<>();
+
+    @org.junit.jupiter.api.BeforeEach
+    void recordForgottenIds() {
+        org.mockito.Mockito.doAnswer(call -> forgottenIds.add(call.<jakarta.servlet.http.HttpSession>getArgument(0).getId()))
+                .when(navEvents).forget(any());
+    }
+
     private static MockHttpSession session(String jwt) {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(ApiClient.SESSION_JWT_KEY, jwt);
@@ -41,9 +50,10 @@ class ImpersonationControllerTest {
     @Test
     void impersonate_keepsTheAdminJwt_andSwapsTheSession() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminImpersonate("alice")).thenReturn("target-token");
+        when(apiService.adminImpersonate("alice")).thenReturn(new ApiClient.Result<>(200, "target-token"));
         MockHttpSession session = session("admin");
         session.setAttribute(SessionChannels.ATTRIBUTE, java.util.List.of());
+        String id = session.getId();
 
         mvc.perform(post("/admin/impersonate").session(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
@@ -51,19 +61,42 @@ class ImpersonationControllerTest {
 
         assertThat(session.getAttribute(ImpersonationController.ORIGINAL_JWT_KEY)).isEqualTo("admin");
         assertThat(session.getAttribute(ApiClient.SESSION_JWT_KEY)).isEqualTo("target-token");
-        // what catapult-web remembered for the admin is not the member's
+        // what catapult-web remembered for the admin is not the member's, forgotten under the former id
         verify(navEvents).forget(session);
+        assertThat(forgottenIds).containsExactly(id);
+        assertThat(session.getId()).isNotEqualTo(id);
     }
 
     @Test
     void impersonate_refused_changesNothing() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminImpersonate("alice")).thenReturn(null);
+        when(apiService.adminImpersonate("alice")).thenReturn(new ApiClient.Result<>(403, null));
         MockHttpSession session = session("admin");
+        String id = session.getId();
 
         mvc.perform(post("/admin/impersonate").session(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isForbidden());
+
+        assertThat(session.getAttribute(ApiClient.SESSION_JWT_KEY)).isEqualTo("admin");
+        assertThat(session.getAttribute(ImpersonationController.ORIGINAL_JWT_KEY)).isNull();
+        assertThat(session.getId()).isEqualTo(id);
+        verify(navEvents, never()).forget(any());
+    }
+
+    @Test
+    void impersonate_unreachableOrUnknown_relaysTheStatus_changesNothing() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminImpersonate("alice")).thenReturn(new ApiClient.Result<>(502, null));
+        when(apiService.adminImpersonate("ghost")).thenReturn(new ApiClient.Result<>(404, null));
+        MockHttpSession session = session("admin");
+
+        mvc.perform(post("/admin/impersonate").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isBadGateway());
+        mvc.perform(post("/admin/impersonate").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"ghost\"}"))
+                .andExpect(status().isNotFound());
 
         assertThat(session.getAttribute(ApiClient.SESSION_JWT_KEY)).isEqualTo("admin");
         assertThat(session.getAttribute(ImpersonationController.ORIGINAL_JWT_KEY)).isNull();
@@ -102,7 +135,7 @@ class ImpersonationControllerTest {
     @Test
     void impersonate_again_keepsTheFirstAdminJwt() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminImpersonate("alice")).thenReturn("second-token");
+        when(apiService.adminImpersonate("alice")).thenReturn(new ApiClient.Result<>(200, "second-token"));
         MockHttpSession session = session("first-token");
         session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin");
 
@@ -118,6 +151,7 @@ class ImpersonationControllerTest {
     void exit_restoresTheAdmin() throws Exception {
         MockHttpSession session = session("target-token");
         session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin");
+        String id = session.getId();
 
         mvc.perform(post("/admin/impersonate/exit").session(session).with(csrf()))
                 .andExpect(status().isFound())
@@ -126,19 +160,34 @@ class ImpersonationControllerTest {
         assertThat(session.getAttribute(ApiClient.SESSION_JWT_KEY)).isEqualTo("admin");
         assertThat(session.getAttribute(ImpersonationController.ORIGINAL_JWT_KEY)).isNull();
         verify(navEvents).forget(session);
+        assertThat(forgottenIds).containsExactly(id);
+        assertThat(session.getId()).isNotEqualTo(id);
     }
 
     /** Review Focus 3: a stale tab or a second click only goes back to the admin page, never logs out. */
     @Test
     void exit_withoutImpersonation_onlyRedirects() throws Exception {
         MockHttpSession session = session("admin");
+        String id = session.getId();
 
         mvc.perform(post("/admin/impersonate/exit").session(session).with(csrf()))
                 .andExpect(status().isFound())
                 .andExpect(redirectedUrl("/admin#members"));
 
         assertThat(session.isInvalid()).isFalse();
+        assertThat(session.getId()).isEqualTo(id);
         assertThat(session.getAttribute(ApiClient.SESSION_JWT_KEY)).isEqualTo("admin");
+        verify(navEvents, never()).forget(any());
+    }
+
+    @Test
+    void exit_withoutASession_onlyRedirects_creatingNone() throws Exception {
+        var result = mvc.perform(post("/admin/impersonate/exit").with(csrf()))
+                .andExpect(status().isFound())
+                .andExpect(redirectedUrl("/admin#members"))
+                .andReturn();
+
+        assertThat(result.getRequest().getSession(false)).isNull();
         verify(navEvents, never()).forget(any());
     }
 
