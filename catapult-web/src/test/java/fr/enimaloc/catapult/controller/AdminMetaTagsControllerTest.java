@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = AdminMetaTagsController.class)
-@Import({WebSecurityConfig.class, ModelFiller.class})
+@Import({WebSecurityConfig.class, ModelFiller.class, SiteMetaTags.class})
 class AdminMetaTagsControllerTest {
     static final String BODY = "{\"attribute\":\"PROPERTY\",\"key\":\"og:image\",\"content\":\"https://x/y.png\"}";
     static final MetaTagRequest REQUEST = new MetaTagRequest(PROPERTY, "og:image", "https://x/y.png");
