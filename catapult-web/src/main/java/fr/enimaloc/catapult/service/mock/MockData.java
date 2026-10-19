@@ -97,6 +97,9 @@ public class MockData {
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
+    /** The OBS widget link's token (/widget/obs/{token}); stable for the channel, so a rebuilt session keeps it. */
+    @Getter
+    private UUID widgetToken;
     @Setter
     @Getter
     private boolean botEnabled = true;
@@ -149,6 +152,7 @@ public class MockData {
         this.hasMinecraftProvider = minecraft != null;
         this.minecraftLink = minecraft;
         this.obsData = obs;
+        this.widgetToken = UUID.nameUUIDFromBytes(("catapult-widget:" + channel.id()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private static Map<String, List<TwitchatEventActionDto>> defaultTwitchatEvents() {

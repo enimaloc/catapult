@@ -10,6 +10,9 @@
  *
  * /me/obs also carries the Twitchat branch picked in the integration settings, handed to
  * twitchat.js ("auto" when there's none: OBS disabled, or logged out).
+ *
+ * A page can name another config URL in its body's data-obs-config-url (the OBS widget page,
+ * /widget/obs/{token}/config, same shape); /me/obs otherwise.
  */
 window.CatapultObsSession = (function () {
     const MIN_DELAY = 1000;
@@ -23,9 +26,11 @@ window.CatapultObsSession = (function () {
     // Bumped by every refresh(), so the retries and connects of an older config give up.
     let generation = 0;
 
+    const configUrl = () => document.body?.dataset.obsConfigUrl || "/me/obs";
+
     async function fetchConfig() {
         try {
-            const response = await fetch("/me/obs", { cache: "no-store" });
+            const response = await fetch(configUrl(), { cache: "no-store" });
             return response.status === 200 ? await response.json() : null;
         } catch {
             return null;
@@ -57,7 +62,7 @@ window.CatapultObsSession = (function () {
         return a?.obsHost === b?.obsHost && a?.obsPort === b?.obsPort && a?.obsPassword === b?.obsPassword;
     }
 
-    /** Re-reads /me/obs, then connects, reconnects or disconnects to match it. */
+    /** Re-reads the config (/me/obs by default), then connects, reconnects or disconnects to match it. */
     async function refresh() {
         const gen = ++generation;
         const next = await fetchConfig();

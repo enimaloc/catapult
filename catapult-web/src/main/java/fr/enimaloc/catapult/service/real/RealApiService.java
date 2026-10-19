@@ -73,6 +73,9 @@ import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
+import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -235,6 +238,22 @@ public class RealApiService implements ApiService {
     @Override
     public TwitchatWidgetConfig obsConnection() {
         return client.get("/api/me/obs", TwitchatWidgetConfig.class);
+    }
+
+    @Override
+    public TwitchatWidgetConfig widgetObsConfig(UUID token) {
+        // The body carries the OBS password: never logged.
+        ApiClient.Result<ConfigResponse> result = client.getAnonymous("/api/twitchat/widget/{token}", ConfigResponse.class, token);
+        ConfigResponse config = result.status() == 200 ? result.body() : null;
+        return config == null ? null
+                : new TwitchatWidgetConfig(config.obsHost(), config.obsPort(), config.obsPassword(), TwitchatData.AUTO);
+    }
+
+    @Override
+    public TwitchatWidgetAccessResponse widgetAccess(UUID token) {
+        ApiClient.Result<TwitchatWidgetAccessResponse> result =
+                client.getAnonymous("/api/twitchat/widget/{token}/access", TwitchatWidgetAccessResponse.class, token);
+        return result.status() == 200 ? result.body() : null;
     }
 
     @Override

@@ -45,6 +45,8 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPayload;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents;
 import fr.enimaloc.catapult.common.twitchat.TwitchatCatalog;
@@ -368,6 +370,28 @@ public class MockApiService implements ApiService {
         log.trace("obsConnection()");
         MockData current = currentData();
         return current == null ? null : current.obsConnection();
+    }
+
+    @Override
+    public TwitchatWidgetConfig widgetObsConfig(UUID token) {
+        log.trace("widgetObsConfig({})", token);
+        // Like catapult-api's /api/twitchat/widget/{token}: no branch, so "auto".
+        return widgetOwner(token).map(MockData::obsConnection)
+                .map(c -> new TwitchatWidgetConfig(c.obsHost(), c.obsPort(), c.obsPassword(), TwitchatData.AUTO))
+                .orElse(null);
+    }
+
+    @Override
+    public TwitchatWidgetAccessResponse widgetAccess(UUID token) {
+        log.trace("widgetAccess({})", token);
+        return widgetOwner(token)
+                .map(d -> new TwitchatWidgetAccessResponse(d.getChannelDto().id().toString(), d.obsConnection() != null))
+                .orElse(null);
+    }
+
+    /** The session whose widget link {@code token} is: an OBS browser source has no session of its own. */
+    private java.util.Optional<MockData> widgetOwner(UUID token) {
+        return data.values().stream().filter(d -> token.equals(d.getWidgetToken())).findFirst();
     }
 
     @Override

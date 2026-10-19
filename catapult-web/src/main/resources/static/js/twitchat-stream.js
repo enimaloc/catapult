@@ -2,14 +2,15 @@
  * The logged-in owner's Twitchat dispatches (/me/twitchat/events, an owner-only SSE stream:
  * their payloads carry signed action tokens), listened to while the page is connected to OBS,
  * the only way they can reach Twitchat. Each becomes a "catapult:twitchat:dispatch" event on
- * document, sent by twitchat.js.
+ * document, sent by twitchat.js. A page can name another stream in its body's
+ * data-twitchat-events-url (the OBS widget page: /widget/obs/{token}/events).
  */
 (function () {
     let source = null;
 
     function open() {
         if (source) return;
-        source = new EventSource("/me/twitchat/events");
+        source = new EventSource(document.body?.dataset.twitchatEventsUrl || "/me/twitchat/events");
         source.addEventListener("TwitchatDispatch", (event) => {
             let detail;
             try {
