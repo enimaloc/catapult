@@ -232,6 +232,40 @@ class IndexControllerTest {
         org.assertj.core.api.Assertions.assertThat(barEnd(admin)).containsPattern("<a id=\"nav-admin\" data-link [^>]*href=\"/admin\"");
     }
 
+    @Test
+    void navbar_offersToLogOut_forMembersOnly() throws Exception {
+        String key = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
+        String member = mvc.perform(get("/").sessionAttr(key, "jwt")).andReturn().getResponse().getContentAsString();
+        assertThat(barEnd(member))
+                .containsPattern("<form id=\"nav-logout\" [^>]*action=\"/logout\" method=\"post\"")
+                .containsPattern("<input type=\"hidden\" name=\"_csrf\" value=\"[^\"]+\"");
+
+        String visitor = mvc.perform(get("/")).andReturn().getResponse().getContentAsString();
+        assertThat(barEnd(visitor)).doesNotContain("nav-logout");
+    }
+
+    @Test
+    void logout_endsTheSession_andGoesHome() throws Exception {
+        org.springframework.mock.web.MockHttpSession session = new org.springframework.mock.web.MockHttpSession();
+        session.setAttribute(fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY, "jwt");
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/logout").session(session)
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/"));
+        assertThat(session.isInvalid()).isTrue();
+    }
+
+    @Test
+    void logout_needsTheCsrfToken() throws Exception {
+        org.springframework.mock.web.MockHttpSession session = new org.springframework.mock.web.MockHttpSession();
+        session.setAttribute(fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY, "jwt");
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/logout").session(session))
+                .andExpect(status().isForbidden());
+        assertThat(session.isInvalid()).isFalse();
+    }
+
     /** Read without arguments (admin-tabs.js fills {0} itself), so MessageFormat's '' escape would show up literally. */
     @Test
     void adminErrorMessage_keepsASingleApostrophe_inFrench() {

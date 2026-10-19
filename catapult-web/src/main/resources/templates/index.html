@@ -80,6 +80,10 @@
             </a>
             <!-- Mock profile only: reopens the member's config popout (mock-popout.js). -->
             <mdui-button th:if="${mock}" id="mock-popout-btn" variant="text" icon="tune">Mock</mdui-button>
+            <!--/* Members: a plain POST (Thymeleaf adds the CSRF field), which ends the session and reloads the home page. */-->
+            <form th:if="${loggedIn}" id="nav-logout" class="nav-logout" th:action="@{/logout}" method="post">
+                <mdui-button-icon type="submit" icon="logout" th:title="#{nav.logout}" th:attr="aria-label=#{nav.logout}"></mdui-button-icon>
+            </form>
             <mdui-button th:unless="${loggedIn}" variant="text" href="/oauth2/authorization/twitch"
                          th:text="#{nav.login}">nav.login</mdui-button>
         </div>
