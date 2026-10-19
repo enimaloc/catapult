@@ -181,6 +181,8 @@ public class ModelFiller {
             var twitchatEvents = channelPage.twitchat() == null ? Map.<String, List<TwitchatEventActionDto>>of()
                     : apiService.twitchatEvents(username);
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
+            model.addAttribute("dangerZone",
+                    DangerZoneView.of(apiService.accountInfo(), apiService.accountDeletionDelayDays()));
         }
         return 0;
     }

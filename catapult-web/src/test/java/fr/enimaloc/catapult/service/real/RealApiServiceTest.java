@@ -76,6 +76,53 @@ class RealApiServiceTest {
         expect(httpMethod, path).andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
     }
 
+    @Test
+    void deleteAccount_postsTheConfirmation() {
+        expectPost("/api/channels/me/settings/delete-account", "{\"confirmUsername\":\"Me\"}");
+
+        assertThat(service.deleteAccount("me", "Me")).isEqualTo(204);
+    }
+
+    @Test
+    void cancelAccountDeletion_posts() {
+        expectPost("/api/channels/me/settings/cancel-deletion");
+
+        assertThat(service.cancelAccountDeletion("me")).isEqualTo(204);
+    }
+
+    @Test
+    void accountInfo_readsTheValidatedAccount() {
+        respond(HttpMethod.GET, "/api/auth/validate", """
+                {"id":"00000000-0000-0000-0000-000000000001","twitchId":"1","username":"me","status":"PENDING_DELETION",
+                 "roles":[],"deletionRequestedAt":"2026-10-01T10:00:00Z"}""");
+
+        var info = service.accountInfo();
+
+        assertThat(info.status()).isEqualTo("PENDING_DELETION");
+        assertThat(info.deletionRequestedAt()).isEqualTo("2026-10-01T10:00:00Z");
+    }
+
+    @Test
+    void accountInfo_isNullWhenItFails() {
+        expect(HttpMethod.GET, "/api/auth/validate").andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        assertThat(service.accountInfo()).isNull();
+    }
+
+    @Test
+    void accountDeletionDelayDays_readsTheConfig() {
+        respond(HttpMethod.GET, "/api/config/app", "{\"name\":\"Catapult\",\"deletionDelayDays\":14,\"gettersName\":[]}");
+
+        assertThat(service.accountDeletionDelayDays()).isEqualTo(14);
+    }
+
+    @Test
+    void accountDeletionDelayDays_fallsBackTo7() {
+        expect(HttpMethod.GET, "/api/config/app").andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        assertThat(service.accountDeletionDelayDays()).isEqualTo(7);
+    }
+
     // --- reads ---------------------------------------------------------------------------------
 
     @Test

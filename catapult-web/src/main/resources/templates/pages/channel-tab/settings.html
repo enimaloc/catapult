@@ -51,4 +51,28 @@
                 'incomplete-fallback-ccl-checkbox', ${settings.incompleteFallbackCcls()}, 'name')}"></div>
         <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
     </mdui-card>
+
+    <!--/* The owner's alone: catapult-api refuses anyone else, so the card isn't offered to a moderator. */-->
+    <mdui-card id="channel-danger-zone" class="settings-card danger-zone-card" variant="outlined"
+               th:if="${channelPage.isOwner() and dangerZone != null}" th:attr="data-username=${username}">
+        <h3 th:text="${dangerZone.pending()} ? #{channel.settings.danger.pending_title} : #{channel.settings.danger.title}">Zone danger</h3>
+        <th:block th:if="${dangerZone.pending()}">
+            <p th:if="${dangerZone.deletesAt() != null}"
+               th:text="#{channel.settings.danger.pending_description(${#temporals.format(dangerZone.deletesAt(), #messages.msg('format.date'))})}">Ton compte sera supprimé le</p>
+            <mdui-button id="danger-zone-cancel-btn" variant="tonal" th:text="#{channel.settings.danger.cancel_button}">Annuler la suppression</mdui-button>
+        </th:block>
+        <th:block th:unless="${dangerZone.pending()}">
+            <p th:utext="#{channel.settings.danger.description(${dangerZone.delayDays()})}">Irréversible</p>
+            <mdui-button id="danger-zone-delete-btn" variant="filled" th:text="#{channel.settings.danger.delete_button}">Supprimer mon compte</mdui-button>
+            <mdui-dialog id="danger-zone-delete-dialog" close-on-overlay-click
+                         th:attr="headline=#{channel.settings.danger.dialog.title}">
+                <p th:text="#{channel.settings.danger.dialog.prompt}">Saisis ton nom</p>
+                <mdui-text-field name="confirmUsername" variant="outlined" autocomplete="off"
+                                 th:attr="placeholder=#{channel.settings.danger.dialog.placeholder}"></mdui-text-field>
+                <mdui-button slot="action" variant="text" class="danger-zone-dismiss" th:text="#{channel.settings.danger.dialog.dismiss}">Annuler</mdui-button>
+                <mdui-button slot="action" variant="filled" class="danger-zone-confirm" disabled
+                             th:text="#{channel.settings.danger.dialog.confirm}">Supprimer définitivement</mdui-button>
+            </mdui-dialog>
+        </th:block>
+    </mdui-card>
 </mdui-tab-panel>

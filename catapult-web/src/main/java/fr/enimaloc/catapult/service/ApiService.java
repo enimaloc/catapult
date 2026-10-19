@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service;
 
+import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -172,4 +173,18 @@ public interface ApiService {
     ApiClient.Result<String> adminPreviewNotification(String body);
     /** catapult-api's status (202; 400 invalid; 429 rate-limited), 502 when unreachable. */
     int adminBroadcast(BroadcastRequestDto body);
+
+    // --- account deletion ---
+
+    /** The logged-in account as catapult-api validates it (status, deletion request time); null when it fails. */
+    UserInfoResponse accountInfo();
+    /** Days between a deletion request and the account's removal; 7 when catapult-api gives none. */
+    int accountDeletionDelayDays();
+    /**
+     * Asks for the channel's deletion: catapult-api's status (204, also when {@code confirmUsername} is not
+     * the channel's, which it then ignores; 403 not the caller's channel), 502 when unreachable.
+     */
+    int deleteAccount(String username, String confirmUsername);
+    /** Cancels a pending deletion: catapult-api's status (204), 502 when unreachable. */
+    int cancelAccountDeletion(String username);
 }
