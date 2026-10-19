@@ -40,9 +40,6 @@ public class AdminWellKnownController {
     }
 
     private ResponseEntity<Void> relay(IntSupplier action) {
-        AdminAccess.require(filler);
-        int status = action.getAsInt();
-        if (status >= 200 && status < 300) cache.clear();
-        return ResponseEntity.status(status).build();
+        return AdminAccess.relay(filler, action, cache::clear);
     }
 }

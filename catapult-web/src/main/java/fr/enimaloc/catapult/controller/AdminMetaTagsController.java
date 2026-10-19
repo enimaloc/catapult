@@ -40,9 +40,6 @@ public class AdminMetaTagsController {
     }
 
     private ResponseEntity<Void> relay(IntSupplier action) {
-        AdminAccess.require(filler);
-        int status = action.getAsInt();
-        if (status >= 200 && status < 300) siteMetaTags.clear();
-        return ResponseEntity.status(status).build();
+        return AdminAccess.relay(filler, action, siteMetaTags::clear);
     }
 }
