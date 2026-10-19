@@ -17,10 +17,9 @@
         <meta name="twitter:card" content="summary">
     </th:block>
     <meta th:unless="${seo.indexed}" name="robots" content="noindex">
-    <!--/* The admin's own (Meta tab, see SiteMetaTags), on every page: site verifications, theme-color… */-->
-    <meta th:each="tag : ${metaTags}"
-          th:attr="name=${tag.attribute().name() == 'NAME' ? tag.key() : null},property=${tag.attribute().name() == 'PROPERTY' ? tag.key() : null}"
-          th:content="${tag.content()}">
+    <!--/* The admin's own (Meta tab, see SiteMetaTags), on every page: site verifications, theme-color…
+         The tags above can't be configured there (MetaTagRules.RESERVED, see IndexTemplateMetaTagsTest). */-->
+    <meta th:each="tag : ${metaTags}" th:attr="__${tag.attribute().html()}__=${tag.key()}" th:content="${tag.content()}">
     <script th:if="${seo.indexed and page == '' and seo.canonicalUrl != null}" type="application/ld+json" th:inline="javascript">
         {"@context": "https://schema.org", "@type": "WebSite", "name": /*[[#{app.brand}]]*/ "", "url": /*[[${seo.canonicalUrl}]]*/ ""}
     </script>
