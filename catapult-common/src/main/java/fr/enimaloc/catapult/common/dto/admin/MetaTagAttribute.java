@@ -6,6 +6,17 @@ package fr.enimaloc.catapult.common.dto.admin;
  * Content-Security-Policy set from the admin page would act on every page of the site.
  */
 public enum MetaTagAttribute {
-    NAME,
-    PROPERTY
+    NAME("name"),
+    PROPERTY("property");
+
+    private final String html;
+
+    MetaTagAttribute(String html) {
+        this.html = html;
+    }
+
+    /** The attribute as written in the tag: {@code name} or {@code property}. */
+    public String html() {
+        return html;
+    }
 }
