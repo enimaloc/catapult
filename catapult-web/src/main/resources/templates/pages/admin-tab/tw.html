@@ -1,0 +1,64 @@
+<!--/*@thymesVar id="definitions" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto>"*/-->
+<!--/*
+  The trigger warnings: the three rebuilds in the header (each confirmed with its own text, the force-pinned one
+  in the danger style), a card adding a definition (id, label, order), then the list with, per definition, a link
+  to its keywords sub-view (#tw/{id}). Driven by admin-tw.js. The keywords sub-view is its own fragment.
+*/-->
+<div th:fragment="content" class="admin-view admin-tw"
+     th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+              data-label-invalid=#{admin.tw.invalid},data-label-conflict=#{admin.tw.conflict},
+              data-label-disabled=#{admin.tw.disabled},data-label-unavailable=#{admin.tw.unavailable},
+              data-label-created=#{admin.tw.created},data-label-rebuild-started=#{admin.tw.rebuild-started}">
+    <div class="section-header admin-tw-head">
+        <h2 th:text="#{admin.tab.tw}">Trigger warnings</h2>
+        <div class="admin-tw-rebuilds">
+            <mdui-tooltip th:each="mode : ${ {'untouched', 'non-overridden', 'force-pinned'} }"
+                          th:attr="content=#{|admin.tw.rebuild.${mode}.tooltip|}">
+                <mdui-button class="admin-tw-rebuild" th:attr="data-rebuild=${mode},data-confirm=#{|admin.tw.rebuild.${mode}.confirm|}"
+                             th:variant="${mode == 'force-pinned' ? 'filled' : 'tonal'}"
+                             th:classappend="${mode == 'force-pinned'} ? 'admin-tw-danger'"
+                             th:icon="${mode == 'force-pinned' ? 'warning' : 'refresh'}"
+                             th:text="#{|admin.tw.rebuild.${mode}.button|}">Rebuild</mdui-button>
+            </mdui-tooltip>
+        </div>
+    </div>
+
+    <mdui-card class="admin-tw-create" variant="outlined">
+        <h3 th:text="#{admin.tw.add.title}">Add a trigger warning</h3>
+        <div class="admin-tw-create-fields">
+            <mdui-text-field name="id" variant="outlined" required maxlength="40" pattern="^[a-z0-9_]{1,40}$"
+                             th:attr="label=#{admin.tw.add.id},helper=#{admin.tw.add.id-helper}"></mdui-text-field>
+            <mdui-text-field name="label" variant="outlined" required maxlength="80" th:attr="label=#{admin.tw.add.label}"></mdui-text-field>
+            <mdui-text-field name="sortOrder" type="number" variant="outlined" min="0" value="0" th:attr="label=#{admin.tw.add.sort-order}"></mdui-text-field>
+            <mdui-button variant="filled" icon="add" class="admin-tw-add-save" th:text="#{admin.tw.add.button}">Add</mdui-button>
+        </div>
+    </mdui-card>
+
+    <th:block th:if="${definitions == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${definitions != null and definitions.isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('policy', #{admin.tw.empty})}"></th:block>
+    </th:block>
+
+    <mdui-card class="admin-table" variant="outlined" th:if="${definitions != null and !definitions.isEmpty()}">
+        <div class="admin-row admin-tw-row admin-row-head" aria-hidden="true">
+            <span th:text="#{admin.tw.column.id}">ID</span>
+            <span th:text="#{admin.tw.column.label}">Label</span>
+            <span th:text="#{admin.tw.column.enabled}">Enabled</span>
+            <span th:text="#{admin.tw.column.sort-order}">Order</span>
+            <span></span>
+        </div>
+        <div class="admin-row admin-tw-row" th:each="d : ${definitions}" th:attr="data-id=${d.id()}">
+            <span class="admin-member-id" th:attr="data-label=#{admin.tw.column.id}" th:text="${d.id()}">id</span>
+            <span class="admin-cell" th:attr="data-label=#{admin.tw.column.label}" th:text="${d.label()}">label</span>
+            <span th:attr="data-label=#{admin.tw.column.enabled}">
+                <mdui-chip th:if="${d.enabled()}" icon="check_circle" th:text="#{admin.tw.status.enabled}">Active</mdui-chip>
+                <mdui-chip th:unless="${d.enabled()}" icon="block" th:text="#{admin.tw.status.disabled}">Disabled</mdui-chip>
+            </span>
+            <span class="admin-cell" th:attr="data-label=#{admin.tw.column.sort-order}" th:text="${d.sortOrder()}">10</span>
+            <span class="admin-row-actions">
+                <mdui-button variant="text" class="admin-tw-keywords" th:attr="data-admin-open=${d.id()}"
+                             th:text="#{admin.tw.action.manage-keywords}">Manage keywords</mdui-button>
+            </span>
+        </div>
+    </mdui-card>
+</div>

@@ -57,7 +57,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys",
+                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
@@ -78,6 +78,7 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminGroups();
         verify(apiService, never()).adminWhitelist();
         verify(apiService, never()).adminApiKeys(org.mockito.ArgumentMatchers.any());
+        verify(apiService, never()).adminTws();
         verify(apiService, never()).adminMinecraftAccounts();
         verify(apiService, never()).adminMembers();
         verify(apiService, never()).adminMember(org.mockito.ArgumentMatchers.any());
@@ -760,5 +761,34 @@ class AdminTabsFragmentControllerTest {
 
         when(apiService.adminMinecraftAccounts()).thenReturn(null);
         assertThat(asAdmin("/spa/admin/keys")).contains("admin-minecraft-unavailable").doesNotContain("admin-minecraft-add");
+    }
+
+    @Test
+    void twFragment_listsDefinitions_andManageKeywordsLinks() throws Exception {
+        when(apiService.adminTws()).thenReturn(List.of(
+                new fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto("gore", "Go<re>", null, true, 10),
+                new fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto("spiders", "Spiders", null, false, 20)));
+
+        String html = asAdmin("/spa/admin/tw");
+
+        assertThat(html).contains("data-id=\"gore\"", "Go&lt;re&gt;", "data-id=\"spiders\"",
+                "data-admin-open=\"gore\"", "data-admin-open=\"spiders\"", "admin-tw-add-save",
+                "data-rebuild=\"untouched\"", "data-rebuild=\"non-overridden\"", "data-rebuild=\"force-pinned\"",
+                "This will OVERWRITE the TW choices");
+        assertThat(html.split("admin-tw-danger", -1)).hasSize(2);
+    }
+
+    @Test
+    void twFragment_unreachableApi_showsThePlaceholder() throws Exception {
+        when(apiService.adminTws()).thenReturn(null);
+
+        assertThat(asAdmin("/spa/admin/tw")).contains("admin-placeholder").doesNotContain("data-admin-open");
+    }
+
+    @Test
+    void twFragment_noDefinition_saysSo() throws Exception {
+        when(apiService.adminTws()).thenReturn(List.of());
+
+        assertThat(asAdmin("/spa/admin/tw")).contains("No trigger warning defined.").doesNotContain("data-admin-open");
     }
 }

@@ -12,6 +12,8 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
+import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -115,6 +117,8 @@ public class MockApiService implements ApiService {
     private final MockWhitelistStore whitelist = new MockWhitelistStore();
     /** Application-wide: the shared Steam and DTDD keys are the same for every mock session. */
     private final MockKeysStore apiKeys = new MockKeysStore();
+    /** Application-wide: the trigger warning definitions are the same for every mock session. */
+    private final MockTwStore tws = new MockTwStore();
     /** Application-wide: the Minecraft service accounts are the same for every mock session. */
     private final MockMinecraftAccountsStore minecraftAccounts = new MockMinecraftAccountsStore();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
@@ -1003,5 +1007,29 @@ public class MockApiService implements ApiService {
     public ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode) {
         log.trace("adminReauthMinecraftAccount({})", id);
         return minecraftAccounts.reauth(id, deviceCode);
+    }
+
+    @Override
+    public List<TwDefinitionDto> adminTws() {
+        log.trace("adminTws()");
+        return tws.list();
+    }
+
+    @Override
+    public TwDefinitionDto adminTw(String id) {
+        log.trace("adminTw({})", id);
+        return tws.find(id).orElse(null);
+    }
+
+    @Override
+    public int adminCreateTw(String id, String label, int sortOrder) {
+        log.trace("adminCreateTw({}, {}, {})", id, label, sortOrder);
+        return tws.create(id, label, sortOrder);
+    }
+
+    @Override
+    public int adminRebuildTws(TwRebuild mode) {
+        log.trace("adminRebuildTws({})", mode);
+        return tws.rebuild();
     }
 }

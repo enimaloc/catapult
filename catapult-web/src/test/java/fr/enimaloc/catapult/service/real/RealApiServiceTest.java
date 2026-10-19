@@ -1084,4 +1084,41 @@ class RealApiServiceTest {
         assertThat(failed.status()).isEqualTo(502);
         assertThat(failed.body()).containsEntry("message", "chain failed");
     }
+
+    @Test
+    void adminTws_readTheListAndOneDefinition_withTheIdAsAUriVariable() {
+        respond(HttpMethod.GET, "/api/admin/tw", "[{\"id\":\"gore\",\"label\":\"Gore\",\"description\":null,"
+                + "\"enabled\":false,\"sortOrder\":7}]");
+        respond(HttpMethod.GET, "/api/admin/tw/a%2Fb%20%C3%A9", "{\"id\":\"a/b é\",\"label\":\"L\","
+                + "\"description\":\"d\",\"enabled\":true,\"sortOrder\":0}");
+
+        assertThat(service.adminTws()).singleElement().satisfies(d -> {
+            assertThat(d.id()).isEqualTo("gore");
+            assertThat(d.label()).isEqualTo("Gore");
+            assertThat(d.description()).isNull();
+            assertThat(d.enabled()).isFalse();
+            assertThat(d.sortOrder()).isEqualTo(7);
+        });
+        assertThat(service.adminTw("a/b é").description()).isEqualTo("d");
+    }
+
+    @Test
+    void adminCreateTw_postsTheDefinition_andReturnsTheStatus() {
+        expect(HttpMethod.POST, "/api/admin/tw")
+                .andExpect(content().json("{\"id\":\"gore\",\"label\":\"Gore\",\"sortOrder\":3}"))
+                .andRespond(withStatus(HttpStatus.CREATED));
+
+        assertThat(service.adminCreateTw("gore", "Gore", 3)).isEqualTo(201);
+    }
+
+    @Test
+    void rebuild_mapsEachModeToItsRoute() {
+        expectPost("/api/admin/tw/rebuild");
+        expectPost("/api/admin/tw/rebuild/force");
+        expect(HttpMethod.POST, "/api/admin/tw/rebuild/force-pinned").andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.adminRebuildTws(fr.enimaloc.catapult.common.dto.admin.TwRebuild.NON_OVERRIDDEN)).isEqualTo(204);
+        assertThat(service.adminRebuildTws(fr.enimaloc.catapult.common.dto.admin.TwRebuild.UNTOUCHED)).isEqualTo(204);
+        assertThat(service.adminRebuildTws(fr.enimaloc.catapult.common.dto.admin.TwRebuild.FORCE_PINNED)).isEqualTo(503);
+    }
 }
