@@ -186,6 +186,28 @@ describe("channel-obs-widget source check", () => {
         expect(missing().classList.contains("hidden")).toBe(false);
     });
 
+    it("checks once per connect event however many times the card was rendered", async () => {
+        page();
+        page();
+        await vi.advanceTimersByTimeAsync(0);
+        requests.getInputList.mockClear();
+
+        document.dispatchEvent(new CustomEvent("catapult:obs:connected"));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(requests.getInputList).toHaveBeenCalledTimes(1);
+    });
+
+    it("drops the previous render's pending wait", async () => {
+        connected = false;
+        page();
+        connected = true;
+        page();
+        await vi.advanceTimersByTimeAsync(10000);
+
+        expect(status().textContent).not.toBe("unreachable");
+    });
+
     it("says unreachable when OBS refuses the request", async () => {
         requests.getInputList.mockRejectedValue(new Error("closed"));
         page();

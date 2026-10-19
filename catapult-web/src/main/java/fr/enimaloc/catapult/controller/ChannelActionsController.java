@@ -187,11 +187,11 @@ public class ChannelActionsController {
         apiService.saveTwitchatBranch(username, body.branch());
     }
 
-    /** Replaces the OBS widget link; 204 (the page re-reads the new link), 502 when catapult-api refuses or is down. */
+    /** Replaces the OBS widget link: 204 (the page re-reads the new link), else catapult-api's status, 502 when unreachable. */
     @PostMapping("/channel/{username}/settings/twitchat/regenerate")
     public ResponseEntity<Void> regenerateTwitchatWidget(@PathVariable String username) {
-        return ResponseEntity.status(apiService.regenerateTwitchatWidget(username) == null
-                ? HttpStatus.BAD_GATEWAY : HttpStatus.NO_CONTENT).build();
+        var result = apiService.regenerateTwitchatWidget(username);
+        return ResponseEntity.status(result.ok() ? 204 : result.status()).build();
     }
 
     @PostMapping("/channel/{username}/settings/ccl")

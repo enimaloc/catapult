@@ -382,7 +382,7 @@ class MockApiServiceTest {
         UUID old = data.getWidgetToken();
         assertThat(service.twitchatSettings(username).widgetToken()).isEqualTo(old.toString());
 
-        var regenerated = service.regenerateTwitchatWidget(username);
+        var regenerated = service.regenerateTwitchatWidget(username).body();
 
         assertThat(regenerated.widgetToken()).isNotEqualTo(old.toString());
         assertThat(service.twitchatSettings(username).widgetToken()).isEqualTo(regenerated.widgetToken());

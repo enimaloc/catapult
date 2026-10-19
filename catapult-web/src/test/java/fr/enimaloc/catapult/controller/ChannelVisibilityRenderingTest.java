@@ -235,6 +235,12 @@ class ChannelVisibilityRenderingTest {
         assertThat(owner).contains("id=\"obs-widget\"", "id=\"obs-widget-regenerate-dialog\"")
                 .contains("http://localhost/widget/obs/11111111-2222-3333-4444-555555555555");
 
+        // catapult-api unreachable: a short line instead of the link, never silence.
+        when(apiService.twitchatSettings("enimaloc")).thenReturn(null);
+        String down = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(down).contains("id=\"obs-widget-unavailable\"").doesNotContain("id=\"obs-widget\"");
+
         // Without OBS (or as a moderator) the link isn't rendered at all.
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
         String noObs = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())

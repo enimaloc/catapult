@@ -418,14 +418,19 @@ class RealApiServiceTest {
                 .andRespond(withSuccess("{\"enabled\":true,\"obsHost\":\"h\",\"obsPort\":4455,\"hasPassword\":true,\"widgetToken\":\"aaaaaaaa-2222-3333-4444-555555555555\"}",
                         MediaType.APPLICATION_JSON));
 
-        assertThat(service.regenerateTwitchatWidget("enimaloc").widgetToken()).isEqualTo("aaaaaaaa-2222-3333-4444-555555555555");
+        var result = service.regenerateTwitchatWidget("enimaloc");
+        assertThat(result.status()).isEqualTo(200);
+        assertThat(result.body().widgetToken()).isEqualTo("aaaaaaaa-2222-3333-4444-555555555555");
     }
 
     @Test
-    void regenerateTwitchatWidget_isNullWhenRefused() {
+    void regenerateTwitchatWidget_relaysTheRefusalsStatus_and502WhenUnreachable() {
         expect(HttpMethod.POST, "/api/channels/enimaloc/settings/twitchat/regenerate").andRespond(withStatus(HttpStatus.FORBIDDEN));
+        assertThat(service.regenerateTwitchatWidget("enimaloc")).isEqualTo(new fr.enimaloc.catapult.service.http.ApiClient.Result<>(403, null));
 
-        assertThat(service.regenerateTwitchatWidget("enimaloc")).isNull();
+        api.reset();
+        expect(HttpMethod.POST, "/api/channels/enimaloc/settings/twitchat/regenerate").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        assertThat(service.regenerateTwitchatWidget("enimaloc").status()).isEqualTo(502);
     }
 
     @Test

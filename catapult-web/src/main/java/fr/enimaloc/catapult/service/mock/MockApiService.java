@@ -403,11 +403,11 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public TwitchatSettingsResponse regenerateTwitchatWidget(String username) {
+    public ApiClient.Result<TwitchatSettingsResponse> regenerateTwitchatWidget(String username) {
         log.trace("regenerateTwitchatWidget({})", username);
         MockData current = currentData();
         current.regenerateWidgetToken();
-        return current.twitchatSettings();
+        return new ApiClient.Result<>(200, current.twitchatSettings());
     }
 
     @Override

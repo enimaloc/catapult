@@ -226,6 +226,8 @@ public class ModelFiller {
                 // The token is a capability: it goes in the link only, never in a log.
                 if (widget != null && widget.widgetToken() != null) {
                     model.addAttribute("widgetUrl", absoluteUrl("/widget/obs/" + widget.widgetToken()));
+                } else {
+                    model.addAttribute("widgetUnavailable", true);
                 }
             }
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
