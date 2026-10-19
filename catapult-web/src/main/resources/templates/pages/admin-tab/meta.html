@@ -34,6 +34,7 @@
                 <span th:text="#{admin.meta-tags.column.attribute}">Type</span>
                 <span th:text="#{admin.meta-tags.column.key}">Name</span>
                 <span th:text="#{admin.meta-tags.column.content}">Content</span>
+                <span class="admin-meta-tag-updated" th:text="#{admin.meta-tags.column.updated}">Updated</span>
                 <span></span>
             </div>
             <div class="admin-row admin-meta-tag-row" th:each="t : ${metaTags}"
@@ -41,6 +42,8 @@
                 <span class="admin-member-id admin-meta-tag-attribute" th:text="${#strings.toLowerCase(t.attribute())}">name</span>
                 <strong class="admin-cell" th:text="${t.key()}">key</strong>
                 <span class="admin-cell admin-meta-tag-content" th:text="${t.content()}" th:title="${t.content()}">content</span>
+                <span class="admin-member-id admin-meta-tag-updated"
+                      th:text="${t.updatedAt() == null ? '—' : #temporals.format(t.updatedAt(), #messages.msg('format.date'))}">date</span>
                 <span class="admin-row-actions">
                     <mdui-button-icon icon="edit" class="admin-meta-tag-edit" th:attr="aria-label=#{admin.meta-tags.edit}"></mdui-button-icon>
                     <mdui-button-icon icon="delete" class="admin-meta-tag-delete"
@@ -60,7 +63,7 @@
                                  th:attr="label=#{admin.meta-tags.column.key}"></mdui-text-field>
                 <mdui-text-field name="content" variant="outlined" maxlength="1000"
                                  th:attr="label=#{admin.meta-tags.column.content}"></mdui-text-field>
-                <div class="admin-meta-tags-buttons">
+                <div class="admin-data-actions">
                     <mdui-button class="admin-meta-tag-cancel" variant="text" hidden th:text="#{admin.cancel}">Cancel</mdui-button>
                     <mdui-button class="admin-meta-tag-save" variant="tonal" icon="add" th:text="#{admin.meta-tags.add}">Add</mdui-button>
                 </div>
