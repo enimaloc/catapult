@@ -16,7 +16,7 @@ const field = name => dialog().querySelector(`[name="${name}"]`);
 const fetchedUrls = () => fetched.mock.calls.map(([url]) => url);
 
 let served; // the file the dialog fragment shows: { path, location, content, status, headers }
-let schemas; // path → the schema served by /spa/admin/well-known/schema
+let schemas; // path → the schema served by /spa/admin/meta/schema
 
 const esc = text => String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 
@@ -57,7 +57,7 @@ function form(id) {
 function page() {
     html(`
         <mdui-tabs id="admin-tabs"></mdui-tabs>
-        <mdui-tab-panel value="well-known">
+        <mdui-tab-panel value="meta">
             <div class="admin-view admin-well-known" data-confirm-text="OK" data-cancel-text="No"
                  data-error="Failed ({0})" data-error-400="Invalid" data-error-404="Gone" data-error-409="Taken"
                  data-error-too-large="Too large" data-error-binary="Not text">
@@ -97,7 +97,7 @@ beforeEach(async () => {
     served = {};
     schemas = {};
     fetched = vi.fn(async url => {
-        if (url.startsWith("/spa/admin/well-known/schema?path=")) {
+        if (url.startsWith("/spa/admin/meta/schema?path=")) {
             const schema = schemas[decodeURIComponent(url.split("=")[1])];
             return schema ? response(200, schema) : response(404);
         }
@@ -125,7 +125,7 @@ describe("admin-well-known", () => {
     it("opens a registry suffix's dialog with its path", async () => {
         page();
         await click(".admin-well-known-configure");
-        expect(fetchedUrls()[0]).toBe("/spa/admin/well-known/file?location=WELL_KNOWN&path=security.txt");
+        expect(fetchedUrls()[0]).toBe("/spa/admin/meta/file?location=WELL_KNOWN&path=security.txt");
         expect(dialog().open).toBe(true);
     });
 
@@ -148,7 +148,7 @@ describe("admin-well-known", () => {
     it("keeps an existing file's type when its path changes", async () => {
         page();
         await click(".admin-well-known-edit");
-        expect(fetchedUrls()[0]).toBe("/spa/admin/well-known/file?id=4");
+        expect(fetchedUrls()[0]).toBe("/spa/admin/meta/file?id=4");
         field("contentType").value = "text/plain";
         type("path", "x.json");
         expect(field("contentType").value).toBe("text/plain");
@@ -183,7 +183,7 @@ describe("admin-well-known", () => {
         field("content").value = "code";
         await click(".admin-well-known-save");
 
-        expect(posted.mock.calls).toEqual([["/admin/well-known",
+        expect(posted.mock.calls).toEqual([["/admin/meta/files",
             { location: "ROOT", path: "riot.txt", status: 200, headers: [], contentType: "text/plain; charset=utf-8", content: "code" }]]);
         expect(dialog().open).toBe(false);
         expect(CatapultAdminTabs.reload).toHaveBeenCalled();
@@ -194,7 +194,7 @@ describe("admin-well-known", () => {
         await click(".admin-well-known-edit");
         posted.mockResolvedValue(response(200));
         await click(".admin-well-known-save");
-        expect(posted.mock.calls[0][0]).toBe("/admin/well-known/4");
+        expect(posted.mock.calls[0][0]).toBe("/admin/meta/files/4");
     });
 
     it("says why a save was refused and keeps the dialog open, its Save usable again", async () => {
@@ -224,7 +224,7 @@ describe("admin-well-known", () => {
         confirmAnswer = true;
         posted.mockResolvedValue(response(204));
         await click(".admin-well-known-delete");
-        expect(posted.mock.calls).toEqual([["/admin/well-known/4/delete", {}]]);
+        expect(posted.mock.calls).toEqual([["/admin/meta/files/4/delete", {}]]);
         expect(CatapultAdminTabs.reload).toHaveBeenCalled();
     });
 
@@ -343,7 +343,7 @@ describe("admin-well-known response and forms", () => {
         schemas["gpc.json"] = { type: "object", required: ["gpc"], properties: { gpc: { type: "boolean" }, lastUpdate: { type: "string" } } };
         await open({ path: "gpc.json", content: '{"gpc": true}' });
         await vi.waitFor(() => expect(mode().value).toBe("form"));
-        expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=gpc.json");
+        expect(fetchedUrls()).toContain("/spa/admin/meta/schema?path=gpc.json");
         const box = fields().querySelector('mdui-checkbox[data-field="gpc"]');
         expect(box.checked).toBe(true);
         box.checked = false;
@@ -353,7 +353,7 @@ describe("admin-well-known response and forms", () => {
         await open({ path: "unknown.json", content: "{}" });
         await vi.waitFor(() => expect(formSegment().hidden).toBe(true));
         expect(mode().value).toBe("raw");
-        expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=unknown.json");
+        expect(fetchedUrls()).toContain("/spa/admin/meta/schema?path=unknown.json");
     });
 
     it("asks no schema for a root file", async () => {
@@ -475,7 +475,7 @@ describe("admin-well-known response and forms", () => {
     it("checks a dedicated form's content against the route's schema too", async () => {
         schemas["assetlinks.json"] = { type: "object", required: ["zzz"] };
         await open({ path: "assetlinks.json", content: "{}" });
-        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=assetlinks.json"));
+        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/meta/schema?path=assetlinks.json"));
         await flush();
         confirmAnswer = false;
         await save();
@@ -529,7 +529,7 @@ describe("admin-well-known response and forms", () => {
     it("lists five schema problems at most", async () => {
         schemas["many.json"] = { type: "object", required: ["a", "b", "c", "d", "e", "f", "g"], properties: { a: { type: "object" } } };
         await open({ path: "many.json", content: "{}" });
-        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=many.json"));
+        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/meta/schema?path=many.json"));
         await flush();
         confirmAnswer = false;
         await save();
@@ -598,7 +598,7 @@ describe("admin-well-known response and forms", () => {
         type("path", "gpc");
         type("path", "gpc.json");
         await vi.waitFor(() => expect(formSegment().hidden).toBe(false));
-        expect(fetchedUrls().filter(u => u.includes("/schema"))).toEqual(["/spa/admin/well-known/schema?path=gpc.json"]);
+        expect(fetchedUrls().filter(u => u.includes("/schema"))).toEqual(["/spa/admin/meta/schema?path=gpc.json"]);
         expect(mode().value).toBe("raw");
     });
 
@@ -613,7 +613,7 @@ describe("admin-well-known response and forms", () => {
         type("path", "old.json");
         await vi.waitFor(() => expect(answerOld).toBeDefined());
         type("path", "new.json");
-        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=new.json"));
+        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/meta/schema?path=new.json"));
         await flush();
         answerOld(response(200, { type: "object", properties: { gpc: { type: "boolean" } } }));
         await flush();
@@ -671,7 +671,7 @@ describe("admin-well-known response and forms", () => {
     it("disables Save while the schema warning is asked, re-enabling it on cancel", async () => {
         schemas["gpc.json"] = { type: "object", required: ["gpc"], properties: { gpc: { type: "boolean" } } };
         await open({ path: "gpc.json", content: "{}" });
-        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=gpc.json"));
+        await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/meta/schema?path=gpc.json"));
         await flush();
         let answer;
         mdui.confirm.mockImplementation(() => new Promise((resolve, reject) => { answer = { resolve, reject }; }));
@@ -721,7 +721,7 @@ describe("admin-well-known response and forms", () => {
             const json = '{  "gpc":true }';
             await open({ path: "gpc.json", content: json });
             await vi.waitFor(() => expect(mode().value).toBe("form"));
-            await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/well-known/schema?path=gpc.json"));
+            await vi.waitFor(() => expect(fetchedUrls()).toContain("/spa/admin/meta/schema?path=gpc.json"));
             await flush();
             const box = fields().querySelector('mdui-checkbox[data-field="gpc"]');
             box.checked = false;

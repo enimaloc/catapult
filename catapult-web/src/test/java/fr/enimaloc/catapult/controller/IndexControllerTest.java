@@ -420,7 +420,7 @@ class IndexControllerTest {
             org.assertj.core.api.Assertions.assertThat(html)
                     .contains("id=\"admin-tabs\"")
                     .contains("<mdui-tab value=\"members\"", "<mdui-tab value=\"ccl\"",
-                            "<mdui-tab value=\"caches\"", "<mdui-tab value=\"data\"", "<mdui-tab value=\"well-known\"")
+                            "<mdui-tab value=\"caches\"", "<mdui-tab value=\"data\"", "<mdui-tab value=\"meta\"")
                     .doesNotContain("process-rules")
                     // Attribute order is Thymeleaf's business: only check each one is on the ccl panel.
                     .containsPattern("<mdui-tab-panel(?=[^>]*value=\"ccl\")(?=[^>]*data-admin-lazy)(?=[^>]*data-unavailable=\"[^\"]+\")[^>]*>");

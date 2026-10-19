@@ -58,7 +58,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
+                "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
@@ -255,7 +255,7 @@ class AdminTabsFragmentControllerTest {
                 java.time.Instant.parse("2025-03-01T12:00:00Z"))));
         when(apiService.adminIanaRegistry()).thenReturn(registry("LIVE"));
 
-        String html = asAdmin("/spa/admin/well-known");
+        String html = asAdmin("/spa/admin/meta");
 
         assertThat(html).contains("admin-well-known", "id=\"admin-well-known-new\"", "data-id=\"3\"", ">/.well-known/security.txt</a>",
                         "admin-well-known-edit", "admin-well-known-delete", "data-confirm=\"Delete /.well-known/security.txt?",
@@ -270,7 +270,7 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminWellKnownFiles()).thenReturn(List.of());
         when(apiService.adminIanaRegistry()).thenReturn(registry("SNAPSHOT"));
 
-        assertThat(asAdmin("/spa/admin/well-known")).contains("offline copy", "No file configured").doesNotContain("Configured<");
+        assertThat(asAdmin("/spa/admin/meta")).contains("offline copy", "No file configured").doesNotContain("Configured<");
     }
 
     @Test
@@ -278,7 +278,7 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminWellKnownFiles()).thenReturn(null);
         when(apiService.adminIanaRegistry()).thenReturn(null);
 
-        assertThat(asAdmin("/spa/admin/well-known")).contains("admin-placeholder", "IANA registry unavailable")
+        assertThat(asAdmin("/spa/admin/meta")).contains("admin-placeholder", "IANA registry unavailable")
                 .doesNotContain("admin-well-known-file");
     }
 
@@ -287,14 +287,14 @@ class AdminTabsFragmentControllerTest {
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminWellKnownFile(9)).thenReturn(null);
 
-        String html = mvc.perform(get("/spa/admin/well-known/file?id=9").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+        String html = mvc.perform(get("/spa/admin/meta/file?id=9").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isNotFound()).andReturn().getResponse().getContentAsString();
         assertThat(html).contains("This file no longer exists.").doesNotContain("admin-well-known-form");
     }
 
     @Test
     void wellKnownFile_newFromTheRegistry_isPrefilled() throws Exception {
-        String html = asAdmin("/spa/admin/well-known/file?location=WELL_KNOWN&path=assetlinks.json");
+        String html = asAdmin("/spa/admin/meta/file?location=WELL_KNOWN&path=assetlinks.json");
 
         assertThat(html).contains("admin-well-known-form", "name=\"path\"", "value=\"assetlinks.json\"",
                 "value=\"application/json\"", "New file", "admin-well-known-save", "admin-well-known-import", "admin-dialog-close")
@@ -306,7 +306,7 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminWellKnownFile(4)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto(
                 4, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "riot.txt", 200, java.util.List.of(), "text/plain", "hello", null));
 
-        String html = asAdmin("/spa/admin/well-known/file?id=4");
+        String html = asAdmin("/spa/admin/meta/file?id=4");
 
         assertThat(html).contains("data-id=\"4\"", "data-manual=\"true\"", "value=\"hello\"", "value=\"ROOT\"", ">/riot.txt</");
     }
@@ -318,7 +318,7 @@ class AdminTabsFragmentControllerTest {
                 java.util.List.of(new fr.enimaloc.catapult.common.dto.admin.WellKnownHeader("Location", "/account")),
                 "text/plain", "", null));
 
-        String html = asAdmin("/spa/admin/well-known/file?id=5");
+        String html = asAdmin("/spa/admin/meta/file?id=5");
 
         assertThat(html).contains("name=\"status\"", "value=\"302\"", "admin-well-known-header\"",
                 "data-header=\"name\"", "value=\"Location\"", "value=\"/account\"", "admin-well-known-redirect",
@@ -332,7 +332,7 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminWellKnownFile(6)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto(
                 6, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "riot.txt", 200, java.util.List.of(), "text/plain", "hi", null));
 
-        String html = asAdmin("/spa/admin/well-known/file?id=6");
+        String html = asAdmin("/spa/admin/meta/file?id=6");
 
         assertThat(html).contains("admin-well-known-sections", "admin-well-known-mode", "admin-well-known-fields", "admin-well-known-raw")
                 .containsPattern("admin-well-known-sections[^>]*value=\"content\"")
@@ -344,7 +344,7 @@ class AdminTabsFragmentControllerTest {
 
     @Test
     void wellKnownFile_changePasswordPreset_isARedirectWithAnEmptyLocation() throws Exception {
-        String html = asAdmin("/spa/admin/well-known/file?location=WELL_KNOWN&path=change-password");
+        String html = asAdmin("/spa/admin/meta/file?location=WELL_KNOWN&path=change-password");
 
         assertThat(html).contains("data-header=\"name\"", "value=\"Location\"")
                 .containsPattern("admin-well-known-sections[^>]*value=\"response\"");
@@ -358,7 +358,7 @@ class AdminTabsFragmentControllerTest {
                 4, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "security.txt", 200, "text/plain", 5, null)));
         when(apiService.adminIanaRegistry()).thenReturn(registry("LIVE"));
 
-        String html = asAdmin("/spa/admin/well-known");
+        String html = asAdmin("/spa/admin/meta");
 
         assertThat(html).contains(">302</mdui-chip>");
     }
@@ -371,7 +371,7 @@ class AdminTabsFragmentControllerTest {
                 4, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.WELL_KNOWN, "security.txt", 200, "text/plain", 5, null)));
         when(apiService.adminIanaRegistry()).thenReturn(registry("LIVE"));
 
-        String html = asAdmin("/spa/admin/well-known");
+        String html = asAdmin("/spa/admin/meta");
         String list = html.substring(html.indexOf("admin-well-known-file"), html.indexOf("admin-iana-row"));
         String[] rows = list.split("admin-well-known-file\"");
 
@@ -391,7 +391,7 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminWellKnownFile(7)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto(
                 7, fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "teapot", 418, java.util.List.of(), "text/plain", "", null));
 
-        String html = asAdmin("/spa/admin/well-known/file?id=7");
+        String html = asAdmin("/spa/admin/meta/file?id=7");
         String select = html.substring(html.indexOf("<mdui-select name=\"status\""));
         select = select.substring(0, select.indexOf(">"));
         String other = html.substring(html.indexOf("<mdui-text-field name=\"statusOther\""));
@@ -403,16 +403,16 @@ class AdminTabsFragmentControllerTest {
 
     @Test
     void wellKnownSchema_isRelayedToAnAdmin_404WhenNone_andRefusedToOthers() throws Exception {
-        mvc.perform(get("/spa/admin/well-known/schema?path=gpc.json")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/spa/admin/well-known/schema?path=gpc.json").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+        mvc.perform(get("/spa/admin/meta/schema?path=gpc.json")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/spa/admin/meta/schema?path=gpc.json").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isForbidden());
 
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminWellKnownSchema("gpc.json")).thenReturn("{\"type\":\"object\"}");
-        mvc.perform(get("/spa/admin/well-known/schema?path=gpc.json").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+        mvc.perform(get("/spa/admin/meta/schema?path=gpc.json").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().json("{\"type\":\"object\"}"));
-        mvc.perform(get("/spa/admin/well-known/schema?path=none").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+        mvc.perform(get("/spa/admin/meta/schema?path=none").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isNotFound());
     }
 

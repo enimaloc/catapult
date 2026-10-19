@@ -122,6 +122,13 @@ document.addEventListener("catapult:render", function () {
     // Non-owners only get the overview tab: ignore a hash naming one they don't have.
     if (wanted && tabs.querySelector(`mdui-tab[value="${CSS.escape(wanted)}"]`)) {
         tabs.value = wanted;
+    } else if (wanted) {
+        // a renamed tab's old name (data-hash-alias) still leads to it, the hash then saying the new one
+        const renamed = tabs.querySelector(`mdui-tab[data-hash-alias="${CSS.escape(wanted)}"]`);
+        if (renamed) {
+            tabs.value = renamed.getAttribute("value");
+            history.replaceState(history.state, "", location.pathname + location.search + `#${tabs.value}`);
+        }
     }
 
     // mdui's change events bubble (composed): only the tabs' own is a tab switch, not one of a
