@@ -9,10 +9,13 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -41,5 +44,16 @@ class TwitchatEventStreamControllerTest {
 
         mvc.perform(get("/me/twitchat/events")).andExpect(request().asyncStarted());
         verify(hub).subscribe(owner);
+    }
+
+    /** An admin acting as a member: the member's dispatches (signed action tokens) never reach the admin's browser. */
+    @Test
+    void impersonating_notFound_withoutSubscribing() throws Exception {
+        when(apiService.currentUserId()).thenReturn(UUID.randomUUID());
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin-jwt");
+
+        mvc.perform(get("/me/twitchat/events").session(session)).andExpect(status().isNotFound());
+        verify(hub, never()).subscribe(any(UUID.class));
     }
 }

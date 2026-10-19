@@ -11,7 +11,6 @@ import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.MessageSource;
@@ -85,13 +84,8 @@ public class ModelFiller {
      * their JWT tells no login; null when the session isn't impersonating (see ImpersonationController).
      */
     static String impersonatedLogin() {
-        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) return null;
-        HttpSession session = attributes.getRequest().getSession(false);
-        try {
-            if (session == null || session.getAttribute(ImpersonationController.ORIGINAL_JWT_KEY) == null) return null;
-        } catch (IllegalStateException e) {
-            return null; // invalidated meanwhile
-        }
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)
+                || !ImpersonationController.impersonating(attributes.getRequest())) return null;
         String login = ApiClient.currentLogin();
         return login == null ? "—" : login;
     }
