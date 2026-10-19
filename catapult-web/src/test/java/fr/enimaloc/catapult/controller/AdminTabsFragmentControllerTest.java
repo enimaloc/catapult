@@ -51,7 +51,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast")) {
+                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
         }
@@ -67,6 +67,7 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminIanaRegistry();
         verify(apiService, never()).adminWellKnownFile(org.mockito.ArgumentMatchers.anyLong());
         verify(apiService, never()).adminNotifications(org.mockito.ArgumentMatchers.anyInt());
+        verify(apiService, never()).adminDtddProposals(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminMembers();
     }
 
@@ -440,6 +441,49 @@ class AdminTabsFragmentControllerTest {
     void notifications_saysWhenThereAreNone() throws Exception {
         when(apiService.adminNotifications(0)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminPage<>(List.of(), 0, 0, 0));
         assertThat(asAdmin("/spa/admin/notifications")).contains("No notification yet");
+    }
+
+    private static fr.enimaloc.catapult.common.dto.admin.DtddProposalDto proposal(String status, String login, String reason) {
+        return new fr.enimaloc.catapult.common.dto.admin.DtddProposalDto(
+                java.util.UUID.fromString("00000000-0000-0000-0000-000000000042"),
+                java.time.Instant.parse("2025-03-01T12:00:00Z"), "100", 4521L,
+                login == null ? null : new fr.enimaloc.catapult.common.dto.admin.DtddProposalDto.Proposer(login), reason, status);
+    }
+
+    @Test
+    void proposals_listsTheFilter_andOnlyPendingRowsHaveActions() throws Exception {
+        when(apiService.adminDtddProposals("PENDING")).thenReturn(List.of(proposal("PENDING", "alice", "wrong <game>"), proposal("PENDING", null, null)));
+        when(apiService.adminDtddProposals("APPROVED")).thenReturn(List.of(proposal("APPROVED", "bob", "ok")));
+
+        String pending = asAdmin("/spa/admin/dtdd-mapping");
+
+        assertThat(pending).contains("admin-dtdd-mapping", "data-status=\"PENDING\"", "data-status-filter=\"PENDING\"",
+                        "data-status-filter=\"APPROVED\"", "data-status-filter=\"REJECTED\"", "alice", "100", "4521",
+                        "wrong &lt;game&gt;", "03/01/2025", "data-approve=\"00000000-0000-0000-0000-000000000042\"",
+                        "data-reject=\"00000000-0000-0000-0000-000000000042\"", "admin-dtdd-dialog", "data-label-conflict=\"")
+                .contains(">?<");
+        assertThat(pending.split("data-status-filter=", -1)).hasSize(4);
+
+        String approved = asAdmin("/spa/admin/dtdd-mapping?status=APPROVED");
+
+        assertThat(approved).contains("data-status=\"APPROVED\"", "bob").doesNotContain("data-approve=").doesNotContain("data-reject=");
+    }
+
+    @Test
+    void proposals_anyOtherStatusIsPending() throws Exception {
+        when(apiService.adminDtddProposals("PENDING")).thenReturn(List.of());
+
+        assertThat(asAdmin("/spa/admin/dtdd-mapping?status=bogus")).contains("data-status=\"PENDING\"");
+        verify(apiService, never()).adminDtddProposals("bogus");
+    }
+
+    @Test
+    void proposals_saySoWhenNoneOrUnavailable() throws Exception {
+        when(apiService.adminDtddProposals("PENDING")).thenReturn(List.of());
+        assertThat(asAdmin("/spa/admin/dtdd-mapping")).contains("No proposal").doesNotContain("data-approve=");
+
+        when(apiService.adminDtddProposals("REJECTED")).thenReturn(null);
+        assertThat(asAdmin("/spa/admin/dtdd-mapping?status=REJECTED")).contains("admin-placeholder", "data-status-filter=\"PENDING\"");
     }
 
     @Test

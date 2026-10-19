@@ -186,6 +186,17 @@ public class AdminTabsFragmentController {
         });
     }
 
+    /** The proposals of one status (PENDING by default, also for any unknown value) with the status chips. */
+    @GetMapping("/dtdd-mapping")
+    String dtddMapping(Model model, HttpServletResponse response, @RequestParam(defaultValue = "PENDING") String status) {
+        return guarded(model, response, () -> {
+            String shown = "APPROVED".equals(status) || "REJECTED".equals(status) ? status : "PENDING";
+            model.addAttribute("status", shown);
+            model.addAttribute("proposals", apiService.adminDtddProposals(shown));
+            return "pages/admin-tab/dtdd-mapping :: content";
+        });
+    }
+
     @GetMapping("/broadcast")
     String broadcast(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {

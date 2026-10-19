@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
+import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -96,6 +97,7 @@ public class MockApiService implements ApiService {
     private final MockWellKnownStore wellKnown = new MockWellKnownStore();
     /** Application-wide, like the well-known files: a notification sent in one session reaches the others. */
     private MockNotificationStore notifications;
+    private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
 
     /** The calling session's mock member {@code id}'s login; null when it has no such member. */
     private String mockMemberLogin(UUID id) {
@@ -370,7 +372,26 @@ public class MockApiService implements ApiService {
     @Override
     public void dtddPropose(String igdbId, Long dtddId, String reason) {
         log.trace("dtddPropose({}, {}, {})", igdbId, dtddId, reason);
-        // no-op in mock mode
+        MockData current = currentData();
+        dtddProposals.propose(igdbId, dtddId, reason, current == null ? null : current.getChannelDto().twitchUsername());
+    }
+
+    @Override
+    public List<DtddProposalDto> adminDtddProposals(String status) {
+        log.trace("adminDtddProposals({})", status);
+        return dtddProposals.list(status);
+    }
+
+    @Override
+    public int adminApproveDtddProposal(UUID id) {
+        log.trace("adminApproveDtddProposal({})", id);
+        return dtddProposals.approve(id);
+    }
+
+    @Override
+    public int adminRejectDtddProposal(UUID id, String reason) {
+        log.trace("adminRejectDtddProposal({})", id);
+        return dtddProposals.reject(id);
     }
 
     @Override
