@@ -1,0 +1,21 @@
+<!--/*@thymesVar id="loginError" type="java.lang.String"*/-->
+<!--/* Where catapult-api sends a failed login (?error=not_whitelisted or any other: generic). */-->
+<mdui-layout-main th:fragment="login" id="login">
+    <section class="hero">
+        <div class="hero-glow"></div>
+        <div class="hero-content">
+            <h1 th:text="#{login.title}">login.title</h1>
+            <p class="hero-description" th:text="#{login.subtitle}">login.subtitle</p>
+
+            <p th:if="${loginError != null}" class="hero-error" id="login-error" role="alert"
+               th:text="${loginError == 'not_whitelisted'} ? #{login.error.not_whitelisted} : #{login.error.generic}">login.error</p>
+
+            <div class="hero-actions">
+                <mdui-button variant="filled" size="large" href="/oauth2/authorization/twitch">
+                    <mdui-icon slot="icon" name="login"></mdui-icon>
+                    <span th:text="#{login.button}">login.button</span>
+                </mdui-button>
+            </div>
+        </div>
+    </section>
+</mdui-layout-main>

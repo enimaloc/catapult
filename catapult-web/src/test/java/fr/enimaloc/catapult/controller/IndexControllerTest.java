@@ -220,6 +220,87 @@ class IndexControllerTest {
     }
 
     @Test
+    void login_showsTheErrorCatapultApiSent() throws Exception {
+        String notWhitelisted = mvc.perform(get("/login").param("error", "not_whitelisted"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(notWhitelisted).contains(messages.getMessage("login.error.not_whitelisted", null, java.util.Locale.ENGLISH).replace("'", "&#39;"))
+                .contains("href=\"/oauth2/authorization/twitch\"");
+
+        String bare = mvc.perform(get("/login").param("error", "")).andReturn().getResponse().getContentAsString();
+        assertThat(bare).contains(messages.getMessage("login.error.generic", null, java.util.Locale.ENGLISH))
+                .doesNotContain(messages.getMessage("login.error.not_whitelisted", null, java.util.Locale.ENGLISH));
+
+        String unknown = mvc.perform(get("/login").param("error", "<x>")).andReturn().getResponse().getContentAsString();
+        assertThat(unknown).contains(messages.getMessage("login.error.generic", null, java.util.Locale.ENGLISH)).doesNotContain("<x>");
+
+        String none = mvc.perform(get("/login")).andReturn().getResponse().getContentAsString();
+        assertThat(none).doesNotContain("login-error");
+    }
+
+    @Test
+    void join_linksTwitchWithAValidCodeOnly() throws Exception {
+        String valid = mvc.perform(get("/join").param("invite", "ABC234")).andReturn().getResponse().getContentAsString();
+        assertThat(valid).contains("href=\"/oauth2/authorization/twitch?invite=ABC234\"")
+                .doesNotContain(messages.getMessage("join.no_code", null, java.util.Locale.ENGLISH));
+
+        for (String bad : new String[]{"abc<x>", "ABC1", "ABCDEFGHJKLMN", "\"onmouseover"}) {
+            String html = mvc.perform(get("/join").param("invite", bad)).andReturn().getResponse().getContentAsString();
+            assertThat(html).doesNotContain("authorization/twitch?invite=")
+                    .contains(messages.getMessage("join.no_code", null, java.util.Locale.ENGLISH));
+        }
+        String missing = mvc.perform(get("/join")).andReturn().getResponse().getContentAsString();
+        assertThat(missing).doesNotContain("authorization/twitch?invite=");
+    }
+
+    @Test
+    void join_showsTheErrorCatapultApiSent() throws Exception {
+        for (String error : new String[]{"invalid_invite", "alpha_full"}) {
+            String html = mvc.perform(get("/join").param("error", error)).andReturn().getResponse().getContentAsString();
+            assertThat(html).contains(messages.getMessage("join.error." + error, null, java.util.Locale.ENGLISH).replace("'", "&#39;"));
+        }
+        String generic = mvc.perform(get("/join").param("error", "boom")).andReturn().getResponse().getContentAsString();
+        assertThat(generic).contains(messages.getMessage("login.error.generic", null, java.util.Locale.ENGLISH));
+    }
+
+    @Test
+    void loginAndJoin_sendAMemberToTheirChannel() throws Exception {
+        String jwt = "x." + java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                "{\"username\":\"enimaloc\"}".getBytes()) + ".y";
+        String key = ApiClient.SESSION_JWT_KEY;
+        mvc.perform(get("/login").sessionAttr(key, jwt)).andExpect(status().isFound())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/channel/enimaloc"));
+        mvc.perform(get("/join").param("invite", "ABC234").sessionAttr(key, jwt)).andExpect(status().isFound())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/channel/enimaloc"));
+        mvc.perform(get("/spa/login").sessionAttr(key, jwt))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/spa/channel/enimaloc"));
+        mvc.perform(get("/spa/join").sessionAttr(key, jwt))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/spa/channel/enimaloc"));
+    }
+
+    @Test
+    void loginAndJoin_renderForASessionWithoutALogin() throws Exception {
+        mvc.perform(get("/login").sessionAttr(ApiClient.SESSION_JWT_KEY, "opaque")).andExpect(status().isOk());
+        mvc.perform(get("/join").sessionAttr(ApiClient.SESSION_JWT_KEY, "opaque")).andExpect(status().isOk());
+    }
+
+    @Test
+    void loginAndJoin_fragmentsRender() throws Exception {
+        assertThat(mvc.perform(get("/spa/login").param("error", "not_whitelisted")).andReturn().getResponse().getContentAsString())
+                .contains("id=\"login\"");
+        assertThat(mvc.perform(get("/spa/join").param("invite", "ABC234")).andReturn().getResponse().getContentAsString())
+                .contains("twitch?invite=ABC234");
+    }
+
+    @Test
+    void loginAndJoin_areNotIndexed() throws Exception {
+        for (String path : new String[]{"/login", "/join"}) {
+            String html = mvc.perform(get(path)).andReturn().getResponse().getContentAsString();
+            assertThat(html).contains("<meta name=\"robots\" content=\"noindex\">")
+                    .doesNotContain("rel=\"canonical\"");
+        }
+    }
+
+    @Test
     void navbar_leavesRoomForTheMembersChannels_withoutWaitingForThem() throws Exception {
         String html = mvc.perform(get("/").sessionAttr(fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andReturn().getResponse().getContentAsString();

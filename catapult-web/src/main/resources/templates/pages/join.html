@@ -1,0 +1,26 @@
+<!--/*@thymesVar id="inviteCode" type="java.lang.String"*/-->
+<!--/*@thymesVar id="joinError" type="java.lang.String"*/-->
+<!--/* The invitation's landing page. inviteCode is only set when it is well formed (see ModelFiller#join), since it goes into a link. */-->
+<mdui-layout-main th:fragment="join" id="join">
+    <section class="hero">
+        <div class="hero-glow"></div>
+        <div class="hero-content">
+            <h1 th:text="#{join.title}">join.title</h1>
+            <p class="hero-description" th:text="#{join.subtitle}">join.subtitle</p>
+
+            <p th:if="${joinError != null}" class="hero-error" id="join-error" role="alert"
+               th:text="${joinError == 'invalid_invite'} ? #{join.error.invalid_invite} :
+                        (${joinError == 'alpha_full'} ? #{join.error.alpha_full} : #{login.error.generic})">join.error</p>
+
+            <p th:if="${inviteCode == null and joinError == null}" class="hero-error" id="join-no-code"
+               th:text="#{join.no_code}">join.no_code</p>
+
+            <div class="hero-actions" th:if="${inviteCode != null}">
+                <mdui-button variant="filled" size="large" th:href="@{/oauth2/authorization/twitch(invite=${inviteCode})}">
+                    <mdui-icon slot="icon" name="login"></mdui-icon>
+                    <span th:text="#{join.cta}">join.cta</span>
+                </mdui-button>
+            </div>
+        </div>
+    </section>
+</mdui-layout-main>

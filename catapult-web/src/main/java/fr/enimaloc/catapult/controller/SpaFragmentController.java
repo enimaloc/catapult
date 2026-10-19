@@ -94,6 +94,29 @@ public class SpaFragmentController {
         return "pages/notifications :: notifications";
     }
 
+    @GetMapping("/login")
+    String login(Model model, @RequestParam(required = false) String error) {
+        String channel = ModelFiller.loggedInChannelPath();
+        if (channel != null) {
+            return "redirect:/spa" + channel;
+        }
+        filler.login(model, error);
+        filler.defaultAttr(model, "login");
+        return "pages/login :: login";
+    }
+
+    @GetMapping("/join")
+    String join(Model model, @RequestParam(required = false) String invite,
+                @RequestParam(required = false) String error) {
+        String channel = ModelFiller.loggedInChannelPath();
+        if (channel != null) {
+            return "redirect:/spa" + channel;
+        }
+        filler.join(model, invite, error);
+        filler.defaultAttr(model, "join");
+        return "pages/join :: join";
+    }
+
     @GetMapping("/{page}")
     String unknown(Model model, HttpServletResponse response) {
         response.setStatus(HttpStatus.NOT_FOUND.value());

@@ -42,6 +42,33 @@ public class IndexController {
         return "index";
     }
 
+    /** Where catapult-api sends a failed login; a member already logged in goes to their channel. */
+    @GetMapping("/login")
+    String login(Model model, @RequestParam(required = false) String error, Locale locale) throws IOException {
+        String channel = ModelFiller.loggedInChannelPath();
+        if (channel != null) {
+            return "redirect:" + channel;
+        }
+        model.addAttribute("error", false);
+        filler.login(model, error);
+        filler.fill(model, "login", locale);
+        return "index";
+    }
+
+    /** Where catapult-api sends an invitation's link and its failures; a logged-in member goes to their channel. */
+    @GetMapping("/join")
+    String join(Model model, @RequestParam(required = false) String invite,
+                @RequestParam(required = false) String error, Locale locale) throws IOException {
+        String channel = ModelFiller.loggedInChannelPath();
+        if (channel != null) {
+            return "redirect:" + channel;
+        }
+        model.addAttribute("error", false);
+        filler.join(model, invite, error);
+        filler.fill(model, "join", locale);
+        return "index";
+    }
+
     /** The admin page, for admins only: anyone else gets the 401 / 403 error page in its place. */
     @GetMapping("/admin")
     String admin(Model model, Locale locale, HttpServletResponse response) throws IOException {

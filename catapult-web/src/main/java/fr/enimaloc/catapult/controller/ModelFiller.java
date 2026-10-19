@@ -41,6 +41,7 @@ public class ModelFiller {
     /** Error codes with their own error.<code>.* messages; anything else uses error.generic.*. */
     /** The statuses with their own title and description (error.{code}.*); the others get error.generic.*. */
     static final Set<Integer> DESCRIBED_ERRORS = Set.of(400, 401, 403, 404, 405, 429, 500, 502, 503);
+    private static final java.util.regex.Pattern INVITE_CODE = java.util.regex.Pattern.compile("[A-Z2-9]{1,12}");
     private static final String DEFAULT_PRIVACY_LANGUAGE = "en";
 
     /**
@@ -151,6 +152,27 @@ public class ModelFiller {
             default -> { }
         }
         defaultAttr(model, page, locale);
+    }
+
+    /** Whom the visitor is, for /login and /join: a member goes to their own channel instead. */
+    public static String loggedInChannelPath() {
+        String login = ApiClient.currentLogin();
+        return login == null ? null : "/channel/" + login;
+    }
+
+    /** What /login says about a failed login: {@code not_whitelisted}, else {@code generic}; null without an error. */
+    public void login(Model model, String error) {
+        model.addAttribute("loginError", error == null ? null : "not_whitelisted".equals(error) ? "not_whitelisted" : "generic");
+    }
+
+    /**
+     * What /join says: the invite code when well formed (it ends up in a link), and the failure
+     * catapult-api sent ({@code invalid_invite}, {@code alpha_full}, else {@code generic}; null without one).
+     */
+    public void join(Model model, String invite, String error) {
+        model.addAttribute("inviteCode", invite != null && INVITE_CODE.matcher(invite).matches() ? invite : null);
+        model.addAttribute("joinError", error == null ? null
+                : "invalid_invite".equals(error) || "alpha_full".equals(error) ? error : "generic");
     }
 
     /**
