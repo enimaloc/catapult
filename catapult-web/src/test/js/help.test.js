@@ -1,6 +1,7 @@
 /*
  * help.js: a card's "?" button opens the shared side sheet with the help fetched from
- * /spa/help/{cardId}; Escape closes it (mdui does that); two quick clicks show only the last answer.
+ * /spa/help/{cardId}; its close button shuts it (Escape and the overlay are mdui's own); two quick
+ * clicks show only the last answer.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
@@ -12,7 +13,10 @@ const content = () => document.getElementById("help-content");
 
 function page() {
     html(`
-        <mdui-navigation-drawer id="help-panel"><div id="help-content"></div></mdui-navigation-drawer>
+        <mdui-navigation-drawer id="help-panel">
+            <mdui-button-icon id="help-panel-close" icon="close" data-help-close></mdui-button-icon>
+            <div id="help-content"></div>
+        </mdui-navigation-drawer>
         <mdui-button-icon data-help="status"></mdui-button-icon>
         <mdui-button-icon data-help="bindings"></mdui-button-icon>`);
     render();
@@ -27,7 +31,7 @@ beforeEach(async () => {
 });
 
 describe("help", () => {
-    it("opens the side sheet with the fetched content and closes on Escape", async () => {
+    it("opens the side sheet with the fetched content and closes it from its close button", async () => {
         page();
         click("status");
         expect(fetch).toHaveBeenCalledWith("/spa/help/status", expect.anything());
@@ -37,9 +41,7 @@ describe("help", () => {
         expect(panel().open).toBe(true);
         expect(content().innerHTML).toContain("<p>Hello</p>");
 
-        // mdui closes a modal drawer on Escape itself and says so with this event; the panel mirrors it.
-        panel().open = false;
-        panel().dispatchEvent(new Event("close"));
+        document.getElementById("help-panel-close").click();
         expect(panel().open).toBe(false);
     });
 
