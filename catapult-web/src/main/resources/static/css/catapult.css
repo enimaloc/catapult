@@ -1650,6 +1650,11 @@ mdui-select::part(menu) {
     flex: 0 1 320px;
 }
 
+/* mdui-card is inline-block: an admin tab's cards would shrink to their content. */
+.admin-view mdui-card {
+    display: block;
+}
+
 .admin-table {
     display: flex;
     flex-direction: column;
@@ -1688,6 +1693,15 @@ mdui-select::part(menu) {
     display: flex;
     gap: 4px;
 }
+
+/*
+ * The tables below are one grid each, every row (header included) a subgrid of it: as separate grids,
+ * the rows sized their action column to their own buttons, so no cell sat under its header.
+ */
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .invite-row)) { display: grid; column-gap: 12px; }
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .invite-row)) > * { grid-column: 1 / -1; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .invite-row) { grid-template-columns: subgrid; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .invite-row) > .admin-row-actions { justify-content: flex-end; }
 
 .admin-pagination {
     display: flex;
@@ -1915,11 +1929,11 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 
 /* The admin DTDD mapping tab. */
 .admin-dtdd-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-.admin-dtdd-row { grid-template-columns: 9.5rem 5rem 6rem minmax(0, 1fr) minmax(0, 2fr) auto; }
+.admin-dtdd-row, .admin-table:has(> .admin-dtdd-row) { grid-template-columns: 9.5rem 5rem 6rem minmax(0, 1fr) minmax(0, 2fr) auto; }
 .admin-dtdd-reason { min-width: 0; overflow-wrap: anywhere; }
 .admin-dtdd-form { display: flex; flex-direction: column; gap: 12px; min-width: min(480px, 100%); }
 @media (max-width: 650px) {
-    .admin-dtdd-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-dtdd-row, .admin-table:has(> .admin-dtdd-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .admin-dtdd-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
     .admin-dtdd-row > .admin-dtdd-reason, .admin-dtdd-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-dtdd-row > .admin-cell { white-space: normal; }
@@ -1928,12 +1942,12 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 /* The admin Groups tab. */
 .admin-groups-create { padding: 16px; margin-bottom: 16px; }
 .admin-groups-create-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 12px; align-items: start; }
-.admin-groups-row { grid-template-columns: 10rem minmax(0, 1fr) minmax(0, 2fr) 5rem auto; }
+.admin-groups-row, .admin-table:has(> .admin-groups-row) { grid-template-columns: 10rem minmax(0, 1fr) minmax(0, 2fr) 5rem auto; }
 .admin-groups-description { min-width: 0; overflow-wrap: anywhere; }
 .admin-groups-form { display: flex; flex-direction: column; gap: 12px; min-width: min(480px, 100%); }
 @media (max-width: 650px) {
     .admin-groups-create-fields { grid-template-columns: minmax(0, 1fr); }
-    .admin-groups-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-groups-row, .admin-table:has(> .admin-groups-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .admin-groups-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
     .admin-groups-row > .admin-groups-description, .admin-groups-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-groups-row > .admin-cell { white-space: normal; }
@@ -1966,14 +1980,14 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-whitelist-settings mdui-checkbox, .admin-whitelist-settings mdui-button { justify-self: start; }
 .admin-whitelist-cap { color: rgb(var(--mdui-color-error)); margin: 8px 0; }
 .admin-whitelist-zero { color: rgb(var(--mdui-color-error)); font-weight: 600; }
-.admin-whitelist-invite-row { grid-template-columns: minmax(0, 1fr) 8rem 5rem 7rem 7rem auto; }
-.admin-whitelist-row { grid-template-columns: 12rem minmax(0, 1fr) auto; }
+.admin-whitelist-invite-row, .admin-table:has(> .admin-whitelist-invite-row) { grid-template-columns: minmax(0, 1fr) repeat(5, auto); }
+.admin-whitelist-row, .admin-table:has(> .admin-whitelist-row) { grid-template-columns: 12rem minmax(0, 1fr) auto; }
 .admin-whitelist-form { display: flex; flex-direction: column; gap: 12px; min-width: min(480px, 100%); }
 @media (max-width: 650px) {
     .admin-whitelist-add { flex-direction: column; align-items: stretch; }
     .admin-whitelist-add mdui-text-field { max-width: none; }
     .admin-whitelist-settings { grid-template-columns: minmax(0, 1fr); }
-    .admin-whitelist-invite-row, .admin-whitelist-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-whitelist-invite-row, .admin-whitelist-row, .admin-table:has(> .admin-whitelist-invite-row), .admin-table:has(> .admin-whitelist-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .admin-whitelist-invite-row > [data-label]::before, .admin-whitelist-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
     .admin-whitelist-invite-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-whitelist-invite-row > .admin-cell, .admin-whitelist-row > .admin-cell { white-space: normal; }
@@ -1982,7 +1996,7 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 /* The channel's Invitations tab: the code reads large, the link and its buttons stack on a phone. */
 .invite-code { font-size: 2rem; letter-spacing: 0.15em; overflow-wrap: anywhere; }
 .invite-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.invite-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.invite-row, .admin-table:has(> .invite-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 
 /* The admin Keys tab. */
 .admin-keys-card { padding: 16px; margin-bottom: 16px; }
@@ -1990,17 +2004,17 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-keys-head h3 { margin: 0; }
 .admin-keys-add { display: flex; gap: 12px; align-items: start; margin: 16px 0; }
 .admin-keys-add mdui-text-field { flex: 1; max-width: 24rem; }
-.admin-keys-row { grid-template-columns: minmax(0, 1fr) 10rem 10rem auto; }
+.admin-keys-row, .admin-table:has(> .admin-keys-row) { grid-template-columns: minmax(0, 1fr) 10rem 10rem auto; }
 .admin-keys-blocked { color: rgb(var(--mdui-color-error)); }
 @media (max-width: 600px) {
     .admin-keys-add { flex-direction: column; align-items: stretch; }
     .admin-keys-add mdui-text-field { max-width: none; }
-    .admin-keys-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-keys-row, .admin-table:has(> .admin-keys-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .admin-keys-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
     .admin-keys-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-keys-row > .admin-cell { white-space: normal; }
 }
-.admin-minecraft-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 6rem 4rem 12rem auto; }
+.admin-minecraft-row, .admin-table:has(> .admin-minecraft-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 6rem 4rem 12rem auto; }
 .admin-minecraft-states { display: flex; flex-wrap: wrap; gap: 4px; }
 .admin-minecraft-full { color: rgb(var(--mdui-color-error)); }
 .admin-minecraft-row > .admin-minecraft-flow { grid-column: 1 / -1; }
@@ -2010,7 +2024,7 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-minecraft-user-code { font-family: monospace; font-size: 1.15em; letter-spacing: .05em; }
 .admin-minecraft-error { color: rgb(var(--mdui-color-error)); }
 @media (max-width: 600px) {
-    .admin-minecraft-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-minecraft-row, .admin-table:has(> .admin-minecraft-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .admin-minecraft-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
     .admin-minecraft-row > .admin-row-actions { grid-column: 1 / -1; flex-wrap: wrap; }
     .admin-minecraft-row > .admin-cell { white-space: normal; }
@@ -2022,10 +2036,10 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-tw-danger { --mdui-color-primary: var(--mdui-color-error); --mdui-color-on-primary: var(--mdui-color-on-error); }
 .admin-tw-create { padding: 16px; margin-bottom: 16px; }
 .admin-tw-create-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 8rem auto; gap: 12px; align-items: start; }
-.admin-tw-row { grid-template-columns: 12rem minmax(0, 1fr) 8rem 5rem auto; }
+.admin-tw-row, .admin-table:has(> .admin-tw-row) { grid-template-columns: 12rem minmax(0, 1fr) 8rem 5rem auto; }
 @media (max-width: 600px) {
     .admin-tw-create-fields { grid-template-columns: minmax(0, 1fr); }
-    .admin-tw-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-tw-row, .admin-table:has(> .admin-tw-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .admin-tw-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
     .admin-tw-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-tw-row > .admin-cell { white-space: normal; }
