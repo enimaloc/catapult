@@ -158,19 +158,19 @@ public class AdminTabsFragmentController {
         return rows.content().isEmpty() ? Map.of("id", "") : rows.content().getFirst();
     }
 
-    @GetMapping("/well-known")
+    @GetMapping("/meta")
     String wellKnown(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {
             List<WellKnownFileDto> files = apiService.adminWellKnownFiles();
             model.addAttribute("files", files);
             model.addAttribute("registry", apiService.adminIanaRegistry());
             model.addAttribute("configured", files == null ? Set.of() : AdminWellKnownViews.configured(files));
-            return "pages/admin-tab/well-known :: content";
+            return "pages/admin-tab/meta :: content";
         });
     }
 
     /** A file's dialog; without an id, a new file's, prefilled from the registry's {@code path} when given. */
-    @GetMapping("/well-known/file")
+    @GetMapping("/meta/file")
     String wellKnownFile(Model model, HttpServletResponse response, @RequestParam(required = false) Long id,
                          @RequestParam(required = false) WellKnownLocation location,
                          @RequestParam(required = false) String path) {
@@ -181,7 +181,7 @@ public class AdminTabsFragmentController {
                 file = apiService.adminWellKnownFile(id);
                 if (file == null) {
                     response.setStatus(HttpStatus.NOT_FOUND.value());
-                    return "pages/admin-tab/well-known :: missing";
+                    return "pages/admin-tab/meta :: missing";
                 }
                 // a redirect or an empty file has no content to edit: it opens on the Response tab
                 if (file.status() >= 300 && file.status() < 400 || file.content() == null || file.content().isEmpty()) {
@@ -200,12 +200,12 @@ public class AdminTabsFragmentController {
             model.addAttribute("preset", preset);
             model.addAttribute("url", AdminWellKnownViews.url(file.location(), file.path()));
             model.addAttribute("creating", id == null);
-            return "pages/admin-tab/well-known :: file";
+            return "pages/admin-tab/meta :: file";
         });
     }
 
     /** SchemaStore's schema for a well-known path, for the dialog's generated form; 404 when none. */
-    @GetMapping(value = "/well-known/schema", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/meta/schema", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     ResponseEntity<String> wellKnownSchema(@RequestParam String path) {
         int refused = AdminAccess.refusal(filler);

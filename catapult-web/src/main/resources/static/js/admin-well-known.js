@@ -1,6 +1,6 @@
 /**
  * The admin Well-known tab: a file's dialog (new, a registry suffix's, or an existing file's) is
- * fetched from /spa/admin/well-known/file; its Content-Type follows the path's extension until
+ * fetched from /spa/admin/meta/file; its Content-Type follows the path's extension until
  * edited by hand (an existing file's never does), its URL preview follows path and location; a
  * file imported is read in the browser as text into the content (refused when larger than 64 KiB
  * or holding a NUL byte, i.e. not text). Save / Delete post to AdminWellKnownController, then the
@@ -215,7 +215,7 @@ window.CatapultAdminWellKnown = (function () {
 
     async function schemaOf(path) {
         try {
-            const response = await fetch(`/spa/admin/well-known/schema?path=${encodeURIComponent(path)}`);
+            const response = await fetch(`/spa/admin/meta/schema?path=${encodeURIComponent(path)}`);
             return response.ok ? await response.json() : null;
         } catch {
             return null;
@@ -306,7 +306,7 @@ window.CatapultAdminWellKnown = (function () {
     async function openFile(panel, root, dialog, query) {
         let response;
         try {
-            response = await fetch(`/spa/admin/well-known/file${query}`);
+            response = await fetch(`/spa/admin/meta/file${query}`);
         } catch {
             CatapultChannel.showError(message(root));
             return;
@@ -386,7 +386,7 @@ window.CatapultAdminWellKnown = (function () {
         if (target.disabled) return; // its request is on its way
         if (target.matches(".admin-well-known-delete")) {
             if (!await CatapultAdminTabs.confirmed(root, target.dataset.confirm)) return;
-            const sent = await send(root, target, `/admin/well-known/${encodeURIComponent(row.dataset.id)}/delete`, {});
+            const sent = await send(root, target, `/admin/meta/files/${encodeURIComponent(row.dataset.id)}/delete`, {});
             if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
             return;
         }
@@ -425,7 +425,7 @@ window.CatapultAdminWellKnown = (function () {
                 contentType: value(form, "contentType").trim(),
                 content
             };
-            const sent = await send(root, target, id ? `/admin/well-known/${encodeURIComponent(id)}` : "/admin/well-known", body);
+            const sent = await send(root, target, id ? `/admin/meta/files/${encodeURIComponent(id)}` : "/admin/meta/files", body);
             if (sent === "ok") dialog.open = false;
             if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
         }
@@ -467,7 +467,7 @@ window.CatapultAdminWellKnown = (function () {
     }
 
     function attach() {
-        const panel = document.querySelector('mdui-tab-panel[value="well-known"]');
+        const panel = document.querySelector('mdui-tab-panel[value="meta"]');
         if (!panel) return;
         panel.addEventListener("click", event => {
             const target = event.target.closest(

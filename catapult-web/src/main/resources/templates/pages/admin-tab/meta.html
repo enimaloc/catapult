@@ -12,7 +12,7 @@
               data-error-too-large=#{admin.well-known.import.too-large},data-error-binary=#{admin.well-known.import.binary}">
     <div class="section-header">
         <div>
-            <h2 th:text="#{admin.tab.well-known}">Well-known</h2>
+            <h2 th:text="#{admin.well-known.title}">Well-known files</h2>
             <span class="eyebrow" th:if="${files != null}" th:text="#{admin.well-known.count(${files.size()})}">0 files</span>
         </div>
         <mdui-button id="admin-well-known-new" variant="tonal" icon="add" th:text="#{admin.well-known.new}">New</mdui-button>

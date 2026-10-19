@@ -13,11 +13,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.function.IntSupplier;
 
 /**
- * The admin Well-known tab's actions, forwarded to catapult-api with the session's JWT and answered
+ * The admin Meta tab's well-known file actions, forwarded to catapult-api with the session's JWT and answered
  * with its status (502 when unreachable); a change is served at once (the public cache is emptied).
  */
 @RestController
-@RequestMapping("/admin/well-known")
+@RequestMapping("/admin/meta/files")
 @RequiredArgsConstructor
 public class AdminWellKnownController {
     private final ApiService apiService;

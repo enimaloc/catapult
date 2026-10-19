@@ -9,14 +9,15 @@
         </div>
 
         <mdui-tabs id="admin-tabs" class="channel-tabs" value="members" placement="top" data-hash-tabs>
-            <th:block th:each="tab : ${ {'members', 'ccl', 'caches', 'data', 'well-known', 'notifications', 'dtdd-mapping', 'groups', 'whitelist', 'keys', 'tw', 'broadcast'} }">
-                <mdui-tab th:value="${tab}" th:text="#{|admin.tab.${tab}|}">admin.tab</mdui-tab>
+            <th:block th:each="tab : ${ {'members', 'ccl', 'caches', 'data', 'meta', 'notifications', 'dtdd-mapping', 'groups', 'whitelist', 'keys', 'tw', 'broadcast'} }">
+                <mdui-tab th:value="${tab}" th:text="#{|admin.tab.${tab}|}"
+                          th:attr="data-hash-alias=${tab == 'meta' ? 'well-known' : null}">admin.tab</mdui-tab>
             </th:block>
 
             <th:block th:replace="~{pages/admin-tab/members::panel}"></th:block>
 
             <!--/* Filled by admin-tabs.js from /spa/admin/{tab} the first time the tab is shown. */-->
-            <mdui-tab-panel slot="panel" th:each="tab : ${ {'ccl', 'caches', 'data', 'well-known', 'notifications', 'dtdd-mapping', 'groups', 'whitelist', 'keys', 'tw', 'broadcast'} }" th:value="${tab}"
+            <mdui-tab-panel slot="panel" th:each="tab : ${ {'ccl', 'caches', 'data', 'meta', 'notifications', 'dtdd-mapping', 'groups', 'whitelist', 'keys', 'tw', 'broadcast'} }" th:value="${tab}"
                             data-admin-lazy th:attr="data-unavailable=#{admin.unavailable}">
                 <div class="admin-loading"><mdui-circular-progress></mdui-circular-progress></div>
             </mdui-tab-panel>
