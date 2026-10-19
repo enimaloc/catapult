@@ -22,6 +22,8 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
+import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
@@ -504,6 +506,27 @@ public class RealApiService implements ApiService {
     @Override
     public int adminDeleteWellKnownFile(long id) {
         return client.call(HttpMethod.DELETE, "/api/admin/well-known/{id}", null, Void.class, id).status();
+    }
+
+    @Override
+    public List<MetaTagDto> metaTags() {
+        ApiClient.Result<MetaTagDto[]> result = client.getAnonymous("/api/meta-tags", MetaTagDto[].class);
+        return result.status() == 200 && result.body() != null ? List.of(result.body()) : null;
+    }
+
+    @Override
+    public int adminCreateMetaTag(MetaTagRequest request) {
+        return client.call(HttpMethod.POST, "/api/admin/meta-tags", request, Void.class).status();
+    }
+
+    @Override
+    public int adminUpdateMetaTag(long id, MetaTagRequest request) {
+        return client.call(HttpMethod.PUT, "/api/admin/meta-tags/{id}", request, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteMetaTag(long id) {
+        return client.call(HttpMethod.DELETE, "/api/admin/meta-tags/{id}", null, Void.class, id).status();
     }
 
     @Override

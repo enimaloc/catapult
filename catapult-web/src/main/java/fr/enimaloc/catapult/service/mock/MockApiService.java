@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.service.mock;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
+import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
@@ -113,6 +115,8 @@ public class MockApiService implements ApiService {
      */
     private final Map<String, MockData> data = new ConcurrentHashMap<>();
     private final MockWellKnownStore wellKnown = new MockWellKnownStore();
+    /** Application-wide too: every page shows them, logged in or not. */
+    private final MockMetaTagStore metaTags = new MockMetaTagStore();
     /** Application-wide, like the well-known files: a notification sent in one session reaches the others. */
     private MockNotificationStore notifications;
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
@@ -813,6 +817,30 @@ public class MockApiService implements ApiService {
     public int adminDeleteWellKnownFile(long id) {
         log.trace("adminDeleteWellKnownFile({})", id);
         return wellKnown.delete(id);
+    }
+
+    @Override
+    public List<MetaTagDto> metaTags() {
+        log.trace("metaTags()");
+        return metaTags.list();
+    }
+
+    @Override
+    public int adminCreateMetaTag(MetaTagRequest request) {
+        log.trace("adminCreateMetaTag({})", request);
+        return metaTags.create(request);
+    }
+
+    @Override
+    public int adminUpdateMetaTag(long id, MetaTagRequest request) {
+        log.trace("adminUpdateMetaTag({}, {})", id, request);
+        return metaTags.update(id, request);
+    }
+
+    @Override
+    public int adminDeleteMetaTag(long id) {
+        log.trace("adminDeleteMetaTag({})", id);
+        return metaTags.delete(id);
     }
 
     @Override

@@ -704,6 +704,34 @@ class RealApiServiceTest {
     }
 
     @Test
+    void metaTags_areReadWithoutTheBearer_andNullWhenCatapultApiFails() {
+        expect(HttpMethod.GET, "/api/meta-tags")
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist("Authorization"))
+                .andRespond(withSuccess("[{\"id\":1,\"attribute\":\"PROPERTY\",\"key\":\"og:image\",\"content\":\"https://x/y.png\","
+                        + "\"updatedAt\":\"2026-10-19T10:00:00Z\"}]", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.GET, "/api/meta-tags").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+
+        assertThat(service.metaTags()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.MetaTagDto(1,
+                fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute.PROPERTY, "og:image", "https://x/y.png",
+                java.time.Instant.parse("2026-10-19T10:00:00Z")));
+        assertThat(service.metaTags()).isNull();
+    }
+
+    @Test
+    void adminMetaTags_areWrittenWithTheirStatus() {
+        var request = new fr.enimaloc.catapult.common.dto.admin.MetaTagRequest(
+                fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute.NAME, "theme-color", "#000");
+        String json = "{\"attribute\":\"NAME\",\"key\":\"theme-color\",\"content\":\"#000\"}";
+        expect(HttpMethod.POST, "/api/admin/meta-tags").andExpect(content().json(json)).andRespond(withStatus(HttpStatus.CREATED));
+        expect(HttpMethod.PUT, "/api/admin/meta-tags/3").andExpect(content().json(json)).andRespond(withStatus(HttpStatus.CONFLICT));
+        expect(HttpMethod.DELETE, "/api/admin/meta-tags/3").andRespond(withNoContent());
+
+        assertThat(service.adminCreateMetaTag(request)).isEqualTo(201);
+        assertThat(service.adminUpdateMetaTag(3, request)).isEqualTo(409);
+        assertThat(service.adminDeleteMetaTag(3)).isEqualTo(204);
+    }
+
+    @Test
     void wellKnown_relaysA404() {
         expect(HttpMethod.GET, "/api/well-known/serve?location=ROOT&path=nope.txt").andRespond(withStatus(HttpStatus.NOT_FOUND));
 

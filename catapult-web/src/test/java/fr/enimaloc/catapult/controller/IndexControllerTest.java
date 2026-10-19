@@ -200,6 +200,29 @@ class IndexControllerTest {
                 .doesNotContain("application/ld+json");
     }
 
+    @Autowired SiteMetaTags siteMetaTags;
+
+    @Test
+    void everyPage_carriesTheAdminsMetaTags_escaped() throws Exception {
+        siteMetaTags.clear(); // the context's copy may hold another test's list
+        when(apiService.metaTags()).thenReturn(java.util.List.of(
+                new fr.enimaloc.catapult.common.dto.admin.MetaTagDto(1, fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute.NAME,
+                        "google-site-verification", "abc\"><script>", null),
+                new fr.enimaloc.catapult.common.dto.admin.MetaTagDto(2, fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute.PROPERTY,
+                        "og:image", "https://catapult.example/og.png", null)));
+        try {
+            for (String url : new String[]{"/", "/channel/enimaloc"}) {
+                String html = mvc.perform(get(url)).andReturn().getResponse().getContentAsString();
+                org.assertj.core.api.Assertions.assertThat(html)
+                        .contains("<meta content=\"abc&quot;&gt;&lt;script&gt;\" name=\"google-site-verification\">")
+                        .contains("<meta content=\"https://catapult.example/og.png\" property=\"og:image\">")
+                        .doesNotContain("<script>\"");
+            }
+        } finally {
+            siteMetaTags.clear();
+        }
+    }
+
     @Test
     void landingPage_namesTheSiteForSearchResults() throws Exception {
         String html = mvc.perform(get("/")).andReturn().getResponse().getContentAsString();

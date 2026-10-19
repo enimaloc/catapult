@@ -1,7 +1,9 @@
+<!--/*@thymesVar id="metaTags" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.MetaTagDto>"*/-->
 <!--/*@thymesVar id="files" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto>"*/-->
 <!--/*@thymesVar id="registry" type="fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto"*/-->
 <!--/*
-  The files served under /.well-known/ and at the root (content: edited, created and deleted by
+  The meta tags added to the head of every page (admin-meta-tags.js: the form below the list adds one,
+  or saves the one picked with its edit button), then the files served under /.well-known/ and at the root (content: edited, created and deleted by
   admin-well-known.js through a file's dialog), then IANA's registry, filtered in the browser, each
   suffix opening a new file's dialog with its path.
 */-->
@@ -10,6 +12,62 @@
               data-error=#{admin.error.generic},data-error-400=#{admin.well-known.error.400},
               data-error-404=#{admin.well-known.error.404},data-error-409=#{admin.well-known.error.409},
               data-error-too-large=#{admin.well-known.import.too-large},data-error-binary=#{admin.well-known.import.binary}">
+    <section class="admin-meta-tags"
+             th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+                      data-error=#{admin.error.generic},data-error-400=#{admin.meta-tags.error.400},
+                      data-error-404=#{admin.meta-tags.error.404},data-error-409=#{admin.meta-tags.error.409}">
+        <div class="section-header">
+            <div>
+                <h2 th:text="#{admin.meta-tags.title}">Meta tags</h2>
+                <span class="eyebrow" th:if="${metaTags != null}" th:text="#{admin.meta-tags.count(${metaTags.size()})}">0 tags</span>
+            </div>
+        </div>
+        <p class="admin-cell-muted" th:text="#{admin.meta-tags.hint}">Added to the head of every page.</p>
+
+        <th:block th:if="${metaTags == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+        <th:block th:if="${metaTags != null and metaTags.isEmpty()}">
+            <th:block th:replace="~{pages/admin-tab/common :: empty('sell', #{admin.meta-tags.empty})}"></th:block>
+        </th:block>
+
+        <mdui-card class="admin-table" variant="outlined" th:if="${metaTags != null and !metaTags.isEmpty()}">
+            <div class="admin-row admin-meta-tag-row admin-row-head" aria-hidden="true">
+                <span th:text="#{admin.meta-tags.column.attribute}">Type</span>
+                <span th:text="#{admin.meta-tags.column.key}">Name</span>
+                <span th:text="#{admin.meta-tags.column.content}">Content</span>
+                <span></span>
+            </div>
+            <div class="admin-row admin-meta-tag-row" th:each="t : ${metaTags}"
+                 th:attr="data-id=${t.id()},data-attribute=${t.attribute()},data-key=${t.key()},data-content=${t.content()}">
+                <span class="admin-member-id admin-meta-tag-attribute" th:text="${#strings.toLowerCase(t.attribute())}">name</span>
+                <strong class="admin-cell" th:text="${t.key()}">key</strong>
+                <span class="admin-cell admin-meta-tag-content" th:text="${t.content()}" th:title="${t.content()}">content</span>
+                <span class="admin-row-actions">
+                    <mdui-button-icon icon="edit" class="admin-meta-tag-edit" th:attr="aria-label=#{admin.meta-tags.edit}"></mdui-button-icon>
+                    <mdui-button-icon icon="delete" class="admin-meta-tag-delete"
+                                      th:attr="aria-label=#{admin.meta-tags.delete},data-confirm=#{admin.meta-tags.delete.confirm(${t.key()})}"></mdui-button-icon>
+                </span>
+            </div>
+        </mdui-card>
+
+        <mdui-card class="admin-meta-tags-form" variant="outlined" th:if="${metaTags != null}"
+                   th:attr="data-label-add=#{admin.meta-tags.add},data-label-save=#{admin.meta-tags.save}">
+            <div class="admin-meta-tags-fields">
+                <mdui-select name="attribute" value="NAME" variant="outlined" th:attr="label=#{admin.meta-tags.column.attribute}">
+                    <mdui-menu-item value="NAME">name</mdui-menu-item>
+                    <mdui-menu-item value="PROPERTY">property</mdui-menu-item>
+                </mdui-select>
+                <mdui-text-field name="key" variant="outlined" maxlength="100" placeholder="google-site-verification"
+                                 th:attr="label=#{admin.meta-tags.column.key}"></mdui-text-field>
+                <mdui-text-field name="content" variant="outlined" maxlength="1000"
+                                 th:attr="label=#{admin.meta-tags.column.content}"></mdui-text-field>
+                <div class="admin-meta-tags-buttons">
+                    <mdui-button class="admin-meta-tag-cancel" variant="text" hidden th:text="#{admin.cancel}">Cancel</mdui-button>
+                    <mdui-button class="admin-meta-tag-save" variant="tonal" icon="add" th:text="#{admin.meta-tags.add}">Add</mdui-button>
+                </div>
+            </div>
+        </mdui-card>
+    </section>
+
     <div class="section-header">
         <div>
             <h2 th:text="#{admin.well-known.title}">Well-known files</h2>

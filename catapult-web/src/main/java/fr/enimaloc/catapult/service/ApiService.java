@@ -182,6 +182,17 @@ public interface ApiService {
     /** catapult-api's status (204; 404), 502 when unreachable. */
     int adminDeleteWellKnownFile(long id);
 
+    // --- meta tags: added to every page, edited from the admin page ---
+
+    /** The configured meta tags (read without the session, as every page shows them); null when catapult-api fails. */
+    List<fr.enimaloc.catapult.common.dto.admin.MetaTagDto> metaTags();
+    /** catapult-api's status (201; 400 invalid or reserved key; 409 key taken), 502 when unreachable. */
+    int adminCreateMetaTag(fr.enimaloc.catapult.common.dto.admin.MetaTagRequest request);
+    /** catapult-api's status (200; 400; 404; 409), 502 when unreachable. */
+    int adminUpdateMetaTag(long id, fr.enimaloc.catapult.common.dto.admin.MetaTagRequest request);
+    /** catapult-api's status (204; 404), 502 when unreachable. */
+    int adminDeleteMetaTag(long id);
+
     // --- notifications and broadcasts ---
 
     /** The bell's content: the newest notifications and the unread count; null when catapult-api fails. */
