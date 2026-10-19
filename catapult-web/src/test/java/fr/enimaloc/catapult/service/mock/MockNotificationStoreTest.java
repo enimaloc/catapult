@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.mock;
 
+import fr.enimaloc.catapult.MutableClock;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.Severity;
@@ -7,11 +8,8 @@ import fr.enimaloc.catapult.event.notification.BroadcastStreamEvent;
 import fr.enimaloc.catapult.event.notification.NotificationStreamEvent;
 import org.junit.jupiter.api.Test;
 
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,22 +25,6 @@ class MockNotificationStoreTest {
     private final MockNotificationStore store = new MockNotificationStore(events::add, clock,
             id -> id.equals(this.member) ? "member" : id.equals(this.a) ? "alice" : id.equals(this.b) ? "bob" : null);
 
-    /** A clock the test moves by hand. */
-    private static final class MutableClock extends Clock {
-        private Instant now;
-
-        MutableClock(Instant now) {
-            this.now = now;
-        }
-
-        void advance(Duration d) {
-            now = now.plus(d);
-        }
-
-        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
-        @Override public Clock withZone(ZoneId zone) { return this; }
-        @Override public Instant instant() { return now; }
-    }
     private final UUID a = UUID.randomUUID();
     private final UUID b = UUID.randomUUID();
 

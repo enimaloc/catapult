@@ -1,25 +1,17 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.MutableClock;
 import org.junit.jupiter.api.Test;
 
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class BroadcastStateTest {
-    private static class MutableClock extends Clock {
-        Instant now = Instant.parse("2026-10-16T00:00:00Z");
-        public ZoneId getZone() { return ZoneOffset.UTC; }
-        public Clock withZone(ZoneId z) { return this; }
-        public Instant instant() { return now; }
-    }
 
-    private final MutableClock clock = new MutableClock();
+    private final MutableClock clock = new MutableClock(Instant.parse("2026-10-16T00:00:00Z"));
     private final BroadcastState state = new BroadcastState(clock);
     private final Instant startsAt = clock.now.plus(Duration.ofHours(1));
 
