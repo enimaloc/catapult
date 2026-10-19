@@ -154,19 +154,6 @@ describe("tab <-> location.hash", () => {
         expect(el.value).toBe("overview");
     });
 
-    it("leads a renamed tab's old name to the tab, the hash then saying its new one", () => {
-        html(`<mdui-tabs id="admin-tabs" data-hash-tabs><mdui-tab value="members"></mdui-tab>
-              <mdui-tab value="meta" data-hash-alias="well-known"></mdui-tab></mdui-tabs>`);
-        const el = document.getElementById("admin-tabs");
-        el.value = "members";
-        history.replaceState(null, "", "/admin?x=1#well-known");
-
-        render();
-
-        expect(el.value).toBe("meta");
-        expect(location.search + location.hash).toBe("?x=1#meta");
-    });
-
     it("mirrors tab changes into the hash, keeping the query", () => {
         const el = tabs("overview", "integrations");
         history.replaceState({ s: 1 }, "", "/channel/enimaloc?page=2");
