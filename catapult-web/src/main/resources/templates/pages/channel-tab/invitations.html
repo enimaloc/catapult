@@ -1,0 +1,47 @@
+<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
+<!--/*@thymesVar id="invite" type="fr.enimaloc.catapult.common.dto.InvitePageData"*/-->
+<!--/* The owner's alone (the model's `invite` is only filled for them). Without the right to invite, or when
+     catapult-api failed, the card says so instead. */-->
+<mdui-tab-panel slot="panel" value="invitations" th:if="${channelPage.isOwner()}" th:fragment="panel"
+                xmlns:spa="urn:fr.enimaloc.catapult:spa">
+    <div class="section-header">
+        <h2 th:text="#{invite.title}">Mes invitations</h2>
+    </div>
+
+    <mdui-card id="channel-invite-denied" class="settings-card" variant="outlined" th:if="${invite == null or !invite.canInvite()}">
+        <h3 th:text="${invite == null} ? #{invite.unavailable} : #{invite.no_permission}">Tu ne peux pas inviter</h3>
+        <p th:if="${invite != null}" th:text="#{invite.no_permission.desc}">Contacte un administrateur.</p>
+    </mdui-card>
+
+    <th:block th:if="${invite != null and invite.canInvite()}">
+        <mdui-card id="channel-invite" class="settings-card" variant="outlined">
+            <span class="eyebrow" th:text="#{invite.code.label}">Ton code d'invitation</span>
+            <strong class="invite-code" th:text="${invite.code()}">ABC234</strong>
+            <mdui-text-field id="invite-link" readonly variant="outlined" th:attr="label=#{invite.link.label},value=${invite.inviteUrl()}"></mdui-text-field>
+            <div class="invite-actions">
+                <mdui-button id="invite-copy-btn" variant="tonal" th:text="#{invite.link.copy}">Copier le lien</mdui-button>
+                <mdui-button id="invite-regenerate-btn" variant="text" th:text="#{invite.regenerate}">Régénérer le code</mdui-button>
+            </div>
+            <mdui-dialog id="invite-regenerate-dialog" close-on-overlay-click th:attr="headline=#{invite.regenerate}">
+                <p th:text="#{invite.regenerate.confirm}">Régénérer ton code invalidera le lien précédent. Continuer ?</p>
+                <mdui-button slot="action" variant="text" class="invite-regenerate-dismiss" th:text="#{invite.regenerate.dismiss}">Annuler</mdui-button>
+                <mdui-button slot="action" variant="filled" class="invite-regenerate-confirm" th:text="#{invite.regenerate}">Régénérer le code</mdui-button>
+            </mdui-dialog>
+        </mdui-card>
+
+        <div class="section-header">
+            <h2 th:text="#{invite.redemptions.title}">Personnes invitées</h2>
+        </div>
+        <p id="invite-redemptions-empty" th:if="${invite.redemptions().isEmpty()}" th:text="#{invite.redemptions.empty}">Personne n'a encore utilisé ton invitation.</p>
+        <mdui-card class="admin-table" variant="outlined" th:unless="${invite.redemptions().isEmpty()}">
+            <div class="admin-row invite-row admin-row-head" aria-hidden="true">
+                <span th:text="#{invite.redemptions.column.twitchId}">Twitch ID</span>
+                <span th:text="#{invite.redemptions.column.date}">Rejoint le</span>
+            </div>
+            <div class="admin-row invite-row" th:each="redemption : ${invite.redemptions()}">
+                <span th:text="${redemption.inviteeTwitchId()}">4242</span>
+                <span th:text="${redemption.redeemedAt() == null ? '—' : #temporals.format(redemption.redeemedAt(), #messages.msg('format.datetime'))}">date</span>
+            </div>
+        </mdui-card>
+    </th:block>
+</mdui-tab-panel>

@@ -202,6 +202,7 @@ public class ModelFiller {
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
             model.addAttribute("dangerZone",
                     DangerZoneView.of(apiService.accountInfo(), apiService.accountDeletionDelayDays()));
+            model.addAttribute("invite", apiService.invitePage());
         }
         return 0;
     }

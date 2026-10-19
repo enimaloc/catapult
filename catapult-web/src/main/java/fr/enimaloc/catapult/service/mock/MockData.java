@@ -18,6 +18,8 @@ import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.common.dto.InvitePageData;
+import fr.enimaloc.catapult.common.dto.InviteRedemptionDto;
 import lombok.Getter;
 import lombok.Setter;
 import tools.jackson.databind.json.JsonMapper;
@@ -105,6 +107,11 @@ public class MockData {
     private String accountStatus = "ACTIVE";
     @Getter
     private Instant deletionRequestedAt;
+    /** The member's invite code, replaced by "Regenerate"; people who used it are listed with it. */
+    private String inviteCode = newInviteCode();
+    private Instant inviteRegeneratedAt = Instant.now();
+    private final List<InviteRedemptionDto> inviteRedemptions = List.of(
+            new InviteRedemptionDto("4242", Instant.now().minus(3, java.time.temporal.ChronoUnit.DAYS)));
     /** The admin members page's accounts, built on its first visit from the channels as they are then. */
     private MockMembers members;
     /** The admin page's CCL, caches and data tabs, built on their first visit. */
@@ -413,6 +420,27 @@ public class MockData {
     public void deleteSteamToken() {
         hasSteamPersonalToken = false;
         steamTokenShared = false;
+    }
+
+    /** Like catapult-api's page: the code, the link built on it (relative: the mock has no web URL) and who used it. */
+    public InvitePageData invitePage() {
+        return new InvitePageData(true, channelDto.id(), inviteCode,
+                "/join?invite=" + inviteCode, inviteRegeneratedAt, inviteRedemptions);
+    }
+
+    public void regenerateInvite() {
+        String previous = inviteCode;
+        while (previous.equals(inviteCode)) inviteCode = newInviteCode();
+        inviteRegeneratedAt = Instant.now();
+    }
+
+    /** Eight characters of the join page's alphabet, {@code [A-Z2-9]}. */
+    private static String newInviteCode() {
+        String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ23456789";
+        java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+        StringBuilder code = new StringBuilder();
+        for (int i = 0; i < 8; i++) code.append(alphabet.charAt(random.nextInt(alphabet.length())));
+        return code.toString();
     }
 
     /** Mirrors catapult-api: only the channel's own name (case-insensitive) starts the deletion, anything else is ignored. */

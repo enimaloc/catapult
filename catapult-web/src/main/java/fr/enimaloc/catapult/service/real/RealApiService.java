@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.real;
 
+import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.AppConfigResponse;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
@@ -679,5 +680,15 @@ public class RealApiService implements ApiService {
     public int cancelAccountDeletion(String username) {
         return client.call(HttpMethod.POST, "/api/channels/{username}/settings/cancel-deletion", null, Void.class,
                 username).status();
+    }
+
+    @Override
+    public InvitePageData invitePage() {
+        return client.get("/api/invite", InvitePageData.class);
+    }
+
+    @Override
+    public int regenerateInvite() {
+        return client.call(HttpMethod.POST, "/api/invite/regenerate", null, Void.class).status();
     }
 }
