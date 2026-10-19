@@ -17,10 +17,12 @@
             <mdui-tab value="overview" th:text="#{channel.tab.overview}">channel.tab.overview</mdui-tab>
             <mdui-tab value="settings" th:text="#{channel.tab.settings}">channel.tab.settings</mdui-tab>
             <mdui-tab value="integrations" th:if="${channelPage.isOwner()}" th:text="#{channel.tab.integrations}">channel.tab.integrations</mdui-tab>
+            <mdui-tab value="invitations" th:if="${channelPage.isOwner()}" th:text="#{channel.tab.invitations}">channel.tab.invitations</mdui-tab>
 
             <th:block th:replace="~{pages/channel-tab/overview::panel}"></th:block>
             <th:block th:replace="~{pages/channel-tab/settings::panel}"></th:block>
             <th:block th:replace="~{pages/channel-tab/integrations::panel}"></th:block>
+            <th:block th:replace="~{pages/channel-tab/invitations::panel}"></th:block>
         </mdui-tabs>
     </section>
 </mdui-layout-main>

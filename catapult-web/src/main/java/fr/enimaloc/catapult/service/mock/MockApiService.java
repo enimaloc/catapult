@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.mock;
 
+import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
@@ -917,6 +918,22 @@ public class MockApiService implements ApiService {
         if (current == null) return 401;
         if (!current.getChannelDto().twitchUsername().equals(username)) return 403;
         current.cancelAccountDeletion();
+        return 204;
+    }
+
+    @Override
+    public InvitePageData invitePage() {
+        log.trace("invitePage()");
+        MockData current = currentData();
+        return current == null ? null : current.invitePage();
+    }
+
+    @Override
+    public int regenerateInvite() {
+        log.trace("regenerateInvite()");
+        MockData current = currentData();
+        if (current == null) return 401;
+        current.regenerateInvite();
         return 204;
     }
 }

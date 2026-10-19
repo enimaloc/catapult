@@ -94,6 +94,30 @@ class MockApiServiceTest {
     }
 
     @Test
+    void invitePage_hasACodeAndRegenerateChangesIt() {
+        var before = service.invitePage();
+
+        assertThat(before.canInvite()).isTrue();
+        assertThat(before.code()).matches("[A-Z2-9]{1,12}");
+        assertThat(before.inviteUrl()).endsWith("/join?invite=" + before.code());
+        assertThat(before.redemptions()).isNotNull();
+
+        assertThat(service.regenerateInvite()).isEqualTo(204);
+
+        var after = service.invitePage();
+        assertThat(after.code()).isNotEqualTo(before.code());
+        assertThat(after.inviteUrl()).endsWith("/join?invite=" + after.code());
+    }
+
+    @Test
+    void invitePage_isNullForAVisitor() {
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+
+        assertThat(service.invitePage()).isNull();
+        assertThat(service.regenerateInvite()).isEqualTo(401);
+    }
+
+    @Test
     void deleteAccount_isRefusedForAnotherChannel() {
         assertThat(service.deleteAccount("someone-else", "someone-else")).isEqualTo(403);
         assertThat(service.cancelAccountDeletion("someone-else")).isEqualTo(403);

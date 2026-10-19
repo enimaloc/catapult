@@ -78,6 +78,35 @@ class RealApiServiceTest {
     }
 
     @Test
+    void invitePage_readsTheCodeLinkAndRedemptions() {
+        respond(HttpMethod.GET, "/api/invite", """
+                {"canInvite":true,"inviteId":"00000000-0000-0000-0000-000000000001","code":"ABC234",
+                 "inviteUrl":"https://catapult.test/join?invite=ABC234","regeneratedAt":"2026-10-01T10:00:00Z",
+                 "redemptions":[{"inviteeTwitchId":"42","redeemedAt":"2026-10-02T10:00:00Z"}]}""");
+
+        var page = service.invitePage();
+
+        assertThat(page.canInvite()).isTrue();
+        assertThat(page.code()).isEqualTo("ABC234");
+        assertThat(page.inviteUrl()).isEqualTo("https://catapult.test/join?invite=ABC234");
+        assertThat(page.redemptions()).singleElement().satisfies(r -> assertThat(r.inviteeTwitchId()).isEqualTo("42"));
+    }
+
+    @Test
+    void invitePage_isNullWhenItFails() {
+        expect(HttpMethod.GET, "/api/invite").andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        assertThat(service.invitePage()).isNull();
+    }
+
+    @Test
+    void regenerateInvite_posts() {
+        expectPost("/api/invite/regenerate");
+
+        assertThat(service.regenerateInvite()).isEqualTo(204);
+    }
+
+    @Test
     void deleteAccount_postsTheConfirmation() {
         expectPost("/api/channels/me/settings/delete-account", "{\"confirmUsername\":\"Me\"}");
 

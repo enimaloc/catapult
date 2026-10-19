@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service;
 
+import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import java.util.List;
 import java.util.Map;
@@ -242,4 +243,11 @@ public interface ApiService {
     int deleteAccount(String username, String confirmUsername);
     /** Cancels a pending deletion: catapult-api's status (204), 502 when unreachable. */
     int cancelAccountDeletion(String username);
+
+    // --- member invitations ---
+
+    /** The member's invite code, link and redemptions (canInvite false without the right); null when catapult-api fails. */
+    InvitePageData invitePage();
+    /** Replaces the member's invite code: catapult-api's status (204), 502 when unreachable. */
+    int regenerateInvite();
 }

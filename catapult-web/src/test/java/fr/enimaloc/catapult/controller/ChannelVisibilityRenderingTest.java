@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.InvitePageData;
+import fr.enimaloc.catapult.common.dto.InviteRedemptionDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
@@ -165,6 +167,55 @@ class ChannelVisibilityRenderingTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(moderator).doesNotContain("channel-danger-zone");
+    }
+
+    @Test
+    void invitationsTab_ownerOnly_withoutRight_showsTheNoPermissionCard() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+        when(apiService.invitePage()).thenReturn(new InvitePageData(false, null, null, null, null, List.of()));
+
+        String denied = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(denied).contains("value=\"invitations\"", "id=\"channel-invite-denied\"")
+                .doesNotContain("id=\"invite-regenerate-btn\"");
+
+        BindingDto binding = new BindingDto("binding-1", "AUTO", "STEAM", "Game A", null, "Game A",
+                false, true, Set.of(), true, false, Set.of());
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 1, List.of(binding)),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, "uuid"));
+
+        String moderator = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(moderator).doesNotContain("value=\"invitations\"", "channel-invite");
+    }
+
+    @Test
+    void invitationsTab_showsCodeLinkAndRedemptions_orTheEmptyState() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+        when(apiService.invitePage()).thenReturn(new InvitePageData(true, java.util.UUID.randomUUID(), "ABC234",
+                "https://catapult.test/join?invite=ABC234", java.time.Instant.parse("2026-10-01T10:00:00Z"),
+                List.of(new InviteRedemptionDto("4242", java.time.Instant.parse("2026-10-02T10:00:00Z")))));
+
+        String used = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(used).contains("id=\"channel-invite\"", ">ABC234<", "https://catapult.test/join?invite=ABC234",
+                "id=\"invite-regenerate-dialog\"", "4242")
+                .doesNotContain("channel-invite-denied", "id=\"invite-redemptions-empty\"");
+
+        when(apiService.invitePage()).thenReturn(new InvitePageData(true, java.util.UUID.randomUUID(), "ABC234",
+                "https://catapult.test/join?invite=ABC234", null, List.of()));
+
+        String unused = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(unused).contains("id=\"invite-redemptions-empty\"").doesNotContain("4242");
     }
 
     private ChannelPageData channelPageData(boolean isLive) {

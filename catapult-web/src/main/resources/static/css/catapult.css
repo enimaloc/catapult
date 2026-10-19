@@ -1972,3 +1972,8 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     .admin-whitelist-invite-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-whitelist-invite-row > .admin-cell, .admin-whitelist-row > .admin-cell { white-space: normal; }
 }
+
+/* The channel's Invitations tab: the code reads large, the link and its buttons stack on a phone. */
+.invite-code { font-size: 2rem; letter-spacing: 0.15em; overflow-wrap: anywhere; }
+.invite-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.invite-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
