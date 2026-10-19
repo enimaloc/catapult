@@ -1915,3 +1915,17 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     .admin-dtdd-row > .admin-dtdd-reason, .admin-dtdd-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-dtdd-row > .admin-cell { white-space: normal; }
 }
+
+/* The admin Groups tab. */
+.admin-groups-create { padding: 16px; margin-bottom: 16px; }
+.admin-groups-create-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 12px; align-items: start; }
+.admin-groups-row { grid-template-columns: 10rem minmax(0, 1fr) minmax(0, 2fr) 5rem auto; }
+.admin-groups-description { min-width: 0; overflow-wrap: anywhere; }
+.admin-groups-form { display: flex; flex-direction: column; gap: 12px; min-width: min(480px, 100%); }
+@media (max-width: 650px) {
+    .admin-groups-create-fields { grid-template-columns: minmax(0, 1fr); }
+    .admin-groups-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-groups-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-groups-row > .admin-groups-description, .admin-groups-row > .admin-row-actions { grid-column: 1 / -1; }
+    .admin-groups-row > .admin-cell { white-space: normal; }
+}

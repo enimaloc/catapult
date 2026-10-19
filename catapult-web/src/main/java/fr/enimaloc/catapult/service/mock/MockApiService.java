@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -98,6 +99,8 @@ public class MockApiService implements ApiService {
     /** Application-wide, like the well-known files: a notification sent in one session reaches the others. */
     private MockNotificationStore notifications;
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
+    /** Application-wide: the groups an admin creates are the same for every mock session. */
+    private final MockGroupsStore groups = new MockGroupsStore();
 
     /** The calling session's mock member {@code id}'s login; null when it has no such member. */
     private String mockMemberLogin(UUID id) {
@@ -380,6 +383,41 @@ public class MockApiService implements ApiService {
     public List<DtddProposalDto> adminDtddProposals(String status) {
         log.trace("adminDtddProposals({})", status);
         return dtddProposals.list(status);
+    }
+
+    @Override
+    public List<GroupSummaryDto> adminGroups() {
+        log.trace("adminGroups()");
+        return groups.list();
+    }
+
+    @Override
+    public int adminCreateGroup(String key, String name, String description) {
+        log.trace("adminCreateGroup({}, {})", key, name);
+        return groups.create(key, name, description);
+    }
+
+    @Override
+    public int adminRenameGroup(UUID id, String name, String description) {
+        log.trace("adminRenameGroup({})", id);
+        return groups.rename(id, name, description);
+    }
+
+    @Override
+    public int adminDeleteGroup(UUID id) {
+        log.trace("adminDeleteGroup({})", id);
+        return groups.delete(id);
+    }
+
+    @Override
+    public int adminAddGroupMember(UUID id, String twitchUsername) {
+        log.trace("adminAddGroupMember({}, {})", id, twitchUsername);
+        MockData current = currentData();
+        String wanted = twitchUsername == null ? "" : twitchUsername.trim();
+        UUID memberId = current == null ? null : current.getMembers().page().members().stream()
+                .filter(m -> m.twitchUsername() != null && m.twitchUsername().equalsIgnoreCase(wanted))
+                .map(m -> m.id()).findFirst().orElse(null);
+        return memberId == null ? 404 : groups.addMember(id, memberId);
     }
 
     @Override

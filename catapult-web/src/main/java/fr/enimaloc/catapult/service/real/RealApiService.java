@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -82,6 +83,7 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<Map<String, Object>> DATA_ROW = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<NotificationDto>> NOTIFICATIONS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DtddProposalDto>> DTDD_PROPOSALS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<GroupSummaryDto>> GROUPS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<AdminNotificationDto>> ADMIN_NOTIFICATIONS = new ParameterizedTypeReference<>() {};
 
     private final ApiClient client;
@@ -525,6 +527,38 @@ public class RealApiService implements ApiService {
     public int adminRejectDtddProposal(UUID id, String reason) {
         Map<String, String> body = reason == null || reason.isBlank() ? Map.of() : Map.of("reason", reason);
         return client.call(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/{id}/reject", body, Void.class, id).status();
+    }
+
+    @Override
+    public List<GroupSummaryDto> adminGroups() {
+        return client.get("/api/admin/groups", GROUPS);
+    }
+
+    @Override
+    public int adminCreateGroup(String key, String name, String description) {
+        Map<String, String> body = new java.util.LinkedHashMap<>();
+        body.put("key", key);
+        body.put("name", name);
+        body.put("description", description);
+        return client.call(HttpMethod.POST, "/api/admin/groups", body, Void.class).status();
+    }
+
+    @Override
+    public int adminRenameGroup(UUID id, String name, String description) {
+        Map<String, String> body = new java.util.LinkedHashMap<>();
+        body.put("name", name);
+        body.put("description", description);
+        return client.call(HttpMethod.POST, "/api/admin/groups/{id}/rename", body, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteGroup(UUID id) {
+        return client.call(HttpMethod.POST, "/api/admin/groups/{id}/delete", null, Void.class, id).status();
+    }
+
+    @Override
+    public int adminAddGroupMember(UUID id, String twitchUsername) {
+        return client.call(HttpMethod.POST, "/api/admin/groups/{id}/members", Map.of("twitchUsername", twitchUsername), Void.class, id).status();
     }
 
     @Override

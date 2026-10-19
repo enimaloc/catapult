@@ -193,6 +193,20 @@ class MockApiServiceTest {
     }
 
     @Test
+    void groups_addMemberByLogin_404ForAnUnknownLoginOrGroup() {
+        assertThat(service.adminCreateGroup("crew", "Crew", null)).isEqualTo(201);
+        var group = service.adminGroups().stream().filter(g -> g.key().equals("crew")).findFirst().orElseThrow();
+        String login = service.adminMembers().members().getFirst().twitchUsername();
+
+        assertThat(service.adminAddGroupMember(group.id(), "nobody-here")).isEqualTo(404);
+        assertThat(service.adminAddGroupMember(java.util.UUID.randomUUID(), login)).isEqualTo(404);
+        assertThat(service.adminAddGroupMember(group.id(), " " + login.toUpperCase() + " ")).isEqualTo(204);
+        assertThat(service.adminGroups().stream().filter(g -> g.key().equals("crew")).findFirst().orElseThrow().memberCount()).isEqualTo(1);
+        assertThat(service.adminDeleteGroup(group.id())).isEqualTo(204);
+        assertThat(service.adminDeleteGroup(group.id())).isEqualTo(404);
+    }
+
+    @Test
     void noOpActions_changeNothing() {
         service.recheckGame(username);
         service.refreshSteamProfileCache(username);
