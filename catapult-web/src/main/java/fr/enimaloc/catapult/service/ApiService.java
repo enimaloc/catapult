@@ -45,6 +45,7 @@ import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 
@@ -81,6 +82,10 @@ public interface ApiService {
     TwitchatWidgetConfig widgetObsConfig(UUID token);
     /** The owner of the widget {@code token} and whether it is on (anonymous); null when unknown or unreachable. */
     TwitchatWidgetAccessResponse widgetAccess(UUID token);
+    /** The channel's Twitchat widget settings (the owner's); null when refused or unreachable. */
+    TwitchatSettingsResponse twitchatSettings(String username);
+    /** Replaces the OBS widget link's token; the answer carries the new one, null when refused or unreachable. */
+    TwitchatSettingsResponse regenerateTwitchatWidget(String username);
     void saveObsSettings(String username, boolean enabled, String host, Integer port, String password);
     /** "auto" or one of TwitchatData.SUPPORTED_BRANCHES. */
     void saveTwitchatBranch(String username, String branch);

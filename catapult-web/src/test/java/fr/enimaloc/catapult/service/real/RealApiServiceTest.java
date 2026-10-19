@@ -404,6 +404,31 @@ class RealApiServiceTest {
     }
 
     @Test
+    void twitchatSettings_readsTheWidgetToken() {
+        respond(HttpMethod.GET, "/api/channels/enimaloc/settings/twitchat",
+                "{\"enabled\":true,\"obsHost\":\"h\",\"obsPort\":4455,\"hasPassword\":true,\"widgetToken\":\"11111111-2222-3333-4444-555555555555\"}");
+
+        assertThat(service.twitchatSettings("enimaloc")).isEqualTo(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse(
+                true, "h", 4455, true, "11111111-2222-3333-4444-555555555555"));
+    }
+
+    @Test
+    void regenerateTwitchatWidget_postsAndReadsTheNewSettings() {
+        expect(HttpMethod.POST, "/api/channels/enimaloc/settings/twitchat/regenerate").andExpect(content().string(""))
+                .andRespond(withSuccess("{\"enabled\":true,\"obsHost\":\"h\",\"obsPort\":4455,\"hasPassword\":true,\"widgetToken\":\"aaaaaaaa-2222-3333-4444-555555555555\"}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(service.regenerateTwitchatWidget("enimaloc").widgetToken()).isEqualTo("aaaaaaaa-2222-3333-4444-555555555555");
+    }
+
+    @Test
+    void regenerateTwitchatWidget_isNullWhenRefused() {
+        expect(HttpMethod.POST, "/api/channels/enimaloc/settings/twitchat/regenerate").andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        assertThat(service.regenerateTwitchatWidget("enimaloc")).isNull();
+    }
+
+    @Test
     void saveTwitchatBranch() {
         expectPost("/api/channels/enimaloc/settings/twitchat/branch", "{\"branch\":\"beta\"}");
         service.saveTwitchatBranch("enimaloc", "beta");

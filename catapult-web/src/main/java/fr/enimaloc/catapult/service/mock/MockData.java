@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
@@ -98,7 +99,7 @@ public class MockData {
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
-    /** The OBS widget link's token (/widget/obs/{token}); stable for the channel, so a rebuilt session keeps it. */
+    /** The OBS widget link's token (/widget/obs/{token}); derived from the channel until regenerated. */
     @Getter
     private UUID widgetToken;
     @Setter
@@ -469,6 +470,17 @@ public class MockData {
                 port == null ? DEFAULT_OBS.port() : port,
                 password != null || obsData != null && obsData.hasPassword());
         if (password != null) obsPassword = password;
+    }
+
+    /** Replaces the widget link's token: the old link stops resolving. */
+    public void regenerateWidgetToken() {
+        widgetToken = UUID.randomUUID();
+    }
+
+    /** What /api/channels/{u}/settings/twitchat answers. */
+    public TwitchatSettingsResponse twitchatSettings() {
+        ObsData obs = obsData == null ? DEFAULT_OBS : obsData;
+        return new TwitchatSettingsResponse(obs.connected(), obs.host(), obs.port(), obs.hasPassword(), widgetToken.toString());
     }
 
     /** Mirrors catapult-api: only "auto" or a supported branch. */

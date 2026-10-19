@@ -378,6 +378,19 @@ class MockApiServiceTest {
     }
 
     @Test
+    void regeneratingTheWidget_changesItsToken_andTheOldOneStopsResolving() {
+        UUID old = data.getWidgetToken();
+        assertThat(service.twitchatSettings(username).widgetToken()).isEqualTo(old.toString());
+
+        var regenerated = service.regenerateTwitchatWidget(username);
+
+        assertThat(regenerated.widgetToken()).isNotEqualTo(old.toString());
+        assertThat(service.twitchatSettings(username).widgetToken()).isEqualTo(regenerated.widgetToken());
+        assertThat(service.widgetAccess(old)).isNull();
+        assertThat(service.widgetAccess(UUID.fromString(regenerated.widgetToken()))).isNotNull();
+    }
+
+    @Test
     void settings_areSavedWithoutEvents() {
         service.saveCclSettings(username, false, Set.of("Gore"));
         service.saveTwSettings(username, true, Set.of("spiders"));

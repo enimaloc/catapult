@@ -72,6 +72,7 @@ import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
@@ -254,6 +255,17 @@ public class RealApiService implements ApiService {
         ApiClient.Result<TwitchatWidgetAccessResponse> result =
                 client.getAnonymous("/api/twitchat/widget/{token}/access", TwitchatWidgetAccessResponse.class, token);
         return result.status() == 200 ? result.body() : null;
+    }
+
+    @Override
+    public TwitchatSettingsResponse twitchatSettings(String username) {
+        return client.get("/api/channels/{username}/settings/twitchat", TwitchatSettingsResponse.class, username);
+    }
+
+    @Override
+    public TwitchatSettingsResponse regenerateTwitchatWidget(String username) {
+        // The answer carries the new token: never logged.
+        return client.post("/api/channels/{username}/settings/twitchat/regenerate", TwitchatSettingsResponse.class, username);
     }
 
     @Override

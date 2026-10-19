@@ -218,6 +218,30 @@ class ChannelVisibilityRenderingTest {
         assertThat(unused).contains("id=\"invite-redemptions-empty\"").doesNotContain("4242");
     }
 
+    @Test
+    void obsCard_showsTheWidgetLink_ownerOnly() throws Exception {
+        when(apiService.twitchatSettings("enimaloc")).thenReturn(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse(
+                true, "localhost", 4455, true, "11111111-2222-3333-4444-555555555555"));
+        ChannelPageData withObs = new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null,
+                new ObsData(true, "localhost", 4455, true), null, "uuid");
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(withObs);
+
+        String owner = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(owner).contains("id=\"obs-widget\"", "id=\"obs-widget-regenerate-dialog\"")
+                .contains("http://localhost/widget/obs/11111111-2222-3333-4444-555555555555");
+
+        // Without OBS (or as a moderator) the link isn't rendered at all.
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+        String noObs = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(noObs).doesNotContain("obs-widget", "11111111-2222-3333-4444-555555555555");
+    }
+
     private ChannelPageData channelPageData(boolean isLive) {
         return channelPageData(isLive, null);
     }
