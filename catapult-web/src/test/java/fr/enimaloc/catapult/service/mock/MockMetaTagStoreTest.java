@@ -26,6 +26,7 @@ class MockMetaTagStoreTest {
         assertThat(store.create(new MetaTagRequest(NAME, "description", "x"))).isEqualTo(400);
         assertThat(store.create(new MetaTagRequest(NAME, "a b", "x"))).isEqualTo(400);
         assertThat(store.create(new MetaTagRequest(NAME, "k", "a\nb"))).isEqualTo(400);
+        assertThat(store.create(new MetaTagRequest(NAME, "k", " "))).isEqualTo(400);
         assertThat(store.create(new MetaTagRequest(null, "k", "x"))).isEqualTo(400);
     }
 
