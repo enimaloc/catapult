@@ -1,12 +1,13 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.config.I18nConfig;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.MessageSource;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
@@ -14,7 +15,7 @@ import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** The help texts ApiHelpController serves: every card's title and body, in both languages, as valid MessageFormat. */
+/** The help texts ApiHelpController serves: every card's title and body, in both languages, read as it serves them. */
 class HelpMessagesTest {
 
     static Properties bundle(String name) throws IOException {
@@ -44,16 +45,23 @@ class HelpMessagesTest {
         }
     }
 
+    /**
+     * As ApiHelpController asks for them: a title as written (no arguments, so no formatting: a doubled
+     * apostrophe would show), a body formatted with ICU4J and the controller's arguments.
+     */
     @Test
-    void everyHelpText_formatsWithTheControllersArguments_withoutAStrayQuote() throws IOException {
+    void everyHelpText_readsAsTheControllerServesIt() throws IOException {
+        MessageSource messages = new I18nConfig().messageSource();
         Object[] args = {7, "Just Chatting", "Catapult"};
-        for (String name : new String[]{"messages.properties", "messages_fr.properties"}) {
-            Properties p = bundle(name);
-            for (String key : helpKeys(p)) {
-                String text = new MessageFormat(p.getProperty(key), Locale.ROOT).format(args);
-                // an unescaped apostrophe swallows what follows it, placeholders included
-                assertThat(text).as(name + " " + key).doesNotContain("{0}", "{1}", "{2}");
-                assertThat(p.getProperty(key).replace("''", "")).as(name + " " + key).doesNotContain("'");
+        for (var bundle : java.util.Map.of("messages.properties", Locale.ROOT, "messages_fr.properties", Locale.FRENCH).entrySet()) {
+            for (String key : helpKeys(bundle(bundle.getKey()))) {
+                String as = bundle.getKey() + " " + key;
+                if (key.endsWith(".title")) {
+                    assertThat(messages.getMessage(key, null, "", bundle.getValue())).as(as).doesNotContain("''", "{");
+                } else {
+                    // a quoted placeholder would come out as written
+                    assertThat(messages.getMessage(key, args, "", bundle.getValue())).as(as).doesNotContain("{0}", "{1}", "{2}");
+                }
             }
         }
     }
