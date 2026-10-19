@@ -69,7 +69,9 @@ class ApiSecurityConfigWellKnownTest {
         when(metaTags.list()).thenReturn(java.util.List.of());
         mvc.perform(get("/api/meta-tags").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                 .andExpect(status().isOk());
-        mvc.perform(get("/api/admin/meta-tags").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/admin/meta-tags")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{}")
+                        .with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                 .andExpect(status().isUnauthorized());
     }
 }
