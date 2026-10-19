@@ -13,6 +13,8 @@ import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -250,4 +252,13 @@ public interface ApiService {
     InvitePageData invitePage();
     /** Replaces the member's invite code: catapult-api's status (204), 502 when unreachable. */
     int regenerateInvite();
+
+    /** A provider's shared API keys, masked; null when catapult-api fails. */
+    ApiKeysPageDto adminApiKeys(ApiKeyProvider provider);
+    /** Adds a key (an already listed one changes nothing); catapult-api's status (204; 400 invalid format), 502 when unreachable. */
+    int adminAddApiKey(ApiKeyProvider provider, String apiKey);
+    /** Removes the key of that id; catapult-api's status (204; 404 unknown), 502 when unreachable. */
+    int adminDeleteApiKey(ApiKeyProvider provider, String keyId);
+    /** Reloads the provider's keys into its rotator; catapult-api's status (204), 502 when unreachable. */
+    int adminRefreshApiKeys(ApiKeyProvider provider);
 }

@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
@@ -246,6 +247,16 @@ public class AdminTabsFragmentController {
         return guarded(model, response, () -> {
             model.addAttribute("whitelist", apiService.adminWhitelist());
             return "pages/admin-tab/whitelist :: content";
+        });
+    }
+
+    /** Steam and DTDD keys cards, and the slot the Minecraft accounts card fills. */
+    @GetMapping("/keys")
+    String keys(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("steam", apiService.adminApiKeys(ApiKeyProvider.STEAM));
+            model.addAttribute("dtdd", apiService.adminApiKeys(ApiKeyProvider.DTDD));
+            return "pages/admin-tab/keys :: content";
         });
     }
 
