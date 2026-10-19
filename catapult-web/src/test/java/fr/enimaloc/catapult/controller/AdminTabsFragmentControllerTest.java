@@ -266,6 +266,28 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void meta_listsTheMetaTags_withTheirFormAndErrors() throws Exception {
+        when(apiService.metaTags()).thenReturn(List.of(new fr.enimaloc.catapult.common.dto.admin.MetaTagDto(
+                5, fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute.PROPERTY, "og:image", "https://x/y.png", null)));
+        when(apiService.adminWellKnownFiles()).thenReturn(List.of());
+
+        String html = asAdmin("/spa/admin/meta");
+
+        assertThat(html).contains("class=\"admin-meta-tags\"", "Meta tags", "1 tag", "data-id=\"5\"", "data-attribute=\"PROPERTY\"",
+                        "data-key=\"og:image\"", "data-content=\"https://x/y.png\"", ">property</span>", "admin-meta-tag-edit",
+                        "data-confirm=\"Delete the meta tag og:image?\"", "admin-meta-tags-form", "data-label-save=\"Save\"",
+                        "data-error-409=\"A meta tag of this type already has this name.\"", "Well-known files");
+    }
+
+    @Test
+    void meta_saysWhenTheMetaTagsAreUnavailable_andHasNoFormThen() throws Exception {
+        when(apiService.metaTags()).thenReturn(null);
+        when(apiService.adminWellKnownFiles()).thenReturn(List.of());
+
+        assertThat(asAdmin("/spa/admin/meta")).contains("class=\"admin-meta-tags\"").doesNotContain("admin-meta-tags-form", "admin-meta-tag-row");
+    }
+
+    @Test
     void wellKnown_notesAnOfflineRegistry() throws Exception {
         when(apiService.adminWellKnownFiles()).thenReturn(List.of());
         when(apiService.adminIanaRegistry()).thenReturn(registry("SNAPSHOT"));

@@ -161,6 +161,7 @@ public class AdminTabsFragmentController {
     @GetMapping("/meta")
     String wellKnown(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {
+            model.addAttribute("metaTags", apiService.metaTags());
             List<WellKnownFileDto> files = apiService.adminWellKnownFiles();
             model.addAttribute("files", files);
             model.addAttribute("registry", apiService.adminIanaRegistry());
