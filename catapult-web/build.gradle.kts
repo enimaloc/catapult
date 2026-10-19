@@ -56,6 +56,10 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // VitestTest runs the browser scripts' suite: a JS-only change must not leave the task up to date.
+    inputs.dir("src/main/resources/static/js").withPropertyName("browserScripts")
+    inputs.dir("src/test/js").withPropertyName("browserScriptTests")
+    inputs.files("vitest.config.js", "package-lock.json").withPropertyName("vitestSetup")
 }
 
 springBoot {
