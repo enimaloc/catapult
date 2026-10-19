@@ -250,12 +250,13 @@ public class AdminTabsFragmentController {
         });
     }
 
-    /** Steam and DTDD keys cards, and the slot the Minecraft accounts card fills. */
+    /** Steam and DTDD keys cards, then the Minecraft service accounts card. */
     @GetMapping("/keys")
     String keys(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {
             model.addAttribute("steam", apiService.adminApiKeys(ApiKeyProvider.STEAM));
             model.addAttribute("dtdd", apiService.adminApiKeys(ApiKeyProvider.DTDD));
+            model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
             return "pages/admin-tab/keys :: content";
         });
     }

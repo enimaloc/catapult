@@ -12,6 +12,8 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
+import fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -114,6 +116,8 @@ public class MockApiService implements ApiService {
     private final MockWhitelistStore whitelist = new MockWhitelistStore();
     /** Application-wide: the shared Steam and DTDD keys are the same for every mock session. */
     private final MockKeysStore apiKeys = new MockKeysStore();
+    /** Application-wide: the Minecraft service accounts are the same for every mock session. */
+    private final MockMinecraftAccountsStore minecraftAccounts = new MockMinecraftAccountsStore();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
     private final MockTargetingStore targeting = new MockTargetingStore();
 
@@ -964,5 +968,41 @@ public class MockApiService implements ApiService {
     public int adminRefreshApiKeys(ApiKeyProvider provider) {
         log.trace("adminRefreshApiKeys({})", provider);
         return apiKeys.refresh();
+    }
+
+    @Override
+    public List<MinecraftAccountDto> adminMinecraftAccounts() {
+        log.trace("adminMinecraftAccounts()");
+        return minecraftAccounts.list();
+    }
+
+    @Override
+    public int adminPatchMinecraftAccount(UUID id, Map<String, Object> patch) {
+        log.trace("adminPatchMinecraftAccount({}, {})", id, patch);
+        return minecraftAccounts.patch(id, patch);
+    }
+
+    @Override
+    public int adminDeleteMinecraftAccount(UUID id) {
+        log.trace("adminDeleteMinecraftAccount({})", id);
+        return minecraftAccounts.delete(id);
+    }
+
+    @Override
+    public MinecraftDeviceCodeDto adminMinecraftDeviceCode() {
+        log.trace("adminMinecraftDeviceCode()");
+        return minecraftAccounts.deviceCode();
+    }
+
+    @Override
+    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label) {
+        log.trace("adminCreateMinecraftAccount({})", label);
+        return minecraftAccounts.create(deviceCode, label);
+    }
+
+    @Override
+    public ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode) {
+        log.trace("adminReauthMinecraftAccount({})", id);
+        return minecraftAccounts.reauth(id, deviceCode);
     }
 }

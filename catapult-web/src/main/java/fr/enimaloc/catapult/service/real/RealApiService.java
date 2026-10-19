@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
+import fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
@@ -723,5 +725,47 @@ public class RealApiService implements ApiService {
     @Override
     public int adminRefreshApiKeys(ApiKeyProvider provider) {
         return client.call(HttpMethod.POST, "/api/admin/{path}/refresh", null, Void.class, provider.apiPath()).status();
+    }
+
+    private static final String MINECRAFT_ACCOUNTS = "/api/admin/minecraft-accounts";
+
+    @Override
+    public List<MinecraftAccountDto> adminMinecraftAccounts() {
+        // call(): a 404 (Minecraft disabled in catapult-api) must be null, not an error body read as accounts
+        ApiClient.Result<MinecraftAccountDto[]> result = client.call(HttpMethod.GET, MINECRAFT_ACCOUNTS, null, MinecraftAccountDto[].class);
+        return result.status() == 200 && result.body() != null ? List.of(result.body()) : null;
+    }
+
+    @Override
+    public int adminPatchMinecraftAccount(UUID id, Map<String, Object> patch) {
+        return client.call(HttpMethod.PATCH, MINECRAFT_ACCOUNTS + "/{id}", patch, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteMinecraftAccount(UUID id) {
+        return client.call(HttpMethod.DELETE, MINECRAFT_ACCOUNTS + "/{id}", null, Void.class, id).status();
+    }
+
+    @Override
+    public MinecraftDeviceCodeDto adminMinecraftDeviceCode() {
+        ApiClient.Result<MinecraftDeviceCodeDto> result =
+                client.call(HttpMethod.POST, MINECRAFT_ACCOUNTS + "/device-code", null, MinecraftDeviceCodeDto.class);
+        return result.status() == 200 ? result.body() : null;
+    }
+
+    @Override
+    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label) {
+        Map<String, String> body = label == null ? Map.of("deviceCode", deviceCode) : Map.of("deviceCode", deviceCode, "label", label);
+        return mapResult(client.call(HttpMethod.POST, MINECRAFT_ACCOUNTS, body, Map.class));
+    }
+
+    @Override
+    public ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode) {
+        return mapResult(client.call(HttpMethod.POST, MINECRAFT_ACCOUNTS + "/{id}/reauth", Map.of("deviceCode", deviceCode), Map.class, id));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ApiClient.Result<Map<String, Object>> mapResult(@SuppressWarnings("rawtypes") ApiClient.Result<Map> result) {
+        return new ApiClient.Result<>(result.status(), (Map<String, Object>) result.body());
     }
 }

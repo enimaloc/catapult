@@ -1,9 +1,10 @@
 <!--/*@thymesVar id="steam" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
 <!--/*@thymesVar id="dtdd" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="minecraft" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto>"*/-->
 <!--/*
   The shared API keys: one card for Steam and one for DTDD (a disabled provider shows only its note; an enabled one
-  the add field, Refresh and the keys, masked only: the raw key is never rendered), then the empty slot the Minecraft
-  accounts card fills. Driven by admin-keys.js; the provider is on each card's data-provider.
+  the add field, Refresh and the keys, masked only: the raw key is never rendered), then the Minecraft service
+  accounts card. Driven by admin-keys.js (the provider is on each card's data-provider) and admin-minecraft.js.
 */-->
 <div th:fragment="content" class="admin-view admin-keys"
      th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
@@ -66,6 +67,74 @@
         </th:block>
     </th:block>
 
-    <!--/* The Minecraft service accounts card is rendered into this slot. */-->
-    <div id="admin-minecraft"></div>
+    <!--/*
+      The Minecraft service accounts: each one's state chips and actions (re-authenticate when disabled, reset the
+      limit when full), then "Add an account". Adding and re-authenticating show the Microsoft device code in their
+      .admin-minecraft-flow.
+    */-->
+    <div id="admin-minecraft">
+        <mdui-card class="admin-keys-card admin-minecraft" variant="outlined"
+                   th:attr="data-label-linked=#{admin.minecraft.error.links},data-label-unknown=#{admin.minecraft.unknown},
+                            data-label-unavailable=#{admin.minecraft.unavailable-action},data-label-updated=#{admin.minecraft.updated},
+                            data-label-deleted=#{admin.minecraft.deleted},data-label-created=#{admin.minecraft.created},
+                            data-label-reauthed=#{admin.minecraft.reauthed},data-label-code=#{admin.minecraft.flow.code},
+                            data-label-pending=#{admin.minecraft.flow.pending},data-label-insecure=#{admin.minecraft.flow.insecure},
+                            data-label-failed=#{admin.minecraft.flow.failed},data-label-expired=#{admin.minecraft.flow.expired}">
+            <div class="admin-keys-head">
+                <h3 th:text="#{admin.minecraft.title}">Minecraft service accounts</h3>
+            </div>
+
+            <p class="admin-cell-muted admin-minecraft-unavailable" th:if="${minecraft == null}"
+               th:text="#{admin.minecraft.unavailable}">Unavailable.</p>
+
+            <th:block th:if="${minecraft != null}">
+                <p class="admin-cell-muted" th:if="${minecraft.isEmpty()}" th:text="#{admin.minecraft.empty}">None.</p>
+                <div class="admin-table" th:unless="${minecraft.isEmpty()}">
+                    <div class="admin-row admin-minecraft-row admin-row-head" aria-hidden="true">
+                        <span th:text="#{admin.minecraft.col.label}">Label</span>
+                        <span th:text="#{admin.minecraft.col.username}">Username</span>
+                        <span th:text="#{admin.minecraft.col.order}">Fill order</span>
+                        <span th:text="#{admin.minecraft.col.links}">Links</span>
+                        <span th:text="#{admin.minecraft.col.state}">State</span>
+                        <span></span>
+                    </div>
+                    <div class="admin-row admin-minecraft-row" th:each="a : ${minecraft}">
+                        <span class="admin-cell" th:attr="data-label=#{admin.minecraft.col.label}" th:text="${a.label()}">Bot1</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.minecraft.col.username}" th:text="${a.minecraftUsername()}">CatapultBot1</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.minecraft.col.order}" th:text="${a.fillOrder()}">0</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.minecraft.col.links}" th:text="${a.linkCount()}">0</span>
+                        <span class="admin-cell admin-minecraft-states" th:attr="data-label=#{admin.minecraft.col.state}">
+                            <mdui-chip th:if="${a.enabled()}" icon="check_circle" th:text="#{admin.minecraft.state.enabled}">Enabled</mdui-chip>
+                            <mdui-chip th:unless="${a.enabled()}" icon="block" th:text="#{admin.minecraft.state.disabled}">Disabled</mdui-chip>
+                            <mdui-chip th:if="${a.friendLimitReached()}" icon="group_off" class="admin-minecraft-full"
+                                       th:text="#{admin.minecraft.state.full}">Full</mdui-chip>
+                        </span>
+                        <span class="admin-row-actions">
+                            <mdui-button th:unless="${a.enabled()}" variant="tonal" icon="key" class="admin-minecraft-reauth"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.minecraft.action.reauth}">Re-authenticate</mdui-button>
+                            <mdui-button variant="text" class="admin-minecraft-toggle"
+                                         th:attr="data-id=${a.id()},data-enabled=${!a.enabled()}"
+                                         th:text="${a.enabled()} ? #{admin.minecraft.action.disable} : #{admin.minecraft.action.enable}">Disable</mdui-button>
+                            <mdui-button th:if="${a.friendLimitReached()}" variant="text" icon="restart_alt" class="admin-minecraft-reset"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.minecraft.action.reset_limit}">Reset limit</mdui-button>
+                            <mdui-button-icon icon="delete" class="admin-minecraft-delete"
+                                              th:attr="data-id=${a.id()},aria-label=#{admin.minecraft.action.delete},
+                                              data-confirm=#{admin.minecraft.action.delete-confirm(${a.label()})}"></mdui-button-icon>
+                        </span>
+                        <div th:unless="${a.enabled()}" class="admin-minecraft-flow" aria-live="polite"></div>
+                    </div>
+                </div>
+
+                <div class="admin-minecraft-enroll">
+                    <div class="admin-keys-add">
+                        <mdui-text-field name="label" variant="outlined" maxlength="80" autocomplete="off"
+                                         th:attr="label=#{admin.minecraft.enroll.label}"></mdui-text-field>
+                        <mdui-button variant="filled" icon="add" class="admin-minecraft-add"
+                                     th:text="#{admin.minecraft.enroll.start}">Add an account</mdui-button>
+                    </div>
+                    <div class="admin-minecraft-flow" aria-live="polite"></div>
+                </div>
+            </th:block>
+        </mdui-card>
+    </div>
 </div>

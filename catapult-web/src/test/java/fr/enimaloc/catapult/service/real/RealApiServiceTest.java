@@ -1005,4 +1005,76 @@ class RealApiServiceTest {
         assertThat(service.adminDeleteApiKey(dtdd, "id/1 é")).isEqualTo(204);
         assertThat(service.adminRefreshApiKeys(dtdd)).isEqualTo(204);
     }
+
+    @Test
+    void adminMinecraftAccounts_readCatapultApisAccountDto() {
+        respond(HttpMethod.GET, "/api/admin/minecraft-accounts", "[{\"id\":\"00000000-0000-0000-0000-00000000000a\","
+                + "\"label\":\"Bot1\",\"minecraftUsername\":\"CatapultBot1\",\"fillOrder\":2,\"friendLimitReached\":true,"
+                + "\"enabled\":false,\"linkCount\":7}]");
+
+        assertThat(service.adminMinecraftAccounts()).singleElement().satisfies(a -> {
+            assertThat(a.id()).isEqualTo(UUID.fromString("00000000-0000-0000-0000-00000000000a"));
+            assertThat(a.label()).isEqualTo("Bot1");
+            assertThat(a.minecraftUsername()).isEqualTo("CatapultBot1");
+            assertThat(a.fillOrder()).isEqualTo(2);
+            assertThat(a.linkCount()).isEqualTo(7);
+            assertThat(a.enabled()).isFalse();
+            assertThat(a.friendLimitReached()).isTrue();
+        });
+    }
+
+    @Test
+    void adminMinecraftAccounts_isNullWhenTheApiFails() {
+        expect(HttpMethod.GET, "/api/admin/minecraft-accounts").andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(service.adminMinecraftAccounts()).isNull();
+    }
+
+    @Test
+    void minecraftAccountActions_sendTheirShapes_andReturnTheStatus() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
+        expect(HttpMethod.PATCH, "/api/admin/minecraft-accounts/" + id)
+                .andExpect(content().json("{\"friendLimitReached\":false}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.DELETE, "/api/admin/minecraft-accounts/" + id)
+                .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"linked\"}"));
+
+        assertThat(service.adminPatchMinecraftAccount(id, Map.of("friendLimitReached", false))).isEqualTo(200);
+        assertThat(service.adminDeleteMinecraftAccount(id)).isEqualTo(409);
+    }
+
+    @Test
+    void adminMinecraftDeviceCode_readsTheSnakeCaseAnswer_andIsNullOnFailure() {
+        expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code").andRespond(withSuccess(
+                "{\"device_code\":\"dc-1\",\"user_code\":\"ABCD-1234\",\"verification_uri\":\"https://www.microsoft.com/link\","
+                        + "\"interval\":5,\"expires_in\":900}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code")
+                .andRespond(withStatus(HttpStatus.BAD_GATEWAY).contentType(MediaType.APPLICATION_JSON).body("{\"message\":\"AADSTS70002\"}"));
+
+        assertThat(service.adminMinecraftDeviceCode()).isEqualTo(new fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto(
+                "dc-1", "ABCD-1234", "https://www.microsoft.com/link", 5));
+        assertThat(service.adminMinecraftDeviceCode()).isNull();
+    }
+
+    @Test
+    void createAndReauth_postTheDeviceCode_andKeepTheStatusAndBody() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
+        expect(HttpMethod.POST, "/api/admin/minecraft-accounts")
+                .andExpect(content().json("{\"deviceCode\":\"dc-1\",\"label\":\"Bot1\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withStatus(HttpStatus.ACCEPTED).contentType(MediaType.APPLICATION_JSON).body("{\"status\":\"PENDING\"}"));
+        expect(HttpMethod.POST, "/api/admin/minecraft-accounts")
+                .andExpect(content().json("{\"deviceCode\":\"dc-1\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"label\":\"Compte Minecraft\",\"minecraftUsername\":\"CatapultBot1\"}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/admin/minecraft-accounts/" + id + "/reauth")
+                .andExpect(content().json("{\"deviceCode\":\"dc-2\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withStatus(HttpStatus.BAD_GATEWAY).contentType(MediaType.APPLICATION_JSON).body("{\"message\":\"chain failed\"}"));
+
+        assertThat(service.adminCreateMinecraftAccount("dc-1", "Bot1").status()).isEqualTo(202);
+        var created = service.adminCreateMinecraftAccount("dc-1", null);
+        assertThat(created.status()).isEqualTo(200);
+        assertThat(created.body()).containsEntry("minecraftUsername", "CatapultBot1");
+        var failed = service.adminReauthMinecraftAccount(id, "dc-2");
+        assertThat(failed.status()).isEqualTo(502);
+        assertThat(failed.body()).containsEntry("message", "chain failed");
+    }
 }
