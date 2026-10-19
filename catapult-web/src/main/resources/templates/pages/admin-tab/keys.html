@@ -1,0 +1,71 @@
+<!--/*@thymesVar id="steam" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="dtdd" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*
+  The shared API keys: one card for Steam and one for DTDD (a disabled provider shows only its note; an enabled one
+  the add field, Refresh and the keys, masked only: the raw key is never rendered), then the empty slot the Minecraft
+  accounts card fills. Driven by admin-keys.js; the provider is on each card's data-provider.
+*/-->
+<div th:fragment="content" class="admin-view admin-keys"
+     th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+              data-label-unknown=#{admin.keys.unknown},data-label-unavailable=#{admin.keys.unavailable},
+              data-label-added=#{admin.keys.added},data-label-deleted=#{admin.keys.deleted},
+              data-label-refreshed=#{admin.keys.refreshed}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.keys}">Keys</h2>
+    </div>
+
+    <th:block th:each="provider : ${ {'steam', 'dtdd'} }">
+        <th:block th:with="keys=${provider == 'steam' ? steam : dtdd}">
+            <th:block th:if="${keys == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+
+            <mdui-card th:if="${keys != null}" class="admin-keys-card" variant="outlined"
+                       th:attr="data-provider=${provider},data-label-invalid=#{|admin.keys.${provider}.invalid|}">
+                <div class="admin-keys-head">
+                    <h3 th:text="#{|admin.keys.${provider}.title|}">Keys</h3>
+                    <mdui-button th:if="${keys.enabled()}" variant="tonal" icon="refresh" class="admin-keys-refresh"
+                                 th:text="#{admin.keys.refresh}">Refresh</mdui-button>
+                </div>
+
+                <p class="admin-cell-muted" th:unless="${keys.enabled()}" th:text="#{|admin.keys.${provider}.disabled|}">Disabled.</p>
+
+                <th:block th:if="${keys.enabled()}">
+                    <div class="admin-keys-add">
+                        <mdui-text-field name="apiKey" type="password" variant="outlined" required autocomplete="off"
+                                         th:attr="label=#{|admin.keys.${provider}.add.label|}"></mdui-text-field>
+                        <mdui-button variant="filled" icon="add" class="admin-keys-add-save" th:text="#{admin.keys.add.button}">Add</mdui-button>
+                    </div>
+
+                    <p class="admin-cell-muted" th:if="${keys.keys().isEmpty()}" th:text="#{|admin.keys.${provider}.empty|}">None.</p>
+                    <div class="admin-table" th:unless="${keys.keys().isEmpty()}">
+                        <div class="admin-row admin-keys-row admin-row-head" aria-hidden="true">
+                            <span th:text="#{admin.keys.column.key}">Key</span>
+                            <span th:text="#{admin.keys.column.owner}">Owner</span>
+                            <span th:text="#{admin.keys.column.status}">Status</span>
+                            <span></span>
+                        </div>
+                        <div class="admin-row admin-keys-row" th:each="key : ${keys.keys()}">
+                            <span class="admin-member-id" th:attr="data-label=#{admin.keys.column.key}" th:text="${key.masked()}">abcd…wxyz</span>
+                            <span class="admin-cell" th:attr="data-label=#{admin.keys.column.owner}">
+                                <span th:if="${key.owner() != null}" th:text="${key.owner()}">owner</span>
+                                <span th:if="${key.owner() == null}" class="admin-cell-muted" th:text="#{admin.keys.owner.admin}">Admin</span>
+                            </span>
+                            <span class="admin-cell" th:attr="data-label=#{admin.keys.column.status}">
+                                <span th:unless="${key.blocked()}" th:text="#{admin.keys.status.available}">Available</span>
+                                <span th:if="${key.blocked()}" class="admin-keys-blocked"
+                                      th:text="#{admin.keys.status.blocked(${key.blockedForSeconds()})}">Blocked</span>
+                            </span>
+                            <span class="admin-row-actions">
+                                <mdui-button-icon icon="delete" class="admin-keys-delete"
+                                                  th:attr="data-key-id=${key.id()},aria-label=#{admin.keys.action.delete},
+                                                  data-confirm=#{admin.keys.action.delete-confirm(${key.masked()})}"></mdui-button-icon>
+                            </span>
+                        </div>
+                    </div>
+                </th:block>
+            </mdui-card>
+        </th:block>
+    </th:block>
+
+    <!--/* The Minecraft service accounts card is rendered into this slot. */-->
+    <div id="admin-minecraft"></div>
+</div>

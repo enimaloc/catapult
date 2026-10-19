@@ -13,6 +13,10 @@ import fr.enimaloc.catapult.common.dto.admin.ImpersonateRequest;
 import fr.enimaloc.catapult.common.dto.admin.ImpersonateResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -690,5 +694,34 @@ public class RealApiService implements ApiService {
     @Override
     public int regenerateInvite() {
         return client.call(HttpMethod.POST, "/api/invite/regenerate", null, Void.class).status();
+    }
+
+    @Override
+    public ApiKeysPageDto adminApiKeys(ApiKeyProvider provider) {
+        return switch (provider) {
+            case STEAM -> {
+                SteamKeysPageData page = client.get("/api/admin/{path}", SteamKeysPageData.class, provider.apiPath());
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
+            case DTDD -> {
+                DtddKeysPageData page = client.get("/api/admin/{path}", DtddKeysPageData.class, provider.apiPath());
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
+        };
+    }
+
+    @Override
+    public int adminAddApiKey(ApiKeyProvider provider, String apiKey) {
+        return client.call(HttpMethod.POST, "/api/admin/{path}/add", Map.of("apiKey", apiKey), Void.class, provider.apiPath()).status();
+    }
+
+    @Override
+    public int adminDeleteApiKey(ApiKeyProvider provider, String keyId) {
+        return client.call(HttpMethod.POST, "/api/admin/{path}/delete", Map.of("keyId", keyId), Void.class, provider.apiPath()).status();
+    }
+
+    @Override
+    public int adminRefreshApiKeys(ApiKeyProvider provider) {
+        return client.call(HttpMethod.POST, "/api/admin/{path}/refresh", null, Void.class, provider.apiPath()).status();
     }
 }

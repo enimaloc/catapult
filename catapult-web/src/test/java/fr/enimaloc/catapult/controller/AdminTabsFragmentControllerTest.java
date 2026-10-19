@@ -57,7 +57,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist",
+                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
@@ -77,6 +77,7 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminDtddProposals(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminGroups();
         verify(apiService, never()).adminWhitelist();
+        verify(apiService, never()).adminApiKeys(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminMembers();
         verify(apiService, never()).adminMember(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminMemberTargeting(org.mockito.ArgumentMatchers.any());
@@ -678,5 +679,43 @@ class AdminTabsFragmentControllerTest {
 
         assertThat(asAdmin("/spa/admin/broadcast")).contains("data-broadcast=\"alert.info\"")
                 .doesNotContain("admin-broadcast-cancel-current");
+    }
+
+    private static fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto keys(boolean enabled,
+            fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.Key... keys) {
+        return new fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto(enabled, List.of(keys));
+    }
+
+    @Test
+    void disabledProvider_showsOnlyTheNote() throws Exception {
+        when(apiService.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM)).thenReturn(keys(false));
+        when(apiService.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD)).thenReturn(keys(true));
+
+        String html = asAdmin("/spa/admin/keys");
+
+        assertThat(html).contains("data-provider=\"steam\"", "data-provider=\"dtdd\"", "id=\"admin-minecraft\"", "steam.enabled=true");
+        // Steam: no add field, no refresh; DTDD (enabled): one of each
+        assertThat(html.split("admin-keys-add-save", -1)).hasSize(2);
+        assertThat(html.split("admin-keys-refresh", -1)).hasSize(2);
+    }
+
+    @Test
+    void keys_areShownMasked_neverRaw() throws Exception {
+        var key = new fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.Key("id-1", "RAWK…Y123", "own<er>", true, 42);
+        var free = new fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.Key("id-2", "abcd…wxyz", null, false, 0);
+        when(apiService.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM)).thenReturn(keys(true, key, free));
+        when(apiService.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD)).thenReturn(keys(true));
+
+        String html = asAdmin("/spa/admin/keys");
+
+        assertThat(html).contains("RAWK…Y123", "abcd…wxyz", "own&lt;er&gt;", "data-key-id=\"id-1\"", "Blocked — 42s")
+                .doesNotContain("RAWKEY123");
+    }
+
+    @Test
+    void unreachableApi_showsThePlaceholder() throws Exception {
+        when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(null);
+
+        assertThat(asAdmin("/spa/admin/keys")).contains("admin-placeholder").doesNotContain("admin-keys-add-save");
     }
 }

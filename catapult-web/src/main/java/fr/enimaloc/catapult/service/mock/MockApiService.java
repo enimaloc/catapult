@@ -10,6 +10,8 @@ import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -110,6 +112,8 @@ public class MockApiService implements ApiService {
     private final MockGroupsStore groups = new MockGroupsStore();
     /** Application-wide: the whitelist and its invitations are the same for every mock session. */
     private final MockWhitelistStore whitelist = new MockWhitelistStore();
+    /** Application-wide: the shared Steam and DTDD keys are the same for every mock session. */
+    private final MockKeysStore apiKeys = new MockKeysStore();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
     private final MockTargetingStore targeting = new MockTargetingStore();
 
@@ -935,5 +939,30 @@ public class MockApiService implements ApiService {
         if (current == null) return 401;
         current.regenerateInvite();
         return 204;
+    }
+
+    // The key itself is never logged, only the provider.
+    @Override
+    public ApiKeysPageDto adminApiKeys(ApiKeyProvider provider) {
+        log.trace("adminApiKeys({})", provider);
+        return apiKeys.page(provider);
+    }
+
+    @Override
+    public int adminAddApiKey(ApiKeyProvider provider, String apiKey) {
+        log.trace("adminAddApiKey({})", provider);
+        return apiKeys.add(provider, apiKey);
+    }
+
+    @Override
+    public int adminDeleteApiKey(ApiKeyProvider provider, String keyId) {
+        log.trace("adminDeleteApiKey({})", provider);
+        return apiKeys.delete(provider, keyId);
+    }
+
+    @Override
+    public int adminRefreshApiKeys(ApiKeyProvider provider) {
+        log.trace("adminRefreshApiKeys({})", provider);
+        return apiKeys.refresh();
     }
 }

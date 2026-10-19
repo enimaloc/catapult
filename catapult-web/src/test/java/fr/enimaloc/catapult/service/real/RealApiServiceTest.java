@@ -969,4 +969,40 @@ class RealApiServiceTest {
         assertThat(service.adminBroadcast(new fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto.AlertInfo("t", "b", 0)))
                 .isEqualTo(429);
     }
+
+    @Test
+    void adminApiKeys_readEachProvidersPage() {
+        respond(HttpMethod.GET, "/api/admin/steam-keys", "{\"keys\":[{\"id\":\"k1\",\"masked\":\"abcd…wxyz\",\"owner\":null,"
+                + "\"blocked\":true,\"blockedForSeconds\":30}],\"steamEnabled\":true}");
+        respond(HttpMethod.GET, "/api/admin/dtdd-keys", "{\"keys\":[],\"dtddEnabled\":false}");
+
+        var steam = service.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM);
+        var dtdd = service.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD);
+
+        assertThat(steam.enabled()).isTrue();
+        assertThat(steam.keys()).singleElement().satisfies(k -> {
+            assertThat(k.id()).isEqualTo("k1");
+            assertThat(k.masked()).isEqualTo("abcd…wxyz");
+            assertThat(k.owner()).isNull();
+            assertThat(k.blocked()).isTrue();
+            assertThat(k.blockedForSeconds()).isEqualTo(30);
+        });
+        assertThat(dtdd.enabled()).isFalse();
+        assertThat(dtdd.keys()).isEmpty();
+    }
+
+    @Test
+    void apiKeyActions_postTheirShapes_andReturnTheStatus() {
+        expect(HttpMethod.POST, "/api/admin/steam-keys/add")
+                .andExpect(content().json("{\"apiKey\":\"abc\"}", true)).andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.POST, "/api/admin/dtdd-keys/delete")
+                .andExpect(content().json("{\"keyId\":\"id/1 é\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/dtdd-keys/refresh").andRespond(withNoContent());
+
+        var steam = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM;
+        var dtdd = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD;
+        assertThat(service.adminAddApiKey(steam, "abc")).isEqualTo(400);
+        assertThat(service.adminDeleteApiKey(dtdd, "id/1 é")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(dtdd)).isEqualTo(204);
+    }
 }
