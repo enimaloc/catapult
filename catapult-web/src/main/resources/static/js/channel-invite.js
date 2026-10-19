@@ -9,7 +9,10 @@ window.CatapultInvite = (function () {
         card.querySelector("#invite-copy-btn")?.addEventListener("click", () => {
             const field = card.querySelector("#invite-link");
             const link = field?.value || field?.getAttribute("value");
-            if (link) navigator.clipboard?.writeText(link)?.catch(() => {});
+            if (!link) return;
+            const copied = navigator.clipboard?.writeText(link) ?? Promise.reject(new Error("no clipboard"));
+            copied.then(() => CatapultChannel.showError(card.dataset.labelCopied))
+                .catch(() => CatapultChannel.showError(card.dataset.labelCopyFailed));
         });
 
         const dialog = card.querySelector("#invite-regenerate-dialog");
@@ -22,9 +25,18 @@ window.CatapultInvite = (function () {
             confirm.disabled = true;
             let succeeded = false;
             try {
-                succeeded = (await CatapultChannel.postJson("/invite/regenerate", {})).ok;
+                const response = await CatapultCsrf.postJson("/invite/regenerate", {});
+                succeeded = response.ok;
+                if (!succeeded) {
+                    // Closed, so the message isn't hidden behind it; the button is free for the next try.
+                    dialog.open = false;
+                    CatapultChannel.showError(response.status === 403 ? card.dataset.labelRefused
+                        : response.status === 429 ? card.dataset.labelRateLimited : card.dataset.labelUnavailable);
+                }
+            } catch (e) {
+                dialog.open = false;
+                CatapultChannel.showError(card.dataset.labelUnavailable);
             } finally {
-                // A failed request leaves the page as is: the button is free to try again.
                 if (!succeeded) confirm.disabled = false;
             }
             if (succeeded) await CatapultChannel.refresh();

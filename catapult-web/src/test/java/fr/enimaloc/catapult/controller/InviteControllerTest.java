@@ -48,6 +48,15 @@ class InviteControllerTest {
     }
 
     @Test
+    void invite_withATokenWithoutLogin_gets401() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        String payload = Base64.getUrlEncoder().withoutPadding().encodeToString("{\"sub\":\"1\"}".getBytes());
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "h." + payload + ".s");
+
+        mvc.perform(get("/invite").session(session)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void regenerate_needsLoginAndCsrf() throws Exception {
         when(apiService.regenerateInvite()).thenReturn(204);
 

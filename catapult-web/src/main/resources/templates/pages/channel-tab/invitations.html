@@ -14,7 +14,8 @@
     </mdui-card>
 
     <th:block th:if="${invite != null and invite.canInvite()}">
-        <mdui-card id="channel-invite" class="settings-card" variant="outlined">
+        <mdui-card id="channel-invite" class="settings-card" variant="outlined"
+                   th:attr="data-label-refused=#{invite.error.refused},data-label-rate-limited=#{invite.error.rate_limited},data-label-unavailable=#{invite.error.unavailable},data-label-copied=#{invite.link.copied},data-label-copy-failed=#{invite.link.copy_failed}">
             <span class="eyebrow" th:text="#{invite.code.label}">Ton code d'invitation</span>
             <strong class="invite-code" th:text="${invite.code()}">ABC234</strong>
             <mdui-text-field id="invite-link" readonly variant="outlined" th:attr="label=#{invite.link.label},value=${invite.inviteUrl()}"></mdui-text-field>
