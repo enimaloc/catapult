@@ -110,7 +110,7 @@ describe("admin-minecraft device-code flow", () => {
         expect(polls()).toHaveLength(2);
     });
 
-    it("counts the code's time left down, then ends the flow once it has expired", async () => {
+    it("counts the code's time left down, the flow ending when catapult-api refuses the expired code", async () => {
         routes["/admin/minecraft-accounts/device-code"] = [response(200, {
             deviceCode: "dc-1", userCode: "ABCD-1234", verificationUri: "https://www.microsoft.com/link", interval: 5, expiresIn: 900 })];
         routes["/admin/minecraft-accounts/create"] = [response(202, {})];
@@ -121,12 +121,29 @@ describe("admin-minecraft device-code flow", () => {
         await vi.advanceTimersByTimeAsync(1000);
         expect(left.textContent).toBe("expires in 14m 59s");
 
-        await vi.advanceTimersByTimeAsync(899000);
+        routes["/admin/minecraft-accounts/create"] = [response(400, {})];
+        await vi.advanceTimersByTimeAsync(904000);
         expect(addFlow().querySelector(".admin-minecraft-error").textContent).toBe("Expired");
         expect(document.querySelector(".admin-minecraft-add").disabled).toBe(false);
         const before = polls().length;
         await vi.advanceTimersByTimeAsync(30000);
         expect(polls()).toHaveLength(before);
+    });
+
+    it("keeps a poll answered as the code runs out: the account it created counts", async () => {
+        routes["/admin/minecraft-accounts/device-code"] = [response(200, {
+            deviceCode: "dc-1", userCode: "ABCD-1234", verificationUri: "https://www.microsoft.com/link", interval: 5, expiresIn: 10 })];
+        let answer;
+        routes["/admin/minecraft-accounts/create"] = [new Promise(resolve => { answer = resolve; })];
+
+        await click(".admin-minecraft-add");
+        await vi.advanceTimersByTimeAsync(5000); // the poll leaves, still unanswered when the code expires
+        await vi.advanceTimersByTimeAsync(10000);
+        answer(response(200, {}));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Created" });
+        expect(addFlow().querySelector(".admin-minecraft-error")).toBeNull();
     });
 
     it("shows no countdown when the code's lifetime is unknown", async () => {

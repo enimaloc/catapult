@@ -7,8 +7,9 @@
  * "Add an account" and "Re-authenticate" run catapult-api's Microsoft device-code flow: get a device
  * code, show its user code, its verification link and the time left before it expires (counted down
  * by time.js), then poll the create / reauth route every max(3, interval) s: 202 → poll again, 200 →
- * done (the tab reloads), anything else → the error, stop. Once the code has expired the flow ends
- * with the expired label, without waiting for a poll to be refused.
+ * done (the tab reloads), anything else → the error, stop. The countdown only shows the time left:
+ * once the code has expired, catapult-api refuses the next poll (400) and the flow ends with the
+ * expired label, so a poll answered as the code runs out still counts.
  * A refusal (of the device code or of a poll) shows its localized label then catapult-api's message.
  * A verification link that isn't https:// is never rendered as a link and no polling starts. Polling
  * also stops once the flow's element has left the page (the panel's content was replaced) or another
@@ -136,12 +137,10 @@ window.CatapultAdminMinecraft = (function () {
      */
     async function runFlow(panel, card, button, flowEl, pollUrl, body, doneLabel) {
         let timer = null;
-        let expiry = null;
         let over = false;
         const end = () => {
             over = true;
             clearTimeout(timer);
-            clearTimeout(expiry);
             flows.delete(cancel);
             button.disabled = false;
         };
@@ -168,16 +167,6 @@ window.CatapultAdminMinecraft = (function () {
         }
         showCode(card, flowEl, code);
         const intervalMs = Math.max(MIN_INTERVAL_S, Number(code.interval) || DEFAULT_INTERVAL_S) * 1000;
-        const expiresIn = Number(code.expiresIn);
-        if (expiresIn > 0) {
-            expiry = setTimeout(() => {
-                if (over) return;
-                if (gone()) return end();
-                showFailure(flowEl, card.dataset.labelExpired);
-                end();
-            }, expiresIn * 1000);
-        }
-
         const tick = async () => {
             if (over) return;
             if (gone()) return end();
