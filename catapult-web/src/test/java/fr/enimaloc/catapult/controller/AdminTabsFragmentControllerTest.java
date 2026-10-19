@@ -284,7 +284,8 @@ class AdminTabsFragmentControllerTest {
         when(apiService.metaTags()).thenReturn(null);
         when(apiService.adminWellKnownFiles()).thenReturn(List.of());
 
-        assertThat(asAdmin("/spa/admin/meta")).contains("class=\"admin-meta-tags\"").doesNotContain("admin-meta-tags-form", "admin-meta-tag-row");
+        assertThat(asAdmin("/spa/admin/meta")).contains("class=\"admin-meta-tags\"", "Unable to load this section right now.", "data-admin-retry")
+                .doesNotContain("admin-meta-tags-form", "admin-meta-tag-row");
     }
 
     @Test
