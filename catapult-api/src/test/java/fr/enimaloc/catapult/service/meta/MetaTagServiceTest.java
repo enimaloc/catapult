@@ -11,6 +11,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
@@ -122,6 +124,24 @@ class MetaTagServiceTest {
         assertThatThrownBy(() -> service.update(9, new MetaTagRequest(NAME, "k", "x")))
                 .satisfies(t -> assertThat(status(t).getStatusCode().value()).isEqualTo(404));
         assertThatThrownBy(() -> service.delete(9))
+                .satisfies(t -> assertThat(status(t).getStatusCode().value()).isEqualTo(404));
+    }
+
+    @Test
+    void create_answers409_whenTheSameKeyIsAddedMeanwhile() {
+        when(repository.findByAttributeAndKeyIgnoreCase(NAME, "author")).thenReturn(Optional.empty());
+        when(repository.save(any())).thenThrow(new DataIntegrityViolationException("uq_meta_tag_attribute_key"));
+        assertThatThrownBy(() -> service.create(new MetaTagRequest(NAME, "author", "x")))
+                .satisfies(t -> assertThat(status(t).getStatusCode().value()).isEqualTo(409));
+    }
+
+    @Test
+    void update_answers404_whenTheTagIsDeletedMeanwhile() {
+        MetaTag mine = tag(1, "author", "x");
+        when(repository.findById(1L)).thenReturn(Optional.of(mine));
+        when(repository.findByAttributeAndKeyIgnoreCase(NAME, "author")).thenReturn(Optional.of(mine));
+        when(repository.save(any())).thenThrow(new ObjectOptimisticLockingFailureException(MetaTag.class, 1L));
+        assertThatThrownBy(() -> service.update(1, new MetaTagRequest(NAME, "author", "y")))
                 .satisfies(t -> assertThat(status(t).getStatusCode().value()).isEqualTo(404));
     }
 }
