@@ -9,6 +9,7 @@ import { flush, html, load, render, response } from "./helpers.js";
 let postJson;
 let refresh;
 let release;
+let showError;
 
 const dialog = () => document.getElementById("danger-zone-delete-dialog");
 const field = () => dialog().querySelector('[name="confirmUsername"]');
@@ -21,7 +22,7 @@ function type(value) {
 
 function page(pending) {
     html(`
-        <mdui-card id="channel-danger-zone" data-username="Me">
+        <mdui-card id="channel-danger-zone" data-username="Me" data-label-refused="refused" data-label-unavailable="down">
             ${pending
                 ? `<mdui-button id="danger-zone-cancel-btn"></mdui-button>`
                 : `<mdui-button id="danger-zone-delete-btn"></mdui-button>
@@ -38,7 +39,9 @@ beforeEach(async () => {
     postJson = vi.fn(() => new Promise(resolve => { release = () => resolve(response(204)); }));
     refresh = vi.fn(async () => {});
     await load("channel-danger-zone");
-    window.CatapultChannel = { baseUrl: () => "/channel/me", postJson, refresh, showError: vi.fn() };
+    showError = vi.fn();
+    window.CatapultChannel = { baseUrl: () => "/channel/me", refresh, showError };
+    window.CatapultCsrf = { postJson };
 });
 
 describe("channel-danger-zone", () => {
@@ -92,8 +95,12 @@ describe("channel-danger-zone", () => {
         expect(refresh).toHaveBeenCalledTimes(1);
     });
 
-    it("keeps the page and frees the button when the request fails", async () => {
-        postJson.mockImplementation(async () => response(502));
+    it.each([
+        [403, "refused"],
+        [401, "refused"],
+        [502, "down"],
+    ])("keeps the page, frees the button and shows a localized message on %i", async (status, label) => {
+        postJson.mockImplementation(async () => response(status));
         page(false);
         type("Me");
 
@@ -102,6 +109,20 @@ describe("channel-danger-zone", () => {
 
         expect(refresh).not.toHaveBeenCalled();
         expect(confirm().disabled).toBe(false);
+        expect(showError).toHaveBeenCalledWith(label);
+    });
+
+    it("keeps the page, frees the button and says unavailable when the network fails", async () => {
+        postJson.mockImplementation(async () => { throw new TypeError("Failed to fetch"); });
+        page(true);
+        const cancel = document.getElementById("danger-zone-cancel-btn");
+
+        cancel.click();
+        await flush();
+
+        expect(refresh).not.toHaveBeenCalled();
+        expect(cancel.disabled).toBe(false);
+        expect(showError).toHaveBeenCalledWith("down");
     });
 
     it("cancels a pending deletion and refreshes", async () => {
