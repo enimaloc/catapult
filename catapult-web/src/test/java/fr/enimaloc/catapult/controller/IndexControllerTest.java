@@ -94,6 +94,23 @@ class IndexControllerTest {
                 .andExpect(model().attribute("page", "channel"));
     }
 
+    /** catapult-api answers nothing for a visitor, an unknown channel or one the member may not see. */
+    @Test
+    void channelPage_withoutData_showsTheErrorPage_insteadOfFailing() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(null);
+        String key = ApiClient.SESSION_JWT_KEY;
+
+        mvc.perform(get("/channel/ghost")).andExpect(status().isUnauthorized())
+                .andExpect(view().name("index")).andExpect(model().attribute("error", true));
+        mvc.perform(get("/spa/channel/ghost")).andExpect(status().isUnauthorized())
+                .andExpect(view().name("pages/error :: error"));
+        mvc.perform(get("/channel/ghost").sessionAttr(key, "jwt")).andExpect(status().isNotFound())
+                .andExpect(view().name("index")).andExpect(model().attribute("error", true));
+        mvc.perform(get("/spa/channel/ghost").sessionAttr(key, "jwt")).andExpect(status().isNotFound())
+                .andExpect(view().name("pages/error :: error"));
+        verify(apiService, never()).channelSettings(any());
+    }
+
     @Test
     void channelFullPage_putsChannelPageDataInModel() throws Exception {
         ChannelPageData data = new ChannelPageData(

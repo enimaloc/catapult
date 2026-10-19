@@ -68,6 +68,14 @@ class MockApiServiceTest {
         RequestContextHolder.resetRequestAttributes();
     }
 
+    /** A visitor has no mock data: like catapult-api's 401, the channel page is null rather than a crash. */
+    @Test
+    void channelPage_isNullForAVisitor() {
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+
+        assertThat(service.channelPage("anyone", 0, null, null)).isNull();
+    }
+
     private BindingDto binding() {
         return data.getPrimaryBinding();
     }

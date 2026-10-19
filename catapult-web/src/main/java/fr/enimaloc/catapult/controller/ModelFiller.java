@@ -162,10 +162,17 @@ public class ModelFiller {
     /**
      * The dashboard model. Only its owner and moderators see a channel (catapult-api refuses anyone
      * else), and both may change its settings; the integration cards are the owner's alone.
+     *
+     * @return 0 when filled; else the error page's status, the model left unfilled: 401 for a
+     *         visitor, 404 for a member when catapult-api answers nothing (an unknown channel, one
+     *         they may not see, or catapult-api down — it doesn't say which)
      */
-    public void channel(Model model, String username, int page, String status, String source) {
+    public int channel(Model model, String username, int page, String status, String source) {
         model.addAttribute("username", username);
         var channelPage = apiService.channelPage(username, page, status, source);
+        if (channelPage == null) {
+            return ApiClient.hasSession() ? HttpStatus.NOT_FOUND.value() : HttpStatus.UNAUTHORIZED.value();
+        }
         model.addAttribute("channelPage", channelPage);
         model.addAttribute("channelSettings", apiService.channelSettings(username));
         model.addAttribute("dtddMapping", apiService.dtddMappingStatus(username));
@@ -174,6 +181,7 @@ public class ModelFiller {
                     : apiService.twitchatEvents(username);
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
         }
+        return 0;
     }
 
     /**

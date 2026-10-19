@@ -78,8 +78,13 @@ public class IndexController {
                    @RequestParam(defaultValue = "0") int page,
                    @RequestParam(required = false) String status,
                    @RequestParam(required = false) String source,
-                   Locale locale) {
-        filler.channel(model, username, page, status, source);
+                   Locale locale, HttpServletResponse response) {
+        int refused = filler.channel(model, username, page, status, source);
+        model.addAttribute("error", refused != 0);
+        if (refused != 0) {
+            response.setStatus(refused);
+            filler.error(model, refused);
+        }
         filler.defaultAttr(model, "channel", locale);
         return "index";
     }
