@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
@@ -296,4 +297,12 @@ public interface ApiService {
     int adminCreateTw(String id, String label, int sortOrder);
     /** Starts a background rebuild of the mappings; catapult-api's status (202; 503 when trigger warnings are off), 502 when unreachable. */
     int adminRebuildTws(TwRebuild mode);
+    /** A definition's Steam keywords, sorted; null when unknown or when catapult-api fails. */
+    List<String> adminTwKeywords(String id);
+    /** Adds a keyword (already there changes nothing); catapult-api's status (204), 502 when unreachable. */
+    int adminAddTwKeyword(String id, String keyword);
+    /** Removes a keyword (also an absent one); catapult-api's status (204), 502 when unreachable. */
+    int adminRemoveTwKeyword(String id, String keyword);
+    /** Tries the definition's saved Steam signals, and the draft keyword, on a Steam app; null on failure. */
+    TwKeywordTestDto adminTestTwKeyword(String id, String appId, String draftKeyword);
 }

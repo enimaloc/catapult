@@ -109,4 +109,63 @@ class AdminTwControllerTest {
         verify(apiService, never()).adminCreateTw(any(), any(), anyInt());
         verify(apiService, never()).adminRebuildTws(any());
     }
+
+    @Test
+    void keywords_addRelaysTheStatus_andChecksTheLength() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminAddTwKeyword("gore", "blood")).thenReturn(204);
+        when(apiService.adminAddTwKeyword("gore", "x".repeat(50))).thenReturn(404);
+
+        mvc.perform(admin(post(BASE + "/gore/keywords"), "{\"keyword\":\" blood \"}")).andExpect(status().isNoContent());
+        mvc.perform(admin(post(BASE + "/gore/keywords"), "{\"keyword\":\"" + "x".repeat(50) + "\"}")).andExpect(status().isNotFound());
+        for (String body : new String[]{"{\"keyword\":\"a\"}", "{\"keyword\":\" a \"}", "{\"keyword\":\"" + "x".repeat(51) + "\"}", "{}"}) {
+            mvc.perform(admin(post(BASE + "/gore/keywords"), body)).andExpect(status().isBadRequest());
+        }
+        verify(apiService, org.mockito.Mockito.times(2)).adminAddTwKeyword(any(), any());
+    }
+
+    @Test
+    void keywords_removeTakesTheKeywordFromTheBody() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminRemoveTwKeyword("gore", "gore/blood é")).thenReturn(204);
+
+        mvc.perform(admin(post(BASE + "/gore/keywords/remove"), "{\"keyword\":\"gore/blood é\"}")).andExpect(status().isNoContent());
+        mvc.perform(admin(post(BASE + "/gore/keywords/remove"), "{\"keyword\":\"  \"}")).andExpect(status().isBadRequest());
+        verify(apiService, org.mockito.Mockito.times(1)).adminRemoveTwKeyword(any(), any());
+    }
+
+    @Test
+    void keywords_areGuardedAndNeedCsrf() throws Exception {
+        for (String url : new String[]{"/gore/keywords", "/gore/keywords/remove", "/gore/keywords/test"}) {
+            mvc.perform(post(BASE + url).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isUnauthorized());
+            mvc.perform(post(BASE + url).with(csrf()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")
+                    .contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
+        }
+        when(apiService.isAdmin()).thenReturn(true);
+        mvc.perform(post(BASE + "/gore/keywords").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"keyword\":\"blood\"}")).andExpect(status().isForbidden());
+        verify(apiService, never()).adminAddTwKeyword(any(), any());
+        verify(apiService, never()).adminRemoveTwKeyword(any(), any());
+        verify(apiService, never()).adminTestTwKeyword(any(), any(), any());
+    }
+
+    @Test
+    void test_relaysTheResult_or502_andChecksTheAppIdAndTheDraft() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminTestTwKeyword("gore", "730", "gor")).thenReturn(new fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto(
+                java.util.List.of("gore"), java.util.List.of(1), true, "gore"));
+        when(apiService.adminTestTwKeyword("gore", "731", null)).thenReturn(null);
+
+        mvc.perform(admin(post(BASE + "/gore/keywords/test"), "{\"appId\":\"730\",\"draftKeyword\":\"gor\"}"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.matchedKeywords[0]").value("gore"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.draftKeywordMatch").value(true))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.notes").value("gore"));
+        mvc.perform(admin(post(BASE + "/gore/keywords/test"), "{\"appId\":\"731\"}")).andExpect(status().isBadGateway());
+        for (String body : new String[]{"{\"appId\":\"abc\"}", "{\"appId\":\"\"}", "{}", "{\"appId\":\"730\",\"draftKeyword\":\"" + "x".repeat(51) + "\"}"}) {
+            mvc.perform(admin(post(BASE + "/gore/keywords/test"), body)).andExpect(status().isBadRequest());
+        }
+        verify(apiService, org.mockito.Mockito.times(2)).adminTestTwKeyword(any(), any(), any());
+    }
 }

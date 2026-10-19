@@ -16,7 +16,10 @@ import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminTwCreateBody;
+import fr.enimaloc.catapult.common.dto.admin.SteamKeywordBody;
+import fr.enimaloc.catapult.common.dto.admin.SteamSignalTestBody;
 import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
@@ -805,5 +808,28 @@ public class RealApiService implements ApiService {
     public int adminRebuildTws(TwRebuild mode) {
         // the route is the enum's own constant, never user input
         return client.call(HttpMethod.POST, "/api/admin/tw/" + mode.apiPath(), null, Void.class).status();
+    }
+
+    @Override
+    public List<String> adminTwKeywords(String id) {
+        return client.get("/api/admin/tw/{id}/steam-keywords", new ParameterizedTypeReference<List<String>>() {}, id);
+    }
+
+    @Override
+    public int adminAddTwKeyword(String id, String keyword) {
+        return client.call(HttpMethod.POST, "/api/admin/tw/{id}/steam-keywords", new SteamKeywordBody(keyword), Void.class, id).status();
+    }
+
+    @Override
+    public int adminRemoveTwKeyword(String id, String keyword) {
+        // free text: a URI variable, encoded as one segment
+        return client.call(HttpMethod.DELETE, "/api/admin/tw/{id}/steam-keywords/{keyword}", null, Void.class, id, keyword).status();
+    }
+
+    @Override
+    public TwKeywordTestDto adminTestTwKeyword(String id, String appId, String draftKeyword) {
+        var result = client.call(HttpMethod.POST, "/api/admin/tw/{id}/steam-keywords/test",
+                new SteamSignalTestBody(appId, draftKeyword), TwKeywordTestDto.class, id);
+        return result.ok() ? result.body() : null;
     }
 }

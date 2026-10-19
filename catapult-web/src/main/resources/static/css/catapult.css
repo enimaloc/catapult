@@ -2030,3 +2030,16 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     .admin-tw-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-tw-row > .admin-cell { white-space: normal; }
 }
+.admin-tw-kw-card { padding: 16px; margin-bottom: 16px; }
+.admin-tw-kw-card h3 { margin: 0 0 12px; }
+.admin-tw-kw-rows { display: flex; flex-direction: column; margin-bottom: 16px; }
+.admin-tw-kw-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 4px 0; }
+.admin-tw-kw-row + .admin-tw-kw-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.admin-tw-kw-row > .admin-member-id { min-width: 0; overflow-wrap: anywhere; }
+.admin-tw-kw-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.admin-tw-test-result { margin-top: 12px; overflow-wrap: anywhere; }
+.admin-tw-test-result p { margin: 4px 0; }
+.admin-tw-test-result .admin-tw-test-notes { white-space: pre-wrap; color: var(--catapult-text-muted); }
+@media (max-width: 600px) {
+    .admin-tw-kw-form { grid-template-columns: minmax(0, 1fr); }
+}
