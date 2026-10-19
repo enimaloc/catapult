@@ -9,7 +9,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpSession;
 
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -38,5 +41,18 @@ class ObsSessionControllerTest {
         when(apiService.obsConnection()).thenReturn(null);
 
         mvc.perform(get("/me/obs")).andExpect(status().isNoContent());
+    }
+
+    /** An admin acting as a member: their browser never connects to the member's OBS. */
+    @Test
+    void impersonating_noContent_withoutAskingCatapultApi() throws Exception {
+        when(apiService.obsConnection()).thenReturn(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin-jwt");
+
+        mvc.perform(get("/me/obs").session(session))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+        verify(apiService, never()).obsConnection();
     }
 }

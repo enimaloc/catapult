@@ -32,6 +32,19 @@ public class ImpersonationController {
     /** The admin's own JWT while they impersonate a member. */
     public static final String ORIGINAL_JWT_KEY = "originalJwt";
 
+    /**
+     * Whether {@code request}'s session is an admin acting as a member: its browser then never joins
+     * the member's OBS session nor their Twitchat relay (/me/obs, /me/twitchat/events).
+     */
+    public static boolean impersonating(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        try {
+            return session != null && session.getAttribute(ORIGINAL_JWT_KEY) != null;
+        } catch (IllegalStateException e) {
+            return false; // invalidated meanwhile
+        }
+    }
+
     private final ApiService apiService;
     private final ModelFiller filler;
     private final NavEventStreamController navEvents;
