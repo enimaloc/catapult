@@ -5,7 +5,10 @@
 <mdui-tab-panel slot="panel" value="invitations" th:if="${channelPage.isOwner()}" th:fragment="panel"
                 xmlns:spa="urn:fr.enimaloc.catapult:spa">
     <div class="section-header">
-        <h2 th:text="#{invite.title}">Mes invitations</h2>
+        <div class="title-row">
+            <h2 th:text="#{invite.title}">Mes invitations</h2>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('invite')}"></mdui-button-icon>
+        </div>
     </div>
 
     <mdui-card id="channel-invite-denied" class="settings-card" variant="outlined" th:if="${invite == null or !invite.canInvite()}">

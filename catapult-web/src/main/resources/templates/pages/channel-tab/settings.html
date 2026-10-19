@@ -53,7 +53,10 @@
     </mdui-card>
 
     <mdui-card id="channel-incomplete-fallback-settings-form" class="settings-card" variant="outlined">
-        <h3 th:text="#{channel.settings.incomplete_fallback.title}">Jeu incomplet</h3>
+        <div class="title-row">
+            <h3 th:text="#{channel.settings.incomplete_fallback.title}">Jeu incomplet</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('incomplete-fallback')}"></mdui-button-icon>
+        </div>
         <th:block th:replace="~{fragments/controls :: gamePicker('incomplete-fallback',
                 ${settings.incompleteFallbackTwitchGameId()}, ${settings.incompleteFallbackTwitchGameName()})}"></th:block>
         <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()},

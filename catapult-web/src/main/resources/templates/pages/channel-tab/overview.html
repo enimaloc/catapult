@@ -50,7 +50,10 @@
     <mdui-card id="channel-dtdd-mapping-card" class="settings-card" variant="outlined"
                th:if="${dtddMapping != null and dtddMapping.igdbId() != null}"
                th:attr="data-igdb-id=${dtddMapping.igdbId()}">
-        <h3 th:text="#{channel.dtdd.title}">Association DTDD</h3>
+        <div class="title-row">
+            <h3 th:text="#{channel.dtdd.title}">Association DTDD</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('dtdd')}"></mdui-button-icon>
+        </div>
 
         <!--/* The verified chip and the proposal note are always rendered: channel-dtdd.js reveals
              them once validated or proposed, instead of re-rendering the page. */-->
