@@ -98,14 +98,6 @@ class AdminMembersControllerTest {
     }
 
     @Test
-    void flagDelete_byPathKey_relaysToo() throws Exception {
-        when(apiService.adminDeleteMemberFlag(ID, "tier")).thenReturn(204);
-
-        mvc.perform(asAdmin("flags/tier/delete").contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isNoContent());
-    }
-
-    @Test
     void targeting_withoutAKeyOrGroup_isABadRequest_withoutCallingTheApi() throws Exception {
         mvc.perform(asAdmin("flags").contentType(MediaType.APPLICATION_JSON).content("{\"key\":\" \",\"value\":\"x\"}"))
                 .andExpect(status().isBadRequest());
@@ -121,7 +113,7 @@ class AdminMembersControllerTest {
 
     @Test
     void targeting_actionsAreRefusedToMembersAndVisitors_andNeedCsrf() throws Exception {
-        for (String action : new String[]{"flags", "flags/delete", "flags/k/delete", "groups", "groups/" + GROUP + "/delete"}) {
+        for (String action : new String[]{"flags", "flags/delete", "groups", "groups/" + GROUP + "/delete"}) {
             mvc.perform(post("/admin/members/" + ID + "/" + action).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}"))
                     .andExpect(status().isUnauthorized());
             mvc.perform(asMember(action).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());

@@ -1,6 +1,10 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminCclDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
+import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
@@ -20,9 +24,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
@@ -513,21 +519,21 @@ class AdminTabsFragmentControllerTest {
         assertThat(asAdmin("/spa/admin/groups")).contains("admin-placeholder").doesNotContain("data-rename=");
     }
 
-    private static final java.util.UUID MEMBER = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID MEMBER = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Test
     void targeting_rendersFlags_groups_andTheGroupSelect() throws Exception {
-        when(apiService.adminMember(MEMBER)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto(MEMBER, "ali<ce>"));
-        when(apiService.adminMemberTargeting(MEMBER)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto(
-                List.of(new fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto.Flag("a/b %é", "<v>"),
-                        new fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto.Flag("beta", null)),
+        when(apiService.adminMember(MEMBER)).thenReturn(new AdminMemberSummaryDto(MEMBER, "ali<ce>"));
+        when(apiService.adminMemberTargeting(MEMBER)).thenReturn(new MemberTargetingDto(
+                List.of(new MemberTargetingDto.Flag("a/b %é", "<v>"),
+                        new MemberTargetingDto.Flag("beta", null)),
                 List.of("staff", "ghost")));
         when(apiService.adminGroups()).thenReturn(List.of(group("staff", null, 1), group("beta", null, 0)));
 
         String html = asAdmin("/spa/admin/members/" + MEMBER);
 
         assertThat(html).contains("ali&lt;ce&gt;", "data-admin-back", "admin-targeting",
-                "data-flag=\"a/b %é\"", "&lt;v&gt;", "data-flag=\"beta\"",
+                "data-flag=\"a/b %é\"", "data-flag-delete=\"a/b %é\"", "&lt;v&gt;", "data-flag=\"beta\"",
                 "data-group-id=\"00000000-0000-0000-0000-000000000042\"", "ghost", "admin-targeting-flag-save", "admin-targeting-group-save")
                 .contains("value=\"beta\"")  // beta is offered; staff, already joined, is not
                 .doesNotContain("value=\"staff\"");
@@ -537,7 +543,7 @@ class AdminTabsFragmentControllerTest {
 
     @Test
     void targeting_whenTheTargetingCantBeLoaded_saysSo() throws Exception {
-        when(apiService.adminMember(MEMBER)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto(MEMBER, "alice"));
+        when(apiService.adminMember(MEMBER)).thenReturn(new AdminMemberSummaryDto(MEMBER, "alice"));
 
         assertThat(asAdmin("/spa/admin/members/" + MEMBER)).contains("admin-placeholder").doesNotContain("admin-targeting-flag-save");
     }
@@ -554,13 +560,13 @@ class AdminTabsFragmentControllerTest {
 
     @Test
     void membersFragment_isThePanelContent_withTheTargetingItem() throws Exception {
-        java.util.UUID other = java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
+        UUID other = UUID.fromString("00000000-0000-0000-0000-000000000002");
         when(apiService.currentUserId()).thenReturn(MEMBER);
-        when(apiService.adminMembers()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMembersPage(List.of(
-                new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE",
-                        java.time.Instant.parse("2025-03-01T12:00:00Z")),
-                new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(MEMBER, "1", "catapult_bot", "img", null, true, true, "ACTIVE",
-                        java.time.Instant.parse("2025-03-01T12:00:00Z"))), java.util.Map.of(), false));
+        when(apiService.adminMembers()).thenReturn(new AdminMembersPage(List.of(
+                new AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE",
+                        Instant.parse("2025-03-01T12:00:00Z")),
+                new AdminMemberDto(MEMBER, "1", "catapult_bot", "img", null, true, true, "ACTIVE",
+                        Instant.parse("2025-03-01T12:00:00Z"))), Map.of(), false));
 
         String html = asAdmin("/spa/admin/members");
 
@@ -571,9 +577,9 @@ class AdminTabsFragmentControllerTest {
     @Test
     void systemAccount_getsOnlyEditSettings() throws Exception {
         when(apiService.currentUserId()).thenReturn(MEMBER);
-        when(apiService.adminMembers()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMembersPage(List.of(
-                new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(MEMBER, "1", "catapult_bot", "img", null, true, true, "ACTIVE",
-                        java.time.Instant.parse("2025-03-01T12:00:00Z"))), java.util.Map.of(), false));
+        when(apiService.adminMembers()).thenReturn(new AdminMembersPage(List.of(
+                new AdminMemberDto(MEMBER, "1", "catapult_bot", "img", null, true, true, "ACTIVE",
+                        Instant.parse("2025-03-01T12:00:00Z"))), Map.of(), false));
 
         String html = asAdmin("/spa/admin/members");
 

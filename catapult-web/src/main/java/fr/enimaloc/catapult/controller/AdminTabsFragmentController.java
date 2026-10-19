@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.function.Supplier;
 
 /**
@@ -66,7 +67,7 @@ public class AdminTabsFragmentController {
             model.addAttribute("targeting", targeting);
             model.addAttribute("groups", groups == null ? List.of() : groups);
             model.addAttribute("groupIds", groups == null ? Map.of()
-                    : groups.stream().collect(java.util.stream.Collectors.toMap(GroupSummaryDto::key, GroupSummaryDto::id, (a, b) -> a)));
+                    : groups.stream().collect(Collectors.toMap(GroupSummaryDto::key, GroupSummaryDto::id, (a, b) -> a)));
             model.addAttribute("joinable", groups == null || targeting == null ? List.of()
                     : groups.stream().filter(g -> !targeting.groupKeys().contains(g.key())).toList());
             return "pages/admin-tab/members :: targeting";
