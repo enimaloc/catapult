@@ -1,7 +1,10 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.api.ApiMetaTagsController;
 import fr.enimaloc.catapult.api.ApiWellKnownController;
+import fr.enimaloc.catapult.api.admin.ApiAdminMetaTagsController;
 import fr.enimaloc.catapult.api.admin.ApiAdminWellKnownController;
+import fr.enimaloc.catapult.service.meta.MetaTagService;
 import fr.enimaloc.catapult.service.wellknown.IanaWellKnownRegistry;
 import fr.enimaloc.catapult.service.wellknown.SchemaStoreRegistry;
 import fr.enimaloc.catapult.service.wellknown.WellKnownFileService;
@@ -25,9 +28,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** The non-dev chain of ApiSecurityConfig, really active: the public serve route vs the admin ones. */
+/** The non-dev chain of ApiSecurityConfig, really active: the public serve and meta-tags routes vs the admin ones. */
 @WebMvcTest(
-        controllers = {ApiWellKnownController.class, ApiAdminWellKnownController.class},
+        controllers = {ApiWellKnownController.class, ApiAdminWellKnownController.class, ApiMetaTagsController.class, ApiAdminMetaTagsController.class},
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import({ApiSecurityConfig.class, ApiSecurityConfigWellKnownTest.Keys.class})
@@ -45,6 +48,7 @@ class ApiSecurityConfigWellKnownTest {
     @MockitoBean WellKnownFileService service;
     @MockitoBean IanaWellKnownRegistry registry;
     @MockitoBean SchemaStoreRegistry schemas;
+    @MockitoBean MetaTagService metaTags;
 
     @Test
     void theServeRouteIsPublic() throws Exception {
@@ -57,6 +61,15 @@ class ApiSecurityConfigWellKnownTest {
     @Test
     void theAdminRoutesRefuseAnAnonymousVisitor() throws Exception {
         mvc.perform(get("/api/admin/well-known").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void theMetaTagsAreReadPublicly_butAdministeredByAnAdminOnly() throws Exception {
+        when(metaTags.list()).thenReturn(java.util.List.of());
+        mvc.perform(get("/api/meta-tags").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/admin/meta-tags").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                 .andExpect(status().isUnauthorized());
     }
 }
