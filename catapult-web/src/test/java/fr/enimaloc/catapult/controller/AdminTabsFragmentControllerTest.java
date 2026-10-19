@@ -78,6 +78,7 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminGroups();
         verify(apiService, never()).adminWhitelist();
         verify(apiService, never()).adminApiKeys(org.mockito.ArgumentMatchers.any());
+        verify(apiService, never()).adminMinecraftAccounts();
         verify(apiService, never()).adminMembers();
         verify(apiService, never()).adminMember(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminMemberTargeting(org.mockito.ArgumentMatchers.any());
@@ -717,5 +718,43 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(null);
 
         assertThat(asAdmin("/spa/admin/keys")).contains("admin-placeholder").doesNotContain("admin-keys-add-save");
+    }
+
+    private static fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto account(String id, String label, long links,
+            boolean enabled, boolean full) {
+        return new fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto(java.util.UUID.fromString(id), label,
+                label + "_mc", 0, links, enabled, full);
+    }
+
+    @Test
+    void accountsCard_statesAndActions() throws Exception {
+        when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(keys(true));
+        when(apiService.adminMinecraftAccounts()).thenReturn(List.of(
+                account("00000000-0000-0000-0000-00000000000a", "Act<ive>", 3, true, false),
+                account("00000000-0000-0000-0000-00000000000b", "Off", 0, false, false),
+                account("00000000-0000-0000-0000-00000000000c", "Full", 1, true, true)));
+
+        String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
+
+        assertThat(html).contains("id=\"admin-minecraft\"", "Act&lt;ive&gt;", "Off_mc", "admin-minecraft-add",
+                "Minecraft service accounts", "Enabled", "Disabled", "Full");
+        // disabled → re-authenticate (only that one); full → reset limit (only that one); each: toggle and delete
+        assertThat(html.split("admin-minecraft-reauth\"", -1)).hasSize(2);
+        assertThat(html).contains("admin-minecraft-reauth\" data-id=\"00000000-0000-0000-0000-00000000000b\"");
+        assertThat(html.split("admin-minecraft-reset\"", -1)).hasSize(2);
+        assertThat(html).contains("admin-minecraft-reset\" data-id=\"00000000-0000-0000-0000-00000000000c\"");
+        assertThat(html.split("admin-minecraft-toggle\"", -1)).hasSize(4);
+        assertThat(html).contains("data-enabled=\"false\"", "data-enabled=\"true\"");
+        assertThat(html.split("admin-minecraft-delete\"", -1)).hasSize(4);
+    }
+
+    @Test
+    void accountsCard_emptyAndUnavailable() throws Exception {
+        when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(keys(true));
+        when(apiService.adminMinecraftAccounts()).thenReturn(List.of());
+        assertThat(asAdmin("/spa/admin/keys")).contains("No service account yet.", "admin-minecraft-add");
+
+        when(apiService.adminMinecraftAccounts()).thenReturn(null);
+        assertThat(asAdmin("/spa/admin/keys")).contains("admin-minecraft-unavailable").doesNotContain("admin-minecraft-add");
     }
 }

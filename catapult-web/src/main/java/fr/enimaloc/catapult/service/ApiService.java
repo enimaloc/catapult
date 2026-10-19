@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
+import fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -261,4 +263,20 @@ public interface ApiService {
     int adminDeleteApiKey(ApiKeyProvider provider, String keyId);
     /** Reloads the provider's keys into its rotator; catapult-api's status (204), 502 when unreachable. */
     int adminRefreshApiKeys(ApiKeyProvider provider);
+
+    /** The Minecraft service accounts; null when catapult-api fails (Minecraft disabled included). */
+    List<MinecraftAccountDto> adminMinecraftAccounts();
+    /** PATCHes an account ({@code enabled}, {@code friendLimitReached}); catapult-api's status (200; 404 unknown), 502 when unreachable. */
+    int adminPatchMinecraftAccount(UUID id, Map<String, Object> patch);
+    /** Deletes an account; catapult-api's status (204; 409 while users are linked to it; 404 unknown), 502 when unreachable. */
+    int adminDeleteMinecraftAccount(UUID id);
+    /** Starts a Microsoft device-code flow; null when catapult-api refuses it or is unreachable. */
+    MinecraftDeviceCodeDto adminMinecraftDeviceCode();
+    /**
+     * Polls the device code to enrol a new account ({@code label} null: catapult-api's default):
+     * 202 while it isn't confirmed yet, 200 with the account once it is, else the error; 502 when unreachable.
+     */
+    ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label);
+    /** Polls the device code to re-authenticate the account, answered like {@link #adminCreateMinecraftAccount}. */
+    ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode);
 }

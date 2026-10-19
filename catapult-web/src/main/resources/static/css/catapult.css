@@ -2000,3 +2000,18 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     .admin-keys-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-keys-row > .admin-cell { white-space: normal; }
 }
+.admin-minecraft-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 6rem 4rem 12rem auto; }
+.admin-minecraft-states { display: flex; flex-wrap: wrap; gap: 4px; }
+.admin-minecraft-full { color: rgb(var(--mdui-color-error)); }
+.admin-minecraft-row > .admin-minecraft-flow { grid-column: 1 / -1; }
+.admin-minecraft-flow:empty { display: none; }
+.admin-minecraft-flow { overflow-wrap: anywhere; }
+.admin-minecraft-code { margin: 4px 0; }
+.admin-minecraft-user-code { font-family: monospace; font-size: 1.15em; letter-spacing: .05em; }
+.admin-minecraft-error { color: rgb(var(--mdui-color-error)); }
+@media (max-width: 600px) {
+    .admin-minecraft-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-minecraft-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-minecraft-row > .admin-row-actions { grid-column: 1 / -1; flex-wrap: wrap; }
+    .admin-minecraft-row > .admin-cell { white-space: normal; }
+}
