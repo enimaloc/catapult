@@ -5,8 +5,10 @@
  * else unavailable.
  *
  * "Add an account" and "Re-authenticate" run catapult-api's Microsoft device-code flow: get a device
- * code, show its user code and verification link, then poll the create / reauth route every
- * max(3, interval) s: 202 → poll again, 200 → done (the tab reloads), anything else → the error, stop.
+ * code, show its user code, its verification link and the time left before it expires (counted down
+ * by time.js), then poll the create / reauth route every max(3, interval) s: 202 → poll again, 200 →
+ * done (the tab reloads), anything else → the error, stop. Once the code has expired the flow ends
+ * with the expired label, without waiting for a poll to be refused.
  * A refusal (of the device code or of a poll) shows its localized label then catapult-api's message.
  * A verification link that isn't https:// is never rendered as a link and no polling starts. Polling
  * also stops once the flow's element has left the page (the panel's content was replaced) or another
@@ -115,7 +117,17 @@ window.CatapultAdminMinecraft = (function () {
         const pending = document.createElement("p");
         pending.className = "admin-cell-muted";
         pending.textContent = card.dataset.labelPending;
+        const expiresIn = Number(code.expiresIn);
+        if (expiresIn > 0) {
+            const left = document.createElement("span");
+            left.className = "admin-minecraft-expires";
+            left.dataset.liveTime = "countdown";
+            left.dataset.liveIn = String(expiresIn);
+            left.dataset.labelFuture = card.dataset.labelExpiresIn ?? "{0}";
+            pending.append(" · ", left);
+        }
         flowEl.replaceChildren(line, pending);
+        window.CatapultTime?.refresh(flowEl);
     }
 
     /**
@@ -124,10 +136,12 @@ window.CatapultAdminMinecraft = (function () {
      */
     async function runFlow(panel, card, button, flowEl, pollUrl, body, doneLabel) {
         let timer = null;
+        let expiry = null;
         let over = false;
         const end = () => {
             over = true;
             clearTimeout(timer);
+            clearTimeout(expiry);
             flows.delete(cancel);
             button.disabled = false;
         };
@@ -154,6 +168,15 @@ window.CatapultAdminMinecraft = (function () {
         }
         showCode(card, flowEl, code);
         const intervalMs = Math.max(MIN_INTERVAL_S, Number(code.interval) || DEFAULT_INTERVAL_S) * 1000;
+        const expiresIn = Number(code.expiresIn);
+        if (expiresIn > 0) {
+            expiry = setTimeout(() => {
+                if (over) return;
+                if (gone()) return end();
+                showFailure(flowEl, card.dataset.labelExpired);
+                end();
+            }, expiresIn * 1000);
+        }
 
         const tick = async () => {
             if (over) return;
