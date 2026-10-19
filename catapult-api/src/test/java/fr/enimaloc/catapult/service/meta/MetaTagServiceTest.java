@@ -87,12 +87,15 @@ class MetaTagServiceTest {
     }
 
     @Test
-    void create_refusesATooLongKey_aContentOnSeveralLinesOrTooLong_andAMissingAttribute() {
+    void create_refusesATooLongKey_aContentBlankOnSeveralLinesOrTooLong_andAMissingAttribute() {
         for (MetaTagRequest request : List.of(
                 new MetaTagRequest(NAME, "a".repeat(101), "x"),
                 new MetaTagRequest(NAME, "k", "a\nb"),
                 new MetaTagRequest(NAME, "k", "a".repeat(1001)),
                 new MetaTagRequest(NAME, "k", null),
+                new MetaTagRequest(NAME, "k", ""),
+                new MetaTagRequest(NAME, "k", "   "),
+                new MetaTagRequest(NAME, "k", "a\u2028b"),
                 new MetaTagRequest(null, "k", "x"))) {
             assertThatThrownBy(() -> service.create(request))
                     .satisfies(t -> assertThat(status(t).getStatusCode().value()).isEqualTo(400));
