@@ -384,11 +384,11 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public TwitchatWidgetAccessResponse widgetAccess(UUID token) {
+    public ApiClient.Result<TwitchatWidgetAccessResponse> widgetAccess(UUID token) {
         log.trace("widgetAccess({})", token);
         return widgetOwner(token)
-                .map(d -> new TwitchatWidgetAccessResponse(d.getChannelDto().id().toString(), d.obsConnection() != null))
-                .orElse(null);
+                .map(d -> new ApiClient.Result<>(200, new TwitchatWidgetAccessResponse(d.getChannelDto().id().toString(), d.obsConnection() != null)))
+                .orElseGet(() -> new ApiClient.Result<>(404, null));
     }
 
     /** The session whose widget link {@code token} is: an OBS browser source has no session of its own. */

@@ -362,18 +362,18 @@ class MockApiServiceTest {
         // Read from another (anonymous) request, like an OBS browser source.
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
 
-        assertThat(service.widgetAccess(token))
+        assertThat(service.widgetAccess(token).body())
                 .isEqualTo(new TwitchatWidgetAccessResponse(owner.toString(), true));
         assertThat(service.widgetObsConfig(token))
                 .isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
 
         data.saveObsSettings(false, "10.0.0.2", 4456, null);
-        assertThat(service.widgetAccess(token))
+        assertThat(service.widgetAccess(token).body())
                 .isEqualTo(new TwitchatWidgetAccessResponse(owner.toString(), false));
         assertThat(service.widgetObsConfig(token)).isNull();
 
         UUID unknown = UUID.randomUUID();
-        assertThat(service.widgetAccess(unknown)).isNull();
+        assertThat(service.widgetAccess(unknown).status()).isEqualTo(404);
         assertThat(service.widgetObsConfig(unknown)).isNull();
     }
 
@@ -386,8 +386,8 @@ class MockApiServiceTest {
 
         assertThat(regenerated.widgetToken()).isNotEqualTo(old.toString());
         assertThat(service.twitchatSettings(username).widgetToken()).isEqualTo(regenerated.widgetToken());
-        assertThat(service.widgetAccess(old)).isNull();
-        assertThat(service.widgetAccess(UUID.fromString(regenerated.widgetToken()))).isNotNull();
+        assertThat(service.widgetAccess(old).status()).isEqualTo(404);
+        assertThat(service.widgetAccess(UUID.fromString(regenerated.widgetToken())).status()).isEqualTo(200);
     }
 
     @Test

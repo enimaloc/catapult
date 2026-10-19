@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.twitchat.TwitchatDispatchHub;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,13 +37,17 @@ class WidgetObsControllerTest {
     private static final UUID TOKEN = UUID.fromString("11111111-2222-3333-4444-555555555555");
     private static final UUID OWNER = UUID.fromString("99999999-8888-7777-6666-555555555555");
 
+    private static ApiClient.Result<TwitchatWidgetAccessResponse> access(String owner, boolean enabled) {
+        return new ApiClient.Result<>(200, new TwitchatWidgetAccessResponse(owner, enabled));
+    }
+
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
     @MockitoBean TwitchatDispatchHub hub;
 
     @Test
     void page_isBare_noindex_withTheTwoUrls() throws Exception {
-        when(apiService.widgetAccess(TOKEN)).thenReturn(new TwitchatWidgetAccessResponse(OWNER.toString(), true));
+        when(apiService.widgetAccess(TOKEN)).thenReturn(access(OWNER.toString(), true));
 
         mvc.perform(get("/widget/obs/" + TOKEN))
                 .andExpect(status().isOk())
@@ -60,7 +65,25 @@ class WidgetObsControllerTest {
                 // Bare: none of the app's shell.
                 .andExpect(content().string(not(containsString("mdui"))))
                 .andExpect(content().string(not(containsString("spa.js"))))
-                .andExpect(content().string(not(containsString("data-disabled"))));
+                .andExpect(content().string(not(containsString("data-disabled"))))
+                .andExpect(content().string(not(containsString("http-equiv=\"refresh\""))));
+    }
+
+    /** A catapult-api blip while OBS loads the page: its scripts are there, retrying the config until it comes back. */
+    @Test
+    void page_keepsItsScripts_whenCatapultApiIsUnreachable() throws Exception {
+        when(apiService.widgetAccess(TOKEN)).thenReturn(new ApiClient.Result<>(502, null));
+
+        mvc.perform(get("/widget/obs/" + TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("data-obs-config-url=\"/widget/obs/" + TOKEN + "/config\"")))
+                .andExpect(content().string(containsString("data-twitchat-events-url=\"/widget/obs/" + TOKEN + "/events\"")))
+                .andExpect(content().string(containsString("src=\"/js/obs-session.js\"")))
+                .andExpect(content().string(not(containsString("data-disabled"))))
+                .andExpect(content().string(not(containsString("widget disabled"))));
+        mvc.perform(get("/widget/obs/" + TOKEN + "/config")).andExpect(status().isNoContent());
+        mvc.perform(get("/widget/obs/" + TOKEN + "/events")).andExpect(status().isNotFound());
+        verify(hub, never()).subscribe(any(), any(Duration.class));
     }
 
     /** Review Focus 4: never a 500 nor a stack trace, whatever the token. */
@@ -68,8 +91,8 @@ class WidgetObsControllerTest {
     void notAUuid_unknown_disabled_neverFail() throws Exception {
         UUID unknown = UUID.randomUUID();
         UUID disabled = UUID.randomUUID();
-        when(apiService.widgetAccess(unknown)).thenReturn(null);
-        when(apiService.widgetAccess(disabled)).thenReturn(new TwitchatWidgetAccessResponse(OWNER.toString(), false));
+        when(apiService.widgetAccess(unknown)).thenReturn(new ApiClient.Result<>(404, null));
+        when(apiService.widgetAccess(disabled)).thenReturn(access(OWNER.toString(), false));
         when(apiService.widgetObsConfig(any())).thenReturn(null);
 
         for (String token : new String[]{"not-a-uuid", unknown.toString(), disabled.toString()}) {
@@ -77,13 +100,15 @@ class WidgetObsControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("data-disabled")))
                     .andExpect(content().string(containsString("widget disabled")))
+                    // Checked again now and then: switching the widget on reaches OBS without touching it.
+                    .andExpect(content().string(containsString("<meta http-equiv=\"refresh\" content=\"60\">")))
                     .andExpect(content().string(not(containsString("obs-session.js"))))
                     .andExpect(content().string(not(containsString("data-obs-config-url"))));
             mvc.perform(get("/widget/obs/" + token + "/config")).andExpect(status().isNoContent());
             mvc.perform(get("/widget/obs/" + token + "/events")).andExpect(status().isNotFound());
         }
         // An owner id that isn't a UUID (never sent by catapult-api, but never a 500 either).
-        when(apiService.widgetAccess(TOKEN)).thenReturn(new TwitchatWidgetAccessResponse("oops", true));
+        when(apiService.widgetAccess(TOKEN)).thenReturn(access("oops", true));
         mvc.perform(get("/widget/obs/" + TOKEN + "/events")).andExpect(status().isNotFound());
 
         verify(hub, never()).subscribe(any(), any(Duration.class));
@@ -110,7 +135,7 @@ class WidgetObsControllerTest {
 
     @Test
     void events_subscribeTheOwner_whenEnabled() throws Exception {
-        when(apiService.widgetAccess(TOKEN)).thenReturn(new TwitchatWidgetAccessResponse(OWNER.toString(), true));
+        when(apiService.widgetAccess(TOKEN)).thenReturn(access(OWNER.toString(), true));
         when(hub.subscribe(OWNER, WidgetObsController.STREAM_TIMEOUT)).thenReturn(new SseEmitter(600_000L));
 
         mvc.perform(get("/widget/obs/" + TOKEN + "/events")).andExpect(request().asyncStarted());

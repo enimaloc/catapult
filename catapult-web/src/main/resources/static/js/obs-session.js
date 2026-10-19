@@ -12,21 +12,26 @@
  * twitchat.js ("auto" when there's none: OBS disabled, or logged out).
  *
  * A page can name another config URL in its body's data-obs-config-url (the OBS widget page,
- * /widget/obs/{token}/config, same shape); /me/obs otherwise.
+ * /widget/obs/{token}/config, same shape); /me/obs otherwise. That page has no settings to save
+ * and nobody to reload it: while it gets no config (catapult-api unreachable, 204), it asks again
+ * every CONFIG_RETRY_MS.
  */
 window.CatapultObsSession = (function () {
     const MIN_DELAY = 1000;
     const MAX_DELAY = 30000;
+    const CONFIG_RETRY_MS = 30000;
     const { CloseCode } = CatapultObs;
     const FINAL_CLOSE_CODES = new Set([CloseCode.AuthenticationFailed, CloseCode.UnsupportedRpcVersion]);
 
     let config = null;
     let delay = MIN_DELAY;
     let timer = null;
+    let configTimer = null;
     // Bumped by every refresh(), so the retries and connects of an older config give up.
     let generation = 0;
 
     const configUrl = () => document.body?.dataset.obsConfigUrl || "/me/obs";
+    const isWidget = () => Boolean(document.body?.dataset.obsConfigUrl);
 
     async function fetchConfig() {
         try {
@@ -65,8 +70,10 @@ window.CatapultObsSession = (function () {
     /** Re-reads the config (/me/obs by default), then connects, reconnects or disconnects to match it. */
     async function refresh() {
         const gen = ++generation;
+        clearTimeout(configTimer);
         const next = await fetchConfig();
         if (gen !== generation) return;
+        if (!next && isWidget()) configTimer = setTimeout(refresh, CONFIG_RETRY_MS);
         window.CatapultTwitchat?.configure(next?.twitchatBranch ?? "auto");
         if (next && sameConfig(next, config) && CatapultObs.isConnected()) return;
         clearTimeout(timer);

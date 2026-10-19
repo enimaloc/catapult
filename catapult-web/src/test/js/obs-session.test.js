@@ -71,6 +71,37 @@ describe("config URL", () => {
         expect(fetch).toHaveBeenLastCalledWith("/widget/obs/t-1/config", { cache: "no-store" });
         expect(connects).toEqual([CONNECTION]);
     });
+
+    it("on the widget page, asks for its config again every 30s until it gets one", async () => {
+        document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
+        await start(response(204));
+        expect(fetch).toHaveBeenCalledTimes(1);
+
+        // catapult-api still down: a network error is retried the same way.
+        fetch.mockImplementation(async () => { throw new TypeError("Failed to fetch"); });
+        await vi.advanceTimersByTimeAsync(29999);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(connects).toEqual([]);
+
+        fetch.mockImplementation(async () => response(200, CONFIG));
+        await vi.advanceTimersByTimeAsync(30000);
+        expect(fetch).toHaveBeenCalledTimes(3);
+        expect(fetch).toHaveBeenLastCalledWith("/widget/obs/t-1/config", { cache: "no-store" });
+        expect(connects).toEqual([CONNECTION]);
+
+        // Configured: no more polling.
+        await vi.advanceTimersByTimeAsync(120000);
+        expect(fetch).toHaveBeenCalledTimes(3);
+    });
+
+    it("on an app page, never asks /me/obs again on its own", async () => {
+        await start(response(204));
+        await vi.advanceTimersByTimeAsync(120000);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(connects).toEqual([]);
+    });
 });
 
 describe("retries", () => {

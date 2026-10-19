@@ -273,16 +273,19 @@ class RealApiServiceTest {
                 .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist("Authorization"))
                 .andRespond(withSuccess("{\"ownerId\":\"99999999-8888-7777-6666-555555555555\",\"enabled\":true}", MediaType.APPLICATION_JSON));
 
-        assertThat(service.widgetAccess(token)).isEqualTo(new TwitchatWidgetAccessResponse(
-                "99999999-8888-7777-6666-555555555555", true));
+        assertThat(service.widgetAccess(token)).isEqualTo(new ApiClient.Result<>(200, new TwitchatWidgetAccessResponse(
+                "99999999-8888-7777-6666-555555555555", true)));
     }
 
     @Test
-    void widgetAccess_isNullWhenUnknown() {
+    void widgetAccess_tellsUnknownFromUnreachable() {
         UUID token = UUID.randomUUID();
         expect(HttpMethod.GET, "/api/twitchat/widget/" + token + "/access").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThat(service.widgetAccess(token)).isEqualTo(new ApiClient.Result<>(404, null));
 
-        assertThat(service.widgetAccess(token)).isNull();
+        api.reset();
+        expect(HttpMethod.GET, "/api/twitchat/widget/" + token + "/access").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        assertThat(service.widgetAccess(token)).isEqualTo(new ApiClient.Result<>(502, null));
     }
 
     @Test
