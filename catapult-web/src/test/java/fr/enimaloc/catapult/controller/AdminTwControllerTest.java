@@ -53,11 +53,24 @@ class AdminTwControllerTest {
         for (String body : new String[]{
                 "{\"id\":\"Bad Id\",\"label\":\"L\"}", "{\"id\":\"\",\"label\":\"L\"}", "{\"label\":\"L\"}",
                 "{\"id\":\"" + "a".repeat(41) + "\",\"label\":\"L\"}",
-                "{\"id\":\"ok\",\"label\":\"" + "x".repeat(81) + "\"}", "{\"id\":\"ok\",\"label\":\"  \"}", "{\"id\":\"ok\"}",
-                "{\"id\":\"ok\",\"label\":\"L\",\"sortOrder\":-1}"}) {
+                "{\"id\":\"ok\",\"label\":\"" + "x".repeat(81) + "\"}", "{\"id\":\"ok\",\"label\":\"  \"}", "{\"id\":\"ok\"}"}) {
             mvc.perform(admin(post(BASE), body)).andExpect(status().isBadRequest());
         }
         verify(apiService, never()).adminCreateTw(any(), any(), anyInt());
+    }
+
+    @Test
+    void create_aTakenId_is409_withoutCallingTheApi_andAnUnreadableListIsNotAnObstacle() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminTws()).thenReturn(java.util.List.of(
+                new fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto("gore", "Gore", null, true, 0)));
+
+        mvc.perform(admin(post(BASE), "{\"id\":\"gore\",\"label\":\"Again\"}")).andExpect(status().isConflict());
+        verify(apiService, never()).adminCreateTw(any(), any(), anyInt());
+
+        when(apiService.adminTws()).thenReturn(null);
+        when(apiService.adminCreateTw("gore", "Again", 0)).thenReturn(201);
+        mvc.perform(admin(post(BASE), "{\"id\":\"gore\",\"label\":\"Again\"}")).andExpect(status().isCreated());
     }
 
     @Test
