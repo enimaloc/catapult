@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
@@ -106,6 +107,8 @@ public class MockApiService implements ApiService {
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
     /** Application-wide: the groups an admin creates are the same for every mock session. */
     private final MockGroupsStore groups = new MockGroupsStore();
+    /** Application-wide: the whitelist and its invitations are the same for every mock session. */
+    private final MockWhitelistStore whitelist = new MockWhitelistStore();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
     private final MockTargetingStore targeting = new MockTargetingStore();
 
@@ -462,6 +465,48 @@ public class MockApiService implements ApiService {
                 .filter(m -> m.twitchUsername() != null && m.twitchUsername().equalsIgnoreCase(wanted))
                 .map(m -> m.id()).findFirst().orElse(null);
         return memberId == null ? 404 : groups.addMember(id, memberId);
+    }
+
+    @Override
+    public WhitelistPageDto adminWhitelist() {
+        log.trace("adminWhitelist()");
+        return whitelist.page();
+    }
+
+    @Override
+    public int adminToggleWhitelist() {
+        log.trace("adminToggleWhitelist()");
+        return whitelist.toggle();
+    }
+
+    @Override
+    public int adminAddWhitelist(String twitchId) {
+        log.trace("adminAddWhitelist({})", twitchId);
+        return whitelist.add(twitchId);
+    }
+
+    @Override
+    public int adminDeleteWhitelist(String twitchId) {
+        log.trace("adminDeleteWhitelist({})", twitchId);
+        return whitelist.delete(twitchId);
+    }
+
+    @Override
+    public int adminToggleInvites() {
+        log.trace("adminToggleInvites()");
+        return whitelist.toggleInvites();
+    }
+
+    @Override
+    public int adminSaveInviteSettings(Integer globalMaxMembers, Integer defaultMaxUses, boolean defaultCanReinvite) {
+        log.trace("adminSaveInviteSettings({}, {}, {})", globalMaxMembers, defaultMaxUses, defaultCanReinvite);
+        return whitelist.saveSettings(globalMaxMembers, defaultMaxUses, defaultCanReinvite);
+    }
+
+    @Override
+    public int adminSaveInviteQuota(UUID inviteId, Integer maxUses, Boolean canReinvite) {
+        log.trace("adminSaveInviteQuota({}, {}, {})", inviteId, maxUses, canReinvite);
+        return whitelist.saveQuota(inviteId, maxUses, canReinvite);
     }
 
     private boolean mockMemberExists(UUID id) {

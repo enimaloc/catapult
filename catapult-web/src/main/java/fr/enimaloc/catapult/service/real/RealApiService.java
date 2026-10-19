@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.common.dto.admin.ImpersonateRequest;
 import fr.enimaloc.catapult.common.dto.admin.ImpersonateResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
@@ -573,6 +574,48 @@ public class RealApiService implements ApiService {
     @Override
     public int adminAddGroupMember(UUID id, String twitchUsername) {
         return client.call(HttpMethod.POST, "/api/admin/groups/{id}/members", Map.of("twitchUsername", twitchUsername), Void.class, id).status();
+    }
+
+    @Override
+    public WhitelistPageDto adminWhitelist() {
+        return client.get("/api/admin/whitelist", WhitelistPageDto.class);
+    }
+
+    @Override
+    public int adminToggleWhitelist() {
+        return client.call(HttpMethod.POST, "/api/admin/whitelist/toggle", null, Void.class).status();
+    }
+
+    @Override
+    public int adminAddWhitelist(String twitchId) {
+        return client.call(HttpMethod.POST, "/api/admin/whitelist/add", Map.of("twitchId", twitchId), Void.class).status();
+    }
+
+    @Override
+    public int adminDeleteWhitelist(String twitchId) {
+        return client.call(HttpMethod.POST, "/api/admin/whitelist/{id}/delete", null, Void.class, twitchId).status();
+    }
+
+    @Override
+    public int adminToggleInvites() {
+        return client.call(HttpMethod.POST, "/api/admin/whitelist/invite/toggle", null, Void.class).status();
+    }
+
+    @Override
+    public int adminSaveInviteSettings(Integer globalMaxMembers, Integer defaultMaxUses, boolean defaultCanReinvite) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("globalMaxMembers", globalMaxMembers);
+        body.put("defaultMaxUses", defaultMaxUses);
+        body.put("defaultCanReinvite", defaultCanReinvite);
+        return client.call(HttpMethod.POST, "/api/admin/whitelist/invite/settings", body, Void.class).status();
+    }
+
+    @Override
+    public int adminSaveInviteQuota(UUID inviteId, Integer maxUses, Boolean canReinvite) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("maxUses", maxUses);
+        body.put("canReinvite", canReinvite);
+        return client.call(HttpMethod.POST, "/api/admin/whitelist/invite/{id}/quota", body, Void.class, inviteId).status();
     }
 
     @Override

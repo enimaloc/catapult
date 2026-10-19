@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
@@ -197,6 +198,21 @@ public interface ApiService {
     int adminDeleteGroup(UUID id);
     /** catapult-api's status (204; 404 unknown group or Twitch username), 502 when unreachable. */
     int adminAddGroupMember(UUID id, String twitchUsername);
+
+    /** The whitelist, its entries, invitation settings and invites; null when catapult-api fails. */
+    WhitelistPageDto adminWhitelist();
+    /** Flips the whitelist; catapult-api's status (204), 502 when unreachable. */
+    int adminToggleWhitelist();
+    /** Adds a Twitch id (already listed changes nothing); catapult-api's status (204), 502 when unreachable. */
+    int adminAddWhitelist(String twitchId);
+    /** Removes a Twitch id (also an absent one); catapult-api's status (204), 502 when unreachable. */
+    int adminDeleteWhitelist(String twitchId);
+    /** Flips the invitations; catapult-api's status (204), 502 when unreachable. */
+    int adminToggleInvites();
+    /** Saves the invitation settings, a null cap meaning unlimited; catapult-api's status (204), 502 when unreachable. */
+    int adminSaveInviteSettings(Integer globalMaxMembers, Integer defaultMaxUses, boolean defaultCanReinvite);
+    /** Sets an invite's quota, null meaning the default; catapult-api's status (204), 502 when unreachable. */
+    int adminSaveInviteQuota(UUID inviteId, Integer maxUses, Boolean canReinvite);
 
     /** One member, for the targeting view's header; null when unknown or catapult-api fails. */
     AdminMemberSummaryDto adminMember(UUID id);

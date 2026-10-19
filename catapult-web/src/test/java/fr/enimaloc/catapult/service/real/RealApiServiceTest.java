@@ -770,6 +770,56 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminWhitelist_readsThePage() {
+        respond(HttpMethod.GET, "/api/admin/whitelist", "{\"entries\":[{\"twitchId\":\"123\"}],\"resolvedUsernames\":{\"123\":\"alice\"},"
+                + "\"whitelistEnabled\":true,\"inviteEnabled\":true,\"globalMaxMembers\":null,\"defaultMaxUses\":3,"
+                + "\"defaultCanReinvite\":false,\"globalCapReached\":false,\"invites\":[{\"id\":\"" + NOTIF_ID
+                + "\",\"ownerId\":\"" + GROUP_ID + "\",\"ownerUsername\":\"bob\",\"code\":\"ABC234\",\"maxUses\":null,"
+                + "\"useCount\":2,\"canReinvite\":null,\"createdAt\":\"2026-10-01T10:00:00Z\",\"redemptions\":[]}]}");
+
+        var page = service.adminWhitelist();
+
+        assertThat(page.entries()).extracting("twitchId").containsExactly("123");
+        assertThat(page.resolvedUsernames()).containsEntry("123", "alice");
+        assertThat(page.globalMaxMembers()).isNull();
+        assertThat(page.defaultMaxUses()).isEqualTo(3);
+        assertThat(page.invites().getFirst().ownerUsername()).isEqualTo("bob");
+        assertThat(page.invites().getFirst().maxUses()).isNull();
+        assertThat(page.invites().getFirst().useCount()).isEqualTo(2);
+    }
+
+    @Test
+    void whitelistActions_postTheirShapes_andReturnTheStatus() {
+        expect(HttpMethod.POST, "/api/admin/whitelist/toggle").andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/whitelist/add")
+                .andExpect(content().json("{\"twitchId\":\"123\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/whitelist/123/delete").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/admin/whitelist/invite/toggle").andRespond(withNoContent());
+
+        assertThat(service.adminToggleWhitelist()).isEqualTo(204);
+        assertThat(service.adminAddWhitelist("123")).isEqualTo(204);
+        assertThat(service.adminDeleteWhitelist("123")).isEqualTo(404);
+        assertThat(service.adminToggleInvites()).isEqualTo(204);
+    }
+
+    @Test
+    void settings_sendNullsForEmptyNumbers() {
+        expect(HttpMethod.POST, "/api/admin/whitelist/invite/settings")
+                .andExpect(content().json("{\"globalMaxMembers\":null,\"defaultMaxUses\":3,\"defaultCanReinvite\":false}", true))
+                .andRespond(withNoContent());
+
+        assertThat(service.adminSaveInviteSettings(null, 3, false)).isEqualTo(204);
+    }
+
+    @Test
+    void quota_sendsNullsForTheDefault() {
+        expect(HttpMethod.POST, "/api/admin/whitelist/invite/" + NOTIF_ID + "/quota")
+                .andExpect(content().json("{\"maxUses\":null,\"canReinvite\":true}", true)).andRespond(withNoContent());
+
+        assertThat(service.adminSaveInviteQuota(NOTIF_ID, null, true)).isEqualTo(204);
+    }
+
+    @Test
     void adminMember_andTargeting_readTheirEndpoints() {
         respond(HttpMethod.GET, "/api/admin/members/" + NOTIF_ID, "{\"id\":\"" + NOTIF_ID + "\",\"twitchUsername\":\"alice\"}");
         respond(HttpMethod.GET, "/api/admin/members/" + NOTIF_ID + "/targeting",

@@ -241,6 +241,14 @@ public class AdminTabsFragmentController {
         });
     }
 
+    @GetMapping("/whitelist")
+    String whitelist(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("whitelist", apiService.adminWhitelist());
+            return "pages/admin-tab/whitelist :: content";
+        });
+    }
+
     @GetMapping("/broadcast")
     String broadcast(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {

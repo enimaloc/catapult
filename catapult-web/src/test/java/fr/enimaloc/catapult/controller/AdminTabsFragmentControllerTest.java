@@ -57,7 +57,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups",
+                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
@@ -76,6 +76,7 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminNotifications(org.mockito.ArgumentMatchers.anyInt());
         verify(apiService, never()).adminDtddProposals(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminGroups();
+        verify(apiService, never()).adminWhitelist();
         verify(apiService, never()).adminMembers();
         verify(apiService, never()).adminMember(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminMemberTargeting(org.mockito.ArgumentMatchers.any());
@@ -517,6 +518,53 @@ class AdminTabsFragmentControllerTest {
 
         when(apiService.adminGroups()).thenReturn(null);
         assertThat(asAdmin("/spa/admin/groups")).contains("admin-placeholder").doesNotContain("data-rename=");
+    }
+
+    private static final UUID INVITE = UUID.fromString("00000000-0000-0000-0000-000000000077");
+
+    private static fr.enimaloc.catapult.common.dto.admin.WhitelistInviteRow invite(Integer maxUses, Boolean canReinvite) {
+        return new fr.enimaloc.catapult.common.dto.admin.WhitelistInviteRow(INVITE, UUID.randomUUID(), "own<er>", "ABC234",
+                maxUses, 2, canReinvite, java.time.Instant.parse("2026-10-01T10:00:00Z"), List.of());
+    }
+
+    private static fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto whitelist(boolean whitelistOn, boolean invitesOn,
+            List<fr.enimaloc.catapult.common.dto.admin.WhitelistInviteRow> invites) {
+        return new fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto(
+                List.of(new fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto.Entry("123"),
+                        new fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto.Entry("456")),
+                java.util.Map.of("123", "ali<ce>"), whitelistOn, invitesOn, 50, 5, true, true, invites);
+    }
+
+    @Test
+    void invitationsCard_onlyWhenTheWhitelistIsOn_settingsOnlyWhenInvitesAreOn() throws Exception {
+        when(apiService.adminWhitelist()).thenReturn(whitelist(false, true, List.of(invite(3, true))));
+        assertThat(asAdmin("/spa/admin/whitelist")).contains("data-whitelist-toggle", "admin-whitelist-add-save",
+                "data-delete=\"123\"", "ali&lt;ce&gt;", ">—<")
+                .doesNotContain("data-invites-toggle", "admin-whitelist-settings-save", "data-quota=");
+
+        when(apiService.adminWhitelist()).thenReturn(whitelist(true, false, List.of(invite(3, true))));
+        assertThat(asAdmin("/spa/admin/whitelist")).contains("data-invites-toggle")
+                .doesNotContain("admin-whitelist-settings-save", "data-quota=");
+
+        when(apiService.adminWhitelist()).thenReturn(whitelist(true, true, List.of(invite(3, true))));
+        assertThat(asAdmin("/spa/admin/whitelist")).contains("data-invites-toggle", "admin-whitelist-settings-save",
+                "name=\"globalMaxMembers\"", "admin-whitelist-cap", "own&lt;er&gt;", "ABC234",
+                "data-quota=\"" + INVITE + "\"", "admin-whitelist-quota-dialog");
+
+        when(apiService.adminWhitelist()).thenReturn(null);
+        assertThat(asAdmin("/spa/admin/whitelist")).contains("admin-placeholder").doesNotContain("data-whitelist-toggle");
+    }
+
+    @Test
+    void invites_showDefaultWhenMaxIsNull_andFlagZero() throws Exception {
+        when(apiService.adminWhitelist()).thenReturn(whitelist(true, true, List.of(invite(null, null), invite(0, false))));
+
+        String html = asAdmin("/spa/admin/whitelist");
+
+        assertThat(html).contains("(default)", "admin-whitelist-zero", "✗", ">—<");
+        // a default (null) is left out, which the dialog reads as empty
+        assertThat(html).contains("data-can-reinvite=\"false\"", "data-max-uses=\"0\"");
+        assertThat(html.indexOf("data-can-reinvite")).isEqualTo(html.lastIndexOf("data-can-reinvite"));
     }
 
     private static final UUID MEMBER = UUID.fromString("00000000-0000-0000-0000-000000000001");
