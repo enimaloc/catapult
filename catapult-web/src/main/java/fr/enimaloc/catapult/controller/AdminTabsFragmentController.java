@@ -250,6 +250,15 @@ public class AdminTabsFragmentController {
         });
     }
 
+    /** The trigger warning definitions; the keywords sub-view is added by the keywords task. */
+    @GetMapping("/tw")
+    String tw(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("definitions", apiService.adminTws());
+            return "pages/admin-tab/tw :: content";
+        });
+    }
+
     /** Steam and DTDD keys cards, then the Minecraft service accounts card. */
     @GetMapping("/keys")
     String keys(Model model, HttpServletResponse response) {

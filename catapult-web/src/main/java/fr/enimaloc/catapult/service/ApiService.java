@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
+import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
@@ -285,4 +287,13 @@ public interface ApiService {
     ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label);
     /** Polls the device code to re-authenticate the account, answered like {@link #adminCreateMinecraftAccount}. */
     ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode);
+
+    /** The trigger warning definitions, by sort order; null when catapult-api fails. */
+    List<TwDefinitionDto> adminTws();
+    /** One definition; null when unknown or when catapult-api fails. */
+    TwDefinitionDto adminTw(String id);
+    /** Creates a definition; catapult-api's status (201; 400 invalid id or label; 409 id taken), 502 when unreachable. */
+    int adminCreateTw(String id, String label, int sortOrder);
+    /** Starts a background rebuild of the mappings; catapult-api's status (202; 503 when trigger warnings are off), 502 when unreachable. */
+    int adminRebuildTws(TwRebuild mode);
 }

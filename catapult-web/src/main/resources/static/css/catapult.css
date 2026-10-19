@@ -2015,3 +2015,18 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     .admin-minecraft-row > .admin-row-actions { grid-column: 1 / -1; flex-wrap: wrap; }
     .admin-minecraft-row > .admin-cell { white-space: normal; }
 }
+
+/* The admin Trigger warnings tab. */
+.admin-tw-head { flex-wrap: wrap; gap: 12px; }
+.admin-tw-rebuilds { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-tw-danger { --mdui-color-primary: var(--mdui-color-error); --mdui-color-on-primary: var(--mdui-color-on-error); }
+.admin-tw-create { padding: 16px; margin-bottom: 16px; }
+.admin-tw-create-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 8rem auto; gap: 12px; align-items: start; }
+.admin-tw-row { grid-template-columns: 12rem minmax(0, 1fr) 8rem 5rem auto; }
+@media (max-width: 600px) {
+    .admin-tw-create-fields { grid-template-columns: minmax(0, 1fr); }
+    .admin-tw-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-tw-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-tw-row > .admin-row-actions { grid-column: 1 / -1; }
+    .admin-tw-row > .admin-cell { white-space: normal; }
+}

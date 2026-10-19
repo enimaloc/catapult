@@ -15,6 +15,9 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminTwCreateBody;
+import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
@@ -95,6 +98,7 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<Map<String, Object>> DATA_ROW = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<NotificationDto>> NOTIFICATIONS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DtddProposalDto>> DTDD_PROPOSALS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<GroupSummaryDto>> GROUPS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<AdminNotificationDto>> ADMIN_NOTIFICATIONS = new ParameterizedTypeReference<>() {};
 
@@ -780,5 +784,26 @@ public class RealApiService implements ApiService {
     @SuppressWarnings("unchecked")
     private static ApiClient.Result<Map<String, Object>> mapResult(@SuppressWarnings("rawtypes") ApiClient.Result<Map> result) {
         return new ApiClient.Result<>(result.status(), (Map<String, Object>) result.body());
+    }
+
+    @Override
+    public List<TwDefinitionDto> adminTws() {
+        return client.get("/api/admin/tw", TWS);
+    }
+
+    @Override
+    public TwDefinitionDto adminTw(String id) {
+        return client.get("/api/admin/tw/{id}", TwDefinitionDto.class, id);
+    }
+
+    @Override
+    public int adminCreateTw(String id, String label, int sortOrder) {
+        return client.call(HttpMethod.POST, "/api/admin/tw", new AdminTwCreateBody(id, label, null, sortOrder), Void.class).status();
+    }
+
+    @Override
+    public int adminRebuildTws(TwRebuild mode) {
+        // the route is the enum's own constant, never user input
+        return client.call(HttpMethod.POST, "/api/admin/tw/" + mode.apiPath(), null, Void.class).status();
     }
 }
