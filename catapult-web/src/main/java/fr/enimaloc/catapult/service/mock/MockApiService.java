@@ -12,7 +12,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
-import fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -971,7 +971,7 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public List<MinecraftAccountDto> adminMinecraftAccounts() {
+    public List<AccountDto> adminMinecraftAccounts() {
         log.trace("adminMinecraftAccounts()");
         return minecraftAccounts.list();
     }

@@ -15,7 +15,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
-import fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
@@ -730,9 +730,9 @@ public class RealApiService implements ApiService {
     private static final String MINECRAFT_ACCOUNTS = "/api/admin/minecraft-accounts";
 
     @Override
-    public List<MinecraftAccountDto> adminMinecraftAccounts() {
+    public List<AccountDto> adminMinecraftAccounts() {
         // call(): a 404 (Minecraft disabled in catapult-api) must be null, not an error body read as accounts
-        ApiClient.Result<MinecraftAccountDto[]> result = client.call(HttpMethod.GET, MINECRAFT_ACCOUNTS, null, MinecraftAccountDto[].class);
+        ApiClient.Result<AccountDto[]> result = client.call(HttpMethod.GET, MINECRAFT_ACCOUNTS, null, AccountDto[].class);
         return result.status() == 200 && result.body() != null ? List.of(result.body()) : null;
     }
 
