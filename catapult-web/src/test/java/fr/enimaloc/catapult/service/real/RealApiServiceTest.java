@@ -803,6 +803,13 @@ class RealApiServiceTest {
     }
 
     @Test
+    void deleteWhitelist_encodesALegacyId() {
+        expect(HttpMethod.POST, "/api/admin/whitelist/old%20user%2F1/delete").andRespond(withNoContent());
+
+        assertThat(service.adminDeleteWhitelist("old user/1")).isEqualTo(204);
+    }
+
+    @Test
     void settings_sendNullsForEmptyNumbers() {
         expect(HttpMethod.POST, "/api/admin/whitelist/invite/settings")
                 .andExpect(content().json("{\"globalMaxMembers\":null,\"defaultMaxUses\":3,\"defaultCanReinvite\":false}", true))

@@ -49,9 +49,18 @@ class AdminWhitelistControllerTest {
         mvc.perform(admin(post(BASE + "/toggle"), "{}")).andExpect(status().isNoContent());
         mvc.perform(admin(post(BASE + "/invite/toggle"), "{}")).andExpect(status().isBadGateway());
         mvc.perform(admin(post(BASE + "/add"), "{\"twitchId\":\" 123 \"}")).andExpect(status().isNoContent());
-        mvc.perform(admin(post(BASE + "/456/delete"), "{}")).andExpect(status().isNoContent());
+        mvc.perform(admin(post(BASE + "/delete"), "{\"twitchId\":\"456\"}")).andExpect(status().isNoContent());
         verify(apiService).adminAddWhitelist("123");
         verify(apiService).adminDeleteWhitelist("456");
+    }
+
+    @Test
+    void delete_takesALegacyIdFromTheBody_andRelaysTheStatus() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminDeleteWhitelist("old user/1")).thenReturn(404);
+
+        mvc.perform(admin(post(BASE + "/delete"), "{\"twitchId\":\"old user/1\"}")).andExpect(status().isNotFound());
+        verify(apiService).adminDeleteWhitelist("old user/1");
     }
 
     @Test
@@ -61,7 +70,8 @@ class AdminWhitelistControllerTest {
         mvc.perform(admin(post(BASE + "/add"), "{\"twitchId\":\"abc\"}")).andExpect(status().isBadRequest());
         mvc.perform(admin(post(BASE + "/add"), "{\"twitchId\":\" \"}")).andExpect(status().isBadRequest());
         mvc.perform(admin(post(BASE + "/add"), "{}")).andExpect(status().isBadRequest());
-        mvc.perform(admin(post(BASE + "/abc/delete"), "{}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE + "/delete"), "{\"twitchId\":\" \"}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE + "/delete"), "{}")).andExpect(status().isBadRequest());
         verify(apiService, never()).adminAddWhitelist(any());
         verify(apiService, never()).adminDeleteWhitelist(any());
     }
@@ -95,7 +105,7 @@ class AdminWhitelistControllerTest {
 
     @Test
     void actions_refuseVisitorsAndMembers_andNeedCsrf() throws Exception {
-        String[] urls = {BASE + "/toggle", BASE + "/add", BASE + "/123/delete", BASE + "/invite/toggle",
+        String[] urls = {BASE + "/toggle", BASE + "/add", BASE + "/delete", BASE + "/invite/toggle",
                 BASE + "/invite/settings", BASE + "/invite/" + ID + "/quota"};
         for (String url : urls) {
             mvc.perform(post(url).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}"))

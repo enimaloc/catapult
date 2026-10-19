@@ -12,7 +12,6 @@ window.CatapultAdminWhitelist = (function () {
     const ok = status => status >= 200 && status < 300;
     const fieldOf = (scope, name) => scope.querySelector(`[name="${name}"]`);
     const valueOf = (scope, name) => (fieldOf(scope, name).value ?? "").trim();
-    const urlOf = (id, action) => `/admin/whitelist/${encodeURIComponent(id)}/${action}`;
 
     function mark(field) {
         field.setAttribute("invalid", "");
@@ -77,7 +76,7 @@ window.CatapultAdminWhitelist = (function () {
         button.disabled = true; // before the confirmation: a second click must not open another
         try {
             if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
-            await act(panel, root, button, urlOf(button.dataset.delete, "delete"), {}, "labelDeleted");
+            await act(panel, root, button, "/admin/whitelist/delete", { twitchId: button.dataset.delete }, "labelDeleted");
         } finally {
             button.disabled = false;
         }
@@ -113,7 +112,12 @@ window.CatapultAdminWhitelist = (function () {
         const canReinvite = reinvite === "" ? null : reinvite === "true";
         const status = await post(button, `/admin/whitelist/invite/${encodeURIComponent(form.dataset.id)}/quota`, { maxUses, canReinvite });
         if (ok(status) || status === 404) dialog.open = false;
-        await settle(panel, root, status, "labelQuotaSaved");
+        button.disabled = true; // post() re-enabled it; still busy until the tab reloads
+        try {
+            await settle(panel, root, status, "labelQuotaSaved");
+        } finally {
+            button.disabled = false;
+        }
     }
 
     function attach() {

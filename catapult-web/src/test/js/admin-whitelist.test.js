@@ -32,7 +32,7 @@ function page() {
                 <div class="admin-row" data-invite="i-1">
                     <button class="admin-whitelist-quota" data-quota="i/1" data-max-uses="4" data-can-reinvite="false"></button>
                 </div>
-                <button class="admin-whitelist-delete" data-delete="123" data-confirm="Remove 123?"></button>
+                <button class="admin-whitelist-delete" data-delete="old user/1" data-confirm="Remove 123?"></button>
                 <div id="admin-whitelist-quota-dialog">
                     <div class="admin-whitelist-form">
                         <input name="maxUses"><input name="canReinvite">
@@ -85,7 +85,7 @@ describe("admin-whitelist", () => {
 
         await click("[data-delete]");
         expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({ headline: "Remove 123?" }));
-        expect(posted).toHaveBeenLastCalledWith("/admin/whitelist/123/delete", {});
+        expect(posted).toHaveBeenLastCalledWith("/admin/whitelist/delete", { twitchId: "old user/1" });
 
         fill(settings("globalMaxMembers"), "");
         fill(settings("defaultMaxUses"), "3");
@@ -159,6 +159,22 @@ describe("admin-whitelist", () => {
 
         expect(posted).not.toHaveBeenCalled();
         expect(document.querySelector("[data-delete]").disabled).toBe(false);
+    });
+
+    it("sends one request on a double click of the quota save", async () => {
+        let release;
+        posted.mockImplementation(() => new Promise(resolve => { release = () => resolve(response(204)); }));
+        await click("[data-quota]");
+        const button = document.querySelector(".admin-whitelist-quota-save");
+        button.click();
+        button.click();
+        await flush();
+
+        expect(posted).toHaveBeenCalledTimes(1);
+        expect(button.disabled).toBe(true);
+        release();
+        await flush();
+        expect(button.disabled).toBe(false);
     });
 
     it("sends one request on a double click of a switch", async () => {
