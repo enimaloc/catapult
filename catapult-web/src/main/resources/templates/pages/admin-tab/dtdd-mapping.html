@@ -1,0 +1,62 @@
+<!--/*@thymesVar id="proposals" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.DtddProposalDto>"*/-->
+<!--/*@thymesVar id="status" type="java.lang.String"*/-->
+<!--/*
+  The DoesTheDogDie mapping proposals members made, one status at a time (chips: Pending by default).
+  Pending rows are approved or rejected, a rejection with an optional reason asked in a small dialog.
+  Driven by admin-dtdd-mapping.js, which keeps the chosen status (data-status) when it reloads the list.
+*/-->
+<div th:fragment="content" class="admin-view admin-dtdd-mapping" th:attr="data-status=${status},
+     data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+     data-label-conflict=#{admin.dtdd-mapping.conflict},data-label-unknown=#{admin.dtdd-mapping.unknown},
+     data-label-unavailable=#{admin.dtdd-mapping.unavailable},data-label-approved=#{admin.dtdd-mapping.approved},
+     data-label-rejected=#{admin.dtdd-mapping.rejected}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.dtdd-mapping}">DTDD mapping</h2>
+    </div>
+
+    <div class="admin-dtdd-filters">
+        <mdui-chip th:each="s : ${ {'PENDING', 'APPROVED', 'REJECTED'} }" variant="filter" th:attr="data-status-filter=${s}"
+                   th:selected="${s == status}" th:text="#{|admin.dtdd-mapping.status.${#strings.toLowerCase(s)}|}">status</mdui-chip>
+    </div>
+
+    <th:block th:if="${proposals == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${proposals != null and proposals.isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('inbox', #{admin.dtdd-mapping.empty})}"></th:block>
+    </th:block>
+
+    <mdui-card class="admin-table" variant="outlined" th:if="${proposals != null and !proposals.isEmpty()}">
+        <div class="admin-row admin-dtdd-row admin-row-head" aria-hidden="true">
+            <span th:text="#{admin.dtdd-mapping.column.created}">Created</span>
+            <span th:text="#{admin.dtdd-mapping.column.igdb}">IGDB id</span>
+            <span th:text="#{admin.dtdd-mapping.column.dtdd}">DTDD id</span>
+            <span th:text="#{admin.dtdd-mapping.column.proposer}">Proposer</span>
+            <span th:text="#{admin.dtdd-mapping.column.reason}">Reason</span>
+            <span th:if="${status == 'PENDING'}"></span>
+        </div>
+        <div class="admin-row admin-dtdd-row" th:each="p : ${proposals}" th:attr="data-id=${p.id()}">
+            <span class="admin-member-id" th:attr="data-label=#{admin.dtdd-mapping.column.created}"
+                  th:text="${p.createdAt() == null ? '—' : #temporals.format(p.createdAt(), #messages.msg('format.datetime'))}">created</span>
+            <span class="admin-cell" th:attr="data-label=#{admin.dtdd-mapping.column.igdb}" th:text="${p.igdbId()}">100</span>
+            <span class="admin-cell" th:attr="data-label=#{admin.dtdd-mapping.column.dtdd}" th:text="${p.proposedDtddId() == null ? '—' : p.proposedDtddId()}">4521</span>
+            <span class="admin-cell" th:attr="data-label=#{admin.dtdd-mapping.column.proposer}"
+                  th:text="${p.proposer() != null and p.proposer().twitchUsername() != null ? p.proposer().twitchUsername() : '?'}">user</span>
+            <span class="admin-dtdd-reason admin-cell-muted" th:attr="data-label=#{admin.dtdd-mapping.column.reason}"
+                  th:text="${p.reason() == null or p.reason().isBlank() ? '—' : p.reason()}">reason</span>
+            <span class="admin-row-actions" th:if="${status == 'PENDING'}">
+                <mdui-button variant="tonal" class="admin-dtdd-approve" th:attr="data-approve=${p.id()}" th:text="#{admin.dtdd-mapping.approve}">Approve</mdui-button>
+                <mdui-button variant="text" class="admin-dtdd-reject" th:attr="data-reject=${p.id()}" th:text="#{admin.dtdd-mapping.reject}">Reject</mdui-button>
+            </span>
+        </div>
+    </mdui-card>
+
+    <mdui-dialog id="admin-dtdd-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-dtdd-form">
+            <h3 th:text="#{admin.dtdd-mapping.reject-title}">Reject this proposal</h3>
+            <mdui-text-field name="reason" variant="outlined" maxlength="500" rows="3" autosize th:attr="label=#{admin.dtdd-mapping.reason}"></mdui-text-field>
+            <div class="admin-data-actions">
+                <mdui-button variant="text" class="admin-dialog-close" th:text="#{admin.cancel}">Cancel</mdui-button>
+                <mdui-button variant="filled" class="admin-dtdd-confirm-reject" th:text="#{admin.dtdd-mapping.reject}">Reject</mdui-button>
+            </div>
+        </div>
+    </mdui-dialog>
+</div>

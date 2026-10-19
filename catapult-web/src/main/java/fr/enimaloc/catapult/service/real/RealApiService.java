@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
+import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -80,6 +81,7 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<AdminPage<Map<String, Object>>> DATA_ROWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<Map<String, Object>> DATA_ROW = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<NotificationDto>> NOTIFICATIONS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<DtddProposalDto>> DTDD_PROPOSALS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<AdminNotificationDto>> ADMIN_NOTIFICATIONS = new ParameterizedTypeReference<>() {};
 
     private final ApiClient client;
@@ -507,6 +509,22 @@ public class RealApiService implements ApiService {
         return result.body() != null && result.body().bodyHtml() != null
                 ? new ApiClient.Result<>(result.status(), result.body().bodyHtml())
                 : new ApiClient.Result<>(502, null);
+    }
+
+    @Override
+    public List<DtddProposalDto> adminDtddProposals(String status) {
+        return client.get("/api/admin/dtdd-mapping/proposals?status={status}", DTDD_PROPOSALS, status);
+    }
+
+    @Override
+    public int adminApproveDtddProposal(UUID id) {
+        return client.call(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/{id}/approve", null, Void.class, id).status();
+    }
+
+    @Override
+    public int adminRejectDtddProposal(UUID id, String reason) {
+        Map<String, String> body = reason == null || reason.isBlank() ? Map.of() : Map.of("reason", reason);
+        return client.call(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/{id}/reject", body, Void.class, id).status();
     }
 
     @Override

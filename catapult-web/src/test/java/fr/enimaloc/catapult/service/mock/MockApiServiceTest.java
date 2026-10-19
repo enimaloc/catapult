@@ -180,6 +180,19 @@ class MockApiServiceTest {
     }
 
     @Test
+    void dtddPropose_reachesTheAdminReview() {
+        int before = service.adminDtddProposals("PENDING").size();
+
+        service.dtddPropose("1", 2L, "r");
+
+        assertThat(service.adminDtddProposals("PENDING")).hasSize(before + 1);
+        var first = service.adminDtddProposals("PENDING").getFirst();
+        assertThat(service.adminApproveDtddProposal(first.id())).isEqualTo(204);
+        assertThat(service.adminApproveDtddProposal(first.id())).isEqualTo(409);
+        assertThat(service.adminRejectDtddProposal(java.util.UUID.randomUUID(), "x")).isEqualTo(404);
+    }
+
+    @Test
     void noOpActions_changeNothing() {
         service.recheckGame(username);
         service.refreshSteamProfileCache(username);

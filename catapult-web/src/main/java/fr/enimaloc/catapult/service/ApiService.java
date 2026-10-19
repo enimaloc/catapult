@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
+import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -171,6 +172,12 @@ public interface ApiService {
      * body; 404 an older catapult-api without the route), 502 when unreachable or answered without HTML.
      */
     ApiClient.Result<String> adminPreviewNotification(String body);
+    /** The DTDD mapping proposals with {@code status} (PENDING, APPROVED, REJECTED), oldest first; null when catapult-api fails. */
+    List<DtddProposalDto> adminDtddProposals(String status);
+    /** catapult-api's status (204; 404 unknown; 409 already resolved), 502 when unreachable. */
+    int adminApproveDtddProposal(UUID id);
+    /** As {@link #adminApproveDtddProposal}; the reason is sent only when not blank. */
+    int adminRejectDtddProposal(UUID id, String reason);
     /** catapult-api's status (202; 400 invalid; 429 rate-limited), 502 when unreachable. */
     int adminBroadcast(BroadcastRequestDto body);
 

@@ -703,6 +703,42 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminDtddProposals_readsTheListOfTheStatus() {
+        respond(HttpMethod.GET, "/api/admin/dtdd-mapping/proposals?status=APPROVED", "[{\"id\":\"" + NOTIF_ID
+                + "\",\"createdAt\":\"2026-10-18T10:00:00Z\",\"igdbId\":\"100\",\"proposedDtddId\":4521,"
+                + "\"proposer\":{\"id\":\"" + NOTIF_ID + "\",\"twitchUsername\":\"alice\"},\"reason\":\"r\",\"status\":\"APPROVED\"}]");
+
+        var proposals = service.adminDtddProposals("APPROVED");
+
+        assertThat(proposals).hasSize(1);
+        assertThat(proposals.getFirst().igdbId()).isEqualTo("100");
+        assertThat(proposals.getFirst().proposedDtddId()).isEqualTo(4521L);
+        assertThat(proposals.getFirst().proposer().twitchUsername()).isEqualTo("alice");
+    }
+
+    @Test
+    void adminApproveDtddProposal_postsAndReturnsTheStatus() {
+        expect(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/" + NOTIF_ID + "/approve")
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+
+        assertThat(service.adminApproveDtddProposal(NOTIF_ID)).isEqualTo(409);
+    }
+
+    @Test
+    void adminRejectDtddProposal_sendsTheReasonOnlyWhenGiven() {
+        expect(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/" + NOTIF_ID + "/reject")
+                .andExpect(content().json("{}", true)).andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/" + NOTIF_ID + "/reject")
+                .andExpect(content().json("{}", true)).andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/" + NOTIF_ID + "/reject")
+                .andExpect(content().json("{\"reason\":\"dup\"}", true)).andRespond(withNoContent());
+
+        assertThat(service.adminRejectDtddProposal(NOTIF_ID, "")).isEqualTo(204);
+        assertThat(service.adminRejectDtddProposal(NOTIF_ID, "  ")).isEqualTo(204);
+        assertThat(service.adminRejectDtddProposal(NOTIF_ID, "dup")).isEqualTo(204);
+    }
+
+    @Test
     void adminDeleteNotification_returnsTheStatus() {
         expect(HttpMethod.DELETE, "/api/admin/notifications/" + NOTIF_ID).andRespond(withNoContent());
 
