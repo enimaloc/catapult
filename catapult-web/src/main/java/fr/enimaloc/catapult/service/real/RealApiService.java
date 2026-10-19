@@ -747,10 +747,23 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public MinecraftDeviceCodeDto adminMinecraftDeviceCode() {
-        ApiClient.Result<MinecraftDeviceCodeDto> result =
-                client.call(HttpMethod.POST, MINECRAFT_ACCOUNTS + "/device-code", null, MinecraftDeviceCodeDto.class);
-        return result.status() == 200 ? result.body() : null;
+    public MinecraftDeviceCodeStart adminMinecraftDeviceCode() {
+        // read as a map: the code on 200 (snake_case, Microsoft's own fields), {message} on a refusal
+        @SuppressWarnings("rawtypes")
+        ApiClient.Result<Map> result = client.call(HttpMethod.POST, MINECRAFT_ACCOUNTS + "/device-code", null, Map.class);
+        Map<?, ?> body = result.body() == null ? Map.of() : result.body();
+        if (result.status() == 200) {
+            if (!(body.get("device_code") instanceof String deviceCode) || deviceCode.isBlank()) {
+                return new MinecraftDeviceCodeStart(502, null, null);
+            }
+            return new MinecraftDeviceCodeStart(200, new MinecraftDeviceCodeDto(deviceCode, text(body.get("user_code")),
+                    text(body.get("verification_uri")), body.get("interval") instanceof Number n ? n.intValue() : 0), null);
+        }
+        return new MinecraftDeviceCodeStart(result.ok() ? 502 : result.status(), null, text(body.get("message")));
+    }
+
+    private static String text(Object value) {
+        return value instanceof String s ? s : null;
     }
 
     @Override

@@ -13,7 +13,6 @@ import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
-import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -989,9 +988,9 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public MinecraftDeviceCodeDto adminMinecraftDeviceCode() {
+    public MinecraftDeviceCodeStart adminMinecraftDeviceCode() {
         log.trace("adminMinecraftDeviceCode()");
-        return minecraftAccounts.deviceCode();
+        return new MinecraftDeviceCodeStart(200, minecraftAccounts.deviceCode(), null);
     }
 
     @Override

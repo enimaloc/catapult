@@ -270,8 +270,14 @@ public interface ApiService {
     int adminPatchMinecraftAccount(UUID id, Map<String, Object> patch);
     /** Deletes an account; catapult-api's status (204; 409 while users are linked to it; 404 unknown), 502 when unreachable. */
     int adminDeleteMinecraftAccount(UUID id);
-    /** Starts a Microsoft device-code flow; null when catapult-api refuses it or is unreachable. */
-    MinecraftDeviceCodeDto adminMinecraftDeviceCode();
+    /**
+     * Starts a Microsoft device-code flow: status 200 with the code, else catapult-api's status and the
+     * refusal's message when it gave one (e.g. Microsoft's AADSTS error), 502 when unreachable.
+     */
+    MinecraftDeviceCodeStart adminMinecraftDeviceCode();
+
+    /** A device-code start: the code when {@code status} is 200, else null and catapult-api's message (may be null). */
+    record MinecraftDeviceCodeStart(int status, MinecraftDeviceCodeDto code, String message) {}
     /**
      * Polls the device code to enrol a new account ({@code label} null: catapult-api's default):
      * 202 while it isn't confirmed yet, 200 with the account once it is, else the error; 502 when unreachable.

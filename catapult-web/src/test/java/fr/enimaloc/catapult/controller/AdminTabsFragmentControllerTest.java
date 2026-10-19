@@ -737,7 +737,11 @@ class AdminTabsFragmentControllerTest {
         String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
 
         assertThat(html).contains("id=\"admin-minecraft\"", "Act&lt;ive&gt;", "Off_mc", "admin-minecraft-add",
-                "Minecraft service accounts", "Enabled", "Disabled", "Full");
+                "Minecraft service accounts");
+        // the state chips themselves: enabled ×2, disabled ×1, full ×1 (not the seeded "Full" label)
+        assertThat(html.split("<mdui-chip icon=\"check_circle\">Enabled</mdui-chip>", -1)).hasSize(3);
+        assertThat(html.split("<mdui-chip icon=\"block\">Disabled</mdui-chip>", -1)).hasSize(2);
+        assertThat(html.split("<mdui-chip icon=\"group_off\" class=\"admin-minecraft-full\">Full</mdui-chip>", -1)).hasSize(2);
         // disabled → re-authenticate (only that one); full → reset limit (only that one); each: toggle and delete
         assertThat(html.split("admin-minecraft-reauth\"", -1)).hasSize(2);
         assertThat(html).contains("admin-minecraft-reauth\" data-id=\"00000000-0000-0000-0000-00000000000b\"");

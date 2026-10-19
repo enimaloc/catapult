@@ -7,6 +7,7 @@
  * "Add an account" and "Re-authenticate" run catapult-api's Microsoft device-code flow: get a device
  * code, show its user code and verification link, then poll the create / reauth route every
  * max(3, interval) s: 202 → poll again, 200 → done (the tab reloads), anything else → the error, stop.
+ * A refusal (of the device code or of a poll) shows its localized label then catapult-api's message.
  * A verification link that isn't https:// is never rendered as a link and no polling starts. Polling
  * also stops once the flow's element has left the page (the panel's content was replaced) or another
  * admin tab is shown. Listeners are delegated to the panel: its content comes and goes.
@@ -87,11 +88,15 @@ window.CatapultAdminMinecraft = (function () {
         flowEl.replaceChildren(p);
     }
 
-    /** The flow's error: the label for its status, then catapult-api's message when it gave one. */
-    function showFailure(card, flowEl, status, message) {
-        let label = card.dataset.labelFailed;
-        if (status === 400) label = card.dataset.labelExpired;
-        else if (status === 404) label = card.dataset.labelUnknown;
+    /** The label for a failed poll's status. */
+    function pollFailure(card, status) {
+        if (status === 400) return card.dataset.labelExpired;
+        if (status === 404) return card.dataset.labelUnknown;
+        return card.dataset.labelFailed;
+    }
+
+    /** The flow's error: its label, then catapult-api's message (e.g. Microsoft's AADSTS refusal) when it gave one. */
+    function showFailure(flowEl, label, message) {
         showText(flowEl, typeof message === "string" && message.trim() ? `${label} (${message.trim()})` : label, true);
     }
 
@@ -140,7 +145,7 @@ window.CatapultAdminMinecraft = (function () {
         if (over) return;
         if (gone()) return end();
         if (status !== 200 || !code?.deviceCode) {
-            showFailure(card, flowEl, status, null);
+            showFailure(flowEl, card.dataset.labelFailed, code?.message);
             return end();
         }
         if (!secure(code.verificationUri)) {
@@ -171,7 +176,7 @@ window.CatapultAdminMinecraft = (function () {
                 }
                 return;
             }
-            showFailure(card, flowEl, answer.status, answer.body?.message);
+            showFailure(flowEl, pollFailure(card, answer.status), answer.body?.message);
             end();
         };
         timer = setTimeout(tick, intervalMs);

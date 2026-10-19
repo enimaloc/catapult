@@ -1044,16 +1044,23 @@ class RealApiServiceTest {
     }
 
     @Test
-    void adminMinecraftDeviceCode_readsTheSnakeCaseAnswer_andIsNullOnFailure() {
+    void adminMinecraftDeviceCode_readsTheSnakeCaseAnswer_andKeepsARefusalsStatusAndMessage() {
         expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code").andRespond(withSuccess(
                 "{\"device_code\":\"dc-1\",\"user_code\":\"ABCD-1234\",\"verification_uri\":\"https://www.microsoft.com/link\","
                         + "\"interval\":5,\"expires_in\":900}", MediaType.APPLICATION_JSON));
         expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code")
-                .andRespond(withStatus(HttpStatus.BAD_GATEWAY).contentType(MediaType.APPLICATION_JSON).body("{\"message\":\"AADSTS70002\"}"));
+                .andRespond(withStatus(HttpStatus.BAD_GATEWAY).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"message\":\"Device-code Microsoft refusé: AADSTS70002\"}"));
+        expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code").andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        assertThat(service.adminMinecraftDeviceCode()).isEqualTo(new fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto(
-                "dc-1", "ABCD-1234", "https://www.microsoft.com/link", 5));
-        assertThat(service.adminMinecraftDeviceCode()).isNull();
+        assertThat(service.adminMinecraftDeviceCode()).isEqualTo(new fr.enimaloc.catapult.service.ApiService.MinecraftDeviceCodeStart(200,
+                new fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto("dc-1", "ABCD-1234", "https://www.microsoft.com/link", 5), null));
+        assertThat(service.adminMinecraftDeviceCode()).isEqualTo(new fr.enimaloc.catapult.service.ApiService.MinecraftDeviceCodeStart(502,
+                null, "Device-code Microsoft refusé: AADSTS70002"));
+        assertThat(service.adminMinecraftDeviceCode()).isEqualTo(new fr.enimaloc.catapult.service.ApiService.MinecraftDeviceCodeStart(404, null, null));
+        // a 200 without a device code is no code at all
+        assertThat(service.adminMinecraftDeviceCode().status()).isEqualTo(502);
     }
 
     @Test
