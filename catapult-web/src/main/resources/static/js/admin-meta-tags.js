@@ -33,7 +33,11 @@ window.CatapultAdminMetaTags = (function () {
         if (target.disabled) return; // its request is on its way
         if (target.matches(".admin-meta-tag-delete")) {
             const row = target.closest(".admin-meta-tag-row");
-            if (!await CatapultAdminTabs.confirmed(root, target.dataset.confirm)) return;
+            target.disabled = true; // a second click meanwhile doesn't ask again
+            if (!await CatapultAdminTabs.confirmed(root, target.dataset.confirm)) {
+                target.disabled = false;
+                return;
+            }
             const sent = await CatapultAdminTabs.post(root, target, `${BASE}/${encodeURIComponent(row.dataset.id)}/delete`, {});
             if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
             return;

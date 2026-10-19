@@ -135,4 +135,24 @@ describe("admin-meta-tags", () => {
         await flush();
         expect(posted).not.toHaveBeenCalled();
     });
+
+    it("asks once for a delete clicked twice before the confirmation shows", async () => {
+        let answer;
+        mdui.confirm.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+        const button = document.querySelector(".admin-meta-tag-delete");
+        button.click();
+        button.click();
+        await flush();
+        expect(mdui.confirm).toHaveBeenCalledTimes(1);
+
+        answer();
+        await flush();
+        expect(posted).toHaveBeenCalledTimes(1);
+    });
+
+    it("lets the delete be clicked again after the confirmation is refused", async () => {
+        confirmAnswer = false;
+        await click(".admin-meta-tag-delete");
+        expect(document.querySelector(".admin-meta-tag-delete").disabled).toBe(false);
+    });
 });

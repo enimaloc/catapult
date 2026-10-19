@@ -365,7 +365,11 @@ window.CatapultAdminWellKnown = (function () {
         }
         if (target.disabled) return; // its request is on its way
         if (target.matches(".admin-well-known-delete")) {
-            if (!await CatapultAdminTabs.confirmed(root, target.dataset.confirm)) return;
+            target.disabled = true; // a second click meanwhile doesn't ask again
+            if (!await CatapultAdminTabs.confirmed(root, target.dataset.confirm)) {
+                target.disabled = false;
+                return;
+            }
             const sent = await CatapultAdminTabs.post(root, target, `/admin/meta/files/${encodeURIComponent(row.dataset.id)}/delete`, {});
             if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
             return;
