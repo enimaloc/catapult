@@ -90,11 +90,6 @@ public class AdminMembersController {
         return relayUnless(isBlank(body.key()), () -> apiService.adminDeleteMemberFlag(id, body.key()));
     }
 
-    @PostMapping("/flags/{key}/delete")
-    public ResponseEntity<Void> deleteFlagByPath(@PathVariable UUID id, @PathVariable String key) {
-        return relayUnless(isBlank(key), () -> apiService.adminDeleteMemberFlag(id, key));
-    }
-
     @PostMapping("/groups")
     public ResponseEntity<Void> addToGroup(@PathVariable UUID id, @RequestBody GroupBody body) {
         return relayUnless(isBlank(body.groupKey()), () -> apiService.adminAddMemberToGroup(id, body.groupKey()));
