@@ -15,6 +15,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpSession;
 
 import static org.mockito.Mockito.when;
 import java.util.List;
@@ -51,6 +52,21 @@ class AuthControllerTest {
                 .andExpect(redirectedUrl("/channel/own"))
                 .andExpect(request().sessionAttribute(ApiClient.SESSION_JWT_KEY, "the-jwt"));
         assertThat(logins("success")).isEqualTo(succeeded + 1);
+    }
+
+    /** A fresh login ends an impersonation: "Back to admin" must not bring the older admin session back. */
+    @Test
+    void callback_whileImpersonating_dropsTheAdminsOriginalJwt() throws Exception {
+        when(apiService.exchangeCode("code-1")).thenReturn(new TokenResponse("the-jwt"));
+        when(apiService.channelList()).thenReturn(new ChannelListResponse("2", List.of(channel("2", "own"))));
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "member-jwt");
+        session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin-jwt");
+
+        mvc.perform(get("/auth/callback").param("code", "code-1").session(session))
+                .andExpect(redirectedUrl("/channel/own"))
+                .andExpect(request().sessionAttribute(ApiClient.SESSION_JWT_KEY, "the-jwt"))
+                .andExpect(request().sessionAttributeDoesNotExist(ImpersonationController.ORIGINAL_JWT_KEY));
     }
 
     @Test
