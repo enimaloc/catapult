@@ -63,7 +63,7 @@
 
     <!--/* The owner's alone: catapult-api refuses anyone else, so the card isn't offered to a moderator. */-->
     <mdui-card id="channel-danger-zone" class="settings-card danger-zone-card" variant="outlined"
-               th:if="${channelPage.isOwner() and dangerZone != null}" th:attr="data-username=${username}">
+               th:if="${channelPage.isOwner() and dangerZone != null}" th:attr="data-username=${username},data-label-refused=#{channel.settings.danger.error.refused},data-label-unavailable=#{channel.settings.danger.error.unavailable}">
         <div class="title-row">
             <h3 th:text="${dangerZone.pending()} ? #{channel.settings.danger.pending_title} : #{channel.settings.danger.title}">Zone danger</h3>
             <mdui-button-icon th:replace="~{fragments/controls :: helpButton('danger-zone')}"></mdui-button-icon>

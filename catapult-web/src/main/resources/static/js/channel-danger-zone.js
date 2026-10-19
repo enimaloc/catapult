@@ -4,16 +4,23 @@
  * as catapult-api compares it (which answers 204 and does nothing on a mismatch, so this check is
  * all that keeps a typo from looking like a success). Confirm and "Cancel the deletion" post once
  * (the button is disabled while the request runs), then re-render the channel page, which shows
- * the card's new state. The card is replaced by each render: listeners go on its elements.
+ * the card's new state; a refusal or an outage is shown as a localized message (data-label-* on the
+ * card). The card is replaced by each render: listeners go on its elements.
  */
 window.CatapultDangerZone = (function () {
-    async function act(button, url, body) {
+    async function act(card, button, url, body) {
         if (button.disabled) return;
         button.disabled = true;
         let succeeded = false;
         try {
-            const response = await CatapultChannel.postJson(url, body);
+            const response = await CatapultCsrf.postJson(url, body);
             succeeded = response.ok;
+            if (!succeeded) {
+                CatapultChannel.showError(response.status === 401 || response.status === 403
+                    ? card.dataset.labelRefused : card.dataset.labelUnavailable);
+            }
+        } catch (e) {
+            CatapultChannel.showError(card.dataset.labelUnavailable);
         } finally {
             // A failed request leaves the page as is: the button is free to try again.
             if (!succeeded) button.disabled = false;
@@ -25,7 +32,7 @@ window.CatapultDangerZone = (function () {
         const baseUrl = CatapultChannel.baseUrl();
 
         const cancel = card.querySelector("#danger-zone-cancel-btn");
-        cancel?.addEventListener("click", () => act(cancel, `${baseUrl}/settings/cancel-deletion`, {}));
+        cancel?.addEventListener("click", () => act(card, cancel, `${baseUrl}/settings/cancel-deletion`, {}));
 
         const dialog = card.querySelector("#danger-zone-delete-dialog");
         if (!dialog) return;
@@ -44,7 +51,7 @@ window.CatapultDangerZone = (function () {
         sync();
         confirm.addEventListener("click", () => {
             if (!matches()) return;
-            act(confirm, `${baseUrl}/settings/delete-account`, { confirmUsername: field.value });
+            act(card, confirm, `${baseUrl}/settings/delete-account`, { confirmUsername: field.value });
         });
     }
 
