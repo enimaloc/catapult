@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * admin" posts {@code /admin/impersonate/exit}; logging out ends both.
  * <p>
  * On each swap, what catapult-web remembered for the session's former login (its navbar's channels,
- * its streams) is dropped, so that the next page is built for the new one.
+ * its streams) is dropped, so that the next page is built for the new one, and the session id changes.
  */
 @Slf4j
 @Controller
@@ -36,25 +36,29 @@ public class ImpersonationController {
     private final ModelFiller filler;
     private final NavEventStreamController navEvents;
 
-    /** 204 once the session acts as {@code username}; 403 when catapult-api refuses, the session unchanged. */
+    /**
+     * 204 once the session acts as {@code username}; else catapult-api's refusal (404 unknown, 403
+     * refused) or 502 when unreachable, the session unchanged.
+     */
     @PostMapping
     @ResponseBody
-    public ResponseEntity<Void> impersonate(@RequestBody ImpersonateRequest body, HttpSession session) {
+    public ResponseEntity<Void> impersonate(@RequestBody ImpersonateRequest body, HttpServletRequest request) {
         AdminAccess.require(filler);
         if (body.username() == null || body.username().isBlank()) {
             return ResponseEntity.badRequest().build();
         }
-        String token = apiService.adminImpersonate(body.username());
-        if (token == null) {
-            log.warn("Impersonation of {} refused or failed", body.username());
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        ApiClient.Result<String> result = apiService.adminImpersonate(body.username());
+        if (!result.ok() || result.body() == null) {
+            log.warn("Impersonation of {} refused or failed ({})", body.username(), result.status());
+            return ResponseEntity.status(result.ok() ? HttpStatus.BAD_GATEWAY.value() : result.status()).build();
         }
+        HttpSession session = request.getSession();
         // Already impersonating (an owner keeps ROLE_ADMIN): the admin's own JWT stays the one to come back to.
         if (session.getAttribute(ORIGINAL_JWT_KEY) == null) {
             session.setAttribute(ORIGINAL_JWT_KEY, session.getAttribute(ApiClient.SESSION_JWT_KEY));
         }
-        session.setAttribute(ApiClient.SESSION_JWT_KEY, token);
-        navEvents.forget(session);
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, result.body());
+        swapped(request, session);
         return ResponseEntity.noContent().build();
     }
 
@@ -68,8 +72,17 @@ public class ImpersonationController {
         if (session != null && session.getAttribute(ORIGINAL_JWT_KEY) instanceof String original) {
             session.setAttribute(ApiClient.SESSION_JWT_KEY, original);
             session.removeAttribute(ORIGINAL_JWT_KEY);
-            navEvents.forget(session);
+            swapped(request, session);
         }
         return "redirect:/admin#members";
+    }
+
+    /**
+     * The session now acts as another account: what was remembered for the former one is dropped
+     * (by the current id, which its streams are kept under), then its id changes, as on a login.
+     */
+    private void swapped(HttpServletRequest request, HttpSession session) {
+        navEvents.forget(session);
+        request.changeSessionId();
     }
 }
