@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.mock;
 
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
@@ -207,6 +208,19 @@ public class MockData {
                         config.minecraft.serviceAccountUsername),
                 DEFAULT_OBS);
         data.setBotEnabled(config.botEnabled);
+        return data;
+    }
+
+    /** The session of an admin impersonating {@code member} (see MockApiService#adminImpersonate): their channel, the defaults otherwise. */
+    static MockData impersonating(AdminMemberDto member) {
+        MockConfig config = new MockConfig();
+        config.username = member.twitchUsername();
+        config.twitchId = member.twitchId();
+        config.avatarUrl = member.profileImageUrl();
+        config.live = false;
+        config.botEnabled = member.botEnabled();
+        MockData data = fromConfig(config);
+        data.channelDto = new ChannelDto(member.id(), member.twitchId(), member.twitchUsername(), member.profileImageUrl(), false);
         return data;
     }
 

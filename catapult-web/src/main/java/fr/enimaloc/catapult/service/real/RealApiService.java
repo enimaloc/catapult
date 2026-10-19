@@ -8,6 +8,8 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.ImpersonateRequest;
+import fr.enimaloc.catapult.common.dto.admin.ImpersonateResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -513,6 +515,14 @@ public class RealApiService implements ApiService {
         return result.body() != null && result.body().bodyHtml() != null
                 ? new ApiClient.Result<>(result.status(), result.body().bodyHtml())
                 : new ApiClient.Result<>(502, null);
+    }
+
+    @Override
+    public String adminImpersonate(String username) {
+        ApiClient.Result<ImpersonateResponse> result = client.call(HttpMethod.POST, "/api/admin/impersonate",
+                new ImpersonateRequest(username), ImpersonateResponse.class);
+        return result.ok() && result.body() != null && result.body().token() != null && !result.body().token().isBlank()
+                ? result.body().token() : null;
     }
 
     @Override

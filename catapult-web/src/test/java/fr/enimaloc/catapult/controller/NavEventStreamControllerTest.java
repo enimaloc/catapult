@@ -260,6 +260,24 @@ class NavEventStreamControllerTest {
         assertThat(sent(asB)).contains("event:NotificationRead");
     }
 
+    /** An impersonation's swap: the former login's navbar channels and streams are gone, another session's kept. */
+    @Test
+    void forget_dropsTheSessionsChannels_andClosesItsStreams() throws Exception {
+        UUID a = UUID.randomUUID();
+        MockHttpSession session = loggedIn();
+        MockHttpSession other = loggedIn();
+        controller.remember(session, List.of(OWN));
+        MvcResult stream = memberStream(session, a);
+        MvcResult kept = memberStream(other, a);
+
+        controller.forget(session);
+
+        assertThat(stream.getAsyncResult(1000)).isNull(); // completed
+        assertThat(SessionChannels.of(session)).isEmpty();
+        controller.onNotification(new NotificationStreamEvent(a, NotificationStreamEvent.READ, Map.of("unreadCount", 0)));
+        assertThat(sent(kept)).contains("event:NotificationRead");
+    }
+
     @Test
     void aLoggedOutSession_getsNoMoreNotifications() throws Exception {
         UUID a = UUID.randomUUID();

@@ -7,6 +7,8 @@
  * groups: every button posts with itself disabled meanwhile and a success reloads the sub-view. A
  * refusal is told by its status (400, 404, else unavailable), never by catapult-api's message. Its
  * listeners are delegated to the panel: the sub-view comes and goes inside it.
+ *
+ * "Impersonate" logs the admin in as a member and opens their channel (see impersonate()).
  */
 window.CatapultAdminMembers = (function () {
     function memberUrl(row, action) {
@@ -159,6 +161,26 @@ window.CatapultAdminMembers = (function () {
         panel.addEventListener("change", event => event.target.removeAttribute?.("invalid"));
     }
 
+    // --- impersonation -----------------------------------------------------------------------
+
+    /**
+     * Logs the admin in as the item's member (catapult-web swaps the session's JWT, keeping the
+     * admin's to come back to), then opens that member's channel as a new page: every part of it
+     * is built for the new account. A refusal is told on the tab, which stays as it was.
+     */
+    async function impersonate(card, item) {
+        const login = item.dataset.impersonate;
+        item.disabled = true;
+        const status = await post("/admin/impersonate", { username: login });
+        if (ok(status)) {
+            location.assign(`/channel/${encodeURIComponent(login)}`);
+            return;
+        }
+        item.disabled = false;
+        CatapultChannel.showError(status === 403 ? card.dataset.labelImpersonateRefused
+            : card.dataset.labelImpersonateUnavailable);
+    }
+
     // --- the list ----------------------------------------------------------------------------
 
     function attach() {
@@ -190,6 +212,13 @@ window.CatapultAdminMembers = (function () {
                 }
                 if (item.dataset.confirm && !await confirmed(card, item.dataset.confirm)) return;
                 await postThenRefresh(memberUrl(row, item.dataset.action), {});
+            });
+        });
+
+        card.querySelectorAll("mdui-menu-item[data-impersonate]").forEach(item => {
+            item.addEventListener("click", () => {
+                // disabled as rendered (the attribute) or while its request runs (the property)
+                if (!item.disabled && !item.hasAttribute("disabled")) impersonate(card, item);
             });
         });
 

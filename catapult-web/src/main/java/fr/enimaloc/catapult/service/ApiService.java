@@ -175,6 +175,11 @@ public interface ApiService {
      * body; 404 an older catapult-api without the route), 502 when unreachable or answered without HTML.
      */
     ApiClient.Result<String> adminPreviewNotification(String body);
+    /**
+     * A token logged in as the member {@code username}, which catapult-api mints for an admin; null
+     * when it refuses (unknown, not active, the admin themself, a system account) or is unreachable.
+     */
+    String adminImpersonate(String username);
     /** The DTDD mapping proposals with {@code status} (PENDING, APPROVED, REJECTED), oldest first; null when catapult-api fails. */
     List<DtddProposalDto> adminDtddProposals(String status);
     /** catapult-api's status (204; 404 unknown; 409 already resolved), 502 when unreachable. */

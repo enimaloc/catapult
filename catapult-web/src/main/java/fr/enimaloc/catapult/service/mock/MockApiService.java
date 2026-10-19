@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -69,7 +70,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.util.Base64;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -151,6 +154,30 @@ public class MockApiService implements ApiService {
         String token = UUID.randomUUID().toString();
         data.put(token, mockData);
         return new TokenResponse(token);
+    }
+
+    /**
+     * As catapult-api: a token for an active member other than the admin, never the system account.
+     * Shaped as a JWT (unsigned, its claims as catapult-api's) so that ApiClient reads its login,
+     * and keyed to the member's own mock session as {@link #exchangeCode} keys a login's.
+     */
+    @Override
+    public String adminImpersonate(String username) {
+        log.trace("adminImpersonate({})", username);
+        MockData current = currentData();
+        if (current == null || username == null) return null;
+        UUID self = current.getChannelDto().id();
+        AdminMemberDto target = current.getMembers().page().members().stream()
+                .filter(m -> username.equals(m.twitchUsername())).findFirst().orElse(null);
+        if (target == null || target.twitchId() == null || target.systemAccount() || target.id().equals(self)
+                || !target.isActive()) return null;
+        Map<String, Object> claims = Map.of("sub", target.id().toString(), "twitchId", target.twitchId(),
+                "username", target.twitchUsername(), "roles", List.of("ROLE_USER", "ROLE_PREVIOUS_ADMINISTRATOR"));
+        Base64.Encoder base64 = Base64.getUrlEncoder().withoutPadding();
+        String token = base64.encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8)) + "."
+                + base64.encodeToString(JSON.writeValueAsBytes(claims)) + "." + UUID.randomUUID();
+        data.put(token, MockData.impersonating(target));
+        return token;
     }
 
     @Override

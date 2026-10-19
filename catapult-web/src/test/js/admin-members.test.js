@@ -2,7 +2,7 @@
  * The admin members tab: the bot switch only posts, every other action posts once confirmed and
  * then re-renders the page; "migrate" goes through its dialog instead.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
 
 let posted;
@@ -114,6 +114,69 @@ describe("admin-members", () => {
         expect(posts()).toEqual([[`/admin/members/${ID}/migrate`,
             { targetId: OTHER, migrateSettings: false, migrateGetters: false, migrateBindings: true }]]);
         expect(dialog.open).toBe(false);
+    });
+
+    describe("impersonate", () => {
+        let assign;
+
+        function impersonatePage() {
+            html(`
+                <div id="admin-members" data-confirm-text="OK" data-cancel-text="No"
+                     data-label-impersonate-refused="Refused" data-label-impersonate-unavailable="Down">
+                    <div class="admin-member" data-member-id="${ID}" data-member-name="alice">
+                        <mdui-menu-item id="impersonate" data-impersonate="alice"></mdui-menu-item>
+                        <mdui-menu-item id="self" data-impersonate="me" disabled></mdui-menu-item>
+                    </div>
+                </div>`);
+            render();
+        }
+
+        beforeEach(() => {
+            assign = vi.fn();
+            vi.spyOn(window, "location", "get").mockReturnValue({ ...window.location, assign });
+            window.CatapultChannel = { showError: vi.fn(), postJson: vi.fn(), refresh: vi.fn() };
+        });
+
+        afterEach(() => vi.restoreAllMocks());
+
+        it("impersonates then opens the member's channel", async () => {
+            impersonatePage();
+            await click("#impersonate");
+
+            expect(posts()).toEqual([["/admin/impersonate", { username: "alice" }]]);
+            expect(assign).toHaveBeenCalledWith("/channel/alice");
+        });
+
+        it("tells a refusal and stays on the tab", async () => {
+            impersonatePage();
+            posted.mockResolvedValue(response(403));
+            await click("#impersonate");
+            expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Refused");
+
+            posted.mockResolvedValue(response(502));
+            await click("#impersonate");
+            expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
+
+            expect(assign).not.toHaveBeenCalled();
+            expect(document.getElementById("impersonate").disabled).toBe(false);
+        });
+
+        it("posts nothing for a disabled item, and once on a double click", async () => {
+            impersonatePage();
+            await click("#self");
+            expect(posts()).toEqual([]);
+
+            let release;
+            posted.mockImplementation(() => new Promise(resolve => { release = () => resolve(response(403)); }));
+            const item = document.getElementById("impersonate");
+            item.click();
+            await flush();
+            item.click();
+            await flush();
+            release();
+            await flush();
+            expect(posts()).toHaveLength(1);
+        });
     });
 
     describe("targeting", () => {
