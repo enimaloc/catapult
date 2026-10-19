@@ -2070,18 +2070,32 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     min-width: 0;
 }
 
+/* A section title's space below goes under the whole row: on the title, it would center the "?" lower. */
+.channel-section .title-row {
+    margin-bottom: 14px;
+}
+
+.channel-section .title-row > h2 {
+    margin-bottom: 0;
+}
+
 .help-button {
     flex: none;
     color: var(--catapult-text-secondary);
 }
 
 /* Fixed to the viewport (!important: mdui-layout places its items with inline styles): as an absolutely
-   placed drawer it spans the whole scrolling page, and its content would sit at the top, out of sight. */
+   placed drawer it spans the whole scrolling page, and its content would sit at the top, out of sight.
+   Modal, the host is the full-screen overlay and the sheet is its panel part: the width goes there. */
 .help-panel {
     position: fixed !important;
     top: 0 !important;
     bottom: 0 !important;
+}
+
+.help-panel::part(panel) {
     width: min(420px, 100vw);
+    max-width: 100%;
 }
 
 .help-panel-header {
