@@ -15,8 +15,8 @@ import java.util.function.IntSupplier;
 /**
  * The admin Whitelist tab's actions (the two switches, add and delete an entry, the invitation
  * settings and an invite's quota), forwarded to catapult-api with the session's JWT and answered
- * with its status (204; 404 for an unknown invite; 502 when unreachable). A Twitch id is made of
- * digits, which keeps it safe in a path; anything else is refused here.
+ * with its status (204; 404 for an unknown invite; 502 when unreachable). A Twitch id to add is made of
+ * digits; deleting takes any listed id, in the body.
  */
 @RestController
 @RequestMapping("/admin/whitelist")
@@ -41,10 +41,11 @@ public class AdminWhitelistController {
         return relay(() -> apiService.adminAddWhitelist(id));
     }
 
-    @PostMapping("/{twitchId}/delete")
-    public ResponseEntity<Void> delete(@PathVariable String twitchId) {
-        if (!isTwitchId(twitchId)) return refuse();
-        return relay(() -> apiService.adminDeleteWhitelist(twitchId));
+    /** Any listed id, legacy ones included (catapult-api never validated them): in the body, safe from the firewall. */
+    @PostMapping("/delete")
+    public ResponseEntity<Void> delete(@RequestBody AddBody body) {
+        if (body.twitchId() == null || body.twitchId().isBlank()) return refuse();
+        return relay(() -> apiService.adminDeleteWhitelist(body.twitchId()));
     }
 
     @PostMapping("/invite/toggle")
