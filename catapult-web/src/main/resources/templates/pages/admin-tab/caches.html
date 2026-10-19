@@ -64,8 +64,11 @@
     <h3 th:text="#{admin.caches.entry.title(${key})}">Entry</h3>
     <p class="admin-placeholder" th:if="${entry == null}" th:text="#{admin.unavailable}">unavailable</p>
     <th:block th:if="${entry != null}">
-        <p th:if="${entry.expiresInSeconds() != null}"
-           th:text="${entry.expiresInSeconds() >= 0} ? #{admin.caches.entry.expires_in(${entry.expiresInSeconds()})} : #{admin.caches.entry.expired_since(${-entry.expiresInSeconds()})}">expires</p>
+        <!--/* Kept current by time.js, counting from when the browser shows it. */-->
+        <p th:if="${entry.expiresInSeconds() != null}" data-live-time="countdown"
+           th:attr="data-live-in=${entry.expiresInSeconds()},
+                    data-label-future=#{admin.caches.entry.expires_in('{0}')},data-label-past=#{admin.caches.entry.expired_since('{0}')}"
+           th:text="${entry.expiresInSeconds() >= 0} ? #{admin.caches.entry.expires_in(${entry.expiresInSeconds() + 's'})} : #{admin.caches.entry.expired_since(${-entry.expiresInSeconds() + 's'})}">expires</p>
         <p class="admin-placeholder" th:if="${entry.empty()}" th:text="#{admin.caches.entry.not_found}">not found</p>
         <dl class="admin-fields" th:unless="${entry.fields().isEmpty()}">
             <th:block th:each="f : ${entry.fields()}">

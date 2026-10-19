@@ -3,10 +3,11 @@
  * snackbars for a new version, a cancelled maintenance and alerts, and the restart veil. They come as
  * "Broadcast" events ({name, data}) on the shared live stream. The server replays the remembered
  * maintenance on each new stream, so every handler is idempotent. Texts come from the data-label-*
- * attributes of #broadcast-banner; broadcast text goes into the DOM as text only.
+ * attributes of #broadcast-banner; broadcast text goes into the DOM as text only. The countdown is a
+ * time.js live element: this script only gives it the start, and hides the banner once the window is over.
  */
 window.CatapultBroadcasts = (function () {
-    const TICK_MS = 30_000;
+    const TICK_MS = 1000;
     const DISMISS_PREFIX = "broadcast-dismissed-";
     let maintenance = null; // {startsAt (ISO), start, end (ms), duration, message}
     let timer = null;
@@ -36,15 +37,6 @@ window.CatapultBroadcasts = (function () {
         }
     }
 
-    function formatCountdown(ms) {
-        const seconds = ms / 1000;
-        const format = new Intl.RelativeTimeFormat(lang(), { numeric: "auto" });
-        for (const [unit, size] of [["day", 86400], ["hour", 3600], ["minute", 60]]) {
-            if (Math.abs(seconds) >= size) return format.format(Math.round(seconds / size), unit);
-        }
-        return format.format(Math.round(seconds), "second");
-    }
-
     function stopTimer() {
         if (timer !== null) clearInterval(timer);
         timer = null;
@@ -56,14 +48,9 @@ window.CatapultBroadcasts = (function () {
         if (el) el.hidden = true;
     }
 
-    /** Refreshes the countdown, or hides the banner once the maintenance window is over. */
+    /** Hides the banner once the maintenance window is over. */
     function tick() {
-        const el = banner();
-        if (!maintenance || !el || Date.now() >= maintenance.end) {
-            hide();
-            return;
-        }
-        el.querySelector("[data-banner-countdown]").textContent = formatCountdown(maintenance.start - Date.now());
+        if (!maintenance || !banner() || Date.now() >= maintenance.end) hide();
     }
 
     function show() {
@@ -76,8 +63,9 @@ window.CatapultBroadcasts = (function () {
             new Intl.DateTimeFormat(lang(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(maintenance.start));
         el.querySelector("[data-banner-duration]").textContent = label("labelDuration", maintenance.duration);
         el.querySelector("[data-banner-message]").textContent = maintenance.message;
+        el.querySelector("[data-banner-countdown]").setAttribute("datetime", new Date(maintenance.start).toISOString());
+        CatapultTime.refresh(el);
         el.hidden = false;
-        tick();
         if (timer === null) timer = setInterval(tick, TICK_MS);
     }
 

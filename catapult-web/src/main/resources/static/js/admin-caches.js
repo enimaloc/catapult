@@ -29,6 +29,7 @@ window.CatapultAdminCaches = (function () {
         const response = await attempt(root, () => fetch(`/spa/admin/caches/${name}/entry?${query}`));
         if (!response) return;
         dialog.querySelector(".admin-dialog-body").innerHTML = await response.text();
+        window.CatapultTime?.refresh(dialog);
         dialog.open = true;
     }
 

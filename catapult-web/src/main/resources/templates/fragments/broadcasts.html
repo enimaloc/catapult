@@ -5,7 +5,8 @@
     <div class="broadcast-banner-text">
         <strong th:text="#{broadcast.maintenance.title}">broadcast.maintenance.title</strong>
         <span data-banner-time></span>
-        <span data-banner-countdown></span>
+        <span data-banner-countdown data-live-time="countdown"
+              th:attr="data-label-future=#{broadcast.maintenance.countdown('{0}')},data-label-past=#{broadcast.maintenance.ongoing('{0}')}"></span>
         <span data-banner-duration></span>
         <span data-banner-message></span>
     </div>

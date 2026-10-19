@@ -152,6 +152,7 @@ class ChannelVisibilityRenderingTest {
 
         assertThat(pending).contains("id=\"channel-danger-zone\"", "danger-zone-cancel-btn")
                 .containsAnyOf("08/10/2026", "10/08/2026")
+                .contains("data-live-time=\"countdown\" datetime=\"2026-10-08T10:00:00Z\"")
                 .doesNotContain("danger-zone-delete-btn");
 
         BindingDto binding = new BindingDto("binding-1", "AUTO", "STEAM", "Game A", null, "Game A",

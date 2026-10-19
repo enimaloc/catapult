@@ -69,8 +69,10 @@
             <mdui-button-icon th:replace="~{fragments/controls :: helpButton('danger-zone')}"></mdui-button-icon>
         </div>
         <th:block th:if="${dangerZone.pending()}">
-            <p th:if="${dangerZone.deletesAt() != null}"
-               th:text="#{channel.settings.danger.pending_description(${#temporals.format(dangerZone.deletesAt(), #messages.msg('format.date'))})}">Ton compte sera supprimé le</p>
+            <p th:if="${dangerZone.deletesAt() != null}">
+                <span th:text="#{channel.settings.danger.pending_description(${#temporals.format(dangerZone.deletesAt(), #messages.msg('format.date'))})}">Ton compte sera supprimé le</span>
+                <span data-live-time="countdown" th:attr="datetime=${dangerZone.deletesAt()},data-label-future=#{channel.settings.danger.pending_countdown('{0}')}"></span>
+            </p>
             <mdui-button id="danger-zone-cancel-btn" variant="tonal" th:text="#{channel.settings.danger.cancel_button}">Annuler la suppression</mdui-button>
         </th:block>
         <th:block th:unless="${dangerZone.pending()}">
