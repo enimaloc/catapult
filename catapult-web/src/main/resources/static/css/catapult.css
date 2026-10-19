@@ -2083,12 +2083,13 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     min-width: 0;
 }
 
-/* A section title's space below goes under the whole row: on the title, it would center the "?" lower. */
-.channel-section .title-row {
+/* A section title's space below goes under the whole row: on the title, it would center the "?" lower.
+   Not a card's title row: the card's gap already spaces it. */
+.channel-section .section-header > .title-row {
     margin-bottom: 14px;
 }
 
-.channel-section .title-row > h2 {
+.channel-section .section-header > .title-row > h2 {
     margin-bottom: 0;
 }
 
