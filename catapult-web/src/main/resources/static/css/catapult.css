@@ -2043,3 +2043,43 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 @media (max-width: 600px) {
     .admin-tw-kw-form { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Contextual help: the "?" beside a card's title, and the side sheet it opens. */
+.title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.title-row > h2,
+.title-row > h3 {
+    min-width: 0;
+}
+
+.help-button {
+    flex: none;
+    color: var(--catapult-text-secondary);
+}
+
+/* Fixed to the viewport (!important: mdui-layout places its items with inline styles): as an absolutely
+   placed drawer it spans the whole scrolling page, and its content would sit at the top, out of sight. */
+.help-panel {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: min(420px, 100vw);
+}
+
+.help-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 12px 0 24px;
+    font-weight: 600;
+}
+
+.help-content {
+    padding: 8px 24px 24px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}

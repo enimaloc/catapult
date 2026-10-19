@@ -321,4 +321,7 @@ public interface ApiService {
     int adminRemoveTwKeyword(String id, String keyword);
     /** Tries the definition's saved Steam signals, and the draft keyword, on a Steam app; null on failure. */
     TwKeywordTestDto adminTestTwKeyword(String id, String appId, String draftKeyword);
+
+    /** A card's help in {@code locale}'s language (catapult-api's own message bundles, HTML); null when catapult-api fails. */
+    fr.enimaloc.catapult.common.dto.HelpContent help(String cardId, java.util.Locale locale);
 }

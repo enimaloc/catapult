@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.http;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -16,6 +17,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -67,6 +69,20 @@ public class ApiClient {
     public <T> T get(String path, ParameterizedTypeReference<T> type, Object... uriVars) {
         try {
             return client.get().uri(path, uriVars).retrieve().body(type);
+        } catch (Exception e) {
+            logFailure(HttpMethod.GET, path, e);
+            return null;
+        }
+    }
+
+    /**
+     * GET {@code path} in {@code locale}'s language (sent as {@code Accept-Language}, which catapult-api
+     * answers its own messages by), its body read as {@code type}; {@code null} when the call fails.
+     */
+    public <T> T getLocalized(String path, Class<T> type, Locale locale, Object... uriVars) {
+        try {
+            return client.get().uri(path, uriVars)
+                    .header(HttpHeaders.ACCEPT_LANGUAGE, locale.toLanguageTag()).retrieve().body(type);
         } catch (Exception e) {
             logFailure(HttpMethod.GET, path, e);
             return null;

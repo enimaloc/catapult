@@ -104,4 +104,37 @@ class SpaFragmentControllerTest {
                 .andExpect(view().name("pages/error :: error"))
                 .andExpect(model().attribute("errorCode", 404));
     }
+
+    @Test
+    void help_rendersTheTitleAndTheTrustedHtmlBody() throws Exception {
+        when(apiService.help("status", Locale.FRENCH))
+                .thenReturn(new fr.enimaloc.catapult.common.dto.HelpContent("Statut", "<p>Le <b>statut</b></p>"));
+
+        String html = mvc.perform(get("/spa/help/status").locale(Locale.FRENCH))
+                .andExpect(status().isOk())
+                .andExpect(view().name("fragments/help :: content"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("Statut").contains("<p>Le <b>statut</b></p>");
+    }
+
+    @Test
+    void help_unreachable_showsTheCardIdOnly() throws Exception {
+        when(apiService.help("status", Locale.ENGLISH)).thenReturn(null);
+
+        String html = mvc.perform(get("/spa/help/status").locale(Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("status").doesNotContain("<p>");
+    }
+
+    @Test
+    void help_badCardId_is404() throws Exception {
+        for (String bad : List.of("A", "x_y", "a".repeat(41), "a1")) {
+            mvc.perform(get("/spa/help/" + bad)).andExpect(status().isNotFound());
+        }
+        mvc.perform(get("/spa/help/..%2Fx")).andExpect(status().is4xxClientError());
+        verify(apiService, never()).help(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+    }
 }

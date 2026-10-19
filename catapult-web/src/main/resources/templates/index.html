@@ -126,6 +126,16 @@
         </div>
     </footer>
     <div th:replace="~{fragments/broadcasts :: veil}"></div>
+
+    <!--/* The one help sheet of the page: help.js fills #help-content when a card's "?" is clicked. */-->
+    <mdui-navigation-drawer id="help-panel" class="help-panel" placement="right" modal close-on-esc close-on-overlay-click>
+        <div class="help-panel-header">
+            <span class="help-panel-title" th:text="#{help.panel.title}">help.panel.title</span>
+            <mdui-button-icon id="help-panel-close" icon="close" data-help-close th:title="#{help.panel.close}"
+                              th:attr="aria-label=#{help.panel.close}"></mdui-button-icon>
+        </div>
+        <div id="help-content" class="help-content"></div>
+    </mdui-navigation-drawer>
 </mdui-layout>
 
 <!--/* First, so that it sees every other script's errors and live update streams. */-->
@@ -138,6 +148,7 @@
 <script src="/js/live.js"></script>
 <script src="/js/spa.js"></script>
 <script src="/js/broadcasts.js"></script>
+<script src="/js/help.js"></script>
 <script th:if="${loggedIn}" src="/js/notifications.js"></script>
 <!-- Page-wide, not per-fragment: the OBS connection must survive SPA navigation. -->
 <script src="/js/suggest.js"></script>

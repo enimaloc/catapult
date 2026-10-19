@@ -1097,4 +1097,14 @@ public class MockApiService implements ApiService {
         log.trace("adminTestTwKeyword({}, {}, {})", id, appId, draftKeyword);
         return tws.test(id, appId, draftKeyword);
     }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.HelpContent help(String cardId, java.util.Locale locale) {
+        log.trace("help({}, {})", cardId, locale);
+        boolean french = "fr".equals(locale.getLanguage());
+        return new fr.enimaloc.catapult.common.dto.HelpContent(
+                (french ? "Aide : " : "Help: ") + cardId,
+                french ? "<p>Texte d'aide de démonstration pour <strong>" + cardId + "</strong>.</p>"
+                        : "<p>Sample help text for <strong>" + cardId + "</strong>.</p>");
+    }
 }

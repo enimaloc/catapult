@@ -3,7 +3,10 @@
 <mdui-tab-panel slot="panel" value="integrations" th:if="${channelPage.isOwner()}" th:fragment="panel"
                 xmlns:spa="urn:fr.enimaloc.catapult:spa">
     <div class="section-header">
-        <h2 th:text="#{channel.connections.title}">Connexions</h2>
+        <div class="title-row">
+            <h2 th:text="#{channel.connections.title}">Connexions</h2>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('connections')}"></mdui-button-icon>
+        </div>
     </div>
 
     <!--/* Cards are built by IntegrationCards: every state is pre-rendered and toggled with the

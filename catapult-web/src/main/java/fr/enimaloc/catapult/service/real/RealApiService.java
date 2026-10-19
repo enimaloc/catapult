@@ -865,4 +865,9 @@ public class RealApiService implements ApiService {
                 new SteamSignalTestBody(appId, draftKeyword), TwKeywordTestDto.class, id);
         return result.ok() ? result.body() : null;
     }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.HelpContent help(String cardId, java.util.Locale locale) {
+        return client.getLocalized("/api/help/{cardId}", fr.enimaloc.catapult.common.dto.HelpContent.class, locale, cardId);
+    }
 }

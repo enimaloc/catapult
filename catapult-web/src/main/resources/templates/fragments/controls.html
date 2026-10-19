@@ -30,3 +30,8 @@
     <input type="hidden" th:id="${prefix} + '-game-id'" th:value="${gameId}"/>
     <mdui-list th:id="${prefix} + '-game-results'"></mdui-list>
 </th:block>
+
+<!--/* The "?" of a card's header: help.js opens the side sheet with that card's help. A native title,
+     as elsewhere (mdui-tooltip renders tiny); no badge inside, the button clips its content. */-->
+<mdui-button-icon th:fragment="helpButton(cardId)" class="help-button" icon="help_outline"
+                  th:attr="data-help=${cardId},aria-label=#{help.button}" th:title="#{help.button}"></mdui-button-icon>
