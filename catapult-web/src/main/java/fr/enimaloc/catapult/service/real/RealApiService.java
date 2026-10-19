@@ -263,9 +263,11 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public TwitchatSettingsResponse regenerateTwitchatWidget(String username) {
+    public ApiClient.Result<TwitchatSettingsResponse> regenerateTwitchatWidget(String username) {
         // The answer carries the new token: never logged.
-        return client.post("/api/channels/{username}/settings/twitchat/regenerate", TwitchatSettingsResponse.class, username);
+        ApiClient.Result<TwitchatSettingsResponse> result = client.call(HttpMethod.POST,
+                "/api/channels/{username}/settings/twitchat/regenerate", null, TwitchatSettingsResponse.class, username);
+        return result.ok() ? result : new ApiClient.Result<>(result.status(), null);
     }
 
     @Override

@@ -233,8 +233,8 @@ class ChannelActionsControllerTest {
 
     @Test
     void regenerateTwitchatWidget_relaysAndAnswersNoContent() throws Exception {
-        when(apiService.regenerateTwitchatWidget("enimaloc")).thenReturn(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse(
-                true, "h", 4455, true, "11111111-2222-3333-4444-555555555555"));
+        when(apiService.regenerateTwitchatWidget("enimaloc")).thenReturn(new fr.enimaloc.catapult.service.http.ApiClient.Result<>(200,
+                new fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse(true, "h", 4455, true, "11111111-2222-3333-4444-555555555555")));
 
         mvc.perform(post("/channel/enimaloc/settings/twitchat/regenerate").with(csrf()))
                 .andExpect(status().isNoContent());
@@ -243,7 +243,12 @@ class ChannelActionsControllerTest {
     }
 
     @Test
-    void regenerateTwitchatWidget_isBadGatewayWhenCatapultApiRefusesOrIsDown() throws Exception {
+    void regenerateTwitchatWidget_relaysCatapultApisStatus() throws Exception {
+        when(apiService.regenerateTwitchatWidget("enimaloc")).thenReturn(new fr.enimaloc.catapult.service.http.ApiClient.Result<>(403, null));
+        mvc.perform(post("/channel/enimaloc/settings/twitchat/regenerate").with(csrf()))
+                .andExpect(status().isForbidden());
+
+        when(apiService.regenerateTwitchatWidget("enimaloc")).thenReturn(new fr.enimaloc.catapult.service.http.ApiClient.Result<>(502, null));
         mvc.perform(post("/channel/enimaloc/settings/twitchat/regenerate").with(csrf()))
                 .andExpect(status().isBadGateway());
     }

@@ -14,6 +14,7 @@
             <span th:replace="~{pages/channel-tab/integrations :: message(${integration.name()})}">Twitch</span>
             <th:block th:each="node : ${integration.nodes()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${node})}"></th:block></th:block>
             <th:block th:if="${integration.id() == 'obs' and widgetUrl != null}" th:insert="~{pages/channel-tab/integrations :: obs-widget}"></th:block>
+            <p th:if="${integration.id() == 'obs' and widgetUrl == null and widgetUnavailable == true}" id="obs-widget-unavailable" th:text="#{channel.connections.obs.widget.link_unavailable}">Lien du widget indisponible.</p>
         </mdui-card>
     </div>
 </mdui-tab-panel>

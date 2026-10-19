@@ -84,8 +84,11 @@ public interface ApiService {
     TwitchatWidgetAccessResponse widgetAccess(UUID token);
     /** The channel's Twitchat widget settings (the owner's); null when refused or unreachable. */
     TwitchatSettingsResponse twitchatSettings(String username);
-    /** Replaces the OBS widget link's token; the answer carries the new one, null when refused or unreachable. */
-    TwitchatSettingsResponse regenerateTwitchatWidget(String username);
+    /**
+     * Replaces the OBS widget link's token: catapult-api's status (403 refused, 404...), 502 when
+     * unreachable; the body carries the new settings on success, null otherwise.
+     */
+    ApiClient.Result<TwitchatSettingsResponse> regenerateTwitchatWidget(String username);
     void saveObsSettings(String username, boolean enabled, String host, Integer port, String password);
     /** "auto" or one of TwitchatData.SUPPORTED_BRANCHES. */
     void saveTwitchatBranch(String username, String branch);

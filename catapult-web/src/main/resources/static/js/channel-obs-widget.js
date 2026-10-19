@@ -50,12 +50,22 @@ window.CatapultObsWidget = (function () {
         });
     }
 
+    // The current card's source check: one document listener for the page's life, not one per render.
+    let active = null;
+
+    document.addEventListener("catapult:obs:connected", () => {
+        if (active?.card.isConnected) active.check();
+    });
+
     function attachSourceCheck(card) {
+        active?.stop();
+        active = null;
         const status = card.querySelector("#obs-widget-source-status");
         const missing = card.querySelector("#obs-widget-source-missing");
         const create = card.querySelector("#obs-widget-source-create-btn");
         const widgetUrl = card.dataset.widgetUrl;
         if (!status || !missing || !widgetUrl) return;
+        let stopped = false;
 
         const show = (label, isMissing) => {
             status.textContent = status.dataset[label];
@@ -92,6 +102,7 @@ window.CatapultObsWidget = (function () {
             let found;
             try {
                 found = await hasSource();
+                if (stopped) return;
             } catch (e) {
                 if (gen === generation) show("labelUnreachable", false);
                 return;
@@ -120,15 +131,8 @@ window.CatapultObsWidget = (function () {
             }
         });
 
-        // Whenever the page's OBS (re)connects, e.g. right after "Connect" in this card.
-        const onConnected = () => {
-            if (!card.isConnected) {
-                document.removeEventListener("catapult:obs:connected", onConnected);
-                return;
-            }
-            check();
-        };
-        document.addEventListener("catapult:obs:connected", onConnected);
+        // Whenever the page's OBS (re)connects, e.g. right after "Connect" in this card, the listener above re-checks.
+        active = { card, check, stop() { stopped = true; generation++; clearTimeout(waiting); } };
         check();
     }
 
