@@ -51,7 +51,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping")) {
+                "/spa/admin/well-known", "/spa/admin/well-known/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
         }
@@ -68,6 +68,7 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminWellKnownFile(org.mockito.ArgumentMatchers.anyLong());
         verify(apiService, never()).adminNotifications(org.mockito.ArgumentMatchers.anyInt());
         verify(apiService, never()).adminDtddProposals(org.mockito.ArgumentMatchers.any());
+        verify(apiService, never()).adminGroups();
         verify(apiService, never()).adminMembers();
     }
 
@@ -484,6 +485,29 @@ class AdminTabsFragmentControllerTest {
 
         when(apiService.adminDtddProposals("REJECTED")).thenReturn(null);
         assertThat(asAdmin("/spa/admin/dtdd-mapping?status=REJECTED")).contains("admin-placeholder", "data-status-filter=\"PENDING\"");
+    }
+
+    private static fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto group(String key, String description, int members) {
+        return new fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto(
+                java.util.UUID.fromString("00000000-0000-0000-0000-000000000042"), key, "Name <" + key + ">", description, members);
+    }
+
+    @Test
+    void groupsFragment_rendersRows_andEmptyState() throws Exception {
+        when(apiService.adminGroups()).thenReturn(List.of(group("beta", "For <testers>", 3), group("staff", null, 0)));
+
+        String html = asAdmin("/spa/admin/groups");
+
+        assertThat(html).contains("admin-groups", "beta", "Name &lt;beta&gt;", "For &lt;testers&gt;", ">3<", "staff", ">—<",
+                "data-rename=\"00000000-0000-0000-0000-000000000042\"", "data-add-member=\"00000000-0000-0000-0000-000000000042\"",
+                "data-delete=\"00000000-0000-0000-0000-000000000042\"", "admin-groups-rename-dialog",
+                "admin-groups-member-dialog", "data-label-conflict=\"");
+
+        when(apiService.adminGroups()).thenReturn(List.of());
+        assertThat(asAdmin("/spa/admin/groups")).contains("No group").doesNotContain("data-rename=");
+
+        when(apiService.adminGroups()).thenReturn(null);
+        assertThat(asAdmin("/spa/admin/groups")).contains("admin-placeholder").doesNotContain("data-rename=");
     }
 
     @Test

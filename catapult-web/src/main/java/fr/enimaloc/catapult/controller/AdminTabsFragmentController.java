@@ -197,6 +197,14 @@ public class AdminTabsFragmentController {
         });
     }
 
+    @GetMapping("/groups")
+    String groups(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("groups", apiService.adminGroups());
+            return "pages/admin-tab/groups :: content";
+        });
+    }
+
     @GetMapping("/broadcast")
     String broadcast(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {

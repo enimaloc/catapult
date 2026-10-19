@@ -739,6 +739,35 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminGroups_readsTheList() {
+        respond(HttpMethod.GET, "/api/admin/groups", "[{\"id\":\"" + NOTIF_ID
+                + "\",\"key\":\"beta\",\"name\":\"Beta\",\"description\":null,\"memberCount\":3}]");
+
+        var groups = service.adminGroups();
+
+        assertThat(groups).hasSize(1);
+        assertThat(groups.getFirst().key()).isEqualTo("beta");
+        assertThat(groups.getFirst().memberCount()).isEqualTo(3);
+    }
+
+    @Test
+    void adminGroupActions_postTheirShapes_andReturnTheStatus() {
+        expect(HttpMethod.POST, "/api/admin/groups")
+                .andExpect(content().json("{\"key\":\"beta\",\"name\":\"Beta\",\"description\":\"d\"}", true))
+                .andRespond(withStatus(HttpStatus.CREATED));
+        expect(HttpMethod.POST, "/api/admin/groups/" + NOTIF_ID + "/rename")
+                .andExpect(content().json("{\"name\":\"N\",\"description\":\"D\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/groups/" + NOTIF_ID + "/members")
+                .andExpect(content().json("{\"twitchUsername\":\"alice\"}", true)).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/admin/groups/" + NOTIF_ID + "/delete").andRespond(withNoContent());
+
+        assertThat(service.adminCreateGroup("beta", "Beta", "d")).isEqualTo(201);
+        assertThat(service.adminRenameGroup(NOTIF_ID, "N", "D")).isEqualTo(204);
+        assertThat(service.adminAddGroupMember(NOTIF_ID, "alice")).isEqualTo(404);
+        assertThat(service.adminDeleteGroup(NOTIF_ID)).isEqualTo(204);
+    }
+
+    @Test
     void adminDeleteNotification_returnsTheStatus() {
         expect(HttpMethod.DELETE, "/api/admin/notifications/" + NOTIF_ID).andRespond(withNoContent());
 

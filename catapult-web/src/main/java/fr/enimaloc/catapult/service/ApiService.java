@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -178,6 +179,16 @@ public interface ApiService {
     int adminApproveDtddProposal(UUID id);
     /** As {@link #adminApproveDtddProposal}; the reason is sent only when not blank. */
     int adminRejectDtddProposal(UUID id, String reason);
+    /** The member groups, with their member counts; null when catapult-api fails. */
+    List<GroupSummaryDto> adminGroups();
+    /** catapult-api's status (201; 400 blank key; 409 key already used), 502 when unreachable. */
+    int adminCreateGroup(String key, String name, String description);
+    /** catapult-api's status (204; 404 unknown group), 502 when unreachable. */
+    int adminRenameGroup(UUID id, String name, String description);
+    /** catapult-api's status (204; 404 unknown group), 502 when unreachable. */
+    int adminDeleteGroup(UUID id);
+    /** catapult-api's status (204; 404 unknown group or Twitch username), 502 when unreachable. */
+    int adminAddGroupMember(UUID id, String twitchUsername);
     /** catapult-api's status (202; 400 invalid; 429 rate-limited), 502 when unreachable. */
     int adminBroadcast(BroadcastRequestDto body);
 
