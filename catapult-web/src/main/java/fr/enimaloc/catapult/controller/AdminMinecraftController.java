@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.controller;
 
-import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,7 @@ import java.util.function.Supplier;
  * The admin Keys tab's Minecraft service accounts: enable / disable, reset the friend limit and
  * delete (409 while users are linked to it), each answered with catapult-api's status (502 when
  * unreachable); and the Microsoft device-code flow catapult-api runs, which this only relays: the
- * device code (502 when it can't be had), then each create / reauth poll with catapult-api's status
+ * device code (else catapult-api's status and {@code message}, 502 when unreachable), then each create / reauth poll with catapult-api's status
  * (202 not confirmed yet, 200 done with the account's {@code minecraftUsername} and {@code label},
  * else the error and its {@code message} when catapult-api gave one).
  */
@@ -55,11 +54,14 @@ public class AdminMinecraftController {
         return ResponseEntity.status(apiService.adminDeleteMinecraftAccount(id)).build();
     }
 
+    /** The code (200), else catapult-api's status with its {@code message} when it gave one: Microsoft's refusal must reach the admin. */
     @PostMapping("/device-code")
-    public ResponseEntity<MinecraftDeviceCodeDto> deviceCode() {
+    public ResponseEntity<?> deviceCode() {
         AdminAccess.require(filler);
-        MinecraftDeviceCodeDto code = apiService.adminMinecraftDeviceCode();
-        return code == null ? ResponseEntity.status(HttpStatus.BAD_GATEWAY).build() : ResponseEntity.ok(code);
+        ApiService.MinecraftDeviceCodeStart start = apiService.adminMinecraftDeviceCode();
+        if (start.status() == 200 && start.code() != null) return ResponseEntity.ok(start.code());
+        int status = start.status() == 200 ? HttpStatus.BAD_GATEWAY.value() : start.status();
+        return ResponseEntity.status(status).body(message(start.message()));
     }
 
     @PostMapping("/create")
@@ -89,9 +91,14 @@ public class AdminMinecraftController {
         if (result.status() == 200) {
             shown.put("minecraftUsername", answer.get("minecraftUsername"));
             shown.put("label", answer.get("label"));
-        } else if (result.status() != 202 && answer.get("message") instanceof String message && !message.isBlank()) {
-            shown.put("message", message);
+        } else if (result.status() != 202) {
+            shown.putAll(message(answer.get("message")));
         }
         return ResponseEntity.status(result.status()).body(shown);
+    }
+
+    /** {@code {message}} for a non-blank message, else nothing. */
+    private static Map<String, Object> message(Object message) {
+        return message instanceof String text && !text.isBlank() ? Map.of("message", text) : Map.of();
     }
 }

@@ -140,15 +140,19 @@ describe("admin-minecraft device-code flow", () => {
         expect(polls()).toHaveLength(2);
     });
 
-    it("says why the device code couldn't be had", async () => {
-        routes["/admin/minecraft-accounts/device-code"] = [response(502, "")];
+    it("shows Microsoft's refusal when the device code can't be had", async () => {
+        routes["/admin/minecraft-accounts/device-code"] = [
+            response(502, { message: "Device-code Microsoft refusé: AADSTS70002" }), response(502, "")];
 
         await click(".admin-minecraft-add");
         await vi.advanceTimersByTimeAsync(30000);
 
-        expect(addFlow().textContent).toContain("Failed");
+        expect(addFlow().textContent).toBe("Failed (Device-code Microsoft refusé: AADSTS70002)");
         expect(polls()).toHaveLength(0);
         expect(document.querySelector(".admin-minecraft-add").disabled).toBe(false);
+
+        await click(".admin-minecraft-add"); // unreachable: no message, the label alone
+        expect(addFlow().textContent).toBe("Failed");
     });
 
     it("does not link a non-https verification URI and does not start polling", async () => {
@@ -177,6 +181,22 @@ describe("admin-minecraft device-code flow", () => {
         await vi.advanceTimersByTimeAsync(30000);
 
         expect(polls()).toHaveLength(1);
+    });
+
+    it("stops when the panel content is replaced while a poll is on its way", async () => {
+        let answer;
+        routes["/admin/minecraft-accounts/create"] = [new Promise(resolve => { answer = resolve; })];
+        await click(".admin-minecraft-add");
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(polls()).toHaveLength(1);
+
+        panel().innerHTML = "<p>another view</p>";
+        answer(response(200, { minecraftUsername: "Bot_mc", label: "Bot1" }));
+        await vi.advanceTimersByTimeAsync(30000);
+
+        expect(polls()).toHaveLength(1);
+        expect(window.mdui.snackbar).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
     });
 
     it("stops polling when another admin tab is shown", async () => {
