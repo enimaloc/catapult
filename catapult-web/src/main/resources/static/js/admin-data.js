@@ -6,21 +6,17 @@
  * open. Listeners are delegated to the panel.
  */
 window.CatapultAdminData = (function () {
-    function message(root, status = "—") {
-        return root.dataset[`error-${status}`] ?? root.dataset.error.replace("{0}", status);
-    }
-
     /** `request`'s response when it went through; otherwise null, the failure told. */
     async function attempt(root, request) {
         let response;
         try {
             response = await request();
         } catch {
-            CatapultChannel.showError(message(root));
+            CatapultChannel.showError(CatapultAdminTabs.refusal(root));
             return null;
         }
         if (!response.ok) {
-            CatapultChannel.showError(message(root, response.status));
+            CatapultChannel.showError(CatapultAdminTabs.refusal(root, response.status));
             return null;
         }
         return response;

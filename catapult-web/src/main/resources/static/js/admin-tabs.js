@@ -143,6 +143,30 @@ window.CatapultAdminTabs = (function () {
         }).then(() => true, () => false);
     }
 
+    /** `root`'s data-error-{status} for a refused admin action, else its data-error with the status ("—" when not sent). */
+    function refusal(root, status = "—") {
+        return root.dataset[`error-${status}`] ?? root.dataset.error.replace("{0}", status);
+    }
+
+    /**
+     * Posts `body` to `url` with `button` disabled meanwhile: "ok" when it went through, else the
+     * refusal's status (null when it couldn't be sent), told to the admin, and the button usable again.
+     */
+    async function post(root, button, url, body) {
+        button.disabled = true;
+        let status;
+        try {
+            const response = await CatapultCsrf.postJson(url, body);
+            if (response.ok) return "ok";
+            status = response.status;
+        } catch {
+            // not sent at all: no status to tell
+        }
+        CatapultChannel.showError(refusal(root, status));
+        button.disabled = false;
+        return status ?? null;
+    }
+
     function listen(panel) {
         panel.addEventListener("click", event => {
             const target = event.target.closest("[data-admin-open],[data-admin-back],[data-admin-page],[data-admin-retry]");
@@ -178,5 +202,5 @@ window.CatapultAdminTabs = (function () {
 
     document.addEventListener("catapult:render", attach);
 
-    return { route, show, reload, reloadResults, confirmed };
+    return { route, show, reload, reloadResults, confirmed, refusal, post };
 })();

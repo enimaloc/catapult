@@ -30,10 +30,6 @@ window.CatapultAdminWellKnown = (function () {
         return "text/plain; charset=utf-8";
     }
 
-    function message(root, status = "—") {
-        return root.dataset[`error-${status}`] ?? root.dataset.error.replace("{0}", status);
-    }
-
     const value = (form, name) => form.querySelector(`[name="${name}"]`).value ?? "";
 
     const states = new WeakMap(); // form root → { descriptor, model, schema, mode }
@@ -308,11 +304,11 @@ window.CatapultAdminWellKnown = (function () {
         try {
             response = await fetch(`/spa/admin/meta/file${query}`);
         } catch {
-            CatapultChannel.showError(message(root));
+            CatapultChannel.showError(CatapultAdminTabs.refusal(root));
             return;
         }
         if (!response.ok) {
-            CatapultChannel.showError(message(root, response.status));
+            CatapultChannel.showError(CatapultAdminTabs.refusal(root, response.status));
             if (response.status === 404) await CatapultAdminTabs.reload(panel);
             return;
         }
@@ -320,22 +316,6 @@ window.CatapultAdminWellKnown = (function () {
         dialog.open = true;
         const form = dialog.querySelector(".admin-well-known-form");
         if (form) await setupForm(form);
-    }
-
-    /** Posts with `button` disabled meanwhile; "ok" when it went through, else the status (null when not sent), told. */
-    async function send(root, button, url, body) {
-        button.disabled = true;
-        let status;
-        try {
-            const response = await CatapultCsrf.postJson(url, body);
-            if (response.ok) return "ok";
-            status = response.status;
-        } catch {
-            // not sent at all: no status to tell
-        }
-        CatapultChannel.showError(message(root, status));
-        button.disabled = false;
-        return status ?? null;
     }
 
     /** The file's text; read with a FileReader, as jsdom's File has no text(). */
@@ -358,7 +338,7 @@ window.CatapultAdminWellKnown = (function () {
         try {
             text = await readText(file);
         } catch {
-            CatapultChannel.showError(message(root));
+            CatapultChannel.showError(CatapultAdminTabs.refusal(root));
             return;
         }
         if (text.includes("\u0000")) {
@@ -386,7 +366,7 @@ window.CatapultAdminWellKnown = (function () {
         if (target.disabled) return; // its request is on its way
         if (target.matches(".admin-well-known-delete")) {
             if (!await CatapultAdminTabs.confirmed(root, target.dataset.confirm)) return;
-            const sent = await send(root, target, `/admin/meta/files/${encodeURIComponent(row.dataset.id)}/delete`, {});
+            const sent = await CatapultAdminTabs.post(root, target, `/admin/meta/files/${encodeURIComponent(row.dataset.id)}/delete`, {});
             if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
             return;
         }
@@ -411,7 +391,7 @@ window.CatapultAdminWellKnown = (function () {
             const id = form.dataset.id;
             const content = contentOf(form); // computed, never written back: the raw field and the snapshot stay in step
             const status = statusOf(form);
-            if (status === null) return CatapultChannel.showError(message(root, 400));
+            if (status === null) return CatapultChannel.showError(CatapultAdminTabs.refusal(root, 400));
             target.disabled = true; // one confirm, one post
             if (!await schemaAccepted(root, form, content)) {
                 target.disabled = false;
@@ -425,7 +405,7 @@ window.CatapultAdminWellKnown = (function () {
                 contentType: value(form, "contentType").trim(),
                 content
             };
-            const sent = await send(root, target, id ? `/admin/meta/files/${encodeURIComponent(id)}` : "/admin/meta/files", body);
+            const sent = await CatapultAdminTabs.post(root, target, id ? `/admin/meta/files/${encodeURIComponent(id)}` : "/admin/meta/files", body);
             if (sent === "ok") dialog.open = false;
             if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
         }
