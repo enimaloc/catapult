@@ -2,7 +2,10 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.service.http.ApiClient;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.function.IntSupplier;
 
 /** Who may open the admin page and use its actions, shared by its page, fragment and action routes. */
 final class AdminAccess {
@@ -24,5 +27,16 @@ final class AdminAccess {
         if (refused != 0) {
             throw new ResponseStatusException(HttpStatus.valueOf(refused));
         }
+    }
+
+    /**
+     * An admin action forwarded to catapult-api, answered with its status; {@code onSuccess} runs after
+     * a 2xx (a cache the change makes stale). Refused first for a non-admin (see {@link #require}).
+     */
+    static ResponseEntity<Void> relay(ModelFiller filler, IntSupplier action, Runnable onSuccess) {
+        require(filler);
+        int status = action.getAsInt();
+        if (status >= 200 && status < 300) onSuccess.run();
+        return ResponseEntity.status(status).build();
     }
 }
