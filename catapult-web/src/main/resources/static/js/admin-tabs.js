@@ -5,6 +5,8 @@
  * comes back to the list (spa.js re-renders the page on popstate, and this restores the view).
  * A sub-view's search and pagination only swap its [data-admin-results], keeping the search
  * field focused. Each new content is announced with "catapult:admin-panel" for the tab scripts.
+ * A panel that comes with the page (data-admin-prerendered: Members) is lazy only for its sub-views:
+ * its list is already there, and comes from /spa/admin/{tab} again on the way back from one.
  */
 window.CatapultAdminTabs = (function () {
     const SEARCH_DELAY_MS = 300;
@@ -23,7 +25,9 @@ window.CatapultAdminTabs = (function () {
         let state = states.get(panel);
         if (!state) {
             const current = route();
-            state = { view: null, sub: current.tab === panel.getAttribute("value") ? current.sub : null, q: "", page: 0, results: null };
+            const sub = current.tab === panel.getAttribute("value") ? current.sub : null;
+            const shown = panel.hasAttribute("data-admin-prerendered") && !sub ? fragmentUrl(tabOf(panel), null) : null;
+            state = { view: shown, sub, q: "", page: 0, results: null };
             states.set(panel, state);
         }
         return state;
@@ -158,7 +162,7 @@ window.CatapultAdminTabs = (function () {
     function attach() {
         const tabs = document.getElementById("admin-tabs");
         if (!tabs) return;
-        const panels = Array.from(tabs.querySelectorAll("mdui-tab-panel[data-admin-lazy]"));
+        const panels = Array.from(tabs.querySelectorAll("mdui-tab-panel[data-admin-lazy],mdui-tab-panel[data-admin-prerendered]"));
         panels.forEach(listen);
         const showActive = () => {
             const panel = panels.find(p => tabOf(p) === tabs.value);

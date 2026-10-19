@@ -3,9 +3,11 @@
 <!--/*
   Every account, one row each: who they are, their Steam link, their bot, their state, and a menu
   of what an admin can do to them (admin-members.js posts it, then re-renders the page).
-  The system account (the chat bot) only gets its bot switch: the API refuses it the rest.
+  The system account (the chat bot) only gets its bot switch and a link to its settings: the API refuses it the rest.
 */-->
-<mdui-tab-panel slot="panel" value="members" th:fragment="panel" th:with="page=${adminMembers}">
+<mdui-tab-panel slot="panel" value="members" th:fragment="panel" data-admin-prerendered
+                th:attr="data-unavailable=#{admin.unavailable}">
+<th:block th:fragment="content" th:with="page=${adminMembers}">
     <div class="section-header">
         <h2 th:text="#{admin.tab.members}">Membres</h2>
         <span class="eyebrow" th:if="${page != null}"
@@ -73,6 +75,8 @@
             <mdui-dropdown placement="bottom-end" th:unless="${m.systemAccount()}">
                 <mdui-button-icon slot="trigger" icon="more_vert" th:attr="aria-label=#{admin.members.column.actions}"></mdui-button-icon>
                 <mdui-menu>
+                    <mdui-menu-item icon="rule" th:attr="data-admin-open=${m.id()}"
+                                    th:text="#{admin.members.actions.targeting}">targeting</mdui-menu-item>
                     <mdui-menu-item icon="smart_toy" data-action="promote-to-system"
                                     th:disabled="${m.twitchId() == null}"
                                     th:attr="data-confirm=#{admin.members.actions.promote_to_system.confirm(${name})}"
@@ -91,7 +95,15 @@
                                     th:text="#{admin.members.actions.delete}">delete</mdui-menu-item>
                 </mdui-menu>
             </mdui-dropdown>
-            <span th:if="${m.systemAccount()}"></span>
+            <!--/* The system account (the chat bot): the API refuses it every action but its bot switch, so it only offers its settings. */-->
+            <mdui-dropdown placement="bottom-end" th:if="${m.systemAccount() and m.twitchUsername() != null}">
+                <mdui-button-icon slot="trigger" icon="more_vert" th:attr="aria-label=#{admin.members.column.actions}"></mdui-button-icon>
+                <mdui-menu>
+                    <mdui-menu-item icon="settings" data-link th:href="@{/channel/{u}(u=${m.twitchUsername()})}"
+                                    th:text="#{admin.members.actions.edit_settings}">settings</mdui-menu-item>
+                </mdui-menu>
+            </mdui-dropdown>
+            <span th:if="${m.systemAccount() and m.twitchUsername() == null}"></span>
         </div>
     </mdui-card>
 
@@ -112,4 +124,76 @@
         <mdui-button slot="action" variant="text" id="admin-migrate-cancel" th:text="#{admin.members.cancel}">Annuler</mdui-button>
         <mdui-button slot="action" id="admin-migrate-submit" th:text="#{admin.members.migrate.submit}">Migrer</mdui-button>
     </mdui-dialog>
+</th:block>
 </mdui-tab-panel>
+
+<!--/*
+  A member's targeting (#members/{id}): their custom flags (key / value, delete, add) and their groups
+  (remove, add through a select of the groups they aren't in). A group key catapult-api lists but
+  /api/admin/groups doesn't (a race) is shown without a remove button. Driven by admin-members.js.
+*/-->
+<div th:fragment="targeting" class="admin-view admin-targeting" th:attr="data-member-id=${member.id()},
+        data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+        data-label-invalid=#{admin.members.targeting.invalid},data-label-unknown=#{admin.members.targeting.unknown},
+        data-label-unavailable=#{admin.members.targeting.unavailable},data-label-flag-saved=#{admin.members.targeting.flag-saved},
+        data-label-flag-deleted=#{admin.members.targeting.flag-deleted},data-label-group-added=#{admin.members.targeting.group-added},
+        data-label-group-removed=#{admin.members.targeting.group-removed}">
+    <div class="section-header admin-subheader">
+        <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
+        <h2 th:text="#{admin.members.targeting.title(${member.twitchUsername() ?: '—'})}">Ciblage</h2>
+    </div>
+
+    <th:block th:if="${targeting == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+
+    <th:block th:if="${targeting != null}">
+        <mdui-card class="admin-targeting-card" variant="outlined">
+            <h3 th:text="#{admin.members.targeting.flags.title}">Flags personnalisés</h3>
+            <p class="admin-cell-muted" th:if="${targeting.flags().isEmpty()}" th:text="#{admin.members.targeting.flags.empty}">Aucun flag.</p>
+            <div class="admin-targeting-rows" th:unless="${targeting.flags().isEmpty()}">
+                <div class="admin-targeting-row" th:each="f : ${targeting.flags()}" th:attr="data-flag=${f.key()}">
+                    <span class="admin-member-id" th:text="${f.key()}">key</span>
+                    <span class="admin-targeting-value" th:text="${f.value() == null or f.value().isBlank() ? '—' : f.value()}">value</span>
+                    <mdui-button-icon icon="delete" class="admin-targeting-flag-delete"
+                                      th:attr="data-flag-delete=${f.key()},aria-label=#{admin.members.targeting.flags.delete},
+                                      data-confirm=#{admin.members.targeting.flags.delete-confirm(${f.key()})}"></mdui-button-icon>
+                </div>
+            </div>
+            <h4 th:text="#{admin.members.targeting.flags.add.title}">Ajouter un flag</h4>
+            <div class="admin-targeting-form">
+                <mdui-text-field name="key" variant="outlined" required maxlength="255"
+                                 th:attr="label=#{admin.members.targeting.flags.column.key},placeholder=#{admin.members.targeting.flags.add.key_placeholder}"></mdui-text-field>
+                <mdui-text-field name="value" variant="outlined" maxlength="1000"
+                                 th:attr="label=#{admin.members.targeting.flags.column.value},placeholder=#{admin.members.targeting.flags.add.value_placeholder}"></mdui-text-field>
+                <mdui-button variant="filled" icon="add" class="admin-targeting-flag-save" th:text="#{admin.members.targeting.add}">Ajouter</mdui-button>
+            </div>
+        </mdui-card>
+
+        <mdui-card class="admin-targeting-card" variant="outlined">
+            <h3 th:text="#{admin.members.targeting.groups.title}">Groupes</h3>
+            <p class="admin-cell-muted" th:if="${targeting.groupKeys().isEmpty()}" th:text="#{admin.members.targeting.groups.empty}">Aucun groupe.</p>
+            <div class="admin-targeting-rows" th:unless="${targeting.groupKeys().isEmpty()}">
+                <div class="admin-targeting-row" th:each="k : ${targeting.groupKeys()}" th:attr="data-group=${k}">
+                    <span class="admin-member-id" th:text="${k}">key</span>
+                    <span></span>
+                    <mdui-button-icon icon="delete" class="admin-targeting-group-remove" th:if="${groupIds.containsKey(k)}"
+                                      th:attr="data-group-id=${groupIds.get(k)},aria-label=#{admin.members.targeting.groups.remove},
+                                      data-confirm=#{admin.members.targeting.groups.remove-confirm(${k})}"></mdui-button-icon>
+                </div>
+            </div>
+            <h4 th:text="#{admin.members.targeting.groups.add.title}">Ajouter à un groupe</h4>
+            <div class="admin-targeting-form">
+                <mdui-select name="groupKey" variant="outlined" th:attr="label=#{admin.members.targeting.groups.add.label}">
+                    <mdui-menu-item th:each="g : ${joinable}" th:value="${g.key()}" th:text="${g.key()}">group</mdui-menu-item>
+                </mdui-select>
+                <mdui-button variant="filled" icon="add" class="admin-targeting-group-save" th:text="#{admin.members.targeting.add}">Ajouter</mdui-button>
+            </div>
+        </mdui-card>
+    </th:block>
+</div>
+
+<div th:fragment="missing" class="admin-view">
+    <div class="section-header admin-subheader">
+        <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
+    </div>
+    <p class="admin-placeholder" th:text="#{admin.members.targeting.missing}">Ce membre n'existe plus.</p>
+</div>

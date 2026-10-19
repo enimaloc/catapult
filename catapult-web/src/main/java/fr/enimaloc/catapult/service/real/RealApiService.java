@@ -8,7 +8,9 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -559,6 +561,41 @@ public class RealApiService implements ApiService {
     @Override
     public int adminAddGroupMember(UUID id, String twitchUsername) {
         return client.call(HttpMethod.POST, "/api/admin/groups/{id}/members", Map.of("twitchUsername", twitchUsername), Void.class, id).status();
+    }
+
+    @Override
+    public AdminMemberSummaryDto adminMember(UUID id) {
+        return client.get("/api/admin/members/{id}", AdminMemberSummaryDto.class, id);
+    }
+
+    @Override
+    public MemberTargetingDto adminMemberTargeting(UUID id) {
+        return client.get("/api/admin/members/{id}/targeting", MemberTargetingDto.class, id);
+    }
+
+    @Override
+    public int adminSetMemberFlag(UUID id, String key, String value) {
+        // a body map (not Map.of): the value is null for a flag set without one
+        Map<String, String> body = new java.util.LinkedHashMap<>();
+        body.put("key", key);
+        body.put("value", value);
+        return client.call(HttpMethod.POST, "/api/admin/members/{id}/flags", body, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteMemberFlag(UUID id, String key) {
+        // the key is a URI variable, so a "/", "%" or space in it is encoded rather than read as part of the path
+        return client.call(HttpMethod.POST, "/api/admin/members/{id}/flags/{key}/delete", null, Void.class, id, key).status();
+    }
+
+    @Override
+    public int adminAddMemberToGroup(UUID id, String groupKey) {
+        return client.call(HttpMethod.POST, "/api/admin/members/{id}/groups", Map.of("groupKey", groupKey), Void.class, id).status();
+    }
+
+    @Override
+    public int adminRemoveMemberFromGroup(UUID id, UUID groupId) {
+        return client.call(HttpMethod.POST, "/api/admin/members/{id}/groups/{groupId}/delete", null, Void.class, id, groupId).status();
     }
 
     @Override

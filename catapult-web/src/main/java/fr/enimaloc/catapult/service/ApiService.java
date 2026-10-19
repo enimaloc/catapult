@@ -10,7 +10,9 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -189,6 +191,19 @@ public interface ApiService {
     int adminDeleteGroup(UUID id);
     /** catapult-api's status (204; 404 unknown group or Twitch username), 502 when unreachable. */
     int adminAddGroupMember(UUID id, String twitchUsername);
+
+    /** One member, for the targeting view's header; null when unknown or catapult-api fails. */
+    AdminMemberSummaryDto adminMember(UUID id);
+    /** The member's custom flags and group keys; null when unknown or catapult-api fails. */
+    MemberTargetingDto adminMemberTargeting(UUID id);
+    /** Sets (or replaces) a custom flag; catapult-api's status (204; 400 blank key, 404 unknown member), 502 when unreachable. */
+    int adminSetMemberFlag(UUID id, String key, String value);
+    /** Deletes a custom flag; catapult-api's status (204, also for an absent flag; 404 unknown member), 502 when unreachable. */
+    int adminDeleteMemberFlag(UUID id, String key);
+    /** Adds the member to the group of that key; catapult-api's status (204; 404 unknown member or group), 502 when unreachable. */
+    int adminAddMemberToGroup(UUID id, String groupKey);
+    /** Removes the member from the group; catapult-api's status (204; 404 unknown group), 502 when unreachable. */
+    int adminRemoveMemberFromGroup(UUID id, UUID groupId);
     /** catapult-api's status (202; 400 invalid; 429 rate-limited), 502 when unreachable. */
     int adminBroadcast(BroadcastRequestDto body);
 

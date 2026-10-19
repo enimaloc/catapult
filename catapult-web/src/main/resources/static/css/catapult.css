@@ -1929,3 +1929,20 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     .admin-groups-row > .admin-groups-description, .admin-groups-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-groups-row > .admin-cell { white-space: normal; }
 }
+
+/* A member's targeting (#members/{id}) in the admin Members tab. */
+.admin-targeting-card { padding: 16px; margin-bottom: 16px; }
+.admin-targeting-card h3, .admin-targeting-card h4 { margin: 0 0 12px; }
+.admin-targeting-card h4 { margin-top: 20px; }
+.admin-targeting-rows { display: flex; flex-direction: column; }
+.admin-targeting-row { display: grid; grid-template-columns: minmax(8rem, 14rem) minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 4px 0; }
+.admin-targeting-row + .admin-targeting-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.admin-targeting-row > .admin-member-id, .admin-targeting-value { min-width: 0; overflow-wrap: anywhere; }
+.admin-targeting-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: 12px; align-items: start; }
+.admin-targeting-form > mdui-select:only-of-type { grid-column: 1 / 3; }
+@media (max-width: 650px) {
+    .admin-targeting-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .admin-targeting-row > .admin-targeting-value, .admin-targeting-row > span:empty { display: none; }
+    .admin-targeting-form { grid-template-columns: minmax(0, 1fr); }
+    .admin-targeting-form > mdui-select:only-of-type { grid-column: auto; }
+}

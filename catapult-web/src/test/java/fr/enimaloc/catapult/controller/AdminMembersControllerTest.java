@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({WebSecurityConfig.class, ModelFiller.class})
 class AdminMembersControllerTest {
     private static final UUID ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID GROUP = UUID.fromString("00000000-0000-0000-0000-000000000042");
     private static final UUID TARGET = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @Autowired MockMvc mvc;
@@ -77,6 +78,62 @@ class AdminMembersControllerTest {
 
         verify(apiService, never()).adminMigrateMember(any(), any(), org.mockito.ArgumentMatchers.anyBoolean(),
                 org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+    @Test
+    void targeting_actionsRelayTheirStatus() throws Exception {
+        when(apiService.adminSetMemberFlag(ID, "tier", "2")).thenReturn(204);
+        when(apiService.adminDeleteMemberFlag(ID, "a/b %é")).thenReturn(204);
+        when(apiService.adminAddMemberToGroup(ID, "staff")).thenReturn(404);
+        when(apiService.adminRemoveMemberFromGroup(ID, GROUP)).thenReturn(502);
+
+        mvc.perform(asAdmin("flags").contentType(MediaType.APPLICATION_JSON).content("{\"key\":\"tier\",\"value\":\"2\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(asAdmin("flags/delete").contentType(MediaType.APPLICATION_JSON).content("{\"key\":\"a/b %é\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(asAdmin("groups").contentType(MediaType.APPLICATION_JSON).content("{\"groupKey\":\"staff\"}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(asAdmin("groups/" + GROUP + "/delete").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadGateway());
+    }
+
+    @Test
+    void flagDelete_byPathKey_relaysToo() throws Exception {
+        when(apiService.adminDeleteMemberFlag(ID, "tier")).thenReturn(204);
+
+        mvc.perform(asAdmin("flags/tier/delete").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void targeting_withoutAKeyOrGroup_isABadRequest_withoutCallingTheApi() throws Exception {
+        mvc.perform(asAdmin("flags").contentType(MediaType.APPLICATION_JSON).content("{\"key\":\" \",\"value\":\"x\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(asAdmin("flags/delete").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(asAdmin("groups").contentType(MediaType.APPLICATION_JSON).content("{\"groupKey\":\"\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(apiService, never()).adminSetMemberFlag(any(), any(), any());
+        verify(apiService, never()).adminDeleteMemberFlag(any(), any());
+        verify(apiService, never()).adminAddMemberToGroup(any(), any());
+    }
+
+    @Test
+    void targeting_actionsAreRefusedToMembersAndVisitors_andNeedCsrf() throws Exception {
+        for (String action : new String[]{"flags", "flags/delete", "flags/k/delete", "groups", "groups/" + GROUP + "/delete"}) {
+            mvc.perform(post("/admin/members/" + ID + "/" + action).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isUnauthorized());
+            mvc.perform(asMember(action).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
+        }
+        when(apiService.isAdmin()).thenReturn(true);
+        mvc.perform(post("/admin/members/" + ID + "/flags").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"key\":\"k\"}")).andExpect(status().isForbidden());
+
+        verify(apiService, never()).adminSetMemberFlag(any(), any(), any());
+        verify(apiService, never()).adminDeleteMemberFlag(any(), any());
+        verify(apiService, never()).adminAddMemberToGroup(any(), any());
+        verify(apiService, never()).adminRemoveMemberFromGroup(any(), any());
     }
 
     @Test

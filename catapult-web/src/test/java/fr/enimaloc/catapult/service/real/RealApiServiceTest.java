@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.real;
 
 import java.util.Map;
+import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
@@ -642,6 +643,7 @@ class RealApiServiceTest {
             + "\"severity\":\"INFO\",\"ctaUrl\":null,\"ctaLabel\":null,\"expiresAt\":null,"
             + "\"createdAt\":\"2026-10-18T10:00:00Z\",\"read\":false}";
     private static final UUID NOTIF_ID = UUID.fromString("00000000-0000-0000-0000-000000000009");
+    private static final UUID GROUP_ID = UUID.fromString("00000000-0000-0000-0000-000000000042");
 
     @Test
     void notificationSnapshot_readsTheSnapshot() {
@@ -765,6 +767,48 @@ class RealApiServiceTest {
         assertThat(service.adminRenameGroup(NOTIF_ID, "N", "D")).isEqualTo(204);
         assertThat(service.adminAddGroupMember(NOTIF_ID, "alice")).isEqualTo(404);
         assertThat(service.adminDeleteGroup(NOTIF_ID)).isEqualTo(204);
+    }
+
+    @Test
+    void adminMember_andTargeting_readTheirEndpoints() {
+        respond(HttpMethod.GET, "/api/admin/members/" + NOTIF_ID, "{\"id\":\"" + NOTIF_ID + "\",\"twitchUsername\":\"alice\"}");
+        respond(HttpMethod.GET, "/api/admin/members/" + NOTIF_ID + "/targeting",
+                "{\"flags\":[{\"key\":\"beta\",\"value\":null},{\"key\":\"tier\",\"value\":\"2\"}],\"groupKeys\":[\"staff\"]}");
+
+        assertThat(service.adminMember(NOTIF_ID).twitchUsername()).isEqualTo("alice");
+        var targeting = service.adminMemberTargeting(NOTIF_ID);
+        assertThat(targeting.flags()).containsExactly(new MemberTargetingDto.Flag("beta", null), new MemberTargetingDto.Flag("tier", "2"));
+        assertThat(targeting.groupKeys()).containsExactly("staff");
+    }
+
+    @Test
+    void adminMemberTargetingActions_postTheirShapes_andReturnTheStatus() {
+        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/flags")
+                .andExpect(content().json("{\"key\":\"tier\",\"value\":\"2\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/flags/tier/delete").andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/groups")
+                .andExpect(content().json("{\"groupKey\":\"staff\"}", true)).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/groups/" + GROUP_ID + "/delete").andRespond(withNoContent());
+
+        assertThat(service.adminSetMemberFlag(NOTIF_ID, "tier", "2")).isEqualTo(204);
+        assertThat(service.adminDeleteMemberFlag(NOTIF_ID, "tier")).isEqualTo(204);
+        assertThat(service.adminAddMemberToGroup(NOTIF_ID, "staff")).isEqualTo(404);
+        assertThat(service.adminRemoveMemberFromGroup(NOTIF_ID, GROUP_ID)).isEqualTo(204);
+    }
+
+    @Test
+    void deleteFlag_encodesTheKey() {
+        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/flags/a%2Fb%20%25%C3%A9/delete").andRespond(withNoContent());
+
+        assertThat(service.adminDeleteMemberFlag(NOTIF_ID, "a/b %é")).isEqualTo(204);
+    }
+
+    @Test
+    void adminSetMemberFlag_withoutAValue_sendsANullOne() {
+        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/flags")
+                .andExpect(content().json("{\"key\":\"beta\",\"value\":null}", true)).andRespond(withNoContent());
+
+        assertThat(service.adminSetMemberFlag(NOTIF_ID, "beta", null)).isEqualTo(204);
     }
 
     @Test
