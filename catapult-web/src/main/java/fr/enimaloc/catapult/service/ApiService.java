@@ -292,7 +292,7 @@ public interface ApiService {
     List<TwDefinitionDto> adminTws();
     /** One definition; null when unknown or when catapult-api fails. */
     TwDefinitionDto adminTw(String id);
-    /** Creates a definition; catapult-api's status (201; 400 invalid id or label; 409 id taken), 502 when unreachable. */
+    /** Creates a definition; catapult-api's status (201), 502 when unreachable. */
     int adminCreateTw(String id, String label, int sortOrder);
     /** Starts a background rebuild of the mappings; catapult-api's status (202; 503 when trigger warnings are off), 502 when unreachable. */
     int adminRebuildTws(TwRebuild mode);

@@ -99,10 +99,10 @@ describe("admin-tw", () => {
         expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
     });
 
-    it("does not post a bad id, an empty or long label, or a negative order", async () => {
+    it("does not post a bad id, an empty or long label, or a fractional order", async () => {
         for (const [id, label, order, bad] of [
             ["Bad Id", "L", "0", "id"], ["", "L", "0", "id"], ["ok", "", "0", "label"],
-            ["ok", "x".repeat(81), "0", "label"], ["ok", "L", "-1", "sortOrder"],
+            ["ok", "x".repeat(81), "0", "label"], ["ok", "L", "1.5", "sortOrder"],
         ]) {
             fill(field("id"), id);
             fill(field("label"), label);

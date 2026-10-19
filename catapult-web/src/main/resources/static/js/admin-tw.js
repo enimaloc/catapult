@@ -43,7 +43,7 @@ window.CatapultAdminTw = (function () {
         const invalid = [
             ["id", !ID.test(id)],
             ["label", label === "" || label.length > 80],
-            ["sortOrder", !Number.isInteger(sortOrder) || sortOrder < 0],
+            ["sortOrder", !Number.isInteger(sortOrder)],
         ].filter(([, bad]) => bad);
         if (invalid.length > 0) {
             invalid.forEach(([name]) => mark(fieldOf(card, name)));
