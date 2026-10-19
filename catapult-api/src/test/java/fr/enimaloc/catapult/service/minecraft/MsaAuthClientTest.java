@@ -75,12 +75,26 @@ class MsaAuthClientTest {
     }
 
     @Test
-    void pollDeviceCode_otherError_throws() {
+    void pollDeviceCode_expiredToken_throwsTheExpiry_a400() {
         doThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request", null,
                 "{\"error\":\"expired_token\"}".getBytes(), null))
                 .when(responseSpec).body(MsaAuthClient.MsaTokens.class);
 
         assertThatThrownBy(() -> client.pollDeviceCode("device-1"))
-                .isInstanceOf(MsaAuthClient.MsaAuthException.class);
+                .isInstanceOf(MsaAuthClient.DeviceCodeExpiredException.class);
+        assertThat(MsaAuthClient.DeviceCodeExpiredException.class
+                .getAnnotation(org.springframework.web.bind.annotation.ResponseStatus.class).value())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void pollDeviceCode_otherError_throws() {
+        doThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request", null,
+                "{\"error\":\"authorization_declined\"}".getBytes(), null))
+                .when(responseSpec).body(MsaAuthClient.MsaTokens.class);
+
+        assertThatThrownBy(() -> client.pollDeviceCode("device-1"))
+                .isInstanceOf(MsaAuthClient.MsaAuthException.class)
+                .isNotInstanceOf(MsaAuthClient.DeviceCodeExpiredException.class);
     }
 }

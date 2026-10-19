@@ -5,10 +5,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
@@ -60,7 +62,10 @@ public class MsaAuthClient {
                 .body(DeviceCodeStart.class);
     }
 
-    /** Vide tant que l'utilisateur n'a pas validé le code ({@code authorization_pending}). */
+    /**
+     * Vide tant que l'utilisateur n'a pas validé le code ({@code authorization_pending}) ;
+     * {@link DeviceCodeExpiredException} une fois le code expiré ({@code expired_token}).
+     */
     public Optional<MsaTokens> pollDeviceCode(String deviceCode) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("client_id", clientId);
@@ -71,6 +76,9 @@ public class MsaAuthClient {
         } catch (HttpClientErrorException e) {
             if (e.getResponseBodyAsString().matches("(?s).*\"error\"\\s*:\\s*\"authorization_pending\".*")) {
                 return Optional.empty();
+            }
+            if (e.getResponseBodyAsString().matches("(?s).*\"error\"\\s*:\\s*\"expired_token\".*")) {
+                throw new DeviceCodeExpiredException(e);
             }
             throw new MsaAuthException("Device code flow failed: " + e.getResponseBodyAsString(), e);
         }
@@ -105,6 +113,14 @@ public class MsaAuthClient {
     public static class MsaAuthException extends RuntimeException {
         public MsaAuthException(String message, Throwable cause) {
             super(message, cause);
+        }
+    }
+
+    /** Le device code a expiré avant d'être validé : 400, l'admin relance le flow. */
+    @ResponseStatus(value = HttpStatus.BAD_REQUEST, reason = "Device code expired")
+    public static class DeviceCodeExpiredException extends MsaAuthException {
+        public DeviceCodeExpiredException(Throwable cause) {
+            super("Device code expired", cause);
         }
     }
 }
