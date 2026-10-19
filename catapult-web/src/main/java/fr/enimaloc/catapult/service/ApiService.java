@@ -15,7 +15,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
-import fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -265,7 +265,7 @@ public interface ApiService {
     int adminRefreshApiKeys(ApiKeyProvider provider);
 
     /** The Minecraft service accounts; null when catapult-api fails (Minecraft disabled included). */
-    List<MinecraftAccountDto> adminMinecraftAccounts();
+    List<AccountDto> adminMinecraftAccounts();
     /** PATCHes an account ({@code enabled}, {@code friendLimitReached}); catapult-api's status (200; 404 unknown), 502 when unreachable. */
     int adminPatchMinecraftAccount(UUID id, Map<String, Object> patch);
     /** Deletes an account; catapult-api's status (204; 409 while users are linked to it; 404 unknown), 502 when unreachable. */

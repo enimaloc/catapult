@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.mock;
 
-import fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -11,15 +11,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MockMinecraftAccountsStoreTest {
     private final MockMinecraftAccountsStore store = new MockMinecraftAccountsStore();
 
-    private MinecraftAccountDto find(java.util.function.Predicate<MinecraftAccountDto> filter) {
+    private AccountDto find(java.util.function.Predicate<AccountDto> filter) {
         return store.list().stream().filter(filter).findFirst().orElseThrow();
     }
 
     @Test
     void seed_coversEveryState() {
-        assertThat(store.list()).anyMatch(MinecraftAccountDto::enabled)
+        assertThat(store.list()).anyMatch(AccountDto::enabled)
                 .anyMatch(a -> !a.enabled())
-                .anyMatch(MinecraftAccountDto::friendLimitReached)
+                .anyMatch(AccountDto::friendLimitReached)
                 .anyMatch(a -> a.linkCount() > 0)
                 .anyMatch(a -> a.linkCount() == 0);
     }
@@ -53,7 +53,7 @@ class MockMinecraftAccountsStoreTest {
 
     @Test
     void patch_andDelete_answerLikeCatapultApi() {
-        var full = find(MinecraftAccountDto::friendLimitReached);
+        var full = find(AccountDto::friendLimitReached);
         var linked = find(a -> a.linkCount() > 0);
         var free = find(a -> a.linkCount() == 0);
 

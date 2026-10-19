@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.mock;
 
-import fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.service.http.ApiClient;
 
@@ -17,10 +17,10 @@ import java.util.UUID;
  * Deleting an account users are linked to is a 409; an unknown account is a 404.
  */
 class MockMinecraftAccountsStore {
-    private record Account(UUID id, String label, String minecraftUsername, int fillOrder, long linkCount,
+    private record Account(UUID id, String label, String minecraftUsername, int fillOrder, int linkCount,
                            boolean enabled, boolean friendLimitReached) {
-        MinecraftAccountDto dto() {
-            return new MinecraftAccountDto(id, label, minecraftUsername, fillOrder, linkCount, enabled, friendLimitReached);
+        AccountDto dto() {
+            return new AccountDto(id, label, minecraftUsername, fillOrder, friendLimitReached, enabled, linkCount);
         }
     }
 
@@ -31,7 +31,7 @@ class MockMinecraftAccountsStore {
     /** Issued device codes → how many times each was polled. */
     private final Map<String, Integer> polls = new HashMap<>();
 
-    synchronized List<MinecraftAccountDto> list() {
+    synchronized List<AccountDto> list() {
         return accounts.stream().map(Account::dto).toList();
     }
 

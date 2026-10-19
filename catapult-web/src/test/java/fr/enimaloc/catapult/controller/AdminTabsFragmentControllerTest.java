@@ -720,10 +720,10 @@ class AdminTabsFragmentControllerTest {
         assertThat(asAdmin("/spa/admin/keys")).contains("admin-placeholder").doesNotContain("admin-keys-add-save");
     }
 
-    private static fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto account(String id, String label, long links,
+    private static fr.enimaloc.catapult.common.dto.admin.AccountDto account(String id, String label, long links,
             boolean enabled, boolean full) {
-        return new fr.enimaloc.catapult.common.dto.admin.MinecraftAccountDto(java.util.UUID.fromString(id), label,
-                label + "_mc", 0, links, enabled, full);
+        return new fr.enimaloc.catapult.common.dto.admin.AccountDto(java.util.UUID.fromString(id), label,
+                label + "_mc", 0, full, enabled, (int) links);
     }
 
     @Test
