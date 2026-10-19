@@ -126,14 +126,28 @@ public class MockApiService implements ApiService {
     private final MockTwStore tws = new MockTwStore();
     /** Application-wide: the Minecraft service accounts are the same for every mock session. */
     private final MockMinecraftAccountsStore minecraftAccounts = new MockMinecraftAccountsStore();
+    /** Application-wide, as catapult-api's: every mock account that logged in is a member any admin session lists. */
+    private final MockMembers members = new MockMembers();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
     private final MockTargetingStore targeting = new MockTargetingStore();
 
-    /** The calling session's mock member {@code id}'s login; null when it has no such member. */
-    private String mockMemberLogin(UUID id) {
+    /**
+     * The members, the calling session's own account first; that account (and the channels it
+     * moderates) is registered here too, for a session rebuilt by {@link #currentData} or given
+     * a moderated channel by the mock admin page. Null without a session, as catapult-api's 401.
+     */
+    private AdminMembersPage memberPage() {
         MockData current = currentData();
         if (current == null) return null;
-        return current.getMembers().page().members().stream().filter(m -> id.equals(m.id()))
+        members.register(current);
+        return members.page(current.getChannelDto().id());
+    }
+
+    /** The mock member {@code id}'s login; null when there is no such member or no session. */
+    private String mockMemberLogin(UUID id) {
+        AdminMembersPage page = memberPage();
+        if (page == null) return null;
+        return page.members().stream().filter(m -> id.equals(m.id()))
                 .map(m -> m.twitchUsername()).findFirst().orElse(null);
     }
 
@@ -190,6 +204,7 @@ public class MockApiService implements ApiService {
         String token = base64.encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8)) + "."
                 + base64.encodeToString(JSON.writeValueAsBytes(claims)) + "." + UUID.randomUUID();
         data.put(token, session);
+        members.register(session);
         return token;
     }
 
@@ -204,7 +219,7 @@ public class MockApiService implements ApiService {
         MockData current = currentData();
         if (current == null) return new ApiClient.Result<>(401, null);
         UUID self = current.getChannelDto().id();
-        AdminMemberDto target = current.getMembers().page().members().stream()
+        AdminMemberDto target = memberPage().members().stream()
                 .filter(m -> username != null && username.equals(m.twitchUsername())).findFirst().orElse(null);
         if (target == null) return new ApiClient.Result<>(404, null);
         if (target.twitchId() == null || target.systemAccount() || target.id().equals(self) || !target.isActive()) {
@@ -512,9 +527,9 @@ public class MockApiService implements ApiService {
     @Override
     public int adminAddGroupMember(UUID id, String twitchUsername) {
         log.trace("adminAddGroupMember({}, {})", id, twitchUsername);
-        MockData current = currentData();
+        AdminMembersPage page = memberPage();
         String wanted = twitchUsername == null ? "" : twitchUsername.trim();
-        UUID memberId = current == null ? null : current.getMembers().page().members().stream()
+        UUID memberId = page == null ? null : page.members().stream()
                 .filter(m -> m.twitchUsername() != null && m.twitchUsername().equalsIgnoreCase(wanted))
                 .map(m -> m.id()).findFirst().orElse(null);
         return memberId == null ? 404 : groups.addMember(id, memberId);
@@ -563,16 +578,16 @@ public class MockApiService implements ApiService {
     }
 
     private boolean mockMemberExists(UUID id) {
-        MockData current = currentData();
-        return current != null && current.getMembers().page().members().stream().anyMatch(m -> id.equals(m.id()));
+        AdminMembersPage page = memberPage();
+        return page != null && page.members().stream().anyMatch(m -> id.equals(m.id()));
     }
 
     @Override
     public AdminMemberSummaryDto adminMember(UUID id) {
         log.trace("adminMember({})", id);
-        MockData current = currentData();
-        if (current == null) return null;
-        return current.getMembers().page().members().stream().filter(m -> id.equals(m.id()))
+        AdminMembersPage page = memberPage();
+        if (page == null) return null;
+        return page.members().stream().filter(m -> id.equals(m.id()))
                 .map(m -> new AdminMemberSummaryDto(m.id(), m.twitchUsername())).findFirst().orElse(null);
     }
 
@@ -634,37 +649,37 @@ public class MockApiService implements ApiService {
     @Override
     public AdminMembersPage adminMembers() {
         log.trace("adminMembers()");
-        return currentData().getMembers().page();
+        return memberPage();
     }
 
     @Override
     public void adminToggleMemberBot(UUID memberId) {
         log.trace("adminToggleMemberBot({})", memberId);
-        currentData().getMembers().toggleBot(memberId);
+        members.toggleBot(memberId);
     }
 
     @Override
     public void adminUnlinkMemberSteam(UUID memberId) {
         log.trace("adminUnlinkMemberSteam({})", memberId);
-        currentData().getMembers().unlinkSteam(memberId);
+        members.unlinkSteam(memberId);
     }
 
     @Override
     public void adminUnlinkMemberTwitch(UUID memberId) {
         log.trace("adminUnlinkMemberTwitch({})", memberId);
-        currentData().getMembers().unlinkTwitch(memberId);
+        members.unlinkTwitch(memberId);
     }
 
     @Override
     public void adminPromoteMemberToSystem(UUID memberId) {
         log.trace("adminPromoteMemberToSystem({})", memberId);
-        currentData().getMembers().promoteToSystem(memberId);
+        members.promoteToSystem(memberId);
     }
 
     @Override
     public void adminDeleteMember(UUID memberId) {
         log.trace("adminDeleteMember({})", memberId);
-        currentData().getMembers().delete(memberId);
+        members.delete(memberId);
     }
 
     @Override
