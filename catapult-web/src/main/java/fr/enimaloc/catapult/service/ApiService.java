@@ -46,6 +46,7 @@ import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 
 public interface ApiService {
     TokenResponse exchangeCode(String code);
@@ -73,6 +74,13 @@ public interface ApiService {
     void minecraftDisconnect(String username);
     /** The logged-in user's OBS connection; null when logged out or OBS isn't enabled. */
     TwitchatWidgetConfig obsConnection();
+    /**
+     * The OBS connection of the widget {@code token} (anonymous), on Twitchat branch "auto";
+     * null when the token is unknown, the widget is off, or catapult-api is unreachable.
+     */
+    TwitchatWidgetConfig widgetObsConfig(java.util.UUID token);
+    /** The owner of the widget {@code token} and whether it is on (anonymous); null when unknown or unreachable. */
+    TwitchatWidgetAccessResponse widgetAccess(java.util.UUID token);
     void saveObsSettings(String username, boolean enabled, String host, Integer port, String password);
     /** "auto" or one of TwitchatData.SUPPORTED_BRANCHES. */
     void saveTwitchatBranch(String username, String branch);

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<!--/* Standalone (no SPA shell): the page an OBS browser source opens, relaying the owner's Twitchat dispatches to OBS. */-->
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Catapult — relais Twitchat</title>
+    <!--/* Its URL carries the widget token. */-->
+    <meta name="robots" content="noindex">
+    <!--
+    Hidden by default: this page is meant to be added as an OBS Browser Source and show
+    nothing on stream. The streamer can reveal the activity log for debugging by adding
+    custom CSS in that source's settings, e.g. "#log{display:block}" — a plain selector at
+    the same specificity as the one below, so no !important is needed on either side; OBS
+    injects its Custom CSS after this stylesheet, so it wins the cascade tie.
+    -->
+    <style>
+        body { margin: 0; background: transparent; }
+        #log { display: none; font-family: monospace; font-size: 12px; white-space: pre-wrap;
+               padding: 8px; color: #0f0; background: #000; }
+    </style>
+</head>
+<body th:if="${token == null}" data-disabled>
+<div id="log">widget disabled</div>
+</body>
+<body th:unless="${token == null}"
+      th:attr="data-obs-config-url=@{/widget/obs/{t}/config(t=${token})},data-twitchat-events-url=@{/widget/obs/{t}/events(t=${token})}">
+<div id="log"></div>
+<script>
+    (function () {
+        const log = document.getElementById("log");
+        const line = (text) => log.append(`${new Date().toLocaleTimeString()} ${text}\n`);
+        document.addEventListener("catapult:obs:connected", () => line("connected to OBS"));
+        document.addEventListener("catapult:obs:disconnected", () => line("disconnected from OBS"));
+        document.addEventListener("catapult:twitchat:presence", (e) => line(e.detail.connected ? "Twitchat found" : "no Twitchat"));
+        document.addEventListener("catapult:twitchat:dispatch", (e) => line(`dispatch ${e.detail?.id ?? "?"}`));
+    })();
+</script>
+<script src="/js/obs.js"></script>
+<script src="/js/obs-session.js"></script>
+<script src="/js/twitchat-protocol.js"></script>
+<script src="/js/twitchat.js"></script>
+<script src="/js/twitchat-stream.js"></script>
+</body>
+</html>

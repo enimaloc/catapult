@@ -35,6 +35,22 @@ describe("twitchat-stream", () => {
         expect(sources.map((s) => s.url)).toEqual(["/me/twitchat/events"]);
     });
 
+    it("opens the page's events URL, /me/twitchat/events by default", async () => {
+        obs("connected");
+        expect(sources.at(-1).url).toBe("/me/twitchat/events");
+        obs("disconnected");
+
+        document.body.dataset.twitchatEventsUrl = "/widget/obs/t-1/events";
+        try {
+            sources = [];
+            await load("twitchat-stream");
+            obs("connected");
+            expect(sources.map((s) => s.url)).toContain("/widget/obs/t-1/events");
+        } finally {
+            delete document.body.dataset.twitchatEventsUrl;
+        }
+    });
+
     it("re-emits each dispatch for twitchat.js", () => {
         const received = vi.fn();
         document.addEventListener("catapult:twitchat:dispatch", (event) => received(event.detail));

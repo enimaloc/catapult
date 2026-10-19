@@ -57,6 +57,22 @@ describe("on page load", () => {
     });
 });
 
+describe("config URL", () => {
+    afterEach(() => {
+        delete document.body.dataset.obsConfigUrl;
+    });
+
+    it("reads its config URL from the page, /me/obs by default", async () => {
+        await start(response(204));
+        expect(fetch).toHaveBeenLastCalledWith("/me/obs", { cache: "no-store" });
+
+        document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
+        await start(response(200, CONFIG));
+        expect(fetch).toHaveBeenLastCalledWith("/widget/obs/t-1/config", { cache: "no-store" });
+        expect(connects).toEqual([CONNECTION]);
+    });
+});
+
 describe("retries", () => {
     it("retries with a doubling delay while OBS is unreachable, then resets it", async () => {
         await start(response(200, CONFIG), async (n) => { if (n <= 3) throw closedWith(1006); });

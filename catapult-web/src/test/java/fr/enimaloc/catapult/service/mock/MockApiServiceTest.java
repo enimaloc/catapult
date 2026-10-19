@@ -352,6 +352,29 @@ class MockApiServiceTest {
     }
 
     @Test
+    void widget_resolvesItsTokenAcrossSessions_andFollowsTheObsToggle() {
+        java.util.UUID token = data.getWidgetToken();
+        java.util.UUID owner = data.getChannelDto().id();
+        service.saveObsSettings(username, true, "10.0.0.2", 4456, "pw");
+        // Read from another (anonymous) request, like an OBS browser source.
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+
+        assertThat(service.widgetAccess(token))
+                .isEqualTo(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse(owner.toString(), true));
+        assertThat(service.widgetObsConfig(token))
+                .isEqualTo(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
+
+        data.saveObsSettings(false, "10.0.0.2", 4456, null);
+        assertThat(service.widgetAccess(token))
+                .isEqualTo(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse(owner.toString(), false));
+        assertThat(service.widgetObsConfig(token)).isNull();
+
+        java.util.UUID unknown = java.util.UUID.randomUUID();
+        assertThat(service.widgetAccess(unknown)).isNull();
+        assertThat(service.widgetObsConfig(unknown)).isNull();
+    }
+
+    @Test
     void settings_areSavedWithoutEvents() {
         service.saveCclSettings(username, false, Set.of("Gore"));
         service.saveTwSettings(username, true, Set.of("spiders"));
