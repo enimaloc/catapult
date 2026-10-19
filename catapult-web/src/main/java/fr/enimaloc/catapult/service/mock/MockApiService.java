@@ -44,6 +44,7 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPayload;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
@@ -393,6 +394,20 @@ public class MockApiService implements ApiService {
     /** The session whose widget link {@code token} is: an OBS browser source has no session of its own. */
     private Optional<MockData> widgetOwner(UUID token) {
         return data.values().stream().filter(d -> token.equals(d.getWidgetToken())).findFirst();
+    }
+
+    @Override
+    public TwitchatSettingsResponse twitchatSettings(String username) {
+        log.trace("twitchatSettings({})", username);
+        return currentData().twitchatSettings();
+    }
+
+    @Override
+    public TwitchatSettingsResponse regenerateTwitchatWidget(String username) {
+        log.trace("regenerateTwitchatWidget({})", username);
+        MockData current = currentData();
+        current.regenerateWidgetToken();
+        return current.twitchatSettings();
     }
 
     @Override

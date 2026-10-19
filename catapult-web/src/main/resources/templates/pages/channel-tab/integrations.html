@@ -13,6 +13,7 @@
                    th:attr="data-conn=${integration.id()}">
             <span th:replace="~{pages/channel-tab/integrations :: message(${integration.name()})}">Twitch</span>
             <th:block th:each="node : ${integration.nodes()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${node})}"></th:block></th:block>
+            <th:block th:if="${integration.id() == 'obs' and widgetUrl != null}" th:insert="~{pages/channel-tab/integrations :: obs-widget}"></th:block>
         </mdui-card>
     </div>
 </mdui-tab-panel>
@@ -107,6 +108,29 @@
     </div>
     <th:block th:case="'raw'" th:utext="${n.html()}"></th:block>
 </th:block>
+
+<!--/* The OBS card's widget link: the browser source URL (read-only + Copy), its regeneration (confirmed in a
+     dialog) and the source check channel-obs-widget.js runs through the page's own OBS connection. */-->
+<div th:fragment="obs-widget" id="obs-widget" class="obs-widget" th:attr="data-widget-url=${widgetUrl},data-label-copied=#{channel.connections.obs.widget.copied},data-label-copy-failed=#{channel.connections.obs.widget.copy_failed},data-label-refused=#{channel.connections.obs.widget.refused},data-label-unavailable=#{channel.connections.obs.widget.unavailable},data-label-create-failed=#{channel.connections.obs.widget.create_failed}">
+    <p th:text="#{channel.connections.obs.widget.hint}">Lien à mettre dans une source web OBS :</p>
+    <mdui-text-field id="obs-widget-link" readonly variant="outlined" th:attr="label=#{channel.connections.obs.widget.label},value=${widgetUrl}"></mdui-text-field>
+    <div class="card-actions">
+        <mdui-button id="obs-widget-copy-btn" variant="tonal" th:text="#{channel.connections.obs.widget.copy}">Copier le lien</mdui-button>
+        <mdui-button id="obs-widget-regenerate-btn" variant="text" th:text="#{channel.connections.obs.widget.regenerate}">Régénérer le lien</mdui-button>
+    </div>
+    <mdui-dialog id="obs-widget-regenerate-dialog" close-on-overlay-click th:attr="headline=#{channel.connections.obs.widget.regenerate}">
+        <p th:text="#{channel.connections.obs.widget.regenerate.confirm}">Régénérer le lien invalidera le précédent.</p>
+        <mdui-button slot="action" variant="text" class="obs-widget-regenerate-dismiss" th:text="#{channel.connections.obs.widget.regenerate.dismiss}">Annuler</mdui-button>
+        <mdui-button slot="action" variant="filled" class="obs-widget-regenerate-confirm" th:text="#{channel.connections.obs.widget.regenerate}">Régénérer le lien</mdui-button>
+    </mdui-dialog>
+    <p id="obs-widget-source-status" class="obs-widget-source-status hidden"
+       th:attr="data-label-checking=#{channel.connections.obs.widget.source.checking},data-label-found=#{channel.connections.obs.widget.source.found},data-label-unreachable=#{channel.connections.obs.widget.source.unreachable}"></p>
+    <div id="obs-widget-source-missing" class="obs-widget-source-missing hidden">
+        <p th:text="#{channel.connections.obs.widget.source.missing}">Aucune source de relais détectée dans OBS.</p>
+        <mdui-button id="obs-widget-source-create-btn" variant="filled" th:text="#{channel.connections.obs.widget.source.create}">Créer la source dans OBS</mdui-button>
+    </div>
+    <p class="obs-widget-reminder" th:text="#{channel.connections.obs.widget.reminder}">N'oublie pas de configurer aussi Twitchat.</p>
+</div>
 
 <!--/* Renders ${node} alone: IntegrationNodeRenderingTest's entry point. */-->
 <th:block th:fragment="node-alone" th:insert="~{pages/channel-tab/integrations :: node(${node})}"></th:block>

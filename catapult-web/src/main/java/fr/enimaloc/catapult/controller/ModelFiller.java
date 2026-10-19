@@ -221,6 +221,13 @@ public class ModelFiller {
         if (channelPage.isOwner()) {
             var twitchatEvents = channelPage.twitchat() == null ? Map.<String, List<TwitchatEventActionDto>>of()
                     : apiService.twitchatEvents(username);
+            if (channelPage.obs() != null) {
+                var widget = apiService.twitchatSettings(username);
+                // The token is a capability: it goes in the link only, never in a log.
+                if (widget != null && widget.widgetToken() != null) {
+                    model.addAttribute("widgetUrl", absoluteUrl("/widget/obs/" + widget.widgetToken()));
+                }
+            }
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
             model.addAttribute("dangerZone",
                     DangerZoneView.of(apiService.accountInfo(), apiService.accountDeletionDelayDays()));

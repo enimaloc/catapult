@@ -232,6 +232,31 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void regenerateTwitchatWidget_relaysAndAnswersNoContent() throws Exception {
+        when(apiService.regenerateTwitchatWidget("enimaloc")).thenReturn(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse(
+                true, "h", 4455, true, "11111111-2222-3333-4444-555555555555"));
+
+        mvc.perform(post("/channel/enimaloc/settings/twitchat/regenerate").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).regenerateTwitchatWidget("enimaloc");
+    }
+
+    @Test
+    void regenerateTwitchatWidget_isBadGatewayWhenCatapultApiRefusesOrIsDown() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/twitchat/regenerate").with(csrf()))
+                .andExpect(status().isBadGateway());
+    }
+
+    @Test
+    void regenerateTwitchatWidget_withoutCsrf_isRejectedAndNotRelayed() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/twitchat/regenerate"))
+                .andExpect(status().isForbidden());
+
+        org.mockito.Mockito.verifyNoInteractions(apiService);
+    }
+
+    @Test
     void saveCclSettings_callsApiServiceWithParsedBody() throws Exception {
         mvc.perform(post("/channel/enimaloc/settings/ccl").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
