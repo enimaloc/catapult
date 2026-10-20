@@ -3,12 +3,14 @@ import { html, load, render } from "./helpers.js";
 
 /** Minimal EventSource stand-in recording every instance and listener. */
 class FakeEventSource {
+    static CLOSED = 2;
     static instances = [];
 
     constructor(url) {
         this.url = url;
         this.listeners = {};
         this.closed = false;
+        this.readyState = 0;
         FakeEventSource.instances.push(this);
     }
 
@@ -83,7 +85,7 @@ describe("subscriptions", () => {
 
         render();
 
-        expect(Object.keys(current().listeners).sort())
+        expect(Object.keys(current().listeners).filter(name => name !== "open" && name !== "error").sort())
             .toEqual(["BindingDeletedEvent", "ChannelLiveStateEvent", "GameChangedEvent"]);
     });
 
@@ -134,5 +136,90 @@ describe("event handling", () => {
 
         expect(document.querySelector("[data-binding-id=b1]")).toBeNull();
         expect(document.querySelector("[data-binding-id=b2]")).not.toBeNull();
+    });
+});
+
+describe("reconnection", () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        window.CatapultSpa = { navigate: vi.fn(async () => {}) };
+        window.scrollTo = vi.fn();
+    });
+
+    function closeByServer(source) {
+        source.readyState = FakeEventSource.CLOSED;
+        source.emit("error", {});
+    }
+
+    it("reopens a stream that stopped for good, after a growing delay", () => {
+        render();
+        closeByServer(current());
+        vi.advanceTimersByTime(4999);
+        expect(sources()).toHaveLength(1);
+        vi.advanceTimersByTime(1);
+        expect(sources()).toHaveLength(2);
+        expect(current().url).toBe("/events/channel/enimaloc");
+
+        closeByServer(current());
+        vi.advanceTimersByTime(9999);
+        expect(sources()).toHaveLength(2);
+        vi.advanceTimersByTime(1);
+        expect(sources()).toHaveLength(3);
+    });
+
+    it("leaves a stream reconnecting by itself alone", () => {
+        render();
+        current().emit("error", {});
+        vi.advanceTimersByTime(60000);
+
+        expect(sources()).toHaveLength(1);
+    });
+
+    it("subscribes the reopened stream to the page's events", () => {
+        html(`<span data-on="live:ChannelLiveStateEvent.state"></span>`);
+        render();
+        closeByServer(current());
+        vi.advanceTimersByTime(5000);
+
+        expect(current().listeners.ChannelLiveStateEvent).toHaveLength(1);
+    });
+
+    it("re-renders the page to catch up each time the stream opens again, not the first time", async () => {
+        render();
+        current().emit("open", {});
+        expect(CatapultSpa.navigate).not.toHaveBeenCalled();
+
+        current().emit("open", {});
+        await vi.runAllTimersAsync();
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "");
+
+        closeByServer(current());
+        vi.advanceTimersByTime(5000);
+        current().emit("open", {});
+        await vi.runAllTimersAsync();
+        expect(CatapultSpa.navigate).toHaveBeenCalledTimes(2);
+    });
+
+    it("stops trying once the visitor left the channel", () => {
+        render();
+        closeByServer(current());
+        history.replaceState(null, "", "/privacy");
+        render();
+        vi.advanceTimersByTime(60000);
+
+        expect(sources()).toHaveLength(1);
+    });
+
+    it("ignores the events of a stream it replaced", () => {
+        render();
+        const old = current();
+        history.replaceState(null, "", "/channel/other");
+        render();
+        closeByServer(old);
+        old.emit("open", {});
+        vi.advanceTimersByTime(60000);
+
+        expect(sources()).toHaveLength(2);
+        expect(CatapultSpa.navigate).not.toHaveBeenCalled();
     });
 });
