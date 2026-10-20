@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AddRequest;
-import fr.enimaloc.catapult.common.dto.admin.AdminWhitelistQuotaRequest;
+import fr.enimaloc.catapult.common.dto.admin.AdminInviteQuotaRequest;
 import fr.enimaloc.catapult.common.dto.admin.AdminWhitelistRedemptionDto;
 import fr.enimaloc.catapult.common.dto.admin.InviteSettingsRequest;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistInviteRow;
@@ -97,7 +97,7 @@ public class ApiAdminWhitelistController {
 
     @PostMapping("/invite/{inviteId}/quota")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateInviteQuota(@PathVariable UUID inviteId, @RequestBody AdminWhitelistQuotaRequest body) {
+    public void updateInviteQuota(@PathVariable UUID inviteId, @RequestBody AdminInviteQuotaRequest body) {
         inviteService.updateInviteQuota(inviteId, body.maxUses(), body.canReinvite());
     }
 

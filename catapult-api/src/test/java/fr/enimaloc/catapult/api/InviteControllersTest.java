@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.api.admin.ApiAdminInviteController;
 import fr.enimaloc.catapult.common.dto.admin.AdminInviteQuotaRequest;
-import fr.enimaloc.catapult.common.dto.admin.GlobalSettingsRequest;
+import fr.enimaloc.catapult.common.dto.admin.InviteSettingsRequest;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.domain.access.AlphaInvite;
 import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
@@ -148,7 +148,7 @@ class InviteControllersTest {
         void settingsAndQuota_areSaved() {
             UUID inviteId = UUID.randomUUID();
 
-            controller.updateSettings(new GlobalSettingsRequest(50, null, true));
+            controller.updateSettings(new InviteSettingsRequest(50, null, true));
             controller.updateQuota(inviteId, new AdminInviteQuotaRequest(3, false));
 
             verify(inviteService).setGlobalMaxMembers(50);
