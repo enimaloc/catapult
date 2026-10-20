@@ -26,9 +26,10 @@ import java.util.concurrent.Semaphore;
  * and trail still arrive. Only envelopes for catapult-web's own DSN go on, to its own project:
  * anything else would make this an open relay. The visitor's IP stays here.
  * <p>
- * Anyone may post here, so it is bounded: an envelope is read up to {@link #MAX_ENVELOPE_BYTES}
- * and no further, and at most {@link #MAX_IN_FLIGHT} wait on Sentry at once (the SDK backs off from
- * the 429 the others get), each for a few seconds only.
+ * Anyone may post here, so it is bounded before anything is read: a request saying it is larger than
+ * {@link #MAX_ENVELOPE_BYTES} is refused (413) unread, and at most {@link #MAX_IN_FLIGHT} are read and
+ * wait on Sentry at once (the SDK backs off from the 429 the others get, refused unread too), each for a
+ * few seconds only; an envelope is then read up to {@link #MAX_ENVELOPE_BYTES} and no further.
  */
 @Slf4j
 @RestController
@@ -72,22 +73,38 @@ public class SentryTunnelController {
         if (request.getContentLengthLong() > MAX_ENVELOPE_BYTES) {
             return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).build();
         }
-        byte[] envelope = request.getInputStream().readNBytes(MAX_ENVELOPE_BYTES + 1);
-        return relay(envelope);
+        // Taken before reading: a body held in memory counts against the bound as much as a wait on Sentry.
+        if (!inFlight.tryAcquire()) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+        }
+        try {
+            return forward(request.getInputStream().readNBytes(MAX_ENVELOPE_BYTES + 1));
+        } finally {
+            inFlight.release();
+        }
     }
 
     ResponseEntity<Void> relay(byte[] envelope) throws InterruptedException {
         if (ingest == null) {
             return ResponseEntity.notFound().build();
         }
+        if (!inFlight.tryAcquire()) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+        }
+        try {
+            return forward(envelope);
+        } finally {
+            inFlight.release();
+        }
+    }
+
+    /** {@code envelope} on to Sentry, within an in-flight slot. */
+    private ResponseEntity<Void> forward(byte[] envelope) throws InterruptedException {
         if (envelope.length > MAX_ENVELOPE_BYTES) {
             return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).build();
         }
         if (!ownDsn(envelope)) {
             return ResponseEntity.badRequest().build();
-        }
-        if (!inFlight.tryAcquire()) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
         }
         try {
             HttpResponse<Void> response = http.send(HttpRequest.newBuilder(ingest)
@@ -99,8 +116,6 @@ public class SentryTunnelController {
         } catch (IOException e) {
             log.warn("Sentry unreachable, a browser report is lost: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
-        } finally {
-            inFlight.release();
         }
     }
 
