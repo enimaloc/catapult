@@ -268,7 +268,17 @@ class ModelFillerTest {
         filler().channel(model, "enimaloc", 1, "AUTO", null);
 
         assertThat(model).containsEntry("username", "enimaloc").containsEntry("channelPage", page(true))
-                .containsEntry("channelSettings", settings).containsEntry("dtddMapping", dtdd);
+                .containsEntry("channelSettings", settings).containsEntry("dtddMapping", dtdd)
+                .containsEntry("settingsUnavailable", false);
+    }
+
+    @Test
+    void channel_settingsCatapultApiFailedToGive_areSaidUnavailable_theRestStillFilled() {
+        when(api.channelPage("enimaloc", 0, null, null)).thenReturn(page(false));
+
+        assertThat(filler().channel(model, "enimaloc", 0, null, null)).isZero();
+
+        assertThat(model).containsEntry("settingsUnavailable", true).containsEntry("channelPage", page(false));
     }
 
     @Test
