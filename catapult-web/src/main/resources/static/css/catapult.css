@@ -2164,6 +2164,12 @@ body.obs-dock-mode #app {
     padding: 8px;
 }
 
+/* A dock reached by client-side navigation: its shell still has them (channel-dock.js). */
+body.obs-dock-mode .app-bar,
+body.obs-dock-mode .footer {
+    display: none;
+}
+
 .obs-dock {
     display: flex;
     flex-direction: column;
