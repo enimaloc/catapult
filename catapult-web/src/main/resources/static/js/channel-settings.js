@@ -20,16 +20,18 @@ document.addEventListener("catapult:render", function () {
     }));
 
     // The "no game" and "incomplete game" cards share the same game picker + ccl
-    // switches shape; only their id prefix, endpoint and extra fields differ.
+    // switches shape; only their id prefix, endpoint and extra fields differ. Only a picked
+    // game is saved (with its own id), never the text being typed; an emptied field saves neither.
     function attachDefaultGameCard(prefix, endpoint, extraFields = () => ({})) {
         const gameInput = byId(`${prefix}-game-input`);
         const gameIdInput = byId(`${prefix}-game-id`);
-        GameSearch.attach(gameInput, byId(`${prefix}-game-results`), `${baseUrl}/games/search`,
-            game => { gameIdInput.value = game.id; });
+        const game = GameSearch.attach(gameInput, byId(`${prefix}-game-results`), `${baseUrl}/games/search`,
+            picked => { gameIdInput.value = picked.id; },
+            { initial: { id: gameIdInput.value, name: gameInput.value } });
 
         on(`${prefix}-settings-save-btn`, "click", () => postJson(`${baseUrl}/settings/${endpoint}`, {
-            twitchGameId: gameIdInput.value || null,
-            twitchGameName: gameInput.value || null,
+            twitchGameId: game.selected()?.id ?? null,
+            twitchGameName: game.selected()?.name ?? null,
             ccls: checkedValues(byId(`channel-${prefix}-settings-form`), `.${prefix}-ccl-checkbox`),
             ...extraFields()
         }));

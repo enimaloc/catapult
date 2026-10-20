@@ -124,6 +124,30 @@ describe("GameSearch.attach", () => {
         expect(CatapultChannel.showError).toHaveBeenCalledWith(told);
     });
 
+    it("keeps the picked game as its selection until the field is emptied", async () => {
+        input.value = "Old";
+        const search = GameSearch.attach(input, results, "/search", vi.fn(), { initial: { id: "9", name: "Old" } });
+        expect(search.selected()).toEqual({ id: "9", name: "Old" });
+
+        type("doom");
+        await vi.runAllTimersAsync();
+        expect(search.selected()).toEqual({ id: "9", name: "Old" });
+        results.children[0].click();
+        expect(search.selected()).toEqual({ id: "1", name: "Doom" });
+
+        type("");
+        expect(search.selected()).toBeNull();
+    });
+
+    it("leaves typed text alone when it is a plain search (no initial game)", async () => {
+        const search = GameSearch.attach(input, results, "/search", vi.fn());
+        type("doo");
+        input.dispatchEvent(new Event("change"));
+
+        expect(input.value).toBe("doo");
+        expect(search.selected()).toBeNull();
+    });
+
     it("reads the result array through `pick` for wrapped responses", async () => {
         fetchMock.mockResolvedValueOnce(response(200, { results: [{ name: "Wrapped" }] }));
         GameSearch.attach(input, results, "/search", vi.fn(), { pick: data => data.results });

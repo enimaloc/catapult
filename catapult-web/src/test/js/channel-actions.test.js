@@ -158,13 +158,26 @@ describe("channel-bindings", () => {
             { twitchGameId: "42", twitchGameName: "Doom", ccls: ["Gore"] }]]);
     });
 
-    it("sends nulls for an empty game", async () => {
+    it("sends nulls for an emptied game", async () => {
         row(".binding-edit-game-input").value = "";
-        row(".binding-edit-game-id").value = "";
+        row(".binding-edit-game-input").dispatchEvent(new Event("input"));
         toggle(row(".binding-edit-ccl-checkbox[value=Gore]"), false);
         await flush();
 
         expect(posts()).toEqual([["/channel/enimaloc/bindings/b1", { twitchGameId: null, twitchGameName: null, ccls: [] }]]);
+    });
+
+    it("never sends text typed but not picked, which leaving the field puts back", async () => {
+        const input = row(".binding-edit-game-input");
+        input.value = "Half-typ";
+        input.dispatchEvent(new Event("input"));
+        toggle(row(".binding-edit-ccl-checkbox[value=Drugs]"), true);
+        await flush();
+
+        expect(posts()).toEqual([["/channel/enimaloc/bindings/b1",
+            { twitchGameId: "10", twitchGameName: "Old", ccls: ["Drugs", "Gore"] }]]);
+        input.dispatchEvent(new Event("change"));
+        expect(input.value).toBe("Old");
     });
 
     it("posts trigger-warning changes to the binding-scoped endpoints", async () => {
@@ -396,6 +409,29 @@ describe("channel-settings", () => {
 
         expect(document.getElementById("incomplete-fallback-game-id").value).toBe("7");
         expect(input.value).toBe("Doom");
+    });
+
+    it("saves the picked game, not text typed after it, and nothing once emptied", async () => {
+        vi.useFakeTimers();
+        fetch.mockResolvedValueOnce(response(200, [{ id: "7", name: "Doom" }]));
+        const input = document.getElementById("incomplete-fallback-game-input");
+        const saved = () => posted.mock.calls.at(-1)[1];
+        input.value = "doom";
+        input.dispatchEvent(new Event("input"));
+        await vi.runAllTimersAsync();
+        document.querySelector("#incomplete-fallback-game-results > *").click();
+
+        input.value = "Doom Eter";
+        input.dispatchEvent(new Event("input"));
+        document.getElementById("incomplete-fallback-settings-save-btn").click();
+        await vi.runAllTimersAsync();
+        expect([saved().twitchGameId, saved().twitchGameName]).toEqual(["7", "Doom"]);
+
+        input.value = "";
+        input.dispatchEvent(new Event("input"));
+        document.getElementById("incomplete-fallback-settings-save-btn").click();
+        await vi.runAllTimersAsync();
+        expect([saved().twitchGameId, saved().twitchGameName]).toEqual([null, null]);
     });
 
     it("does nothing for viewers without the settings tab", () => {

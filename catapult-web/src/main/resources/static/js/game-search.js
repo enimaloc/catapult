@@ -8,6 +8,12 @@
  *
  * `pick` extracts the result array from the response body, for endpoints that wrap
  * it (e.g. DTDD's `{ results: [...] }`).
+ *
+ * attach() returns the field's selection: the game last picked, else `initial` (the one the page
+ * was rendered with, `{ id, name }`), null once the field is emptied. Given an `initial`, the
+ * field holds a game rather than a search: text typed but never picked is no game, so when the
+ * field is left it shows the selection back, and a save never pairs a typed name with another
+ * game's id.
  */
 window.GameSearch = (function () {
     const MIN_QUERY_LENGTH = 2;
@@ -19,9 +25,10 @@ window.GameSearch = (function () {
         channel.showError(status ? channel.actionFailed(status) : channel.unreachable());
     }
 
-    function attach(inputEl, resultsEl, searchUrl, onSelect, { pick = data => data } = {}) {
+    function attach(inputEl, resultsEl, searchUrl, onSelect, { pick = data => data, initial } = {}) {
         let debounceTimer;
         let latest = 0;
+        let selected = initial?.id ? { id: initial.id, name: initial.name ?? "" } : null;
 
         async function search(q, query) {
             let games;
@@ -49,6 +56,7 @@ window.GameSearch = (function () {
                 item.addEventListener("click", () => {
                     resultsEl.replaceChildren();
                     inputEl.value = game.name;
+                    selected = { id: game.id, name: game.name };
                     onSelect(game);
                 });
                 return item;
@@ -59,12 +67,21 @@ window.GameSearch = (function () {
             clearTimeout(debounceTimer);
             const query = ++latest;
             const q = inputEl.value.trim();
+            if (q === "") selected = null;
             if (q.length < MIN_QUERY_LENGTH) {
                 resultsEl.replaceChildren();
                 return;
             }
             debounceTimer = setTimeout(() => search(q, query), DEBOUNCE_MS);
         });
+
+        if (initial !== undefined) {
+            inputEl.addEventListener("change", () => {
+                if (inputEl.value.trim() !== "") inputEl.value = selected?.name ?? "";
+            });
+        }
+
+        return { selected: () => selected };
     }
 
     return { attach };
