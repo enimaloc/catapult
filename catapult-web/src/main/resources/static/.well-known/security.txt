@@ -1,0 +1,4 @@
+Contact: mailto:security@enimaloc.fr
+Policy: https://enimaloc.fr/.well-known/security-policy.txt
+Preferred-Languages: fr, en
+Expires: 2027-06-12T00:00:00.000Z

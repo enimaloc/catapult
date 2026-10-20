@@ -103,6 +103,27 @@ class WellKnownServeControllerTest {
     }
 
     @Test
+    void servesTheShippedSecurityFiles_whileTheAdminConfiguredNone() throws Exception {
+        when(apiService.wellKnown(any(), any())).thenReturn(new WellKnownContent(404, null));
+        mvc.perform(get("/.well-known/security.txt"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("text/plain"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Contact: ")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Policy: ")))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+        mvc.perform(get("/.well-known/security-policy.txt")).andExpect(status().isOk());
+        // Only under /.well-known/, and only those.
+        mvc.perform(get("/security.txt")).andExpect(status().isNotFound());
+        mvc.perform(get("/.well-known/application.properties")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void anAdminsSecurityFile_replacesTheShippedOne() throws Exception {
+        when(apiService.wellKnown(WELL_KNOWN, "security.txt")).thenReturn(ok("text/plain", "Contact: mailto:admin@example.test"));
+        mvc.perform(get("/.well-known/security.txt")).andExpect(content().string("Contact: mailto:admin@example.test"));
+    }
+
+    @Test
     void neverAsksForATraversal() throws Exception {
         // Spring Security's StrictHttpFirewall may refuse it first (400): any 4xx, never a file.
         mvc.perform(get("/.well-known/../application.properties")).andExpect(status().is4xxClientError());
