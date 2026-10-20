@@ -373,7 +373,7 @@ describe("dispatch", () => {
 
     async function dispatch(batch = DISPATCH) {
         const result = CatapultTwitchat.dispatch(batch);
-        await vi.advanceTimersByTimeAsync(150);
+        await vi.advanceTimersByTimeAsync(350);
         return result;
     }
 
@@ -381,7 +381,7 @@ describe("dispatch", () => {
 
     it("claims the dispatch, then sends every payload in order under the protocol's names", async () => {
         await expect(dispatch()).resolves.toBe(2);
-        expect(slot).toBe("d-1");
+        expect(slot).toEqual([{ id: "d-1", by: expect.any(String) }]);
         expect(sent()).toEqual([
             ["CUSTOM_CHAT_MESSAGE", { message: "Live", user: { name: "Catapult" } }],
             ["EXECUTE_TRIGGER", { id: "t-1" }],
@@ -411,6 +411,59 @@ describe("dispatch", () => {
         expect(broadcasts()).toEqual([]);
     });
 
+    it("claims two dispatches close together, sending both, in order", async () => {
+        const second = { ...DISPATCH, id: "d-2", payloads: [{ action: "SHOUTOUT", data: { user: "b" } }] };
+        const results = Promise.all([CatapultTwitchat.dispatch(DISPATCH), CatapultTwitchat.dispatch(second)]);
+        await vi.advanceTimersByTimeAsync(700);
+
+        await expect(results).resolves.toEqual([2, 1]);
+        expect(slot.map(({ id }) => id)).toEqual(["d-1", "d-2"]);
+        expect(sent().map(([type]) => type)).toEqual(["CUSTOM_CHAT_MESSAGE", "EXECUTE_TRIGGER", "SHOUTOUT"]);
+    });
+
+    it("sends a dispatch reaching it twice only once", async () => {
+        await dispatch();
+        await expect(dispatch()).resolves.toBe(0);
+        expect(broadcasts()).toHaveLength(2);
+    });
+
+    it("leaves the dispatch to the client whose claim landed last", async () => {
+        const requestsStub = CatapultObs.requests;
+        CatapultObs.requests = new Proxy({}, { get: (_, name) => (name === "setPersistentData"
+            ? async (data) => { await requestsStub.setPersistentData(data); slot = [{ id: "d-1", by: "another client" }]; }
+            : requestsStub[name]) });
+
+        await expect(dispatch()).resolves.toBe(0);
+        expect(broadcasts()).toEqual([]);
+    });
+
+    it("claims again when another dispatch's claim overwrote its own", async () => {
+        const requestsStub = CatapultObs.requests;
+        let overwrites = 1;
+        CatapultObs.requests = new Proxy({}, { get: (_, name) => (name === "setPersistentData"
+            ? async (data) => {
+                await requestsStub.setPersistentData(data);
+                if (overwrites-- > 0) slot = [{ id: "d-0", by: "another client" }];
+            }
+            : requestsStub[name]) });
+
+        const result = CatapultTwitchat.dispatch(DISPATCH);
+        await vi.advanceTimersByTimeAsync(1000);
+        await expect(result).resolves.toBe(2);
+        expect(slot.map(({ id }) => id)).toEqual(["d-0", "d-1"]);
+    });
+
+    it("sends anyway when its claim keeps being overwritten", async () => {
+        const requestsStub = CatapultObs.requests;
+        CatapultObs.requests = new Proxy({}, { get: (_, name) => (name === "setPersistentData"
+            ? async (data) => { await requestsStub.setPersistentData(data); slot = []; }
+            : requestsStub[name]) });
+
+        const result = CatapultTwitchat.dispatch(DISPATCH);
+        await vi.advanceTimersByTimeAsync(1000);
+        await expect(result).resolves.toBe(2);
+    });
+
     it("dispatches anyway when OBS can't coordinate", async () => {
         const requestsStub = CatapultObs.requests;
         CatapultObs.requests = new Proxy({}, { get: (_, name) => (name === "getPersistentData"
@@ -427,7 +480,7 @@ describe("dispatch", () => {
 
     it("dispatches what catapult:twitchat:dispatch carries", async () => {
         document.dispatchEvent(new CustomEvent("catapult:twitchat:dispatch", { detail: DISPATCH }));
-        await vi.advanceTimersByTimeAsync(150);
+        await vi.advanceTimersByTimeAsync(350);
         expect(broadcasts()).toHaveLength(2);
     });
 
@@ -442,7 +495,7 @@ describe("dispatch", () => {
 describe("dispatch to a Twitchat not detected yet", () => {
     it("detects its protocol before naming the first payload", async () => {
         const result = CatapultTwitchat.dispatch({ ...DISPATCH, payloads: [...DISPATCH.payloads].reverse() });
-        await vi.advanceTimersByTimeAsync(150);
+        await vi.advanceTimersByTimeAsync(350);
         twitchatSends("ON_GLOBAL_STATES", {});
         await vi.advanceTimersByTimeAsync(0);
 
