@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apk add --no-cache git
 
-COPY gradlew settings.gradle.kts build.gradle.kts ./
+COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle ./gradle
 COPY catapult-common/build.gradle.kts ./catapult-common/
 COPY catapult-api/build.gradle.kts ./catapult-api/
