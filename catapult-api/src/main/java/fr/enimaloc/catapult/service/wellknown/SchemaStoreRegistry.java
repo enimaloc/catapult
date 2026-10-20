@@ -23,6 +23,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
@@ -30,6 +33,8 @@ import java.util.function.Function;
  * save-time checks: SchemaStore's catalog and the schemas it points to are kept 24 h; when SchemaStore
  * can't be reached, the copies bundled with catapult-api, SchemaStore being asked again 10 min later at
  * the earliest. Only https schemas of at most 1 MiB, on SchemaStore's own hosts and without redirects, are fetched.
+ * Downloads happen outside the registry's lock (a slow SchemaStore never holds up a cached answer),
+ * and concurrent requests for one url share a single download.
  */
 @Slf4j
 @Service
@@ -47,7 +52,9 @@ public class SchemaStoreRegistry {
 
     /** Raw bytes of a url, at most the cap + 1 of them (the registry refuses anything over its cap); throws when unavailable. */
     private final Function<String, byte[]> download;
+    private final Map<String, CompletableFuture<byte[]>> downloading = new ConcurrentHashMap<>();
     private final Clock clock;
+    // The fields below are guarded by `this`
     private Map<String, String> catalog; // fileMatch → schema url
     private Instant catalogUntil = Instant.MIN;
     private Instant retryAt = Instant.MIN;
@@ -97,20 +104,23 @@ public class SchemaStoreRegistry {
         }
     }
 
-    public synchronized Optional<String> schemaFor(String path) {
+    public Optional<String> schemaFor(String path) {
         if (path == null || path.isBlank()) return Optional.empty();
         Instant now = clock.instant();
         Map<String, String> live = liveCatalog(now);
         if (live == null) return snapshot(path);
         String url = match(live, path);
         if (url == null || !allowed(url)) return Optional.empty();
-        Cached cached = schemas.get(url);
+        Cached cached;
+        synchronized (this) {
+            cached = schemas.get(url);
+        }
         if (cached != null && now.isBefore(cached.until())) {
             if (cached.value() != null) return Optional.of(cached.value());
             return cached.failed() ? snapshot(path) : Optional.empty();
         }
         try {
-            byte[] body = download.apply(url);
+            byte[] body = fetch(url);
             String schema = null;
             if (body != null && body.length <= MAX_SCHEMA) {
                 String text = new String(body, StandardCharsets.UTF_8);
@@ -118,25 +128,31 @@ public class SchemaStoreRegistry {
                 schema = text;
             }
             if (schema != null) {
-                schemas.put(url, new Cached(schema, now.plus(TTL), false));
+                cache(url, new Cached(schema, now.plus(TTL), false));
                 return Optional.of(schema);
             }
             log.warn("SchemaStore schema {} refused: over {} bytes", url, MAX_SCHEMA);
-            schemas.put(url, new Cached(null, now.plus(RETRY), false));
+            cache(url, new Cached(null, now.plus(RETRY), false));
             return Optional.empty();
         } catch (RuntimeException e) {
             log.warn("SchemaStore schema {} unavailable: {}", url, e.getMessage());
-            schemas.put(url, new Cached(null, now.plus(RETRY), true));
+            cache(url, new Cached(null, now.plus(RETRY), true));
             return snapshot(path);
         }
     }
 
+    private synchronized void cache(String url, Cached cached) {
+        schemas.put(url, cached);
+    }
+
     /** The live catalog, null while SchemaStore is unreachable (until the retry delay is over). */
     private Map<String, String> liveCatalog(Instant now) {
-        if (catalog != null && now.isBefore(catalogUntil)) return catalog;
-        if (now.isBefore(retryAt)) return catalog;
+        synchronized (this) {
+            if (catalog != null && now.isBefore(catalogUntil)) return catalog;
+            if (now.isBefore(retryAt)) return catalog;
+        }
         try {
-            byte[] raw = download.apply(CATALOG_URL);
+            byte[] raw = fetch(CATALOG_URL);
             if (raw == null || raw.length > MAX_CATALOG) throw new IllegalStateException("catalog over " + MAX_CATALOG + " bytes");
             JsonNode root = JSON.readTree(new String(raw, StandardCharsets.UTF_8));
             Map<String, String> index = new LinkedHashMap<>();
@@ -144,13 +160,43 @@ public class SchemaStoreRegistry {
                 String url = schema.path("url").asString("");
                 for (JsonNode match : schema.path("fileMatch")) index.putIfAbsent(match.asString(""), url);
             }
-            catalog = index;
-            catalogUntil = now.plus(TTL);
-            return catalog;
+            synchronized (this) {
+                catalog = index;
+                catalogUntil = now.plus(TTL);
+                return catalog;
+            }
         } catch (RuntimeException e) {
             log.warn("SchemaStore catalog unavailable, using the bundled copies: {}", e.getMessage());
-            retryAt = now.plus(RETRY);
-            return catalog;
+            synchronized (this) {
+                retryAt = now.plus(RETRY);
+                return catalog;
+            }
+        }
+    }
+
+    /**
+     * Downloads {@code url}, without holding the lock: the first caller downloads, the ones
+     * arriving meanwhile wait for its result (or its failure) instead of downloading it again.
+     */
+    private byte[] fetch(String url) {
+        CompletableFuture<byte[]> mine = new CompletableFuture<>();
+        CompletableFuture<byte[]> running = downloading.putIfAbsent(url, mine);
+        if (running != null) {
+            try {
+                return running.join();
+            } catch (CompletionException e) {
+                throw e.getCause() instanceof RuntimeException cause ? cause : e;
+            }
+        }
+        try {
+            byte[] body = download.apply(url);
+            mine.complete(body);
+            return body;
+        } catch (RuntimeException e) {
+            mine.completeExceptionally(e);
+            throw e;
+        } finally {
+            downloading.remove(url, mine);
         }
     }
 
@@ -167,7 +213,7 @@ public class SchemaStoreRegistry {
         return null;
     }
 
-    private Optional<String> snapshot(String path) {
+    private synchronized Optional<String> snapshot(String path) {
         try {
             if (snapshotIndex == null) {
                 String json = new ClassPathResource(SNAPSHOT + "index.json").getContentAsString(StandardCharsets.UTF_8);
