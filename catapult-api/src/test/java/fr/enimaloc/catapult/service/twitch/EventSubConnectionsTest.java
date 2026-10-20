@@ -100,6 +100,18 @@ class EventSubConnectionsTest {
     }
 
     @Test
+    void onOpen_afterADisconnect_closesTheSocketInsteadOfRegisteringIt() {
+        WebSocket ws = mock(WebSocket.class);
+        connections.forbidReconnect(user);
+
+        connections.new Listener(user, token, false).onOpen(ws);
+
+        assertThat(registered()).doesNotContainKey(user.getId());
+        verify(ws).sendClose(eq(WebSocket.NORMAL_CLOSURE), anyString());
+        verify(ws, never()).request(anyInt());
+    }
+
+    @Test
     void onError_immediatelyAfterOnOpen_stillTriggersReconnectCleanup() {
         // A "Connection reset" right after the handshake: onOpen must have registered the socket
         // synchronously so this compare-and-remove can't lose the race.
