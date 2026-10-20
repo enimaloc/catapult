@@ -37,9 +37,6 @@ services:
       dockerfile: catapult-web/Dockerfile
     environment:
       - CATAPULT_API_URL=${CATAPULT_API_URL:-http://catapult-api:8080}
-      - JWT_SECRET=${JWT_SECRET}
-      # Empty = use relative URL for OAuth so nginx routes /oauth2/** to catapult-api correctly
-      - CATAPULT_API_PUBLIC_URL=
       - REDIS_HOST=catapult-redis
       # Empty = Sentry off
       - SENTRY_DSN=${SENTRY_DSN:-}
