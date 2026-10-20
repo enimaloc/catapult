@@ -31,7 +31,26 @@ cp .env.example .env
 docker compose up -d
 ```
 
-L'application est accessible sur `http://localhost:8080`.
+L'application est accessible sur `http://localhost` (port choisi par `WEB_PORTS`, 80 par défaut).
+
+### Déploiement
+
+`catapult-web` est le seul point d'entrée : il sert le site et relaie lui-même vers `catapult-api` les chemins
+que le navigateur appelle directement (login Twitch `/oauth2/` et `/login/oauth2/`, retour Steam, `/api/game/`,
+`/api/user/`, Swagger). Quand `catapult-api` est injoignable, ces chemins répondent la page de maintenance (503).
+`catapult-api` n'est jamais exposé.
+
+Le proxy TLS placé devant (Caddy, Traefik, Cloudflare…) doit :
+
+- terminer le TLS et parler **HTTP/2** au navigateur (chaque onglet garde des flux SSE ouverts, que HTTP/1.1
+  limite à 6 connexions par hôte) ;
+- transmettre `X-Forwarded-For`, `X-Forwarded-Proto` et `X-Forwarded-Host` (les adresses de retour Twitch et
+  Steam en dépendent) ;
+- ne pas mettre en tampon les réponses `text/event-stream`, et tolérer des réponses de plusieurs minutes
+  (`catapult-web` envoie un battement toutes les 30 s) ;
+- sonder `/up` pour la santé ;
+- avec plusieurs instances (`CATAPULT_WEB_REPLICAS=N`, `WEB_PORTS=8081-808N`), répartir entre elles : sessions et
+  événements passent par Redis, n'importe quelle instance sert n'importe quel visiteur.
 
 ## Configuration
 
