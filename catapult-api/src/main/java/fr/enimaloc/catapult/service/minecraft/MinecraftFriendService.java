@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,7 @@ public class MinecraftFriendService {
     private final MinecraftAccountLimitMarker limitMarker;
     private final GetterConfigRepository getterConfigRepository;
     private final ObjectMapper objectMapper;
+    private final ChannelEventPublisher channelEventPublisher;
 
     @Transactional
     public MinecraftFriendLink enroll(UserAccount user, String pseudo) {
@@ -153,6 +155,7 @@ public class MinecraftFriendService {
     /**
      * Réconcilie les liens locaux avec la friends list réelle de chaque compte :
      * PENDING accepté en jeu → ACCEPTED ; ACCEPTED disparu → REMOVED ; pseudo rafraîchi.
+     * Chaque lien modifié est annoncé aux dashboards de sa chaîne.
      */
     // Pas de @Transactional : évite de tenir une connexion BD pendant les appels HTTP getFriends ;
     // chaque save() porte sa propre transaction et la réconciliation est idempotente.
@@ -233,7 +236,11 @@ public class MinecraftFriendService {
                     changed = true;
                 }
 
-                if (changed) linkRepository.save(link);
+                if (changed) {
+                    linkRepository.save(link);
+                    channelEventPublisher.minecraftLinkChanged(link.getUser().getId(),
+                            link.getStatus().name(), link.getMinecraftName());
+                }
             }
         }
     }
