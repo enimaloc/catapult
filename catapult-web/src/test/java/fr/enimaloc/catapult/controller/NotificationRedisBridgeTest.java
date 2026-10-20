@@ -2,13 +2,24 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.event.notification.BroadcastStreamEvent;
 import fr.enimaloc.catapult.event.notification.NotificationStreamEvent;
+import fr.enimaloc.catapult.TestRedis;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 import java.util.Map;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -70,5 +81,62 @@ class NotificationRedisBridgeTest {
         forward(user, "{\"name\":\"notification.all.read\",\"data\":[0]}");
         forward("catapult:events:global", "{\"name\":\"alert.info\",\"data\":\"text\"}");
         verifyNoInteractions(events);
+    }
+
+    private final NotificationRedisBridge bridge = new NotificationRedisBridge();
+    private LettuceConnectionFactory redis;
+    private RedisMessageListenerContainer listener;
+
+    /** This instance's listener on {@code redis}, started the way its context would start it. */
+    private void listen(LettuceConnectionFactory redis) throws Exception {
+        this.redis = redis;
+        listener = TestRedis.prepared(bridge.notificationEventListener(redis, events));
+        bridge.startNotificationEventListener(listener).run(new DefaultApplicationArguments());
+    }
+
+    @AfterEach
+    void stopListening() throws Exception {
+        if (listener != null) listener.destroy();
+        if (redis != null) redis.destroy();
+    }
+
+    @Test
+    void throughRedis_aBroadcast_andAnAccountsNotification_reachThisInstancesNavbars() throws Exception {
+        listen(TestRedis.up());
+        StringRedisTemplate publisher = new StringRedisTemplate(redis);
+
+        publisher.convertAndSend(NotificationRedisBridge.GLOBAL, "{\"name\":\"version.deployed\",\"data\":{\"version\":\"1.2\"}}");
+        publisher.convertAndSend(user, "{\"name\":\"notification.all.read\",\"data\":{\"unreadCount\":0}}");
+
+        verify(events, timeout(5_000)).publishEvent(new BroadcastStreamEvent("version.deployed", Map.of("version", "1.2")));
+        verify(events, timeout(5_000)).publishEvent(new NotificationStreamEvent(account, NotificationStreamEvent.ALL_READ,
+                Map.of("unreadCount", 0)));
+    }
+
+    @Test
+    void throughRedis_garbage_andTheOtherEventChannels_reachNoNavbar() throws Exception {
+        listen(TestRedis.up());
+        StringRedisTemplate publisher = new StringRedisTemplate(redis);
+        String created = "{\"name\":\"notification.created\",\"data\":{\"id\":\"n1\"}}";
+
+        publisher.convertAndSend(user, "{oops");
+        publisher.convertAndSend(NotificationRedisBridge.GLOBAL, "{oops");
+        publisher.convertAndSend("catapult:events:admin", "{\"name\":\"alert.info\",\"data\":{}}");
+        publisher.convertAndSend("catapult:events:channel:" + account, created);
+        publisher.convertAndSend(user, created);
+
+        verify(events, timeout(5_000)).publishEvent(new NotificationStreamEvent(account, NotificationStreamEvent.CREATED,
+                Map.of("id", "n1")));
+        verify(events, after(300).times(1)).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void aRedisDownAtBoot_costsTheNotifications_notTheBoot() {
+        redis = TestRedis.down();
+        listener = TestRedis.prepared(bridge.notificationEventListener(redis, events));
+
+        assertThatCode(() -> bridge.startNotificationEventListener(listener).run(new DefaultApplicationArguments()))
+                .doesNotThrowAnyException();
+        verify(events, never()).publishEvent(any(Object.class));
     }
 }
