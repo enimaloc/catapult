@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.wellknown;
 
 import org.junit.jupiter.api.Test;
+import java.util.Optional;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -174,5 +175,45 @@ class SchemaStoreRegistryTest {
         assertThat(registry.schemaFor("foo/package.json")).isEmpty();
         assertThat(registry.schemaFor("package.json")).isPresent();
         assertThat(new SchemaStoreRegistry(web(true), new MovableClock()).schemaFor("assetlinks.json")).isPresent();
+    }
+
+    @Test
+    void concurrentRequestsShareOneDownload_madeOutsideTheLock() throws Exception {
+        java.util.concurrent.CountDownLatch inDownload = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger schemaDownloads = new java.util.concurrent.atomic.AtomicInteger();
+        var registry = new SchemaStoreRegistry(url -> {
+            if (url.endsWith("catalog.json")) return bytes(CATALOG);
+            schemaDownloads.incrementAndGet();
+            inDownload.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return bytes("{\"title\":\"gpc\"}");
+        }, new MovableClock());
+        registry.schemaFor("unknown.json"); // loads the catalog first
+
+        AtomicReference<Optional<String>> first = new AtomicReference<>();
+        AtomicReference<Optional<String>> second = new AtomicReference<>();
+        Thread a = new Thread(() -> first.set(registry.schemaFor("gpc.json")));
+        a.start();
+        assertThat(inDownload.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        // The registry isn't locked during the download: another schema's cached answer is served
+        assertThat(registry.schemaFor("security.txt")).isEmpty();
+        Thread b = new Thread(() -> second.set(registry.schemaFor("gpc.json")));
+        b.start();
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (b.getState() != Thread.State.WAITING && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
+        release.countDown();
+        a.join(5_000);
+        b.join(5_000);
+
+        assertThat(schemaDownloads).hasValue(1);
+        assertThat(first.get()).hasValue("{\"title\":\"gpc\"}");
+        assertThat(second.get()).hasValue("{\"title\":\"gpc\"}");
     }
 }
