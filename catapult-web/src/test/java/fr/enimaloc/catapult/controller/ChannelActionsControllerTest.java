@@ -182,29 +182,67 @@ class ChannelActionsControllerTest {
         verify(apiService).refreshSteamProfileCache("enimaloc");
     }
 
+    /** A session logged in as {@code login}, its JWT naming it (unsigned: catapult-web only reads it). */
+    private static org.springframework.mock.web.MockHttpSession as(String login) {
+        java.util.Base64.Encoder base64 = java.util.Base64.getUrlEncoder().withoutPadding();
+        String payload = base64.encodeToString(("{\"username\":\"" + login + "\"}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        org.springframework.mock.web.MockHttpSession session = new org.springframework.mock.web.MockHttpSession();
+        session.setAttribute(fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY, "e30." + payload + ".sig");
+        return session;
+    }
+
     @Test
     void minecraftStatus_returnsApiServiceResult() throws Exception {
         when(apiService.minecraftStatus("enimaloc"))
                 .thenReturn(new LinkStateResponse("ACCEPTED", "Steve", "bot-account-1"));
 
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/channel/enimaloc/minecraft"))
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/channel/enimaloc/minecraft")
+                        .session(as("Enimaloc")))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status").value("ACCEPTED"));
     }
 
     @Test
     void minecraftEnroll_callsApiServiceWithParsedBody() throws Exception {
-        mvc.perform(post("/channel/enimaloc/minecraft/enroll").with(csrf())
+        mvc.perform(post("/channel/enimaloc/minecraft/enroll").with(csrf()).session(as("enimaloc"))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Steve\"}"))
+                        .content("{\"name\":\" Steve \"}"))
                 .andExpect(status().isNoContent());
 
         verify(apiService).minecraftEnroll("enimaloc", "Steve");
     }
 
     @Test
+    void minecraftEnroll_withoutAName_isABadRequest_notSentOn() throws Exception {
+        for (String body : new String[]{"{}", "{\"name\":\"  \"}"}) {
+            mvc.perform(post("/channel/enimaloc/minecraft/enroll").with(csrf()).session(as("enimaloc"))
+                            .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).minecraftEnroll(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    /** The link is the member's own: never reached through another channel, nor logged out. */
+    @Test
+    void minecraft_onAnotherChannel_isForbidden() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/channel/someone/minecraft")
+                .session(as("enimaloc"))).andExpect(status().isForbidden());
+        mvc.perform(post("/channel/someone/minecraft/enroll").with(csrf()).session(as("enimaloc"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"name\":\"Steve\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/channel/someone/minecraft/sync").with(csrf()).session(as("enimaloc"))).andExpect(status().isForbidden());
+        mvc.perform(post("/channel/enimaloc/minecraft/disconnect").with(csrf())).andExpect(status().isForbidden());
+
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).minecraftStatus(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).minecraftEnroll(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).minecraftSync(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).minecraftDisconnect(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void minecraftSync_callsApiService() throws Exception {
-        mvc.perform(post("/channel/enimaloc/minecraft/sync").with(csrf()))
+        mvc.perform(post("/channel/enimaloc/minecraft/sync").with(csrf()).session(as("enimaloc")))
                 .andExpect(status().isNoContent());
 
         verify(apiService).minecraftSync("enimaloc");
@@ -212,7 +250,7 @@ class ChannelActionsControllerTest {
 
     @Test
     void minecraftDisconnect_callsApiService() throws Exception {
-        mvc.perform(post("/channel/enimaloc/minecraft/disconnect").with(csrf()))
+        mvc.perform(post("/channel/enimaloc/minecraft/disconnect").with(csrf()).session(as("enimaloc")))
                 .andExpect(status().isNoContent());
 
         verify(apiService).minecraftDisconnect("enimaloc");

@@ -19,7 +19,9 @@ import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -133,24 +135,39 @@ public class ChannelActionsController {
         return ApiStatus.answer(apiService.refreshSteamProfileCache(username));
     }
 
+    // The Minecraft link is the logged-in member's own (catapult-api reads it from the JWT, not from the
+    // path): it is only reached from their own channel, never through another channel they moderate.
+
     @GetMapping("/channel/{username}/minecraft")
-    public LinkStateResponse minecraftStatus(@PathVariable String username) {
-        return apiService.minecraftStatus(username);
+    public ResponseEntity<LinkStateResponse> minecraftStatus(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ResponseEntity.ok(apiService.minecraftStatus(username));
     }
 
     @PostMapping("/channel/{username}/minecraft/enroll")
     public ResponseEntity<Void> minecraftEnroll(@PathVariable String username, @RequestBody java.util.Map<String, String> body) {
-        return ApiStatus.answer(apiService.minecraftEnroll(username, body.get("name")));
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        String name = body == null ? null : body.get("name");
+        if (name == null || name.isBlank()) return ResponseEntity.badRequest().build();
+        return ApiStatus.answer(apiService.minecraftEnroll(username, name.trim()));
     }
 
     @PostMapping("/channel/{username}/minecraft/sync")
     public ResponseEntity<Void> minecraftSync(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         return ApiStatus.answer(apiService.minecraftSync(username));
     }
 
     @PostMapping("/channel/{username}/minecraft/disconnect")
     public ResponseEntity<Void> minecraftDisconnect(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         return ApiStatus.answer(apiService.minecraftDisconnect(username));
+    }
+
+    /** Whether {@code username} is the logged-in member's own channel. */
+    private static boolean ownChannel(String username) {
+        String login = ApiClient.currentLogin();
+        return login != null && login.equalsIgnoreCase(username);
     }
 
     @PostMapping("/channel/{username}/settings/obs")
