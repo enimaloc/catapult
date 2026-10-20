@@ -1,6 +1,10 @@
+import org.springframework.boot.gradle.plugin.SpringBootPlugin
+
 plugins {
     `java-library`
-    id("io.spring.dependency-management") version "1.1.7"
+    // Not applied (a library, no boot jar): only on the classpath for the BOM coordinates below
+    id("org.springframework.boot") apply false
+    id("io.spring.dependency-management")
 }
 
 description = "catapult-common"
@@ -13,7 +17,8 @@ java {
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:4.0.4")
+        // The Boot version the other modules build with (gradle.properties)
+        mavenBom(SpringBootPlugin.BOM_COORDINATES)
     }
 }
 
