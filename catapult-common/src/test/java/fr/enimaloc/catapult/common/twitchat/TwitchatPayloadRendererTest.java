@@ -97,4 +97,24 @@ class TwitchatPayloadRendererTest {
         renderer(Set.of()).render("SEND_MESSAGE", data);
         assertThat(data.get("message")).isEqualTo("{{gameName}}");
     }
+
+    @Test
+    void noData_rendersAnEmptyObject() {
+        assertThat(renderer(Set.of()).render("SEND_MESSAGE", null).orElseThrow().data()).isEmpty();
+    }
+
+    @Test
+    void aMapKeyReferencingAnInapplicableAction_skipsThePayload() {
+        assertThat(renderer(Set.of()).render("SEND_MESSAGE",
+                map("message", "x", "extra", map("{{action:REVERT_CATEGORY}}", "v")))).isEmpty();
+        assertThat(minted).isEmpty();
+    }
+
+    @Test
+    void mapKeysAreSubstitutedLikeValues() {
+        TwitchatPayload payload = renderer(Set.of(TwitchatActionType.DISABLE_BOT)).render("SEND_MESSAGE",
+                map("{{gameName}}", "{{action:DISABLE_BOT}}")).orElseThrow();
+
+        assertThat(payload.data()).isEqualTo(map("Celeste", "tok-DISABLE_BOT"));
+    }
 }
