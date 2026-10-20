@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.common.dto;
 
+import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
@@ -83,6 +84,24 @@ class DtoBehaviourTest {
             assertThat(page.first()).isEqualTo(first).isEqualTo(bindings.first());
             assertThat(page.last()).isEqualTo(last).isEqualTo(bindings.last());
         }
+    }
+
+    @Test
+    void adminMembersPage_withoutLiveStatuses_hasNobodyLive() {
+        AdminMembersPage page = new AdminMembersPage(null, null, false);
+
+        assertThat(page.members()).isEmpty();
+        assertThat(page.isLive(java.util.UUID.randomUUID())).isFalse();
+        assertThat(page.isLive(null)).isFalse();
+    }
+
+    @Test
+    void adminMembersPage_tellsWhoIsLive() {
+        java.util.UUID live = java.util.UUID.randomUUID();
+        AdminMembersPage page = new AdminMembersPage(List.of(), java.util.Map.of(live, true), false);
+
+        assertThat(page.isLive(live)).isTrue();
+        assertThat(page.isLive(java.util.UUID.randomUUID())).isFalse();
     }
 
     @Test
