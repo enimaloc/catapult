@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.dto.index.SpaPage;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -27,11 +28,12 @@ public class IndexController {
         return index(model, "", locale, response);
     }
 
-    // No page name has a dot: dotted names are WellKnownServeController's root files.
+    // No page name has a dot: dotted names are WellKnownServeController's root files. A dynamic page
+    // (/channel/{username}) without its segment is no page either.
     @GetMapping("/{page:[^.]+}")
     String index(Model model, @PathVariable String page, Locale locale, HttpServletResponse response)
             throws IOException {
-        boolean unknownPage = !SiteCatalog.isPage(page);
+        boolean unknownPage = !SiteCatalog.isPage(page) || SiteCatalog.page(page).map(SpaPage::isDynamic).orElse(false);
         model.addAttribute("error", unknownPage);
         if (unknownPage) {
             // A real 404, not a page saying so: search engines would index it as a page otherwise.

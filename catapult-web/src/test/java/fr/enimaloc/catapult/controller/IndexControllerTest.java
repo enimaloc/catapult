@@ -187,6 +187,11 @@ class IndexControllerTest {
     }
 
     @Test
+    void aDynamicPageWithoutItsSegment_isARealNotFound() throws Exception {
+        mvc.perform(get("/channel")).andExpect(status().isNotFound());
+    }
+
+    @Test
     void publicPage_describesItselfWithItsCanonicalUrl() throws Exception {
         String html = mvc.perform(get("/privacy").param("utm_source", "x"))
                 .andExpect(status().isOk())
