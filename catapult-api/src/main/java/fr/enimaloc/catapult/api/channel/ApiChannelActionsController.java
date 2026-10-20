@@ -31,7 +31,6 @@ import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
-import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
@@ -43,7 +42,6 @@ import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatValidationException;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
-import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -458,14 +456,13 @@ public class ApiChannelActionsController {
     }
 
     private void publishSettings(UserAccount channel, UserSettings settings) {
-        channelEventPublisher.settingsUpdated(channel.getId(), UserSettingsDto.from(settings));
+        channelEventPublisher.settingsUpdated(channel.getId(), settings);
     }
 
     /** Tells the channel's dashboards about a binding's new state (nothing if it's gone). */
     private void publishBinding(UserAccount channel, UUID bindingId) {
         bindingService.findBinding(channel, bindingId)
-                .map(BindingDto::from)
-                .ifPresent(dto -> channelEventPublisher.bindingUpserted(channel.getId(), dto));
+                .ifPresent(binding -> channelEventPublisher.bindingUpserted(channel.getId(), binding));
     }
 
     private static TwitchatSettingsResponse twitchatResponse(UserAccount channel, TwitchatWidgetSettings settings) {

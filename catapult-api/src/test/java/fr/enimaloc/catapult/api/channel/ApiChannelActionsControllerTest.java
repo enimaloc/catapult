@@ -5,10 +5,8 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
-import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
-import fr.enimaloc.catapult.service.settings.UserSettingsDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -73,7 +71,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
                     .andExpect(status().isNoContent());
 
             verify(bindingService).toggleCclEnabled(owner, bindingId, false);
-            verify(channelEventPublisher).bindingUpserted(owner.getId(), BindingDto.from(binding));
+            verify(channelEventPublisher).bindingUpserted(owner.getId(), binding);
         }
 
         @Test
@@ -152,7 +150,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
             assertThat(saved()).isSameAs(existing);
             assertThat(existing.isCclFeatureEnabled()).isFalse();
             assertThat(existing.getBlockedCcls()).containsExactly("Gore");
-            verify(channelEventPublisher).settingsUpdated(owner.getId(), UserSettingsDto.from(existing));
+            verify(channelEventPublisher).settingsUpdated(owner.getId(), existing);
         }
 
         @Test

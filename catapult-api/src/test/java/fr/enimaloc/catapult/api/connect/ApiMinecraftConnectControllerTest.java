@@ -24,6 +24,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +35,7 @@ class ApiMinecraftConnectControllerTest {
     @Mock private MinecraftGateService gateService;
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private MinecraftServiceAccountRepository accountRepository;
+    @Mock private fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
     @Mock private Jwt jwt;
 
     private ApiMinecraftConnectController controller;
@@ -91,6 +93,15 @@ class ApiMinecraftConnectControllerTest {
         var response = controller.enroll(jwt, Map.of("name", "jeb_"));
 
         assertThat(response.status()).isEqualTo("PENDING");
+        verify(channelEventPublisher).minecraftLinkChanged(user.getId(), "PENDING", "jeb_");
+    }
+
+    @Test
+    void delete_unenrolls_andTellsTheDashboards() {
+        controller.unenroll(jwt);
+
+        verify(friendService).unenroll(user);
+        verify(channelEventPublisher).minecraftLinkChanged(user.getId(), "NONE", null);
     }
 
     @Test
