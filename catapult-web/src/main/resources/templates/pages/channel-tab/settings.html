@@ -6,6 +6,11 @@
         <h2 th:text="#{channel.settings.title}">Paramètres</h2>
     </div>
 
+    <!--/* catapult-api failed to give the settings: the tab says so instead of failing the whole page. */-->
+    <p th:if="${settings == null}" id="channel-settings-unavailable" class="settings-unavailable"
+       th:text="#{channel.settings.unavailable}">Paramètres indisponibles.</p>
+
+    <th:block th:if="${settings != null}">
     <mdui-card id="channel-ccl-settings-form" class="settings-card" variant="outlined">
         <div class="title-row">
             <h3 th:text="#{channel.settings.ccl.title}">Filtres de contenu</h3>
@@ -63,6 +68,7 @@
                 'incomplete-fallback-ccl-checkbox', ${settings.incompleteFallbackCcls()}, 'name')}"></div>
         <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
     </mdui-card>
+    </th:block>
 
     <!--/* The owner's alone: catapult-api refuses anyone else, so the card isn't offered to a moderator. */-->
     <mdui-card id="channel-danger-zone" class="settings-card danger-zone-card" variant="outlined"
