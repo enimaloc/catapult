@@ -81,4 +81,21 @@ class IanaWellKnownRegistryTest {
         var registry = new IanaWellKnownRegistry(() -> "<html>maintenance</html>", new MovableClock());
         assertThat(registry.registry().source()).isEqualTo("SNAPSHOT");
     }
+
+    @Test
+    void theDownloaderRefusesARedirect_andAnOversizedAnswer() throws Exception {
+        try (okhttp3.mockwebserver.MockWebServer server = new okhttp3.mockwebserver.MockWebServer()) {
+            server.enqueue(new okhttp3.mockwebserver.MockResponse().setResponseCode(302).setHeader("Location", "/elsewhere"));
+            server.enqueue(new okhttp3.mockwebserver.MockResponse().setBody("x".repeat(IanaWellKnownRegistry.MAX_BYTES + 1)));
+            server.enqueue(new okhttp3.mockwebserver.MockResponse().setBody(CSV));
+            server.start();
+            Supplier<String> download = IanaWellKnownRegistry.downloader(
+                    org.springframework.web.client.RestClient.builder(), server.url("/registry.csv").toString());
+
+            org.assertj.core.api.Assertions.assertThatThrownBy(download::get).hasMessageContaining("302");
+            org.assertj.core.api.Assertions.assertThatThrownBy(download::get).hasMessageContaining("bytes");
+            assertThat(download.get()).isEqualTo(CSV);
+            assertThat(server.getRequestCount()).isEqualTo(3); // the redirect was never followed
+        }
+    }
 }

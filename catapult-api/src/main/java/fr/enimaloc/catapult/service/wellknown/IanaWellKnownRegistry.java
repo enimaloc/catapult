@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -21,7 +22,8 @@ import java.util.function.Supplier;
 /**
  * IANA's Well-Known URIs registry for the admin's Well-known tab: downloaded from iana.org and kept
  * 24 h; when that fails, the copy bundled with catapult-api, iana.org being asked again 10 min later
- * at the earliest (not on every tab opening).
+ * at the earliest (not on every tab opening). Like SchemaStore's schemas, the download is refused
+ * over {@value #MAX_BYTES} bytes or when answered with a redirect.
  */
 @Slf4j
 @Service
@@ -29,6 +31,8 @@ public class IanaWellKnownRegistry {
     static final String URL = "https://www.iana.org/assignments/well-known-uris/well-known-uris-1.csv";
     static final Duration TTL = Duration.ofHours(24);
     static final Duration RETRY = Duration.ofMinutes(10);
+    /** The registry is some 20 KiB: 50 times that is no longer it. */
+    static final int MAX_BYTES = 1024 * 1024;
     private static final String SNAPSHOT = "iana/well-known-uris-1.csv";
     private static final String HEADER = "URI Suffix,";
 
@@ -41,7 +45,7 @@ public class IanaWellKnownRegistry {
 
     @Autowired
     public IanaWellKnownRegistry(RestClient.Builder builder) {
-        this(downloader(builder), Clock.systemUTC());
+        this(downloader(builder, URL), Clock.systemUTC());
     }
 
     IanaWellKnownRegistry(Supplier<String> download, Clock clock) {
@@ -49,12 +53,26 @@ public class IanaWellKnownRegistry {
         this.clock = clock;
     }
 
-    private static Supplier<String> downloader(RestClient.Builder builder) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+    /** Downloads {@code url}; throws when unavailable, redirected or over {@value #MAX_BYTES} bytes. */
+    static Supplier<String> downloader(RestClient.Builder builder, String url) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                connection.setInstanceFollowRedirects(false); // a 3xx is "unavailable"
+            }
+        };
         factory.setConnectTimeout(Duration.ofSeconds(5));
         factory.setReadTimeout(Duration.ofSeconds(10));
         RestClient client = builder.clone().requestFactory(factory).build();
-        return () -> client.get().uri(URL).retrieve().body(String.class);
+        return () -> client.get().uri(url).exchange((request, response) -> {
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new IllegalStateException("HTTP " + response.getStatusCode().value());
+            }
+            byte[] body = response.getBody().readNBytes(MAX_BYTES + 1);
+            if (body.length > MAX_BYTES) throw new IllegalStateException("over " + MAX_BYTES + " bytes");
+            return new String(body, StandardCharsets.UTF_8);
+        });
     }
 
     public synchronized IanaRegistryDto registry() {
