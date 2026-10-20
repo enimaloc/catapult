@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.MutableClock;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
-import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -15,8 +15,6 @@ import java.time.Instant;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -31,11 +29,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StatusControllerTest {
 
     @Autowired MockMvc mvc;
-    @MockitoBean ApiClient apiClient;
+    @MockitoBean ApiService apiService;
 
     @Test
     void tellsWhetherCatapultApiAnswers_uncached() throws Exception {
-        when(apiClient.getAnonymous("/api/health", Map.class)).thenReturn(new ApiClient.Result<>(200, Map.of("status", "UP")));
+        when(apiService.apiAvailable()).thenReturn(true);
 
         mvc.perform(get("/status"))
                 .andExpect(status().isOk())
@@ -44,13 +42,11 @@ class StatusControllerTest {
     }
 
     @Test
-    void unavailable_whenDownOrNotUp() {
-        ApiClient client = mock(ApiClient.class);
+    void unavailable_whileCatapultApiIsnt() {
+        ApiService client = mock(ApiService.class);
         MutableClock clock = new MutableClock(Instant.parse("2026-10-20T10:00:00Z"));
         StatusController controller = new StatusController(client, clock);
-        when(client.getAnonymous(eq("/api/health"), any())).thenReturn(
-                new ApiClient.Result<>(502, null), new ApiClient.Result<>(200, Map.of("status", "DOWN")),
-                new ApiClient.Result<>(200, Map.of("status", "UP")));
+        when(client.apiAvailable()).thenReturn(false, false, true);
 
         assertThat(available(controller)).isFalse();
         clock.advance(StatusController.TTL);
@@ -61,17 +57,17 @@ class StatusControllerTest {
 
     @Test
     void asksCatapultApiOnceEveryFewSeconds() {
-        ApiClient client = mock(ApiClient.class);
+        ApiService client = mock(ApiService.class);
         MutableClock clock = new MutableClock(Instant.parse("2026-10-20T10:00:00Z"));
         StatusController controller = new StatusController(client, clock);
-        when(client.getAnonymous(eq("/api/health"), any())).thenReturn(new ApiClient.Result<>(200, Map.of("status", "UP")));
+        when(client.apiAvailable()).thenReturn(true);
 
         available(controller);
         available(controller);
-        verify(client, times(1)).getAnonymous(eq("/api/health"), any());
+        verify(client, times(1)).apiAvailable();
         clock.advance(StatusController.TTL);
         available(controller);
-        verify(client, times(2)).getAnonymous(eq("/api/health"), any());
+        verify(client, times(2)).apiAvailable();
     }
 
     private static boolean available(StatusController controller) {

@@ -78,6 +78,48 @@ class RealApiServiceTest {
     }
 
     @Test
+    void steamConnectUrl_isWhereCatapultApiSendsTheMember_andNeverAskedLoggedOut() {
+        assertThat(service.steamConnectUrl()).isNull();
+
+        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.getSession(true).setAttribute(ApiClient.SESSION_JWT_KEY, "jwt");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(request));
+        try {
+            respond(HttpMethod.GET, "/api/connect/steam/start", "{\"redirectUrl\":\"https://steamcommunity.com/openid/login?x\"}");
+            assertThat(service.steamConnectUrl()).isEqualTo("https://steamcommunity.com/openid/login?x");
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    @Test
+    void steamDisconnect_postsAndRelaysTheStatus() {
+        expectPost("/api/connect/steam/disconnect");
+        assertThat(service.steamDisconnect()).isEqualTo(204);
+    }
+
+    @Test
+    void changelog_readsTheVersions_orNullWhenItFails() {
+        respond(HttpMethod.GET, "/api/changelog", "[{\"version\":\"0.3.7\",\"entries\":[]}]");
+        expect(HttpMethod.GET, "/api/changelog").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+
+        assertThat(service.changelog()).singleElement().satisfies(s -> assertThat(s.version()).isEqualTo("0.3.7"));
+        assertThat(service.changelog()).isNull();
+    }
+
+    @Test
+    void apiAvailable_onlyWhenItsHealthIsUp() {
+        respond(HttpMethod.GET, "/api/health", "{\"status\":\"UP\"}");
+        respond(HttpMethod.GET, "/api/health", "{\"status\":\"DOWN\"}");
+        expect(HttpMethod.GET, "/api/health").andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.apiAvailable()).isTrue();
+        assertThat(service.apiAvailable()).isFalse();
+        assertThat(service.apiAvailable()).isFalse();
+    }
+
+    @Test
     void invitePage_readsTheCodeLinkAndRedemptions() {
         respond(HttpMethod.GET, "/api/invite", """
                 {"canInvite":true,"inviteId":"00000000-0000-0000-0000-000000000001","code":"ABC234",

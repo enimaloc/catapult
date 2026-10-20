@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
+import fr.enimaloc.catapult.event.ChannelConnectionChangedEvent;
+import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
 import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
@@ -131,6 +133,39 @@ class MockApiServiceTest {
     @Test
     void accountDeletionDelayDays_isTheApiDefault() {
         assertThat(service.accountDeletionDelayDays()).isEqualTo(7);
+    }
+
+    @Test
+    void steamConnect_linksAtOnce_andDisconnectUnlinks_eachTellingTheCard() {
+        data.setProviders(true, false, false, false);
+
+        assertThat(service.steamConnectUrl()).isEqualTo("/connect/steam/close");
+        assertThat(data.isHasSteam()).isTrue();
+        assertThat(events).contains(new ChannelConnectionChangedEvent(username, "STEAM", true));
+        assertThat(events).anySatisfy(e -> assertThat(e).isInstanceOfSatisfying(SteamConnectionStateEvent.class,
+                steam -> assertThat(steam.connected()).isTrue()));
+
+        events.clear();
+        assertThat(service.steamDisconnect()).isEqualTo(204);
+        assertThat(data.isHasSteam()).isFalse();
+        assertThat(events).contains(new ChannelConnectionChangedEvent(username, "STEAM", false),
+                new SteamConnectionStateEvent(username, false, false, false, false));
+    }
+
+    @Test
+    void steamConnect_unavailableWithoutSteam_orForAVisitor() {
+        data.setProviders(false, false, false, false);
+        assertThat(service.steamConnectUrl()).isNull();
+
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+        assertThat(service.steamConnectUrl()).isNull();
+        assertThat(service.steamDisconnect()).isEqualTo(401);
+    }
+
+    @Test
+    void changelogAndStatus_answerAsAnUpCatapultApi() {
+        assertThat(service.changelog()).isNotEmpty().allSatisfy(section -> assertThat(section.groups()).isNotEmpty());
+        assertThat(service.apiAvailable()).isTrue();
     }
 
     private BindingDto binding() {

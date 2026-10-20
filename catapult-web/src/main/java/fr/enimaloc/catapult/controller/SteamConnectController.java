@@ -1,9 +1,8 @@
 package fr.enimaloc.catapult.controller;
 
-import fr.enimaloc.catapult.common.dto.connect.SteamStartResponse;
+import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -26,16 +25,19 @@ import org.springframework.web.bind.annotation.ResponseBody;
 public class SteamConnectController {
     /** Where catapult-api sends the browser to log in to Steam; nothing else is followed. */
     static final String STEAM_OPENID_LOGIN = "https://steamcommunity.com/openid/login?";
+    /** The popup's closing page, where the mock profile, linking at once, sends it. */
+    static final String CLOSE = "/connect/steam/close";
 
-    private final ApiClient apiClient;
+    private final ApiService apiService;
 
     /** Off to Steam's login, as catapult-api prepared it; the popup's closing page when that fails. */
     @GetMapping
     public String connect() {
-        if (!ApiClient.hasSession()) return "redirect:/connect/steam/close?error=session";
-        SteamStartResponse start = apiClient.get("/api/connect/steam/start", SteamStartResponse.class);
-        String url = start == null ? null : start.redirectUrl();
-        if (url == null || !url.startsWith(STEAM_OPENID_LOGIN)) return "redirect:/connect/steam/close?error=unavailable";
+        if (!ApiClient.hasSession()) return "redirect:" + CLOSE + "?error=session";
+        String url = apiService.steamConnectUrl();
+        if (url == null || !(url.startsWith(STEAM_OPENID_LOGIN) || url.equals(CLOSE))) {
+            return "redirect:" + CLOSE + "?error=unavailable";
+        }
         return "redirect:" + url;
     }
 
@@ -51,7 +53,7 @@ public class SteamConnectController {
     @ResponseBody
     public ResponseEntity<Void> disconnect() {
         if (!ApiClient.hasSession()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        int status = apiClient.call(HttpMethod.POST, "/api/connect/steam/disconnect", null, Void.class).status();
+        int status = apiService.steamDisconnect();
         return ResponseEntity.status(status >= 200 && status < 300 ? HttpStatus.NO_CONTENT.value() : status).build();
     }
 }

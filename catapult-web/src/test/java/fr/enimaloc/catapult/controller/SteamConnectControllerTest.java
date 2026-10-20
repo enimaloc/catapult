@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
-import fr.enimaloc.catapult.common.dto.connect.SteamStartResponse;
+import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.config.I18nConfiguration;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpMethod;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -16,9 +15,6 @@ import java.util.Locale;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -36,20 +32,28 @@ class SteamConnectControllerTest {
     static final String STEAM = "https://steamcommunity.com/openid/login?openid.mode=checkid_setup";
 
     @Autowired MockMvc mvc;
-    @MockitoBean ApiClient apiClient;
+    @MockitoBean ApiService apiService;
 
     @Test
     void connect_goesToTheSteamLoginCatapultApiPrepared() throws Exception {
-        when(apiClient.get("/api/connect/steam/start", SteamStartResponse.class)).thenReturn(new SteamStartResponse(STEAM));
+        when(apiService.steamConnectUrl()).thenReturn(STEAM);
 
         mvc.perform(get("/connect/steam").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(redirectedUrl(STEAM));
     }
 
+    /** The mock profile links at once: its popup goes straight to the closing page. */
+    @Test
+    void connect_followsTheClosingPage() throws Exception {
+        when(apiService.steamConnectUrl()).thenReturn("/connect/steam/close");
+
+        mvc.perform(get("/connect/steam").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(redirectedUrl("/connect/steam/close"));
+    }
+
     @Test
     void connect_neverFollowsAnythingButSteamsLogin() throws Exception {
-        when(apiClient.get("/api/connect/steam/start", SteamStartResponse.class))
-                .thenReturn(new SteamStartResponse("https://evil.example/openid/login?x"));
+        when(apiService.steamConnectUrl()).thenReturn("https://evil.example/openid/login?x");
 
         mvc.perform(get("/connect/steam").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(redirectedUrl("/connect/steam/close?error=unavailable"));
@@ -61,7 +65,7 @@ class SteamConnectControllerTest {
                 .andExpect(redirectedUrl("/connect/steam/close?error=unavailable"));
         mvc.perform(get("/connect/steam")).andExpect(redirectedUrl("/connect/steam/close?error=session"));
         // The logged-out visitor's never reached catapult-api: only the first call did.
-        verify(apiClient, times(1)).get(eq("/api/connect/steam/start"), eq(SteamStartResponse.class));
+        verify(apiService, times(1)).steamConnectUrl();
     }
 
     @Test
@@ -78,8 +82,7 @@ class SteamConnectControllerTest {
 
     @Test
     void disconnect_relaysCatapultApisStatus() throws Exception {
-        when(apiClient.call(eq(HttpMethod.POST), eq("/api/connect/steam/disconnect"), isNull(), eq(Void.class)))
-                .thenReturn(new ApiClient.Result<>(204, null), new ApiClient.Result<>(404, null), new ApiClient.Result<>(502, null));
+        when(apiService.steamDisconnect()).thenReturn(204, 404, 502);
 
         for (int expected : new int[]{204, 404, 502}) {
             mvc.perform(post("/connect/steam/disconnect").with(csrf()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
@@ -92,6 +95,6 @@ class SteamConnectControllerTest {
         mvc.perform(post("/connect/steam/disconnect").with(csrf())).andExpect(status().isUnauthorized());
         mvc.perform(post("/connect/steam/disconnect").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isForbidden());
-        verify(apiClient, never()).call(any(), any(), any(), any());
+        verify(apiService, never()).steamDisconnect();
     }
 }

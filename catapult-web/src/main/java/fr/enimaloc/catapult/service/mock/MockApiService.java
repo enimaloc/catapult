@@ -64,6 +64,9 @@ import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamTokenDeletedEvent;
+import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
+import fr.enimaloc.catapult.event.ChannelConnectionChangedEvent;
+import fr.enimaloc.catapult.dto.changelog.ChangelogSection;
 import fr.enimaloc.catapult.event.steam.SteamTokenSavedEvent;
 import fr.enimaloc.catapult.event.steam.SteamTokenSharedStateEvent;
 import fr.enimaloc.catapult.event.tw.TwEnabledStateEvent;
@@ -1183,4 +1186,58 @@ public class MockApiService implements ApiService {
                 french ? "<p>Texte d'aide de démonstration pour <strong>" + cardId + "</strong>.</p>"
                         : "<p>Sample help text for <strong>" + cardId + "</strong>.</p>");
     }
+
+    /** Like Steam's login sending the popup back: the account is linked at once, then the popup's closing page. */
+    @Override
+    public String steamConnectUrl() {
+        log.trace("steamConnectUrl()");
+        MockData current = currentData();
+        if (current == null || !current.isHasSteamProvider()) return null;
+        current.steamConnect();
+        publishSteamConnection(current);
+        return "/connect/steam/close";
+    }
+
+    @Override
+    public int steamDisconnect() {
+        log.trace("steamDisconnect()");
+        MockData current = currentData();
+        if (current == null) return 401;
+        current.steamDisconnect();
+        publishSteamConnection(current);
+        return NO_CONTENT;
+    }
+
+    /** The Steam card's events for {@code current}'s link, as ChannelEventRedisBridge relays catapult-api's. */
+    private void publishSteamConnection(MockData current) {
+        String username = current.getChannelDto().twitchUsername();
+        boolean connected = current.isHasSteam();
+        eventPublisher.publishEvent(new ChannelConnectionChangedEvent(username, "STEAM", connected));
+        eventPublisher.publishEvent(new SteamConnectionStateEvent(username, connected,
+                connected && current.isSteamRateLimited(), connected && current.isSteamOfflineMode(),
+                connected && current.isSteamProfilePrivate()));
+    }
+
+    @Override
+    public List<ChangelogSection> changelog() {
+        log.trace("changelog()");
+        return MOCK_CHANGELOG;
+    }
+
+    /** The mock's catapult-api is always up. */
+    @Override
+    public boolean apiAvailable() {
+        log.trace("apiAvailable()");
+        return true;
+    }
+
+    private static final List<ChangelogSection> MOCK_CHANGELOG = List.of(
+            new ChangelogSection("0.4.0", List.of(
+                    new ChangelogSection.Entry("c0ffee1", "feat", "web", "link a Steam account from its card", false),
+                    new ChangelogSection.Entry("c0ffee2", "feat", "api", "name the channel by login in its events", true),
+                    new ChangelogSection.Entry("c0ffee3", "fix", "web", "keep a navbar's live states per stream", false),
+                    new ChangelogSection.Entry("c0ffee4", "chore", "release", "0.4.0", false))),
+            new ChangelogSection("0.3.9", List.of(
+                    new ChangelogSection.Entry("bead001", "fix", null, "open an OBS widget on its owner's Twitchat branch", false),
+                    new ChangelogSection.Entry("bead002", "perf", "web", "build each expanded message's format once", false))));
 }
