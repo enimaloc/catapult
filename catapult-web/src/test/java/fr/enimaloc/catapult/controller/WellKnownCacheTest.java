@@ -33,6 +33,19 @@ class WellKnownCacheTest {
     }
 
     @Test
+    void anotherInstancesClear_emptiesThisOneToo() {
+        fr.enimaloc.catapult.cluster.InstanceBus bus = fr.enimaloc.catapult.cluster.InstanceBus.local();
+        WellKnownCache here = new WellKnownCache(clock, bus);
+        WellKnownCache there = new WellKnownCache(clock, bus);
+        here.get(WELL_KNOWN, "a", () -> load(200));
+
+        there.clear();
+        here.get(WELL_KNOWN, "a", () -> load(200));
+
+        assertThat(loads).hasValue(2);
+    }
+
+    @Test
     void doesNotStoreFailures() {
         cache.get(WELL_KNOWN, "a", () -> load(502));
         cache.get(WELL_KNOWN, "a", () -> load(502));

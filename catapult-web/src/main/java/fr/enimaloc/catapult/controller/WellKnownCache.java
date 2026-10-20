@@ -1,7 +1,10 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.cluster.InstanceBus;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
 import fr.enimaloc.catapult.service.WellKnownContent;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -13,7 +16,8 @@ import java.util.function.Supplier;
 
 /**
  * catapult-api's well-known answers kept 60 s (absences included, not a failure to reach it), so a
- * crawler polling them doesn't reach the API each time; emptied when the admin changes a file.
+ * crawler polling them doesn't reach the API each time; emptied when the admin changes a file, on every
+ * catapult-web instance (through the {@link InstanceBus}).
  * Bounded to {@link #MAX_ENTRIES}: the paths are chosen by whoever asks, so when full, expired entries
  * are dropped and, if it is still full, a new answer is returned without being kept.
  */
@@ -21,6 +25,7 @@ import java.util.function.Supplier;
 public class WellKnownCache {
     static final Duration TTL = Duration.ofSeconds(60);
     static final int MAX_ENTRIES = 1000;
+    static final String CLEAR_TOPIC = "well-known.clear";
 
     private record Entry(WellKnownContent content, Instant until) {}
 
@@ -29,12 +34,22 @@ public class WellKnownCache {
     /** Bumped by {@link #clear()}: an answer loaded before it may predate the change and isn't kept. */
     private final java.util.concurrent.atomic.AtomicLong generation = new java.util.concurrent.atomic.AtomicLong();
 
-    public WellKnownCache() {
-        this(Clock.systemUTC());
+    /** Null for a cache alone (a test): its clear only empties itself. */
+    private final InstanceBus bus;
+
+    @Autowired
+    public WellKnownCache(ObjectProvider<InstanceBus> bus) {
+        this(Clock.systemUTC(), bus.getIfAvailable());
     }
 
     WellKnownCache(Clock clock) {
+        this(clock, null);
+    }
+
+    WellKnownCache(Clock clock, InstanceBus bus) {
         this.clock = clock;
+        this.bus = bus;
+        if (bus != null) bus.on(CLEAR_TOPIC, ignored -> clearLocally());
     }
 
     public WellKnownContent get(WellKnownLocation location, String path, Supplier<WellKnownContent> load) {
@@ -61,7 +76,16 @@ public class WellKnownCache {
         if (generation.get() != loadedAt) entries.remove(key, entry);
     }
 
+    /** Empties this cache on every instance: the admin's change shows wherever the next crawler lands. */
     public void clear() {
+        if (bus == null) {
+            clearLocally();
+        } else {
+            bus.publish(CLEAR_TOPIC, "");
+        }
+    }
+
+    void clearLocally() {
         generation.incrementAndGet();
         entries.clear();
     }
