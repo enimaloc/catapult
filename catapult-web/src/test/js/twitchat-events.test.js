@@ -163,6 +163,16 @@ describe("editing", () => {
         expect(card.querySelector(".twitchat-payload-errors").textContent).toContain("message");
     });
 
+    it("tells a 422 that lists no errors as a failure, staying in raw", async () => {
+        const card = document.querySelector(".twitchat-payload");
+        card.querySelector(".twitchat-payload-raw-btn").click();
+        fetchMock.mockResolvedValueOnce(response(422, "Unprocessable"));
+        card.querySelector(".twitchat-payload-raw-btn").click();
+        await flush();
+        expect(card.querySelector(".twitchat-payload-mode").value).toBe("RAW");
+        expect(document.querySelector("mdui-snackbar").textContent).toBe("Action failed (422)");
+    });
+
     it("shows invalid JSON of a json field instead of switching to raw", () => {
         const card = document.querySelector(".twitchat-payload");
         card.querySelector(".json-field").value = "{oops";
@@ -220,6 +230,15 @@ describe("saving and testing", () => {
         await flush();
         expect(document.querySelector(".twitchat-payload-errors").textContent).toBe("message: Required");
     });
+
+    it.each([["a page", "<html>Bad request</html>"], ["an object", { status: 400, title: "Too big" }]])(
+        "tells a 400 whose body is %s as a failure", async (ignored, body) => {
+            fetchMock.mockResolvedValueOnce(response(400, body));
+            document.querySelector(".twitchat-save-btn").click();
+            await flush();
+            expect(document.querySelector("mdui-snackbar").textContent).toBe("Action failed (400)");
+            expect(document.querySelector(".twitchat-payload-errors").textContent).toBe("");
+        });
 
     it("refuses to save invalid JSON in a json field, sending nothing", async () => {
         document.querySelector(".json-field").value = "{oops";
