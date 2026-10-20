@@ -393,6 +393,36 @@ class ChannelVisibilityRenderingTest {
         assertThat(openingTagForId(html, "minecraft-disconnect-btn")).contains("hidden");
     }
 
+    /** Every service account full: the card says so, and offers nothing to do. */
+    @Test
+    void minecraftStatusFull_saysEveryAccountIsFull_withoutAnyButton() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any()))
+                .thenReturn(channelPageData(true, new MinecraftData("FULL", null, null)));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String fullCase = html.substring(html.lastIndexOf('<', html.indexOf("data-if=\"caseFull\"")));
+        assertThat(fullCase.substring(0, fullCase.indexOf('>'))).doesNotContain("hidden");
+        assertThat(html).contains("Every Catapult Minecraft account is full for now");
+        assertThat(openingTagForId(html, "minecraft-enroll-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "minecraft-check-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "minecraft-disconnect-btn")).contains("hidden");
+    }
+
+    /** Minecraft unavailable to the channel (catapult-api's null): no card at all. */
+    @Test
+    void minecraftUnavailable_hasNoCard() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true, null));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("data-conn=\"minecraft\"").doesNotContain("minecraft-status-body");
+    }
+
     @Test
     void integrationCards_renderEveryIntegrationFromTheirDtos() throws Exception {
         ChannelPageData data = new ChannelPageData(

@@ -148,7 +148,10 @@ public final class IntegrationCards {
                                         "MinecraftEnrollEvent.minecraftName", "MinecraftSyncEvent.minecraftName")),
                                         Message.literal(minecraft.minecraftName()))),
                         minecraftCase("caseRemoved", status, List.of("REMOVED"),
-                                new Text(Attrs.NONE, false, key(PREFIX + "minecraft.removed"))))),
+                                new Text(Attrs.NONE, false, key(PREFIX + "minecraft.removed"))),
+                        // No link, and no service account with room for one: nothing to do but wait.
+                        minecraftCase("caseFull", status, List.of("FULL"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "minecraft.full"))))),
 
                 // Each button needs its own flag name even though they're all page-level:
                 // Visibility.apply looks elements up by data-if name alone, so buttons sharing
