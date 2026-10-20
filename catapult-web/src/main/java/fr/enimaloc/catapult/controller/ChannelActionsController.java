@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
-import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
@@ -19,10 +18,8 @@ import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
-import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.service.ApiService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,7 +40,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ChannelActionsController {
     private final ApiService apiService;
-    private final ApplicationEventPublisher eventPublisher;
 
     @PostMapping("/channel/{username}/settings/bot")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -52,16 +48,14 @@ public class ChannelActionsController {
     }
 
     /**
-     * Rechecks, then publishes the game now detected (all nulls for none) to the channel's
-     * streams: catapult-api doesn't push it, and the page shows it from that event.
+     * Rechecks; the game now detected reaches the channel's streams as catapult-api's own event, on
+     * every instance (never published from here: any member could then tell a channel's dashboards
+     * anything, and only this instance's would hear it).
      */
     @PostMapping("/channel/{username}/game/recheck")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void recheckGame(@PathVariable String username) {
         apiService.recheckGame(username);
-        GameDto game = apiService.currentGame(username);
-        eventPublisher.publishEvent(game == null ? new GameChangedEvent(username, null, null, null)
-                : new GameChangedEvent(username, game.bindingId(), game.sourceType(), game.sourceName()));
     }
 
     @PostMapping("/channel/{username}/bindings/{bindingId}/ccl-toggle")

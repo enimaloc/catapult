@@ -274,6 +274,9 @@ public class ApiChannelActionsController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Account is not active");
         }
         schedulerService.triggerManualCheck(user);
+        // The dashboards are told what is detected now, changed or not: the check's own event only
+        // goes out on a change, and catapult-web no longer publishes one itself.
+        channelEventPublisher.gameDetected(user.getId(), gameStateService.getLastKnownGame(user).orElse(null));
     }
 
     @PostMapping("/settings/ccl")

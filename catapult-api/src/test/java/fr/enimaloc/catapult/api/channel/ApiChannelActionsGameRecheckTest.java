@@ -34,6 +34,8 @@ class ApiChannelActionsGameRecheckTest extends ApiChannelActionsTestSupport {
                 .andExpect(status().isNoContent());
 
         verify(schedulerService).triggerManualCheck(user);
+        // Nothing detected: the dashboards are told so, the check having changed nothing.
+        verify(channelEventPublisher).gameDetected(userId, null);
     }
 
     @Test

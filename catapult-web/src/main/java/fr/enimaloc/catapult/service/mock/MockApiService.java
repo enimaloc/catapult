@@ -60,6 +60,7 @@ import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
+import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -257,13 +258,10 @@ public class MockApiService implements ApiService {
     @Override
     public void recheckGame(String username) {
         log.trace("recheckGame({})", username);
-        // no-op in mock mode
-    }
-
-    @Override
-    public GameDto currentGame(String username) {
-        log.trace("currentGame({})", username);
-        return currentData().getGameDto();
+        // Nothing to detect in mock mode: the dashboards are told the game the mock has, as catapult-api would.
+        GameDto game = currentData().getGameDto();
+        eventPublisher.publishEvent(game == null ? new GameChangedEvent(username, null, null, null)
+                : new GameChangedEvent(username, game.bindingId(), game.sourceType(), game.sourceName()));
     }
 
     @Override
