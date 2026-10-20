@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.IntSupplier;
 
 /**
  * The admin Notifications tab's actions (create, delete, Markdown preview), forwarded to catapult-api
@@ -29,12 +28,12 @@ public class AdminNotificationsController {
 
     @PostMapping
     public ResponseEntity<Void> create(@RequestBody AdminNotificationCreateBody body) {
-        return relay(() -> apiService.adminCreateNotification(body));
+        return AdminAccess.relay(filler, () -> apiService.adminCreateNotification(body));
     }
 
     @PostMapping("/{id}/delete")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        return relay(() -> apiService.adminDeleteNotification(id));
+        return AdminAccess.relay(filler, () -> apiService.adminDeleteNotification(id));
     }
 
     /** The body's sanitized HTML as catapult-api renders it; 502 when it refuses or is unreachable. */
@@ -44,10 +43,5 @@ public class AdminNotificationsController {
         ApiClient.Result<String> result = apiService.adminPreviewNotification(request.get("body"));
         if (!result.ok()) return ResponseEntity.status(result.status()).build();
         return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(result.body());
-    }
-
-    private ResponseEntity<Void> relay(IntSupplier action) {
-        AdminAccess.require(filler);
-        return ResponseEntity.status(action.getAsInt()).build();
     }
 }

@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
-import java.util.function.IntSupplier;
 
 /**
  * The admin Groups tab's actions (create, rename, delete, add a member), forwarded to catapult-api
@@ -29,17 +28,17 @@ public class AdminGroupsController {
 
     @PostMapping
     public ResponseEntity<Void> create(@RequestBody CreateBody body) {
-        return relay(() -> apiService.adminCreateGroup(body.key(), body.name(), body.description()));
+        return AdminAccess.relay(filler, () -> apiService.adminCreateGroup(body.key(), body.name(), body.description()));
     }
 
     @PostMapping("/{id}/rename")
     public ResponseEntity<Void> rename(@PathVariable UUID id, @RequestBody RenameBody body) {
-        return relay(() -> apiService.adminRenameGroup(id, body.name(), body.description()));
+        return AdminAccess.relay(filler, () -> apiService.adminRenameGroup(id, body.name(), body.description()));
     }
 
     @PostMapping("/{id}/delete")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        return relay(() -> apiService.adminDeleteGroup(id));
+        return AdminAccess.relay(filler, () -> apiService.adminDeleteGroup(id));
     }
 
     @PostMapping("/{id}/members")
@@ -49,11 +48,6 @@ public class AdminGroupsController {
             AdminAccess.require(filler);
             return ResponseEntity.badRequest().build();
         }
-        return relay(() -> apiService.adminAddGroupMember(id, body.twitchUsername()));
-    }
-
-    private ResponseEntity<Void> relay(IntSupplier action) {
-        AdminAccess.require(filler);
-        return ResponseEntity.status(action.getAsInt()).build();
+        return AdminAccess.relay(filler, () -> apiService.adminAddGroupMember(id, body.twitchUsername()));
     }
 }
