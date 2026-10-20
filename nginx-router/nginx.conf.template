@@ -1,11 +1,12 @@
+# catapult-web is stateless across instances (sessions in Redis via Spring Session, browser events
+# fanned out over Redis pub/sub), so any number of instances can sit behind this upstream. With
+# `docker compose up --scale catapult-web=N`, Docker's DNS answers every replica for the service name
+# and nginx balances over all the addresses it resolved at startup; outside compose, list one
+# `server` line per instance. Keepalive connections let the long-lived SSE streams and the regular
+# requests reuse upstream sockets (needs HTTP/1.1 and an empty Connection header, set below).
 upstream frontend {
     server ${UPSTREAM_FRONTEND};
-}
-
-# Map directive must live in the http context (top-level for default.conf includes).
-map $http_upgrade $connection_upgrade {
-    default upgrade;
-    ''      close;
+    keepalive 32;
 }
 
 upstream backend {
@@ -30,14 +31,32 @@ server {
     proxy_read_timeout    60s;
     proxy_send_timeout    60s;
 
-    # ── SSE: live logs and connection events ──────────────────────────────────
-    # Must come before the generic `location /` to override timeouts and buffering.
-    location ~ ^/channels/[^/]+/(logs|connections)$ {
+    # ── Server-sent event streams ─────────────────────────────────────────────
+    # The channel page and nav streams (/events/**), the Twitchat dispatch stream
+    # and the OBS widget stream stay open for as long as the page is: no read
+    # timeout cut, no buffering (each event leaves at once), HTTP/1.1 keepalive to
+    # catapult-web rather than `Connection: close`. Regex locations win over the
+    # generic `location /` prefix below.
+    # Browsers cap HTTP/1.1 at 6 connections per host, which a few tabs of SSE
+    # exhaust: the TLS terminator in front of this router must speak HTTP/2 to
+    # the browser (this server only listens in clear text, where browsers never
+    # use HTTP/2).
+    location ~ ^/(events/|me/twitchat/events$|widget/obs/[^/]+/events$) {
         proxy_pass         http://frontend;
-        proxy_read_timeout 0;           # SSE streams have no fixed end
-        proxy_buffering    off;         # Forward events immediately
+        proxy_http_version 1.1;
+        proxy_set_header   Connection        "";
+        # nginx drops every inherited proxy_set_header once a location sets one: repeat them
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto ${FORWARDED_PROTO};
+        proxy_set_header   X-Forwarded-Host  $host;
+        proxy_set_header   X-Forwarded-Port  $server_port;
+        proxy_read_timeout 24h;         # the app's heartbeats keep the stream alive, not this timer
+        proxy_send_timeout 24h;
+        proxy_buffering    off;         # forward each event immediately
         proxy_cache        off;
-        add_header         X-Accel-Buffering no;  # Disable when behind another proxy
+        add_header         X-Accel-Buffering no always;  # for a proxy in front of this one
         error_page 502 503 504 = @maintenance;
     }
 
@@ -99,34 +118,17 @@ server {
         proxy_read_timeout    3s;
     }
 
-    # ── WebSocket (single connection per tab) ─────────────────────────────────
-    # Must come before the generic `location /` so the Upgrade headers and
-    # zero read/send timeouts are applied to /ws.
-    # NB: nginx drops ALL inherited proxy_set_header directives the moment a
-    # location declares one of its own, so the X-Forwarded-* headers from the
-    # server scope must be repeated here. This also matters for /ws/auth-ticket
-    # (a non-upgrade GET that matches this prefix) — without X-Forwarded-Proto,
-    # Spring builds absolute redirect URLs with the inbound scheme (http).
-    location /ws {
+    # ── Everything else goes to catapult-web ──────────────────────────────────
+    location / {
         proxy_pass         http://frontend;
         proxy_http_version 1.1;
+        proxy_set_header   Connection        "";
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header   X-Forwarded-Proto ${FORWARDED_PROTO};
         proxy_set_header   X-Forwarded-Host  $host;
         proxy_set_header   X-Forwarded-Port  $server_port;
-        proxy_set_header   Upgrade           $http_upgrade;
-        proxy_set_header   Connection        $connection_upgrade;
-        proxy_read_timeout 3600s;
-        proxy_send_timeout 3600s;
-        proxy_buffering    off;
-        error_page 502 503 504 = @maintenance;
-    }
-
-    # ── Everything else goes to catapult-web ──────────────────────────────────
-    location / {
-        proxy_pass         http://frontend;
         error_page 502 503 504 = @maintenance;
     }
 
