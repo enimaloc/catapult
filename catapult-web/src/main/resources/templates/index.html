@@ -87,7 +87,7 @@
             <form th:if="${loggedIn}" id="nav-logout" class="nav-logout" th:action="@{/logout}" method="post">
                 <mdui-button-icon type="submit" icon="logout" th:title="#{nav.logout}" th:attr="aria-label=#{nav.logout}"></mdui-button-icon>
             </form>
-            <mdui-button th:unless="${loggedIn}" variant="text" href="/oauth2/authorization/twitch"
+            <mdui-button th:unless="${loggedIn}" variant="text" href="/auth/login"
                          th:text="#{nav.login}">nav.login</mdui-button>
         </div>
 

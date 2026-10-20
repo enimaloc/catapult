@@ -116,4 +116,37 @@ class InviteCodeRelayFilterTest {
         RequestContextHolder.resetRequestAttributes();
         InviteCodeRelayFilter.clearPendingCode();
     }
+
+    @Test
+    void storesCatapultWebsStateInSessionAndCookie() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/oauth2/authorization/twitch");
+        request.setParameter("web_state", "abc-DEF_1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, mock(FilterChain.class));
+
+        assertThat(request.getSession().getAttribute(InviteCodeRelayFilter.WEB_STATE_SESSION_KEY)).isEqualTo("abc-DEF_1");
+        assertThat(response.getHeader(HttpHeaders.SET_COOKIE))
+                .contains("catapult_web_state=abc-DEF_1").contains("Max-Age=600").contains("HttpOnly");
+    }
+
+    @Test
+    void pendingWebState_prefersTheSession_thenTheCookie_andClearForgetsBoth() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(InviteCodeRelayFilter.WEB_STATE_SESSION_KEY, "fromSession");
+        request.setSession(session);
+        request.setCookies(new Cookie(InviteCodeRelayFilter.WEB_STATE_COOKIE_NAME, "fromCookie"));
+        assertThat(InviteCodeRelayFilter.pendingWebState(request)).contains("fromSession");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        InviteCodeRelayFilter.clearPendingWebState(request, response);
+        assertThat(session.getAttribute(InviteCodeRelayFilter.WEB_STATE_SESSION_KEY)).isNull();
+        assertThat(response.getHeader(HttpHeaders.SET_COOKIE)).contains("catapult_web_state=").contains("Max-Age=0");
+
+        MockHttpServletRequest cookieOnly = new MockHttpServletRequest();
+        cookieOnly.setCookies(new Cookie(InviteCodeRelayFilter.WEB_STATE_COOKIE_NAME, "fromCookie"));
+        assertThat(InviteCodeRelayFilter.pendingWebState(cookieOnly)).contains("fromCookie");
+        assertThat(InviteCodeRelayFilter.pendingWebState(new MockHttpServletRequest())).isEmpty();
+    }
 }

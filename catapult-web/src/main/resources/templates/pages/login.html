@@ -11,7 +11,7 @@
                th:text="${loginError == 'not_whitelisted'} ? #{login.error.not_whitelisted} : #{login.error.generic}">login.error</p>
 
             <div class="hero-actions">
-                <mdui-button variant="filled" size="large" href="/oauth2/authorization/twitch">
+                <mdui-button variant="filled" size="large" href="/auth/login">
                     <mdui-icon slot="icon" name="login"></mdui-icon>
                     <span th:text="#{login.button}">login.button</span>
                 </mdui-button>

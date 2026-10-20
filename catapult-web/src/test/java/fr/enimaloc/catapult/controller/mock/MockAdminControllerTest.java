@@ -157,8 +157,8 @@ class MockAdminControllerTest {
     void withoutASession_goesBackToTheMockLogin() throws Exception {
         when(mockApiService.getData()).thenReturn(null);
 
-        mvc.perform(get("/mock/admin")).andExpect(redirectedUrl("/oauth2/authorization/twitch"));
-        mvc.perform(form()).andExpect(redirectedUrl("/oauth2/authorization/twitch"));
+        mvc.perform(get("/mock/admin")).andExpect(redirectedUrl("/auth/login"));
+        mvc.perform(form()).andExpect(redirectedUrl("/auth/login"));
     }
 
     @Test

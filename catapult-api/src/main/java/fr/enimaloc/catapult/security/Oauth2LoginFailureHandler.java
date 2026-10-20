@@ -26,6 +26,7 @@ import java.util.Set;
  * a stale authorization_request in session, ...) that a fresh attempt commonly fixes.
  * Known business-rule errors (not whitelisted, invite already used, ...) are
  * deterministic — retrying changes nothing — so they skip straight to the error page.
+ * The retry keeps catapult-web's state and invite code: both survive the dropped session in a cookie.
  */
 @Slf4j
 @Component
@@ -57,6 +58,10 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
         }
 
         clearRetryMarker(request, response);
+        if ("twitch".equals(registrationId)) {
+            // The login is given up: catapult-web starts the next one with a state of its own
+            InviteCodeRelayFilter.clearPendingWebState(request, response);
+        }
         response.sendRedirect(errorRedirectUrl(errorCode));
     }
 

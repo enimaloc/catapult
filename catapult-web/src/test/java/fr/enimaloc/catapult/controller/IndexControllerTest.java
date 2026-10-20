@@ -259,7 +259,7 @@ class IndexControllerTest {
         String notWhitelisted = mvc.perform(get("/login").param("error", "not_whitelisted"))
                 .andReturn().getResponse().getContentAsString();
         assertThat(notWhitelisted).contains(messages.getMessage("login.error.not_whitelisted", null, java.util.Locale.ENGLISH).replace("'", "&#39;"))
-                .contains("href=\"/oauth2/authorization/twitch\"");
+                .contains("href=\"/auth/login\"");
 
         String bare = mvc.perform(get("/login").param("error", "")).andReturn().getResponse().getContentAsString();
         assertThat(bare).contains(messages.getMessage("login.error.generic", null, java.util.Locale.ENGLISH))
@@ -275,16 +275,16 @@ class IndexControllerTest {
     @Test
     void join_linksTwitchWithAValidCodeOnly() throws Exception {
         String valid = mvc.perform(get("/join").param("invite", "ABC234")).andReturn().getResponse().getContentAsString();
-        assertThat(valid).contains("href=\"/oauth2/authorization/twitch?invite=ABC234\"")
+        assertThat(valid).contains("href=\"/auth/login?invite=ABC234\"")
                 .doesNotContain(messages.getMessage("join.no_code", null, java.util.Locale.ENGLISH));
 
         for (String bad : new String[]{"abc<x>", "ABC1", "ABCDEFGHJKLMN", "\"onmouseover"}) {
             String html = mvc.perform(get("/join").param("invite", bad)).andReturn().getResponse().getContentAsString();
-            assertThat(html).doesNotContain("authorization/twitch?invite=")
+            assertThat(html).doesNotContain("/auth/login?invite=")
                     .contains(messages.getMessage("join.no_code", null, java.util.Locale.ENGLISH));
         }
         String missing = mvc.perform(get("/join")).andReturn().getResponse().getContentAsString();
-        assertThat(missing).doesNotContain("authorization/twitch?invite=");
+        assertThat(missing).doesNotContain("/auth/login?invite=");
     }
 
     @Test
@@ -323,7 +323,7 @@ class IndexControllerTest {
         assertThat(mvc.perform(get("/spa/login").param("error", "not_whitelisted")).andReturn().getResponse().getContentAsString())
                 .contains("id=\"login\"");
         assertThat(mvc.perform(get("/spa/join").param("invite", "ABC234")).andReturn().getResponse().getContentAsString())
-                .contains("twitch?invite=ABC234");
+                .contains("/auth/login?invite=ABC234");
     }
 
     @Test
@@ -342,7 +342,7 @@ class IndexControllerTest {
 
         org.assertj.core.api.Assertions.assertThat(html)
                 .containsPattern("<nav id=\"nav-channels\" class=\"nav-channels\" aria-label=\"[^\"]+\"></nav>");
-        org.assertj.core.api.Assertions.assertThat(barEnd(html)).doesNotContain("/oauth2/authorization/twitch");
+        org.assertj.core.api.Assertions.assertThat(barEnd(html)).doesNotContain("/auth/login");
         org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).channelList();
     }
 
@@ -351,7 +351,7 @@ class IndexControllerTest {
         String html = mvc.perform(get("/")).andReturn().getResponse().getContentAsString();
 
         org.assertj.core.api.Assertions.assertThat(html).doesNotContain("nav-channels\"");
-        org.assertj.core.api.Assertions.assertThat(barEnd(html)).contains("href=\"/oauth2/authorization/twitch\"");
+        org.assertj.core.api.Assertions.assertThat(barEnd(html)).contains("href=\"/auth/login\"");
     }
 
     @Test

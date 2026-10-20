@@ -134,6 +134,18 @@ class AuthControllerTest {
         org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).exchangeCode(org.mockito.ArgumentMatchers.any());
     }
 
+    /** A login this session started, but a callback that brings back no state: refused, the state used up. */
+    @Test
+    void callback_withoutState_isRefused_evenForALoginThisSessionStarted() throws Exception {
+        MockHttpSession session = started(new MockHttpSession(), "s1");
+
+        mvc.perform(get("/auth/callback").param("code", "attackers-code").session(session))
+                .andExpect(redirectedUrl("/login?error"));
+
+        assertThat(session.getAttribute(AuthController.STATE_KEY)).isNull();
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).exchangeCode(org.mockito.ArgumentMatchers.any());
+    }
+
     @Test
     void callback_usesTheStateUp() throws Exception {
         when(apiService.exchangeCode("code-1")).thenReturn(new TokenResponse("the-jwt"));

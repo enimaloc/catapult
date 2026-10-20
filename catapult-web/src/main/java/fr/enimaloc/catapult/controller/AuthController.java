@@ -26,8 +26,8 @@ import java.util.Base64;
 /**
  * The login, both ends. {@code /auth/login} starts it: a random state kept in the browser's session
  * goes with it to catapult-api's Twitch login ({@code web_state}). {@code /auth/callback} completes it,
- * only for the session that started it ({@code state}, as catapult-api sends it back, matching the one
- * kept, which is used up): a code an attacker got for their own account cannot log a victim into it
+ * only for the session that started it ({@code state}, which catapult-api sends back, matching the one
+ * kept, which is used up; a callback without one is refused): a code an attacker got for their own account cannot log a victim into it
  * (login CSRF). It trades the OAuth code for a catapult-api JWT kept in the session, then opens the
  * member's channel. The session then gets a new id (a session id known before the login is worth nothing
  * after it), what was kept for a former login is dropped, and that login's streams close on every instance.
@@ -85,7 +85,7 @@ public class AuthController {
 
     /**
      * Whether the session behind {@code request} started a login in the last {@link #STATE_TTL}, its state
-     * (used up here, whatever the answer) being {@code state} when catapult-api sends one back.
+     * (used up here, whatever the answer) being {@code state}, which catapult-api always sends back.
      */
     private static boolean startedHere(HttpServletRequest request, String state) {
         HttpSession session = request.getSession(false);
@@ -100,7 +100,7 @@ public class AuthController {
             return false;
         }
         String expected = kept.substring(0, separator);
-        return state == null || MessageDigest.isEqual(expected.getBytes(StandardCharsets.US_ASCII),
+        return state != null && MessageDigest.isEqual(expected.getBytes(StandardCharsets.US_ASCII),
                 state.getBytes(StandardCharsets.US_ASCII));
     }
 

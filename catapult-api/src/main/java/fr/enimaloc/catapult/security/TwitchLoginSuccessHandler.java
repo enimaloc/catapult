@@ -70,14 +70,16 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
 
                 // If catapult-web is configured, redirect there with a one-time code instead of the JWT.
                 // catapult-web exchanges the code server-to-server via POST /api/auth/exchange (30s TTL, single-use).
+                // catapult-web's state comes back with it: its callback only completes a login its session started.
                 if (webUrl != null && !webUrl.isBlank()) {
                     String jwt = jwtService.generate(catUser);
                     String code = codeStore.issue(jwt);
-                    String callbackUrl = UriComponentsBuilder.fromUriString(webUrl)
+                    UriComponentsBuilder callback = UriComponentsBuilder.fromUriString(webUrl)
                             .path("/auth/callback")
-                            .queryParam("code", code)
-                            .build().toUriString();
-                    response.sendRedirect(callbackUrl);
+                            .queryParam("code", code);
+                    InviteCodeRelayFilter.pendingWebState(request).ifPresent(state -> callback.queryParam("state", state));
+                    InviteCodeRelayFilter.clearPendingWebState(request, response);
+                    response.sendRedirect(callback.encode().build().toUriString());
                     return;
                 }
             } else if ("xbox".equals(registrationId)) {
