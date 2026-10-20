@@ -54,7 +54,7 @@ import java.util.function.Supplier;
  * address and overall, and closed after a while ({@link AnonymousStreams}): past the overall bound
  * the answer is 503.
  * <p>
- * Behind nginx: the response asks it not to buffer the stream ({@code X-Accel-Buffering: no}); the
+ * Behind a proxy: the response asks it not to buffer the stream ({@code X-Accel-Buffering: no}); the
  * streams are written by {@link SseStreams} (off the publisher's thread, with heartbeats, closed after a
  * while), a stream that cannot take an event being dropped.
  */

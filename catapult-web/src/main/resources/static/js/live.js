@@ -3,7 +3,7 @@
  * here rather than opening its own, a browser allowing only a few connections per site.
  *
  * EventSource reconnects by itself, except when a reconnect is answered with something other
- * than a stream (nginx's maintenance page during a restart, a 503 when the server is full): it
+ * than a stream (a maintenance page during a restart, a 503 when the server is full): it
  * then stops for good, so a closed source is rebuilt after a backoff (5 s, doubling up to 60 s,
  * back to 5 s once a stream opens). A stream the server closed for a newer one of the same tab
  * group ("Evicted") is not reopened until this tab is shown again, else the tabs would keep

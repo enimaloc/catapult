@@ -180,7 +180,7 @@ public class ApiClient {
 
     /**
      * An error answer, worth a warning unless it only says the session's JWT is no longer valid, or
-     * is nginx's 502 while catapult-api is still starting (expected).
+     * is a 502 while catapult-api is still starting (expected).
      */
     private static void logError(HttpStatusCode status, String path) {
         if (status.value() == HttpStatus.BAD_GATEWAY.value()) {

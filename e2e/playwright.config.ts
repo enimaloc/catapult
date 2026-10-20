@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
  * Playwright config for the catapult WebSocket E2E suite.
  *
  * Assumes the docker compose stack is up and reachable at `BASE_URL`
- * (default: http://localhost, the nginx-router published port).
+ * (default: http://localhost, catapult-web's published port, WEB_PORTS).
  *
  *   docker compose up -d
  *   cd e2e && npx playwright test
