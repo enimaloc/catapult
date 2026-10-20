@@ -453,6 +453,23 @@ class MockApiServiceTest {
     }
 
     @Test
+    void twitchatEvents_keepCatapultApisLimits() {
+        TwitchatEventActionDto payload = new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "RAW", "{\"message\":\"hi\"}", true);
+
+        assertThat(service.saveTwitchatEvent(username, "BOT_ENABLED", java.util.Collections.nCopies(21, payload)))
+                .containsExactly(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError(20, "action",
+                        "At most 20 payloads per event"));
+        String huge = "{\"message\":\"" + "x".repeat(33_000) + "\"}";
+        assertThat(service.testTwitchatEvent(username, "BOT_ENABLED",
+                List.of(payload, new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "RAW", huge, true))))
+                .singleElement().satisfies(e -> {
+                    assertThat(e.index()).isEqualTo(1);
+                    assertThat(e.field()).isEqualTo("dataJson");
+                });
+        assertThat(service.twitchatEvents(username).get("BOT_ENABLED")).isNullOrEmpty();
+    }
+
+    @Test
     void twitchatEvents_areSavedThenReadBack() {
         List<TwitchatEventActionDto> payloads = List.of(new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "RAW", "{\"message\":\"hi\"}", true));
 

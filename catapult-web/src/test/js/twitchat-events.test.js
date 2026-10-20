@@ -231,6 +231,34 @@ describe("saving and testing", () => {
         expect(document.querySelector(".twitchat-payload-errors").textContent).toBe("message: Required");
     });
 
+    it("shows every error of a payload, the size refusal on its dataJson included", async () => {
+        html(EVENT(CARD() + CARD() + CARD()));
+        render();
+        fetchMock.mockResolvedValueOnce(response(400, [
+            { index: 1, field: "dataJson", message: "At most 32768 characters" },
+            { index: 1, field: "message", message: "Required" },
+        ]));
+        document.querySelector(".twitchat-save-btn").click();
+        await flush();
+        const errors = [...document.querySelectorAll(".twitchat-payload-errors")].map((el) => el.textContent);
+        expect(errors).toEqual(["", "dataJson: At most 32768 characters, message: Required", ""]);
+    });
+
+    it("tells the payloads one too many on the first card past the limit, else under the event", async () => {
+        html(EVENT(CARD() + CARD() + CARD()));
+        render();
+        fetchMock.mockResolvedValueOnce(response(400, [{ index: 2, field: "action", message: "At most 2 payloads per event" }]));
+        document.querySelector(".twitchat-save-btn").click();
+        await flush();
+        expect(document.querySelectorAll(".twitchat-payload-errors")[2].textContent).toBe("action: At most 2 payloads per event");
+
+        fetchMock.mockResolvedValueOnce(response(400, [{ index: 20, field: "action", message: "At most 20 payloads per event" }]));
+        document.querySelector(".twitchat-save-btn").click();
+        await flush();
+        expect(document.querySelectorAll(".twitchat-payload-errors")[2].textContent).toBe("");
+        expect(document.querySelector(".twitchat-event-errors").textContent).toBe("At most 20 payloads per event");
+    });
+
     it.each([["a page", "<html>Bad request</html>"], ["an object", { status: 400, title: "Too big" }]])(
         "tells a 400 whose body is %s as a failure", async (ignored, body) => {
             fetchMock.mockResolvedValueOnce(response(400, body));
