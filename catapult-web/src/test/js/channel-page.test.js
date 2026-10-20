@@ -31,7 +31,7 @@ describe("refresh / postJson", () => {
 
         await CatapultChannel.refresh();
 
-        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc?status=AUTO", false);
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "?status=AUTO");
     });
 
     it("posts through CatapultCsrf and returns the response", async () => {
