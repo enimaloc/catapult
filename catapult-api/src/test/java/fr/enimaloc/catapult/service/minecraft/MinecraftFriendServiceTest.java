@@ -37,6 +37,7 @@ class MinecraftFriendServiceTest {
     @Mock private MinecraftFriendLinkRepository linkRepository;
     @Mock private MinecraftAccountLimitMarker limitMarker;
     @Mock private fr.enimaloc.catapult.repository.binding.GetterConfigRepository getterConfigRepository;
+    @Mock private fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
 
     @InjectMocks private MinecraftFriendService service;
 
@@ -47,6 +48,7 @@ class MinecraftFriendServiceTest {
     @BeforeEach
     void setup() {
         user = new UserAccount();
+        user.setId(UUID.randomUUID());
         bot1 = account("CatapultBot1", 0);
         bot2 = account("CatapultBot2", 1);
 
@@ -192,6 +194,7 @@ class MinecraftFriendServiceTest {
         assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.ACCEPTED);
         assertThat(link.getAcceptedAt()).isNotNull();
         verify(linkRepository).save(link);
+        verify(channelEventPublisher).minecraftLinkChanged(user.getId(), "ACCEPTED", "jeb_");
     }
 
     @Test
@@ -206,6 +209,7 @@ class MinecraftFriendServiceTest {
 
         assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.REMOVED);
         verify(linkRepository).save(link);
+        verify(channelEventPublisher).minecraftLinkChanged(user.getId(), "REMOVED", "jeb_");
     }
 
     @Test
@@ -220,6 +224,7 @@ class MinecraftFriendServiceTest {
         service.syncFriendLinks();
 
         assertThat(link.getMinecraftName()).isEqualTo("nouveau_pseudo");
+        verify(channelEventPublisher).minecraftLinkChanged(user.getId(), "ACCEPTED", "nouveau_pseudo");
     }
 
     @Test
@@ -336,6 +341,7 @@ class MinecraftFriendServiceTest {
 
         assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.INVITE_REJECTED);
         verify(linkRepository, never()).save(link);
+        verifyNoInteractions(channelEventPublisher);
     }
 
     @Test
@@ -351,6 +357,7 @@ class MinecraftFriendServiceTest {
         verify(minecraftService, never()).addFriend(anyString(), any(), anyString());
         assertThat(link.getStatus()).isEqualTo(MinecraftFriendLink.Status.INVITE_REJECTED);
         verify(linkRepository, never()).save(link);
+        verifyNoInteractions(channelEventPublisher);
     }
 
     private MinecraftFriendLink pendingLink(String profileId, String name) {
