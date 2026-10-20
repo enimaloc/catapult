@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.RejectRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
@@ -36,9 +37,29 @@ public class ApiAdminDtddMappingController {
     @Autowired(required = false)
     private AdminEventPublisher events;
 
+    /**
+     * The proposals in {@code status}, oldest first, as catapult-web reads them (not the entities,
+     * whose lazy proposer can't be serialized once the transaction is over).
+     */
     @GetMapping("/proposals")
-    public List<DtddMappingProposal> pending(@RequestParam(defaultValue = "PENDING") String status) {
-        return proposalRepo.findByStatusOrderByCreatedAtAsc(Status.valueOf(status));
+    @Transactional(readOnly = true)
+    public List<DtddProposalDto> pending(@RequestParam(defaultValue = "PENDING") String status) {
+        Status wanted;
+        try {
+            wanted = Status.valueOf(status);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown status " + status);
+        }
+        return proposalRepo.findByStatusOrderByCreatedAtAsc(wanted).stream()
+                .map(ApiAdminDtddMappingController::toDto)
+                .toList();
+    }
+
+    static DtddProposalDto toDto(DtddMappingProposal p) {
+        DtddProposalDto.Proposer proposer = p.getProposer() == null
+                ? null : new DtddProposalDto.Proposer(p.getProposer().getTwitchUsername());
+        return new DtddProposalDto(p.getId(), p.getCreatedAt(), p.getIgdbId(), p.getProposedDtddId(), proposer,
+                p.getReason(), p.getStatus().name());
     }
 
     @PostMapping("/proposals/{id}/approve")
