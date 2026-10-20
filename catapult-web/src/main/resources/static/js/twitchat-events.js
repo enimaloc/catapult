@@ -85,6 +85,16 @@ window.CatapultTwitchatEvents = (function () {
         event.querySelector(".twitchat-event-errors").textContent = general.join(" ");
     }
 
+    /** The errors `response` lists (an array of {index, field, message}); null when its body is anything else. */
+    async function errorList(response) {
+        try {
+            const errors = await response.json();
+            return Array.isArray(errors) ? errors : null;
+        } catch {
+            return null;
+        }
+    }
+
     /** Posts these cards' payloads; shows the errors a 400 lists. Resolves with whether it went through. */
     async function send(event, path, cards) {
         event.querySelector(".twitchat-event-errors").textContent = "";
@@ -103,7 +113,10 @@ window.CatapultTwitchatEvents = (function () {
             return false;
         }
         if (response.status === 400) {
-            showErrors(event, cards, await response.json());
+            // A 400 that isn't the list of errors (refused before validation, e.g. too big) is told as a failure.
+            const errors = await errorList(response);
+            if (errors) showErrors(event, cards, errors);
+            else CatapultChannel.showError(CatapultChannel.actionFailed(response.status));
             return false;
         }
         if (!response.ok) {
@@ -122,7 +135,8 @@ window.CatapultTwitchatEvents = (function () {
             CatapultChannel.showError(CatapultChannel.unreachable());
             return {};
         }
-        if (response.status === 422) return { errors: await response.json() };
+        const errors = response.status === 422 ? await errorList(response) : null;
+        if (errors) return { errors };
         if (!response.ok) {
             CatapultChannel.showError(CatapultChannel.actionFailed(response.status));
             return {};
