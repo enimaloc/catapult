@@ -77,6 +77,53 @@ describe("GameSearch.attach", () => {
         expect(results.children).toHaveLength(0);
     });
 
+    it("drops an answer that comes back after a newer query", async () => {
+        let answerFirst;
+        fetchMock.mockImplementationOnce(() => new Promise(resolve => { answerFirst = resolve; }));
+        fetchMock.mockResolvedValueOnce(response(200, [{ id: "3", name: "Quake" }]));
+        GameSearch.attach(input, results, "/search", vi.fn());
+
+        type("doom");
+        await vi.advanceTimersByTimeAsync(300);
+        type("quake");
+        await vi.advanceTimersByTimeAsync(300);
+        answerFirst(response(200, [{ id: "1", name: "Doom" }]));
+        await vi.runAllTimersAsync();
+
+        expect(results.textContent).toBe("Quake");
+    });
+
+    it("drops a pending answer once the field is emptied, the list staying empty", async () => {
+        let answer;
+        fetchMock.mockImplementationOnce(() => new Promise(resolve => { answer = resolve; }));
+        GameSearch.attach(input, results, "/search", vi.fn());
+
+        type("doom");
+        await vi.advanceTimersByTimeAsync(300);
+        type("");
+        answer(response(200, [{ id: "1", name: "Doom" }]));
+        await vi.runAllTimersAsync();
+
+        expect(results.children).toHaveLength(0);
+    });
+
+    it.each([
+        ["refused", () => fetchMock.mockResolvedValueOnce(response(502, "Bad gateway")), "Failed (502)"],
+        ["not sent", () => fetchMock.mockRejectedValueOnce(new TypeError("offline")), "Unreachable"],
+    ])("empties the list and tells a search %s", async (ignored, fail, told) => {
+        window.CatapultChannel = {
+            showError: vi.fn(), actionFailed: status => `Failed (${status})`, unreachable: () => "Unreachable",
+        };
+        fail();
+        GameSearch.attach(input, results, "/search", vi.fn());
+
+        type("doom");
+        await vi.runAllTimersAsync();
+
+        expect(results.children).toHaveLength(0);
+        expect(CatapultChannel.showError).toHaveBeenCalledWith(told);
+    });
+
     it("reads the result array through `pick` for wrapped responses", async () => {
         fetchMock.mockResolvedValueOnce(response(200, { results: [{ name: "Wrapped" }] }));
         GameSearch.attach(input, results, "/search", vi.fn(), { pick: data => data.results });
