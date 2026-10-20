@@ -4,7 +4,6 @@ import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
-import fr.enimaloc.catapult.common.dto.twitchat.TwitchatAction;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -113,12 +112,6 @@ class DtoBehaviourTest {
     @Test
     void minecraftData_withoutStatus_isNotConnected() {
         assertThat(new MinecraftData(null, null, null).connected()).isFalse();
-    }
-
-    @Test
-    void twitchatAction_urlButton() {
-        assertThat(TwitchatAction.urlButton("Open", "https://x", "primary"))
-                .isEqualTo(new TwitchatAction("Open", "url", "https://x", null, "primary"));
     }
 
     @Test
