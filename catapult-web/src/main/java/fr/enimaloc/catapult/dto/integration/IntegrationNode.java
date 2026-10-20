@@ -163,15 +163,4 @@ public sealed interface IntegrationNode {
             return "repeater";
         }
     }
-
-    /** Escape hatch for markup no node covers: inserted unescaped, so never user input. */
-    record Raw(String html) implements IntegrationNode {
-        public String type() {
-            return "raw";
-        }
-
-        public Attrs attrs() {
-            return Attrs.NONE;
-        }
-    }
 }
