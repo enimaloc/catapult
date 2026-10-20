@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = WidgetObsController.class)
-@Import(WebSecurityConfig.class)
+@Import({WebSecurityConfig.class, fr.enimaloc.catapult.config.I18nConfiguration.class})
 class WidgetObsControllerTest {
 
     private static final UUID TOKEN = UUID.fromString("11111111-2222-3333-4444-555555555555");
@@ -70,6 +70,16 @@ class WidgetObsControllerTest {
     }
 
     /** A catapult-api blip while OBS loads the page: its scripts are there, retrying the config until it comes back. */
+    @Test
+    void page_isTitledInTheVisitorsLanguage() throws Exception {
+        when(apiService.widgetAccess(TOKEN)).thenReturn(access(OWNER.toString(), true));
+
+        mvc.perform(get("/widget/obs/" + TOKEN).locale(java.util.Locale.FRENCH))
+                .andExpect(content().string(containsString("<title>Catapult — relais Twitchat</title>")));
+        mvc.perform(get("/widget/obs/" + TOKEN).locale(java.util.Locale.ENGLISH))
+                .andExpect(content().string(containsString("<title>Catapult — Twitchat relay</title>")));
+    }
+
     @Test
     void page_keepsItsScripts_whenCatapultApiIsUnreachable() throws Exception {
         when(apiService.widgetAccess(TOKEN)).thenReturn(new ApiClient.Result<>(502, null));
