@@ -24,7 +24,8 @@ import java.util.Set;
  * The well-known files the admin configured, served to anyone: under /.well-known/ (any depth), and
  * at the root for a dotted name (IndexController's pages have none). catapult-api decides what
  * exists; a path breaking its rules is a 404 there. The status and headers are the file's; nosniff is
- * always sent, and CSP {@code sandbox} unless the file sets its own Content-Security-Policy.
+ * always sent, and CSP {@code sandbox} unless the file sets its own Content-Security-Policy. Where the
+ * admin configured nothing, catapult-web's own default is served, if it ships one ({@link WellKnownDefaults}).
  */
 @RestController
 @RequiredArgsConstructor
@@ -64,7 +65,9 @@ public class WellKnownServeController {
     private ResponseEntity<byte[]> serve(WellKnownLocation location, String path) {
         if (path.isEmpty() || traverses(path) || path.contains("%")) return ResponseEntity.notFound().build();
         WellKnownContent content = cache.get(location, path, () -> apiService.wellKnown(location, path));
-        if (content.status() == 404) return ResponseEntity.notFound().build();
+        // No admin file there: the one catapult-web ships, if any (security.txt...).
+        if (content.status() == 404) content = WellKnownDefaults.find(location, path);
+        if (content == null) return ResponseEntity.notFound().build();
         if (content.status() != 200) return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         WellKnownResponseDto response = content.response();
         MediaType type;
