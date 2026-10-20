@@ -31,6 +31,8 @@ public final class SiteCatalog {
             // Served by ChangelogController, which fills its model (catapult-api's versions).
             new SpaPage("changelog", "pages/changelog", "changelog", "/spa/changelog", "page.title.changelog", "page.description.changelog"),
             new SpaPage("channel", "pages/channel", "channel", "/spa/channel", "page.title.channel", null, true),
+            // A card's help (HelpPageController); /spa/help/{cardId} is the side sheet's.
+            new SpaPage("help", "pages/help", "help", "/spa/help-page", "page.title.help", null, true),
             new SpaPage("admin", "pages/admin", "admin", "/spa/admin", "page.title.admin", null),
             new SpaPage("notifications", "pages/notifications", "notifications", "/spa/notifications", "page.title.notifications", null),
             new SpaPage("login", "pages/login", "login", "/spa/login", "page.title.login", null),
