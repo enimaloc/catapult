@@ -39,15 +39,18 @@ class ApiChannelDtddMappingControllerTest {
     @Mock DtddMappingProposalRepository proposalRepo;
     @Mock DtddApiClient apiClient;
     @Mock fr.enimaloc.catapult.service.dtdd.DtddMappingEvents mappingEvents;
+    @Mock fr.enimaloc.catapult.api.ApiUserResolver userResolver;
+    @Mock org.springframework.security.oauth2.jwt.Jwt jwt;
 
     ApiChannelDtddMappingController controller;
     UserAccount user;
 
     @BeforeEach
     void setUp() {
-        controller = new ApiChannelDtddMappingController(mappingRepo, gameRepo, searchRepo, proposalRepo, apiClient, mappingEvents);
+        controller = new ApiChannelDtddMappingController(mappingRepo, gameRepo, searchRepo, proposalRepo, apiClient, mappingEvents, userResolver);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
+        lenient().when(userResolver.viewer(jwt)).thenReturn(user);
     }
 
     @Test
@@ -59,7 +62,7 @@ class ApiChannelDtddMappingControllerTest {
             .thenReturn(Optional.empty());
         when(gameRepo.findById(4521L)).thenReturn(Optional.empty());
 
-        var status = controller.status("100", user);
+        var status = controller.status("100", jwt);
         assertThat(status.canValidateDirectly()).isTrue();
     }
 
@@ -68,7 +71,7 @@ class ApiChannelDtddMappingControllerTest {
         when(mappingRepo.findById("100")).thenReturn(Optional.of(
             new DtddGameMapping("100", 4521L, 0.92, true, Instant.now())));
         when(gameRepo.findById(4521L)).thenReturn(Optional.empty());
-        var status = controller.status("100", user);
+        var status = controller.status("100", jwt);
         assertThat(status.canValidateDirectly()).isFalse();
     }
 
@@ -78,7 +81,7 @@ class ApiChannelDtddMappingControllerTest {
         when(mappingRepo.findById("100")).thenReturn(Optional.of(mapping));
         when(proposalRepo.countByIgdbIdAndStatus("100", Status.PENDING)).thenReturn(0L);
 
-        controller.validate(new ValidateRequest("100"), user);
+        controller.validate(new ValidateRequest("100"));
 
         assertThat(mapping.isVerified()).isTrue();
         assertThat(mapping.getConfidence()).isEqualTo(1.0);
@@ -90,15 +93,17 @@ class ApiChannelDtddMappingControllerTest {
     void validate_rejects_whenAlreadyVerified() {
         when(mappingRepo.findById("100")).thenReturn(Optional.of(
             new DtddGameMapping("100", 4521L, 0.92, true, Instant.now())));
-        assertThatThrownBy(() -> controller.validate(new ValidateRequest("100"), user))
+        assertThatThrownBy(() -> controller.validate(new ValidateRequest("100")))
             .isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(mappingEvents);
     }
 
     @Test
     void propose_createsPendingProposal() {
-        controller.propose(new ProposeRequest("100", 1287L, "wrong game"), user);
-        verify(proposalRepo).save(any(DtddMappingProposal.class));
+        controller.propose(new ProposeRequest("100", 1287L, "wrong game"), jwt);
+        var saved = org.mockito.ArgumentCaptor.forClass(DtddMappingProposal.class);
+        verify(proposalRepo).save(saved.capture());
+        assertThat(saved.getValue().getProposer()).isSameAs(user); // the caller, from the JWT
         verify(mappingEvents).mappingChanged("100");
     }
 

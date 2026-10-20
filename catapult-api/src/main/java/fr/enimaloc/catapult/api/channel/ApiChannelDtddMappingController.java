@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.channel;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingProposalDto;
 import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
@@ -25,6 +26,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -44,10 +46,12 @@ public class ApiChannelDtddMappingController {
     private final DtddMappingProposalRepository proposalRepo;
     private final DtddApiClient apiClient;
     private final DtddMappingEvents mappingEvents;
+    private final ApiUserResolver userResolver;
 
     @GetMapping
     public StatusResponse status(@RequestParam("igdbId") String igdbId,
-                                 @AuthenticationPrincipal UserAccount user) {
+                                 @AuthenticationPrincipal Jwt jwt) {
+        UserAccount user = jwt == null ? null : userResolver.viewer(jwt);
         Optional<DtddGameMapping> mappingOpt = mappingRepo.findById(igdbId);
         Optional<DtddMappingProposal> myProposal = user == null ? Optional.empty()
             : proposalRepo.findFirstByProposerAndIgdbIdAndStatus(user, igdbId, Status.PENDING);
@@ -72,7 +76,7 @@ public class ApiChannelDtddMappingController {
     @PostMapping("/validate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
-    public void validate(@RequestBody ValidateRequest body, @AuthenticationPrincipal UserAccount user) {
+    public void validate(@RequestBody ValidateRequest body) {
         DtddGameMapping mapping = mappingRepo.findById(body.igdbId())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (mapping.isVerified()) {
@@ -90,7 +94,8 @@ public class ApiChannelDtddMappingController {
     @PostMapping("/propose")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
-    public void propose(@RequestBody ProposeRequest body, @AuthenticationPrincipal UserAccount user) {
+    public void propose(@RequestBody ProposeRequest body, @AuthenticationPrincipal Jwt jwt) {
+        UserAccount user = userResolver.viewer(jwt);
         DtddMappingProposal p = new DtddMappingProposal();
         p.setId(UUID.randomUUID());
         p.setIgdbId(body.igdbId());

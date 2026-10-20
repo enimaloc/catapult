@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.RejectRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -35,6 +37,7 @@ public class ApiAdminDtddMappingController {
     private final DtddGameMappingRepository mappingRepo;
     private final DtddTopicsCacheRepository topicsRepo;
     private final DtddMappingEvents mappingEvents;
+    private final ApiUserResolver userResolver;
 
     @Autowired(required = false)
     private AdminEventPublisher events;
@@ -67,7 +70,8 @@ public class ApiAdminDtddMappingController {
     @PostMapping("/proposals/{id}/approve")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
-    public void approve(@PathVariable UUID id, @AuthenticationPrincipal UserAccount admin) {
+    public void approve(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        UserAccount admin = userResolver.viewer(jwt);
         DtddMappingProposal p = proposalRepo.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (p.getStatus() != Status.PENDING) {
@@ -102,7 +106,8 @@ public class ApiAdminDtddMappingController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
     public void reject(@PathVariable UUID id, @RequestBody(required = false) RejectRequest body,
-                       @AuthenticationPrincipal UserAccount admin) {
+                       @AuthenticationPrincipal Jwt jwt) {
+        UserAccount admin = userResolver.viewer(jwt);
         DtddMappingProposal p = proposalRepo.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (p.getStatus() != Status.PENDING) {

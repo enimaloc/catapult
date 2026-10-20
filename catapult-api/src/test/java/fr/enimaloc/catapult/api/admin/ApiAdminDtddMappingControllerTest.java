@@ -28,15 +28,18 @@ class ApiAdminDtddMappingControllerTest {
     @Mock DtddGameMappingRepository mappingRepo;
     @Mock DtddTopicsCacheRepository topicsRepo;
     @Mock fr.enimaloc.catapult.service.dtdd.DtddMappingEvents mappingEvents;
+    @Mock fr.enimaloc.catapult.api.ApiUserResolver userResolver;
+    @Mock org.springframework.security.oauth2.jwt.Jwt jwt;
 
     ApiAdminDtddMappingController controller;
     UserAccount admin;
 
     @BeforeEach
     void setUp() {
-        controller = new ApiAdminDtddMappingController(proposalRepo, mappingRepo, topicsRepo, mappingEvents);
+        controller = new ApiAdminDtddMappingController(proposalRepo, mappingRepo, topicsRepo, mappingEvents, userResolver);
         admin = new UserAccount();
         admin.setId(UUID.randomUUID());
+        lenient().when(userResolver.viewer(jwt)).thenReturn(admin);
     }
 
     @Test
@@ -78,7 +81,7 @@ class ApiAdminDtddMappingControllerTest {
         DtddGameMapping existing = new DtddGameMapping("100", 4521L, 0.71, false, Instant.now());
         when(mappingRepo.findById("100")).thenReturn(Optional.of(existing));
 
-        controller.approve(propId, admin);
+        controller.approve(propId, jwt);
 
         assertThat(existing.getDtddId()).isEqualTo(1287L);
         assertThat(existing.isVerified()).isTrue();
@@ -97,7 +100,7 @@ class ApiAdminDtddMappingControllerTest {
         proposal.setStatus(Status.PENDING);
         when(proposalRepo.findById(propId)).thenReturn(Optional.of(proposal));
 
-        controller.reject(propId, new RejectRequest("not the right game"), admin);
+        controller.reject(propId, new RejectRequest("not the right game"), jwt);
 
         assertThat(proposal.getStatus()).isEqualTo(Status.REJECTED);
         verify(mappingRepo, never()).save(any());
