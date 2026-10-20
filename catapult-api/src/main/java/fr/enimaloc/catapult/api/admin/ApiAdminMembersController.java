@@ -3,9 +3,8 @@ package fr.enimaloc.catapult.api.admin;
 import fr.enimaloc.catapult.common.dto.admin.AddToGroupRequest;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
-import fr.enimaloc.catapult.common.dto.admin.FlagView;
+import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
-import fr.enimaloc.catapult.common.dto.admin.MemberTargeting;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
 import fr.enimaloc.catapult.common.dto.admin.SetFlagRequest;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -224,14 +223,14 @@ public class ApiAdminMembersController {
 
     @GetMapping("/{id}/targeting")
     @Transactional(readOnly = true)
-    public MemberTargeting targeting(@PathVariable UUID id) {
+    public MemberTargetingDto targeting(@PathVariable UUID id) {
         UserAccount user = findOrThrow(id);
-        List<FlagView> flags = userFlagRepository.findByUser(user).stream()
-                .map(f -> new FlagView(f.getFlagKey(), f.getFlagValue())).toList();
+        List<MemberTargetingDto.Flag> flags = userFlagRepository.findByUser(user).stream()
+                .map(f -> new MemberTargetingDto.Flag(f.getFlagKey(), f.getFlagValue())).toList();
         List<String> groups = userGroupRepository.findAll().stream()
                 .filter(g -> g.getMembers().stream().anyMatch(m -> m.getId().equals(id)))
                 .map(UserGroup::getKey).toList();
-        return new MemberTargeting(flags, groups);
+        return new MemberTargetingDto(flags, groups);
     }
 
     private UserAccount findOrThrow(UUID id) {

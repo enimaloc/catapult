@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AddToGroupRequest;
-import fr.enimaloc.catapult.common.dto.admin.FlagView;
+import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
 import fr.enimaloc.catapult.common.dto.admin.SetFlagRequest;
@@ -326,7 +326,7 @@ class ApiAdminMembersControllerTest {
 
             var targeting = controller.targeting(member.getId());
 
-            assertThat(targeting.flags()).containsExactly(new FlagView("beta", "on"));
+            assertThat(targeting.flags()).containsExactly(new MemberTargetingDto.Flag("beta", "on"));
             assertThat(targeting.groupKeys()).containsExactly("testers");
         }
     }
