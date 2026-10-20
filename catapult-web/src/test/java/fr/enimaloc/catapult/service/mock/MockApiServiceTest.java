@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
+import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -269,10 +270,16 @@ class MockApiServiceTest {
 
     @Test
     void noOpActions_changeNothing() {
-        service.recheckGame(username);
         service.refreshSteamProfileCache(username);
 
         assertThat(events).isEmpty();
+    }
+
+    @Test
+    void recheckGame_tellsTheGameTheMockHas_asCatapultApiWould() {
+        service.recheckGame(username);
+
+        assertThat(events).singleElement().isInstanceOf(GameChangedEvent.class);
     }
 
     // --- mutations publish what changed ----------------------------------------------------------
