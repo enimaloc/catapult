@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.common.dto;
 
+import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -12,6 +13,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import java.time.Instant;
 import java.util.List;
+
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,6 +37,52 @@ class DtoBehaviourTest {
 
             assertThat(page.first()).isEqualTo(first);
             assertThat(page.last()).isEqualTo(last);
+        }
+    }
+
+    @Nested
+    class AdminPages {
+        private final JsonMapper json = JsonMapper.builder().build();
+
+        private AdminPage<String> read(String body) {
+            return json.readValue(body, new TypeReference<AdminPage<String>>() {});
+        }
+
+        @Test
+        void readsASpringDataPageSerializedDirectly() {
+            AdminPage<String> page = read("""
+                    {"content":["a","b"],"number":1,"totalPages":3,"totalElements":42,"size":20,
+                     "first":false,"last":false,"numberOfElements":2,"empty":false,"pageable":{"pageNumber":1}}""");
+
+            assertThat(page).isEqualTo(new AdminPage<>(List.of("a", "b"), 1, 3, 42));
+        }
+
+        @Test
+        void readsASpringDataPagedModel() {
+            AdminPage<String> page = read("""
+                    {"content":["a"],"page":{"size":20,"number":2,"totalElements":41,"totalPages":3}}""");
+
+            assertThat(page).isEqualTo(new AdminPage<>(List.of("a"), 2, 3, 41));
+            assertThat(page.last()).isTrue();
+        }
+
+        @Test
+        void anEmptyAnswerIsAnEmptyFirstAndLastPage() {
+            AdminPage<String> page = read("{}");
+
+            assertThat(page.content()).isEmpty();
+            assertThat(page.first()).isTrue();
+            assertThat(page.last()).isTrue();
+        }
+
+        @ParameterizedTest(name = "page {0} of {1}: first={2} last={3}, like PagedBindings")
+        @CsvSource({"0, 1, true, true", "1, 3, false, false", "2, 3, false, true", "0, 0, true, true", "-1, 0, true, true"})
+        void firstAndLast(int number, int totalPages, boolean first, boolean last) {
+            AdminPage<String> page = new AdminPage<>(List.of(), number, totalPages, 0);
+            PagedBindings bindings = new PagedBindings(number, totalPages, 0, List.of());
+
+            assertThat(page.first()).isEqualTo(first).isEqualTo(bindings.first());
+            assertThat(page.last()).isEqualTo(last).isEqualTo(bindings.last());
         }
     }
 
