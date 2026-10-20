@@ -39,6 +39,32 @@ class ApiAdminDtddMappingControllerTest {
     }
 
     @Test
+    void pending_listsTheProposalsAsTheWebReadsThem() {
+        UserAccount proposer = new UserAccount();
+        proposer.setTwitchUsername("viewer");
+        DtddMappingProposal proposal = new DtddMappingProposal();
+        proposal.setId(UUID.randomUUID());
+        proposal.setIgdbId("100");
+        proposal.setProposedDtddId(1287L);
+        proposal.setProposer(proposer);
+        proposal.setReason("same game");
+        proposal.setStatus(Status.PENDING);
+        proposal.setCreatedAt(Instant.parse("2026-10-16T10:00:00Z"));
+        when(proposalRepo.findByStatusOrderByCreatedAtAsc(Status.PENDING)).thenReturn(java.util.List.of(proposal));
+
+        assertThat(controller.pending("PENDING")).containsExactly(new fr.enimaloc.catapult.common.dto.admin.DtddProposalDto(
+                proposal.getId(), proposal.getCreatedAt(), "100", 1287L,
+                new fr.enimaloc.catapult.common.dto.admin.DtddProposalDto.Proposer("viewer"), "same game", "PENDING"));
+    }
+
+    @Test
+    void pending_refusesAnUnknownStatus_with400() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.pending("NOPE"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+    }
+
+    @Test
     void approve_updatesMapping_andInvalidatesOldTopics() {
         UUID propId = UUID.randomUUID();
         DtddMappingProposal proposal = new DtddMappingProposal();
