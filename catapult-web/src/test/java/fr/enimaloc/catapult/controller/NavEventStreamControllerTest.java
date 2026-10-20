@@ -148,11 +148,11 @@ class NavEventStreamControllerTest {
     }
 
     @Test
-    void catapultApisLiveState_findsTheChannelByItsId() throws Exception {
+    void catapultApisLiveState_findsTheChannelByItsLogin_whateverItsCase() throws Exception {
         MvcResult stream = navbar(loggedIn(), OWN, MODERATED);
 
-        controller.liveChanged(MODERATED.id(), false);
-        controller.liveChanged(UUID.randomUUID(), true);
+        controller.onChannelLive(new ChannelLiveStateEvent("OTHER", false));
+        controller.onChannelLive(new ChannelLiveStateEvent("unknown", true));
 
         assertThat(stream.getResponse().getContentAsString())
                 .contains("data:{\"username\":\"other\",\"live\":false}")
@@ -164,7 +164,7 @@ class NavEventStreamControllerTest {
         MvcResult stream = navbar(loggedIn(), OWN);
 
         controller.onChannelLive(new ChannelLiveStateEvent("enimaloc", true));
-        controller.liveChanged(OWN.id(), false);
+        controller.onChannelLive(new ChannelLiveStateEvent("enimaloc", false));
 
         assertThat(stream.getResponse().getContentAsString())
                 .contains("\"live\":true").contains("\"live\":false");

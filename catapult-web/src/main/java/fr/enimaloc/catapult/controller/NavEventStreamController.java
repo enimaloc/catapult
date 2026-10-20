@@ -165,15 +165,10 @@ public class NavEventStreamController {
         if (nav != null) nav.emitters().forEach(SseEmitter::complete);
     }
 
-    /** The mock's channels go live by name (MockAdminController). */
+    /** A channel goes live or offline, by login (ChannelEventRedisBridge, or the mock's MockAdminController). */
     @EventListener
     public void onChannelLive(ChannelLiveStateEvent event) {
-        live(channel -> channel.twitchUsername().equals(event.username()), event.state());
-    }
-
-    /** catapult-api's own channels go live by account id (ChannelEventRedisBridge). */
-    public void liveChanged(UUID channelId, boolean live) {
-        live(channel -> channel.id().equals(channelId), live);
+        live(channel -> channel.twitchUsername().equalsIgnoreCase(event.username()), event.state());
     }
 
     @EventListener
