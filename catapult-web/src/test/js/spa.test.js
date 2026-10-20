@@ -130,6 +130,27 @@ describe("navigate", () => {
         expect(rendered).not.toHaveBeenCalled();
         expect(document.getElementById("nav-progress").hidden).toBe(true);
     });
+
+    it("falls back to the page's absolute URL, / for the landing page", () => {
+        expect(CatapultSpa.urlOf("")).toBe("/");
+        expect(CatapultSpa.urlOf("", "?a=1")).toBe("/?a=1");
+        expect(CatapultSpa.urlOf("channel/enimaloc", "?page=2")).toBe("/channel/enimaloc?page=2");
+    });
+
+    it("never lets a slower earlier navigation replace a later one", async () => {
+        let answerFirst;
+        fetchMock.mockImplementationOnce(() => new Promise(resolve => { answerFirst = resolve; }));
+        fetchMock.mockResolvedValueOnce(response(200, "<p>channel</p>"));
+
+        const first = CatapultSpa.navigate("privacy");
+        await CatapultSpa.navigate("channel/enimaloc");
+        answerFirst(response(200, "<p>privacy</p>"));
+        await first;
+
+        expect(document.getElementById("app").innerHTML).toBe("<p>channel</p>");
+        expect(location.pathname).toBe("/channel/enimaloc");
+        expect(document.getElementById("nav-progress").hidden).toBe(true);
+    });
 });
 
 describe("the navbar's channels", () => {
@@ -293,6 +314,31 @@ describe("link and history handling", () => {
         expect(decisions).toEqual([false, false]);
         await flush();
 
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("leaves new tabs, downloads and handled clicks to the browser", async () => {
+        const decisions = [];
+        window.addEventListener("click", event => {
+            decisions.push(event.defaultPrevented);
+            event.preventDefault();
+        });
+        const link = document.getElementById("privacy");
+        for (const init of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }]) {
+            link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...init }));
+        }
+        link.setAttribute("target", "_blank");
+        link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        link.removeAttribute("target");
+        link.setAttribute("download", "");
+        link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        link.removeAttribute("download");
+        const handled = new MouseEvent("click", { bubbles: true, cancelable: true });
+        handled.preventDefault();
+        link.dispatchEvent(handled);
+        await flush();
+
+        expect(decisions).toEqual([false, false, false, false, false, false, false, true]);
         expect(fetchMock).not.toHaveBeenCalled();
     });
 

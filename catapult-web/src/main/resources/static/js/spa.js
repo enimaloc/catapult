@@ -41,7 +41,16 @@ function resolveRoute(path) {
     return { route: undefined, param: null };
 }
 
+/** The address bar's URL of the SPA path `path` (no leading slash, "" for the landing page). */
+function urlOf(path, search = "") {
+    return (path === "" ? "/" : `/${path}`) + search;
+}
+
+// Bumped by every navigation: a slower earlier one never swaps its page over a later one's.
+let generation = 0;
+
 async function navigate(path, push = true, search = "") {
+    const current = ++generation;
     const { route, param } = resolveRoute(path);
     const templateUrl = route
         ? (param ? `${route.templateUrl}/${param}` : route.templateUrl)
@@ -50,18 +59,20 @@ async function navigate(path, push = true, search = "") {
     progress.hidden = false;
 
     let response;
+    let html;
     try {
         response = await fetch(templateUrl + search);
+        html = await response.text();
     } catch {
         // Network failure (offline, timeout, ...): fall back to a full
         // navigation so the browser's own error handling takes over.
-        window.location.href = path + search;
+        if (current === generation) window.location.href = urlOf(path, search);
         return;
     } finally {
-        progress.hidden = true;
+        if (current === generation) progress.hidden = true;
     }
+    if (current !== generation) return;
 
-    const html = await response.text();
     app.innerHTML = html;
 
     // Before the render: its listeners read the page's channel off location (CatapultChannel.username()).
@@ -72,7 +83,7 @@ async function navigate(path, push = true, search = "") {
                 path
             },
             "",
-            (path === "" ? "/" : `/${path}`) + search
+            urlOf(path, search)
         );
     }
     document.dispatchEvent(new CustomEvent("catapult:render"));
@@ -147,7 +158,7 @@ function listenNavChannels() {
 }
 
 // The router's public surface, for the per-fragment scripts (channel-page.js's refresh()).
-window.CatapultSpa = { navigate, resolveRoute, loadNavChannels };
+window.CatapultSpa = { navigate, resolveRoute, loadNavChannels, urlOf };
 
 updateActiveLink(currentPath());
 loadNavChannels();
@@ -158,9 +169,19 @@ document.addEventListener("click", event => {
     // click inside a web component's shadow DOM (e.g. <mdui-button href>),
     // event.target is retargeted to the component itself, which isn't an
     // <a> and wouldn't match a plain `a[data-link]` selector.
+    // What the browser does itself is left to it: a new tab or window (modifier, middle click,
+    // target), a download, or a click a handler already took care of.
+    if (event.defaultPrevented || event.button !== 0
+        || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+    }
     const el = event.composedPath().find(node => node instanceof Element && node.hasAttribute("data-link"));
     const href = el?.getAttribute("href");
     if (!href) {
+        return;
+    }
+    const target = el.getAttribute("target");
+    if ((target && target !== "_self") || el.hasAttribute("download")) {
         return;
     }
 
