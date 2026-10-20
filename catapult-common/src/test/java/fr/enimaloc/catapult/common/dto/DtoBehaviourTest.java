@@ -1,6 +1,10 @@
 package fr.enimaloc.catapult.common.dto;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
+import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
@@ -102,6 +106,24 @@ class DtoBehaviourTest {
 
         assertThat(page.isLive(live)).isTrue();
         assertThat(page.isLive(java.util.UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void apiKeysPage_ofNoPage_isNull() {
+        assertThat(ApiKeysPageDto.of((SteamKeysPageData) null)).isNull();
+        assertThat(ApiKeysPageDto.of((DtddKeysPageData) null)).isNull();
+    }
+
+    @Test
+    void apiKeysPage_ofAPageWithoutKeys_hasNoKeys() {
+        assertThat(ApiKeysPageDto.of(new SteamKeysPageData(null, true))).isEqualTo(new ApiKeysPageDto(true, List.of()));
+        assertThat(ApiKeysPageDto.of(new DtddKeysPageData(null, false)).keys()).isEmpty();
+    }
+
+    @Test
+    void apiKeysPage_mapsEachKey() {
+        assertThat(ApiKeysPageDto.of(new DtddKeysPageData(List.of(new KeyStatus("id", "ab…yz", null, true, 30)), true)))
+                .isEqualTo(new ApiKeysPageDto(true, List.of(new ApiKeysPageDto.Key("id", "ab…yz", null, true, 30))));
     }
 
     @Test
