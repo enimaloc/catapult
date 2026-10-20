@@ -7,12 +7,22 @@
  * after most actions: the SSE echo (including for the tab that triggered the mutation) is
  * the single source of truth for what changed.
  *
- * EventSource reconnects on its own (no manual retry logic needed here).
+ * EventSource reconnects on its own, except when a reconnect is answered with something other
+ * than a stream (nginx's maintenance page during a restart, a refusal): it then stops for good,
+ * so a closed stream is reopened after a backoff (5 s, doubling up to 60 s, back to 5 s once a
+ * stream opens), as live.js does. Events sent while the stream was down are lost: every time it
+ * opens again (by itself or reopened), the page is re-rendered to catch up.
  */
 (function () {
+    const FIRST_DELAY = 5000;
+    const MAX_DELAY = 60000;
     let source = null;
     let sourceUsername = null;
     let registeredEvents = new Set();
+    let delay = FIRST_DELAY;
+    let retry = null;
+    // Whether the channel's stream opened before: an open after that is a reconnection.
+    let opened = false;
 
     // The handful of events that need more than Visibility.dispatch's generic handling —
     // BindingDeletedEvent actually removes a row (not a class toggle or property sync, so
@@ -31,8 +41,12 @@
             source.close();
             source = null;
         }
+        clearTimeout(retry);
+        retry = null;
         sourceUsername = null;
         registeredEvents = new Set();
+        delay = FIRST_DELAY;
+        opened = false;
     }
 
     function registerEvent(eventName) {
@@ -59,11 +73,46 @@
         Object.keys(customHandlers).forEach(registerEvent);
     }
 
+    /** Re-renders the page, keeping where the visitor had scrolled to. */
+    async function catchUp() {
+        const top = window.scrollY;
+        await CatapultChannel.refresh();
+        window.scrollTo({ top, behavior: "instant" });
+    }
+
+    function open(username) {
+        const current = new EventSource(`/events/channel/${username}`);
+        source = current;
+        registeredEvents = new Set();
+        current.addEventListener("open", () => {
+            if (current !== source) return;
+            delay = FIRST_DELAY;
+            if (opened) catchUp();
+            opened = true;
+        });
+        current.addEventListener("error", () => {
+            if (current !== source || current.readyState !== EventSource.CLOSED) return;
+            scheduleReopen();
+        });
+        registerDiscoveredEvents();
+    }
+
+    function scheduleReopen() {
+        if (retry !== null) return;
+        const username = sourceUsername;
+        retry = setTimeout(() => {
+            retry = null;
+            if (sourceUsername === username) open(username);
+        }, delay);
+        delay = Math.min(delay * 2, MAX_DELAY);
+    }
+
     function connect(username) {
         if (!source || sourceUsername !== username) {
             closeSource();
             sourceUsername = username;
-            source = new EventSource(`/events/channel/${username}`);
+            open(username);
+            return;
         }
         registerDiscoveredEvents();
     }
