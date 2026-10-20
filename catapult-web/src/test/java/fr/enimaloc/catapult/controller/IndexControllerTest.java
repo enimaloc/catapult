@@ -582,6 +582,14 @@ class IndexControllerTest {
         assertThat(html).containsPattern("class=\"notification-empty\"(?![^>]*hidden)");
     }
 
+    /** Third-party files come through catapult-web's own proxy (ExternalAssetController): no Google host. */
+    @Test
+    void page_neverHasTheBrowserContactGoogle() throws Exception {
+        String html = mvc.perform(get("/")).andReturn().getResponse().getContentAsString();
+        assertThat(html).contains("href=\"/assets/ext/fonts/material-icons.css\"")
+                .doesNotContain("googleapis.com").doesNotContain("gstatic.com");
+    }
+
     /** No build info (tests, the IDE): the footer shows no version rather than a placeholder. */
     @Test
     void footer_showsNoVersion_withoutBuildInfo() throws Exception {
