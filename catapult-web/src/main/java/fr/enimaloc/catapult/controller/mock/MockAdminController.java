@@ -53,7 +53,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Profile("mock")
 public class MockAdminController {
-    private static final String REDIRECT_LOGIN = "redirect:/oauth2/authorization/twitch";
+    private static final String REDIRECT_LOGIN = "redirect:/auth/login";
     private static final String REDIRECT_ADMIN = "redirect:/mock/admin";
 
     private final MockApiService mockApiService;

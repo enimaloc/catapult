@@ -64,4 +64,16 @@ class Oauth2LoginFailureHandlerTest {
 
         assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost:8081/login?error");
     }
+
+    @Test
+    void twitchRetry_keepsCatapultWebsState_butGivingUpForgetsIt() throws Exception {
+        handler.onAuthenticationFailure(request, response,
+                new OAuth2AuthenticationException(new OAuth2Error("server_error")));
+        assertThat(response.getCookie(InviteCodeRelayFilter.WEB_STATE_COOKIE_NAME)).isNull();
+
+        MockHttpServletResponse givenUp = new MockHttpServletResponse();
+        handler.onAuthenticationFailure(request, givenUp,
+                new OAuth2AuthenticationException(new OAuth2Error("not_whitelisted")));
+        assertThat(givenUp.getCookie(InviteCodeRelayFilter.WEB_STATE_COOKIE_NAME).getMaxAge()).isZero();
+    }
 }

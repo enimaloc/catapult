@@ -57,7 +57,7 @@ describe("in the app", () => {
 
     it("leaves logging in alone: no popout then", async () => {
         const open = vi.spyOn(window, "open").mockReturnValue(null);
-        html('<mdui-button href="/oauth2/authorization/twitch">Log in</mdui-button>');
+        html('<mdui-button href="/auth/login">Log in</mdui-button>');
         tag({});
         await load("mock-popout");
         expect(click(document.querySelector("mdui-button")).defaultPrevented).toBe(false);
