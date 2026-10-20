@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
 import fr.enimaloc.catapult.repository.twitch.CatapultCategoryChangeStateRepository;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatActionTokenRepository;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
+import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.twitch.EventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
@@ -50,7 +51,7 @@ public class AccountService {
     private final TwitchatWidgetSettingsRepository twitchatWidgetSettingsRepository;
     private final CatapultCategoryChangeStateRepository catapultCategoryChangeStateRepository;
     private final TwitchatActionTokenRepository twitchatActionTokenRepository;
-    private final fr.enimaloc.catapult.repository.twitchat.TwitchatEventActionRepository twitchatEventActionRepository;
+    private final TwitchatEventActionService twitchatEventActionService;
     private final Optional<XboxUserTokenService> xboxUserTokenService;
     private final BotToggleService botToggleService;
     private final TwitchChatService twitchChatService;
@@ -115,7 +116,7 @@ public class AccountService {
         twitchatWidgetSettingsRepository.deleteByUser(account);
         catapultCategoryChangeStateRepository.deleteByUser(account);
         twitchatActionTokenRepository.deleteByUserId(account.getId());
-        twitchatEventActionRepository.deleteAllOfUser(account);
+        twitchatEventActionService.deleteAllOfUser(account);
         // Pas d'endpoint de révocation officiel pour ces providers — suppression en base uniquement
 //        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
 //            oAuthTokenRepository.findByUserAndProvider(account, p)

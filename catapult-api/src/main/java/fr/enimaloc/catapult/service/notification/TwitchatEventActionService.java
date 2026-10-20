@@ -45,6 +45,10 @@ public class TwitchatEventActionService {
             SELECT to_regclass('public.twitchat_active_preset') IS NOT NULL
                AND to_regclass('public.twitchat_payload_preset') IS NOT NULL""";
 
+    // Active presets first: they reference the presets
+    private static final String DELETE_ACTIVE_PRESETS = "DELETE FROM twitchat_active_preset WHERE user_id = ?";
+    private static final String DELETE_PRESETS = "DELETE FROM twitchat_payload_preset WHERE user_id = ?";
+
     private final TwitchatEventActionRepository repository;
     private final TwitchatWidgetSettingsRepository widgetSettingsRepository;
     private final JdbcTemplate jdbc;
@@ -84,6 +88,20 @@ public class TwitchatEventActionService {
         }
     }
 
+    /**
+     * Deletes everything the account has here, legacy presets included: an account whose
+     * widget was never enabled still has its presets, unconverted, and their foreign keys
+     * would block deleting the account.
+     */
+    @Transactional
+    public void deleteAllOfUser(UserAccount user) {
+        repository.deleteAllOfUser(user);
+        if (legacyTablesExist()) {
+            jdbc.update(DELETE_ACTIVE_PRESETS, user.getId());
+            jdbc.update(DELETE_PRESETS, user.getId());
+        }
+    }
+
     public Map<String, Object> parseData(String dataJson) {
         return validator.parse(dataJson);
     }
@@ -117,7 +135,7 @@ public class TwitchatEventActionService {
     private Map<TwitchatNotificationEventType, String> activePresets(UUID userId) {
         Map<TwitchatNotificationEventType, String> presets = new EnumMap<>(TwitchatNotificationEventType.class);
         try {
-            if (!Boolean.TRUE.equals(jdbc.queryForObject(LEGACY_TABLES_EXIST, Boolean.class))) {
+            if (!legacyTablesExist()) {
                 return presets;
             }
             jdbc.query(ACTIVE_PRESETS, rs -> {
@@ -132,6 +150,15 @@ public class TwitchatEventActionService {
             log.debug("No legacy Twitchat presets to convert for {}: {}", userId, e.getMessage());
         }
         return presets;
+    }
+
+    private boolean legacyTablesExist() {
+        try {
+            return Boolean.TRUE.equals(jdbc.queryForObject(LEGACY_TABLES_EXIST, Boolean.class));
+        } catch (DataAccessException e) {
+            log.debug("Legacy Twitchat preset tables not checked: {}", e.getMessage());
+            return false;
+        }
     }
 
     private Map<String, Object> legacy(String payloadJson) {

@@ -166,4 +166,27 @@ class TwitchatEventActionServiceTest {
         verify(repository, never()).save(any());
         assertThat(settings.isEventActionsInitialized()).isTrue();
     }
+
+    @Test
+    void deleteAllOfUser_deletesTheActions_thenTheLegacyPresets_activeOnesFirst() {
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class))).thenReturn(true);
+
+        service.deleteAllOfUser(user);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(repository, jdbc);
+        order.verify(repository).deleteAllOfUser(user);
+        order.verify(jdbc).update("DELETE FROM twitchat_active_preset WHERE user_id = ?", user.getId());
+        order.verify(jdbc).update("DELETE FROM twitchat_payload_preset WHERE user_id = ?", user.getId());
+    }
+
+    @Test
+    void deleteAllOfUser_withoutLegacyTables_deletesOnlyTheActions() {
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class)))
+                .thenThrow(new DataAccessResourceFailureException("no to_regclass"));
+
+        service.deleteAllOfUser(user);
+
+        verify(repository).deleteAllOfUser(user);
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
 }

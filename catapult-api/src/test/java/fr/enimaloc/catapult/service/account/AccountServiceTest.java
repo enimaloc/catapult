@@ -14,8 +14,8 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
 import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
 import fr.enimaloc.catapult.repository.twitch.CatapultCategoryChangeStateRepository;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatActionTokenRepository;
-import fr.enimaloc.catapult.repository.twitchat.TwitchatEventActionRepository;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
+import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.twitch.EventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +50,7 @@ class AccountServiceTest {
     @Mock private TwitchatWidgetSettingsRepository twitchatWidgetSettingsRepository;
     @Mock private CatapultCategoryChangeStateRepository catapultCategoryChangeStateRepository;
     @Mock private TwitchatActionTokenRepository twitchatActionTokenRepository;
-    @Mock private TwitchatEventActionRepository twitchatEventActionRepository;
+    @Mock private TwitchatEventActionService twitchatEventActionService;
     @Mock private BotToggleService botToggleService;
     @Mock private TwitchChatService twitchChatService;
     @Mock private EventSubService twitchEventSubService;
@@ -113,12 +113,12 @@ class AccountServiceTest {
         accountService.deleteAccountImmediately(account);
 
         InOrder order = inOrder(twitchatWidgetSettingsRepository, catapultCategoryChangeStateRepository,
-            twitchatActionTokenRepository, twitchatEventActionRepository,
+            twitchatActionTokenRepository, twitchatEventActionService,
             userAccountRepository);
         order.verify(twitchatWidgetSettingsRepository).deleteByUser(account);
         order.verify(catapultCategoryChangeStateRepository).deleteByUser(account);
         order.verify(twitchatActionTokenRepository).deleteByUserId(account.getId());
-        order.verify(twitchatEventActionRepository).deleteAllOfUser(account);
+        order.verify(twitchatEventActionService).deleteAllOfUser(account);
         order.verify(userAccountRepository).delete(account);
     }
 
