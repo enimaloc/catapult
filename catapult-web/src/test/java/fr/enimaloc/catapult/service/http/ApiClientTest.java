@@ -11,7 +11,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import org.springframework.core.ParameterizedTypeReference;
+
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -170,6 +173,18 @@ class ApiClientTest {
         assertThat(client.get("/api/a", Payload.class)).isNull();
         assertThat(client.post("/api/b", Payload.class)).isNull();
         assertThat(client.get("/api/auth/validate", Payload.class)).isNull();
+    }
+
+    @Test
+    void anErrorAnswersBody_isNeverReadAsTheExpectedOne() {
+        // A ProblemDetail or a Spring error body whose fields happen to fit the expected type.
+        server.enqueue(new MockResponse().setResponseCode(404).setHeader("Content-Type", "application/json")
+                .setBody("{\"name\":\"Not Found\"}"));
+        server.enqueue(new MockResponse().setResponseCode(400).setHeader("Content-Type", "application/json")
+                .setBody("[{\"name\":\"bad\"}]"));
+
+        assertThat(client.get("/api/a", Payload.class)).isNull();
+        assertThat(client.get("/api/a", new ParameterizedTypeReference<List<Payload>>() {})).isNull();
     }
 
     @Test
