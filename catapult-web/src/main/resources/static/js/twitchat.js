@@ -253,28 +253,60 @@ window.CatapultTwitchat = (function () {
         })]));
 
     // Dispatching Catapult's payloads. Several clients may be connected to the same OBS (this
-    // page in two tabs, the old widget page in OBS's browser source…): they claim each
-    // dispatch in OBS's persistent data, the only storage they all share, so only one sends it.
+    // page in two tabs, the widget page in OBS's browser source…): they claim each dispatch in
+    // OBS's persistent data, the only storage they all share, so only one sends it. The slot
+    // holds the latest claims, {id, by} each (by: the claiming client), not just the last one:
+    // two dispatches close together no longer overwrite each other's claim.
     const DEDUP_REALM = "OBS_WEBSOCKET_DATA_REALM_GLOBAL";
     const DEDUP_SLOT = "catapult_twitchat_relay_dedup";
     const MAX_JITTER_MS = 150;
+    // How long a claim is left for the others' to land before it's read back.
+    const SETTLE_MS = 200;
+    const KEPT_CLAIMS = 50;
+    const MAX_CLAIM_TRIES = 3;
+    const CLIENT_ID = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+    // The dispatches this client handled already, in case one reaches it twice.
+    const handled = [];
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    /** The claims in the slot; an older client's plain id counts as a claim by someone else. */
+    async function readClaims() {
+        const { slotValue } = await CatapultObs.requests.getPersistentData({ realm: DEDUP_REALM, slotName: DEDUP_SLOT });
+        if (Array.isArray(slotValue)) return slotValue.filter((claim) => claim && typeof claim.id === "string");
+        return typeof slotValue === "string" ? [{ id: slotValue, by: null }] : [];
+    }
 
     /**
-     * Whether this client should send the dispatch: false when another one already
-     * claimed it. The random jitter narrows (but can't close) the race between two clients
-     * checking at once. If OBS fails to answer, sends anyway: a duplicate beats a lost one.
+     * Whether this client should send the dispatch: false when another one claimed it. A claim is
+     * written, then read back once the others' had time to land: the client whose claim is there
+     * (the last to write) sends it, the others don't. The random jitter spreads the clients
+     * checking at once. A claim lost to another dispatch's write is made again; when OBS fails to
+     * answer, or the claim keeps being lost, it sends anyway: a duplicate beats a lost one.
      */
     async function claim(dispatchId) {
-        await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * MAX_JITTER_MS)));
+        await sleep(Math.floor(Math.random() * MAX_JITTER_MS));
         try {
-            const { slotValue } = await CatapultObs.requests.getPersistentData({ realm: DEDUP_REALM, slotName: DEDUP_SLOT });
-            if (slotValue === dispatchId) return false;
-            await CatapultObs.requests.setPersistentData({ realm: DEDUP_REALM, slotName: DEDUP_SLOT, slotValue: dispatchId });
+            for (let tries = 0; tries < MAX_CLAIM_TRIES; tries++) {
+                const claims = await readClaims();
+                const existing = claims.find((claimed) => claimed.id === dispatchId);
+                if (existing) return existing.by === CLIENT_ID;
+                const slotValue = [...claims, { id: dispatchId, by: CLIENT_ID }].slice(-KEPT_CLAIMS);
+                await CatapultObs.requests.setPersistentData({ realm: DEDUP_REALM, slotName: DEDUP_SLOT, slotValue });
+                await sleep(SETTLE_MS);
+                const settled = (await readClaims()).find((claimed) => claimed.id === dispatchId);
+                if (settled) return settled.by === CLIENT_ID;
+            }
+            log("dispatch claim kept being overwritten, sending anyway");
         } catch (error) {
             log("dispatch coordination failed, sending anyway", error);
         }
         return true;
     }
+
+    // One dispatch at a time: this client's claims never race each other, and its payloads go
+    // in the order the dispatches came.
+    let dispatching = Promise.resolve();
 
     const client = {
         PROTOCOLS,
@@ -396,34 +428,10 @@ window.CatapultTwitchat = (function () {
          * when another client claimed it already. A payload failing, or unknown to this
          * Twitchat, is logged and skipped: the next ones still go.
          */
-        async dispatch(batch) {
-            if (!CatapultObs.isConnected()) {
-                log("OBS not connected, dispatch dropped:", batch.eventType);
-                return 0;
-            }
-            if (!await claim(batch.id)) {
-                log("already dispatched by another client:", batch.eventType);
-                return 0;
-            }
-            // Each payload is named in this Twitchat's protocol: asked first if not known yet,
-            // or a beta Twitchat would miss every action named otherwise in the stable one.
-            if (!protocol && !forced) await detectProtocol();
-            let sent = 0;
-            for (const { action, data } of batch.payloads ?? []) {
-                const name = client.actionName(action);
-                if (!name) {
-                    log(`${action} unavailable in this Twitchat (${protocol ?? DEFAULT_PROTOCOL}), skipped`);
-                    continue;
-                }
-                try {
-                    await sendAs(name, data ?? {});
-                    sent++;
-                } catch (error) {
-                    log(`${action} failed`, error);
-                }
-            }
-            log(`dispatched ${sent}/${batch.payloads?.length ?? 0} payload(s) of ${batch.eventType}`);
-            return sent;
+        dispatch(batch) {
+            const run = dispatching.then(() => dispatchNow(batch));
+            dispatching = run.catch(() => {});
+            return run;
         },
 
         /** The name this Twitchat gives a catalog action, null when its protocol hasn't it. */
@@ -433,6 +441,43 @@ window.CatapultTwitchat = (function () {
             return name && knowsAction(current, name) ? name : null;
         },
     };
+
+    /** client.dispatch(), once the dispatches before it are done. */
+    async function dispatchNow(batch) {
+        if (!CatapultObs.isConnected()) {
+            log("OBS not connected, dispatch dropped:", batch.eventType);
+            return 0;
+        }
+        if (handled.includes(batch.id)) {
+            log("already dispatched by this client:", batch.eventType);
+            return 0;
+        }
+        handled.push(batch.id);
+        if (handled.length > KEPT_CLAIMS) handled.shift();
+        if (!await claim(batch.id)) {
+            log("already dispatched by another client:", batch.eventType);
+            return 0;
+        }
+        // Each payload is named in this Twitchat's protocol: asked first if not known yet,
+        // or a beta Twitchat would miss every action named otherwise in the stable one.
+        if (!protocol && !forced) await detectProtocol();
+        let sent = 0;
+        for (const { action, data } of batch.payloads ?? []) {
+            const name = client.actionName(action);
+            if (!name) {
+                log(`${action} unavailable in this Twitchat (${protocol ?? DEFAULT_PROTOCOL}), skipped`);
+                continue;
+            }
+            try {
+                await sendAs(name, data ?? {});
+                sent++;
+            } catch (error) {
+                log(`${action} failed`, error);
+            }
+        }
+        log(`dispatched ${sent}/${batch.payloads?.length ?? 0} payload(s) of ${batch.eventType}`);
+        return sent;
+    }
 
     document.addEventListener("catapult:twitchat:dispatch", (event) => client.dispatch(event.detail));
     // Another OBS may have another Twitchat: looked for anew, its protocol detected right away
