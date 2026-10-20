@@ -36,6 +36,7 @@ import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -95,6 +96,8 @@ public interface ApiService {
     int saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
     int saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws);
     UserSettingsDto channelSettings(String username);
+    /** The binding of the game the channel plays now (the OBS dock's); null when there is none or on failure. */
+    BindingDto currentBinding(String username);
     int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
                              boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
     int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);

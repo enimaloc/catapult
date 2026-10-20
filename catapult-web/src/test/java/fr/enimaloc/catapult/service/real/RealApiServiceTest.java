@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
@@ -347,6 +348,19 @@ class RealApiServiceTest {
 
         assertThat(service.channelSettings("enimaloc")).isInstanceOf(UserSettingsDto.class)
                 .extracting(UserSettingsDto::cclFeatureEnabled).isEqualTo(true);
+    }
+
+    @Test
+    void currentBinding_isTheGamePlayedNows_nullOnNoContent() {
+        respond(HttpMethod.GET, "/api/channels/enimaloc/bindings/current", """
+                {"id":"b1","status":"AUTO","sourceType":"STEAM","sourceName":"Valheim","twitchGameId":"508455",
+                 "twitchGameName":"Valheim","ignored":false,"cclEnabled":true,"ccls":["a"],"twEnabled":false,
+                 "twOverride":false,"tws":[]}""");
+        assertThat(service.currentBinding("enimaloc")).extracting(BindingDto::id).isEqualTo("b1");
+
+        api.reset();
+        expect(HttpMethod.GET, "/api/channels/enimaloc/bindings/current").andRespond(withNoContent());
+        assertThat(service.currentBinding("enimaloc")).isNull();
     }
 
     @Test

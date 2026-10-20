@@ -35,6 +35,7 @@ import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
 import fr.enimaloc.catapult.service.WellKnownContent;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -494,6 +495,14 @@ public class MockApiService implements ApiService {
     public UserSettingsDto channelSettings(String username) {
         log.trace("channelSettings({})", username);
         return currentData().getUserSettings();
+    }
+
+    @Override
+    public BindingDto currentBinding(String username) {
+        log.trace("currentBinding({})", username);
+        MockData data = currentData();
+        GameDto game = data == null ? null : data.getGameDto();
+        return game == null || game.bindingId() == null ? null : data.bindingById(game.bindingId());
     }
 
     @Override
