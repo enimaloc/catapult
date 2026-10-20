@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal.Status;
 import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddTopicsCacheRepository;
+import fr.enimaloc.catapult.service.dtdd.DtddMappingEvents;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,7 @@ public class ApiAdminDtddMappingController {
     private final DtddMappingProposalRepository proposalRepo;
     private final DtddGameMappingRepository mappingRepo;
     private final DtddTopicsCacheRepository topicsRepo;
+    private final DtddMappingEvents mappingEvents;
 
     @Autowired(required = false)
     private AdminEventPublisher events;
@@ -93,6 +95,7 @@ public class ApiAdminDtddMappingController {
         p.setResolvedAt(Instant.now());
         proposalRepo.save(p);
         if (events != null) events.dtddProposalResolved(id.toString(), Status.APPROVED.name());
+        mappingEvents.mappingChanged(p.getIgdbId());
     }
 
     @PostMapping("/proposals/{id}/reject")
@@ -110,5 +113,6 @@ public class ApiAdminDtddMappingController {
         p.setResolvedAt(Instant.now());
         proposalRepo.save(p);
         if (events != null) events.dtddProposalResolved(id.toString(), Status.REJECTED.name());
+        mappingEvents.mappingChanged(p.getIgdbId());
     }
 }

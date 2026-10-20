@@ -38,13 +38,14 @@ class ApiChannelDtddMappingControllerTest {
     @Mock DtddSearchCacheRepository searchRepo;
     @Mock DtddMappingProposalRepository proposalRepo;
     @Mock DtddApiClient apiClient;
+    @Mock fr.enimaloc.catapult.service.dtdd.DtddMappingEvents mappingEvents;
 
     ApiChannelDtddMappingController controller;
     UserAccount user;
 
     @BeforeEach
     void setUp() {
-        controller = new ApiChannelDtddMappingController(mappingRepo, gameRepo, searchRepo, proposalRepo, apiClient);
+        controller = new ApiChannelDtddMappingController(mappingRepo, gameRepo, searchRepo, proposalRepo, apiClient, mappingEvents);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
@@ -82,6 +83,7 @@ class ApiChannelDtddMappingControllerTest {
         assertThat(mapping.isVerified()).isTrue();
         assertThat(mapping.getConfidence()).isEqualTo(1.0);
         verify(mappingRepo).save(mapping);
+        verify(mappingEvents).mappingChanged("100");
     }
 
     @Test
@@ -90,12 +92,14 @@ class ApiChannelDtddMappingControllerTest {
             new DtddGameMapping("100", 4521L, 0.92, true, Instant.now())));
         assertThatThrownBy(() -> controller.validate(new ValidateRequest("100"), user))
             .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(mappingEvents);
     }
 
     @Test
     void propose_createsPendingProposal() {
         controller.propose(new ProposeRequest("100", 1287L, "wrong game"), user);
         verify(proposalRepo).save(any(DtddMappingProposal.class));
+        verify(mappingEvents).mappingChanged("100");
     }
 
     @Test
