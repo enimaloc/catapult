@@ -136,30 +136,30 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public void toggleBot(String username) {
-        client.postVoid("/api/channels/{username}/settings/bot", null, username);
+    public int toggleBot(String username) {
+        return client.postVoid("/api/channels/{username}/settings/bot", null, username);
     }
 
     @Override
-    public void recheckGame(String username) {
-        client.postVoid("/api/channels/{username}/game/recheck", null, username);
+    public int recheckGame(String username) {
+        return client.postVoid("/api/channels/{username}/game/recheck", null, username);
     }
 
     @Override
-    public void cclToggle(String username, String bindingId, boolean enabled) {
-        client.postVoid("/api/channels/{username}/bindings/{bindingId}/ccl-toggle",
+    public int cclToggle(String username, String bindingId, boolean enabled) {
+        return client.postVoid("/api/channels/{username}/bindings/{bindingId}/ccl-toggle",
                 new CclToggleRequest(enabled), username, bindingId);
     }
 
     @Override
-    public void ignoredToggle(String username, String bindingId, boolean ignored) {
-        client.postVoid("/api/channels/{username}/bindings/{bindingId}/ignored-toggle",
+    public int ignoredToggle(String username, String bindingId, boolean ignored) {
+        return client.postVoid("/api/channels/{username}/bindings/{bindingId}/ignored-toggle",
                 new IgnoredToggleRequest(ignored), username, bindingId);
     }
 
     @Override
-    public void deleteBinding(String username, String bindingId) {
-        client.postVoid("/api/channels/{username}/bindings/{bindingId}/delete", null, username, bindingId);
+    public int deleteBinding(String username, String bindingId) {
+        return client.postVoid("/api/channels/{username}/bindings/{bindingId}/delete", null, username, bindingId);
     }
 
     @Override
@@ -168,46 +168,46 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, Set<String> ccls) {
-        client.postVoid("/api/channels/{username}/bindings/{bindingId}",
+    public int updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, Set<String> ccls) {
+        return client.postVoid("/api/channels/{username}/bindings/{bindingId}",
                 new UpdateBindingRequest(twitchGameId, twitchGameName, ccls), username, bindingId);
     }
 
     @Override
-    public void saveTws(String bindingId, Set<String> tws) {
-        client.postVoid("/api/channel/bindings/{bindingId}/tws", new SaveBody(tws), bindingId);
+    public int saveTws(String bindingId, Set<String> tws) {
+        return client.postVoid("/api/channel/bindings/{bindingId}/tws", new SaveBody(tws), bindingId);
     }
 
     @Override
-    public void resetTws(String bindingId) {
-        client.postVoid("/api/channel/bindings/{bindingId}/tws/reset", null, bindingId);
+    public int resetTws(String bindingId) {
+        return client.postVoid("/api/channel/bindings/{bindingId}/tws/reset", null, bindingId);
     }
 
     @Override
-    public void toggleTwEnabled(String bindingId, boolean enabled) {
-        client.postVoid("/api/channel/bindings/{bindingId}/tw-enabled", new TwEnabledBody(enabled), bindingId);
+    public int toggleTwEnabled(String bindingId, boolean enabled) {
+        return client.postVoid("/api/channel/bindings/{bindingId}/tw-enabled", new TwEnabledBody(enabled), bindingId);
     }
 
     @Override
-    public void saveSteamToken(String username, String token, boolean shared) {
-        client.postVoid("/api/channels/{username}/settings/steam-personal-token",
+    public int saveSteamToken(String username, String token, boolean shared) {
+        return client.postVoid("/api/channels/{username}/settings/steam-personal-token",
                 new SteamTokenRequest(token, shared), username);
     }
 
     @Override
-    public void steamTokenSharing(String username, boolean shared) {
-        client.postVoid("/api/channels/{username}/settings/steam-personal-token/sharing",
+    public int steamTokenSharing(String username, boolean shared) {
+        return client.postVoid("/api/channels/{username}/settings/steam-personal-token/sharing",
                 new SteamTokenSharingRequest(shared), username);
     }
 
     @Override
-    public void deleteSteamToken(String username) {
-        client.postVoid("/api/channels/{username}/settings/steam-personal-token/delete", null, username);
+    public int deleteSteamToken(String username) {
+        return client.postVoid("/api/channels/{username}/settings/steam-personal-token/delete", null, username);
     }
 
     @Override
-    public void refreshSteamProfileCache(String username) {
-        client.postVoid("/api/channels/{username}/steam/refresh-profile-cache", null, username);
+    public int refreshSteamProfileCache(String username) {
+        return client.postVoid("/api/channels/{username}/steam/refresh-profile-cache", null, username);
     }
 
     @Override
@@ -216,18 +216,18 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public void minecraftEnroll(String username, String name) {
-        client.postVoid("/api/connect/minecraft", Map.of("name", name));
+    public int minecraftEnroll(String username, String name) {
+        return client.postVoid("/api/connect/minecraft", Map.of("name", name));
     }
 
     @Override
-    public void minecraftSync(String username) {
-        client.postVoid("/api/connect/minecraft/sync", null);
+    public int minecraftSync(String username) {
+        return client.postVoid("/api/connect/minecraft/sync", null);
     }
 
     @Override
-    public void minecraftDisconnect(String username) {
-        client.delete("/api/connect/minecraft");
+    public int minecraftDisconnect(String username) {
+        return client.delete("/api/connect/minecraft");
     }
 
     @Override
@@ -263,25 +263,25 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public void saveObsSettings(String username, boolean enabled, String host, Integer port, String password) {
-        client.postVoid("/api/channels/{username}/settings/obs",
+    public int saveObsSettings(String username, boolean enabled, String host, Integer port, String password) {
+        return client.postVoid("/api/channels/{username}/settings/obs",
                 new ObsSettingsRequest(enabled, host, port, password), username);
     }
 
     @Override
-    public void saveTwitchatBranch(String username, String branch) {
-        client.postVoid("/api/channels/{username}/settings/twitchat/branch", new TwitchatBranchRequest(branch), username);
+    public int saveTwitchatBranch(String username, String branch) {
+        return client.postVoid("/api/channels/{username}/settings/twitchat/branch", new TwitchatBranchRequest(branch), username);
     }
 
     @Override
-    public void saveCclSettings(String username, boolean enabled, Set<String> blockedCcls) {
-        client.postVoid("/api/channels/{username}/settings/ccl",
+    public int saveCclSettings(String username, boolean enabled, Set<String> blockedCcls) {
+        return client.postVoid("/api/channels/{username}/settings/ccl",
                 new CclSettingsRequest(enabled, blockedCcls), username);
     }
 
     @Override
-    public void saveTwSettings(String username, boolean enabled, Set<String> blockedTws) {
-        client.postVoid("/api/channels/{username}/settings/tws",
+    public int saveTwSettings(String username, boolean enabled, Set<String> blockedTws) {
+        return client.postVoid("/api/channels/{username}/settings/tws",
                 new TwSettingsRequest(enabled, blockedTws), username);
     }
 
@@ -291,16 +291,16 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
+    public int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
                                     boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
-        client.postVoid("/api/channels/{username}/settings/no-game",
+        return client.postVoid("/api/channels/{username}/settings/no-game",
                 new NoGameSettingsRequest(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd),
                 username);
     }
 
     @Override
-    public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
-        client.postVoid("/api/channels/{username}/settings/incomplete-fallback",
+    public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
+        return client.postVoid("/api/channels/{username}/settings/incomplete-fallback",
                 new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls), username);
     }
 
@@ -315,13 +315,13 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public void dtddValidate(String igdbId) {
-        client.postVoid("/api/channel/dtdd-mapping/validate", new ValidateRequest(igdbId));
+    public int dtddValidate(String igdbId) {
+        return client.postVoid("/api/channel/dtdd-mapping/validate", new ValidateRequest(igdbId));
     }
 
     @Override
-    public void dtddPropose(String igdbId, Long dtddId, String reason) {
-        client.postVoid("/api/channel/dtdd-mapping/propose", new ProposeRequest(igdbId, dtddId, reason));
+    public int dtddPropose(String igdbId, Long dtddId, String reason) {
+        return client.postVoid("/api/channel/dtdd-mapping/propose", new ProposeRequest(igdbId, dtddId, reason));
     }
 
     @Override
@@ -365,33 +365,33 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public void adminToggleMemberBot(UUID memberId) {
-        client.postVoid("/api/admin/members/{id}/bot/toggle", null, memberId);
+    public int adminToggleMemberBot(UUID memberId) {
+        return client.postVoid("/api/admin/members/{id}/bot/toggle", null, memberId);
     }
 
     @Override
-    public void adminUnlinkMemberSteam(UUID memberId) {
-        client.postVoid("/api/admin/members/{id}/steam/unlink", null, memberId);
+    public int adminUnlinkMemberSteam(UUID memberId) {
+        return client.postVoid("/api/admin/members/{id}/steam/unlink", null, memberId);
     }
 
     @Override
-    public void adminUnlinkMemberTwitch(UUID memberId) {
-        client.postVoid("/api/admin/members/{id}/twitch/unlink", null, memberId);
+    public int adminUnlinkMemberTwitch(UUID memberId) {
+        return client.postVoid("/api/admin/members/{id}/twitch/unlink", null, memberId);
     }
 
     @Override
-    public void adminPromoteMemberToSystem(UUID memberId) {
-        client.postVoid("/api/admin/members/{id}/promote-to-system", null, memberId);
+    public int adminPromoteMemberToSystem(UUID memberId) {
+        return client.postVoid("/api/admin/members/{id}/promote-to-system", null, memberId);
     }
 
     @Override
-    public void adminDeleteMember(UUID memberId) {
-        client.postVoid("/api/admin/members/{id}/delete", null, memberId);
+    public int adminDeleteMember(UUID memberId) {
+        return client.postVoid("/api/admin/members/{id}/delete", null, memberId);
     }
 
     @Override
-    public void adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
-        client.postVoid("/api/admin/members/{id}/migrate", new MigrateRequest(targetId, settings, getters, bindings), memberId);
+    public int adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
+        return client.postVoid("/api/admin/members/{id}/migrate", new MigrateRequest(targetId, settings, getters, bindings), memberId);
     }
 
     @Override

@@ -52,24 +52,24 @@ public interface ApiService {
     TokenResponse exchangeCode(String code);
     ChannelListResponse channelList();
     ChannelPageData channelPage(String username, int page, String status, String source);
-    void toggleBot(String username);
-    void recheckGame(String username);
-    void cclToggle(String username, String bindingId, boolean enabled);
-    void ignoredToggle(String username, String bindingId, boolean ignored);
-    void deleteBinding(String username, String bindingId);
+    int toggleBot(String username);
+    int recheckGame(String username);
+    int cclToggle(String username, String bindingId, boolean enabled);
+    int ignoredToggle(String username, String bindingId, boolean ignored);
+    int deleteBinding(String username, String bindingId);
     Object searchGames(String username, String q);
-    void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
-    void saveTws(String bindingId, java.util.Set<String> tws);
-    void resetTws(String bindingId);
-    void toggleTwEnabled(String bindingId, boolean enabled);
-    void saveSteamToken(String username, String token, boolean shared);
-    void steamTokenSharing(String username, boolean shared);
-    void deleteSteamToken(String username);
-    void refreshSteamProfileCache(String username);
+    int updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
+    int saveTws(String bindingId, java.util.Set<String> tws);
+    int resetTws(String bindingId);
+    int toggleTwEnabled(String bindingId, boolean enabled);
+    int saveSteamToken(String username, String token, boolean shared);
+    int steamTokenSharing(String username, boolean shared);
+    int deleteSteamToken(String username);
+    int refreshSteamProfileCache(String username);
     LinkStateResponse minecraftStatus(String username);
-    void minecraftEnroll(String username, String name);
-    void minecraftSync(String username);
-    void minecraftDisconnect(String username);
+    int minecraftEnroll(String username, String name);
+    int minecraftSync(String username);
+    int minecraftDisconnect(String username);
     /** The logged-in user's OBS connection; null when logged out or OBS isn't enabled. */
     TwitchatWidgetConfig obsConnection();
     /**
@@ -89,19 +89,19 @@ public interface ApiService {
      * unreachable; the body carries the new settings on success, null otherwise.
      */
     ApiClient.Result<TwitchatSettingsResponse> regenerateTwitchatWidget(String username);
-    void saveObsSettings(String username, boolean enabled, String host, Integer port, String password);
+    int saveObsSettings(String username, boolean enabled, String host, Integer port, String password);
     /** "auto" or one of TwitchatData.SUPPORTED_BRANCHES. */
-    void saveTwitchatBranch(String username, String branch);
-    void saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
-    void saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws);
+    int saveTwitchatBranch(String username, String branch);
+    int saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
+    int saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws);
     UserSettingsDto channelSettings(String username);
-    void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
+    int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
                              boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
-    void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
+    int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
     DtddMappingStatusDto dtddMappingStatus(String username);
     SearchResponse dtddSearch(String q);
-    void dtddValidate(String igdbId);
-    void dtddPropose(String igdbId, Long dtddId, String reason);
+    int dtddValidate(String igdbId);
+    int dtddPropose(String igdbId, Long dtddId, String reason);
     /** The logged-in user's account id (the subject of their JWT); null when logged out. */
     java.util.UUID currentUserId();
     /** Whether the logged-in user is a Catapult admin; false when logged out. */
@@ -118,15 +118,15 @@ public interface ApiService {
     // --- admin: members (catapult-api refuses them to anyone but an admin) ---
     /** Every member, and whether each one is live. */
     AdminMembersPage adminMembers();
-    void adminToggleMemberBot(java.util.UUID memberId);
-    void adminUnlinkMemberSteam(java.util.UUID memberId);
+    int adminToggleMemberBot(java.util.UUID memberId);
+    int adminUnlinkMemberSteam(java.util.UUID memberId);
     /** Leaves the account inactive, without Twitch identity nor bot. */
-    void adminUnlinkMemberTwitch(java.util.UUID memberId);
+    int adminUnlinkMemberTwitch(java.util.UUID memberId);
     /** Makes the member the account posting chat command replies, in place of the previous one. */
-    void adminPromoteMemberToSystem(java.util.UUID memberId);
-    void adminDeleteMember(java.util.UUID memberId);
+    int adminPromoteMemberToSystem(java.util.UUID memberId);
+    int adminDeleteMember(java.util.UUID memberId);
     /** Copies the chosen parts of a member's data onto another member. */
-    void adminMigrateMember(java.util.UUID memberId, java.util.UUID targetId,
+    int adminMigrateMember(java.util.UUID memberId, java.util.UUID targetId,
                             boolean settings, boolean getters, boolean bindings);
 
     // --- admin: CCL, caches and data tabs (catapult-api refuses them to anyone but an admin) ---

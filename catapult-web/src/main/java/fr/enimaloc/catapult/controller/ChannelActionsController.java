@@ -20,21 +20,21 @@ import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.service.ApiService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Browser-facing mutation endpoints for the channel dashboard page. These exist because
  * the session JWT ApiClient authenticates with never reaches the browser (see ApiClient's
  * HttpSession lookup) — the browser can only call back into catapult-web itself, which
- * then forwards to catapult-api with the server-held JWT via ApiService.
+ * then forwards to catapult-api with the server-held JWT via ApiService. Each answers catapult-api's
+ * outcome (see {@link ApiStatus}): 204 once done, its refusal or failure as is, 502 when unreachable,
+ * so that the page can tell and put a switch back.
  */
 @RestController
 @RequiredArgsConstructor
@@ -42,9 +42,8 @@ public class ChannelActionsController {
     private final ApiService apiService;
 
     @PostMapping("/channel/{username}/settings/bot")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void toggleBot(@PathVariable String username) {
-        apiService.toggleBot(username);
+    public ResponseEntity<Void> toggleBot(@PathVariable String username) {
+        return ApiStatus.answer(apiService.toggleBot(username));
     }
 
     /**
@@ -53,29 +52,25 @@ public class ChannelActionsController {
      * anything, and only this instance's would hear it).
      */
     @PostMapping("/channel/{username}/game/recheck")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void recheckGame(@PathVariable String username) {
-        apiService.recheckGame(username);
+    public ResponseEntity<Void> recheckGame(@PathVariable String username) {
+        return ApiStatus.answer(apiService.recheckGame(username));
     }
 
     @PostMapping("/channel/{username}/bindings/{bindingId}/ccl-toggle")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void cclToggle(@PathVariable String username, @PathVariable String bindingId,
+    public ResponseEntity<Void> cclToggle(@PathVariable String username, @PathVariable String bindingId,
                            @RequestBody CclToggleRequest body) {
-        apiService.cclToggle(username, bindingId, body.enabled());
+        return ApiStatus.answer(apiService.cclToggle(username, bindingId, body.enabled()));
     }
 
     @PostMapping("/channel/{username}/bindings/{bindingId}/ignored-toggle")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void ignoredToggle(@PathVariable String username, @PathVariable String bindingId,
+    public ResponseEntity<Void> ignoredToggle(@PathVariable String username, @PathVariable String bindingId,
                                @RequestBody IgnoredToggleRequest body) {
-        apiService.ignoredToggle(username, bindingId, body.ignored());
+        return ApiStatus.answer(apiService.ignoredToggle(username, bindingId, body.ignored()));
     }
 
     @PostMapping("/channel/{username}/bindings/{bindingId}/delete")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteBinding(@PathVariable String username, @PathVariable String bindingId) {
-        apiService.deleteBinding(username, bindingId);
+    public ResponseEntity<Void> deleteBinding(@PathVariable String username, @PathVariable String bindingId) {
+        return ApiStatus.answer(apiService.deleteBinding(username, bindingId));
     }
 
     @GetMapping("/channel/{username}/games/search")
@@ -84,66 +79,58 @@ public class ChannelActionsController {
     }
 
     @PostMapping("/channel/{username}/bindings/{bindingId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateBinding(@PathVariable String username, @PathVariable String bindingId,
+    public ResponseEntity<Void> updateBinding(@PathVariable String username, @PathVariable String bindingId,
                                @RequestBody UpdateBindingRequest body) {
-        apiService.updateBinding(username, bindingId, body.twitchGameId(), body.twitchGameName(), body.ccls());
+        return ApiStatus.answer(apiService.updateBinding(username, bindingId, body.twitchGameId(), body.twitchGameName(), body.ccls()));
     }
 
     // Unlike the sibling binding endpoints above, the upstream ApiChannelTwController on
     // catapult-api is binding-scoped, not username-scoped, so these routes don't take
     // {username}.
     @PostMapping("/channel/bindings/{bindingId}/tws")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void saveTws(@PathVariable String bindingId, @RequestBody SaveBody body) {
-        apiService.saveTws(bindingId, body.tws());
+    public ResponseEntity<Void> saveTws(@PathVariable String bindingId, @RequestBody SaveBody body) {
+        return ApiStatus.answer(apiService.saveTws(bindingId, body.tws()));
     }
 
     @PostMapping("/channel/bindings/{bindingId}/tws/reset")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void resetTws(@PathVariable String bindingId) {
-        apiService.resetTws(bindingId);
+    public ResponseEntity<Void> resetTws(@PathVariable String bindingId) {
+        return ApiStatus.answer(apiService.resetTws(bindingId));
     }
 
     @PostMapping("/channel/bindings/{bindingId}/tw-enabled")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void toggleTwEnabled(@PathVariable String bindingId, @RequestBody TwEnabledBody body) {
-        apiService.toggleTwEnabled(bindingId, body.enabled());
+    public ResponseEntity<Void> toggleTwEnabled(@PathVariable String bindingId, @RequestBody TwEnabledBody body) {
+        return ApiStatus.answer(apiService.toggleTwEnabled(bindingId, body.enabled()));
     }
 
     /** Answered with catapult-api's status: the account's deletion is the one action the page must not guess at. */
     @PostMapping("/channel/{username}/settings/delete-account")
     public ResponseEntity<Void> deleteAccount(@PathVariable String username, @RequestBody DeleteAccountRequest body) {
-        return ResponseEntity.status(apiService.deleteAccount(username, body.confirmUsername())).build();
+        return ApiStatus.answer(apiService.deleteAccount(username, body.confirmUsername()));
     }
 
     @PostMapping("/channel/{username}/settings/cancel-deletion")
     public ResponseEntity<Void> cancelDeletion(@PathVariable String username) {
-        return ResponseEntity.status(apiService.cancelAccountDeletion(username)).build();
+        return ApiStatus.answer(apiService.cancelAccountDeletion(username));
     }
 
     @PostMapping("/channel/{username}/settings/steam-personal-token")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void saveSteamToken(@PathVariable String username, @RequestBody SteamTokenRequest body) {
-        apiService.saveSteamToken(username, body.token(), body.shared());
+    public ResponseEntity<Void> saveSteamToken(@PathVariable String username, @RequestBody SteamTokenRequest body) {
+        return ApiStatus.answer(apiService.saveSteamToken(username, body.token(), body.shared()));
     }
 
     @PostMapping("/channel/{username}/settings/steam-personal-token/sharing")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void steamTokenSharing(@PathVariable String username, @RequestBody SteamTokenSharingRequest body) {
-        apiService.steamTokenSharing(username, body.shared());
+    public ResponseEntity<Void> steamTokenSharing(@PathVariable String username, @RequestBody SteamTokenSharingRequest body) {
+        return ApiStatus.answer(apiService.steamTokenSharing(username, body.shared()));
     }
 
     @PostMapping("/channel/{username}/settings/steam-personal-token/delete")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteSteamToken(@PathVariable String username) {
-        apiService.deleteSteamToken(username);
+    public ResponseEntity<Void> deleteSteamToken(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteSteamToken(username));
     }
 
     @PostMapping("/channel/{username}/steam/refresh-profile-cache")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void refreshSteamProfileCache(@PathVariable String username) {
-        apiService.refreshSteamProfileCache(username);
+    public ResponseEntity<Void> refreshSteamProfileCache(@PathVariable String username) {
+        return ApiStatus.answer(apiService.refreshSteamProfileCache(username));
     }
 
     @GetMapping("/channel/{username}/minecraft")
@@ -152,65 +139,55 @@ public class ChannelActionsController {
     }
 
     @PostMapping("/channel/{username}/minecraft/enroll")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void minecraftEnroll(@PathVariable String username, @RequestBody java.util.Map<String, String> body) {
-        apiService.minecraftEnroll(username, body.get("name"));
+    public ResponseEntity<Void> minecraftEnroll(@PathVariable String username, @RequestBody java.util.Map<String, String> body) {
+        return ApiStatus.answer(apiService.minecraftEnroll(username, body.get("name")));
     }
 
     @PostMapping("/channel/{username}/minecraft/sync")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void minecraftSync(@PathVariable String username) {
-        apiService.minecraftSync(username);
+    public ResponseEntity<Void> minecraftSync(@PathVariable String username) {
+        return ApiStatus.answer(apiService.minecraftSync(username));
     }
 
     @PostMapping("/channel/{username}/minecraft/disconnect")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void minecraftDisconnect(@PathVariable String username) {
-        apiService.minecraftDisconnect(username);
+    public ResponseEntity<Void> minecraftDisconnect(@PathVariable String username) {
+        return ApiStatus.answer(apiService.minecraftDisconnect(username));
     }
 
     @PostMapping("/channel/{username}/settings/obs")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void saveObsSettings(@PathVariable String username, @RequestBody ObsSettingsRequest body) {
-        apiService.saveObsSettings(username, body.enabled(), body.host(), body.port(), body.password());
+    public ResponseEntity<Void> saveObsSettings(@PathVariable String username, @RequestBody ObsSettingsRequest body) {
+        return ApiStatus.answer(apiService.saveObsSettings(username, body.enabled(), body.host(), body.port(), body.password()));
     }
 
     @PostMapping("/channel/{username}/settings/twitchat/branch")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void saveTwitchatBranch(@PathVariable String username, @RequestBody TwitchatBranchRequest body) {
-        apiService.saveTwitchatBranch(username, body.branch());
+    public ResponseEntity<Void> saveTwitchatBranch(@PathVariable String username, @RequestBody TwitchatBranchRequest body) {
+        return ApiStatus.answer(apiService.saveTwitchatBranch(username, body.branch()));
     }
 
     /** Replaces the OBS widget link: 204 (the page re-reads the new link), else catapult-api's status, 502 when unreachable. */
     @PostMapping("/channel/{username}/settings/twitchat/regenerate")
     public ResponseEntity<Void> regenerateTwitchatWidget(@PathVariable String username) {
-        var result = apiService.regenerateTwitchatWidget(username);
-        return ResponseEntity.status(result.ok() ? 204 : result.status()).build();
+        return ApiStatus.answer(apiService.regenerateTwitchatWidget(username).status());
     }
 
     @PostMapping("/channel/{username}/settings/ccl")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void saveCclSettings(@PathVariable String username, @RequestBody CclSettingsRequest body) {
-        apiService.saveCclSettings(username, body.cclEnabled(), body.blockedCcls());
+    public ResponseEntity<Void> saveCclSettings(@PathVariable String username, @RequestBody CclSettingsRequest body) {
+        return ApiStatus.answer(apiService.saveCclSettings(username, body.cclEnabled(), body.blockedCcls()));
     }
 
     @PostMapping("/channel/{username}/settings/tws")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void saveTwSettings(@PathVariable String username, @RequestBody TwSettingsRequest body) {
-        apiService.saveTwSettings(username, body.enabled(), body.blockedTws());
+    public ResponseEntity<Void> saveTwSettings(@PathVariable String username, @RequestBody TwSettingsRequest body) {
+        return ApiStatus.answer(apiService.saveTwSettings(username, body.enabled(), body.blockedTws()));
     }
 
     @PostMapping("/channel/{username}/settings/no-game")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void saveNoGameSettings(@PathVariable String username, @RequestBody NoGameSettingsRequest body) {
-        apiService.saveNoGameSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls(),
-                body.applyOnStreamStart(), body.applyOnNoGame(), body.applyOnStreamEnd());
+    public ResponseEntity<Void> saveNoGameSettings(@PathVariable String username, @RequestBody NoGameSettingsRequest body) {
+        return ApiStatus.answer(apiService.saveNoGameSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls(),
+                body.applyOnStreamStart(), body.applyOnNoGame(), body.applyOnStreamEnd()));
     }
 
     @PostMapping("/channel/{username}/settings/incomplete-fallback")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void saveIncompleteFallbackSettings(@PathVariable String username, @RequestBody IncompleteFallbackRequest body) {
-        apiService.saveIncompleteFallbackSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls());
+    public ResponseEntity<Void> saveIncompleteFallbackSettings(@PathVariable String username, @RequestBody IncompleteFallbackRequest body) {
+        return ApiStatus.answer(apiService.saveIncompleteFallbackSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls()));
     }
 
     // Unlike the sibling channel endpoints above, the upstream ApiChannelDtddMappingController
@@ -222,14 +199,12 @@ public class ChannelActionsController {
     }
 
     @PostMapping("/channel/dtdd-mapping/validate")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void dtddValidate(@RequestBody ValidateRequest body) {
-        apiService.dtddValidate(body.igdbId());
+    public ResponseEntity<Void> dtddValidate(@RequestBody ValidateRequest body) {
+        return ApiStatus.answer(apiService.dtddValidate(body.igdbId()));
     }
 
     @PostMapping("/channel/dtdd-mapping/propose")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void dtddPropose(@RequestBody ProposeRequest body) {
-        apiService.dtddPropose(body.igdbId(), body.dtddId(), body.reason());
+    public ResponseEntity<Void> dtddPropose(@RequestBody ProposeRequest body) {
+        return ApiStatus.answer(apiService.dtddPropose(body.igdbId(), body.dtddId(), body.reason()));
     }
 }

@@ -31,6 +31,25 @@ class ChannelActionsControllerTest {
     @Autowired ApplicationEvents events;
     @MockitoBean ApiService apiService;
 
+    @org.junit.jupiter.api.BeforeEach
+    void catapultApiTakesTheActions() {
+        ApiServiceStubs.actionsAnswer(apiService, 204);
+    }
+
+    @Test
+    void anAction_answersCatapultApisRefusalOrFailure() throws Exception {
+        when(apiService.cclToggle("enimaloc", "b1", true)).thenReturn(403);
+        mvc.perform(post("/channel/enimaloc/bindings/b1/ccl-toggle").with(csrf())
+                        .contentType("application/json").content("{\"enabled\":true}"))
+                .andExpect(status().isForbidden());
+
+        when(apiService.toggleBot("enimaloc")).thenReturn(502);
+        mvc.perform(post("/channel/enimaloc/settings/bot").with(csrf())).andExpect(status().isBadGateway());
+
+        when(apiService.toggleBot("enimaloc")).thenReturn(200);
+        mvc.perform(post("/channel/enimaloc/settings/bot").with(csrf())).andExpect(status().isNoContent());
+    }
+
     @Test
     void toggleBot_callsApiServiceAndReturns204() throws Exception {
         mvc.perform(post("/channel/enimaloc/settings/bot").with(csrf()))
@@ -52,14 +71,6 @@ class ChannelActionsControllerTest {
         mvc.perform(post("/channel/enimaloc/game/recheck").with(csrf()));
 
         assertThat(events.stream(GameChangedEvent.class)).isEmpty();
-    }
-
-    @Test
-    void recheckGame_publishesNoGameWhenNoneIsDetected() throws Exception {
-        mvc.perform(post("/channel/enimaloc/game/recheck").with(csrf()));
-
-        assertThat(events.stream(GameChangedEvent.class))
-                .containsExactly(new GameChangedEvent("enimaloc", null, null, null));
     }
 
     @Test

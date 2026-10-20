@@ -34,6 +34,11 @@ class AdminMembersControllerTest {
     @MockitoBean ApiService apiService;
     @MockitoBean fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms twitchatEventForms;
 
+    @org.junit.jupiter.api.BeforeEach
+    void catapultApiTakesTheActions() {
+        ApiServiceStubs.actionsAnswer(apiService, 204);
+    }
+
     private MockHttpServletRequestBuilder asAdmin(String action) {
         when(apiService.isAdmin()).thenReturn(true);
         return asMember(action);
@@ -41,6 +46,15 @@ class AdminMembersControllerTest {
 
     private static MockHttpServletRequestBuilder asMember(String action) {
         return post("/admin/members/" + ID + "/" + action).with(csrf()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt");
+    }
+
+    @Test
+    void anActionCatapultApiRefuses_answersItsStatus() throws Exception {
+        when(apiService.adminDeleteMember(ID)).thenReturn(409);
+        when(apiService.adminToggleMemberBot(ID)).thenReturn(502);
+
+        mvc.perform(asAdmin("delete")).andExpect(status().isConflict());
+        mvc.perform(asAdmin("bot/toggle")).andExpect(status().isBadGateway());
     }
 
     @Test

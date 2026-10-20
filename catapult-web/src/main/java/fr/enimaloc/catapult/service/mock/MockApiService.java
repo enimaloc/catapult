@@ -103,6 +103,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Profile("mock")
 public class MockApiService implements ApiService {
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    /** What catapult-api answers an action that went through. */
+    private static final int NO_CONTENT = 204;
 
     private final ApplicationEventPublisher eventPublisher;
     private final TwitchatDispatchHub twitchatHub;
@@ -247,42 +249,47 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void toggleBot(String username) {
+    public int toggleBot(String username) {
         log.trace("toggleBot({})", username);
         MockData data = currentData();
         data.setBotEnabled(!data.isBotEnabled());
         eventPublisher.publishEvent(new BotStateChangedEvent(username, data.isBotEnabled()));
         dispatchTwitchatEvent(data.isBotEnabled() ? "BOT_ENABLED" : "BOT_DISABLED", Map.of());
+        return NO_CONTENT;
     }
 
     @Override
-    public void recheckGame(String username) {
+    public int recheckGame(String username) {
         log.trace("recheckGame({})", username);
         // Nothing to detect in mock mode: the dashboards are told the game the mock has, as catapult-api would.
         GameDto game = currentData().getGameDto();
         eventPublisher.publishEvent(game == null ? new GameChangedEvent(username, null, null, null)
                 : new GameChangedEvent(username, game.bindingId(), game.sourceType(), game.sourceName()));
+        return NO_CONTENT;
     }
 
     @Override
-    public void cclToggle(String username, String bindingId, boolean enabled) {
+    public int cclToggle(String username, String bindingId, boolean enabled) {
         log.trace("cclToggle({}, {}, {})", username, bindingId, enabled);
         currentData().setBindingCclEnabled(bindingId, enabled);
         eventPublisher.publishEvent(new CclStateEvent(username, bindingId, enabled));
+        return NO_CONTENT;
     }
 
     @Override
-    public void ignoredToggle(String username, String bindingId, boolean ignored) {
+    public int ignoredToggle(String username, String bindingId, boolean ignored) {
         log.trace("ignoredToggle({}, {}, {})", username, bindingId, ignored);
         currentData().setBindingIgnored(bindingId, ignored);
         eventPublisher.publishEvent(new BindingIgnoredStateEvent(username, bindingId, ignored));
+        return NO_CONTENT;
     }
 
     @Override
-    public void deleteBinding(String username, String bindingId) {
+    public int deleteBinding(String username, String bindingId) {
         log.trace("deleteBinding({}, {})", username, bindingId);
         currentData().deleteBinding(bindingId);
         eventPublisher.publishEvent(new BindingDeletedEvent(username, bindingId));
+        return NO_CONTENT;
     }
 
     @Override
@@ -296,61 +303,69 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, Set<String> ccls) {
+    public int updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, Set<String> ccls) {
         log.trace("updateBinding({}, {}, {}, {}, {})", username, bindingId, twitchGameId, twitchGameName, ccls);
         currentData().updateBindingGame(bindingId, twitchGameId, twitchGameName, ccls);
         eventPublisher.publishEvent(new BindingUpdatedEvent(username, bindingId, twitchGameId, twitchGameName, ccls));
+        return NO_CONTENT;
     }
 
     @Override
-    public void saveTws(String bindingId, Set<String> tws) {
+    public int saveTws(String bindingId, Set<String> tws) {
         log.trace("saveTws({}, {})", bindingId, tws);
         MockData data = currentData();
         data.setBindingTws(bindingId, tws);
         eventPublisher.publishEvent(new TwUpdatedEvent(data.getChannelDto().twitchUsername(), bindingId, tws));
+        return NO_CONTENT;
     }
 
     @Override
-    public void resetTws(String bindingId) {
+    public int resetTws(String bindingId) {
         log.trace("resetTws({})", bindingId);
         MockData data = currentData();
         data.resetBindingTws(bindingId);
         eventPublisher.publishEvent(new TwResetEvent(data.getChannelDto().twitchUsername(), bindingId));
+        return NO_CONTENT;
     }
 
     @Override
-    public void toggleTwEnabled(String bindingId, boolean enabled) {
+    public int toggleTwEnabled(String bindingId, boolean enabled) {
         log.trace("toggleTwEnabled({}, {})", bindingId, enabled);
         MockData data = currentData();
         data.setBindingTwEnabled(bindingId, enabled);
         eventPublisher.publishEvent(new TwEnabledStateEvent(data.getChannelDto().twitchUsername(), bindingId, enabled));
+        return NO_CONTENT;
     }
 
     @Override
-    public void saveSteamToken(String username, String token, boolean shared) {
+    public int saveSteamToken(String username, String token, boolean shared) {
         log.trace("saveSteamToken({}, {}, {})", username, token, shared);
         currentData().saveSteamToken(shared);
         eventPublisher.publishEvent(new SteamTokenSavedEvent(username, shared));
+        return NO_CONTENT;
     }
 
     @Override
-    public void steamTokenSharing(String username, boolean shared) {
+    public int steamTokenSharing(String username, boolean shared) {
         log.trace("steamTokenSharing({}, {})", username, shared);
         currentData().setSteamTokenShared(shared);
         eventPublisher.publishEvent(new SteamTokenSharedStateEvent(username, shared));
+        return NO_CONTENT;
     }
 
     @Override
-    public void deleteSteamToken(String username) {
+    public int deleteSteamToken(String username) {
         log.trace("deleteSteamToken({})", username);
         currentData().deleteSteamToken();
         eventPublisher.publishEvent(new SteamTokenDeletedEvent(username));
+        return NO_CONTENT;
     }
 
     @Override
-    public void refreshSteamProfileCache(String username) {
+    public int refreshSteamProfileCache(String username) {
         log.trace("refreshSteamProfileCache({})", username);
         // no-op in mock mode
+        return NO_CONTENT;
     }
 
     @Override
@@ -360,28 +375,31 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void minecraftEnroll(String username, String name) {
+    public int minecraftEnroll(String username, String name) {
         log.trace("minecraftEnroll({}, {})", username, name);
         MockData data = currentData();
         data.minecraftEnroll(name);
         LinkStateResponse link = data.getMinecraftLink();
         eventPublisher.publishEvent(new MinecraftEnrollEvent(username, link.status(), link.minecraftName()));
+        return NO_CONTENT;
     }
 
     @Override
-    public void minecraftSync(String username) {
+    public int minecraftSync(String username) {
         log.trace("minecraftSync({})", username);
         MockData data = currentData();
         data.minecraftSync();
         LinkStateResponse link = data.getMinecraftLink();
         eventPublisher.publishEvent(new MinecraftSyncEvent(username, link.status(), link.minecraftName()));
+        return NO_CONTENT;
     }
 
     @Override
-    public void minecraftDisconnect(String username) {
+    public int minecraftDisconnect(String username) {
         log.trace("minecraftDisconnect({})", username);
         currentData().minecraftDisconnect();
         eventPublisher.publishEvent(new MinecraftDisconnectedEvent(username));
+        return NO_CONTENT;
     }
 
     @Override
@@ -428,27 +446,31 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void saveObsSettings(String username, boolean enabled, String host, Integer port, String password) {
+    public int saveObsSettings(String username, boolean enabled, String host, Integer port, String password) {
         log.trace("saveObsSettings({}, {}, {}, {})", username, enabled, host, port);
         currentData().saveObsSettings(enabled, host, port, password);
+        return NO_CONTENT;
     }
 
     @Override
-    public void saveTwitchatBranch(String username, String branch) {
+    public int saveTwitchatBranch(String username, String branch) {
         log.trace("saveTwitchatBranch({}, {})", username, branch);
         currentData().saveTwitchatBranch(branch);
+        return NO_CONTENT;
     }
 
     @Override
-    public void saveCclSettings(String username, boolean enabled, Set<String> blockedCcls) {
+    public int saveCclSettings(String username, boolean enabled, Set<String> blockedCcls) {
         log.trace("saveCclSettings({}, {}, {})", username, enabled, blockedCcls);
         currentData().saveCclSettings(enabled, blockedCcls);
+        return NO_CONTENT;
     }
 
     @Override
-    public void saveTwSettings(String username, boolean enabled, Set<String> blockedTws) {
+    public int saveTwSettings(String username, boolean enabled, Set<String> blockedTws) {
         log.trace("saveTwSettings({}, {}, {})", username, enabled, blockedTws);
         currentData().saveTwSettings(enabled, blockedTws);
+        return NO_CONTENT;
     }
 
     @Override
@@ -458,17 +480,19 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
+    public int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
                                     boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
         log.trace("saveNoGameSettings({}, {}, {}, {}, {}, {}, {})", username, twitchGameId, twitchGameName,
                 ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
         currentData().saveNoGameSettings(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
+        return NO_CONTENT;
     }
 
     @Override
-    public void saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
+    public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
         log.trace("saveIncompleteFallbackSettings({}, {}, {}, {})", username, twitchGameId, twitchGameName, ccls);
         currentData().saveIncompleteFallbackSettings(twitchGameId, twitchGameName, ccls);
+        return NO_CONTENT;
     }
 
     @Override
@@ -484,16 +508,18 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void dtddValidate(String igdbId) {
+    public int dtddValidate(String igdbId) {
         log.trace("dtddValidate({})", igdbId);
         // no-op in mock mode
+        return NO_CONTENT;
     }
 
     @Override
-    public void dtddPropose(String igdbId, Long dtddId, String reason) {
+    public int dtddPropose(String igdbId, Long dtddId, String reason) {
         log.trace("dtddPropose({}, {}, {})", igdbId, dtddId, reason);
         MockData current = currentData();
         dtddProposals.propose(igdbId, dtddId, reason, current == null ? null : current.getChannelDto().twitchUsername());
+        return NO_CONTENT;
     }
 
     @Override
@@ -655,39 +681,45 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public void adminToggleMemberBot(UUID memberId) {
+    public int adminToggleMemberBot(UUID memberId) {
         log.trace("adminToggleMemberBot({})", memberId);
         members.toggleBot(memberId);
+        return NO_CONTENT;
     }
 
     @Override
-    public void adminUnlinkMemberSteam(UUID memberId) {
+    public int adminUnlinkMemberSteam(UUID memberId) {
         log.trace("adminUnlinkMemberSteam({})", memberId);
         members.unlinkSteam(memberId);
+        return NO_CONTENT;
     }
 
     @Override
-    public void adminUnlinkMemberTwitch(UUID memberId) {
+    public int adminUnlinkMemberTwitch(UUID memberId) {
         log.trace("adminUnlinkMemberTwitch({})", memberId);
         members.unlinkTwitch(memberId);
+        return NO_CONTENT;
     }
 
     @Override
-    public void adminPromoteMemberToSystem(UUID memberId) {
+    public int adminPromoteMemberToSystem(UUID memberId) {
         log.trace("adminPromoteMemberToSystem({})", memberId);
         members.promoteToSystem(memberId);
+        return NO_CONTENT;
     }
 
     @Override
-    public void adminDeleteMember(UUID memberId) {
+    public int adminDeleteMember(UUID memberId) {
         log.trace("adminDeleteMember({})", memberId);
         members.delete(memberId);
+        return NO_CONTENT;
     }
 
     @Override
-    public void adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
+    public int adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
         log.trace("adminMigrateMember({}, {}, {}, {}, {})", memberId, targetId, settings, getters, bindings);
         // no-op in mock mode: a mock session holds a single channel's data
+        return NO_CONTENT;
     }
 
     @Override
