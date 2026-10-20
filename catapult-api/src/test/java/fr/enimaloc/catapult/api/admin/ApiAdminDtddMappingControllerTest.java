@@ -27,13 +27,14 @@ class ApiAdminDtddMappingControllerTest {
     @Mock DtddMappingProposalRepository proposalRepo;
     @Mock DtddGameMappingRepository mappingRepo;
     @Mock DtddTopicsCacheRepository topicsRepo;
+    @Mock fr.enimaloc.catapult.service.dtdd.DtddMappingEvents mappingEvents;
 
     ApiAdminDtddMappingController controller;
     UserAccount admin;
 
     @BeforeEach
     void setUp() {
-        controller = new ApiAdminDtddMappingController(proposalRepo, mappingRepo, topicsRepo);
+        controller = new ApiAdminDtddMappingController(proposalRepo, mappingRepo, topicsRepo, mappingEvents);
         admin = new UserAccount();
         admin.setId(UUID.randomUUID());
     }
@@ -85,6 +86,7 @@ class ApiAdminDtddMappingControllerTest {
         verify(topicsRepo).deleteById(4521L); // old invalidated
         assertThat(proposal.getStatus()).isEqualTo(Status.APPROVED);
         assertThat(proposal.getResolver()).isEqualTo(admin);
+        verify(mappingEvents).mappingChanged("100");
     }
 
     @Test

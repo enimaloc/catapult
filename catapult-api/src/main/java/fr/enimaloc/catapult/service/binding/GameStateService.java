@@ -28,6 +28,11 @@ public class GameStateService {
         return Optional.ofNullable(lastKnownGame.get(user.getId()));
     }
 
+    /** Every channel's last known game, by owner id (a snapshot). */
+    public Map<UUID, DetectedGame> lastKnownGames() {
+        return Map.copyOf(lastKnownGame);
+    }
+
     public void updateState(UserAccount user, DetectedGame game) {
         DetectedGame previous = lastKnownGame.put(user.getId(), game);
         if (!sameSource(previous, game)) {

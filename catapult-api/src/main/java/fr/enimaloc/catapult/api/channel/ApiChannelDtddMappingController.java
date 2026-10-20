@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddSearchCacheRepository;
+import fr.enimaloc.catapult.service.dtdd.DtddMappingEvents;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.data.domain.PageRequest;
@@ -42,6 +43,7 @@ public class ApiChannelDtddMappingController {
     private final DtddSearchCacheRepository searchRepo;
     private final DtddMappingProposalRepository proposalRepo;
     private final DtddApiClient apiClient;
+    private final DtddMappingEvents mappingEvents;
 
     @GetMapping
     public StatusResponse status(@RequestParam("igdbId") String igdbId,
@@ -82,6 +84,7 @@ public class ApiChannelDtddMappingController {
         mapping.setVerified(true);
         mapping.setConfidence(1.0);
         mappingRepo.save(mapping);
+        mappingEvents.mappingChanged(body.igdbId());
     }
 
     @PostMapping("/propose")
@@ -97,6 +100,8 @@ public class ApiChannelDtddMappingController {
         p.setStatus(Status.PENDING);
         p.setCreatedAt(Instant.now());
         proposalRepo.save(p);
+        // A pending proposal is part of the mapping's state: nobody may validate it directly meanwhile
+        mappingEvents.mappingChanged(body.igdbId());
     }
 
     @GetMapping("/search")
