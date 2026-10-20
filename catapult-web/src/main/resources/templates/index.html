@@ -125,7 +125,8 @@
             <a data-link href="/privacy" th:text="#{footer.privacy}">footer.privacy</a>
             <a href="https://github.com/enimaloc/catapult" target="_blank" rel="noopener noreferrer"
                th:text="#{footer.github}">footer.github</a>
-            <span class="version" th:text="#{footer.version('TODO: Fetch version')}">footer.version</span>
+            <!--/* See BuildVersionAdvice: absent when the build wrote no version. */-->
+            <span th:if="${appVersion != null}" class="version" th:text="#{footer.version(${appVersion})}">footer.version</span>
         </div>
     </footer>
     <div th:replace="~{fragments/broadcasts :: veil}"></div>

@@ -582,6 +582,13 @@ class IndexControllerTest {
         assertThat(html).containsPattern("class=\"notification-empty\"(?![^>]*hidden)");
     }
 
+    /** No build info (tests, the IDE): the footer shows no version rather than a placeholder. */
+    @Test
+    void footer_showsNoVersion_withoutBuildInfo() throws Exception {
+        String html = mvc.perform(get("/")).andReturn().getResponse().getContentAsString();
+        assertThat(html).doesNotContain("class=\"version\"").doesNotContain("TODO");
+    }
+
     @Test
     void settingsTab_saysSo_whenTheSettingsCantBeLoaded() throws Exception {
         when(apiService.channelSettings(any())).thenReturn(null);
