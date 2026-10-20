@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api.channel;
 
+import java.util.Set;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.StatusData;
@@ -117,6 +119,21 @@ class ApiChannelDataControllerTest {
     }
 
     @Test
+    void currentBinding_isTheDashboardsOr204() throws Exception {
+        BindingDto binding = new BindingDto("b1", "AUTO", "STEAM", "Valheim", "1", "Valheim",
+                false, true, Set.of("Gore"), true, false, Set.of());
+        when(dashboard.currentBinding(owner)).thenReturn(Optional.of(binding));
+        mvc.perform(get("/api/channels/streamer/bindings/current").with(as(moderator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("b1"))
+                .andExpect(jsonPath("$.ccls[0]").value("Gore"));
+
+        when(dashboard.currentBinding(owner)).thenReturn(Optional.empty());
+        mvc.perform(get("/api/channels/streamer/bindings/current").with(as(moderator)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void searchGames_asksTwitchAsTheViewer() throws Exception {
         when(twitchService.searchCategories(moderator, "doom")).thenReturn(List.of(new TwitchCategory("1", "Doom", null)));
 
@@ -159,7 +176,7 @@ class ApiChannelDataControllerTest {
     void inaccessibleChannel_isForbidden() throws Exception {
         when(channelAccessService.canAccess(moderator, owner)).thenReturn(false);
 
-        for (String path : List.of("", "/status", "/settings", "/dtdd-mapping", "/games/search", "/logs")) {
+        for (String path : List.of("", "/status", "/settings", "/dtdd-mapping", "/bindings/current", "/games/search", "/logs")) {
             mvc.perform(get("/api/channels/streamer" + path).with(as(moderator))).andExpect(status().isForbidden());
         }
         verifyNoInteractions(dashboard);
