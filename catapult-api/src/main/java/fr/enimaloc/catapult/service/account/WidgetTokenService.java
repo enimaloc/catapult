@@ -18,20 +18,29 @@ public class WidgetTokenService {
 
     private final UserAccountRepository userAccountRepository;
 
+    // Only the widget_token column is written: `user` is often a copy loaded earlier (from the
+    // request's JWT, an event), and saving it whole would undo whatever changed since.
+
     @Transactional
     public UUID getOrCreate(UserAccount user) {
         if (user.getWidgetToken() == null) {
-            user.setWidgetToken(UUID.randomUUID());
-            userAccountRepository.save(user);
+            UUID token = UUID.randomUUID();
+            if (userAccountRepository.setWidgetTokenIfAbsent(user.getId(), token) == 0) {
+                // Another request gave it one first: that one stands
+                token = userAccountRepository.findWidgetTokenById(user.getId())
+                        .orElseThrow(() -> new IllegalStateException("No account " + user.getId()));
+            }
+            user.setWidgetToken(token);
         }
         return user.getWidgetToken();
     }
 
     @Transactional
     public UUID regenerate(UserAccount user) {
-        user.setWidgetToken(UUID.randomUUID());
-        userAccountRepository.save(user);
-        return user.getWidgetToken();
+        UUID token = UUID.randomUUID();
+        userAccountRepository.setWidgetToken(user.getId(), token);
+        user.setWidgetToken(token);
+        return token;
     }
 
     public Optional<UserAccount> resolve(UUID token) {
