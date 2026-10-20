@@ -617,6 +617,15 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void targeting_withoutGroupsOrFlags_rendersThemEmpty() throws Exception {
+        when(apiService.adminMember(MEMBER)).thenReturn(new AdminMemberSummaryDto(MEMBER, "alice"));
+        when(apiService.adminGroups()).thenReturn(List.of());
+        when(apiService.adminMemberTargeting(MEMBER)).thenReturn(new MemberTargetingDto(null, null));
+
+        assertThat(asAdmin("/spa/admin/members/" + MEMBER)).contains("admin-targeting-flag-save");
+    }
+
+    @Test
     void targeting_whenTheTargetingCantBeLoaded_saysSo() throws Exception {
         when(apiService.adminMember(MEMBER)).thenReturn(new AdminMemberSummaryDto(MEMBER, "alice"));
 

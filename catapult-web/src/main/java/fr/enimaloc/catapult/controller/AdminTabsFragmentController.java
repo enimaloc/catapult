@@ -54,6 +54,13 @@ public class AdminTabsFragmentController {
         });
     }
 
+    /** {@code targeting} with no flag nor group where catapult-api left them out; null stays null (unavailable). */
+    private static MemberTargetingDto complete(MemberTargetingDto targeting) {
+        if (targeting == null || (targeting.flags() != null && targeting.groupKeys() != null)) return targeting;
+        return new MemberTargetingDto(targeting.flags() == null ? List.of() : targeting.flags(),
+                targeting.groupKeys() == null ? List.of() : targeting.groupKeys());
+    }
+
     /** One member's targeting: custom flags and groups, with the groups still to join; 404 when the member is unknown. */
     @GetMapping("/members/{id}")
     String memberTargeting(Model model, HttpServletResponse response, @PathVariable UUID id) {
@@ -64,7 +71,7 @@ public class AdminTabsFragmentController {
                 return "pages/admin-tab/members :: missing";
             }
             List<GroupSummaryDto> groups = apiService.adminGroups();
-            MemberTargetingDto targeting = apiService.adminMemberTargeting(id);
+            MemberTargetingDto targeting = complete(apiService.adminMemberTargeting(id));
             model.addAttribute("member", member);
             model.addAttribute("targeting", targeting);
             model.addAttribute("groups", groups == null ? List.of() : groups);
