@@ -33,6 +33,10 @@ import java.util.UUID;
 public class TwitchatEventActionService {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    /** Payloads one event may send: far more than a real setup needs, few enough to bound a save. */
+    static final int MAX_ACTIONS_PER_EVENT = 20;
+    /** Characters of one payload's dataJson. */
+    static final int MAX_DATA_JSON_LENGTH = 32_768;
     // Read raw: the legacy preset entities are gone, their tables only await a later drop.
     private static final String ACTIVE_PRESETS = """
             SELECT ap.event_type, p.payload_json
@@ -68,8 +72,30 @@ public class TwitchatEventActionService {
         return repository.findByUserAndEventTypeAndEnabledTrueOrderByPositionAsc(user, type);
     }
 
+    /**
+     * Refuses the list (a 400 with each error) when a payload is invalid, missing or too large,
+     * or when there are more than {@value #MAX_ACTIONS_PER_EVENT}: checked before anything is
+     * parsed or stored.
+     */
     public void validate(List<TwitchatEventActionDto> payloads) {
-        List<TwitchatValidationError> errors = validator.validate(payloads);
+        List<TwitchatValidationError> errors = new ArrayList<>();
+        if (payloads.size() > MAX_ACTIONS_PER_EVENT) {
+            errors.add(new TwitchatValidationError(MAX_ACTIONS_PER_EVENT, "action",
+                    "At most " + MAX_ACTIONS_PER_EVENT + " payloads per event"));
+            throw new TwitchatValidationException(errors);
+        }
+        for (int i = 0; i < payloads.size(); i++) {
+            TwitchatEventActionDto payload = payloads.get(i);
+            if (payload == null) {
+                errors.add(new TwitchatValidationError(i, "action", "Missing payload"));
+            } else if (payload.dataJson() != null && payload.dataJson().length() > MAX_DATA_JSON_LENGTH) {
+                errors.add(new TwitchatValidationError(i, "dataJson",
+                        "At most " + MAX_DATA_JSON_LENGTH + " characters"));
+            }
+        }
+        if (errors.isEmpty()) {
+            errors.addAll(validator.validate(payloads));
+        }
         if (!errors.isEmpty()) {
             throw new TwitchatValidationException(errors);
         }

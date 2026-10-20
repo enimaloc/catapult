@@ -76,6 +76,43 @@ class TwitchatEventActionServiceTest {
     }
 
     @Test
+    void replace_withTooManyPayloads_isRefusedBeforeTouchingAnything() {
+        List<TwitchatEventActionDto> payloads = java.util.Collections.nCopies(
+                TwitchatEventActionService.MAX_ACTIONS_PER_EVENT + 1,
+                new TwitchatEventActionDto("SEND_MESSAGE", "RAW", "{}", true));
+
+        assertThatThrownBy(() -> service.replace(user, STREAM_STARTED, payloads))
+                .isInstanceOfSatisfying(TwitchatValidationException.class, e ->
+                        assertThat(e.errors()).singleElement().satisfies(error ->
+                                assertThat(error.index()).isEqualTo(TwitchatEventActionService.MAX_ACTIONS_PER_EVENT)));
+        verify(repository, never()).deleteAllOfEvent(any(), any());
+    }
+
+    @Test
+    void replace_withAnOversizedPayload_isRefused() {
+        String huge = "{\"message\":\"" + "a".repeat(TwitchatEventActionService.MAX_DATA_JSON_LENGTH) + "\"}";
+
+        assertThatThrownBy(() -> service.replace(user, STREAM_STARTED, List.of(
+                new TwitchatEventActionDto("SEND_MESSAGE", "RAW", "{}", true),
+                new TwitchatEventActionDto("SEND_MESSAGE", "RAW", huge, true))))
+                .isInstanceOfSatisfying(TwitchatValidationException.class, e ->
+                        assertThat(e.errors()).singleElement().satisfies(error -> {
+                            assertThat(error.index()).isEqualTo(1);
+                            assertThat(error.field()).isEqualTo("dataJson");
+                        }));
+        verify(repository, never()).deleteAllOfEvent(any(), any());
+    }
+
+    @Test
+    void replace_withANullPayload_isRefused() {
+        List<TwitchatEventActionDto> payloads = new java.util.ArrayList<>();
+        payloads.add(null);
+
+        assertThatThrownBy(() -> service.replace(user, STREAM_STARTED, payloads))
+                .isInstanceOf(TwitchatValidationException.class);
+    }
+
+    @Test
     void replace_withAnInvalidPayload_touchesNothing() {
         assertThatThrownBy(() -> service.replace(user, STREAM_STARTED,
                 List.of(new TwitchatEventActionDto("SEND_MESSAGE", "FORM", "{}", true))))
