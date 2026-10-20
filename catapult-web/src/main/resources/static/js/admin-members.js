@@ -197,10 +197,7 @@ window.CatapultAdminMembers = (function () {
         const rowOf = el => el.closest("[data-member-id]");
 
         card.querySelectorAll(".admin-member-bot-toggle").forEach(sw => {
-            sw.addEventListener("change", async () => {
-                const response = await CatapultChannel.postJson(memberUrl(rowOf(sw), "bot/toggle"), {});
-                if (!response.ok) sw.checked = !sw.checked;
-            });
+            sw.addEventListener("change", () => CatapultChannel.postSwitch(sw, memberUrl(rowOf(sw), "bot/toggle"), {}));
         });
 
         card.querySelectorAll("mdui-menu-item[data-action]").forEach(item => {

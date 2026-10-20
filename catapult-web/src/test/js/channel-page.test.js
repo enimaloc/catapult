@@ -51,6 +51,58 @@ describe("refresh / postJson", () => {
         expect(snackbar.textContent).toBe("Action failed (403)");
         expect(snackbar.open).toBe(true);
     });
+
+    it("words the failure in the page's language", async () => {
+        document.body.dataset.labelActionFailed = "L'action a échoué ({0}).";
+        postJson.mockResolvedValueOnce(response(502));
+
+        await CatapultChannel.postJson("/x", {});
+
+        expect(document.querySelector("mdui-snackbar").textContent).toBe("L'action a échoué (502).");
+    });
+
+    it("resolves a request that could not be sent to a not-ok answer, telling it", async () => {
+        document.body.dataset.labelActionUnreachable = "Injoignable";
+        postJson.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+        const result = await CatapultChannel.postJson("/x", {});
+
+        expect(result).toEqual({ ok: false, status: 0 });
+        expect(document.querySelector("mdui-snackbar").textContent).toBe("Injoignable");
+    });
+
+    it("removes a snackbar from the page once it closes", async () => {
+        CatapultChannel.showError("boom");
+        const snackbar = document.querySelector("mdui-snackbar");
+
+        snackbar.dispatchEvent(new Event("closed"));
+
+        expect(document.querySelector("mdui-snackbar")).toBeNull();
+    });
+});
+
+describe("postSwitch", () => {
+    it("leaves the switch as the user set it when the change goes through", async () => {
+        const sw = Object.assign(document.createElement("mdui-switch"), { checked: true });
+
+        await CatapultChannel.postSwitch(sw, "/x", { on: true });
+
+        expect(postJson).toHaveBeenCalledWith("/x", { on: true });
+        expect(sw.checked).toBe(true);
+    });
+
+    it.each([
+        ["refused", () => postJson.mockResolvedValueOnce(response(403))],
+        ["not sent", () => postJson.mockRejectedValueOnce(new TypeError("offline"))],
+    ])("puts the switch back when the change is %s", async (ignored, fail) => {
+        fail();
+        const sw = Object.assign(document.createElement("mdui-switch"), { checked: true });
+
+        const result = await CatapultChannel.postSwitch(sw, "/x", {});
+
+        expect(result.ok).toBe(false);
+        expect(sw.checked).toBe(false);
+    });
 });
 
 describe("on / checkedValues", () => {

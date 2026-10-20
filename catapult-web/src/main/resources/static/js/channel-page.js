@@ -12,8 +12,9 @@
  *   the query string (page/status/source filters) instead of dropping it. No action
  *   of the page uses it: each patches the page itself or through its SSE echo. Only
  *   the mock profile's popout does, for the changes no event carries (mock-popout.js).
- * - postJson(): wraps CatapultCsrf.postJson and surfaces a visible error when the
- *   mutation didn't succeed.
+ * - postJson(): wraps CatapultCsrf.postJson and surfaces a visible error (in the page's
+ *   language) when the mutation didn't succeed or couldn't be sent; postSwitch() also puts
+ *   the switch that triggered it back as it was.
  * - on(): the null-guarded addEventListener every optional control needs (owner-only
  *   and provider-dependent elements simply aren't rendered for everyone).
  * - checkedValues(): values of the checked switches under a root.
@@ -33,18 +34,51 @@ window.CatapultChannel = (function () {
         await CatapultSpa.navigate(location.pathname.replace(/^\/+|\/+$/g, ""), false, location.search);
     }
 
+    /** Shows `message` in a snackbar, removed from the page once it closes. */
     function showError(message) {
         const snackbar = document.createElement("mdui-snackbar");
         snackbar.textContent = message;
+        snackbar.addEventListener("closed", () => snackbar.remove());
         snackbar.open = true;
         document.body.appendChild(snackbar);
     }
 
+    /** What a refused action says (index.html's body carries it in the page's language), with its status. */
+    function actionFailed(status) {
+        return (document.body.dataset.labelActionFailed ?? "Action failed ({0})").replace("{0}", status);
+    }
+
+    /** What an action that could not reach the server says. */
+    function unreachable() {
+        return document.body.dataset.labelActionUnreachable ?? "Catapult could not be reached";
+    }
+
+    /**
+     * Posts through CatapultCsrf and tells a failure in a snackbar. Never rejects: a request that
+     * could not be sent at all resolves to a not-ok answer with status 0.
+     */
     async function postJson(url, body) {
-        const response = await CatapultCsrf.postJson(url, body);
-        if (!response.ok) {
-            showError(`Action failed (${response.status})`);
+        let response;
+        try {
+            response = await CatapultCsrf.postJson(url, body);
+        } catch {
+            showError(unreachable());
+            return { ok: false, status: 0 };
         }
+        if (!response.ok) {
+            showError(actionFailed(response.status));
+        }
+        return response;
+    }
+
+    /**
+     * Posts the change of switch `sw` (already flipped by the user): when it doesn't go through,
+     * the switch is put back as it was, so it never shows a state the server doesn't have.
+     */
+    async function postSwitch(sw, url, body) {
+        const wanted = sw.checked;
+        const response = await postJson(url, body);
+        if (!response.ok) sw.checked = !wanted;
         return response;
     }
 
@@ -98,7 +132,7 @@ window.CatapultChannel = (function () {
     // No handler is needed here for any Steam or Minecraft event.
 
     return {
-        username, baseUrl, refresh, postJson, showError,
+        username, baseUrl, refresh, postJson, postSwitch, showError, actionFailed, unreachable,
         on, checkedValues,
         getBindingsElements, getBindingElement,
         setCurrentGame,
