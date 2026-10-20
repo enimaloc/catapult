@@ -1022,6 +1022,12 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public int validateSession() {
+        // the mock's tokens never expire
+        return 200;
+    }
+
+    @Override
     public int accountDeletionDelayDays() {
         return 7;
     }

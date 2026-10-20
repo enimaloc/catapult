@@ -724,6 +724,11 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public int validateSession() {
+        return client.call(HttpMethod.GET, "/api/auth/validate", null, Void.class).status();
+    }
+
+    @Override
     public int accountDeletionDelayDays() {
         AppConfigResponse config = client.get("/api/config/app", AppConfigResponse.class);
         return config == null || config.deletionDelayDays() <= 0 ? DEFAULT_DELETION_DELAY_DAYS : config.deletionDelayDays();
