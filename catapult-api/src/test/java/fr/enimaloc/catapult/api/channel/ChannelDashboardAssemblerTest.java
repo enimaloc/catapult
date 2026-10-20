@@ -448,6 +448,14 @@ class ChannelDashboardAssemblerTest {
         }
 
         @Test
+        void butNeverTheWidgetTokenToAModerator() {
+            owner.setWidgetToken(UUID.randomUUID());
+
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).exampleUuid())
+                    .isEqualTo(ApiV2.GENERIC_UUID_EXAMPLE);
+        }
+
+        @Test
         void otherwiseTheGenericExample() {
             assertThat(exampleUuid()).isEqualTo(ApiV2.GENERIC_UUID_EXAMPLE);
         }

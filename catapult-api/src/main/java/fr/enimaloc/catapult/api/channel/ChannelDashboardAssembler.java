@@ -127,7 +127,7 @@ public class ChannelDashboardAssembler {
                 owner ? minecraftData(channel) : null,
                 owner ? obsData(channel) : null,
                 owner ? twitchatData(channel) : null,
-                exampleUuid(channel, detected));
+                exampleUuid(channel, owner, detected));
     }
 
     private static ChannelUserDto channelUser(UserAccount channel) {
@@ -205,11 +205,11 @@ public class ChannelDashboardAssembler {
      * <ol>
      *   <li>the currently detected game, backdoor-encoded, if its source type supports it;
      *   <li>otherwise the most recently touched encodable binding on record;
-     *   <li>otherwise the account's own widget token;
+     *   <li>otherwise the account's own widget token, for its owner only (it's a credential);
      *   <li>and only then the generic example anonymous Swagger visitors see.
      * </ol>
      */
-    private String exampleUuid(UserAccount channel, Optional<DetectedGame> detected) {
+    private String exampleUuid(UserAccount channel, boolean owner, Optional<DetectedGame> detected) {
         Optional<UUID> encoded = detected
                 .filter(game -> BACKDOOR_ENCODABLE.contains(game.getSourceType()))
                 .flatMap(game -> devBackdoorResolver.encode(game.getSourceType(), game.getSourceId()));
@@ -219,7 +219,7 @@ public class ChannelDashboardAssembler {
                     .flatMap(binding -> devBackdoorResolver.encode(binding.getSourceType(), binding.getSourceId()));
         }
         return encoded.map(UUID::toString)
-                .orElseGet(() -> channel.getWidgetToken() != null
+                .orElseGet(() -> owner && channel.getWidgetToken() != null
                         ? channel.getWidgetToken().toString()
                         : ApiV2.GENERIC_UUID_EXAMPLE);
     }
