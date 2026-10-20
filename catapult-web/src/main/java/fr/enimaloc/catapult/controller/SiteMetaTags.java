@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
+import fr.enimaloc.catapult.cluster.InstanceBus;
 import fr.enimaloc.catapult.service.ApiService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,21 +32,31 @@ public class SiteMetaTags {
         }
     }
 
+    static final String CLEAR_TOPIC = "meta-tags.clear";
+
     private final ObjectProvider<ApiService> apiService;
     private final Clock clock;
+    /** Null for a list alone (a test): its clear only marks itself stale. */
+    private final InstanceBus bus;
     private final AtomicReference<Entry> entry = new AtomicReference<>(new Entry(List.of(), Instant.MIN));
     private final ReentrantLock loading = new ReentrantLock();
     /** Bumped by {@link #clear()}: a list loaded before it may predate the change and is kept stale. */
     private final AtomicLong generation = new AtomicLong();
 
     @Autowired
-    public SiteMetaTags(ObjectProvider<ApiService> apiService) {
-        this(apiService, Clock.systemUTC());
+    public SiteMetaTags(ObjectProvider<ApiService> apiService, ObjectProvider<InstanceBus> bus) {
+        this(apiService, Clock.systemUTC(), bus.getIfAvailable());
     }
 
     SiteMetaTags(ObjectProvider<ApiService> apiService, Clock clock) {
+        this(apiService, clock, null);
+    }
+
+    SiteMetaTags(ObjectProvider<ApiService> apiService, Clock clock, InstanceBus bus) {
         this.apiService = apiService;
         this.clock = clock;
+        this.bus = bus;
+        if (bus != null) bus.on(CLEAR_TOPIC, ignored -> clearLocally());
     }
 
     public List<MetaTagDto> tags() {
@@ -70,7 +81,16 @@ public class SiteMetaTags {
         }
     }
 
+    /** Marks the list stale on every instance: the admin's change shows on the next page wherever it is served. */
     public void clear() {
+        if (bus == null) {
+            clearLocally();
+        } else {
+            bus.publish(CLEAR_TOPIC, "");
+        }
+    }
+
+    void clearLocally() {
         generation.incrementAndGet();
         entry.updateAndGet(Entry::stale);
     }
