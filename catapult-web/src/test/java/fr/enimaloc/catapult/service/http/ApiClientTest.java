@@ -188,12 +188,17 @@ class ApiClientTest {
     }
 
     @Test
-    void failedVoidCalls_areSwallowed() throws IOException {
+    void actions_answerCatapultApisStatus_or502WhenUnreachable() throws IOException {
+        server.enqueue(new MockResponse().setResponseCode(204));
+        server.enqueue(new MockResponse().setResponseCode(403).setBody("{\"message\":\"no\"}"));
         server.enqueue(new MockResponse().setResponseCode(503));
-        client.postVoid("/api/a", new Payload("x"));
+
+        assertThat(client.postVoid("/api/a", new Payload("x"))).isEqualTo(204);
+        assertThat(client.postVoid("/api/a", null)).isEqualTo(403);
+        assertThat(client.delete("/api/a")).isEqualTo(503);
 
         server.shutdown();
-        client.delete("/api/unreachable");
+        assertThat(client.delete("/api/unreachable")).isEqualTo(502);
     }
 
     @Test

@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -29,56 +28,50 @@ public class AdminMembersController {
     private final ModelFiller filler;
 
     @PostMapping("/bot/toggle")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void toggleBot(@PathVariable UUID id) {
+    public ResponseEntity<Void> toggleBot(@PathVariable UUID id) {
         requireAdmin();
-        apiService.adminToggleMemberBot(id);
+        return ApiStatus.answer(apiService.adminToggleMemberBot(id));
     }
 
     @PostMapping("/steam/unlink")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void unlinkSteam(@PathVariable UUID id) {
+    public ResponseEntity<Void> unlinkSteam(@PathVariable UUID id) {
         requireAdmin();
-        apiService.adminUnlinkMemberSteam(id);
+        return ApiStatus.answer(apiService.adminUnlinkMemberSteam(id));
     }
 
     @PostMapping("/twitch/unlink")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void unlinkTwitch(@PathVariable UUID id) {
+    public ResponseEntity<Void> unlinkTwitch(@PathVariable UUID id) {
         requireAdmin();
-        apiService.adminUnlinkMemberTwitch(id);
+        return ApiStatus.answer(apiService.adminUnlinkMemberTwitch(id));
     }
 
     @PostMapping("/promote-to-system")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void promoteToSystem(@PathVariable UUID id) {
+    public ResponseEntity<Void> promoteToSystem(@PathVariable UUID id) {
         requireAdmin();
-        apiService.adminPromoteMemberToSystem(id);
+        return ApiStatus.answer(apiService.adminPromoteMemberToSystem(id));
     }
 
     @PostMapping("/delete")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID id) {
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
         requireAdmin();
-        apiService.adminDeleteMember(id);
+        return ApiStatus.answer(apiService.adminDeleteMember(id));
     }
 
     @PostMapping("/migrate")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void migrate(@PathVariable UUID id, @RequestBody MigrateRequest body) {
+    public ResponseEntity<Void> migrate(@PathVariable UUID id, @RequestBody MigrateRequest body) {
         requireAdmin();
         if (body.targetId() == null || body.targetId().equals(id)
                 || !(body.migrateSettings() || body.migrateGetters() || body.migrateBindings())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
-        apiService.adminMigrateMember(id, body.targetId(), body.migrateSettings(), body.migrateGetters(), body.migrateBindings());
+        return ApiStatus.answer(apiService.adminMigrateMember(id, body.targetId(), body.migrateSettings(), body.migrateGetters(), body.migrateBindings()));
     }
 
     public record FlagBody(String key, String value) {}
     public record FlagKeyBody(String key) {}
     public record GroupBody(String groupKey) {}
 
-    /** Targeting actions answer catapult-api's status (204; 404; 502 when unreachable), not a void. */
+    /** Like every action here, they answer catapult-api's outcome (see {@link ApiStatus}): 204; 404; 502 when unreachable. */
     @PostMapping("/flags")
     public ResponseEntity<Void> setFlag(@PathVariable UUID id, @RequestBody FlagBody body) {
         return relayUnless(isBlank(body.key()), () -> apiService.adminSetMemberFlag(id, body.key(), body.value()));
@@ -103,7 +96,7 @@ public class AdminMembersController {
     /** Admins only; a missing key is refused here (400) rather than sent on. */
     private ResponseEntity<Void> relayUnless(boolean invalid, IntSupplier action) {
         requireAdmin();
-        return invalid ? ResponseEntity.badRequest().build() : ResponseEntity.status(action.getAsInt()).build();
+        return invalid ? ResponseEntity.badRequest().build() : ApiStatus.answer(action.getAsInt());
     }
 
     private static boolean isBlank(String text) {

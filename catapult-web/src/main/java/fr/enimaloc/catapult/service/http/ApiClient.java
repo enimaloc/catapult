@@ -25,7 +25,8 @@ import java.util.UUID;
  * Calls catapult-api on behalf of the current browser session, authenticated with the JWT
  * stored in that session (it never reaches the browser). A failed read is logged and reported
  * as {@code null} rather than thrown, so a page still renders while the API is down; an error
- * answer (4xx/5xx) is a failure too, its body never read as the expected type.
+ * answer (4xx/5xx) is a failure too, its body never read as the expected type. An action
+ * answers catapult-api's status instead (502 when unreachable), for the browser to be told.
  */
 @Slf4j
 @Component
@@ -142,14 +143,14 @@ public class ApiClient {
         return exchange(HttpMethod.POST, path, type, uriVars);
     }
 
-    /** POST {@code body} (none when {@code null}) to {@code path}, ignoring the response. */
-    public void postVoid(String path, Object body, Object... uriVars) {
-        send(HttpMethod.POST, path, body, uriVars);
+    /** POST {@code body} (none when {@code null}) to {@code path}: catapult-api's status, its body ignored; 502 when unreachable. */
+    public int postVoid(String path, Object body, Object... uriVars) {
+        return send(HttpMethod.POST, path, body, uriVars);
     }
 
-    /** DELETE {@code path}, ignoring the response. */
-    public void delete(String path, Object... uriVars) {
-        send(HttpMethod.DELETE, path, null, uriVars);
+    /** DELETE {@code path}: catapult-api's status, its body ignored; 502 when unreachable. */
+    public int delete(String path, Object... uriVars) {
+        return send(HttpMethod.DELETE, path, null, uriVars);
     }
 
     private <T> T exchange(HttpMethod method, String path, Class<T> type, Object... uriVars) {
