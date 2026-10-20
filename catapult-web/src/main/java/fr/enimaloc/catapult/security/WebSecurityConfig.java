@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.relay.ApiRelayController;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,7 +47,9 @@ public class WebSecurityConfig {
                         // stable and comparable, matching Spring's documented "SPA" CSRF setup.
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                         // The Sentry SDK posts its reports there without the token; relayed, they change nothing here.
-                        .ignoringRequestMatchers("/monitoring/tunnel"))
+                        .ignoringRequestMatchers("/monitoring/tunnel")
+                        // catapult-api's own paths (ApiRelayController): its rules apply to them, not these.
+                        .ignoringRequestMatchers(ApiRelayController.PATHS))
                 .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
                 // POST with the CSRF token only: a cross-site link or image can't log a member out.
                 .logout(logout -> logout

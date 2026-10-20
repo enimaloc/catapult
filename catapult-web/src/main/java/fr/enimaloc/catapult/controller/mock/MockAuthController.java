@@ -15,8 +15,7 @@ import java.util.List;
  * form building a custom one, each of which goes on to {@code /auth/callback} with a mock code.
  * With the quick-login profile too, logging in skips that page for the first quick account;
  * {@code /mock/login} still switches account, from the member's config popout (mock-popout.js).
- * Outside the mock profile, nginx routes
- * {@code /oauth2/**} to catapult-api instead.
+ * Outside the mock profile, ApiRelayController relays {@code /oauth2/**} to catapult-api instead.
  */
 @Controller
 @Profile("mock")
