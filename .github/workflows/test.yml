@@ -35,8 +35,19 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Run tests
-        run: ./gradlew :catapult-api:test :catapult-api:jacocoTestReport
+      # catapult-web's `check` also runs the browser-script suite (jsTest: npm ci + Vitest)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: catapult-web/package-lock.json
+
+      # `check` = unit tests + JaCoCo report + the per-module coverage floor (root build.gradle.kts)
+      # for catapult-common, catapult-api and catapult-web, plus jsTest; --continue reports every
+      # failing module rather than stopping at the first
+      - name: Run tests and coverage checks
+        run: ./gradlew check --continue
         env:
           DB_URL: jdbc:postgresql://localhost:5432/catapult_test
           DB_USERNAME: catapult
@@ -54,9 +65,13 @@ jobs:
       - name: Coverage summary
         if: always()
         run: |
-          grep 'type="INSTRUCTION"' catapult-api/build/reports/jacoco/test/jacocoTestReport.xml | tail -1 | \
-          awk '{for(i=1;i<=NF;i++){if($i~/^missed=/){split($i,a,"\"");m=a[2]} if($i~/^covered=/){split($i,a,"\"");c=a[2]}}}
-               END{printf "Coverage: %.1f%%\n", c/(m+c)*100}' >> "$GITHUB_STEP_SUMMARY"
+          for module in catapult-common catapult-api catapult-web; do
+            report="$module/build/reports/jacoco/test/jacocoTestReport.xml"
+            [ -f "$report" ] || { echo "$module: no coverage report" >> "$GITHUB_STEP_SUMMARY"; continue; }
+            grep -o '<counter type="LINE"[^>]*>' "$report" | tail -1 | \
+            awk -v m="$module" '{for(i=1;i<=NF;i++){if($i~/^missed=/){split($i,a,"\"");mi=a[2]} if($i~/^covered=/){split($i,a,"\"");c=a[2]}}}
+                 END{printf "%s line coverage: %.1f%%\n", m, c/(mi+c)*100}' >> "$GITHUB_STEP_SUMMARY"
+          done
 
       - name: Upload test results
         if: always()
@@ -64,6 +79,7 @@ jobs:
         with:
           name: test-results
           path: |
-            catapult-api/build/reports/jacoco/
-            catapult-api/build/test-results/test/
+            */build/reports/jacoco/
+            */build/test-results/test/
+            catapult-web/build/reports/js-coverage/
           retention-days: 7
