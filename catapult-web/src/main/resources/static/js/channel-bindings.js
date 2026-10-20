@@ -45,24 +45,26 @@ document.addEventListener("catapult:render", function () {
         // The ccl switches live in the sibling .binding-ccl-panel, within the same row.
         const cclRoot = panel.parentElement;
 
-        // A ccl switch's save puts that switch back when it doesn't go through.
-        function saveBinding(gameId, gameName, sw) {
+        // Only a picked game is sent (with its own id), never the text being typed; an emptied
+        // field sends neither. A ccl switch's save puts that switch back when it doesn't go through.
+        const game = GameSearch.attach(gameInput, panel.querySelector(".binding-edit-game-results"),
+            `${CatapultChannel.baseUrl()}/games/search`, picked => {
+                gameIdInput.value = picked.id;
+                saveBinding();
+            }, { initial: { id: gameIdInput.value, name: gameInput.value } });
+
+        function saveBinding(sw) {
+            const selected = game.selected();
             const body = {
-                twitchGameId: gameId || null,
-                twitchGameName: gameName || null,
+                twitchGameId: selected?.id ?? null,
+                twitchGameName: selected?.name ?? null,
                 ccls: checkedValues(cclRoot, ".binding-edit-ccl-checkbox")
             };
             return sw ? postSwitch(sw, bindingUrl(row, ""), body) : postJson(bindingUrl(row, ""), body);
         }
 
-        GameSearch.attach(gameInput, panel.querySelector(".binding-edit-game-results"),
-            `${CatapultChannel.baseUrl()}/games/search`, game => {
-                gameIdInput.value = game.id;
-                saveBinding(game.id, game.name);
-            });
-
         cclRoot.querySelectorAll(".binding-edit-ccl-checkbox").forEach(sw => {
-            sw.addEventListener("change", () => saveBinding(gameIdInput.value, gameInput.value, sw));
+            sw.addEventListener("change", () => saveBinding(sw));
         });
     });
 
