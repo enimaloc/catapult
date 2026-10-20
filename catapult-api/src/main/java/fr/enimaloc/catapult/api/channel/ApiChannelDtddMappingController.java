@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.channel;
 
-import fr.enimaloc.catapult.common.dto.channel.MappingDto;
-import fr.enimaloc.catapult.common.dto.channel.ProposalDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingProposalDto;
 import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.SearchResultDto;
@@ -54,16 +54,16 @@ public class ApiChannelDtddMappingController {
             && !mappingOpt.get().isVerified()
             && otherPending == 0;
 
-        MappingDto current = mappingOpt.map(m -> {
+        DtddMappingCurrentDto current = mappingOpt.map(m -> {
             String name = null;
             if (m.getDtddId() != null) {
                 name = gameRepo.findById(m.getDtddId()).map(DtddGameCache::getName).orElse(null);
             }
-            return new MappingDto(m.getDtddId(), name, m.getConfidence(), m.isVerified());
+            return new DtddMappingCurrentDto(m.getDtddId(), name, m.getConfidence(), m.isVerified());
         }).orElse(null);
 
-        ProposalDto pending = myProposal.map(p ->
-            new ProposalDto(p.getId(), p.getProposedDtddId(), p.getReason())).orElse(null);
+        DtddMappingProposalDto pending = myProposal.map(p ->
+            new DtddMappingProposalDto(p.getId(), p.getProposedDtddId(), p.getReason())).orElse(null);
         return new StatusResponse(current, pending, canValidate);
     }
 
