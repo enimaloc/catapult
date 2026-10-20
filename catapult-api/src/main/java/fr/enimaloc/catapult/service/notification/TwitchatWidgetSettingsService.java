@@ -34,10 +34,9 @@ public class TwitchatWidgetSettingsService {
     public TwitchatWidgetSettings getOrCreate(UserAccount user) {
         widgetTokenService.getOrCreate(user);
         return repository.findById(user.getId()).orElseGet(() -> {
-            TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
-            settings.setUser(user);
-            settings.setEnabled(false);
-            return repository.save(settings);
+            repository.insertIfAbsent(user.getId());
+            return repository.findById(user.getId())
+                    .orElseThrow(() -> new IllegalStateException("No Twitchat settings row for " + user.getId()));
         });
     }
 

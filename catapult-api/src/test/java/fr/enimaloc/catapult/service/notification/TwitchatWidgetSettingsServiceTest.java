@@ -40,16 +40,17 @@ class TwitchatWidgetSettingsServiceTest {
     }
 
     @Test
-    void getOrCreate_noExistingSettings_createsDisabledAndEnsuresToken() {
-        when(repository.findById(user.getId())).thenReturn(Optional.empty());
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    void getOrCreate_noExistingSettings_insertsTheRowIdempotently_andEnsuresToken() {
+        TwitchatWidgetSettings created = new TwitchatWidgetSettings();
+        created.setUser(user);
+        when(repository.findById(user.getId())).thenReturn(Optional.empty(), Optional.of(created));
 
         TwitchatWidgetSettings settings = service.getOrCreate(user);
 
-        assertThat(settings.isEnabled()).isFalse();
-        assertThat(settings.getUser()).isEqualTo(user);
+        assertThat(settings).isSameAs(created);
         verify(widgetTokenService).getOrCreate(user);
-        verify(repository).save(settings);
+        verify(repository).insertIfAbsent(user.getId());
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -225,7 +226,9 @@ class TwitchatWidgetSettingsServiceTest {
 
     @Test
     void enablingTheWidget_initializesItsEventActions() {
-        when(repository.findById(user.getId())).thenReturn(Optional.empty());
+        TwitchatWidgetSettings fresh = new TwitchatWidgetSettings();
+        fresh.setUser(user);
+        when(repository.findById(user.getId())).thenReturn(Optional.of(fresh));
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.updateSettings(user, true, null, null, null);
@@ -235,7 +238,9 @@ class TwitchatWidgetSettingsServiceTest {
 
     @Test
     void savingADisabledWidget_initializesNothing() {
-        when(repository.findById(user.getId())).thenReturn(Optional.empty());
+        TwitchatWidgetSettings fresh = new TwitchatWidgetSettings();
+        fresh.setUser(user);
+        when(repository.findById(user.getId())).thenReturn(Optional.of(fresh));
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.updateSettings(user, false, null, null, null);
