@@ -66,6 +66,25 @@ class TwitchatWidgetSettingsServiceTest {
     }
 
     @Test
+    void isEnabled_readsTheRow_withoutCreatingAnything() {
+        TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
+        existing.setEnabled(true);
+        when(repository.findById(user.getId())).thenReturn(Optional.of(existing));
+
+        assertThat(service.isEnabled(user)).isTrue();
+        verifyNoInteractions(widgetTokenService);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void isEnabled_isFalseWithoutARow() {
+        when(repository.findById(user.getId())).thenReturn(Optional.empty());
+
+        assertThat(service.isEnabled(user)).isFalse();
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void updateSettings_withNewPassword_encryptsAndSaves() {
         TwitchatWidgetSettings existing = new TwitchatWidgetSettings();
         existing.setUser(user);

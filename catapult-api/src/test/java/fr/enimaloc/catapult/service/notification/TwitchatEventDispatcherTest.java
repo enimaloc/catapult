@@ -67,7 +67,7 @@ class TwitchatEventDispatcherTest {
         user.setTwitchUsername("streamer");
         settings = new TwitchatWidgetSettings();
         settings.setEnabled(true);
-        lenient().when(widgetSettingsService.getOrCreate(user)).thenReturn(settings);
+        lenient().when(widgetSettingsService.isEnabled(user)).thenAnswer(invocation -> settings.isEnabled());
         lenient().when(eventActionService.parseData(any())).thenAnswer(invocation ->
                 new fr.enimaloc.catapult.common.twitchat.TwitchatPayloadValidator(
                         fr.enimaloc.catapult.common.twitchat.TwitchatCatalog.load()).parse(invocation.getArgument(0)));

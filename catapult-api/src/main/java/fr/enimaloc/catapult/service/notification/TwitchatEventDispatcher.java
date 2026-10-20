@@ -130,7 +130,7 @@ public class TwitchatEventDispatcher {
      * unknown token, it can never trigger a real action.
      */
     public void sendTest(UserAccount user, TwitchatNotificationEventType type, List<TwitchatEventActionDto> payloads) {
-        if (!widgetSettingsService.getOrCreate(user).isEnabled()) {
+        if (!widgetSettingsService.isEnabled(user)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Le widget Twitchat est désactivé : active-le pour pouvoir tester.");
         }
@@ -146,7 +146,7 @@ public class TwitchatEventDispatcher {
 
     private void dispatch(UserAccount user, TwitchatNotificationEventType type, Map<String, String> eventVariables,
                           Map<TwitchatActionType, Map<String, String>> applicable) {
-        if (!widgetSettingsService.getOrCreate(user).isEnabled()) {
+        if (!widgetSettingsService.isEnabled(user)) {
             return;
         }
         List<TwitchatEventAction> rows = eventActionService.enabledActions(user, type);

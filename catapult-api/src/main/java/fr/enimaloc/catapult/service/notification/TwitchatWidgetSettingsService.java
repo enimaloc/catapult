@@ -41,6 +41,12 @@ public class TwitchatWidgetSettingsService {
         });
     }
 
+    /** Whether the user's relay is on; read only, unlike getOrCreate() (no row, no token created). */
+    @Transactional(readOnly = true)
+    public boolean isEnabled(UserAccount user) {
+        return repository.findById(user.getId()).map(TwitchatWidgetSettings::isEnabled).orElse(false);
+    }
+
     @Transactional
     public TwitchatWidgetSettings updateSettings(UserAccount user, boolean enabled, String obsHost,
                                                   Integer obsPort, String obsPasswordPlaintext) {
