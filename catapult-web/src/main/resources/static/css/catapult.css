@@ -2124,3 +2124,35 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     line-height: 1.6;
     overflow-wrap: anywhere;
 }
+
+/*
+ * Changelog: laid out as the privacy page, one card per version
+ */
+.changelog-card {
+    margin-top: 24px;
+    padding: 28px;
+}
+
+.changelog-version {
+    margin: 0 0 8px;
+    color: var(--catapult-text);
+    font-size: 1.25rem;
+}
+
+.changelog-kind {
+    margin: 16px 0 6px;
+    font-size: 1rem;
+}
+
+.changelog-entries {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.changelog-scope {
+    color: var(--catapult-text-muted);
+}
+
+.changelog-breaking {
+    color: rgb(var(--mdui-color-error));
+}
