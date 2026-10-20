@@ -311,6 +311,14 @@ public class ChannelDashboardAssembler {
         return gameStateService.getLastKnownGame(channel).map(game -> toGameDto(channel, game));
     }
 
+    /** The channel's binding for the game it plays now, absent when no game is detected or none is bound to it. */
+    public Optional<BindingDto> currentBinding(UserAccount channel) {
+        return gameStateService.getLastKnownGame(channel)
+                .flatMap(game -> gameBindingRepository
+                        .findByUserAndSourceIdAndSourceType(channel, game.getSourceId(), game.getSourceType()))
+                .map(ChannelDashboardAssembler::toBindingDto);
+    }
+
     /** The detected game, with the id of the channel's binding for it when there is one. */
     private GameDto toGameDto(UserAccount channel, DetectedGame game) {
         String bindingId = gameBindingRepository

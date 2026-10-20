@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.StatusData;
@@ -85,6 +86,14 @@ public class ApiChannelDataController {
         userResolver.accessibleChannel(username, viewer);
         if (q.isBlank()) return List.of();
         return twitchService.searchCategories(viewer, q);
+    }
+
+    /** The binding of the game the channel plays now (the OBS dock's), 204 when there is none. */
+    @GetMapping("/bindings/current")
+    public ResponseEntity<BindingDto> currentBinding(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
+        return dashboard.currentBinding(userResolver.accessibleChannel(username, jwt))
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @GetMapping("/dtdd-mapping")

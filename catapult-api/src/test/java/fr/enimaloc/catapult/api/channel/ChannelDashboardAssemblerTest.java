@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.api.userapi.ApiV2;
 import fr.enimaloc.catapult.api.userapi.DevBackdoorResolver;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
@@ -319,6 +320,30 @@ class ChannelDashboardAssemblerTest {
             twitchat.getOrCreate(owner).setObsPasswordEncrypted("encrypted");
 
             assertThat(assembler().page(owner, owner, "streamer", 0, null, null).obs().hasPassword()).isTrue();
+        }
+    }
+
+    @Nested
+    class CurrentBinding {
+        @Test
+        void isTheBindingOfTheGamePlayedNow() {
+            GameBinding valheim = binding(owner, "892970", "Valheim");
+            when(gameState.getLastKnownGame(owner))
+                    .thenReturn(Optional.of(new DetectedGame("892970", GameBinding.SourceType.STEAM, "Valheim")));
+            when(bindings.findByUserAndSourceIdAndSourceType(owner, "892970", GameBinding.SourceType.STEAM))
+                    .thenReturn(Optional.of(valheim));
+
+            assertThat(assembler().currentBinding(owner)).get()
+                    .extracting(BindingDto::id).isEqualTo(valheim.getId().toString());
+        }
+
+        @Test
+        void isAbsentWithoutAGameOrWithAnUnboundOne() {
+            assertThat(assembler().currentBinding(owner)).isEmpty();
+
+            when(gameState.getLastKnownGame(owner))
+                    .thenReturn(Optional.of(new DetectedGame("1", GameBinding.SourceType.XBOX, "Halo")));
+            assertThat(assembler().currentBinding(owner)).isEmpty();
         }
     }
 
