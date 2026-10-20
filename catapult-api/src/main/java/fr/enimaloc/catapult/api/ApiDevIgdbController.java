@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.enimaloc.catapult.common.dto.DevIgdbQueryRequest;
+import fr.enimaloc.catapult.common.dto.admin.AdminProviderIgdbQueryRequest;
 import fr.enimaloc.catapult.common.dto.ExplorerData;
 import fr.enimaloc.catapult.common.dto.QueryResult;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
@@ -55,7 +55,7 @@ public class ApiDevIgdbController {
     }
 
     @PostMapping("/query")
-    public QueryResult query(@RequestBody DevIgdbQueryRequest body) {
+    public QueryResult query(@RequestBody AdminProviderIgdbQueryRequest body) {
         if (!body.endpoint().matches("[a-z_]+")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid endpoint: " + body.endpoint());
         }
