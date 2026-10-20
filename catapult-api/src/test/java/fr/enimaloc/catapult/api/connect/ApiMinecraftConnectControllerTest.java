@@ -7,10 +7,10 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -36,12 +36,14 @@ class ApiMinecraftConnectControllerTest {
     @Mock private MinecraftServiceAccountRepository accountRepository;
     @Mock private Jwt jwt;
 
-    @InjectMocks private ApiMinecraftConnectController controller;
+    private ApiMinecraftConnectController controller;
 
     private UserAccount user;
 
     @BeforeEach
     void setup() {
+        controller = new ApiMinecraftConnectController(friendService, userAccountRepository, gateService,
+                new MinecraftLinkStateService(friendService, gateService, accountRepository));
         user = new UserAccount();
         UUID userId = UUID.randomUUID();
         when(jwt.getSubject()).thenReturn(userId.toString());

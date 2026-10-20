@@ -2,11 +2,10 @@ package fr.enimaloc.catapult.api.connect;
 
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
@@ -16,7 +15,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -28,7 +26,7 @@ public class ApiMinecraftConnectController {
     private final MinecraftFriendService friendService;
     private final UserAccountRepository userAccountRepository;
     private final MinecraftGateService gateService;
-    private final MinecraftServiceAccountRepository accountRepository;
+    private final MinecraftLinkStateService linkStates;
 
     /** Vérification immédiate : force la sync des liens puis retourne l'état à jour. */
     @PostMapping("/sync")
@@ -36,31 +34,13 @@ public class ApiMinecraftConnectController {
         UserAccount user = gatedUser(jwt);
         friendService.syncFriendLinks();
         return friendService.getLink(user)
-                .map(ApiMinecraftConnectController::toLinkState)
-                .orElseGet(ApiMinecraftConnectController::none);
+                .map(MinecraftLinkStateService::of)
+                .orElseGet(() -> MinecraftLinkStateService.of(MinecraftLinkStateService.NONE));
     }
 
     @GetMapping
     public LinkStateResponse status(@AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = currentUser(jwt);
-        if (!gateService.isAvailableFor(user)) {
-            return unavailable();
-        }
-        // Aucun compte de service actif : la feature est indisponible, y compris pour un
-        // utilisateur déjà lié (son lien ne peut plus être géré tant qu'aucun compte ne tourne).
-        if (accountRepository.countByEnabledTrue() == 0) {
-            return unavailable();
-        }
-        Optional<MinecraftFriendLink> link = friendService.getLink(user);
-        if (link.isPresent()) {
-            return toLinkState(link.get());
-        }
-        // Comptes actifs mais tous pleins : on cache juste la possibilité de se lier,
-        // un utilisateur déjà lié plus haut garde sa connexion (cas géré ci-dessus).
-        if (accountRepository.countByEnabledTrueAndFriendLimitReachedFalse() == 0) {
-            return full();
-        }
-        return none();
+        return linkStates.state(currentUser(jwt));
     }
 
     @PostMapping
@@ -72,7 +52,7 @@ public class ApiMinecraftConnectController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pseudo requis");
         }
         try {
-            return toLinkState(friendService.enroll(user, name));
+            return MinecraftLinkStateService.of(friendService.enroll(user, name));
         } catch (MinecraftFriendService.MinecraftEnrollmentException e) {
             throw switch (e.getReason()) {
                 case UNKNOWN_PLAYER -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Joueur introuvable");
@@ -99,25 +79,5 @@ public class ApiMinecraftConnectController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature Minecraft indisponible");
         }
         return user;
-    }
-
-    private static LinkStateResponse none() {
-        return new LinkStateResponse("NONE", null, null);
-    }
-
-    private static LinkStateResponse unavailable() {
-        return new LinkStateResponse("UNAVAILABLE", null, null);
-    }
-
-    /** Aucun compte de service actif ne peut accepter de nouvel ami — état transitoire, distinct de UNAVAILABLE. */
-    private static LinkStateResponse full() {
-        return new LinkStateResponse("FULL", null, null);
-    }
-
-    private static LinkStateResponse toLinkState(MinecraftFriendLink link) {
-        return new LinkStateResponse(
-                link.getStatus().name(),
-                link.getMinecraftName(),
-                link.getServiceAccount().getMinecraftUsername());
     }
 }

@@ -26,7 +26,6 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
 import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
-import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.steam.SteamApiClient;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -43,7 +42,7 @@ import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
-import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -84,7 +83,7 @@ public class ChannelDashboardAssembler {
     private final OAuthTokenRepository oAuthTokenRepository;
     private final DevBackdoorResolver devBackdoorResolver;
     // Only present when minecraft.enabled (the service is @ConditionalOnBooleanProperty).
-    private final Optional<MinecraftFriendService> minecraftFriendService;
+    private final Optional<MinecraftLinkStateService> minecraftLinkStates;
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
 
     @Value("${xbox.enabled:false}")
@@ -174,16 +173,17 @@ public class ChannelDashboardAssembler {
         return oAuthTokenRepository.findByUserAndProvider(channel, OAuthToken.Provider.XBOX).isPresent();
     }
 
-    /** The Minecraft link ("NONE" when unlinked, as the connect endpoint says), null without Minecraft. */
+    /**
+     * The Minecraft link as the connect endpoint states it (FULL included), null without
+     * Minecraft or when it's {@link MinecraftLinkStateService#UNAVAILABLE unavailable} to the
+     * channel: the card then has nothing to offer.
+     */
     private MinecraftData minecraftData(UserAccount channel) {
-        if (minecraftFriendService.isEmpty()) {
-            return null;
-        }
-        // getLink() fetches the service account too, so its username is readable here (OSIV is off).
-        Optional<MinecraftFriendLink> link = minecraftFriendService.get().getLink(channel);
-        return link.map(l -> new MinecraftData(l.getStatus().name(), l.getMinecraftName(),
-                        l.getServiceAccount().getMinecraftUsername()))
-                .orElseGet(() -> new MinecraftData("NONE", null, null));
+        return minecraftLinkStates
+                .map(service -> service.state(channel))
+                .filter(state -> !MinecraftLinkStateService.UNAVAILABLE.equals(state.status()))
+                .map(state -> new MinecraftData(state.status(), state.minecraftName(), state.serviceAccountUsername()))
+                .orElse(null);
     }
 
     /** The Twitchat relay's OBS settings; getOrCreate() may insert the row on first view. */

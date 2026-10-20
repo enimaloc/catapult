@@ -40,6 +40,9 @@ import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -82,13 +85,17 @@ class ChannelDashboardAssemblerTest {
     private final OAuthTokenRepository oauthTokens = mock(OAuthTokenRepository.class);
     private final DevBackdoorResolver backdoor = mock(DevBackdoorResolver.class);
     private final MinecraftFriendService minecraft = mock(MinecraftFriendService.class);
+    private final MinecraftGateService minecraftGate = mock(MinecraftGateService.class);
+    private final MinecraftServiceAccountRepository minecraftAccounts = mock(MinecraftServiceAccountRepository.class);
+    private final MinecraftLinkStateService minecraftStates =
+            new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
 
     private UserAccount owner;
     private UserAccount moderator;
 
     private ChannelDashboardAssembler assembler(Optional<SteamApiClient> steamClient,
-                                                Optional<MinecraftFriendService> minecraftService,
+                                                Optional<MinecraftLinkStateService> minecraftService,
                                                 boolean xboxEnabled) {
         SteamProfileDiagnostics diagnostics = new SteamProfileDiagnostics(steamClient, Optional.of(keyRotator), encryption);
         ChannelDashboardAssembler assembler = new ChannelDashboardAssembler(bindings, settingsRepository, streamState,
@@ -99,7 +106,7 @@ class ChannelDashboardAssemblerTest {
     }
 
     private ChannelDashboardAssembler assembler() {
-        return assembler(Optional.of(steam), Optional.of(minecraft), true);
+        return assembler(Optional.of(steam), Optional.of(minecraftStates), true);
     }
 
     private static UserAccount account(String username) {
@@ -146,6 +153,9 @@ class ChannelDashboardAssemblerTest {
         obs.setObsPort(4456);
         obs.setTwitchatBranch("beta");
         when(twitchat.getOrCreate(owner)).thenReturn(obs);
+        when(minecraftGate.isAvailableFor(owner)).thenReturn(true);
+        when(minecraftAccounts.countByEnabledTrue()).thenReturn(1L);
+        when(minecraftAccounts.countByEnabledTrueAndFriendLimitReachedFalse()).thenReturn(1L);
     }
 
     @Nested
@@ -187,7 +197,7 @@ class ChannelDashboardAssemblerTest {
             assertThat(page.obs()).isNull();
             assertThat(page.twitchat()).isNull();
             assertThat(page.blockedCcls()).isEmpty();
-            verifyNoInteractions(minecraft, twitchat);
+            verifyNoInteractions(minecraft, minecraftGate, twitchat);
         }
 
         @Test
@@ -278,6 +288,29 @@ class ChannelDashboardAssemblerTest {
 
             assertThat(assembler().page(owner, owner, "streamer", 0, null, null).minecraft())
                     .isEqualTo(new MinecraftData("ACCEPTED", "Steve", "CatapultBot"));
+        }
+
+        @Test
+        void minecraftClosedToTheChannelIsNull_likeTheConnectEndpointsUnavailable() {
+            when(minecraftGate.isAvailableFor(owner)).thenReturn(false);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).minecraft()).isNull();
+            verify(minecraft, never()).getLink(any());
+        }
+
+        @Test
+        void minecraftWithoutARunningServiceAccountIsNull() {
+            when(minecraftAccounts.countByEnabledTrue()).thenReturn(0L);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).minecraft()).isNull();
+        }
+
+        @Test
+        void minecraftIsFullWhenEveryServiceAccountIsFull() {
+            when(minecraftAccounts.countByEnabledTrueAndFriendLimitReachedFalse()).thenReturn(0L);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).minecraft())
+                    .isEqualTo(new MinecraftData("FULL", null, null));
         }
 
         @Test
