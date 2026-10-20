@@ -242,12 +242,13 @@ class MockApiServiceTest {
     }
 
     @Test
-    void dtddIsInert() {
+    void dtddIsInert_butAProposalIsTold() {
         assertThat(service.dtddMappingStatus(username)).isEqualTo(new DtddMappingStatusDto(null, null, false, null));
         assertThat(service.dtddSearch("doom")).isEqualTo(new SearchResponse(List.of()));
         service.dtddValidate("1");
-        service.dtddPropose("1", 2L, "r");
         assertThat(events).isEmpty();
+        service.dtddPropose("1", 2L, "r");
+        assertThat(events).containsExactly(new fr.enimaloc.catapult.event.DtddMappingChangedEvent(username));
     }
 
     @Test
@@ -433,7 +434,7 @@ class MockApiServiceTest {
     }
 
     @Test
-    void settings_areSavedWithoutEvents() {
+    void settings_areSaved_eachSaveTellingTheirWholeState() {
         service.saveCclSettings(username, false, Set.of("Gore"));
         service.saveTwSettings(username, true, Set.of("spiders"));
         service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false);
@@ -443,7 +444,12 @@ class MockApiServiceTest {
         assertThat(data.getUserSettings().twFeatureEnabled()).isTrue();
         assertThat(data.getUserSettings().noGameTwitchGameName()).isEqualTo("Just Chatting");
         assertThat(data.getUserSettings().incompleteFallbackCcls()).containsExactly("Drugs");
-        assertThat(events).isEmpty();
+        assertThat(events).hasSize(4).allSatisfy(e -> assertThat(e).isInstanceOf(fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent.class));
+        var last = ((fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent) events.getLast()).settings();
+        assertThat(last.ccl().blockedCcls()).containsExactly("Gore");
+        assertThat(last.tw().enabled()).isTrue();
+        assertThat(last.noGame().twitchGameName()).isEqualTo("Just Chatting");
+        assertThat(last.incompleteFallback().ccls()).containsExactly("Drugs");
     }
 
     @Test

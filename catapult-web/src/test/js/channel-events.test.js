@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { html, load, render } from "./helpers.js";
+import { flush, html, load, render } from "./helpers.js";
 
 /** Minimal EventSource stand-in recording every instance and listener. */
 class FakeEventSource {
@@ -86,7 +86,8 @@ describe("subscriptions", () => {
         render();
 
         expect(Object.keys(current().listeners).filter(name => name !== "open" && name !== "error").sort())
-            .toEqual(["BindingDeletedEvent", "ChannelLiveStateEvent", "GameChangedEvent"]);
+            .toEqual(["BindingDeletedEvent", "ChannelConnectionChangedEvent", "ChannelLiveStateEvent",
+                "ChannelSettingsUpdatedEvent", "DtddMappingChangedEvent", "GameChangedEvent"]);
     });
 
     it("subscribes each event only once, adding newly referenced ones on re-render", () => {
@@ -139,6 +140,45 @@ describe("event handling", () => {
     });
 });
 
+describe("events the page catches up on", () => {
+    beforeEach(() => {
+        window.CatapultSpa = { navigate: vi.fn(async () => {}) };
+        window.scrollTo = vi.fn();
+    });
+
+    it("hands the settings to the settings cards", () => {
+        window.CatapultSettings = { apply: vi.fn() };
+        render();
+        const settings = { ccl: { enabled: true, blockedCcls: ["Gambling"] } };
+
+        current().emit("ChannelSettingsUpdatedEvent", { username: "enimaloc", settings });
+
+        expect(CatapultSettings.apply).toHaveBeenCalledWith(settings);
+        delete window.CatapultSettings;
+    });
+
+    it("re-renders the page when a DTDD mapping changed", async () => {
+        render();
+
+        current().emit("DtddMappingChangedEvent", { username: "enimaloc" });
+        await flush();
+
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "");
+    });
+
+    it("re-renders the page for a connection change, but Steam's, whose card follows its own event", async () => {
+        render();
+
+        current().emit("ChannelConnectionChangedEvent", { username: "enimaloc", provider: "STEAM", connected: true });
+        await flush();
+        expect(CatapultSpa.navigate).not.toHaveBeenCalled();
+
+        current().emit("ChannelConnectionChangedEvent", { username: "enimaloc", provider: "XBOX", connected: false });
+        await flush();
+        expect(CatapultSpa.navigate).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe("reconnection", () => {
     beforeEach(() => {
         vi.useFakeTimers();
@@ -165,6 +205,21 @@ describe("reconnection", () => {
         expect(sources()).toHaveLength(2);
         vi.advanceTimersByTime(1);
         expect(sources()).toHaveLength(3);
+    });
+
+    // The server ends every stream after 30 minutes (after its ":open" comment, which EventSource
+    // ignores): the browser reconnects by itself, and the page catches up once the new one opens.
+    it("catches up after a stream the server ended cleanly reconnects by itself", async () => {
+        render();
+        current().emit("open", {});
+        current().emit("error", {});
+        vi.advanceTimersByTime(60000);
+        expect(sources()).toHaveLength(1);
+
+        current().emit("open", {});
+        await vi.runAllTimersAsync();
+        expect(CatapultSpa.navigate).toHaveBeenCalledTimes(1);
+        expect(sources()).toHaveLength(1);
     });
 
     it("leaves a stream reconnecting by itself alone", () => {

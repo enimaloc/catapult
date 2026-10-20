@@ -450,6 +450,38 @@ describe("channel-settings", () => {
         expect([saved().twitchGameId, saved().twitchGameName]).toEqual([null, null]);
     });
 
+    it("sets every card to the settings saved elsewhere, a later save sending them", async () => {
+        CatapultSettings.apply({
+            ccl: { enabled: false, blockedCcls: ["Gore"] },
+            tw: { enabled: true, blockedTws: ["spiders"] },
+            noGame: { twitchGameId: "33214", twitchGameName: "Fortnite", ccls: [],
+                applyOnStreamStart: false, applyOnNoGame: true, applyOnStreamEnd: false },
+            incompleteFallback: { twitchGameId: null, twitchGameName: null, ccls: ["Drugs"] },
+        });
+
+        expect(document.getElementById("no-game-game-input").value).toBe("Fortnite");
+        expect(document.getElementById("no-game-game-id").value).toBe("33214");
+        await click("#ccl-settings-save-btn");
+        await click("#tw-settings-save-btn");
+        await click("#no-game-settings-save-btn");
+        await click("#incomplete-fallback-settings-save-btn");
+        expect(posts()).toEqual([
+            ["/channel/enimaloc/settings/ccl", { cclEnabled: false, blockedCcls: ["Gore"] }],
+            ["/channel/enimaloc/settings/tws", { enabled: true, blockedTws: ["spiders"] }],
+            ["/channel/enimaloc/settings/no-game", {
+                twitchGameId: "33214", twitchGameName: "Fortnite", ccls: [],
+                applyOnStreamStart: false, applyOnNoGame: true, applyOnStreamEnd: false,
+            }],
+            ["/channel/enimaloc/settings/incomplete-fallback", { twitchGameId: null, twitchGameName: null, ccls: ["Drugs"] }],
+        ]);
+    });
+
+    it("ignores settings when the tab isn't there", () => {
+        html("");
+        render();
+        expect(() => CatapultSettings.apply({ ccl: { enabled: true, blockedCcls: [] } })).not.toThrow();
+    });
+
     it("does nothing for viewers without the settings tab", () => {
         html(`<button id="ccl-settings-save-btn"></button>`);
         render();

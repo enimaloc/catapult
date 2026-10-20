@@ -31,9 +31,18 @@
     // added purely via spa:on/spa:switch/spa:value/spa:in; this map — and this map alone —
     // is what a genuinely new concern (not just a new use of an already-wired event) would
     // ever need a line added to.
+    //
+    // The settings come whole, for channel-settings.js to set its cards to. A DTDD mapping's change
+    // carries nothing, and a connection other than Steam's (whose card follows SteamConnectionStateEvent)
+    // has no live state on its card: the page is re-rendered for those.
     const customHandlers = {
         GameChangedEvent: data => CatapultChannel.setCurrentGame(data.bindingId),
         BindingDeletedEvent: data => CatapultChannel.removeBinding(data.bindingId),
+        ChannelSettingsUpdatedEvent: data => window.CatapultSettings?.apply(data.settings),
+        DtddMappingChangedEvent: () => catchUp(),
+        ChannelConnectionChangedEvent: data => {
+            if (data.provider !== "STEAM") catchUp();
+        },
     };
 
     function closeSource() {

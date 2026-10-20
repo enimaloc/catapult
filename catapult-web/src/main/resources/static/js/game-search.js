@@ -13,7 +13,7 @@
  * was rendered with, `{ id, name }`), null once the field is emptied. Given an `initial`, the
  * field holds a game rather than a search: text typed but never picked is no game, so when the
  * field is left it shows the selection back, and a save never pairs a typed name with another
- * game's id.
+ * game's id. select() sets the selection from elsewhere (a save made in another tab).
  */
 window.GameSearch = (function () {
     const MIN_QUERY_LENGTH = 2;
@@ -81,7 +81,14 @@ window.GameSearch = (function () {
             });
         }
 
-        return { selected: () => selected };
+        /** Shows `game` (`{ id, name }`, null for none) as the field's selection, as if picked. */
+        function select(game) {
+            selected = game?.id ? { id: game.id, name: game.name ?? "" } : null;
+            inputEl.value = selected?.name ?? "";
+            resultsEl.replaceChildren();
+        }
+
+        return { selected: () => selected, select };
     }
 
     return { attach };
