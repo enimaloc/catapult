@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AddMemberRequest;
 import fr.enimaloc.catapult.common.dto.admin.CreateGroupRequest;
-import fr.enimaloc.catapult.common.dto.admin.GroupSummary;
+import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.RenameRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserGroup;
@@ -32,15 +32,15 @@ public class ApiAdminGroupsController {
     @Autowired(required = false)
     private AdminEventPublisher events;
 
-    private static GroupSummary summaryOf(UserGroup g) {
-        return new GroupSummary(g.getId(), g.getKey(), g.getName(), g.getDescription(), g.getMembers().size());
+    private static GroupSummaryDto summaryOf(UserGroup g) {
+        return new GroupSummaryDto(g.getId(), g.getKey(), g.getName(), g.getDescription(), g.getMembers().size());
     }
 
     @GetMapping
     @Transactional(readOnly = true)
-    public List<GroupSummary> list() {
+    public List<GroupSummaryDto> list() {
         return groupRepository.findAll().stream()
-            .map(g -> new GroupSummary(g.getId(), g.getKey(), g.getName(), g.getDescription(), g.getMembers().size()))
+            .map(g -> new GroupSummaryDto(g.getId(), g.getKey(), g.getName(), g.getDescription(), g.getMembers().size()))
             .toList();
     }
 
@@ -60,7 +60,7 @@ public class ApiAdminGroupsController {
         group.setDescription(body.description());
         UserGroup saved = groupRepository.save(group);
         if (events != null) {
-            events.groupCreated(new GroupSummary(saved.getId(), saved.getKey(), saved.getName(), saved.getDescription(), 0));
+            events.groupCreated(new GroupSummaryDto(saved.getId(), saved.getKey(), saved.getName(), saved.getDescription(), 0));
         }
     }
 
