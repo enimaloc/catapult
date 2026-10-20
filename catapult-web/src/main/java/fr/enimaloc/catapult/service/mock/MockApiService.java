@@ -963,10 +963,30 @@ public class MockApiService implements ApiService {
         return currentData().getTwitchatEvents();
     }
 
+    /** catapult-api's own limits on an event's payloads (TwitchatEventActionService). */
+    private static final int MAX_TWITCHAT_PAYLOADS = 20;
+    private static final int MAX_TWITCHAT_DATA_JSON = 32_768;
+
+    /** As catapult-api checks them: the number of payloads, their size, then the payloads themselves. */
+    private List<TwitchatValidationError> validateTwitchat(List<TwitchatEventActionDto> payloads) {
+        if (payloads.size() > MAX_TWITCHAT_PAYLOADS) {
+            return List.of(new TwitchatValidationError(MAX_TWITCHAT_PAYLOADS, "action",
+                    "At most " + MAX_TWITCHAT_PAYLOADS + " payloads per event"));
+        }
+        List<TwitchatValidationError> tooBig = new ArrayList<>();
+        for (int i = 0; i < payloads.size(); i++) {
+            String dataJson = payloads.get(i) == null ? null : payloads.get(i).dataJson();
+            if (dataJson != null && dataJson.length() > MAX_TWITCHAT_DATA_JSON) {
+                tooBig.add(new TwitchatValidationError(i, "dataJson", "At most " + MAX_TWITCHAT_DATA_JSON + " characters"));
+            }
+        }
+        return tooBig.isEmpty() ? twitchatValidator.validate(payloads) : tooBig;
+    }
+
     @Override
     public List<TwitchatValidationError> saveTwitchatEvent(String username, String eventType, List<TwitchatEventActionDto> payloads) {
         log.trace("saveTwitchatEvent({}, {})", username, eventType);
-        List<TwitchatValidationError> errors = twitchatValidator.validate(payloads);
+        List<TwitchatValidationError> errors = validateTwitchat(payloads);
         if (errors.isEmpty()) currentData().setTwitchatEvent(eventType, payloads);
         return errors;
     }
@@ -974,7 +994,7 @@ public class MockApiService implements ApiService {
     @Override
     public List<TwitchatValidationError> testTwitchatEvent(String username, String eventType, List<TwitchatEventActionDto> payloads) {
         log.trace("testTwitchatEvent({}, {})", username, eventType);
-        List<TwitchatValidationError> errors = twitchatValidator.validate(payloads);
+        List<TwitchatValidationError> errors = validateTwitchat(payloads);
         if (errors.isEmpty()) {
             // As the API's test: every button shows, its token leading nowhere.
             publishTwitchat(username, eventType, render(payloads, Map.of("gameName", "Jeu de test", "previousGameName", "Jeu précédent"),

@@ -73,15 +73,20 @@ window.CatapultTwitchatEvents = (function () {
     const eventTypeOf = (event) => event.querySelector(".twitchat-event-type").value;
     const url = (path) => `${CatapultChannel.baseUrl()}/twitchat/${path}`;
 
-    /** Errors on the cards they concern: an error's index is its card's among those posted. */
+    /**
+     * Errors on the cards they concern: an error's index is its card's among those posted (one past
+     * the limit for "at most N payloads per event": the first card too many), every error of a card
+     * shown. One that concerns no card posted goes under the event.
+     */
     function showErrors(event, cards, errors) {
-        cards.forEach((card) => { part(card, "errors").textContent = ""; });
+        const byCard = new Map(cards.map((card) => [card, []]));
         const general = [];
         for (const { index, field, message } of errors) {
             const card = cards[index];
-            if (card) part(card, "errors").textContent = `${field}: ${message}`;
+            if (card) byCard.get(card).push(field ? `${field}: ${message}` : message);
             else general.push(message);
         }
+        byCard.forEach((lines, card) => { part(card, "errors").textContent = lines.join(", "); });
         event.querySelector(".twitchat-event-errors").textContent = general.join(" ");
     }
 
