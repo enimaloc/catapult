@@ -157,7 +157,17 @@ public class TwitchatEventDispatcher {
                 action -> actionTokenService.generate(user.getId(), action, applicable.get(action)).toString());
         List<TwitchatPayload> rendered = new ArrayList<>();
         for (TwitchatEventAction row : rows) {
-            renderer.render(row.getAction(), eventActionService.parseData(row.getDataJson())).ifPresent(rendered::add);
+            // A stored row that no longer parses (saved before a check existed, edited in the
+            // database) only loses its own payload, never the event's others.
+            Map<String, Object> data;
+            try {
+                data = eventActionService.parseData(row.getDataJson());
+            } catch (IllegalArgumentException e) {
+                log.warn("Skipping unreadable Twitchat payload {} ({}) of {} for user {}: {}",
+                        row.getPosition(), row.getAction(), type, user.getId(), e.getMessage());
+                continue;
+            }
+            renderer.render(row.getAction(), data).ifPresent(rendered::add);
         }
         publish(user, type, rendered);
     }

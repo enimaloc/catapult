@@ -110,6 +110,17 @@ class TwitchatEventDispatcherTest {
     }
 
     @Test
+    void anUnreadableStoredPayload_isSkipped_andTheOthersStillGo() {
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", "{not json"),
+                row("EXECUTE_TRIGGER", "{\"id\":\"t-1\"}")));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        assertThat(published().payloads()).extracting(p -> p.action()).containsExactly("EXECUTE_TRIGGER");
+    }
+
+    @Test
     void noPreviousCategory_dropsTheRevertButton_withoutMintingIt() {
         when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
                 row("CUSTOM_CHAT_MESSAGE", "{\"message\":\"x\",\"actions\":[{\"label\":\"Revert\",\"url\":\"{{action:REVERT_CATEGORY}}\"}]}")));
