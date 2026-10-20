@@ -4,6 +4,9 @@ import org.springframework.context.support.ResourceBundleMessageSource;
 
 import java.text.MessageFormat;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,6 +21,12 @@ public class RecursiveMessageSource extends ResourceBundleMessageSource {
             Pattern.compile("#\\{([^}]+)}");
 
     private static final int MAX_DEPTH = 10;
+
+    /**
+     * Each code's {@link MessageFormat} per locale, built once as the parent caches its own (the parent
+     * formats under a lock on it, so sharing one is safe); not kept when bundles are reloaded.
+     */
+    private final Map<Locale, Map<String, Optional<MessageFormat>>> formats = new ConcurrentHashMap<>();
 
     @Override
     protected String resolveCodeWithoutArguments(String code, Locale locale) {
@@ -36,8 +45,17 @@ public class RecursiveMessageSource extends ResourceBundleMessageSource {
      */
     @Override
     protected MessageFormat resolveCode(String code, Locale locale) {
+        if (getCacheMillis() >= 0) {
+            return format(code, locale).orElse(null);
+        }
+        return formats.computeIfAbsent(locale, ignored -> new ConcurrentHashMap<>())
+                .computeIfAbsent(code, ignored -> format(code, locale))
+                .orElse(null);
+    }
+
+    private Optional<MessageFormat> format(String code, Locale locale) {
         String message = resolveCodeWithoutArguments(code, locale);
-        return message == null ? null : createMessageFormat(message, locale);
+        return message == null ? Optional.empty() : Optional.of(createMessageFormat(message, locale));
     }
 
     private String resolveReferences(

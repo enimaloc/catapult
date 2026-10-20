@@ -26,6 +26,14 @@ class RecursiveMessageSourceTest {
     }
 
     @Test
+    void aMessageWithArguments_isParsedOnce_andFormatsEachCallsOwn() {
+        assertThat(get("with.args", "Alice")).isEqualTo("Alice uses Catapult");
+        assertThat(get("with.args", "Bob")).isEqualTo("Bob uses Catapult");
+        assertThat(messages.resolveCode("with.args", Locale.ENGLISH)).isSameAs(messages.resolveCode("with.args", Locale.ENGLISH));
+        assertThat(messages.resolveCode("nope", Locale.ENGLISH)).isNull();
+    }
+
+    @Test
     void expandsReferencesToOtherKeys() {
         assertThat(get("greeting")).isEqualTo("Welcome to Catapult");
     }
