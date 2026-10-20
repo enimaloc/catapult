@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.controller;
 
-import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
@@ -49,13 +48,10 @@ class ChannelActionsControllerTest {
     }
 
     @Test
-    void recheckGame_publishesTheGameNowDetected() throws Exception {
-        when(apiService.currentGame("enimaloc")).thenReturn(new GameDto("b1", "Halo", "XBOX"));
-
+    void recheckGame_publishesNothingItself() throws Exception {
         mvc.perform(post("/channel/enimaloc/game/recheck").with(csrf()));
 
-        assertThat(events.stream(GameChangedEvent.class))
-                .containsExactly(new GameChangedEvent("enimaloc", "b1", "XBOX", "Halo"));
+        assertThat(events.stream(GameChangedEvent.class)).isEmpty();
     }
 
     @Test
