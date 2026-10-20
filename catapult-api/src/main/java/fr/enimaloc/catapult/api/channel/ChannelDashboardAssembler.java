@@ -26,6 +26,7 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
 import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.steam.SteamApiClient;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -107,6 +108,8 @@ public class ChannelDashboardAssembler {
         boolean owner = isOwner(viewer, channel);
         Optional<DetectedGame> detected = gameStateService.getLastKnownGame(channel);
         Optional<UserSettings> settings = userSettingsRepository.findById(channel.getId());
+        // One read (or creation, on a first view) for both the OBS and the Twitchat parts
+        TwitchatWidgetSettings widget = owner ? twitchatWidgetSettingsService.getOrCreate(channel) : null;
 
         return new ChannelPageData(
                 channelUser(channel),
@@ -125,8 +128,8 @@ public class ChannelDashboardAssembler {
                 steamData(channel, owner),
                 xboxEnabled ? new XboxData(hasXboxToken(channel)) : null,
                 owner ? minecraftData(channel) : null,
-                owner ? obsData(channel) : null,
-                owner ? twitchatData(channel) : null,
+                owner ? obsData(widget) : null,
+                owner ? TwitchatData.of(widget.getTwitchatBranch()) : null,
                 exampleUuid(channel, owner, detected));
     }
 
@@ -186,16 +189,10 @@ public class ChannelDashboardAssembler {
                 .orElse(null);
     }
 
-    /** The Twitchat relay's OBS settings; getOrCreate() may insert the row on first view. */
-    private ObsData obsData(UserAccount channel) {
-        var settings = twitchatWidgetSettingsService.getOrCreate(channel);
+    /** The Twitchat relay's OBS settings, without the password itself. */
+    private static ObsData obsData(TwitchatWidgetSettings settings) {
         return new ObsData(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
                 settings.getObsPasswordEncrypted() != null);
-    }
-
-    /** The Twitchat API the channel's pages speak, from the same settings row as obsData(). */
-    private TwitchatData twitchatData(UserAccount channel) {
-        return TwitchatData.of(twitchatWidgetSettingsService.getOrCreate(channel).getTwitchatBranch());
     }
 
     /**

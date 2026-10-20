@@ -184,6 +184,7 @@ class ChannelDashboardAssemblerTest {
             assertThat(page.obs()).isEqualTo(new ObsData(true, "10.0.0.2", 4456, false));
             assertThat(page.twitchat()).isEqualTo(new TwitchatData("beta", List.of("stable", "beta")));
             assertThat(page.minecraft()).isEqualTo(new MinecraftData("NONE", null, null));
+            verify(twitchat, org.mockito.Mockito.times(1)).getOrCreate(owner);
         }
 
         @Test
