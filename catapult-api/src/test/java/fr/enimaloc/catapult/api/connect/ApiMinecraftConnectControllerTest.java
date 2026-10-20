@@ -45,7 +45,7 @@ class ApiMinecraftConnectControllerTest {
     @BeforeEach
     void setup() {
         controller = new ApiMinecraftConnectController(friendService, userAccountRepository, gateService,
-                new MinecraftLinkStateService(friendService, gateService, accountRepository));
+                new MinecraftLinkStateService(friendService, gateService, accountRepository), channelEventPublisher);
         user = new UserAccount();
         UUID userId = UUID.randomUUID();
         when(jwt.getSubject()).thenReturn(userId.toString());
