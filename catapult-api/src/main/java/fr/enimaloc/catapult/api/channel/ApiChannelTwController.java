@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.TwEnabledBody;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,7 +26,8 @@ import java.util.UUID;
  * <p>
  * Ownership is enforced inside {@link BindingService} via
  * {@code findByIdAndUser(bindingId, user)}: any request whose resolved user does not own
- * the binding is silently a no-op (404-like behavior).
+ * the binding is silently a no-op (404-like behavior). Each change goes out to the owner's dashboards
+ * as the binding's new state.
  */
 @RestController
 @RequestMapping("/api/channel/bindings/{bindingId}")
@@ -34,6 +36,7 @@ public class ApiChannelTwController {
 
     private final BindingService bindingService;
     private final ApiUserResolver userResolver;
+    private final ChannelEventPublisher channelEventPublisher;
 
     @PostMapping("/tws")
     public ResponseEntity<Void> saveTws(@PathVariable UUID bindingId,
@@ -42,6 +45,7 @@ public class ApiChannelTwController {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         bindingService.setTwsForBinding(user, bindingId,
                 body.tws() == null ? Set.of() : body.tws());
+        publishBinding(user, bindingId);
         return ResponseEntity.noContent().build();
     }
 
@@ -50,6 +54,7 @@ public class ApiChannelTwController {
                                          @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         bindingService.resetTws(user, bindingId);
+        publishBinding(user, bindingId);
         return ResponseEntity.noContent().build();
     }
 
@@ -59,6 +64,7 @@ public class ApiChannelTwController {
                                                 @RequestBody TwEnabledBody body) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         bindingService.toggleTwEnabled(user, bindingId, body.enabled());
+        publishBinding(user, bindingId);
         return ResponseEntity.noContent().build();
     }
 
@@ -69,4 +75,9 @@ public class ApiChannelTwController {
         return Map.of("preview", bindingService.previewTws(user, bindingId));
     }
 
+    /** Tells the owner's dashboards about the binding's new state (nothing if it isn't theirs). */
+    private void publishBinding(UserAccount user, UUID bindingId) {
+        bindingService.findBinding(user, bindingId)
+                .ifPresent(binding -> channelEventPublisher.bindingUpserted(user.getId(), binding));
+    }
 }

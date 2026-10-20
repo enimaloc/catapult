@@ -8,7 +8,6 @@ import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
-import fr.enimaloc.catapult.service.binding.BindingDto;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
@@ -40,7 +39,7 @@ public class GameEventListener {
         // for this user) or refreshed an INCOMPLETE one. Either way the channel
         // page needs to see it — ApiChannelActionsController only publishes for
         // user-initiated mutations, not for scheduler-triggered creations.
-        channelEventPublisher.bindingUpserted(user.getId(), BindingDto.from(binding));
+        channelEventPublisher.bindingUpserted(user.getId(), binding);
 
         if (binding.isIgnored()) {
             log.debug("Binding is ignored — applying no-game fallback for user {}", user.getId());

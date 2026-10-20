@@ -1,102 +1,148 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.service.binding.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.event.ChannelEvents;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
-import fr.enimaloc.catapult.service.settings.UserSettingsDto;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class ChannelEventPublisherTest {
 
-    @Test
-    void bindingUpserted_publishesFullDto() {
-        RedisEventPublisher redis = mock(RedisEventPublisher.class);
-        ChannelEventPublisher publisher = new ChannelEventPublisher(redis);
-        UUID ownerId = UUID.randomUUID();
-        BindingDto dto = new BindingDto(
-                UUID.randomUUID().toString(),
-                "STEAM",
-                "Skyrim",
-                "Skyrim",
-                Set.of("ccl1"),
-                "AUTO",
-                true,
-                false
-        );
+    private final RedisEventPublisher redis = mock(RedisEventPublisher.class);
+    private final UserAccountRepository accounts = mock(UserAccountRepository.class);
+    private final GameBindingRepository bindings = mock(GameBindingRepository.class);
+    private final ChannelEventPublisher publisher = new ChannelEventPublisher(redis, accounts, bindings);
+    private final UUID ownerId = UUID.randomUUID();
+    private UserAccount owner;
 
-        publisher.bindingUpserted(ownerId, dto);
+    @BeforeEach
+    void setUp() {
+        owner = new UserAccount();
+        owner.setId(ownerId);
+        owner.setTwitchUsername("StreamerName");
+        when(accounts.findById(ownerId)).thenReturn(Optional.of(owner));
+    }
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(redis).publishChannel(eq(ownerId), eq("binding.upserted"), captor.capture());
-        Map<String, Object> payload = captor.getValue();
-        assertThat(payload).containsKey("binding");
-        assertThat(payload.get("binding")).isEqualTo(dto);
+    private Object published(String name) {
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(redis).publishChannel(eq(ownerId), eq(name), captor.capture());
+        return captor.getValue();
     }
 
     @Test
-    void settingsUpdated_publishesFullDto() {
-        RedisEventPublisher redis = mock(RedisEventPublisher.class);
-        ChannelEventPublisher publisher = new ChannelEventPublisher(redis);
-        UUID ownerId = UUID.randomUUID();
-        UserSettingsDto dto = new UserSettingsDto(
-                new UserSettingsDto.Ccl(true, Set.of("ccl1")),
-                new UserSettingsDto.Tw(false, Set.of()),
-                new UserSettingsDto.NoGame("123", "Just Chatting", Set.of("ccl2"), true, true, false),
-                new UserSettingsDto.IncompleteFallback("456", "Science & Technology", Set.of())
-        );
+    void everyPayload_namesTheChannelByIdAndLowerCaseLogin() {
+        publisher.botToggled(ownerId, true);
 
-        publisher.settingsUpdated(ownerId, dto);
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(redis).publishChannel(eq(ownerId), eq("settings.updated"), captor.capture());
-        Map<String, Object> payload = captor.getValue();
-        assertThat(payload).containsKey("settings");
-        assertThat(payload.get("settings")).isEqualTo(dto);
+        assertThat(published(ChannelEvents.BOT_TOGGLED))
+                .isEqualTo(new ChannelEvents.BotToggled(ownerId.toString(), "streamername", true));
     }
 
     @Test
-    void steamProfileChanged_publishesFullDto() {
-        RedisEventPublisher redis = mock(RedisEventPublisher.class);
-        ChannelEventPublisher publisher = new ChannelEventPublisher(redis);
-        UUID ownerId = UUID.randomUUID();
-        SteamProfileDto dto = new SteamProfileDto(true, false, true, false, 15L, true, false);
+    void unknownOwner_publishesNothing() {
+        publisher.streamStateChanged(UUID.randomUUID(), true);
 
-        publisher.steamProfileChanged(ownerId, dto);
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(redis).publishChannel(eq(ownerId), eq("steam.profile.changed"), captor.capture());
-        Map<String, Object> payload = captor.getValue();
-        assertThat(payload).containsKey("profile");
-        assertThat(payload.get("profile")).isEqualTo(dto);
+        verify(redis, never()).publishChannel(any(), anyString(), any());
     }
 
     @Test
-    void connectionChanged_publishesFullDto() {
-        RedisEventPublisher redis = mock(RedisEventPublisher.class);
-        ChannelEventPublisher publisher = new ChannelEventPublisher(redis);
-        UUID ownerId = UUID.randomUUID();
-        ProviderConnectionsDto dto = new ProviderConnectionsDto("TWITCH", false, null);
+    void bindingUpserted_publishesTheBindingsWholeState() {
+        GameBinding binding = new GameBinding();
+        binding.setId(UUID.randomUUID());
+        binding.setSourceType(GameBinding.SourceType.STEAM);
+        binding.setSourceName("Skyrim");
+        binding.setTwitchGameId("42");
+        binding.setTwitchGameName("Skyrim");
+        binding.setStatus(GameBinding.Status.AUTO);
+        binding.getCcls().add("ccl1");
+        binding.setTwOverride(true);
+        binding.getTws().add("tw1");
 
-        publisher.connectionChanged(ownerId, dto);
+        publisher.bindingUpserted(ownerId, binding);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(redis).publishChannel(eq(ownerId), eq("connection.changed"), captor.capture());
-        Map<String, Object> payload = captor.getValue();
-        assertThat(payload).containsKey("provider");
-        assertThat(payload.get("provider")).isEqualTo(dto);
+        assertThat(published(ChannelEvents.BINDING_UPSERTED)).isEqualTo(new ChannelEvents.BindingUpserted(
+                ownerId.toString(), "streamername", new BindingDto(binding.getId().toString(), "AUTO", "STEAM",
+                "Skyrim", "42", "Skyrim", false, true, Set.of("ccl1"), true, true, Set.of("tw1"))));
+    }
+
+    @Test
+    void gameDetected_carriesTheBindingOfThatGame() {
+        GameBinding binding = new GameBinding();
+        binding.setId(UUID.randomUUID());
+        DetectedGame game = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+        when(bindings.findByUserAndSourceIdAndSourceType(owner, "570", GameBinding.SourceType.STEAM))
+                .thenReturn(Optional.of(binding));
+
+        publisher.gameDetected(ownerId, game);
+
+        assertThat(published(ChannelEvents.GAME_DETECTED)).isEqualTo(new ChannelEvents.GameDetected(
+                ownerId.toString(), "streamername", binding.getId().toString(), "Dota 2", "STEAM"));
+    }
+
+    @Test
+    void gameDetected_withoutAGame_clearsIt() {
+        publisher.gameDetected(ownerId, null);
+
+        assertThat(published(ChannelEvents.GAME_CLEARED))
+                .isEqualTo(new ChannelEvents.GameCleared(ownerId.toString(), "streamername"));
+    }
+
+    @Test
+    void settingsUpdated_publishesEachPanel() {
+        UserSettings settings = new UserSettings();
+        settings.setCclFeatureEnabled(true);
+        settings.getBlockedCcls().clear();
+        settings.getBlockedCcls().add("ccl1");
+        settings.setNoGameTwitchGameName("Just Chatting");
+
+        publisher.settingsUpdated(ownerId, settings);
+
+        ChannelEvents.SettingsUpdated payload = (ChannelEvents.SettingsUpdated) published(ChannelEvents.SETTINGS_UPDATED);
+        assertThat(payload.settings().ccl()).isEqualTo(new ChannelEvents.Settings.Ccl(true, Set.of("ccl1")));
+        assertThat(payload.settings().noGame().twitchGameName()).isEqualTo("Just Chatting");
+    }
+
+    @Test
+    void steamProfileChanged_publishesTheProfile() {
+        publisher.steamProfileChanged(ownerId, new SteamProfileDto(true, false, true, false, 15L, true, false));
+
+        assertThat(published(ChannelEvents.STEAM_PROFILE_CHANGED)).isEqualTo(new ChannelEvents.SteamProfileChanged(
+                ownerId.toString(), "streamername", new ChannelEvents.SteamProfile(true, false, true, false, 15L, true, false)));
+    }
+
+    @Test
+    void connectionChanged_publishesTheProvidersState() {
+        publisher.connectionChanged(ownerId, new ProviderConnectionsDto("TWITCH", false, null));
+
+        assertThat(published(ChannelEvents.CONNECTION_CHANGED)).isEqualTo(
+                new ChannelEvents.ConnectionChanged(ownerId.toString(), "streamername", "TWITCH", false, null));
+    }
+
+    @Test
+    void minecraftLinkChanged_publishesTheLinkState() {
+        publisher.minecraftLinkChanged(ownerId, "PENDING", "jeb_");
+
+        assertThat(published(ChannelEvents.MINECRAFT_LINK_CHANGED)).isEqualTo(
+                new ChannelEvents.MinecraftLinkChanged(ownerId.toString(), "streamername", "PENDING", "jeb_"));
     }
 }
