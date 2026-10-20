@@ -48,7 +48,7 @@ class AuthControllerTest {
         when(apiService.channelList()).thenReturn(new ChannelListResponse("2", List.of(
                 channel("1", "moderated"), channel("2", "own"))));
 
-        mvc.perform(get("/auth/callback").param("code", "code-1"))
+        mvc.perform(get("/auth/callback").param("code", "code-1").param("state", "s1").session(started(new MockHttpSession(), "s1")))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/channel/own"))
                 .andExpect(request().sessionAttribute(ApiClient.SESSION_JWT_KEY, "the-jwt"));
@@ -64,7 +64,7 @@ class AuthControllerTest {
         session.setAttribute(ApiClient.SESSION_JWT_KEY, "member-jwt");
         session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin-jwt");
 
-        mvc.perform(get("/auth/callback").param("code", "code-1").session(session))
+        mvc.perform(get("/auth/callback").param("code", "code-1").param("state", "s1").session(started(session, "s1")))
                 .andExpect(redirectedUrl("/channel/own"))
                 .andExpect(request().sessionAttribute(ApiClient.SESSION_JWT_KEY, "the-jwt"))
                 .andExpect(request().sessionAttributeDoesNotExist(ImpersonationController.ORIGINAL_JWT_KEY));
@@ -80,7 +80,7 @@ class AuthControllerTest {
         SessionChannels.remember(session, List.of(channel("1", "former")));
         String formerId = session.getId();
 
-        mvc.perform(get("/auth/callback").param("code", "code-1").session(session))
+        mvc.perform(get("/auth/callback").param("code", "code-1").param("state", "s1").session(started(session, "s1")))
                 .andExpect(redirectedUrl("/channel/own"));
 
         assertThat(session.getId()).isNotEqualTo(formerId);
@@ -93,10 +93,57 @@ class AuthControllerTest {
         double failed = logins("failure");
         when(apiService.exchangeCode("expired")).thenReturn(null);
 
-        mvc.perform(get("/auth/callback").param("code", "expired"))
+        mvc.perform(get("/auth/callback").param("code", "expired").param("state", "s1").session(started(new MockHttpSession(), "s1")))
                 .andExpect(redirectedUrl("/login?error"))
                 .andExpect(request().sessionAttributeDoesNotExist(ApiClient.SESSION_JWT_KEY));
         assertThat(logins("failure")).isEqualTo(failed + 1);
+    }
+
+    /** {@code session}, as /auth/login leaves it: a login started with {@code state}, a moment ago. */
+    private static MockHttpSession started(MockHttpSession session, String state) {
+        session.setAttribute(AuthController.STATE_KEY, state + ":" + java.time.Instant.now().toEpochMilli());
+        return session;
+    }
+
+    @Test
+    void login_keepsAStateInTheSession_andSendsItWithTheLogin() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+
+        String target = mvc.perform(get("/auth/login").param("invite", "ABC234").session(session))
+                .andExpect(status().is3xxRedirection()).andReturn().getResponse().getRedirectedUrl();
+
+        String kept = (String) session.getAttribute(AuthController.STATE_KEY);
+        String state = kept.substring(0, kept.lastIndexOf(':'));
+        assertThat(target).isEqualTo("/oauth2/authorization/twitch?web_state=" + state + "&invite=ABC234");
+        assertThat(state).hasSizeGreaterThanOrEqualTo(43);
+    }
+
+    /** Login CSRF: a code the attacker got for their own account cannot log another browser into it. */
+    @Test
+    void callback_forNoLoginThisSessionStarted_isRefused_beforeTheCodeIsUsed() throws Exception {
+        mvc.perform(get("/auth/callback").param("code", "attackers-code"))
+                .andExpect(redirectedUrl("/login?error"));
+        mvc.perform(get("/auth/callback").param("code", "attackers-code").param("state", "other")
+                        .session(started(new MockHttpSession(), "s1")))
+                .andExpect(redirectedUrl("/login?error"));
+        MockHttpSession stale = new MockHttpSession();
+        stale.setAttribute(AuthController.STATE_KEY, "s1:" + java.time.Instant.now().minus(AuthController.STATE_TTL).minusSeconds(1).toEpochMilli());
+        mvc.perform(get("/auth/callback").param("code", "attackers-code").param("state", "s1").session(stale))
+                .andExpect(redirectedUrl("/login?error"));
+
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).exchangeCode(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void callback_usesTheStateUp() throws Exception {
+        when(apiService.exchangeCode("code-1")).thenReturn(new TokenResponse("the-jwt"));
+        when(apiService.channelList()).thenReturn(new ChannelListResponse("2", List.of(channel("2", "own"))));
+        MockHttpSession session = started(new MockHttpSession(), "s1");
+
+        mvc.perform(get("/auth/callback").param("code", "code-1").param("state", "s1").session(session))
+                .andExpect(redirectedUrl("/channel/own"));
+
+        assertThat(session.getAttribute(AuthController.STATE_KEY)).isNull();
     }
 
     @Test
