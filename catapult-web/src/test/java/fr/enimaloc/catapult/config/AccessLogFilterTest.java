@@ -49,6 +49,15 @@ class AccessLogFilterTest {
         assertThat(output).doesNotContain("/actuator/health");
     }
 
+    /** Static assets, the re-served external ones included, only at DEBUG (off by default). */
+    @Test
+    void keepsStaticAssetsOutOfTheInfoLog(CapturedOutput output) throws Exception {
+        for (String uri : new String[]{"/css/app.css", "/js/spa.js", "/assets/ext/fonts/material-icons.css"}) {
+            filter.doFilter(request("GET", uri), new MockHttpServletResponse(), new MockFilterChain());
+            assertThat(output).doesNotContain(uri);
+        }
+    }
+
     @Test
     void logsAFailedRequestAsA500(CapturedOutput output) {
         assertThatThrownBy(() -> filter.doFilter(request("POST", "/me/bot"), new MockHttpServletResponse(),

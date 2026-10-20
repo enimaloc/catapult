@@ -15,7 +15,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 @RequiredArgsConstructor
 class MonitoringWebConfig implements WebMvcConfigurer {
-    private static final String[] STATIC = {"/css/**", "/js/**", "/_static/**"};
+    private static final String[] STATIC = {"/css/**", "/js/**", "/_static/**", "/assets/**"};
 
     private final ObjectProvider<InteractionMetrics> metrics;
     private final ObjectProvider<ApiService> apiService;
