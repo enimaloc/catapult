@@ -439,6 +439,20 @@ class NavEventStreamControllerTest {
     }
 
     @Test
+    void aSessionGoneMeanwhile_neitherFailsNorHoldsUpTheOthers() throws Exception {
+        MockHttpSession gone = loggedIn();
+        navbar(gone, OWN);
+        MockHttpSession other = loggedIn();
+        MvcResult stream = navbar(other, OWN);
+
+        gone.invalidate();
+        controller.remember(gone, List.of(OWN, MODERATED));
+        controller.onChannelLive(new ChannelLiveStateEvent("enimaloc", true));
+
+        assertThat(sent(stream)).contains("NavChannelLive");
+    }
+
+    @Test
     void theListIsKeptInTheSession_andGoesWithIt() throws Exception {
         MockHttpSession session = loggedIn();
         MvcResult stream = navbar(session, OWN);

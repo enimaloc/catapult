@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.cluster.InstanceBus;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
@@ -9,6 +10,8 @@ import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
@@ -18,6 +21,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import tools.jackson.databind.json.JsonMapper;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,6 +31,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -52,6 +58,7 @@ import java.util.function.Supplier;
  * streams are written by {@link SseStreams} (off the publisher's thread, with heartbeats, closed after a
  * while), a stream that cannot take an event being dropped.
  */
+@Slf4j
 @RestController
 public class NavEventStreamController {
     static final String LIVE = "NavChannelLive";
@@ -67,9 +74,18 @@ public class NavEventStreamController {
 
     /**
      * A session with streams open (its id kept: an invalidated session may not tell it), the account it was logged in as then (null if unknown), the token
-     * of that login (a login in the same session replaces it), and those streams.
+     * of that login (a login in the same session replaces it), the channels its navbar lists (kept here, not
+     * written back to the session from outside its requests: it may be gone, or served by another instance),
+     * and those streams.
      */
-    private record Nav(String sessionId, HttpSession session, UUID account, String token, List<SseEmitter> emitters) {}
+    private record Nav(String sessionId, HttpSession session, UUID account, String token,
+                       AtomicReference<List<ChannelDto>> channels, List<SseEmitter> emitters) {}
+
+    /** What {@link #remember} tells every instance: a session's navbar now lists {@code channels}. */
+    record Remembered(String sessionId, List<ChannelDto> channels) {}
+
+    static final String REMEMBER_TOPIC = "nav.channels";
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     /** Only the sessions with a stream open. */
     private final Map<String, Nav> navsBySession = new ConcurrentHashMap<>();
@@ -80,11 +96,16 @@ public class NavEventStreamController {
     private final AnonymousStreams anonymousStreams;
     private final ApiService apiService;
     private final BroadcastState broadcastState;
+    /** Tells the other instances what a navbar lists; null alone (a test). */
+    private final InstanceBus bus;
     /** Makes the streams, by timeout; tests swap it for one whose writes can be made to fail. */
     LongFunction<SseEmitter> emitters = SseEmitter::new;
 
-    public NavEventStreamController(SseStreams sse, ApiService apiService, BroadcastState broadcastState) {
+    public NavEventStreamController(SseStreams sse, ApiService apiService, BroadcastState broadcastState,
+                                    ObjectProvider<InstanceBus> bus) {
         this.sse = sse;
+        this.bus = bus.getIfAvailable();
+        if (this.bus != null) this.bus.on(REMEMBER_TOPIC, this::remembered);
         streams = sse.sessionStreams("nav");
         anonymousStreams = sse.anonymousStreams(AnonymousStreams.STREAM);
         this.apiService = apiService;
@@ -117,7 +138,8 @@ public class NavEventStreamController {
             Nav current = nav;
             if (current == null || !Objects.equals(current.account(), account) || !Objects.equals(current.token(), token)) {
                 if (current != null) former.addAll(current.emitters());
-                current = new Nav(sessionId, session, account, token, new CopyOnWriteArrayList<>());
+                current = new Nav(sessionId, session, account, token, new AtomicReference<>(listed(session)),
+                        new CopyOnWriteArrayList<>());
             }
             current.emitters().add(emitter);
             return current;
@@ -139,9 +161,43 @@ public class NavEventStreamController {
         return emitter;
     }
 
-    /** The channels {@code session}'s navbar now lists (see SpaFragmentController#navChannels). */
+    /**
+     * The channels {@code session}'s navbar now lists (see SpaFragmentController#navChannels): kept in the
+     * session for its streams to come, and told to its streams already open, wherever they are. A session
+     * invalidated meanwhile keeps nothing.
+     */
     public void remember(HttpSession session, List<ChannelDto> channels) {
-        SessionChannels.remember(session, channels);
+        String sessionId;
+        try {
+            SessionChannels.remember(session, channels);
+            sessionId = session.getId();
+        } catch (IllegalStateException e) {
+            return; // invalidated meanwhile
+        }
+        if (bus == null) {
+            remembered(sessionId, List.copyOf(channels));
+        } else {
+            bus.publish(REMEMBER_TOPIC, JSON.writeValueAsString(new Remembered(sessionId, channels)));
+        }
+    }
+
+    private void remembered(String message) {
+        Remembered remembered = JSON.readValue(message, Remembered.class);
+        remembered(remembered.sessionId(), remembered.channels() == null ? List.of() : List.copyOf(remembered.channels()));
+    }
+
+    private void remembered(String sessionId, List<ChannelDto> channels) {
+        Nav nav = navsBySession.get(sessionId);
+        if (nav != null) nav.channels().set(channels);
+    }
+
+    /** What {@code session} lists, within its own request; none once it is gone. */
+    private static List<ChannelDto> listed(HttpSession session) {
+        try {
+            return SessionChannels.of(session);
+        } catch (IllegalStateException e) {
+            return List.of();
+        }
     }
 
     /**
@@ -182,8 +238,9 @@ public class NavEventStreamController {
         if (event.accountId() == null) return;
         navsBySession.values().stream()
                 .filter(nav -> event.accountId().equals(nav.account()))
-                .filter(this::stillLoggedIn)
-                .forEach(nav -> send(nav, event.name(), event.data()));
+                .forEach(nav -> isolated(nav, () -> {
+                    if (stillLoggedIn(nav)) send(nav, event.name(), event.data());
+                }));
     }
 
     private void broadcastToAll(Broadcast broadcast) {
@@ -197,23 +254,27 @@ public class NavEventStreamController {
     }
 
     private void live(Predicate<ChannelDto> which, boolean live) {
-        navsBySession.values().forEach(nav -> {
-            List<ChannelDto> channels = channelsOf(nav);
+        navsBySession.values().forEach(nav -> isolated(nav, () -> {
+            if (tokenOf(nav.session()) == null) {
+                // Logged out or gone: its streams close (their pages reconnect as what the session is now).
+                nav.emitters().forEach(sse::close);
+                return;
+            }
+            List<ChannelDto> channels = nav.channels().get();
             if (channels.stream().noneMatch(which)) return;
-            SessionChannels.remember(nav.session(), channels.stream().map(c -> which.test(c)
+            nav.channels().set(channels.stream().map(c -> which.test(c)
                     ? new ChannelDto(c.id(), c.twitchId(), c.twitchUsername(), c.profileImageUrl(), live) : c).toList());
             channels.stream().filter(which)
                     .forEach(channel -> send(nav, LIVE, new NavChannelLive(channel.twitchUsername(), live)));
-        });
+        }));
     }
 
-    /** What {@code nav}'s session lists; none once that session is gone, whose streams then close. */
-    private List<ChannelDto> channelsOf(Nav nav) {
+    /** {@code action} for {@code nav} alone: whatever goes wrong with one session, the others still get theirs. */
+    private void isolated(Nav nav, Runnable action) {
         try {
-            return SessionChannels.of(nav.session());
-        } catch (IllegalStateException e) {
-            nav.emitters().forEach(sse::close);
-            return List.of();
+            action.run();
+        } catch (RuntimeException e) {
+            log.warn("Dropped an event for a navbar's session: {}", e.toString());
         }
     }
 
