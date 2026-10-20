@@ -197,4 +197,43 @@ class ExternalAssetsTest {
         assertThat(text(assets.twitchatIcon(COMMIT, "add"))).contains("new");
         assertThat(server.takeRequest(1, TimeUnit.SECONDS)).isNotNull();
     }
+
+    /** The style sheet blocks a page's rendering: an upstream down must not take the icons with it. */
+    @Test
+    void anExpiredFile_isServedAsKept_whileItsUpstreamFails_thenAskedAgainAfterAWhile() throws Exception {
+        server.enqueue(new MockResponse().setBody("<svg/>"));
+        server.enqueue(new MockResponse().setResponseCode(500));
+        server.enqueue(new MockResponse().setBody("<svg id=\"new\"/>"));
+        assets.twitchatIcon(COMMIT, "add");
+        clock.advance(ExternalAssets.Kind.SVG.ttl.plus(Duration.ofSeconds(1)));
+
+        assertThat(text(assets.twitchatIcon(COMMIT, "add"))).isEqualTo("<svg/>");
+        assertThat(text(assets.twitchatIcon(COMMIT, "add"))).isEqualTo("<svg/>");
+        assertThat(server.getRequestCount()).isEqualTo(2);
+
+        clock.advance(ExternalAssets.MISSING_TTL.plus(Duration.ofSeconds(1)));
+        assertThat(text(assets.twitchatIcon(COMMIT, "add"))).contains("new");
+    }
+
+    @Test
+    void fetchIconFonts_fetchesTheStyleSheet_thenEachFontItNames() throws Exception {
+        server.enqueue(new MockResponse().setBody("@font-face { src: url(" + base + "gstatic/" + FONT + ") format('woff2'); }"));
+        server.enqueue(new MockResponse().setBody("woff2"));
+
+        assets.fetchIconFonts();
+
+        assertThat(server.takeRequest().getPath()).isEqualTo("/icon?family=Material+Icons");
+        assertThat(server.takeRequest().getPath()).isEqualTo("/gstatic/" + FONT);
+        assertThat(text(assets.font(FONT))).isEqualTo("woff2");
+        assertThat(server.getRequestCount()).isEqualTo(2);
+    }
+
+    @Test
+    void fetchIconFonts_stopsAtAStyleSheetItCantHave() {
+        server.enqueue(new MockResponse().setResponseCode(500));
+
+        assets.fetchIconFonts();
+
+        assertThat(server.getRequestCount()).isEqualTo(1);
+    }
 }
