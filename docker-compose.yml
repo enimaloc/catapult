@@ -39,11 +39,12 @@ services:
     # Several instances can run behind the TLS proxy in front (sessions and browser events go through
     # Redis): raise CATAPULT_WEB_REPLICAS, or `docker compose up --scale catapult-web=N`, and give
     # WEB_PORTS one host port per instance (e.g. 8081-8083) for the proxy to balance across. No fixed
-    # container_name, so the replicas don't collide.
+    # container_name, so the replicas don't collide. Published on the loopback only (WEB_BIND): catapult-web
+    # trusts the X-Forwarded-* of private addresses, which only the TLS proxy in front may send it.
     deploy:
       replicas: ${CATAPULT_WEB_REPLICAS:-1}
     ports:
-      - "${WEB_PORTS:-80}:8081"
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORTS:-80}:8081"
     environment:
       - CATAPULT_API_URL=${CATAPULT_API_URL:-http://catapult-api:8080}
       - REDIS_HOST=catapult-redis
