@@ -35,6 +35,11 @@ services:
     build:
       context: .
       dockerfile: catapult-web/Dockerfile
+    # Several instances can run behind the router (sessions and browser events go through Redis):
+    # raise CATAPULT_WEB_REPLICAS, or `docker compose up --scale catapult-web=N`. No fixed
+    # container_name or host port here, so the replicas don't collide.
+    deploy:
+      replicas: ${CATAPULT_WEB_REPLICAS:-1}
     environment:
       - CATAPULT_API_URL=${CATAPULT_API_URL:-http://catapult-api:8080}
       - REDIS_HOST=catapult-redis
