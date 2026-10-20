@@ -46,6 +46,7 @@ class InteractionMetricsInterceptorTest {
     @BeforeEach
     void loggedInAsTheMember() {
         when(apiService.currentUserId()).thenReturn(MEMBER);
+        fr.enimaloc.catapult.controller.ApiServiceStubs.actionsAnswer(apiService, 204);
     }
 
     /** A session logged in as {@link #MEMBER}, listing {@code channels}. */
