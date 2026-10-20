@@ -2,9 +2,9 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminInvitePageData;
 import fr.enimaloc.catapult.common.dto.admin.AdminInviteQuotaRequest;
-import fr.enimaloc.catapult.common.dto.admin.AdminInviteRedemptionDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminWhitelistRedemptionDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminInviteRow;
-import fr.enimaloc.catapult.common.dto.admin.GlobalSettingsRequest;
+import fr.enimaloc.catapult.common.dto.admin.InviteSettingsRequest;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.domain.access.AlphaInvite;
 import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
@@ -58,7 +58,7 @@ public class ApiAdminInviteController {
                 inv.getCreatedAt(),
                 inv.getRegeneratedAt(),
                 redemptions.stream()
-                    .map(r -> new AdminInviteRedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
+                    .map(r -> new AdminWhitelistRedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
                     .toList()
             );
         }).toList();
@@ -81,7 +81,7 @@ public class ApiAdminInviteController {
 
     @PostMapping("/settings")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateSettings(@RequestBody GlobalSettingsRequest body) {
+    public void updateSettings(@RequestBody InviteSettingsRequest body) {
         inviteService.setGlobalMaxMembers(body.globalMaxMembers());
         inviteService.setDefaultMaxUses(body.defaultMaxUses());
         inviteService.setDefaultCanReinvite(body.defaultCanReinvite());

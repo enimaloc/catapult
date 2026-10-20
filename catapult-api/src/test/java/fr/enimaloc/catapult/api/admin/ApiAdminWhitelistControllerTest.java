@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AddRequest;
-import fr.enimaloc.catapult.common.dto.admin.AdminWhitelistQuotaRequest;
+import fr.enimaloc.catapult.common.dto.admin.AdminInviteQuotaRequest;
 import fr.enimaloc.catapult.common.dto.admin.AdminWhitelistRedemptionDto;
 import fr.enimaloc.catapult.common.dto.admin.InviteSettingsRequest;
 import fr.enimaloc.catapult.domain.access.AlphaInvite;
@@ -94,7 +94,7 @@ class ApiAdminWhitelistControllerTest {
 
         controller.toggleInvites();
         controller.updateInviteSettings(new InviteSettingsRequest(100, 2, true));
-        controller.updateInviteQuota(inviteId, new AdminWhitelistQuotaRequest(5, false));
+        controller.updateInviteQuota(inviteId, new AdminInviteQuotaRequest(5, false));
 
         verify(invites).setInviteEnabled(false);
         verify(invites).setGlobalMaxMembers(100);
