@@ -59,7 +59,7 @@
              them once validated or proposed, instead of re-rendering the page. */-->
         <div th:if="${dtddMapping.current() != null}">
             <span th:text="${dtddMapping.current().name() ?: '—'}">DTDD name</span>
-            <mdui-chip id="dtdd-confidence" th:text="${dtddMapping.current().confidence() * 100} + '%'">confidence</mdui-chip>
+            <mdui-chip id="dtdd-confidence" th:text="${#numbers.formatDecimal(dtddMapping.current().confidence() * 100, 1, 0)} + '%'">confidence</mdui-chip>
             <mdui-chip id="dtdd-verified" th:classappend="${dtddMapping.current().verified()} ? '' : 'hidden'"
                        th:text="#{channel.dtdd.verified}">
                 Vérifié
