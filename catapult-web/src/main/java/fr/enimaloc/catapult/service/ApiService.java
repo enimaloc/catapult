@@ -340,4 +340,16 @@ public interface ApiService {
 
     /** A card's help in {@code locale}'s language (catapult-api's own message bundles, HTML); null when catapult-api fails. */
     fr.enimaloc.catapult.common.dto.HelpContent help(String cardId, java.util.Locale locale);
+
+    /**
+     * Where the member's Steam-linking popup goes: Steam's OpenID login as catapult-api prepared it (the mock
+     * links at once and answers its closing page); null when logged out or catapult-api fails.
+     */
+    String steamConnectUrl();
+    /** Unlinks the member's Steam account; catapult-api's status (204), 502 when unreachable. */
+    int steamDisconnect();
+    /** catapult-api's public changelog, newest version first; null when it can't give it. */
+    List<fr.enimaloc.catapult.dto.changelog.ChangelogSection> changelog();
+    /** Whether catapult-api answers and reports itself up (its health, asked without the session's bearer). */
+    boolean apiAvailable();
 }

@@ -409,6 +409,16 @@ public class MockData {
         minecraftLink = MINECRAFT_UNLINKED;
     }
 
+    /** Links a Steam account, as Steam's login sends the popup back: its diagnostics stay as they were. */
+    public void steamConnect() {
+        hasSteam = true;
+    }
+
+    /** Unlinks the Steam account, as catapult-api's disconnect: the personal token stays. */
+    public void steamDisconnect() {
+        hasSteam = false;
+    }
+
     public void saveSteamToken(boolean shared) {
         hasSteamPersonalToken = true;
         steamTokenShared = shared;

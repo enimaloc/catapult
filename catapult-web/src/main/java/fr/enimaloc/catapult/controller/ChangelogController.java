@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.dto.changelog.ChangelogSection;
-import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.ApiService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -27,18 +27,18 @@ public class ChangelogController {
     private record Cached(List<ChangelogSection> sections, Instant until) {}
 
     private final ModelFiller filler;
-    private final ApiClient apiClient;
+    private final ApiService apiService;
     private final Clock clock;
     private volatile Cached cached;
 
     @Autowired
-    public ChangelogController(ModelFiller filler, ApiClient apiClient) {
-        this(filler, apiClient, Clock.systemUTC());
+    public ChangelogController(ModelFiller filler, ApiService apiService) {
+        this(filler, apiService, Clock.systemUTC());
     }
 
-    ChangelogController(ModelFiller filler, ApiClient apiClient, Clock clock) {
+    ChangelogController(ModelFiller filler, ApiService apiService, Clock clock) {
         this.filler = filler;
-        this.apiClient = apiClient;
+        this.apiService = apiService;
         this.clock = clock;
     }
 
@@ -62,9 +62,8 @@ public class ChangelogController {
         Instant now = clock.instant();
         Cached current = cached;
         if (current != null && now.isBefore(current.until())) return current.sections();
-        ApiClient.Result<ChangelogSection[]> result = apiClient.getAnonymous("/api/changelog", ChangelogSection[].class);
-        if (!result.ok() || result.body() == null) return null;
-        List<ChangelogSection> sections = List.of(result.body());
+        List<ChangelogSection> sections = apiService.changelog();
+        if (sections == null) return null;
         cached = new Cached(sections, now.plus(TTL));
         return sections;
     }

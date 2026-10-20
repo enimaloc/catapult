@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
-import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.ApiService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -23,17 +23,17 @@ public class StatusController {
 
     private record Cached(boolean available, Instant until) {}
 
-    private final ApiClient apiClient;
+    private final ApiService apiService;
     private final Clock clock;
     private volatile Cached cached;
 
     @Autowired
-    public StatusController(ApiClient apiClient) {
-        this(apiClient, Clock.systemUTC());
+    public StatusController(ApiService apiService) {
+        this(apiService, Clock.systemUTC());
     }
 
-    StatusController(ApiClient apiClient, Clock clock) {
-        this.apiClient = apiClient;
+    StatusController(ApiService apiService, Clock clock) {
+        this.apiService = apiService;
         this.clock = clock;
     }
 
@@ -46,9 +46,7 @@ public class StatusController {
         Instant now = clock.instant();
         Cached current = cached;
         if (current != null && now.isBefore(current.until())) return current.available();
-        @SuppressWarnings("rawtypes")
-        ApiClient.Result<Map> health = apiClient.getAnonymous("/api/health", Map.class);
-        boolean available = health.ok() && health.body() != null && "UP".equals(health.body().get("status"));
+        boolean available = apiService.apiAvailable();
         cached = new Cached(available, now.plus(TTL));
         return available;
     }

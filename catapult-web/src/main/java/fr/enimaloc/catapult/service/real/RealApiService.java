@@ -77,6 +77,8 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
+import fr.enimaloc.catapult.common.dto.connect.SteamStartResponse;
+import fr.enimaloc.catapult.dto.changelog.ChangelogSection;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -889,5 +891,30 @@ public class RealApiService implements ApiService {
     @Override
     public fr.enimaloc.catapult.common.dto.HelpContent help(String cardId, java.util.Locale locale) {
         return client.getLocalized("/api/help/{cardId}", fr.enimaloc.catapult.common.dto.HelpContent.class, locale, cardId);
+    }
+
+    @Override
+    public String steamConnectUrl() {
+        if (!ApiClient.hasSession()) return null;
+        SteamStartResponse start = client.get("/api/connect/steam/start", SteamStartResponse.class);
+        return start == null ? null : start.redirectUrl();
+    }
+
+    @Override
+    public int steamDisconnect() {
+        return client.call(HttpMethod.POST, "/api/connect/steam/disconnect", null, Void.class).status();
+    }
+
+    @Override
+    public List<ChangelogSection> changelog() {
+        ApiClient.Result<ChangelogSection[]> result = client.getAnonymous("/api/changelog", ChangelogSection[].class);
+        return result.ok() && result.body() != null ? List.of(result.body()) : null;
+    }
+
+    @Override
+    @SuppressWarnings("rawtypes")
+    public boolean apiAvailable() {
+        ApiClient.Result<Map> health = client.getAnonymous("/api/health", Map.class);
+        return health.ok() && health.body() != null && "UP".equals(health.body().get("status"));
     }
 }

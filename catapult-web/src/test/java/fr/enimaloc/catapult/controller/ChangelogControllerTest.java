@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.dto.changelog.ChangelogSection;
 import fr.enimaloc.catapult.dto.changelog.ChangelogSection.Entry;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
-import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -21,8 +20,6 @@ import java.util.Locale;
 import fr.enimaloc.catapult.MutableClock;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -43,13 +40,12 @@ class ChangelogControllerTest {
     };
 
     @Autowired MockMvc mvc;
-    @MockitoBean ApiClient apiClient;
     @MockitoBean ApiService apiService;
     @MockitoBean NavEventStreamController navEvents;
 
     @Test
     void servesTheVersions_fullAndAsAFragment_byKind() throws Exception {
-        when(apiClient.getAnonymous("/api/changelog", ChangelogSection[].class)).thenReturn(new ApiClient.Result<>(200, SECTIONS));
+        when(apiService.changelog()).thenReturn(List.of(SECTIONS));
 
         String full = mvc.perform(get("/changelog").locale(Locale.ENGLISH)).andExpect(status().isOk())
                 .andExpect(view().name("index")).andReturn().getResponse().getContentAsString();
@@ -68,7 +64,7 @@ class ChangelogControllerTest {
 
     @Test
     void saysSo_whenCatapultApiCantGiveIt() throws Exception {
-        when(apiClient.getAnonymous("/api/changelog", ChangelogSection[].class)).thenReturn(new ApiClient.Result<>(502, null));
+        when(apiService.changelog()).thenReturn(null);
 
         String html = mvc.perform(get("/spa/changelog")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -77,20 +73,19 @@ class ChangelogControllerTest {
 
     @Test
     void keepsTheVersionsAFewMinutes_butNotAFailure() {
-        ApiClient client = mock(ApiClient.class);
+        ApiService client = mock(ApiService.class);
         MutableClock clock = new MutableClock(Instant.parse("2026-10-20T10:00:00Z"));
         ChangelogController controller = new ChangelogController(mock(ModelFiller.class), client, clock);
-        when(client.getAnonymous(eq("/api/changelog"), any()))
-                .thenReturn(new ApiClient.Result<>(502, null), new ApiClient.Result<>(200, SECTIONS));
+        when(client.changelog()).thenReturn(null, List.of(SECTIONS));
 
         assertThat(controller.sections()).isNull();
         assertThat(controller.sections()).hasSize(2);
         assertThat(controller.sections()).hasSize(2);
-        verify(client, times(2)).getAnonymous(eq("/api/changelog"), any());
+        verify(client, times(2)).changelog();
 
         clock.advance(ChangelogController.TTL);
         controller.sections();
-        verify(client, times(3)).getAnonymous(eq("/api/changelog"), any());
+        verify(client, times(3)).changelog();
     }
 
     @Test
