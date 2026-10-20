@@ -82,6 +82,27 @@ class TwitchatPayloadValidatorTest {
     }
 
     @Test
+    void aRequiredFieldTheFormHides_isNotRequired() {
+        TwitchatCatalog catalog = new TwitchatCatalog(1, List.of(new TwitchatCatalog.Action("X", Map.of(), "", null, "action", "generated",
+                List.of(new TwitchatCatalog.Field("kind", "select", "kind", null, false,
+                                List.of(new TwitchatCatalog.Option("url", "url", null), new TwitchatCatalog.Option("text", "text", null)),
+                                null, null, null, null),
+                        new TwitchatCatalog.Field("url", "text", "url", null, true, null, null, null, null,
+                                new TwitchatCatalog.Condition("kind", List.of("url")))))));
+        TwitchatPayloadValidator v = new TwitchatPayloadValidator(catalog);
+
+        assertThat(v.validate(List.of(new TwitchatEventActionDto("X", "FORM", "{\"kind\":\"text\"}", true)))).isEmpty();
+        assertThat(v.validate(List.of(new TwitchatEventActionDto("X", "FORM", "{}", true)))).isEmpty();
+        assertThat(v.validate(List.of(new TwitchatEventActionDto("X", "FORM", "{\"kind\":\"url\"}", true))))
+                .extracting(TwitchatValidationError::field).containsExactly("url");
+    }
+
+    @Test
+    void aConditionWithoutValues_neverShowsItsField() {
+        assertThat(new TwitchatCatalog.Condition("kind", null).values()).isEmpty();
+    }
+
+    @Test
     void liveSelect_acceptsAnyValue() {
         assertThat(validate("EXECUTE_TRIGGER", "FORM", "{\"id\":\"deleted-trigger-id\"}")).isEmpty();
     }
