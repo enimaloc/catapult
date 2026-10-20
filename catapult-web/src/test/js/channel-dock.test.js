@@ -63,6 +63,17 @@ describe("active", () => {
     });
 });
 
+describe("dock mode", () => {
+    it("follows the page shown, even one reached by client-side navigation", () => {
+        dock();
+        expect(document.body.classList.contains("obs-dock-mode")).toBe(true);
+
+        html(`<main>other page</main>`);
+        render();
+        expect(document.body.classList.contains("obs-dock-mode")).toBe(false);
+    });
+});
+
 describe("channel-wide switches", () => {
     it("send the CCL feature's state with the blocked CCL unchanged", async () => {
         dock();

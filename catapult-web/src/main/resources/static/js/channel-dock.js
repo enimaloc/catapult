@@ -39,6 +39,9 @@ window.CatapultDock = (function () {
 
     function wire() {
         const dock = document.getElementById("obs-dock");
+        // A dock reached by client-side navigation (OBS opened on another page) sits in a shell rendered
+        // with the app bar: the class hides it, as the server leaves it out of a dock's own shell.
+        document.body.classList.toggle("obs-dock-mode", dock !== null);
         if (!dock) return;
         const { on, postSwitch, checkedValues } = CatapultChannel;
         const base = CatapultChannel.baseUrl();
