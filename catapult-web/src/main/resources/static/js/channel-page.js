@@ -29,8 +29,8 @@ window.CatapultChannel = (function () {
     }
 
     async function refresh() {
-        const path = location.pathname.replace(/^\/+/, "") + location.search;
-        await CatapultSpa.navigate(path, false);
+        // The query goes as the router's `search`: in the path, it would end up in the route's param.
+        await CatapultSpa.navigate(location.pathname.replace(/^\/+|\/+$/g, ""), false, location.search);
     }
 
     function showError(message) {
