@@ -214,7 +214,10 @@ public class ModelFiller {
             return ApiClient.hasSession() ? HttpStatus.NOT_FOUND.value() : HttpStatus.UNAUTHORIZED.value();
         }
         model.addAttribute("channelPage", channelPage);
-        model.addAttribute("channelSettings", apiService.channelSettings(username));
+        // Settings catapult-api failed to give: the settings tab says so, the rest of the page still shows.
+        var settings = apiService.channelSettings(username);
+        model.addAttribute("channelSettings", settings);
+        model.addAttribute("settingsUnavailable", settings == null);
         model.addAttribute("dtddMapping", apiService.dtddMappingStatus(username));
         if (channelPage.isOwner()) {
             var twitchatEvents = channelPage.twitchat() == null ? Map.<String, List<TwitchatEventActionDto>>of()
