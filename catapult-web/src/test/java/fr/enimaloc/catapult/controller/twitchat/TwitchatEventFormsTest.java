@@ -209,7 +209,7 @@ class TwitchatEventFormsTest {
         IntegrationNode.Select icon = (IntegrationNode.Select) byField(forms.payloadCard("STREAM_STARTED", payload), "icon");
 
         assertThat(icon.hasIcons()).isTrue();
-        assertThat(icon.pickedIcon()).startsWith("https://raw.githubusercontent.com/Durss/Twitchat/").endsWith("/src_front/assets/icons/add.svg");
+        assertThat(icon.pickedIcon()).startsWith("/assets/ext/twitchat/").endsWith("/add.svg");
         // More than the API's typing lists: every icon Twitchat's folder holds.
         assertThat(icon.options()).extracting(IntegrationNode.Select.Option::value).contains("bluesky", "folder");
         // The "none" option has no picture.
