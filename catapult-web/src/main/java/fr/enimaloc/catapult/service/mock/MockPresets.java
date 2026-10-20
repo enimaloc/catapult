@@ -82,7 +82,7 @@ public final class MockPresets {
     public static final List<String> BINDING_STATUSES = List.of("AUTO", "MANUAL", "INCOMPLETE");
     public static final List<String> SOURCE_TYPES = List.of("STEAM", "XBOX", "MINECRAFT");
     public static final List<String> MINECRAFT_STATUSES =
-            List.of("NONE", "PENDING", "INVITE_REJECTED", "ACCEPTED", "REMOVED");
+            List.of("NONE", "PENDING", "INVITE_REJECTED", "ACCEPTED", "REMOVED", "FULL");
 
     /** The quick-launch channels: "0" is live, "1" offline. */
     public static final List<ChannelDto> CHANNELS = List.of(
