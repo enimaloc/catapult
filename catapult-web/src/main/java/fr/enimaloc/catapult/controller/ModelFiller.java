@@ -38,7 +38,6 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class ModelFiller {
-    /** Error codes with their own error.<code>.* messages; anything else uses error.generic.*. */
     /** The statuses with their own title and description (error.{code}.*); the others get error.generic.*. */
     static final Set<Integer> DESCRIBED_ERRORS = Set.of(400, 401, 403, 404, 405, 429, 500, 502, 503);
     private static final java.util.regex.Pattern INVITE_CODE = java.util.regex.Pattern.compile("[A-Z2-9]{1,12}");
