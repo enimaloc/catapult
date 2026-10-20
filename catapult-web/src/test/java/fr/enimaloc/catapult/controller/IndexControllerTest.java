@@ -581,4 +581,16 @@ class IndexControllerTest {
                 .andReturn().getResponse().getContentAsString();
         assertThat(html).containsPattern("class=\"notification-empty\"(?![^>]*hidden)");
     }
+
+    @Test
+    void settingsTab_saysSo_whenTheSettingsCantBeLoaded() throws Exception {
+        when(apiService.channelSettings(any())).thenReturn(null);
+
+        for (String url : List.of("/channel/enimaloc", "/spa/channel/enimaloc")) {
+            String html = mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(html).contains("id=\"channel-settings-unavailable\"")
+                    .doesNotContain("id=\"channel-ccl-settings-form\"");
+        }
+    }
 }
