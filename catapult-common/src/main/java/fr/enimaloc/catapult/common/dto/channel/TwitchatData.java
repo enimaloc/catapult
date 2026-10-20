@@ -17,6 +17,6 @@ public record TwitchatData(String branch, List<String> supportedBranches) {
     }
 
     public static boolean isValid(String branch) {
-        return AUTO.equals(branch) || SUPPORTED_BRANCHES.contains(branch);
+        return branch != null && (AUTO.equals(branch) || SUPPORTED_BRANCHES.contains(branch));
     }
 }
