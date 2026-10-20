@@ -32,6 +32,7 @@ public class DtddMappingService {
     private final DtddGameCacheRepository gameRepo;
     private final DtddSearchCacheRepository searchRepo;
     private final DtddApiClient apiClient;
+    private final DtddMappingEvents mappingEvents;
 
     @Setter @Value("${dtdd.cache.search-ttl-days:30}")     private int searchTtlDays;
     @Setter @Value("${dtdd.match.min-confidence:0.85}")    private double minConfidence;
@@ -74,7 +75,10 @@ public class DtddMappingService {
             mapping.setConfidence(0.0);
             mapping.setVerified(false);
         }
-        return mappingRepo.save(mapping);
+        DtddGameMapping saved = mappingRepo.save(mapping);
+        // A first resolution happens on a read: the dashboards showing the game had no mapping until now
+        mappingEvents.mappingChanged(igdbId);
+        return saved;
     }
 
     /** @return null if API failed AND no cache. Empty list if API returned nothing. */

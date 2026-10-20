@@ -28,12 +28,13 @@ class DtddMappingServiceTest {
     @Mock DtddGameCacheRepository gameRepo;
     @Mock DtddSearchCacheRepository searchRepo;
     @Mock DtddApiClient apiClient;
+    @Mock DtddMappingEvents mappingEvents;
 
     DtddMappingService service;
 
     @BeforeEach
     void setUp() {
-        service = new DtddMappingService(mappingRepo, gameRepo, searchRepo, apiClient);
+        service = new DtddMappingService(mappingRepo, gameRepo, searchRepo, apiClient, mappingEvents);
         service.setSearchTtlDays(30);
         service.setMinConfidence(0.85);
         service.setMinCandidateScore(0.30);
@@ -49,6 +50,7 @@ class DtddMappingServiceTest {
         DtddGameMapping result = service.resolve("100", "Stardew Valley");
         assertThat(result).isSameAs(existing);
         verifyNoInteractions(apiClient);
+        verifyNoInteractions(mappingEvents); // nothing changed
     }
 
     @Test
@@ -68,6 +70,7 @@ class DtddMappingServiceTest {
         verify(gameRepo, times(2)).save(any(DtddGameCache.class));
         verify(searchRepo).save(any(DtddSearchCache.class));
         verify(mappingRepo).save(any(DtddGameMapping.class));
+        verify(mappingEvents).mappingChanged("100"); // the dashboards showing the game learn of its first mapping
     }
 
     @Test
@@ -111,5 +114,6 @@ class DtddMappingServiceTest {
         assertThat(result.getDtddId()).isNull();
         // not persisted: avoid blocking future retries when API recovers
         verify(mappingRepo, never()).save(any());
+        verifyNoInteractions(mappingEvents);
     }
 }
