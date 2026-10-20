@@ -96,7 +96,7 @@ class CommonDtoContractTest {
         when(proposals.findByStatusOrderByCreatedAtAsc(DtddMappingProposal.Status.PENDING)).thenReturn(List.of(proposal));
         ApiAdminDtddMappingController controller = new ApiAdminDtddMappingController(proposals,
                 mock(DtddGameMappingRepository.class), mock(DtddTopicsCacheRepository.class),
-                mock(fr.enimaloc.catapult.service.dtdd.DtddMappingEvents.class));
+                mock(fr.enimaloc.catapult.service.dtdd.DtddMappingEvents.class), mock(ApiUserResolver.class));
 
         List<DtddProposalDto> produced = controller.pending("PENDING");
         List<DtddProposalDto> read = JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<>() {});
