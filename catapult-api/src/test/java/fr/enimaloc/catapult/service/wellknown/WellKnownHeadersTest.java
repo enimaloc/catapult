@@ -40,7 +40,7 @@ class WellKnownHeadersTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"Content-Length", "transfer-encoding", "CONNECTION", "Content-Type", "Set-Cookie", "x-content-type-options"})
+    @ValueSource(strings = {"Content-Length", "transfer-encoding", "CONNECTION", "Content-Type", "Content-Encoding", "Set-Cookie", "x-content-type-options"})
     void refusesReservedNames(String name) {
         refused(200, List.of(h(name, "x")));
     }

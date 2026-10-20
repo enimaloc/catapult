@@ -23,7 +23,7 @@ public final class WellKnownHeaders {
 
     private static final Pattern TOKEN = Pattern.compile("[!#$%&'*+.^_`|~0-9A-Za-z-]+");
     private static final Set<String> REFUSED = Set.of("content-length", "transfer-encoding", "connection",
-            "content-type", "set-cookie", "x-content-type-options");
+            "content-type", "content-encoding", "set-cookie", "x-content-type-options");
     private static final Set<Integer> REDIRECTS = Set.of(301, 302, 303, 307, 308);
     /** http(s) with a host (not empty, no whitespace). */
     private static final Pattern ABSOLUTE = Pattern.compile("https?://[^/\\s?#]+.*");
