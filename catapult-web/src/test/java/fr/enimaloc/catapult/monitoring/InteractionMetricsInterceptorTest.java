@@ -53,7 +53,7 @@ class InteractionMetricsInterceptorTest {
     private static MockHttpSession member(ChannelDto... channels) {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(ApiClient.SESSION_JWT_KEY, "jwt");
-        session.setAttribute(SessionChannels.class.getName(), List.of(channels)); // as SessionChannels keeps them
+        SessionChannels.remember(session, List.of(channels));
         return session;
     }
 

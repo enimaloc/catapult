@@ -4,6 +4,8 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.http.HttpSession;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.Optional;
@@ -11,7 +13,8 @@ import java.util.Optional;
 /**
  * The channels a logged-in session can act on (its member's own and those they moderate), as
  * catapult-api last listed them: what its navbar shows, and what its streams may follow. Kept in
- * the session, so it goes with it.
+ * the session, so it goes with it; as JSON text, the session being stored in Redis for every
+ * catapult-web instance to read.
  */
 public final class SessionChannels {
     static final String ATTRIBUTE = SessionChannels.class.getName();
@@ -19,15 +22,28 @@ public final class SessionChannels {
     private SessionChannels() {
     }
 
-    static void remember(HttpSession session, List<ChannelDto> channels) {
-        session.setAttribute(ATTRIBUTE, List.copyOf(channels));
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final TypeReference<List<ChannelDto>> CHANNELS = new TypeReference<>() {};
+
+    public static void remember(HttpSession session, List<ChannelDto> channels) {
+        session.setAttribute(ATTRIBUTE, JSON.writeValueAsString(channels));
+    }
+
+    /** Forgets what {@code session} listed: it now acts as another account, whose list is to be read. */
+    public static void forget(HttpSession session) {
+        session.removeAttribute(ATTRIBUTE);
     }
 
     /** What {@code session} last listed; none yet. Throws IllegalStateException once it is gone. */
-    @SuppressWarnings("unchecked")
     static List<ChannelDto> of(HttpSession session) {
-        Object channels = session.getAttribute(ATTRIBUTE);
-        return channels == null ? List.of() : (List<ChannelDto>) channels;
+        if (!(session.getAttribute(ATTRIBUTE) instanceof String channels)) {
+            return List.of();
+        }
+        try {
+            return List.copyOf(JSON.readValue(channels, CHANNELS));
+        } catch (RuntimeException e) {
+            return List.of(); // written by another version: listed again on the next page
+        }
     }
 
     /**
