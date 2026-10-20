@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.real;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.AppConfigResponse;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
@@ -291,6 +292,11 @@ public class RealApiService implements ApiService {
     @Override
     public UserSettingsDto channelSettings(String username) {
         return client.get("/api/channels/{username}/settings", UserSettingsDto.class, username);
+    }
+
+    @Override
+    public BindingDto currentBinding(String username) {
+        return client.get("/api/channels/{username}/bindings/current", BindingDto.class, username);
     }
 
     @Override

@@ -534,6 +534,11 @@ public class MockData {
         this.steamProfileCacheTtlMinutes = cacheTtlMinutes;
     }
 
+    /** The binding of that id, or null when there's none. */
+    public BindingDto bindingById(String id) {
+        return binding.stream().filter(b -> b.id().equals(id)).findFirst().orElse(null);
+    }
+
     /** The first binding, or null when there's none. */
     public BindingDto getPrimaryBinding() {
         return binding.isEmpty() ? null : binding.getFirst();

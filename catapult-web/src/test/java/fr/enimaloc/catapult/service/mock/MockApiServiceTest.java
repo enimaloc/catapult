@@ -235,6 +235,19 @@ class MockApiServiceTest {
     }
 
     @Test
+    void currentBinding_isTheDetectedGames_nullWhenItHasNone() {
+        loginAs("{}");
+        org.junit.jupiter.api.Assumptions.assumeTrue(bindingId != null);
+        data.setDetectedGame(bindingId, "STEAM", "Valheim");
+        assertThat(service.currentBinding(username)).isEqualTo(data.bindingById(bindingId));
+
+        data.setDetectedGame(null, "STEAM", "Unbound");
+        assertThat(service.currentBinding(username)).isNull();
+        data.setDetectedGame("no-such-binding", "STEAM", "Gone");
+        assertThat(service.currentBinding(username)).isNull();
+    }
+
+    @Test
     void searchGames_matchesCategoryNamesIgnoringCase() {
         assertThat(service.searchGames(username, "VAL")).isEqualTo(List.of(Map.of("id", "508455", "name", "Valheim")));
         assertThat((List<?>) service.searchGames(username, "")).hasSize(MockPresets.CATEGORIES.size());
