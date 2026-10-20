@@ -29,6 +29,11 @@ final class AdminAccess {
         }
     }
 
+    /** An admin action forwarded to catapult-api, answered with its status; refused first for a non-admin (see {@link #require}). */
+    static ResponseEntity<Void> relay(ModelFiller filler, IntSupplier action) {
+        return relay(filler, action, () -> { });
+    }
+
     /**
      * An admin action forwarded to catapult-api, answered with its status; {@code onSuccess} runs after
      * a 2xx (a cache the change makes stale). Refused first for a non-admin (see {@link #require}).

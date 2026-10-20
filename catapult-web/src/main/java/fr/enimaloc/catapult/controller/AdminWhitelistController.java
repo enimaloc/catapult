@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
-import java.util.function.IntSupplier;
 
 /**
  * The admin Whitelist tab's actions (the two switches, add and delete an entry, the invitation
@@ -31,39 +30,39 @@ public class AdminWhitelistController {
 
     @PostMapping("/toggle")
     public ResponseEntity<Void> toggle() {
-        return relay(apiService::adminToggleWhitelist);
+        return AdminAccess.relay(filler, apiService::adminToggleWhitelist);
     }
 
     @PostMapping("/add")
     public ResponseEntity<Void> add(@RequestBody AddBody body) {
         String id = body.twitchId() == null ? "" : body.twitchId().trim();
         if (!isTwitchId(id)) return refuse();
-        return relay(() -> apiService.adminAddWhitelist(id));
+        return AdminAccess.relay(filler, () -> apiService.adminAddWhitelist(id));
     }
 
     /** Any listed id, legacy ones included (catapult-api never validated them): in the body, safe from the firewall. */
     @PostMapping("/delete")
     public ResponseEntity<Void> delete(@RequestBody AddBody body) {
         if (body.twitchId() == null || body.twitchId().isBlank()) return refuse();
-        return relay(() -> apiService.adminDeleteWhitelist(body.twitchId()));
+        return AdminAccess.relay(filler, () -> apiService.adminDeleteWhitelist(body.twitchId()));
     }
 
     @PostMapping("/invite/toggle")
     public ResponseEntity<Void> toggleInvites() {
-        return relay(apiService::adminToggleInvites);
+        return AdminAccess.relay(filler, apiService::adminToggleInvites);
     }
 
     @PostMapping("/invite/settings")
     public ResponseEntity<Void> saveSettings(@RequestBody SettingsBody body) {
         if (negative(body.defaultMaxUses()) || (body.globalMaxMembers() != null && body.globalMaxMembers() < 1)) return refuse();
-        return relay(() -> apiService.adminSaveInviteSettings(body.globalMaxMembers(), body.defaultMaxUses(),
+        return AdminAccess.relay(filler, () -> apiService.adminSaveInviteSettings(body.globalMaxMembers(), body.defaultMaxUses(),
                 Boolean.TRUE.equals(body.defaultCanReinvite())));
     }
 
     @PostMapping("/invite/{id}/quota")
     public ResponseEntity<Void> saveQuota(@PathVariable UUID id, @RequestBody QuotaBody body) {
         if (negative(body.maxUses())) return refuse();
-        return relay(() -> apiService.adminSaveInviteQuota(id, body.maxUses(), body.canReinvite()));
+        return AdminAccess.relay(filler, () -> apiService.adminSaveInviteQuota(id, body.maxUses(), body.canReinvite()));
     }
 
     private static boolean isTwitchId(String id) {
@@ -78,10 +77,5 @@ public class AdminWhitelistController {
     private ResponseEntity<Void> refuse() {
         AdminAccess.require(filler);
         return ResponseEntity.badRequest().build();
-    }
-
-    private ResponseEntity<Void> relay(IntSupplier action) {
-        AdminAccess.require(filler);
-        return ResponseEntity.status(action.getAsInt()).build();
     }
 }
