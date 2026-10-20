@@ -31,7 +31,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-L'application est accessible sur `http://localhost` (port choisi par `WEB_PORTS`, 80 par défaut).
+L'application est accessible sur `http://localhost` (port choisi par `WEB_PORTS`, 80 par défaut, sur la boucle locale).
 
 ### Déploiement
 
@@ -44,8 +44,10 @@ Le proxy TLS placé devant (Caddy, Traefik, Cloudflare…) doit :
 
 - terminer le TLS et parler **HTTP/2** au navigateur (chaque onglet garde des flux SSE ouverts, que HTTP/1.1
   limite à 6 connexions par hôte) ;
-- transmettre `X-Forwarded-For`, `X-Forwarded-Proto` et `X-Forwarded-Host` (les adresses de retour Twitch et
-  Steam en dépendent) ;
+- transmettre `X-Forwarded-For`, `X-Forwarded-Proto` et `X-Forwarded-Host` en **remplaçant** ceux du visiteur
+  (les adresses de retour Twitch et Steam en dépendent, et `catapult-web` croit ceux d'une adresse privée) ;
+- être le seul à joindre `catapult-web` : le port est publié sur `127.0.0.1` (`WEB_BIND`) ; ne l'ouvrir
+  (`WEB_BIND=0.0.0.0`) que si le proxy est sur une autre machine, derrière un pare-feu qui ne laisse passer que lui ;
 - ne pas mettre en tampon les réponses `text/event-stream`, et tolérer des réponses de plusieurs minutes
   (`catapult-web` envoie un battement toutes les 30 s) ;
 - sonder `/up` pour la santé ;
