@@ -1,0 +1,28 @@
+<!--/*@thymesVar id="changelog" type="java.util.List<fr.enimaloc.catapult.dto.changelog.ChangelogSection>"*/-->
+<!--/* catapult-api's versions, newest first (ChangelogController): each one's commits by kind. */-->
+<mdui-layout-main th:fragment="changelog">
+    <section class="section privacy-section changelog-section">
+        <div class="section-header">
+            <span class="eyebrow" th:text="#{changelog.eyebrow}">changelog.eyebrow</span>
+            <h1 th:text="#{changelog.title}">changelog.title</h1>
+            <p th:text="#{changelog.description}">changelog.description</p>
+        </div>
+
+        <p th:if="${changelog == null}" id="changelog-unavailable" th:text="#{changelog.unavailable}">changelog.unavailable</p>
+        <p th:if="${changelog != null and changelog.isEmpty()}" id="changelog-empty" th:text="#{changelog.empty}">changelog.empty</p>
+
+        <mdui-card th:each="version : ${changelog}" class="privacy-card changelog-card" variant="outlined">
+            <h2 class="changelog-version" th:text="${version.version()}">1.0.0</h2>
+            <th:block th:each="group : ${version.groups()}">
+                <h3 class="changelog-kind" th:text="#{${'changelog.kind.' + group.kind()}}">changelog.kind</h3>
+                <ul class="changelog-entries">
+                    <li th:each="entry : ${group.entries()}">
+                        <strong th:if="${entry.breaking()}" class="changelog-breaking" th:text="#{changelog.breaking}">BREAKING</strong>
+                        <span th:if="${entry.scope() != null}" class="changelog-scope" th:text="|(${entry.scope()})|">(scope)</span>
+                        <span th:text="${entry.subject()}">subject</span>
+                    </li>
+                </ul>
+            </th:block>
+        </mdui-card>
+    </section>
+</mdui-layout-main>
