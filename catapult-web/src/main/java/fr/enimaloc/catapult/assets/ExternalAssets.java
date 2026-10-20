@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.assets;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -33,7 +35,10 @@ import java.util.regex.Pattern;
  * element against a strict pattern before it gets here. Redirects aren't followed, an answer over
  * its kind's size limit is refused, and the style sheet is rewritten to point at the proxied fonts
  * (one pointing anywhere else is refused). Answers are kept in memory (bounded): an instance fetches
- * each file once a day at most, and only once while it is being fetched.
+ * each file once a day at most, and only once while it is being fetched. A file that can't be fetched
+ * again once expired is served as it was kept, a while longer: an upstream that fails or hangs then
+ * holds no page waiting on it (the style sheet blocks a page's rendering). The style sheet and its
+ * fonts are fetched once the instance is ready, so that its first visitor doesn't wait on them either.
  */
 @Slf4j
 @Component
@@ -90,6 +95,21 @@ public class ExternalAssets {
         return get("css:material-icons", materialIconsCss, Kind.CSS, this::rewriteCss);
     }
 
+    /** Fetches the style sheet and the fonts it names, off the startup thread. */
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmUp() {
+        Thread.ofVirtual().name("external-assets-warm-up").start(this::fetchIconFonts);
+    }
+
+    /** The style sheet, then each font it points at (through the proxy). */
+    void fetchIconFonts() {
+        Result css = materialIconsCss();
+        if (css.status() != 200) return;
+        Matcher matcher = Pattern.compile(Pattern.quote(FONTS_PATH) + "(" + FONT_PATH.pattern() + ")")
+                .matcher(new String(css.body(), StandardCharsets.UTF_8));
+        while (matcher.find()) font(matcher.group(1));
+    }
+
     /** A font file of Google's font host; {@code path} must match {@link #FONT_PATH}. */
     public Result font(String path) {
         if (!FONT_PATH.matcher(path).matches()) return Result.MISSING;
@@ -127,7 +147,11 @@ public class ExternalAssets {
         if (running != null) return running.join();
         try {
             Result result = fetch(uri, kind, transform);
-            if (result.status() == 200) keep(key, new Entry(result, now.plus(kind.ttl)), now);
+            if (result == Result.FAILED && entry != null && entry.result().status() == 200) {
+                log.info("External asset {} served as kept, for {}", uri, MISSING_TTL);
+                result = entry.result();
+                keep(key, new Entry(result, now.plus(MISSING_TTL)), now);
+            } else if (result.status() == 200) keep(key, new Entry(result, now.plus(kind.ttl)), now);
             else if (result.status() == 404) keep(key, new Entry(result, now.plus(MISSING_TTL)), now);
             mine.complete(result);
             return result;

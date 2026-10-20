@@ -2164,6 +2164,11 @@ body.obs-dock-mode #app {
     padding: 8px;
 }
 
+/* An icon whose font couldn't be had shows its name instead: kept within the icon's own box. */
+mdui-icon {
+    overflow: hidden;
+}
+
 /* A dock reached by client-side navigation: its shell still has them (channel-dock.js). */
 body.obs-dock-mode .app-bar,
 body.obs-dock-mode .footer {
