@@ -206,6 +206,13 @@ final class EventSubConnections {
         public void onOpen(WebSocket webSocket) {
             log.debug("{} WebSocket opened for user {}", logPrefix, user.getId());
             this.webSocket = webSocket;
+            // A handshake still in flight when the user got disconnected: close it rather than
+            // register a socket nobody will close (its onClose then finds nothing to drop).
+            if (intentionallyDisconnected.contains(user.getId())) {
+                log.debug("{} Closing a socket opened after user {} was disconnected", logPrefix, user.getId());
+                webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "disconnected");
+                return;
+            }
             // A session_reconnect replaces the previous socket: register the new one first,
             // then close the old — its onClose sees a foreign socket and no-ops. Done here,
             // synchronously with the handshake, so no error on this socket can race ahead of
