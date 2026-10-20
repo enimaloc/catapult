@@ -66,6 +66,9 @@ import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamTokenDeletedEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
 import fr.enimaloc.catapult.event.ChannelConnectionChangedEvent;
+import fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent;
+import fr.enimaloc.catapult.event.DtddMappingChangedEvent;
+import fr.enimaloc.catapult.common.event.ChannelEvents;
 import fr.enimaloc.catapult.dto.changelog.ChangelogSection;
 import fr.enimaloc.catapult.event.steam.SteamTokenSavedEvent;
 import fr.enimaloc.catapult.event.steam.SteamTokenSharedStateEvent;
@@ -463,6 +466,7 @@ public class MockApiService implements ApiService {
     public int saveCclSettings(String username, boolean enabled, Set<String> blockedCcls) {
         log.trace("saveCclSettings({}, {}, {})", username, enabled, blockedCcls);
         currentData().saveCclSettings(enabled, blockedCcls);
+        publishSettings(username);
         return NO_CONTENT;
     }
 
@@ -470,7 +474,20 @@ public class MockApiService implements ApiService {
     public int saveTwSettings(String username, boolean enabled, Set<String> blockedTws) {
         log.trace("saveTwSettings({}, {}, {})", username, enabled, blockedTws);
         currentData().saveTwSettings(enabled, blockedTws);
+        publishSettings(username);
         return NO_CONTENT;
+    }
+
+    /** The settings cards' whole state, as ChannelEventRedisBridge relays catapult-api's settings.updated. */
+    private void publishSettings(String username) {
+        UserSettingsDto s = currentData().getUserSettings();
+        eventPublisher.publishEvent(new ChannelSettingsUpdatedEvent(username, new ChannelEvents.Settings(
+                new ChannelEvents.Settings.Ccl(s.cclFeatureEnabled(), s.blockedCcls()),
+                new ChannelEvents.Settings.Tw(s.twFeatureEnabled(), s.blockedTws()),
+                new ChannelEvents.Settings.NoGame(s.noGameTwitchGameId(), s.noGameTwitchGameName(), s.noGameCcls(),
+                        s.applyDefaultOnStreamStart(), s.applyDefaultOnNoGame(), s.applyDefaultOnStreamEnd()),
+                new ChannelEvents.Settings.IncompleteFallback(s.incompleteFallbackTwitchGameId(),
+                        s.incompleteFallbackTwitchGameName(), s.incompleteFallbackCcls()))));
     }
 
     @Override
@@ -485,6 +502,7 @@ public class MockApiService implements ApiService {
         log.trace("saveNoGameSettings({}, {}, {}, {}, {}, {}, {})", username, twitchGameId, twitchGameName,
                 ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
         currentData().saveNoGameSettings(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
+        publishSettings(username);
         return NO_CONTENT;
     }
 
@@ -492,6 +510,7 @@ public class MockApiService implements ApiService {
     public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
         log.trace("saveIncompleteFallbackSettings({}, {}, {}, {})", username, twitchGameId, twitchGameName, ccls);
         currentData().saveIncompleteFallbackSettings(twitchGameId, twitchGameName, ccls);
+        publishSettings(username);
         return NO_CONTENT;
     }
 
@@ -519,6 +538,7 @@ public class MockApiService implements ApiService {
         log.trace("dtddPropose({}, {}, {})", igdbId, dtddId, reason);
         MockData current = currentData();
         dtddProposals.propose(igdbId, dtddId, reason, current == null ? null : current.getChannelDto().twitchUsername());
+        if (current != null) eventPublisher.publishEvent(new DtddMappingChangedEvent(current.getChannelDto().twitchUsername()));
         return NO_CONTENT;
     }
 
