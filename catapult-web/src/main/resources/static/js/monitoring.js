@@ -5,8 +5,9 @@
  * last minute of the page as a replay. Loaded with the SDK only when a DSN is set (see SentryBrowser).
  *
  * Replays show the page's text, which is the member's own dashboard, but never what is typed in a
- * field (a Steam token...), nor anything of a page without an error, but where the config asks for
- * whole sessions (replaysSessionSampleRate: dev only).
+ * field (a Steam token...), nor what grants access (the OBS widget's link, invitation codes: the
+ * templates mark them .sentry-block, recorded as an empty box), nor anything of a page without an
+ * error, but where the config asks for whole sessions (replaysSessionSampleRate: dev only).
  */
 (function () {
     const config = window.Catapult?.sentry;
@@ -25,9 +26,10 @@
         integrations: [
             Sentry.browserTracingIntegration(),
             // Dark Reader's style sheets left out: it rewrites them as the page loads, and the
-            // replay would serialize each version (and may not read them anyway).
+            // replay would serialize each version (and may not read them anyway). .sentry-block:
+            // what grants access, its attributes (a field's value, data-widget-url) included.
             Sentry.replayIntegration({
-                maskAllText: false, maskAllInputs: true, blockAllMedia: false, block: [".darkreader"],
+                maskAllText: false, maskAllInputs: true, blockAllMedia: false, block: [".darkreader", ".sentry-block"],
             }),
             // A request to catapult-web answered with a 5xx is an error of the page too, so the
             // replay of what led to it comes along with the server's own report, on the same trace.

@@ -65,7 +65,7 @@
                     </div>
                     <div class="admin-row admin-whitelist-invite-row" th:each="inv : ${whitelist.invites()}" th:attr="data-invite=${inv.id()}">
                         <span class="admin-cell" th:attr="data-label=#{admin.whitelist.invite.column.owner}" th:text="${inv.ownerUsername()}">owner</span>
-                        <span class="admin-member-id" th:attr="data-label=#{admin.whitelist.invite.column.code}" th:text="${inv.code()}">CODE</span>
+                        <span class="admin-member-id sentry-block" th:attr="data-label=#{admin.whitelist.invite.column.code}" th:text="${inv.code()}">CODE</span>
                         <span class="admin-cell" th:attr="data-label=#{admin.whitelist.invite.column.uses}" th:text="${inv.useCount()}">1</span>
                         <span class="admin-cell" th:attr="data-label=#{admin.whitelist.invite.column.max-uses}">
                             <span th:if="${inv.maxUses() == null}" class="admin-cell-muted" th:text="|(#{admin.whitelist.invite.default})|">(default)</span>

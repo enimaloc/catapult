@@ -114,7 +114,7 @@
 
 <!--/* The OBS card's widget link: the browser source URL (read-only + Copy), its regeneration (confirmed in a
      dialog) and the source check channel-obs-widget.js runs through the page's own OBS connection. */-->
-<div th:fragment="obs-widget" id="obs-widget" class="obs-widget" th:attr="data-widget-url=${widgetUrl},data-label-copied=#{channel.connections.obs.widget.copied},data-label-copy-failed=#{channel.connections.obs.widget.copy_failed},data-label-refused=#{channel.connections.obs.widget.refused},data-label-unavailable=#{channel.connections.obs.widget.unavailable},data-label-create-failed=#{channel.connections.obs.widget.create_failed}">
+<div th:fragment="obs-widget" id="obs-widget" class="obs-widget sentry-block" th:attr="data-widget-url=${widgetUrl},data-label-copied=#{channel.connections.obs.widget.copied},data-label-copy-failed=#{channel.connections.obs.widget.copy_failed},data-label-refused=#{channel.connections.obs.widget.refused},data-label-unavailable=#{channel.connections.obs.widget.unavailable},data-label-create-failed=#{channel.connections.obs.widget.create_failed}">
     <p th:text="#{channel.connections.obs.widget.hint}">Lien à mettre dans une source web OBS :</p>
     <mdui-text-field id="obs-widget-link" readonly variant="outlined" th:attr="label=#{channel.connections.obs.widget.label},value=${widgetUrl}"></mdui-text-field>
     <div class="card-actions">

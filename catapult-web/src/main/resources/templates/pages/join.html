@@ -16,7 +16,7 @@
                th:text="#{join.no_code}">join.no_code</p>
 
             <div class="hero-actions" th:if="${inviteCode != null}">
-                <mdui-button variant="filled" size="large" th:href="@{/oauth2/authorization/twitch(invite=${inviteCode})}">
+                <mdui-button class="sentry-block" variant="filled" size="large" th:href="@{/oauth2/authorization/twitch(invite=${inviteCode})}">
                     <mdui-icon slot="icon" name="login"></mdui-icon>
                     <span th:text="#{join.cta}">join.cta</span>
                 </mdui-button>
