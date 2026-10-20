@@ -102,9 +102,14 @@ class ApiAdminMembersControllerTest {
         when(streamState.isLive(member)).thenReturn(true);
         when(environment.getActiveProfiles()).thenReturn(new String[]{"dev", "mock"});
 
-        ApiAdminMembersController.MembersPageData page = controller.page();
+        member.setSteamId("7656");
+        member.setProfileImageUrl("https://img/member");
 
-        assertThat(page.members()).containsExactly(member);
+        fr.enimaloc.catapult.common.dto.admin.AdminMembersPage page = controller.page();
+
+        assertThat(page.members()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
+                member.getId(), member.getTwitchId(), member.getTwitchUsername(), "https://img/member", "7656",
+                false, member.isBotEnabled(), "ACTIVE", member.getCreatedAt()));
         assertThat(page.liveStatus()).containsEntry(member.getId(), true);
         assertThat(page.isMockProfile()).isTrue();
     }
