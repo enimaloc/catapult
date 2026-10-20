@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDefaultPayload;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 
 import java.util.ArrayList;
