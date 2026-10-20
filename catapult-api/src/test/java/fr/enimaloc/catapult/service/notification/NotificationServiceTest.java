@@ -171,7 +171,7 @@ class NotificationServiceTest {
         when(userRepo.findById(ghost)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.create(new NotificationService.CreateRequest("t", "b", Severity.INFO, null, null, null, ghost), admin))
                 .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value()).isEqualTo(400);
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value()).isEqualTo(404);
         verify(notifRepo, never()).save(any());
     }
 

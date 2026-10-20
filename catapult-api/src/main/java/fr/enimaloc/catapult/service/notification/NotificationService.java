@@ -53,7 +53,7 @@ public class NotificationService {
         List<UserAccount> recipients;
         if (req.targetUserId() != null) {
             recipients = List.of(userRepo.findById(req.targetUserId())
-                    .orElseThrow(() -> bad("Unknown member")));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown member")));
         } else {
             recipients = userRepo.findByStatus(UserAccount.Status.ACTIVE);
         }

@@ -3,7 +3,7 @@
  * emptied each time. Save checks the fields as catapult-api does (title and body required, the call
  * to action's label and http(s) URL both or neither, an expiry in the future, a member chosen for
  * "One member") before posting to AdminNotificationsController; a refusal is told by its status
- * (400: data-label-invalid, else data-label-unavailable) and leaves the dialog open, a success
+ * (400: data-label-invalid, 404: data-label-unknown-member, else data-label-unavailable) and leaves the dialog open, a success
  * closes it and reloads the tab. The Preview toggle renders the Markdown through the server
  * (catapult-api sanitizes it), shown as HTML in .notification-preview. Delete asks first.
  * Listeners are delegated to the panel: its content comes and goes.
@@ -98,7 +98,8 @@ window.CatapultAdminNotifications = (function () {
         }
     }
 
-    const refusal = (root, status) => root.dataset[status === 400 ? "labelInvalid" : "labelUnavailable"];
+    const REFUSALS = { 400: "labelInvalid", 404: "labelUnknownMember" };
+    const refusal = (root, status) => root.dataset[REFUSALS[status] ?? "labelUnavailable"];
     const ok = status => status >= 200 && status < 300;
 
     async function saveForm(panel, root, dialog, form, button) {
