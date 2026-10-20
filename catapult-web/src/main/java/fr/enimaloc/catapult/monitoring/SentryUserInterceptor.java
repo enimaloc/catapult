@@ -13,7 +13,9 @@ import java.util.UUID;
 /**
  * Names the member behind a request in its Sentry scope, by account id alone: enough to find their
  * account, nothing more of them reaches Sentry (no IP, no name). Set here rather than by a
- * SentryUserProvider, whose filter runs before the session's JWT can be read.
+ * SentryUserProvider, whose filter runs before the session's JWT can be read. A visitor's request names
+ * no one, and the member is forgotten once the request is done: a thread serving another request
+ * next never reports it as theirs.
  */
 @RequiredArgsConstructor
 class SentryUserInterceptor implements HandlerInterceptor {
@@ -22,11 +24,18 @@ class SentryUserInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         UUID account = apiService.currentUserId();
-        if (account != null) {
+        if (account == null) {
+            Sentry.setUser(null);
+        } else {
             User user = new User();
             user.setId(account.toString());
             Sentry.setUser(user);
         }
         return true;
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        Sentry.setUser(null);
     }
 }
