@@ -784,9 +784,9 @@ public class RealApiService implements ApiService {
 
     @Override
     public List<AccountDto> adminMinecraftAccounts() {
-        // call(): a 404 (Minecraft disabled in catapult-api) must be null, not an error body read as accounts
-        ApiClient.Result<AccountDto[]> result = client.call(HttpMethod.GET, MINECRAFT_ACCOUNTS, null, AccountDto[].class);
-        return result.status() == 200 && result.body() != null ? List.of(result.body()) : null;
+        // a 404 (Minecraft disabled in catapult-api) is null, like any failed read
+        AccountDto[] accounts = client.get(MINECRAFT_ACCOUNTS, AccountDto[].class);
+        return accounts == null ? null : List.of(accounts);
     }
 
     @Override

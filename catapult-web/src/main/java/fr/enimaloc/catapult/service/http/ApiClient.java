@@ -19,21 +19,18 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
  * Calls catapult-api on behalf of the current browser session, authenticated with the JWT
- * stored in that session (it never reaches the browser). A failed call is logged and
- * reported as {@code null} rather than thrown, so a page still renders while the API is down.
+ * stored in that session (it never reaches the browser). A failed read is logged and reported
+ * as {@code null} rather than thrown, so a page still renders while the API is down; an error
+ * answer (4xx/5xx) is a failure too, its body never read as the expected type.
  */
 @Slf4j
 @Component
 public class ApiClient {
     public static final String SESSION_JWT_KEY = "jwt";
-
-    /** What nginx answers while catapult-api is still starting: expected, not worth a warning. */
-    static final String NOT_STARTED_MESSAGE = "502 Bad Gateway: \"<html><EOL><EOL><head><title>502 Bad Gateway</title></head><EOL><EOL><body><EOL><EOL><center><h1>502 Bad Gateway</h1></center><EOL><EOL><hr><center>openresty</center><EOL><EOL></body><EOL><EOL></html><EOL><EOL>\"";
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
     /** Marks a call that must go out without the session's bearer; the interceptor removes it. */
@@ -51,11 +48,11 @@ public class ApiClient {
                     if (token != null) request.getHeaders().setBearerAuth(token);
                     return execution.execute(request, body);
                 })
-                .defaultStatusHandler(HttpStatusCode::is4xxClientError, (request, response) -> {
-                    if (response.getStatusCode() != HttpStatus.UNAUTHORIZED
-                            && !request.getURI().getPath().equals(AUTH_VALIDATE_PATH)) {
-                        log.warn("API returned {} for {}", response.getStatusCode(), request.getURI());
-                    }
+                // An error answer is never read as the expected body: logged here, then thrown to the
+                // caller's catch, which reports it as no answer.
+                .defaultStatusHandler(HttpStatusCode::isError, (request, response) -> {
+                    logError(response.getStatusCode(), request.getURI().getPath());
+                    throw new ApiErrorException(response.getStatusCode());
                 })
                 .build();
     }
@@ -164,19 +161,51 @@ public class ApiClient {
         }
     }
 
-    private void send(HttpMethod method, String path, Object body, Object... uriVars) {
+    private int send(HttpMethod method, String path, Object body, Object... uriVars) {
         try {
             RestClient.RequestBodySpec spec = client.method(method).uri(path, uriVars);
             if (body != null) spec.body(body);
-            spec.retrieve().toBodilessEntity();
+            return spec.exchange((request, response) -> {
+                HttpStatusCode status = response.getStatusCode();
+                if (status.isError()) logError(status, request.getURI().getPath());
+                return status.value();
+            });
         } catch (Exception e) {
             logFailure(method, path, e);
+            return HttpStatus.BAD_GATEWAY.value();
+        }
+    }
+
+    /**
+     * An error answer, worth a warning unless it only says the session's JWT is no longer valid, or
+     * is nginx's 502 while catapult-api is still starting (expected).
+     */
+    private static void logError(HttpStatusCode status, String path) {
+        if (status.value() == HttpStatus.BAD_GATEWAY.value()) {
+            log.debug("API returned {} for {}", status, path);
+        } else if (status.value() != HttpStatus.UNAUTHORIZED.value() && !path.equals(AUTH_VALIDATE_PATH)) {
+            log.warn("API returned {} for {}", status, path);
         }
     }
 
     private static void logFailure(HttpMethod method, String path, Exception e) {
-        if (!Objects.equals(e.getMessage(), NOT_STARTED_MESSAGE)) {
+        // An error answer was logged when it came.
+        if (!(e instanceof ApiErrorException)) {
             log.warn("{} {} failed: {}", method, path, e.getMessage());
+        }
+    }
+
+    /** catapult-api answered {@code status}, an error: what a read reports as no answer. */
+    public static final class ApiErrorException extends RuntimeException {
+        private final int status;
+
+        ApiErrorException(HttpStatusCode status) {
+            super("catapult-api answered " + status.value(), null, false, false);
+            this.status = status.value();
+        }
+
+        public int status() {
+            return status;
         }
     }
 
