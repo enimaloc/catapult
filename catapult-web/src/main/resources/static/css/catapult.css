@@ -2156,3 +2156,85 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .changelog-breaking {
     color: rgb(var(--mdui-color-error));
 }
+
+/* ── OBS dock (pages/channel-dock.html) ───────────────────────────────────
+   A narrow column inside OBS: no app bar or footer (index.html drops them),
+   tight spacing, one switch per row. */
+body.obs-dock-mode #app {
+    padding: 8px;
+}
+
+.obs-dock {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.875rem;
+}
+
+.obs-dock-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+}
+
+.obs-dock-game-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.obs-dock-muted {
+    flex: 1;
+    margin: 0;
+    color: var(--catapult-text-muted);
+}
+
+.obs-dock-binding {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.obs-dock-card {
+    padding: 8px 12px;
+}
+
+.obs-dock-card h3 {
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+}
+
+.obs-dock-global {
+    border-bottom: 1px solid var(--catapult-border);
+    padding-bottom: 4px;
+}
+
+.obs-dock-items {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-left: 12px;
+}
+
+.obs-dock-items label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.obs-dock-login {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.obs-dock-full {
+    align-self: flex-end;
+    color: var(--catapult-text-secondary);
+    font-size: 0.8rem;
+}

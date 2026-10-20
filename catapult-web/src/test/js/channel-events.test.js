@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render } from "./helpers.js";
 
 /** Minimal EventSource stand-in recording every instance and listener. */
@@ -276,5 +276,39 @@ describe("reconnection", () => {
 
         expect(sources()).toHaveLength(2);
         expect(CatapultSpa.navigate).not.toHaveBeenCalled();
+    });
+});
+
+describe("in the OBS dock", () => {
+    let refresh;
+
+    beforeEach(() => {
+        refresh = vi.fn();
+        window.CatapultDock = { active: () => true, EVENTS: ["GameChangedEvent", "TwUpdatedEvent"], refresh };
+        history.replaceState(null, "", "/channel/enimaloc/dock");
+    });
+
+    afterEach(() => {
+        delete window.CatapultDock;
+    });
+
+    it("subscribes to the dock's events as well", () => {
+        html(`<section id="obs-dock"></section>`);
+        render();
+
+        expect(current().url).toBe("/events/channel/enimaloc");
+        expect(current().listeners.TwUpdatedEvent).toHaveLength(1);
+    });
+
+    it("hands the dock its events instead of patching the full page it doesn't have", () => {
+        html(`<section id="obs-dock"><span id="live" class="hidden" data-if="live" data-on="live:ChannelLiveStateEvent.state"></span></section>`);
+        render();
+
+        current().emit("GameChangedEvent", { bindingId: "b7", sourceName: "X" });
+        current().emit("BindingDeletedEvent", { bindingId: "b1" });
+        current().emit("ChannelLiveStateEvent", { state: true });
+
+        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(document.getElementById("live").classList.contains("hidden")).toBe(true);
     });
 });

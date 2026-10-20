@@ -1,10 +1,12 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.twitchat.TwitchatCatalog;
@@ -110,7 +112,7 @@ class ModelFillerTest {
         Map<String, String> titles = (Map<String, String>) model.get("titles");
         assertThat(titles).containsEntry("privacy", "Confidentialité")
                 .containsEntry("channel", "page.title.channel")
-                .containsOnlyKeys("", "privacy", "changelog", "channel", "help", "admin", "notifications", "login", "join");
+                .containsOnlyKeys("", "privacy", "changelog", "channel", "channel-dock", "help", "admin", "notifications", "login", "join");
     }
 
     @Test
@@ -319,6 +321,57 @@ class ModelFillerTest {
         request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, 403);
         filler().error(model, request);
         assertThat(model).containsEntry("errorCode", 403).containsEntry("errorTitle", "error.403.title");
+    }
+
+    private static ChannelPageData playing(GameDto game) {
+        return new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, false, true,
+                game, new PagedBindings(0, 1, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, "uuid");
+    }
+
+    /** The dock has no app bar to log in from: a visitor gets its own login prompt, not the 401 page. */
+    @Test
+    void channelDock_promptsAVisitorToLogIn_askingCatapultApiNothing() {
+        assertThat(filler().channelDock(model, "enimaloc")).isZero();
+
+        assertThat(model).containsEntry("username", "enimaloc").containsEntry("dockLogin", true)
+                .doesNotContainKey("channelPage");
+        verifyNoMoreInteractions(api);
+    }
+
+    @Test
+    void channelDock_isA404_forAChannelCatapultApiDoesntGive() {
+        inSession(() -> assertThat(filler().channelDock(model, "ghost")).isEqualTo(404));
+
+        assertThat(model).doesNotContainKey("channelPage").doesNotContainKey("dockLogin");
+    }
+
+    @Test
+    void channelDock_hasThePageTheSettingsAndTheBindingOfTheGamePlayedNow() {
+        ChannelPageData data = playing(new GameDto("b1", "Valheim", "STEAM"));
+        UserSettingsDto settings = mock(UserSettingsDto.class);
+        BindingDto binding = mock(BindingDto.class);
+        when(api.channelPage("enimaloc", 0, null, null)).thenReturn(data);
+        when(api.channelSettings("enimaloc")).thenReturn(settings);
+        when(api.currentBinding("enimaloc")).thenReturn(binding);
+
+        inSession(() -> assertThat(filler().channelDock(model, "enimaloc")).isZero());
+
+        assertThat(model).containsEntry("channelPage", data).containsEntry("channelSettings", settings)
+                .containsEntry("currentBinding", binding);
+    }
+
+    /** No game, or one without a binding: nothing to ask catapult-api for. */
+    @ParameterizedTest
+    @CsvSource(nullValues = "null", value = {"false, null", "true, null"})
+    void channelDock_asksNoBinding_whenTheGameHasNone(boolean hasGame, String bindingId) {
+        when(api.channelPage("enimaloc", 0, null, null))
+                .thenReturn(playing(hasGame ? new GameDto(bindingId, "Valheim", "STEAM") : null));
+
+        inSession(() -> filler().channelDock(model, "enimaloc"));
+
+        assertThat(model).containsKey("currentBinding").containsEntry("currentBinding", null);
+        verify(api, org.mockito.Mockito.never()).currentBinding(org.mockito.ArgumentMatchers.any());
     }
 
     private String resource(String path) throws IOException {

@@ -4,11 +4,13 @@ import fr.enimaloc.catapult.dto.index.SpaPage;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.io.IOException;
@@ -102,12 +104,18 @@ public class IndexController {
         return "index";
     }
 
+    /** The channel's page, or its OBS dock when opened in OBS or asked for (see {@link ObsDock}). */
     @GetMapping("/channel/{username}")
     String channel(Model model, @PathVariable String username,
                    @RequestParam(defaultValue = "0") int page,
                    @RequestParam(required = false) String status,
                    @RequestParam(required = false) String source,
+                   @RequestParam(required = false) String view,
+                   @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
                    Locale locale, HttpServletResponse response) {
+        if (ObsDock.wanted(userAgent, view)) {
+            return dock(model, username, locale, response);
+        }
         int refused = filler.channel(model, username, page, status, source);
         model.addAttribute("error", refused != 0);
         if (refused != 0) {
@@ -115,6 +123,20 @@ public class IndexController {
             filler.error(model, refused);
         }
         filler.defaultAttr(model, "channel", locale);
+        return "index";
+    }
+
+    /** The channel's OBS dock, wherever it is opened. */
+    @GetMapping("/channel/{username}/dock")
+    String dock(Model model, @PathVariable String username, Locale locale, HttpServletResponse response) {
+        int refused = filler.channelDock(model, username);
+        model.addAttribute("error", refused != 0);
+        model.addAttribute("dock", true);
+        if (refused != 0) {
+            response.setStatus(refused);
+            filler.error(model, refused);
+        }
+        filler.defaultAttr(model, "channel-dock", locale);
         return "index";
     }
 }

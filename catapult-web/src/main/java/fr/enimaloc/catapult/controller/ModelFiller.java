@@ -239,6 +239,29 @@ public class ModelFiller {
     }
 
     /**
+     * The OBS dock model (see {@link ObsDock}): the channel's page and settings, and the binding of the
+     * game it plays now (null when none). A visitor who is logged out gets the dock's own login prompt
+     * ({@code dockLogin}) rather than the 401 error page: the dock has no app bar to log in from.
+     * Returns 404 for a channel the member can't reach, else 0.
+     */
+    public int channelDock(Model model, String username) {
+        model.addAttribute("username", username);
+        if (!ApiClient.hasSession()) {
+            model.addAttribute("dockLogin", true);
+            return 0;
+        }
+        var channelPage = apiService.channelPage(username, 0, null, null);
+        if (channelPage == null) {
+            return HttpStatus.NOT_FOUND.value();
+        }
+        model.addAttribute("channelPage", channelPage);
+        model.addAttribute("channelSettings", apiService.channelSettings(username));
+        boolean bound = channelPage.currentGame() != null && channelPage.currentGame().bindingId() != null;
+        model.addAttribute("currentBinding", bound ? apiService.currentBinding(username) : null);
+        return 0;
+    }
+
+    /**
      * The admin page model: the members tab's accounts (null when catapult-api fails), and the
      * admin's own account id, which the tab won't let them delete.
      */

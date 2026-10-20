@@ -1,0 +1,93 @@
+<!--/*
+  The channel page as an OBS dock (ObsDock): what a streamer checks and flips during a live, in a
+  narrow column. The game and bot rows keep the full page's ids, so channel-status.js wires them as
+  it does there; channel-dock.js wires the rest and re-renders the dock on the events changing it.
+*/-->
+<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
+<!--/*@thymesVar id="channelSettings" type="fr.enimaloc.catapult.common.dto.channel.UserSettingsDto"*/-->
+<!--/*@thymesVar id="currentBinding" type="fr.enimaloc.catapult.common.dto.channel.BindingDto"*/-->
+<section th:fragment="dock" id="obs-dock" class="obs-dock" xmlns:spa="urn:fr.enimaloc.catapult:spa">
+    <!--/* Logged out: a login right in the dock, where OBS keeps the session afterwards. */-->
+    <div th:if="${dockLogin}" class="obs-dock-login">
+        <p th:text="#{channel.dock.login}">Connectez-vous pour piloter votre chaîne depuis OBS.</p>
+        <mdui-button href="/auth/login" variant="filled" th:text="#{nav.login}">Se connecter</mdui-button>
+    </div>
+
+    <th:block th:unless="${dockLogin}" th:with="ch=${channelPage}, settings=${channelSettings}, b=${currentBinding}">
+        <div class="obs-dock-row obs-dock-game">
+            <mdui-icon name="sports_esports"></mdui-icon>
+            <span id="channel-current-game" class="obs-dock-game-name" th:if="${ch.currentGame() != null}"
+                  th:text="${ch.currentGame().sourceName()}">Game</span>
+            <span id="channel-no-game" class="obs-dock-muted" th:if="${ch.currentGame() == null}"
+                  th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
+            <mdui-button-icon icon="refresh" th:if="${ch.isOwner()}" th:title="#{channel.dock.recheck}"
+                              th:attr="data-recheck-url=@{/channel/{u}/game/recheck(u=${ch.channelUsername()}),aria-label=#{channel.dock.recheck}}"
+                              id="channel-recheck-game"></mdui-button-icon>
+        </div>
+
+        <label class="obs-dock-row" th:if="${ch.isOwner()}">
+            <mdui-switch id="channel-bot-toggle" th:checked="${ch.botEnabled()}"
+                         th:attr="data-toggle-url=@{/channel/{u}/settings/bot(u=${ch.channelUsername()})}"></mdui-switch>
+            <span th:text="#{channel.status.bot_enabled}">Bot activé</span>
+        </label>
+
+        <!--/* The game now played: its binding's own CCL and TW, under the channel-wide switches. */-->
+        <div class="obs-dock-binding" th:attr="data-binding-id=${b?.id()},data-game-id=${b?.twitchGameId()},
+                data-game-name=${b?.twitchGameName()}">
+            <mdui-card variant="outlined" class="obs-dock-card" id="obs-dock-ccl">
+                <h3 th:text="#{channel.settings.ccl.title}">Filtres de contenu</h3>
+                <label class="obs-dock-row obs-dock-global" th:if="${settings != null}">
+                    <mdui-switch id="obs-dock-ccl-enabled" th:checked="${settings.cclFeatureEnabled()}"
+                                 th:attr="data-blocked=${#strings.listJoin(settings.blockedCcls(), ',')}"></mdui-switch>
+                    <span th:text="#{channel.dock.all_channel}">Toute la chaîne</span>
+                </label>
+                <th:block th:if="${b != null}">
+                    <label class="obs-dock-row">
+                        <mdui-switch id="obs-dock-binding-ccl-enabled" th:checked="${b.cclEnabled()}"></mdui-switch>
+                        <span th:text="#{channel.dock.this_game}">Ce jeu</span>
+                    </label>
+                    <div class="obs-dock-items">
+                        <label th:each="ccl : ${ch.availableCcls()}">
+                            <mdui-switch class="obs-dock-binding-ccl" th:value="${ccl.id()}"
+                                         th:checked="${b.ccls().contains(ccl.id())}"
+                                         th:disabled="${ch.blockedCcls().contains(ccl.id())}"></mdui-switch>
+                            <span th:text="${ccl.name()}">ccl</span>
+                        </label>
+                    </div>
+                </th:block>
+                <p th:if="${b == null}" class="obs-dock-muted" th:text="#{channel.dock.no_binding}">
+                    Aucune association pour le jeu en cours.
+                </p>
+            </mdui-card>
+
+            <mdui-card variant="outlined" class="obs-dock-card" id="obs-dock-tw">
+                <h3 th:text="#{channel.settings.tw.title}">Avertissements</h3>
+                <label class="obs-dock-row obs-dock-global" th:if="${settings != null}">
+                    <mdui-switch id="obs-dock-tw-enabled" th:checked="${settings.twFeatureEnabled()}"
+                                 th:attr="data-blocked=${#strings.listJoin(settings.blockedTws(), ',')}"></mdui-switch>
+                    <span th:text="#{channel.dock.all_channel}">Toute la chaîne</span>
+                </label>
+                <!--/* A binding's TW are its owner's to change, as on the full page. */-->
+                <th:block th:if="${b != null and ch.isOwner()}">
+                    <label class="obs-dock-row">
+                        <mdui-switch id="obs-dock-binding-tw-enabled" th:checked="${b.twEnabled()}"></mdui-switch>
+                        <span th:text="#{channel.dock.this_game}">Ce jeu</span>
+                    </label>
+                    <div class="obs-dock-items">
+                        <label th:each="tw : ${ch.availableTws()}">
+                            <mdui-switch class="obs-dock-binding-tw" th:value="${tw.id()}"
+                                         th:checked="${b.tws().contains(tw.id())}"></mdui-switch>
+                            <span th:text="${tw.label()}">tw</span>
+                        </label>
+                    </div>
+                </th:block>
+                <p th:if="${b == null}" class="obs-dock-muted" th:text="#{channel.dock.no_binding}">
+                    Aucune association pour le jeu en cours.
+                </p>
+            </mdui-card>
+        </div>
+
+        <a class="obs-dock-full" th:href="@{/channel/{u}(u=${ch.channelUsername()},view='full')}"
+           th:text="#{channel.dock.full_page}">Page complète</a>
+    </th:block>
+</section>
