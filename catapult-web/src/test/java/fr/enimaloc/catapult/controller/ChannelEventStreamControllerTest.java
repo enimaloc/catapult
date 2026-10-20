@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = ChannelEventStreamController.class)
-@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class})
+@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class, DirectSse.class})
 class ChannelEventStreamControllerTest {
 
     @Autowired MockMvc mvc;
@@ -76,6 +76,16 @@ class ChannelEventStreamControllerTest {
         assertThat(body)
                 .contains("event:GameChangedEvent\ndata:{\"username\":\"enimaloc\",\"bindingId\":\"b1\",\"sourceType\":\"STEAM\",\"sourceName\":\"Valheim\"}")
                 .contains("event:BotStateChangedEvent\ndata:{\"username\":\"enimaloc\",\"state\":false}");
+    }
+
+    @Test
+    void aChannelIsFollowedByItsLogin_whateverItsCase() throws Exception {
+        MvcResult stream = subscribe("EnimaLoc");
+
+        controller.onChannelUpdated(new BotStateChangedEvent("enimaloc", true));
+
+        assertThat(stream.getResponse().getContentAsString()).contains("BotStateChangedEvent");
+        assertThat(stream.getResponse().getHeader("X-Accel-Buffering")).isEqualTo("no");
     }
 
     @Test

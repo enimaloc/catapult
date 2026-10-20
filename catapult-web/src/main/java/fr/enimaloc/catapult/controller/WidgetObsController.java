@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.twitchat.TwitchatDispatchHub;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -29,7 +30,8 @@ import java.util.UUID;
  * OBS connection, its config 204 and its stream 404: never an error page; it reloads itself every
  * minute, so switching the widget on reaches OBS. While catapult-api is unreachable the page keeps
  * its scripts, which retry the config until it answers. The stream closes
- * every {@link #STREAM_TIMEOUT}, so revoking the link takes effect on the reconnection.
+ * every {@link #STREAM_TIMEOUT}, so revoking the link takes effect on the reconnection; an address
+ * keeps a few streams, and past the overall bound they are refused (503).
  */
 @Controller
 @RequiredArgsConstructor
@@ -71,10 +73,15 @@ public class WidgetObsController {
 
     @GetMapping(value = "/widget/obs/{token}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @ResponseBody
-    public ResponseEntity<SseEmitter> events(@PathVariable String token) {
+    public ResponseEntity<SseEmitter> events(@PathVariable String token, HttpServletRequest request) {
         UUID uuid = uuid(token);
         UUID owner = uuid == null ? null : owner(apiService.widgetAccess(uuid));
-        return owner == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(hub.subscribe(owner, STREAM_TIMEOUT));
+        if (owner == null) {
+            return ResponseEntity.notFound().build();
+        }
+        SseEmitter emitter = hub.subscribeWidget(owner, request.getRemoteAddr(), STREAM_TIMEOUT);
+        return emitter == null ? ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build()
+                : ResponseEntity.ok().header("X-Accel-Buffering", "no").body(emitter);
     }
 
     /** The link OBS sources were set up with before /widget/obs. */

@@ -44,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = NavEventStreamController.class)
-@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class, BroadcastState.class})
+@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class, BroadcastState.class, DirectSse.class})
 class NavEventStreamControllerTest {
 
     private static final ChannelDto OWN = new ChannelDto(UUID.randomUUID(), "1", "enimaloc", "img", false);
@@ -54,6 +54,7 @@ class NavEventStreamControllerTest {
     @Autowired NavEventStreamController controller;
     @Autowired MeterRegistry registry;
     @Autowired BroadcastState broadcastState;
+    @Autowired SseStreams sse;
     @MockitoBean ApiService apiService;
 
     private static final Instant STARTS_AT = Instant.now().plus(Duration.ofHours(1));
@@ -324,8 +325,8 @@ class NavEventStreamControllerTest {
 
     @Test
     void aNewStream_getsAHeartbeatAtOnce_soThatItsHeadersGoOutAndThePageSeesItOpen() throws Exception {
-        assertThat(sent(anonymous("1.2.3.12"))).isEqualTo(":heartbeat\n\n");
-        assertThat(sent(memberStream(loggedIn(), UUID.randomUUID()))).isEqualTo(":heartbeat\n\n");
+        assertThat(sent(anonymous("1.2.3.12"))).isEqualTo(":open\n\n");
+        assertThat(sent(memberStream(loggedIn(), UUID.randomUUID()))).isEqualTo(":open\n\n");
     }
 
     @Test
@@ -333,7 +334,7 @@ class NavEventStreamControllerTest {
         MvcResult member = memberStream(loggedIn(), UUID.randomUUID());
         MvcResult visitor = anonymous("1.2.3.11");
 
-        controller.heartbeat();
+        sse.heartbeat();
 
         assertThat(sent(member)).contains(":heartbeat\n\n");
         assertThat(sent(visitor)).contains(":heartbeat\n\n");
@@ -346,7 +347,7 @@ class NavEventStreamControllerTest {
         double before = anonymousOpen();
 
         breakLastStream();
-        controller.heartbeat();
+        sse.heartbeat();
 
         assertThat(anonymousOpen()).isEqualTo(before - 1);
     }
@@ -358,13 +359,13 @@ class NavEventStreamControllerTest {
         double before = registry.get("catapult.web.sse.streams").tag("stream", "nav").gauge().value();
 
         breakLastStream();
-        controller.heartbeat();
+        sse.heartbeat();
 
         assertThat(registry.get("catapult.web.sse.streams").tag("stream", "nav").gauge().value()).isEqualTo(before - 1);
     }
 
     @Test
-    void aRememberedMaintenance_isTheFirstThingANewStreamReceives() throws Exception {
+    void aRememberedMaintenance_isTheFirstEventANewStreamReceives() throws Exception {
         MvcResult before = anonymous("1.2.3.7");
         assertThat(sent(before)).doesNotContain("maintenance");
 
@@ -374,8 +375,8 @@ class NavEventStreamControllerTest {
 
         String event = "event:Broadcast\ndata:{\"name\":\"maintenance.scheduled\",\"data\":{\"startsAt\":\""
                 + STARTS_AT + "\",\"durationMinutes\":30,\"message\":\"m\"}}";
-        assertThat(sent(member)).startsWith(event);
-        assertThat(sent(visitor)).startsWith(event);
+        assertThat(sent(member)).startsWith(":open\n\n" + event);
+        assertThat(sent(visitor)).startsWith(":open\n\n" + event);
         assertThat(sent(before)).contains(event); // live, as any broadcast
     }
 

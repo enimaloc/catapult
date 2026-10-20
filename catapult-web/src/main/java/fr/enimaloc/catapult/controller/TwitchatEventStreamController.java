@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.twitchat.TwitchatDispatchHub;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -14,7 +15,8 @@ import java.util.UUID;
 
 /**
  * The logged-in owner's Twitchat dispatches, for twitchat-stream.js; 204 when logged out, 404 while
- * an admin impersonates a member (the dispatches carry the member's signed action tokens).
+ * an admin impersonates a member (the dispatches carry the member's signed action tokens). A session
+ * keeps a few streams, closed when it logs out (see {@link TwitchatDispatchHub}).
  */
 @RestController
 @RequiredArgsConstructor
@@ -28,7 +30,9 @@ public class TwitchatEventStreamController {
         if (ImpersonationController.impersonating(request)) {
             return ResponseEntity.notFound().build();
         }
-        UUID userId = apiService.currentUserId();
-        return userId == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(hub.subscribe(userId));
+        HttpSession session = SessionStreams.loggedIn(request);
+        UUID userId = session == null ? null : apiService.currentUserId();
+        return userId == null ? ResponseEntity.noContent().build()
+                : ResponseEntity.ok().header("X-Accel-Buffering", "no").body(hub.subscribe(userId, session.getId()));
     }
 }
