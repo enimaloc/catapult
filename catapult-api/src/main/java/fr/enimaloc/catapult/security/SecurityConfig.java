@@ -13,7 +13,7 @@ import org.springframework.security.web.session.HttpSessionEventPublisher;
 
 /**
  * Handles the Twitch OAuth2 login flow for catapult-api.
- * Only /oauth2/** and /login/oauth2/** reach this filter chain (nginx routes them here).
+ * Only /oauth2/** and /login/oauth2/** reach this filter chain (catapult-web relays them here).
  * Everything else is handled by ApiSecurityConfig (/api/**) or catapult-web.
  */
 @Slf4j

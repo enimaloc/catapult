@@ -8,7 +8,7 @@
  * the single source of truth for what changed.
  *
  * EventSource reconnects on its own, except when a reconnect is answered with something other
- * than a stream (nginx's maintenance page during a restart, a refusal): it then stops for good,
+ * than a stream (a maintenance page during a restart, a refusal): it then stops for good,
  * so a closed stream is reopened after a backoff (5 s, doubling up to 60 s, back to 5 s once a
  * stream opens), as live.js does. Events sent while the stream was down are lost: every time it
  * opens again (by itself or reopened), the page is re-rendered to catch up.

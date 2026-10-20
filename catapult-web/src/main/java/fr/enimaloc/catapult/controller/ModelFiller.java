@@ -128,7 +128,7 @@ public class ModelFiller {
         return messageSource.getMessage(key, args, key, locale);
     }
 
-    /** {@code path} on this site's own origin, as the visitor (behind nginx) reached it; null outside a request. */
+    /** {@code path} on this site's own origin, as the visitor (behind the proxy in front) reached it; null outside a request. */
     static String absoluteUrl(String path) {
         if (RequestContextHolder.getRequestAttributes() == null) {
             return null;

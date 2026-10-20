@@ -84,7 +84,7 @@ un ping passe dans la fenêtre 45s.
 
 ```bash
 # Sur Linux avec tc-netem :
-docker compose exec --user root catapult-router \
+docker compose exec --user root catapult-web \
   tc qdisc add dev eth0 root netem delay 5000ms
 ```
 
@@ -93,7 +93,7 @@ docker compose exec --user root catapult-router \
 - [ ] Cleanup :
 
   ```bash
-  docker compose exec --user root catapult-router \
+  docker compose exec --user root catapult-web \
     tc qdisc del dev eth0 root netem
   ```
 

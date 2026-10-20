@@ -113,7 +113,7 @@ public class ApiAdminBroadcastController {
 
     /**
      * Best-effort client IP: trusts {@code X-Forwarded-For} (first hop) when
-     * present — catapult is fronted by nginx so the remote addr otherwise
+     * present — catapult is fronted by proxies so the remote addr otherwise
      * points at the reverse proxy.
      */
     private static String clientIp(HttpServletRequest req) {

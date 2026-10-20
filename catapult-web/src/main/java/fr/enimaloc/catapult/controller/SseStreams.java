@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *     queue, written in order on a virtual thread, so a slow client only holds its own; one that lets more
  *     than {@link #MAX_PENDING} events pile up is closed (its page reconnects and catches up);</li>
  *     <li>with a comment on opening (the response, and so its headers, go out at once) and every
- *     {@link #HEARTBEAT} after, under nginx's read timeout, so that an idle stream is not cut;</li>
+ *     {@link #HEARTBEAT} after, under a proxy's usual read timeout, so that an idle stream is not cut;</li>
  *     <li>closed after their timeout rather than failed (the browser's EventSource reconnects, and
  *     whatever the stream depends on is checked again), and forgotten once closed, whichever way.</li>
  * </ul>
@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 @Component
 public class SseStreams implements DisposableBean {
-    /** Below nginx's default 60 s read timeout. */
+    /** Below the usual 60 s read timeout of proxies (nginx's default). */
     static final Duration HEARTBEAT = Duration.ofSeconds(30);
     /** How long a stream stays open; the browser then opens another, its rights checked again. */
     public static final Duration TIMEOUT = Duration.ofMinutes(30);
