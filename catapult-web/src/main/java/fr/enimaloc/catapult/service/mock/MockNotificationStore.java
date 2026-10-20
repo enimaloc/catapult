@@ -86,7 +86,7 @@ class MockNotificationStore {
     synchronized int create(String title, String body, Severity severity, String ctaUrl, String ctaLabel,
                             Instant expiresAt, UUID target) {
         if (!valid(title, body, severity, ctaUrl, ctaLabel, expiresAt)) return 400;
-        if (target != null && !byAccount.containsKey(target) && memberLogin.apply(target) == null) return 400;
+        if (target != null && !byAccount.containsKey(target) && memberLogin.apply(target) == null) return 404;
         ctaUrl = blankToNull(ctaUrl);
         ctaLabel = blankToNull(ctaLabel);
         UUID id = UUID.randomUUID();

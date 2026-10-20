@@ -19,7 +19,7 @@ function page() {
         <mdui-tab-panel value="notifications">
             <div class="admin-view admin-notifications" data-confirm-text="OK" data-cancel-text="No"
                  data-label-invalid="Refused" data-label-cta-pair="Both" data-label-past-expiry="Past"
-                 data-label-member-required="Pick one" data-label-unavailable="Down" data-label-created="Sent">
+                 data-label-member-required="Pick one" data-label-unknown-member="Gone" data-label-unavailable="Down" data-label-created="Sent">
                 <button id="admin-notifications-new"></button>
                 <div data-admin-results>
                     <div class="admin-notification-row" data-id="n1">
@@ -185,13 +185,17 @@ describe("admin-notifications", () => {
         expect(posted).not.toHaveBeenCalled();
     });
 
-    it("keeps the dialog open and says why on a 400, then on a 502", async () => {
+    it("keeps the dialog open and says why on a 400, a 404, then a 502", async () => {
         valid();
         posted.mockResolvedValueOnce(response(400));
         await click(".admin-notifications-save");
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Refused");
         expect(dialog().open).toBe(true);
         expect(save().disabled).toBe(false);
+
+        posted.mockResolvedValueOnce(response(404));
+        await click(".admin-notifications-save");
+        expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
 
         posted.mockResolvedValueOnce(response(502));
         await click(".admin-notifications-save");

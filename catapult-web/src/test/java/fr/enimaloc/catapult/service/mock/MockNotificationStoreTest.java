@@ -189,7 +189,7 @@ class MockNotificationStoreTest {
 
     @Test
     void anUnknownTargetIsRefused_aKnownOneIsNot() {
-        assertThat(send(UUID.randomUUID())).isEqualTo(400);
+        assertThat(send(UUID.randomUUID())).isEqualTo(404);
         assertThat(events).isEmpty();
         assertThat(store.adminPage(0).content()).isEmpty();
 
