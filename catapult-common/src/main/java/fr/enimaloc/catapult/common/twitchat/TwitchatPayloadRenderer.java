@@ -20,7 +20,8 @@ import java.util.regex.Pattern;
  * resolves to the raw signed token of that Catapult action, minted once per type and only when
  * referenced. A payload referencing an action that doesn't apply right now (or an unknown or
  * malformed one) is skipped whole — never sent with the placeholder — except the buttons of a
- * CUSTOM_CHAT_MESSAGE, dropped one by one so the message itself still goes.
+ * CUSTOM_CHAT_MESSAGE, dropped one by one so the message itself still goes. Map keys are data
+ * like their values: checked and substituted the same way. No data renders as an empty object.
  */
 public final class TwitchatPayloadRenderer {
 
@@ -44,7 +45,7 @@ public final class TwitchatPayloadRenderer {
     }
 
     public Optional<TwitchatPayload> render(String action, Map<String, Object> data) {
-        Map<String, Object> kept = new LinkedHashMap<>(data);
+        Map<String, Object> kept = data == null ? new LinkedHashMap<>() : new LinkedHashMap<>(data);
         if (CHAT_MESSAGE.equals(action) && kept.get("actions") instanceof List<?> buttons) {
             kept.put("actions", buttons.stream().filter(this::onlyApplicableActions).toList());
         }
@@ -57,7 +58,8 @@ public final class TwitchatPayloadRenderer {
 
     private boolean onlyApplicableActions(Object node) {
         return switch (node) {
-            case Map<?, ?> map -> map.values().stream().allMatch(this::onlyApplicableActions);
+            case Map<?, ?> map -> map.entrySet().stream().allMatch(entry ->
+                    onlyApplicableActions(entry.getKey()) && onlyApplicableActions(entry.getValue()));
             case List<?> list -> list.stream().allMatch(this::onlyApplicableActions);
             case String text -> {
                 Matcher matcher = ACTION.matcher(text);
@@ -77,7 +79,7 @@ public final class TwitchatPayloadRenderer {
         return switch (node) {
             case Map<?, ?> map -> {
                 Map<String, Object> copy = new LinkedHashMap<>();
-                map.forEach((key, value) -> copy.put(String.valueOf(key), substitute(value)));
+                map.forEach((key, value) -> copy.put(String.valueOf(substitute(key)), substitute(value)));
                 yield copy;
             }
             case List<?> list -> {
