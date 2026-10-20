@@ -89,4 +89,13 @@ class BroadcastRequestDtoTest {
         assertThat(data).doesNotContainKey("name");
         assertThat(data).containsOnlyKeys("startsAt", "durationMinutes", "message");
     }
+
+    @Test
+    void versionDeployed_namesItselfAndCarriesItsVersion() {
+        var dto = new BroadcastRequestDto.VersionDeployed("0.3.7", true);
+
+        org.assertj.core.api.Assertions.assertThat(dto.name()).isEqualTo("version.deployed");
+        org.assertj.core.api.Assertions.assertThat(dto.data())
+                .containsExactly(java.util.Map.entry("version", "0.3.7"), java.util.Map.entry("promptReload", true));
+    }
 }

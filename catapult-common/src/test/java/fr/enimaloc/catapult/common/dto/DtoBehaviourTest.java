@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.common.dto;
 
+import fr.enimaloc.catapult.common.dto.admin.AdminCclDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminIgdbDescriptorDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
@@ -8,6 +10,8 @@ import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
 
 import org.junit.jupiter.api.Nested;
@@ -124,6 +128,50 @@ class DtoBehaviourTest {
     void apiKeysPage_mapsEachKey() {
         assertThat(ApiKeysPageDto.of(new DtddKeysPageData(List.of(new KeyStatus("id", "ab…yz", null, true, 30)), true)))
                 .isEqualTo(new ApiKeysPageDto(true, List.of(new ApiKeysPageDto.Key("id", "ab…yz", null, true, 30))));
+    }
+
+    @Test
+    void twitchatData_offersEverySupportedBranch() {
+        assertThat(TwitchatData.of("beta")).isEqualTo(new TwitchatData("beta", List.of("stable", "beta")));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"auto, true", "stable, true", "beta, true", "nightly, false", "AUTO, false", "'', false"})
+    void twitchatData_acceptsAutoOrASupportedBranch(String branch, boolean valid) {
+        assertThat(TwitchatData.isValid(branch)).isEqualTo(valid);
+    }
+
+    @Test
+    void twitchatData_refusesNoBranch() {
+        assertThat(TwitchatData.isValid(null)).isFalse();
+    }
+
+    @Test
+    void twitchatDispatch_getsAFreshIdEachTime() {
+        TwitchatDispatch first = new TwitchatDispatch("streamer", "STREAM_STARTED", List.of());
+        TwitchatDispatch second = new TwitchatDispatch("streamer", "STREAM_STARTED", List.of());
+
+        assertThat(first.id()).isNotBlank().isNotEqualTo(second.id());
+        assertThat(java.util.UUID.fromString(first.id())).isNotNull();
+        assertThat(first.channel()).isEqualTo("streamer");
+    }
+
+    @Test
+    void adminCcl_listsItsMappedIdsSorted() {
+        AdminCclDto ccl = new AdminCclDto("Gore", "Gore", null, List.of(
+                new AdminIgdbDescriptorDto(12L, "Blood", 1, null),
+                new AdminIgdbDescriptorDto(3L, "Gore", 1, "ESRB Gore")));
+
+        assertThat(ccl.mappedIds()).isEqualTo("3,12");
+        assertThat(new AdminCclDto("x", "x", null, List.of()).mappedIds()).isEmpty();
+        assertThat(new AdminCclDto("x", "x", null, null).mappedIds()).isEmpty();
+    }
+
+    @Test
+    void igdbDescriptor_isLabelledByItsDisplayName_elseItsDescription() {
+        assertThat(new AdminIgdbDescriptorDto(1L, "Violence", 1, "ESRB Violence").label()).isEqualTo("ESRB Violence");
+        assertThat(new AdminIgdbDescriptorDto(1L, "Violence", 1, " ").label()).isEqualTo("Violence");
+        assertThat(new AdminIgdbDescriptorDto(1L, "Violence", null, null).label()).isEqualTo("Violence");
     }
 
     @Test
