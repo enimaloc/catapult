@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
 import fr.enimaloc.catapult.event.notification.BroadcastStreamEvent;
 import fr.enimaloc.catapult.event.notification.NotificationStreamEvent;
-import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,12 +14,10 @@ import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -51,9 +48,9 @@ import java.util.function.Supplier;
  * address and overall, and closed after a while ({@link AnonymousStreams}): past the overall bound
  * the answer is 503.
  * <p>
- * Behind nginx: the response asks it not to buffer the stream ({@code X-Accel-Buffering: no}), and
- * every open stream gets a comment on opening and every {@link #HEARTBEAT_MILLIS} ms so that an idle one is not cut
- * by the proxy's read timeout; a stream that cannot take it is dropped as after any failed send.
+ * Behind nginx: the response asks it not to buffer the stream ({@code X-Accel-Buffering: no}); the
+ * streams are written by {@link SseStreams} (off the publisher's thread, with heartbeats, closed after a
+ * while), a stream that cannot take an event being dropped.
  */
 @RestController
 public class NavEventStreamController {
@@ -61,9 +58,6 @@ public class NavEventStreamController {
     static final String CHANGED = "NavChannelsChanged";
     static final String BROADCAST = "Broadcast";
     static final String IMMINENT = "maintenance.imminent";
-    /** Below nginx's default 60 s read timeout. */
-    static final long HEARTBEAT_MILLIS = 30_000;
-    private static final String HEARTBEAT = "heartbeat";
 
     /** A {@link #LIVE} event's data. */
     record NavChannelLive(String username, boolean live) {}
@@ -81,6 +75,7 @@ public class NavEventStreamController {
     private final Map<String, Nav> navsBySession = new ConcurrentHashMap<>();
     /** The streams opened without a session, and the address each counts against. */
     private final Map<SseEmitter, String> anonymous = new ConcurrentHashMap<>();
+    private final SseStreams sse;
     private final SessionStreams streams;
     private final AnonymousStreams anonymousStreams;
     private final ApiService apiService;
@@ -88,9 +83,10 @@ public class NavEventStreamController {
     /** Makes the streams, by timeout; tests swap it for one whose writes can be made to fail. */
     LongFunction<SseEmitter> emitters = SseEmitter::new;
 
-    public NavEventStreamController(InteractionMetrics metrics, ApiService apiService, BroadcastState broadcastState) {
-        streams = new SessionStreams("nav", metrics);
-        anonymousStreams = new AnonymousStreams(metrics);
+    public NavEventStreamController(SseStreams sse, ApiService apiService, BroadcastState broadcastState) {
+        this.sse = sse;
+        streams = sse.sessionStreams("nav");
+        anonymousStreams = sse.anonymousStreams(AnonymousStreams.STREAM);
         this.apiService = apiService;
         this.broadcastState = broadcastState;
     }
@@ -102,11 +98,10 @@ public class NavEventStreamController {
         if (emitter == null) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
+        // SseStreams writes a comment at once: the headers only go out with the first write, and the
+        // page only sees the stream open (live.js's onOpen, lifting the restart veil) once they do.
         broadcastState.maintenance().ifPresent(maintenance ->
-                send(emitter, BROADCAST, new Broadcast(BroadcastState.SCHEDULED, maintenance)));
-        // Something written at once: the headers only go out with the first write, and the page
-        // only sees the stream open (live.js's onOpen, lifting the restart veil) once they do.
-        send(emitter, SseEmitter.event().comment(HEARTBEAT));
+                sse.send(emitter, BROADCAST, new Broadcast(BroadcastState.SCHEDULED, maintenance)));
         return ResponseEntity.ok().header("X-Accel-Buffering", "no").body(emitter);
     }
 
@@ -114,7 +109,7 @@ public class NavEventStreamController {
         String sessionId = session.getId();
         UUID account = apiService.currentUserId();
         String token = tokenOf(session);
-        SseEmitter emitter = emitters.apply(0L);
+        SseEmitter emitter = emitters.apply(SseStreams.TIMEOUT.toMillis());
         List<SseEmitter> former = new ArrayList<>();
         // Added within compute: remove() drops an emptied Nav atomically too. A session now logged in
         // again drops the streams of the former login, which must not get the new one's events.
@@ -127,10 +122,8 @@ public class NavEventStreamController {
             current.emitters().add(emitter);
             return current;
         });
-        former.forEach(SseEmitter::complete);
-        emitter.onCompletion(() -> remove(sessionId, emitter));
-        emitter.onTimeout(() -> remove(sessionId, emitter));
-        emitter.onError(e -> remove(sessionId, emitter));
+        former.forEach(sse::close);
+        sse.open(emitter, () -> remove(sessionId, emitter));
         streams.open(sessionId, emitter);
         return emitter;
     }
@@ -138,14 +131,11 @@ public class NavEventStreamController {
     /** A visitor's stream; null when too many are open already. */
     private SseEmitter subscribeAnonymous(String ip) {
         SseEmitter emitter = emitters.apply(AnonymousStreams.TIMEOUT.toMillis());
-        anonymous.put(emitter, ip);
-        emitter.onCompletion(() -> removeAnonymous(ip, emitter));
-        emitter.onTimeout(emitter::complete);
-        emitter.onError(e -> removeAnonymous(ip, emitter));
         if (!anonymousStreams.open(ip, emitter)) {
-            anonymous.remove(emitter);
             return null;
         }
+        anonymous.put(emitter, ip);
+        sse.open(emitter, () -> removeAnonymous(ip, emitter));
         return emitter;
     }
 
@@ -162,7 +152,7 @@ public class NavEventStreamController {
     public void forget(HttpSession session) {
         session.removeAttribute(SessionChannels.ATTRIBUTE);
         Nav nav = navsBySession.remove(session.getId());
-        if (nav != null) nav.emitters().forEach(SseEmitter::complete);
+        if (nav != null) nav.emitters().forEach(sse::close);
     }
 
     /** A channel goes live or offline, by login (ChannelEventRedisBridge, or the mock's MockAdminController). */
@@ -192,14 +182,8 @@ public class NavEventStreamController {
         if (event.accountId() == null) return;
         navsBySession.values().stream()
                 .filter(nav -> event.accountId().equals(nav.account()))
-                .filter(NavEventStreamController::stillLoggedIn)
+                .filter(this::stillLoggedIn)
                 .forEach(nav -> send(nav, event.name(), event.data()));
-    }
-
-    /** A comment to every open stream, one task for them all; those it cannot reach are dropped. */
-    @Scheduled(fixedRate = HEARTBEAT_MILLIS, initialDelay = HEARTBEAT_MILLIS)
-    public void heartbeat() {
-        toAll(() -> SseEmitter.event().comment(HEARTBEAT));
     }
 
     private void broadcastToAll(Broadcast broadcast) {
@@ -209,9 +193,7 @@ public class NavEventStreamController {
     /** {@code event} (a new one per stream: a builder is not reusable) to every stream. */
     private void toAll(Supplier<SseEmitter.SseEventBuilder> event) {
         navsBySession.values().forEach(nav -> send(nav, event));
-        anonymous.forEach((emitter, ip) -> {
-            if (!send(emitter, event.get())) removeAnonymous(ip, emitter);
-        });
+        anonymous.keySet().forEach(emitter -> sse.send(emitter, event.get()));
     }
 
     private void live(Predicate<ChannelDto> which, boolean live) {
@@ -226,11 +208,11 @@ public class NavEventStreamController {
     }
 
     /** What {@code nav}'s session lists; none once that session is gone, whose streams then close. */
-    private static List<ChannelDto> channelsOf(Nav nav) {
+    private List<ChannelDto> channelsOf(Nav nav) {
         try {
             return SessionChannels.of(nav.session());
         } catch (IllegalStateException e) {
-            nav.emitters().forEach(SseEmitter::complete);
+            nav.emitters().forEach(sse::close);
             return List.of();
         }
     }
@@ -240,10 +222,10 @@ public class NavEventStreamController {
      * (logged out, or logged in again, possibly as another account), its streams close. The token
      * is compared rather than its subject: the mock's tokens are not JWTs.
      */
-    private static boolean stillLoggedIn(Nav nav) {
+    private boolean stillLoggedIn(Nav nav) {
         String token = tokenOf(nav.session());
         boolean same = token != null && token.equals(nav.token());
-        if (!same) nav.emitters().forEach(SseEmitter::complete);
+        if (!same) nav.emitters().forEach(sse::close);
         return same;
     }
 
@@ -261,24 +243,7 @@ public class NavEventStreamController {
     }
 
     private void send(Nav nav, Supplier<SseEmitter.SseEventBuilder> event) {
-        for (SseEmitter emitter : nav.emitters()) {
-            if (!send(emitter, event.get())) remove(nav.sessionId(), emitter);
-        }
-    }
-
-    /** False when {@code emitter} is gone. */
-    private static boolean send(SseEmitter emitter, String name, Object data) {
-        return send(emitter, SseEmitter.event().name(name).data(data));
-    }
-
-    /** False when {@code emitter} is gone. */
-    private static boolean send(SseEmitter emitter, SseEmitter.SseEventBuilder event) {
-        try {
-            emitter.send(event);
-            return true;
-        } catch (IOException | IllegalStateException e) {
-            return false;
-        }
+        nav.emitters().forEach(emitter -> sse.send(emitter, event.get()));
     }
 
     private void remove(String sessionId, SseEmitter emitter) {
@@ -298,7 +263,7 @@ public class NavEventStreamController {
     @EventListener
     public void onContextClosed(ContextClosedEvent event) {
         broadcastToAll(new Broadcast(IMMINENT, Collections.singletonMap("etaSeconds", null)));
-        navsBySession.values().forEach(nav -> nav.emitters().forEach(SseEmitter::complete));
-        anonymous.keySet().forEach(SseEmitter::complete);
+        navsBySession.values().forEach(nav -> nav.emitters().forEach(sse::close));
+        anonymous.keySet().forEach(sse::close);
     }
 }

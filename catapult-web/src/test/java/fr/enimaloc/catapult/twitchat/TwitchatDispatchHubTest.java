@@ -1,62 +1,44 @@
 package fr.enimaloc.catapult.twitchat;
 
+import fr.enimaloc.catapult.controller.SseStreams;
+import fr.enimaloc.catapult.monitoring.InteractionMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 class TwitchatDispatchHubTest {
 
+    private final SseStreams sse = SseStreams.direct(new InteractionMetrics(new SimpleMeterRegistry()));
+    private final TwitchatDispatchHub hub = new TwitchatDispatchHub(sse);
+
     @Test
-    void publish_reachesOnlyThatUsersEmitters() throws IOException {
-        TwitchatDispatchHub hub = new TwitchatDispatchHub();
+    void publish_reachesOnlyThatUsersStreams() {
         UUID owner = UUID.randomUUID();
-        SseEmitter mine = mock(SseEmitter.class);
-        SseEmitter other = mock(SseEmitter.class);
-        hub.subscribe(owner, mine);
-        hub.subscribe(UUID.randomUUID(), other);
+        SseEmitter mine = hub.subscribe(owner, "s1");
+        SseEmitter other = hub.subscribe(UUID.randomUUID(), "s2");
 
         hub.publish(owner, "{\"id\":\"d-1\"}");
 
-        verify(mine).send(any(SseEmitter.SseEventBuilder.class));
-        verify(other, never()).send(any(SseEmitter.SseEventBuilder.class));
         assertThat(hub.subscriberCount(owner)).isEqualTo(1);
+        assertThat(mine).isNotSameAs(other);
     }
 
     @Test
-    void publish_dropsAnEmitterWhoseSendFails() throws IOException {
-        TwitchatDispatchHub hub = new TwitchatDispatchHub();
-        UUID owner = UUID.randomUUID();
-        SseEmitter broken = mock(SseEmitter.class);
-        doThrow(new IOException("gone")).when(broken).send(any(SseEmitter.SseEventBuilder.class));
-        hub.subscribe(owner, broken);
-
-        hub.publish(owner, "{}");
-
-        assertThat(hub.subscriberCount(owner)).isZero();
-    }
-
-    @Test
-    void subscribe_withATimeout_closesTheStreamAfterIt_andTheOpenEndedOneNever() {
-        TwitchatDispatchHub hub = new TwitchatDispatchHub();
+    void widgetStreams_closeAfterTheirTimeout_andAreBoundedPerAddress() {
         UUID owner = UUID.randomUUID();
 
-        assertThat(hub.subscribe(owner, Duration.ofMinutes(10)).getTimeout()).isEqualTo(600_000L);
-        assertThat(hub.subscribe(owner).getTimeout()).isZero();
+        assertThat(hub.subscribeWidget(owner, "1.2.3.4", Duration.ofMinutes(10)).getTimeout()).isEqualTo(600_000L);
+        assertThat(hub.subscribe(owner, "s1").getTimeout()).isEqualTo(SseStreams.TIMEOUT.toMillis());
         assertThat(hub.subscriberCount(owner)).isEqualTo(2);
     }
 
     @Test
     void publish_withoutSubscribers_isANoOp() {
-        new TwitchatDispatchHub().publish(UUID.randomUUID(), "{}");
+        hub.publish(UUID.randomUUID(), "{}");
     }
 }

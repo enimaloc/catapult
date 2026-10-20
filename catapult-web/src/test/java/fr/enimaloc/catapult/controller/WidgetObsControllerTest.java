@@ -83,7 +83,7 @@ class WidgetObsControllerTest {
                 .andExpect(content().string(not(containsString("widget disabled"))));
         mvc.perform(get("/widget/obs/" + TOKEN + "/config")).andExpect(status().isNoContent());
         mvc.perform(get("/widget/obs/" + TOKEN + "/events")).andExpect(status().isNotFound());
-        verify(hub, never()).subscribe(any(), any(Duration.class));
+        verify(hub, never()).subscribeWidget(any(), any(), any(Duration.class));
     }
 
     /** Review Focus 4: never a 500 nor a stack trace, whatever the token. */
@@ -111,7 +111,7 @@ class WidgetObsControllerTest {
         when(apiService.widgetAccess(TOKEN)).thenReturn(access("oops", true));
         mvc.perform(get("/widget/obs/" + TOKEN + "/events")).andExpect(status().isNotFound());
 
-        verify(hub, never()).subscribe(any(), any(Duration.class));
+        verify(hub, never()).subscribeWidget(any(), any(), any(Duration.class));
     }
 
     @Test
@@ -136,13 +136,20 @@ class WidgetObsControllerTest {
     @Test
     void events_subscribeTheOwner_whenEnabled() throws Exception {
         when(apiService.widgetAccess(TOKEN)).thenReturn(access(OWNER.toString(), true));
-        when(hub.subscribe(OWNER, WidgetObsController.STREAM_TIMEOUT)).thenReturn(new SseEmitter(600_000L));
+        when(hub.subscribeWidget(OWNER, "127.0.0.1", WidgetObsController.STREAM_TIMEOUT)).thenReturn(new SseEmitter(600_000L));
 
         mvc.perform(get("/widget/obs/" + TOKEN + "/events")).andExpect(request().asyncStarted());
-        // Finite, unlike /me/twitchat/events: a revoked link stops at the next reconnection.
+        // Shorter than a page's stream: a revoked link stops at the next reconnection.
         assertThat(WidgetObsController.STREAM_TIMEOUT).isEqualTo(Duration.ofMinutes(10));
-        verify(hub).subscribe(OWNER, WidgetObsController.STREAM_TIMEOUT);
-        verify(hub, never()).subscribe(any(UUID.class));
+        verify(hub).subscribeWidget(OWNER, "127.0.0.1", WidgetObsController.STREAM_TIMEOUT);
+        verify(hub, never()).subscribe(any(UUID.class), any());
+    }
+
+    @Test
+    void events_pastTheOverallBound_areRefused() throws Exception {
+        when(apiService.widgetAccess(TOKEN)).thenReturn(access(OWNER.toString(), true));
+
+        mvc.perform(get("/widget/obs/" + TOKEN + "/events")).andExpect(status().isServiceUnavailable());
     }
 
     @Test

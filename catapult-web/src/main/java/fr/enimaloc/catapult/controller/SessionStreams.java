@@ -22,9 +22,10 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  * reconnect at once and close the next oldest in turn (live.js waits until its tab is shown again).
  * <p>
  * Its streams, the newer ones closing older and those turned away, show in {@link InteractionMetrics}
- * under the stream's name.
+ * under the stream's name. Made by {@link SseStreams#sessionStreams}, which closes a session's streams
+ * when it logs out or becomes another account.
  */
-final class SessionStreams {
+public final class SessionStreams {
     static final int MAX_PER_SESSION = 8;
     /** The event a stream closed for a newer one gets before it closes. */
     static final String EVICTED = "Evicted";
@@ -40,7 +41,7 @@ final class SessionStreams {
     }
 
     /** The calling request's session when it is logged in; null otherwise, never creating one. */
-    static HttpSession loggedIn(HttpServletRequest request) {
+    public static HttpSession loggedIn(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         try {
             return session != null && session.getAttribute(ApiClient.SESSION_JWT_KEY) != null ? session : null;
@@ -50,7 +51,7 @@ final class SessionStreams {
     }
 
     /** Counts {@code emitter} against {@code sessionId}, closing its oldest stream past the limit. */
-    void open(String sessionId, SseEmitter emitter) {
+    public void open(String sessionId, SseEmitter emitter) {
         Deque<SseEmitter> streams = bySession.computeIfAbsent(sessionId, ignored -> new ConcurrentLinkedDeque<>());
         streams.addLast(emitter);
         while (streams.size() > MAX_PER_SESSION) {
@@ -73,11 +74,17 @@ final class SessionStreams {
     }
 
     /** A stream turned away: {@code unauthenticated} (logged out) or {@code forbidden}. */
-    void refused(String reason) {
+    public void refused(String reason) {
         metrics.streamRefused(stream, reason);
     }
 
-    void closed(String sessionId, SseEmitter emitter) {
+    /** {@code sessionId}'s streams, closed once what was sent to them is written; their pages reconnect. */
+    void closeSession(String sessionId, SseStreams sse) {
+        Deque<SseEmitter> streams = bySession.remove(sessionId);
+        if (streams != null) streams.forEach(sse::close);
+    }
+
+    public void closed(String sessionId, SseEmitter emitter) {
         bySession.computeIfPresent(sessionId, (id, streams) -> {
             streams.remove(emitter);
             return streams.isEmpty() ? null : streams;

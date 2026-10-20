@@ -25,10 +25,10 @@ import java.util.regex.Pattern;
  * overall (beyond that refused), each closed after {@link #TIMEOUT} (the browser reconnects).
  * The counterpart of {@link SessionStreams} for visitors who are not logged in.
  * <p>
- * They show in {@link InteractionMetrics} under the stream {@value #STREAM}: open, refused for
- * {@code capacity}, closed for a newer one of the same address.
+ * They show in {@link InteractionMetrics} under the stream's name (the navbars' {@value #STREAM} by
+ * default): open, refused for {@code capacity}, closed for a newer one of the same address.
  */
-final class AnonymousStreams {
+public final class AnonymousStreams {
     static final int MAX_PER_IP = 8;
     static final int MAX_TOTAL = 1000;
     static final Duration TIMEOUT = Duration.ofMinutes(30);
@@ -38,21 +38,27 @@ final class AnonymousStreams {
     /** Each address's streams, by {@link #addressKey}, oldest first; only touched within the map's compute calls. */
     private final Map<String, Deque<SseEmitter>> byIp = new ConcurrentHashMap<>();
     private final AtomicInteger total = new AtomicInteger();
+    private final String stream;
     private final InteractionMetrics metrics;
 
     AnonymousStreams(InteractionMetrics metrics) {
+        this(STREAM, metrics);
+    }
+
+    AnonymousStreams(String stream, InteractionMetrics metrics) {
+        this.stream = stream;
         this.metrics = metrics;
-        metrics.streams(STREAM, total::get);
+        metrics.streams(stream, total::get);
     }
 
     /**
      * Counts {@code emitter} against {@code ip}, closing that address's oldest stream past its limit;
      * false when {@link #MAX_TOTAL} streams are already open, {@code emitter} then not counted.
      */
-    boolean open(String ip, SseEmitter emitter) {
+    public boolean open(String ip, SseEmitter emitter) {
         if (total.incrementAndGet() > MAX_TOTAL) {
             total.decrementAndGet();
-            metrics.streamRefused(STREAM, "capacity");
+            metrics.streamRefused(stream, "capacity");
             return false;
         }
         List<SseEmitter> evicted = new ArrayList<>();
@@ -66,13 +72,13 @@ final class AnonymousStreams {
         for (SseEmitter oldest : evicted) {
             total.decrementAndGet();
             SessionStreams.evict(oldest);
-            metrics.streamEvicted(STREAM);
+            metrics.streamEvicted(stream);
         }
         return true;
     }
 
     /** {@code emitter} closed; counted once however often it is reported. */
-    void closed(String ip, SseEmitter emitter) {
+    public void closed(String ip, SseEmitter emitter) {
         AtomicBoolean removed = new AtomicBoolean();
         byIp.computeIfPresent(addressKey(ip), (key, streams) -> {
             removed.set(streams.remove(emitter));

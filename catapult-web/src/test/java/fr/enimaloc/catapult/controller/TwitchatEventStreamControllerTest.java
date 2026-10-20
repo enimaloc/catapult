@@ -19,6 +19,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,11 +40,14 @@ class TwitchatEventStreamControllerTest {
     @Test
     void loggedIn_opensTheOwnersStream() throws Exception {
         UUID owner = UUID.randomUUID();
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY, "jwt");
         when(apiService.currentUserId()).thenReturn(owner);
-        when(hub.subscribe(owner)).thenReturn(new SseEmitter(0L));
+        when(hub.subscribe(owner, session.getId())).thenReturn(new SseEmitter(0L));
 
-        mvc.perform(get("/me/twitchat/events")).andExpect(request().asyncStarted());
-        verify(hub).subscribe(owner);
+        mvc.perform(get("/me/twitchat/events").session(session)).andExpect(request().asyncStarted())
+                .andExpect(header().string("X-Accel-Buffering", "no"));
+        verify(hub).subscribe(owner, session.getId());
     }
 
     /** An admin acting as a member: the member's dispatches (signed action tokens) never reach the admin's browser. */
@@ -54,6 +58,6 @@ class TwitchatEventStreamControllerTest {
         session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin-jwt");
 
         mvc.perform(get("/me/twitchat/events").session(session)).andExpect(status().isNotFound());
-        verify(hub, never()).subscribe(any(UUID.class));
+        verify(hub, never()).subscribe(any(UUID.class), any());
     }
 }
