@@ -29,16 +29,16 @@ class ImpersonationControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
-    @MockitoBean NavEventStreamController navEvents;
+    @MockitoBean SseStreams sse;
     @MockitoBean fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms twitchatEventForms;
 
-    /** The session ids forget() was called under: before the swap rotates them. */
+    /** The session ids whose streams were closed: before the swap rotates them. */
     private final java.util.List<String> forgottenIds = new java.util.ArrayList<>();
 
     @org.junit.jupiter.api.BeforeEach
     void recordForgottenIds() {
-        org.mockito.Mockito.doAnswer(call -> forgottenIds.add(call.<jakarta.servlet.http.HttpSession>getArgument(0).getId()))
-                .when(navEvents).forget(any());
+        org.mockito.Mockito.doAnswer(call -> forgottenIds.add(call.getArgument(0)))
+                .when(sse).closeSession(any());
     }
 
     private static MockHttpSession session(String jwt) {
@@ -52,7 +52,7 @@ class ImpersonationControllerTest {
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminImpersonate("alice")).thenReturn(new ApiClient.Result<>(200, "target-token"));
         MockHttpSession session = session("admin");
-        session.setAttribute(SessionChannels.ATTRIBUTE, java.util.List.of());
+        session.setAttribute(SessionChannels.ATTRIBUTE, "[]");
         String id = session.getId();
 
         mvc.perform(post("/admin/impersonate").session(session).with(csrf())
@@ -62,7 +62,7 @@ class ImpersonationControllerTest {
         assertThat(session.getAttribute(ImpersonationController.ORIGINAL_JWT_KEY)).isEqualTo("admin");
         assertThat(session.getAttribute(ApiClient.SESSION_JWT_KEY)).isEqualTo("target-token");
         // what catapult-web remembered for the admin is not the member's, forgotten under the former id
-        verify(navEvents).forget(session);
+        assertThat(session.getAttribute(SessionChannels.ATTRIBUTE)).isNull();
         assertThat(forgottenIds).containsExactly(id);
         assertThat(session.getId()).isNotEqualTo(id);
     }
@@ -81,7 +81,7 @@ class ImpersonationControllerTest {
         assertThat(session.getAttribute(ApiClient.SESSION_JWT_KEY)).isEqualTo("admin");
         assertThat(session.getAttribute(ImpersonationController.ORIGINAL_JWT_KEY)).isNull();
         assertThat(session.getId()).isEqualTo(id);
-        verify(navEvents, never()).forget(any());
+        verify(sse, never()).closeSession(any());
     }
 
     @Test
@@ -100,7 +100,7 @@ class ImpersonationControllerTest {
 
         assertThat(session.getAttribute(ApiClient.SESSION_JWT_KEY)).isEqualTo("admin");
         assertThat(session.getAttribute(ImpersonationController.ORIGINAL_JWT_KEY)).isNull();
-        verify(navEvents, never()).forget(any());
+        verify(sse, never()).closeSession(any());
     }
 
     @Test
@@ -159,7 +159,7 @@ class ImpersonationControllerTest {
 
         assertThat(session.getAttribute(ApiClient.SESSION_JWT_KEY)).isEqualTo("admin");
         assertThat(session.getAttribute(ImpersonationController.ORIGINAL_JWT_KEY)).isNull();
-        verify(navEvents).forget(session);
+        assertThat(session.getAttribute(SessionChannels.ATTRIBUTE)).isNull();
         assertThat(forgottenIds).containsExactly(id);
         assertThat(session.getId()).isNotEqualTo(id);
     }
@@ -177,7 +177,7 @@ class ImpersonationControllerTest {
         assertThat(session.isInvalid()).isFalse();
         assertThat(session.getId()).isEqualTo(id);
         assertThat(session.getAttribute(ApiClient.SESSION_JWT_KEY)).isEqualTo("admin");
-        verify(navEvents, never()).forget(any());
+        verify(sse, never()).closeSession(any());
     }
 
     @Test
@@ -188,7 +188,7 @@ class ImpersonationControllerTest {
                 .andReturn();
 
         assertThat(result.getRequest().getSession(false)).isNull();
-        verify(navEvents, never()).forget(any());
+        verify(sse, never()).closeSession(any());
     }
 
     @Test

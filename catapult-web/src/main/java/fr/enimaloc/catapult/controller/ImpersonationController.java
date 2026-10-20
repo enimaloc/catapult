@@ -47,7 +47,7 @@ public class ImpersonationController {
 
     private final ApiService apiService;
     private final ModelFiller filler;
-    private final NavEventStreamController navEvents;
+    private final SseStreams sse;
 
     /**
      * 204 once the session acts as {@code username}; else catapult-api's refusal (404 unknown, 403
@@ -91,11 +91,13 @@ public class ImpersonationController {
     }
 
     /**
-     * The session now acts as another account: what was remembered for the former one is dropped
-     * (by the current id, which its streams are kept under), then its id changes, as on a login.
+     * The session now acts as another account: what was remembered for the former one is dropped and its
+     * streams close on every instance (by the current id, which they are kept under), then its id changes,
+     * as on a login.
      */
     private void swapped(HttpServletRequest request, HttpSession session) {
-        navEvents.forget(session);
+        SessionChannels.forget(session);
+        sse.closeSession(session.getId());
         request.changeSessionId();
     }
 }

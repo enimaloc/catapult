@@ -4,6 +4,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import fr.enimaloc.catapult.controller.SseStreams;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -23,8 +26,12 @@ import java.io.IOException;
 @Configuration
 @EnableWebSecurity
 public class WebSecurityConfig {
+    /**
+     * The session is shared by every catapult-web instance (Spring Session, in Redis); logging out closes
+     * its streams on all of them, before it is invalidated (they would otherwise go on until they time out).
+     */
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectProvider<SseStreams> sse) throws Exception {
         return http
                 .authorizeHttpRequests(auth ->
                         auth.anyRequest().permitAll()
@@ -45,6 +52,11 @@ public class WebSecurityConfig {
                 .logout(logout -> logout
                         .logoutUrl("/logout")
                         .logoutSuccessUrl("/")
+                        .addLogoutHandler((request, response, authentication) -> {
+                            HttpSession session = request.getSession(false);
+                            SseStreams streams = sse.getIfAvailable();
+                            if (session != null && streams != null) streams.closeSession(session.getId());
+                        })
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID"))
                 .formLogin(FormLoginConfigurer::disable)

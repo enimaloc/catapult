@@ -33,6 +33,7 @@ class AuthControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
+    @MockitoBean SseStreams sse;
     @Autowired MeterRegistry registry;
 
     private double logins(String outcome) {
@@ -67,6 +68,24 @@ class AuthControllerTest {
                 .andExpect(redirectedUrl("/channel/own"))
                 .andExpect(request().sessionAttribute(ApiClient.SESSION_JWT_KEY, "the-jwt"))
                 .andExpect(request().sessionAttributeDoesNotExist(ImpersonationController.ORIGINAL_JWT_KEY));
+    }
+
+    /** A session id known before the login is worth nothing after it; the former login's streams close everywhere. */
+    @Test
+    void callback_givesTheSessionANewId_andClosesTheFormerLoginsStreams() throws Exception {
+        when(apiService.exchangeCode("code-1")).thenReturn(new TokenResponse("the-jwt"));
+        when(apiService.channelList()).thenReturn(new ChannelListResponse("2", List.of(channel("2", "own"))));
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "former-jwt");
+        SessionChannels.remember(session, List.of(channel("1", "former")));
+        String formerId = session.getId();
+
+        mvc.perform(get("/auth/callback").param("code", "code-1").session(session))
+                .andExpect(redirectedUrl("/channel/own"));
+
+        assertThat(session.getId()).isNotEqualTo(formerId);
+        assertThat(SessionChannels.of(session)).isEmpty();
+        org.mockito.Mockito.verify(sse).closeSession(formerId);
     }
 
     @Test
