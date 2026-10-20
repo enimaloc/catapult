@@ -39,6 +39,12 @@ const source = (ref, path) => `https://raw.githubusercontent.com/Durss/Twitchat/
 const EVENTS_PATH = "src_front/events/TwitchatEvent.ts";
 const DOCS_PATH = "PUBLIC_API.md";
 const ICONS_PATH = "src_front/assets/icons";
+/**
+ * Where catapult-web serves one of Twitchat's icons (ExternalAssetController fetches it from GitHub
+ * itself): the pages never have the visitor's browser ask GitHub. Only names it accepts are listed.
+ */
+const ICON_NAME = /^[A-Za-z0-9_-]+$/;
+const iconUrl = (commit, name) => `/assets/ext/twitchat/${commit}/${name}.svg`;
 const GITHUB_API = "https://api.github.com/repos/Durss/Twitchat";
 
 /**
@@ -155,14 +161,16 @@ function betaProtocol(ref, eventsSource) {
 
 /**
  * Every icon Twitchat can show: the SVGs of its assets/icons folder (its Icon component loads
- * any of them by name, more than the API's typing lists), each with its URL pinned to the ref's
- * current commit so a preview never breaks when an icon goes.
+ * any of them by name, more than the API's typing lists), each with its URL (catapult-web's proxy
+ * of it, see iconUrl) pinned to the ref's current commit so a preview never breaks when an icon goes.
  */
 async function icons(ref) {
     const commit = await fetchText(`${GITHUB_API}/commits/${ref}`, { Accept: "application/vnd.github.sha" });
     const listing = JSON.parse(await fetchText(`${GITHUB_API}/contents/${ICONS_PATH}?ref=${commit}`));
     return listing.filter((file) => file.type === "file" && file.name.endsWith(".svg"))
-        .map((file) => ({ name: file.name.slice(0, -".svg".length), url: source(commit, file.path) }));
+        .map((file) => file.name.slice(0, -".svg".length))
+        .filter((name) => ICON_NAME.test(name))
+        .map((name) => ({ name, url: iconUrl(commit, name) }));
 }
 
 /** Both branches' icons, each once (the beta's picture first) with the branches that have it. */
