@@ -20,8 +20,14 @@ import fr.enimaloc.catapult.event.steam.SteamTokenSavedEvent;
 import fr.enimaloc.catapult.event.tw.TwEnabledStateEvent;
 import fr.enimaloc.catapult.event.tw.TwResetEvent;
 import fr.enimaloc.catapult.event.tw.TwUpdatedEvent;
+import fr.enimaloc.catapult.TestRedis;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.LinkedHashMap;
@@ -30,7 +36,12 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -127,6 +138,14 @@ class ChannelEventRedisBridgeTest {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.STEAM_PROFILE_CHANGED,
                 new ChannelEvents.SteamProfileChanged(owner.toString(), "streamer", noToken))))
                 .contains(new SteamTokenDeletedEvent("streamer"));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CONNECTION_CHANGED,
+                new ChannelEvents.ConnectionChanged(owner.toString(), "streamer", "STEAM", true, noToken)))).containsExactly(
+                new ChannelConnectionChangedEvent("streamer", "STEAM", true),
+                new SteamConnectionStateEvent("streamer", true, false, false, false),
+                new SteamTokenDeletedEvent("streamer"));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CONNECTION_CHANGED,
+                new ChannelEvents.ConnectionChanged(owner.toString(), "streamer", "DISCORD", false, null))))
+                .containsExactly(new ChannelConnectionChangedEvent("streamer", "DISCORD", false));
     }
 
     @Test
@@ -154,5 +173,58 @@ class ChannelEventRedisBridgeTest {
         ChannelEventRedisBridge.forward(publisher, channel,
                 "{\"name\":\"binding.upserted\",\"data\":{\"channelLogin\":\"s\"}}");
         verifyNoInteractions(publisher);
+    }
+
+    private final ChannelEventRedisBridge bridge = new ChannelEventRedisBridge();
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private LettuceConnectionFactory redis;
+    private RedisMessageListenerContainer listener;
+
+    /** This instance's listener on {@code redis}, started the way its context would start it. */
+    private void listen(LettuceConnectionFactory redis) throws Exception {
+        this.redis = redis;
+        listener = TestRedis.prepared(bridge.channelEventListener(redis, events));
+        bridge.startChannelEventListener(listener).run(new DefaultApplicationArguments());
+    }
+
+    @AfterEach
+    void stopListening() throws Exception {
+        if (listener != null) listener.destroy();
+        if (redis != null) redis.destroy();
+    }
+
+    @Test
+    void throughRedis_anOwnersChannelEvent_reachesThisInstancesPages() throws Exception {
+        listen(TestRedis.up());
+
+        new StringRedisTemplate(redis).convertAndSend(channel, envelope(ChannelEvents.STREAM_STATE_CHANGED,
+                new ChannelEvents.StreamStateChanged(owner.toString(), "Streamer", true)));
+
+        verify(events, timeout(5_000)).publishEvent(new ChannelLiveStateEvent("streamer", true));
+    }
+
+    @Test
+    void throughRedis_garbage_andTheOtherEventChannels_reachNoPage() throws Exception {
+        listen(TestRedis.up());
+        StringRedisTemplate publisher = new StringRedisTemplate(redis);
+        String toggled = envelope(ChannelEvents.BOT_TOGGLED, new ChannelEvents.BotToggled(owner.toString(), "s", true));
+
+        publisher.convertAndSend(channel, "{oops");
+        publisher.convertAndSend(ChannelEvents.REDIS_PREFIX + "not-a-uuid", toggled);
+        publisher.convertAndSend("catapult:events:user:" + owner, toggled);
+        publisher.convertAndSend(channel, toggled);
+
+        verify(events, timeout(5_000)).publishEvent(new BotStateChangedEvent("s", true));
+        verify(events, after(300).times(1)).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void aRedisDownAtBoot_costsTheLiveEvents_notTheBoot() {
+        redis = TestRedis.down();
+        listener = TestRedis.prepared(bridge.channelEventListener(redis, events));
+
+        assertThatCode(() -> bridge.startChannelEventListener(listener).run(new DefaultApplicationArguments()))
+                .doesNotThrowAnyException();
+        verify(events, never()).publishEvent(any(Object.class));
     }
 }
