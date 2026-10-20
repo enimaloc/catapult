@@ -16,5 +16,7 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
+      # assemble: compile and package every module (catapult-common included) without `check`,
+      # which the Tests workflow runs (catapult-web's would need Node for jsTest)
       - name: Build with Gradle
-        run: ./gradlew :catapult-api:build :catapult-web:build -x test
+        run: ./gradlew assemble
