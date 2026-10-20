@@ -126,6 +126,14 @@ class SentryTunnelControllerTest {
             while (sentry.getRequestCount() < SentryTunnelController.MAX_IN_FLIGHT) Thread.sleep(10);
 
             assertThat(tunnel.relay(envelope(dsn)).getStatusCode().value()).isEqualTo(429);
+            // Refused before its body is read: a body held in memory counts as much as a wait.
+            org.springframework.mock.web.MockHttpServletRequest unread = new org.springframework.mock.web.MockHttpServletRequest("POST", SentryTunnelController.PATH) {
+                @Override
+                public jakarta.servlet.ServletInputStream getInputStream() {
+                    throw new AssertionError("read while every slot is taken");
+                }
+            };
+            assertThat(tunnel.relay(unread).getStatusCode().value()).isEqualTo(429);
         } finally {
             pending.shutdownNow();
         }
