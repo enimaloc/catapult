@@ -17,6 +17,7 @@ import java.util.Optional;
  * schema of its fields (required, type, choices, rows). RAW mode is the streamer's override and
  * only needs to be a JSON object. A select fed live from Twitchat ({@code source}) accepts any
  * value, the list being unknown here; a value containing a {{placeholder}} passes as a number.
+ * A required field the form hides ({@code showIf} unmet) isn't required.
  */
 public final class TwitchatPayloadValidator {
 
@@ -89,7 +90,7 @@ public final class TwitchatPayloadValidator {
             String name = prefix + field.path();
             Object value = valueAt(data, field.path());
             if (value == null || value instanceof String text && text.isBlank()) {
-                if (field.required()) {
+                if (field.required() && shown(field, data)) {
                     errors.add(new TwitchatValidationError(index, name, "Required"));
                 }
                 continue;
@@ -125,6 +126,19 @@ public final class TwitchatPayloadValidator {
                 }
             }
         }
+    }
+
+    /**
+     * Whether the form shows {@code field}: no condition, or its sibling (in the same row or form,
+     * {@code data}) holding one of the values, as the form compares them (text, "" when absent).
+     */
+    private static boolean shown(TwitchatCatalog.Field field, Map<String, Object> data) {
+        TwitchatCatalog.Condition condition = field.showIf();
+        if (condition == null || condition.path() == null) {
+            return true;
+        }
+        Object sibling = valueAt(data, condition.path());
+        return condition.values().contains(sibling == null ? "" : String.valueOf(sibling));
     }
 
     /**
