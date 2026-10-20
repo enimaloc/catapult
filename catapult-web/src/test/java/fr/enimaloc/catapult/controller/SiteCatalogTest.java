@@ -22,8 +22,8 @@ class SiteCatalogTest {
     }
 
     @Test
-    void onlyTheChannelAndHelpPagesTakeAParameter() {
-        assertThat(SiteCatalog.PAGES).filteredOn(SpaPage::isDynamic).extracting(SpaPage::getId).containsExactly("channel", "help");
+    void onlyTheChannelPagesAndHelpTakeAParameter() {
+        assertThat(SiteCatalog.PAGES).filteredOn(SpaPage::isDynamic).extracting(SpaPage::getId).containsExactly("channel", "channel-dock", "help");
     }
 
     @Test

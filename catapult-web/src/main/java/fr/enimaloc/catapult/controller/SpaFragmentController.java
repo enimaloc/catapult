@@ -8,11 +8,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -62,7 +64,14 @@ public class SpaFragmentController {
     String channel(Model model, @PathVariable String username,
                    @RequestParam(defaultValue = "0") int page,
                    @RequestParam(required = false) String status,
-                   @RequestParam(required = false) String source, HttpServletResponse response) {
+                   @RequestParam(required = false) String source,
+                   @RequestParam(required = false) String view,
+                   @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
+                   HttpServletResponse response) {
+        // The dock re-renders itself through here too (CatapultChannel.refresh): it must stay a dock.
+        if (ObsDock.wanted(userAgent, view)) {
+            return dock(model, username, response);
+        }
         int refused = filler.channel(model, username, page, status, source);
         if (refused != 0) {
             response.setStatus(refused);
@@ -71,6 +80,18 @@ public class SpaFragmentController {
         }
         filler.defaultAttr(model, "channel");
         return "pages/channel :: channel";
+    }
+
+    @GetMapping("/channel/{username}/dock")
+    String dock(Model model, @PathVariable String username, HttpServletResponse response) {
+        int refused = filler.channelDock(model, username);
+        if (refused != 0) {
+            response.setStatus(refused);
+            filler.error(model, refused);
+            return "pages/error :: error";
+        }
+        filler.defaultAttr(model, "channel-dock");
+        return "pages/channel-dock :: dock";
     }
 
     @GetMapping("/admin")

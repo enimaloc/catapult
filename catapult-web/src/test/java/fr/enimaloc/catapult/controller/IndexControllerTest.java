@@ -1,10 +1,14 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.CclDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.TwDto;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.Severity;
@@ -612,5 +616,103 @@ class IndexControllerTest {
             assertThat(html).contains("id=\"channel-settings-unavailable\"")
                     .doesNotContain("id=\"channel-ccl-settings-form\"");
         }
+    }
+
+    // --- the OBS dock (ObsDock) ------------------------------------------------------------------
+
+    private static final String OBS_AGENT = "Mozilla/5.0 Chrome/127.0.0.0 Safari/537.36 OBS/31.0.2";
+
+    private static ChannelPageData playingValheim() {
+        return new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, new GameDto("b1", "Valheim", "STEAM"),
+                new PagedBindings(0, 1, 0, List.of()),
+                List.of(new CclDto("ccl-a", "Drugs"), new CclDto("ccl-b", "Gambling")), java.util.Set.of("ccl-b"),
+                List.of(new TwDto("tw-a", "Flashes")), java.util.Set.of(),
+                null, null, null, null, null, null, null, "uuid");
+    }
+
+    @Test
+    void channel_inObs_isTheDock_withoutTheAppBar_unlessViewFullAsksOtherwise() throws Exception {
+        String html = mvc.perform(get("/channel/enimaloc").header("User-Agent", OBS_AGENT)
+                        .sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andExpect(view().name("index"))
+                .andExpect(model().attribute("page", "channel-dock")).andExpect(model().attribute("dock", true))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(html).contains("id=\"obs-dock\"").contains("obs-dock-mode")
+                .doesNotContain("<mdui-top-app-bar").doesNotContain("id=\"channel-bindings-list\"");
+
+        mvc.perform(get("/channel/enimaloc").param("view", "full").header("User-Agent", OBS_AGENT))
+                .andExpect(model().attribute("page", "channel"));
+    }
+
+    @Test
+    void channel_isTheDock_atItsOwnAddress_orWithViewDock_inAnyBrowser() throws Exception {
+        for (var request : List.of(get("/channel/enimaloc/dock"), get("/channel/enimaloc").param("view", "dock"))) {
+            mvc.perform(request.sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                    .andExpect(status().isOk()).andExpect(model().attribute("page", "channel-dock"));
+        }
+    }
+
+    /** CatapultChannel.refresh re-renders the dock through the channel's fragment: it must stay one. */
+    @Test
+    void spaChannelFragment_isTheDock_whereThePageWouldBe() throws Exception {
+        mvc.perform(get("/spa/channel/enimaloc").header("User-Agent", OBS_AGENT).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andExpect(view().name("pages/channel-dock :: dock"));
+        mvc.perform(get("/spa/channel/enimaloc/dock").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andExpect(view().name("pages/channel-dock :: dock"));
+        mvc.perform(get("/spa/channel/enimaloc").param("view", "full").header("User-Agent", OBS_AGENT))
+                .andExpect(view().name("pages/channel :: channel"));
+    }
+
+    @Test
+    void dock_offersAVisitorTheLogin_ratherThanThe401Page() throws Exception {
+        for (String url : List.of("/channel/enimaloc/dock", "/spa/channel/enimaloc/dock")) {
+            String html = mvc.perform(get(url)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(html).contains("class=\"obs-dock-login\"").contains("href=\"/auth/login\"");
+        }
+        verify(apiService, never()).channelPage(any(), anyInt(), any(), any());
+    }
+
+    @Test
+    void dock_ofAChannelCatapultApiDoesntGive_isA404() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(null);
+
+        mvc.perform(get("/channel/ghost/dock").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound()).andExpect(model().attribute("error", true));
+        mvc.perform(get("/spa/channel/ghost/dock").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound()).andExpect(view().name("pages/error :: error"));
+    }
+
+    @Test
+    void dock_showsTheGamePlayedNow_itsBindingsSwitches_andTheChannelWideOnes() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(playingValheim());
+        when(apiService.currentBinding("enimaloc")).thenReturn(new BindingDto("b1", "AUTO", "STEAM", "Valheim",
+                "508455", "Valheim", false, true, java.util.Set.of("ccl-a"), true, false, java.util.Set.of("tw-a")));
+        when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
+                true, java.util.Set.of("ccl-b"), null, null, java.util.Set.of(), false, false, false,
+                null, null, java.util.Set.of(), List.of(), true, java.util.Set.of(), List.of()));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc/dock").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("id=\"channel-current-game\"").contains("Valheim")
+                .contains("id=\"channel-recheck-game\"").contains("id=\"channel-bot-toggle\"")
+                .contains("data-binding-id=\"b1\"").contains("data-game-id=\"508455\"")
+                .contains("id=\"obs-dock-ccl-enabled\"").contains("data-blocked=\"ccl-b\"")
+                .contains("id=\"obs-dock-binding-ccl-enabled\"").contains("id=\"obs-dock-binding-tw-enabled\"")
+                .containsPattern("class=\"obs-dock-binding-ccl\" value=\"ccl-b\"[^>]*disabled")
+                .doesNotContain("id=\"channel-no-game\"");
+    }
+
+    @Test
+    void dock_withoutABinding_saysSo_butKeepsTheChannelWideSwitches() throws Exception {
+        String html = mvc.perform(get("/spa/channel/enimaloc/dock").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("id=\"channel-no-game\"").contains("id=\"obs-dock-ccl-enabled\"")
+                .contains("id=\"obs-dock-tw-enabled\"").doesNotContain("id=\"obs-dock-binding-ccl-enabled\"");
+        verify(apiService, never()).currentBinding(any());
     }
 }

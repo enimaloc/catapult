@@ -31,7 +31,7 @@ afterEach(() => {
         const [target, type, listener, options] = registered.pop();
         target.removeEventListener(type, listener, options);
     }
-    for (const name of ["Visibility", "CatapultChannel", "CatapultCsrf", "CatapultSpa", "GameSearch", "Catapult"]) {
+    for (const name of ["Visibility", "CatapultChannel", "CatapultCsrf", "CatapultSpa", "GameSearch", "Catapult", "CatapultDock"]) {
         delete window[name];
     }
     vi.unstubAllGlobals();

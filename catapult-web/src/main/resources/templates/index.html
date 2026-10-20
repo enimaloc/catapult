@@ -47,10 +47,11 @@
 </head>
 
 <!--/* The words of a failed action's snackbar, for every page's scripts (CatapultChannel.postJson). */-->
-<body th:attr="data-label-action-failed=#{action.error.failed('{0}')},data-label-action-unreachable=#{action.error.unreachable}">
+<!--/* An OBS dock (ObsDock) is the channel page alone: no app bar, no footer, a compact layout. */-->
+<body th:classappend="${dock} ? 'obs-dock-mode'" th:attr="data-label-action-failed=#{action.error.failed('{0}')},data-label-action-unreachable=#{action.error.unreachable}">
 <mdui-layout>
     <!-- Navigation -->
-    <mdui-top-app-bar class="app-bar">
+    <mdui-top-app-bar class="app-bar" th:unless="${dock}">
         <a data-link href="/" class="brand-link">
             <mdui-top-app-bar-title>
             <span class="brand">
@@ -116,7 +117,7 @@
     </div>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="footer" th:unless="${dock}">
         <div class="footer-brand">
             <span class="brand-icon">🚀</span><span th:text="#{app.brand}">app.brand</span>
         </div>
@@ -184,6 +185,7 @@
 <script src="/js/channel-settings.js"></script>
 <script src="/js/channel-dtdd.js"></script>
 <script src="/js/channel-danger-zone.js"></script>
+<script src="/js/channel-dock.js"></script>
 <script src="/js/channel-invite.js"></script>
 <script src="/js/channel-obs-widget.js"></script>
 <script src="/js/admin-members.js"></script>
