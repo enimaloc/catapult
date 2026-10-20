@@ -268,6 +268,11 @@ public interface ApiService {
 
     /** The logged-in account as catapult-api validates it (status, deletion request time); null when it fails. */
     UserInfoResponse accountInfo();
+    /**
+     * Whether catapult-api still accepts the session's JWT: its status (2xx yes; 401/403 no), 502 when
+     * unreachable, which tells nothing about the JWT.
+     */
+    int validateSession();
     /** Days between a deletion request and the account's removal; 7 when catapult-api gives none. */
     int accountDeletionDelayDays();
     /**

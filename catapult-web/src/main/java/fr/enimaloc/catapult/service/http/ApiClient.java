@@ -15,6 +15,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
@@ -239,9 +240,18 @@ public class ApiClient {
         return roles.stream().map(String::valueOf).toList();
     }
 
+    /** When {@code jwt} expires (its {@code exp} claim); null when it tells none, or is not a JWT (the mock's). */
+    public static Instant expiresAt(String jwt) {
+        Map<?, ?> claims = claims(jwt);
+        return claims != null && claims.get("exp") instanceof Number exp ? Instant.ofEpochSecond(exp.longValue()) : null;
+    }
+
     /** The calling session's JWT claims; null without one. Read, not verified: the session holds it server-side. */
     private static Map<?, ?> currentClaims() {
-        String jwt = currentJwt();
+        return claims(currentJwt());
+    }
+
+    private static Map<?, ?> claims(String jwt) {
         if (jwt == null) return null;
         String[] parts = jwt.split("\\.");
         if (parts.length < 2) return null;
