@@ -288,6 +288,49 @@ class ApiClientTest {
     }
 
     @Test
+    void getAnonymous_goesOutWithoutTheSessionsBearer_norItsOwnMarker() throws InterruptedException {
+        inSessionWithJwt("expired.jwt.sig");
+        server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"name\":\"public\"}"));
+
+        assertThat(client.getAnonymous("/api/public/{id}", Payload.class, "p1"))
+                .isEqualTo(new ApiClient.Result<>(200, new Payload("public")));
+
+        RecordedRequest request = server.takeRequest();
+        assertThat(request.getPath()).isEqualTo("/api/public/p1");
+        assertThat(request.getHeader("Authorization")).isNull();
+        assertThat(request.getHeader("X-Catapult-Anonymous")).isNull();
+    }
+
+    @Test
+    void getAnonymous_keepsTheStatus_withoutABodyItCannotRead_or502WhenUnreachable() throws IOException {
+        server.enqueue(new MockResponse().setResponseCode(404).setHeader("Content-Type", "application/json")
+                .setBody("{\"name\":\"Not Found\"}"));
+        server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("{oops"));
+
+        assertThat(client.getAnonymous("/api/public", Payload.class)).isEqualTo(new ApiClient.Result<Payload>(404, null));
+        assertThat(client.getAnonymous("/api/public", Payload.class)).isEqualTo(new ApiClient.Result<Payload>(200, null));
+
+        server.shutdown();
+        assertThat(client.getAnonymous("/api/public", Payload.class)).isEqualTo(new ApiClient.Result<Payload>(502, null));
+    }
+
+    @Test
+    void theSessionsJwt_isUnreadable_whenItsPayloadIsNotBase64_orItsRequestIsOver() {
+        inSessionWithJwt("h.!not base64!.sig");
+        assertThat(ApiClient.currentSubject()).isNull();
+        assertThat(ApiClient.hasSession()).isTrue();
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.getSession(true).setAttribute(ApiClient.SESSION_JWT_KEY, jwtWithPayload("{\"username\":\"alice\"}"));
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        assertThat(ApiClient.currentLogin()).isEqualTo("alice");
+        // Read from an async thread once the request is done.
+        request.close();
+        assertThat(ApiClient.currentLogin()).isNull();
+        assertThat(ApiClient.hasSession()).isFalse();
+    }
+
+    @Test
     void call_keepsTheStatus_whenTheBodyIsNotTheRequestedType() {
         server.enqueue(new MockResponse().setResponseCode(403).setHeader("Content-Type", "application/json")
                 .setBody("{\"detail\":\"nope\"}"));
