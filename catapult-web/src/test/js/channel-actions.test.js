@@ -168,11 +168,13 @@ describe("channel-bindings", () => {
     });
 
     it("never sends text typed but not picked, which leaving the field puts back", async () => {
+        // Fake timers: the search the typing starts must not outlive the test.
+        vi.useFakeTimers();
         const input = row(".binding-edit-game-input");
         input.value = "Half-typ";
         input.dispatchEvent(new Event("input"));
         toggle(row(".binding-edit-ccl-checkbox[value=Drugs]"), true);
-        await flush();
+        await vi.runAllTimersAsync();
 
         expect(posts()).toEqual([["/channel/enimaloc/bindings/b1",
             { twitchGameId: "10", twitchGameName: "Old", ccls: ["Drugs", "Gore"] }]]);
