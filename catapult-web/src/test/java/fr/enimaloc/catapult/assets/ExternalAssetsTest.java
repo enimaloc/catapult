@@ -16,6 +16,12 @@ import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class ExternalAssetsTest {
     static final String COMMIT = "25c0c7be44d5692e323e4a5779202bdb31f1e2e8";
@@ -104,6 +110,55 @@ class ExternalAssetsTest {
         // Announced too big: refused without reading it.
         server.enqueue(new MockResponse().setBody("<svg/>").setHeader("Content-Length", ExternalAssets.Kind.SVG.maxBytes + 1));
         assertThat(assets.twitchatIcon(COMMIT, "big").status()).isEqualTo(502);
+    }
+
+    @Test
+    void anAnswerOverItsSizeLimit_withoutAnnouncingIt_isRefused() {
+        server.enqueue(new MockResponse().setChunkedBody("x".repeat(ExternalAssets.Kind.CSS.maxBytes + 1), 4096));
+        assertThat(assets.materialIconsCss().status()).isEqualTo(502);
+    }
+
+    @Test
+    void aFullCache_stillServes_butKeepsNothingMore_untilItsFilesExpire() throws Exception {
+        String font = "x".repeat(ExternalAssets.Kind.FONT.maxBytes);
+        long fits = ExternalAssets.MAX_CACHED_BYTES / ExternalAssets.Kind.FONT.maxBytes;
+        for (int i = 0; i <= fits + 1; i++) server.enqueue(new MockResponse().setBody(font));
+        for (int i = 0; i < fits; i++) assertThat(assets.font("s/full/v1/f" + i + ".woff2").status()).isEqualTo(200);
+
+        assertThat(assets.font("s/full/v1/over.woff2").status()).isEqualTo(200);
+        assertThat(assets.font("s/full/v1/over.woff2").status()).isEqualTo(200);
+        assertThat(server.getRequestCount()).isEqualTo(fits + 2);
+
+        clock.advance(ExternalAssets.Kind.FONT.ttl.plus(Duration.ofSeconds(1)));
+        server.enqueue(new MockResponse().setBody("wOF2"));
+        assertThat(text(assets.font("s/full/v1/over.woff2"))).isEqualTo("wOF2");
+        assertThat(text(assets.font("s/full/v1/over.woff2"))).isEqualTo("wOF2");
+        assertThat(server.getRequestCount()).isEqualTo(fits + 3);
+    }
+
+    @Test
+    void aFetchThatBlowsUp_isNotLeftInFlight_andIsAskedAgainNextTime() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(), any())).thenThrow(new IllegalStateException("closed")).thenThrow(new IOException("reset"));
+        ExternalAssets failing = new ExternalAssets(http, clock, base + "css", base + "gstatic/", base + "twitchat/");
+
+        assertThatThrownBy(failing::materialIconsCss).isInstanceOf(IllegalStateException.class);
+        assertThat(failing.materialIconsCss().status()).isEqualTo(502);
+        verify(http, times(2)).send(any(), any());
+    }
+
+    @Test
+    void aFetchInterrupted_isA502_andKeepsTheThreadInterrupted() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(), any())).thenThrow(new InterruptedException("shutting down"));
+        ExternalAssets interrupted = new ExternalAssets(http, clock, base + "css", base + "gstatic/", base + "twitchat/");
+
+        try {
+            assertThat(interrupted.twitchatIcon(COMMIT, "add").status()).isEqualTo(502);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
     }
 
     @Test
