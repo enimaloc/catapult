@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AddToGroupRequest;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.FlagView;
 import fr.enimaloc.catapult.common.dto.admin.MemberSummary;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargeting;
@@ -56,13 +58,21 @@ public class ApiAdminMembersController {
     private final UserFlagRepository userFlagRepository;
     private final UserGroupRepository userGroupRepository;
 
+    /** Every member as catapult-web's admin page reads them (not the entity: no tokens, no proxies). */
     @GetMapping
-    public MembersPageData page() {
+    public AdminMembersPage page() {
         List<UserAccount> members = userAccountRepository.findAll();
         Map<UUID, Boolean> liveStatus = members.stream()
                 .collect(Collectors.toMap(UserAccount::getId, streamStateService::isLive));
         boolean isMockProfile = Arrays.asList(environment.getActiveProfiles()).contains("mock");
-        return new MembersPageData(members, liveStatus, isMockProfile);
+        return new AdminMembersPage(members.stream().map(ApiAdminMembersController::toDto).toList(),
+                liveStatus, isMockProfile);
+    }
+
+    static AdminMemberDto toDto(UserAccount user) {
+        return new AdminMemberDto(user.getId(), user.getTwitchId(), user.getTwitchUsername(), user.getProfileImageUrl(),
+                user.getSteamId(), user.isSystemAccount(), user.isBotEnabled(),
+                user.getStatus() == null ? null : user.getStatus().name(), user.getCreatedAt());
     }
 
     @PostMapping("/{id}/bot/toggle")
@@ -228,6 +238,4 @@ public class ApiAdminMembersController {
         return userAccountRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
-
-    public record MembersPageData(List<UserAccount> members, Map<UUID, Boolean> liveStatus, boolean isMockProfile) {}
 }
