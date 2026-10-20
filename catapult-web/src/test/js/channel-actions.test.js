@@ -246,6 +246,20 @@ describe("channel-connections", () => {
         expect(refreshed()).toBe(0);
     });
 
+    it("links Steam in a popup, and unlinks it with a post", async () => {
+        const open = vi.fn(() => ({}));
+        vi.stubGlobal("open", open);
+        document.getElementById("channel-connections").insertAdjacentHTML("beforeend",
+            `<button id="steam-connect-btn"></button><button id="steam-disconnect-btn"></button>`);
+        render();
+
+        document.getElementById("steam-connect-btn").click();
+        await click("#steam-disconnect-btn");
+
+        expect(open).toHaveBeenCalledWith("/connect/steam", "catapult-steam", expect.stringContaining("popup"));
+        expect(posts()).toContainEqual(["/connect/steam/disconnect", {}]);
+    });
+
     it("puts the token sharing switch back when the change fails", async () => {
         posted.mockResolvedValueOnce(response(502));
 

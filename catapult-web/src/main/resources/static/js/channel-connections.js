@@ -32,7 +32,13 @@
         const value = id => document.getElementById(id).value;
         const checked = id => document.getElementById(id).checked;
 
-        // Steam
+        // Steam. Linking goes through Steam's login in a popup, which closes itself once done
+        // (the tab itself when the browser blocks popups); the card follows from the event.
+        on("steam-connect-btn", "click", () => {
+            const popup = window.open("/connect/steam", "catapult-steam", "popup,width=800,height=720");
+            if (!popup) location.assign("/connect/steam");
+        });
+        on("steam-disconnect-btn", "click", () => postJson("/connect/steam/disconnect", {}));
         on("steam-token-shared", "change", event =>
             postSwitch(event.currentTarget, `${baseUrl}/settings/steam-personal-token/sharing`,
                 { shared: event.currentTarget.checked }));

@@ -76,6 +76,7 @@ public final class IntegrationCards {
 
     private static IntegrationDto steam(SteamData steam) {
         SpaState connected = SpaState.flag("connected", steam.connected(), STEAM_STATE + ".connected");
+        SpaState notConnected = SpaState.flag("notConnected", !steam.connected(), STEAM_STATE + ".!connected");
         SpaState hasToken = SpaState.flag("hasToken", steam.hasPersonalToken(),
                 "SteamTokenSavedEvent", "!SteamTokenDeletedEvent");
         SpaState noToken = SpaState.flag("noToken", !steam.hasPersonalToken(),
@@ -83,9 +84,15 @@ public final class IntegrationCards {
 
         return card("steam",
                 new Chip(Attrs.cls("steam-connected-chip").withState(connected), CONNECTED),
-                new Chip(Attrs.cls("steam-not-connected-chip")
-                        .withState(SpaState.flag("notConnected", !steam.connected(), STEAM_STATE + ".!connected")),
-                        NOT_CONNECTED),
+                new Chip(Attrs.cls("steam-not-connected-chip").withState(notConnected), NOT_CONNECTED),
+
+                // Linking runs in a popup (SteamConnectController), unlinking is a post: both are
+                // channel-connections.js's, the card following from the connection's event.
+                new Container(Attrs.id("steam-link-actions").withClass("card-actions"), Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("steam-connect-btn").withState(notConnected), Button.Kind.FILLED,
+                                key(PREFIX + "steam.connect")),
+                        new Button(Attrs.id("steam-disconnect-btn").withState(connected), Button.Kind.TEXT,
+                                key(PREFIX + "steam.disconnect")))),
 
                 steamDiagnostic("rate-limited", connected.and("rateLimited", steam.rateLimited(), STEAM_STATE + ".rateLimited"),
                         key(PREFIX + "steam.rate_limited")),
