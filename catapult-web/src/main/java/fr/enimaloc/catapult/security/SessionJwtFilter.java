@@ -29,7 +29,7 @@ public class SessionJwtFilter extends OncePerRequestFilter {
     static final Duration REVALIDATE = Duration.ofMinutes(5);
     /** When catapult-api last accepted the session's JWT, in epoch milliseconds (a string, as every attribute). */
     static final String CHECKED_AT_KEY = "jwtCheckedAt";
-    private static final String[] STATIC = {"/css/", "/js/", "/img/", "/fonts/", "/webjars/", "/favicon", "/assets/"};
+    private static final String[] STATIC = {"/css/", "/js/", "/img/", "/_static/", "/favicon", "/assets/"};
 
     private final Supplier<ApiService> apiService;
     private final Supplier<SseStreams> sse;
