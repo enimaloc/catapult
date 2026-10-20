@@ -54,10 +54,10 @@ public record TwitchatCatalog(int version, List<Action> actions) {
                         Condition showIf) {
     }
 
-    /** The sibling field at {@code path} (same row, or same form) holds one of {@code values}. */
+    /** The sibling field at {@code path} (same row, or same form) holds one of {@code values} (none when null). */
     public record Condition(String path, List<String> values) {
         public Condition {
-            values = List.copyOf(values);
+            values = values == null ? List.of() : List.copyOf(values);
         }
     }
 
