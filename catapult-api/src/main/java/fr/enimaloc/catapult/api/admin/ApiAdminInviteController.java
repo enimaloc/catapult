@@ -5,7 +5,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminInviteQuotaRequest;
 import fr.enimaloc.catapult.common.dto.admin.AdminInviteRedemptionDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminInviteRow;
 import fr.enimaloc.catapult.common.dto.admin.GlobalSettingsRequest;
-import fr.enimaloc.catapult.common.dto.admin.MemberDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.domain.access.AlphaInvite;
 import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -63,10 +63,10 @@ public class ApiAdminInviteController {
             );
         }).toList();
 
-        List<MemberDto> membersWithoutInvite = userAccountRepository.findAll().stream()
+        List<AdminMemberSummaryDto> membersWithoutInvite = userAccountRepository.findAll().stream()
             .filter(u -> !u.isSystemAccount() && u.getStatus() == UserAccount.Status.ACTIVE)
             .filter(u -> !ownersWithInvite.contains(u.getId()))
-            .map(u -> new MemberDto(u.getId(), u.getTwitchUsername()))
+            .map(u -> new AdminMemberSummaryDto(u.getId(), u.getTwitchUsername()))
             .toList();
 
         return new AdminInvitePageData(
