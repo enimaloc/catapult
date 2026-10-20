@@ -9,17 +9,21 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserGroupRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
+import fr.enimaloc.catapult.service.dtdd.DtddMappingEvents;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -41,6 +45,7 @@ class ApiAdminDataControllerTest {
     @Autowired UserGroupRepository userGroupRepository;
     @Autowired UserAccountRepository userAccountRepository;
     @Autowired ChatCommandDefinitionRepository chatCommandDefinitionRepository;
+    @MockitoBean DtddMappingEvents dtddMappingEvents;
 
     @Test
     void listRepositories_includesKnownRepos() throws Exception {
@@ -260,5 +265,19 @@ class ApiAdminDataControllerTest {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         mvc.perform(delete("/api/admin/data/tw-definition/does-not-exist").with(csrf()))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void dtddMappingEdits_tellTheGamesDashboards() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(post("/api/admin/data/dtdd-game-mapping").with(csrf())
+                        .contentType("application/json")
+                        .content("{\"igdbId\":\"4242\",\"dtddId\":\"7\",\"confidence\":\"1.0\",\"verified\":\"true\","
+                                + "\"resolvedAt\":\"2026-10-20T08:00:00Z\"}"))
+                .andExpect(status().isCreated());
+        mvc.perform(delete("/api/admin/data/dtdd-game-mapping/4242").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(dtddMappingEvents, times(2)).mappingChanged("4242");
     }
 }
