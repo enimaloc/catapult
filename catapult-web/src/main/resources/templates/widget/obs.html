@@ -3,7 +3,7 @@
 <html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Catapult — relais Twitchat</title>
+    <title th:text="#{widget.obs.title}">Catapult — Twitchat relay</title>
     <!--/* Its URL carries the widget token. */-->
     <meta name="robots" content="noindex">
     <!--/* Off or unknown: checked again every minute, so switching the widget on reaches OBS without touching the source. */-->
