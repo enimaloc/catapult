@@ -9,6 +9,8 @@ import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
 import fr.enimaloc.catapult.domain.wellknown.WellKnownFile;
 import fr.enimaloc.catapult.repository.wellknown.WellKnownFileRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
@@ -20,7 +22,11 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 
-/** The well-known files the admin configures and catapult-web serves (see {@link WellKnownPaths}). */
+/**
+ * The well-known files the admin configures and catapult-web serves (see {@link WellKnownPaths}).
+ * A path is configured once: a second one is a 409, also when two admins add it at once (the
+ * table's unique constraint), and an update of a file deleted meanwhile is a 404.
+ */
 @Service
 public class WellKnownFileService {
     private final WellKnownFileRepository repository;
@@ -49,7 +55,7 @@ public class WellKnownFileService {
         if (repository.findByLocationAndPath(request.location(), request.path()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Path already configured");
         }
-        return detail(repository.save(fill(new WellKnownFile(), request, normalized)));
+        return save(fill(new WellKnownFile(), request, normalized));
     }
 
     public WellKnownFileDetailDto update(long id, WellKnownFileRequest request) {
@@ -60,7 +66,7 @@ public class WellKnownFileService {
                 .ifPresent(other -> {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Path already configured");
                 });
-        return detail(repository.save(fill(file, request, normalized)));
+        return save(fill(file, request, normalized));
     }
 
     public void delete(long id) {
@@ -71,6 +77,16 @@ public class WellKnownFileService {
     public Optional<WellKnownFile> find(WellKnownLocation location, String path) {
         if (!WellKnownPaths.valid(location, path)) return Optional.empty();
         return repository.findByLocationAndPath(location, path);
+    }
+
+    private WellKnownFileDetailDto save(WellKnownFile file) {
+        try {
+            return detail(repository.save(file));
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Path already configured");
+        } catch (OptimisticLockingFailureException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown well-known file");
+        }
     }
 
     private WellKnownFile existing(long id) {

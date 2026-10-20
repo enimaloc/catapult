@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
@@ -155,6 +157,26 @@ class WellKnownFileServiceTest {
         assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", 200, List.of(), "", "content")))
                 .satisfies(t -> assertThat(status(t)).isEqualTo(400));
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void create_answers409_whenTheSamePathIsAddedMeanwhile() {
+        when(repository.findByLocationAndPath(WELL_KNOWN, "security.txt")).thenReturn(Optional.empty());
+        when(repository.save(any())).thenThrow(new DataIntegrityViolationException("uq_well_known_file_location_path"));
+
+        assertThatThrownBy(() -> service.create(new WellKnownFileRequest(WELL_KNOWN, "security.txt", 200, List.of(), "text/plain", "x")))
+                .satisfies(t -> assertThat(status(t)).isEqualTo(409));
+    }
+
+    @Test
+    void update_answers404_whenTheFileIsDeletedMeanwhile() {
+        WellKnownFile mine = file(1, "security.txt", "x");
+        when(repository.findById(1L)).thenReturn(Optional.of(mine));
+        when(repository.findByLocationAndPath(WELL_KNOWN, "security.txt")).thenReturn(Optional.of(mine));
+        when(repository.save(any())).thenThrow(new ObjectOptimisticLockingFailureException(WellKnownFile.class, 1L));
+
+        assertThatThrownBy(() -> service.update(1, new WellKnownFileRequest(WELL_KNOWN, "security.txt", 200, List.of(), "text/plain", "y")))
+                .satisfies(t -> assertThat(status(t)).isEqualTo(404));
     }
 
     @Test
