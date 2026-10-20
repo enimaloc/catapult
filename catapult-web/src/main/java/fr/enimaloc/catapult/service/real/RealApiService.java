@@ -240,8 +240,9 @@ public class RealApiService implements ApiService {
         // The body carries the OBS password: never logged.
         ApiClient.Result<ConfigResponse> result = client.getAnonymous("/api/twitchat/widget/{token}", ConfigResponse.class, token);
         ConfigResponse config = result.status() == 200 ? result.body() : null;
-        return config == null ? null
-                : new TwitchatWidgetConfig(config.obsHost(), config.obsPort(), config.obsPassword(), TwitchatData.AUTO);
+        // The owner's Twitchat branch; "auto" (detected by the widget) when catapult-api tells none.
+        return config == null ? null : new TwitchatWidgetConfig(config.obsHost(), config.obsPort(), config.obsPassword(),
+                config.twitchatBranch() == null ? TwitchatData.AUTO : config.twitchatBranch());
     }
 
     @Override

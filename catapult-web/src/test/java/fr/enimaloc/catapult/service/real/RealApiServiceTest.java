@@ -239,6 +239,15 @@ class RealApiServiceTest {
     }
 
     @Test
+    void widgetObsConfig_isOnTheOwnersTwitchatBranch() {
+        UUID token = UUID.fromString("11111111-2222-3333-4444-555555555555");
+        expect(HttpMethod.GET, "/api/twitchat/widget/" + token)
+                .andRespond(withSuccess("{\"obsHost\":\"10.0.0.2\",\"obsPort\":4456,\"obsPassword\":\"pw\",\"twitchatBranch\":\"beta\"}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.widgetObsConfig(token)).isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "beta"));
+    }
+
+    @Test
     void help_forwardsTheLocale() {
         expect(HttpMethod.GET, "/api/help/status")
                 .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("Accept-Language", "fr-FR"))

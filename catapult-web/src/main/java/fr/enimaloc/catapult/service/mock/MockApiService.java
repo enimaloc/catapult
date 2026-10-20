@@ -49,7 +49,6 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
-import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents;
 import fr.enimaloc.catapult.common.twitchat.TwitchatCatalog;
@@ -412,10 +411,8 @@ public class MockApiService implements ApiService {
     @Override
     public TwitchatWidgetConfig widgetObsConfig(UUID token) {
         log.trace("widgetObsConfig({})", token);
-        // Like catapult-api's /api/twitchat/widget/{token}: no branch, so "auto".
-        return widgetOwner(token).map(MockData::obsConnection)
-                .map(c -> new TwitchatWidgetConfig(c.obsHost(), c.obsPort(), c.obsPassword(), TwitchatData.AUTO))
-                .orElse(null);
+        // Like catapult-api's /api/twitchat/widget/{token}: the owner's connection, on their branch.
+        return widgetOwner(token).map(MockData::obsConnection).orElse(null);
     }
 
     @Override
