@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AddToGroupRequest;
 import fr.enimaloc.catapult.common.dto.admin.FlagView;
-import fr.enimaloc.catapult.common.dto.admin.MemberSummary;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
 import fr.enimaloc.catapult.common.dto.admin.SetFlagRequest;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -125,7 +125,7 @@ class ApiAdminMembersControllerTest {
 
     @Test
     void getMember() {
-        assertThat(controller.getMember(member.getId())).isEqualTo(new MemberSummary(member.getId(), "member"));
+        assertThat(controller.getMember(member.getId())).isEqualTo(new AdminMemberSummaryDto(member.getId(), "member"));
     }
 
     @Nested

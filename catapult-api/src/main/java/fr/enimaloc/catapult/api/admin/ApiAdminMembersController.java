@@ -4,7 +4,7 @@ import fr.enimaloc.catapult.common.dto.admin.AddToGroupRequest;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.FlagView;
-import fr.enimaloc.catapult.common.dto.admin.MemberSummary;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargeting;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
 import fr.enimaloc.catapult.common.dto.admin.SetFlagRequest;
@@ -171,9 +171,9 @@ public class ApiAdminMembersController {
     }
 
     @GetMapping("/{id}")
-    public MemberSummary getMember(@PathVariable UUID id) {
+    public AdminMemberSummaryDto getMember(@PathVariable UUID id) {
         UserAccount user = findOrThrow(id);
-        return new MemberSummary(user.getId(), user.getTwitchUsername());
+        return new AdminMemberSummaryDto(user.getId(), user.getTwitchUsername());
     }
 
     @PostMapping("/{id}/flags")
