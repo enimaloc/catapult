@@ -49,7 +49,7 @@ describe("with a DSN", () => {
             integrations: ["tracing", "replay", "httpClient"],
         }));
         expect(Sentry.replayIntegration).toHaveBeenCalledWith(expect.objectContaining({
-            maskAllInputs: true, block: [".darkreader"],
+            maskAllInputs: true, block: [".darkreader", ".sentry-block"],
         }));
         expect(Sentry.httpClientIntegration).toHaveBeenCalledWith({
             failedRequestStatusCodes: [[500, 599]], failedRequestTargets: [window.location.origin],
