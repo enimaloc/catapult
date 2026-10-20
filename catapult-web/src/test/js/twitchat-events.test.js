@@ -230,10 +230,19 @@ describe("saving and testing", () => {
     });
 
     it("reports a network failure instead of rejecting", async () => {
+        document.body.dataset.labelActionUnreachable = "Catapult is unreachable";
         fetchMock.mockRejectedValueOnce(new Error("offline"));
         document.querySelector(".twitchat-save-btn").click();
         await flush();
-        expect(document.querySelector(".twitchat-event-errors").textContent).toContain("offline");
+        expect(document.querySelector(".twitchat-event-errors").textContent).toBe("Catapult is unreachable");
+    });
+
+    it("tells a refusal in the page's language", async () => {
+        document.body.dataset.labelActionFailed = "Échec ({0})";
+        fetchMock.mockResolvedValueOnce(response(500));
+        document.querySelector(".twitchat-save-btn").click();
+        await flush();
+        expect(document.querySelector("mdui-snackbar").textContent).toBe("Échec (500)");
     });
 
     it("reports a network failure when fetching a card", async () => {

@@ -2,7 +2,7 @@ document.addEventListener("catapult:render", function () {
     const list = document.getElementById("channel-bindings-list");
     if (!list) return;
 
-    const { postJson, checkedValues } = CatapultChannel;
+    const { postJson, postSwitch, checkedValues } = CatapultChannel;
     const rowOf = el => el.closest("[data-binding-id]");
 
     // ccl-toggle/ignored-toggle/delete/edit hit ApiChannelActionsController, which IS
@@ -29,7 +29,7 @@ document.addEventListener("catapult:render", function () {
     // Generic actions: data-post names the endpoint suffix, data-key the boolean field.
     list.querySelectorAll("mdui-switch[data-post]").forEach(el => {
         el.addEventListener("change", () =>
-            postJson(bindingUrl(rowOf(el), el.dataset.post), { [el.dataset.key]: el.checked }));
+            postSwitch(el, bindingUrl(rowOf(el), el.dataset.post), { [el.dataset.key]: el.checked }));
     });
 
     list.querySelectorAll("mdui-button-icon[data-post]").forEach(el => {
@@ -45,12 +45,14 @@ document.addEventListener("catapult:render", function () {
         // The ccl switches live in the sibling .binding-ccl-panel, within the same row.
         const cclRoot = panel.parentElement;
 
-        function saveBinding(gameId, gameName) {
-            return postJson(bindingUrl(row, ""), {
+        // A ccl switch's save puts that switch back when it doesn't go through.
+        function saveBinding(gameId, gameName, sw) {
+            const body = {
                 twitchGameId: gameId || null,
                 twitchGameName: gameName || null,
                 ccls: checkedValues(cclRoot, ".binding-edit-ccl-checkbox")
-            });
+            };
+            return sw ? postSwitch(sw, bindingUrl(row, ""), body) : postJson(bindingUrl(row, ""), body);
         }
 
         GameSearch.attach(gameInput, panel.querySelector(".binding-edit-game-results"),
@@ -60,7 +62,7 @@ document.addEventListener("catapult:render", function () {
             });
 
         cclRoot.querySelectorAll(".binding-edit-ccl-checkbox").forEach(sw => {
-            sw.addEventListener("change", () => saveBinding(gameIdInput.value, gameInput.value));
+            sw.addEventListener("change", () => saveBinding(gameIdInput.value, gameInput.value, sw));
         });
     });
 
@@ -68,11 +70,11 @@ document.addEventListener("catapult:render", function () {
         const row = rowOf(panel);
 
         panel.querySelector(".binding-tw-enabled-checkbox").addEventListener("change", event =>
-            postJson(twUrl(row, "tw-enabled"), { enabled: event.currentTarget.checked }));
+            postSwitch(event.currentTarget, twUrl(row, "tw-enabled"), { enabled: event.currentTarget.checked }));
 
         panel.querySelectorAll(".binding-tw-checkbox").forEach(sw => {
             sw.addEventListener("change", () =>
-                postJson(twUrl(row, "tws"), { tws: checkedValues(panel, ".binding-tw-checkbox") }));
+                postSwitch(sw, twUrl(row, "tws"), { tws: checkedValues(panel, ".binding-tw-checkbox") }));
         });
 
         panel.querySelector(".binding-tw-reset-btn").addEventListener("click", () =>

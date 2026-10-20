@@ -27,14 +27,15 @@ document.addEventListener("catapult:render", function () {
     if (!document.getElementById("channel-connections")) return;
     showTwitchatPresence();
 
-    const { on, postJson } = CatapultChannel;
+    const { on, postJson, postSwitch } = CatapultChannel;
     const baseUrl = CatapultChannel.baseUrl();
     const value = id => document.getElementById(id).value;
     const checked = id => document.getElementById(id).checked;
 
     // Steam
     on("steam-token-shared", "change", event =>
-        postJson(`${baseUrl}/settings/steam-personal-token/sharing`, { shared: event.currentTarget.checked }));
+        postSwitch(event.currentTarget, `${baseUrl}/settings/steam-personal-token/sharing`,
+            { shared: event.currentTarget.checked }));
     on("steam-token-delete-btn", "click", () =>
         postJson(`${baseUrl}/settings/steam-personal-token/delete`, {}));
     on("steam-token-save-btn", "click", () =>

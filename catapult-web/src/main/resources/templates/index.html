@@ -47,7 +47,8 @@
     </script>
 </head>
 
-<body>
+<!--/* The words of a failed action's snackbar, for every page's scripts (CatapultChannel.postJson). */-->
+<body th:attr="data-label-action-failed=#{action.error.failed('{0}')},data-label-action-unreachable=#{action.error.unreachable}">
 <mdui-layout>
     <!-- Navigation -->
     <mdui-top-app-bar class="app-bar">

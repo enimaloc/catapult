@@ -43,6 +43,17 @@ describe("channel-status", () => {
         expect(refreshed()).toBe(0);
     });
 
+    it("puts the bot switch back when the toggle fails", async () => {
+        html(`<input type="checkbox" id="channel-bot-toggle" data-toggle-url="/channel/enimaloc/settings/bot" checked>`);
+        render();
+        posted.mockRejectedValueOnce(new TypeError("offline"));
+
+        toggle(document.getElementById("channel-bot-toggle"), false);
+        await flush();
+
+        expect(document.getElementById("channel-bot-toggle").checked).toBe(true);
+    });
+
     it("rechecks the game, the result coming back as an event", async () => {
         html(`<button id="channel-recheck-game" data-recheck-url="/channel/enimaloc/game/recheck"></button>`);
         render();
@@ -102,6 +113,18 @@ describe("channel-bindings", () => {
             ["/channel/enimaloc/bindings/b1/ignored-toggle", { ignored: true }],
             ["/channel/enimaloc/bindings/b1/ccl-toggle", { enabled: false }],
         ]);
+    });
+
+    it("puts each switch back when its change is refused", async () => {
+        posted.mockResolvedValue(response(403));
+        const switches = [".binding-ignored-toggle", ".binding-edit-ccl-checkbox[value=Drugs]",
+            ".binding-tw-enabled-checkbox", ".binding-tw-checkbox[value=flashing]"].map(row);
+
+        switches.forEach(sw => toggle(sw, true));
+        await flush();
+
+        expect(posts()).toHaveLength(4);
+        expect(switches.map(sw => sw.checked)).toEqual([false, false, false, false]);
     });
 
     it("posts icon buttons to their data-post endpoint", async () => {
@@ -206,6 +229,15 @@ describe("channel-connections", () => {
             ["/channel/enimaloc/settings/steam-personal-token/delete", {}],
         ]);
         expect(refreshed()).toBe(0);
+    });
+
+    it("puts the token sharing switch back when the change fails", async () => {
+        posted.mockResolvedValueOnce(response(502));
+
+        toggle(document.getElementById("steam-token-shared"), true);
+        await flush();
+
+        expect(document.getElementById("steam-token-shared").checked).toBe(false);
     });
 
     it("refreshes the Steam profile cache, without re-rendering", async () => {

@@ -99,7 +99,7 @@ window.CatapultTwitchatEvents = (function () {
         try {
             response = await CatapultCsrf.postJson(url(path), body);
         } catch (error) {
-            event.querySelector(".twitchat-event-errors").textContent = `Request failed: ${error.message}`;
+            event.querySelector(".twitchat-event-errors").textContent = CatapultChannel.unreachable();
             return false;
         }
         if (response.status === 400) {
@@ -107,7 +107,7 @@ window.CatapultTwitchatEvents = (function () {
             return false;
         }
         if (!response.ok) {
-            CatapultChannel.showError(`Action failed (${response.status})`);
+            CatapultChannel.showError(CatapultChannel.actionFailed(response.status));
             return false;
         }
         showErrors(event, cards, []);
@@ -119,12 +119,12 @@ window.CatapultTwitchatEvents = (function () {
         try {
             response = await CatapultCsrf.postJson(url(`payload-form?event=${eventTypeOf(event)}`), payload);
         } catch (error) {
-            CatapultChannel.showError(`Request failed: ${error.message}`);
+            CatapultChannel.showError(CatapultChannel.unreachable());
             return {};
         }
         if (response.status === 422) return { errors: await response.json() };
         if (!response.ok) {
-            CatapultChannel.showError(`Action failed (${response.status})`);
+            CatapultChannel.showError(CatapultChannel.actionFailed(response.status));
             return {};
         }
         const template = document.createElement("template");
