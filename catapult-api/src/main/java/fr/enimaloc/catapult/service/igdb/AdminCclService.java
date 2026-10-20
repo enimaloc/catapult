@@ -4,11 +4,12 @@ import fr.enimaloc.catapult.domain.igdb.IgdbRatingDescriptor;
 import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
 import fr.enimaloc.catapult.repository.igdb.IgdbRatingDescriptorRepository;
 import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
@@ -67,7 +68,11 @@ public class AdminCclService {
         this.self = self;
     }
 
-    @PostConstruct
+    /**
+     * Once the context is ready: during its own construction, the {@code @Lazy} self proxy can't be
+     * resolved yet, so a {@code @PostConstruct} sync always failed.
+     */
+    @EventListener(ApplicationReadyEvent.class)
     public void init() {
         try {
             String appToken = fetchAppToken();
