@@ -40,7 +40,8 @@ public class ApiTwitchatWidgetController {
                 .flatMap(user -> widgetSettingsRepository.findById(user.getId()))
                 .filter(TwitchatWidgetSettings::isEnabled)
                 .map(s -> ResponseEntity.ok(new ConfigResponse(s.getObsHost(), s.getObsPort(),
-                        s.getObsPasswordEncrypted() == null ? null : tokenEncryptionService.decrypt(s.getObsPasswordEncrypted()))))
+                        s.getObsPasswordEncrypted() == null ? null : tokenEncryptionService.decrypt(s.getObsPasswordEncrypted()),
+                        s.getTwitchatBranch())))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 

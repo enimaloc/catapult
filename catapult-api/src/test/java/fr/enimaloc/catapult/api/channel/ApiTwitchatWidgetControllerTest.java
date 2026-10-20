@@ -87,6 +87,7 @@ class ApiTwitchatWidgetControllerTest {
         settings.setObsHost("127.0.0.1");
         settings.setObsPort(4455);
         settings.setObsPasswordEncrypted("ENC(pw)");
+        settings.setTwitchatBranch("beta");
         when(widgetTokenService.resolve(token)).thenReturn(Optional.of(owner));
         when(widgetSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
         when(tokenEncryptionService.decrypt("ENC(pw)")).thenReturn("pw");
@@ -95,7 +96,8 @@ class ApiTwitchatWidgetControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.obsHost").value("127.0.0.1"))
                 .andExpect(jsonPath("$.obsPort").value(4455))
-                .andExpect(jsonPath("$.obsPassword").value("pw"));
+                .andExpect(jsonPath("$.obsPassword").value("pw"))
+                .andExpect(jsonPath("$.twitchatBranch").value("beta"));
     }
 
     @Test
