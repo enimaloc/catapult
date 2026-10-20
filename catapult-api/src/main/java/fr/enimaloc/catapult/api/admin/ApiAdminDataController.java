@@ -8,6 +8,8 @@ import fr.enimaloc.catapult.admindata.ValueCoercion;
 import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
+import fr.enimaloc.catapult.service.dtdd.DtddMappingEvents;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import jakarta.persistence.metamodel.Attribute;
@@ -51,6 +53,7 @@ public class ApiAdminDataController {
     private final DataRegistry registry;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
+    private final DtddMappingEvents dtddMappingEvents;
 
     @GetMapping
     public List<RepoSummaryDto> listRepositories() {
@@ -141,6 +144,7 @@ public class ApiAdminDataController {
         Object entity = instantiate(entry.entityClass());
         applyFields(entity, entry.entityType(), body);
         Object saved = entry.repository().save(entity);
+        changed(saved);
         return ResponseEntity.status(HttpStatus.CREATED).body(toRowMap(saved, entry.entityType()));
     }
 
@@ -151,6 +155,7 @@ public class ApiAdminDataController {
         Object entity = findEntity(entry, id);
         applyFields(entity, entry.entityType(), body);
         Object saved = entry.repository().save(entity);
+        changed(saved);
         return toRowMap(saved, entry.entityType());
     }
 
@@ -158,16 +163,24 @@ public class ApiAdminDataController {
     public ResponseEntity<Void> delete(@PathVariable String repo, @PathVariable String id) {
         DataRegistry.Entry entry = requireEntry(repo);
         Object entityId = IdCodec.decode(id, entry.entityType());
-        if (entry.repository().findById(entityId).isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown id " + id);
-        }
+        @SuppressWarnings("unchecked")
+        Object existing = ((Optional<Object>) entry.repository().findById(entityId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown id " + id));
         try {
             entry.repository().deleteById(entityId);
+            changed(existing);
         } catch (DataIntegrityViolationException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Cannot delete: referenced by other data (" + e.getMostSpecificCause().getMessage() + ")");
         }
         return ResponseEntity.noContent().build();
+    }
+
+    /** Tells who shows an edited row, as the dedicated endpoints do: a game's DTDD mapping, its dashboards. */
+    private void changed(Object entity) {
+        if (entity instanceof DtddGameMapping mapping) {
+            dtddMappingEvents.mappingChanged(mapping.getIgdbId());
+        }
     }
 
     @SuppressWarnings("unchecked")
