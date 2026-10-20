@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  * (the real one behind nginx, through {@code server.forward-headers-strategy}). The query string
  * is left out, since it can carry the one-time login code. Health checks are skipped: docker
  * and nginx hit them every few seconds. Long-lived responses (SSE) are logged when they close.
- * Static assets (css, js, _static) are logged at DEBUG only. An OBS widget link's token is a
+ * Static assets (css, js, _static, assets) are logged at DEBUG only. An OBS widget link's token is a
  * capability: it is masked wherever it shows (path, Referer, Location).
  * <p>
  * Under the dev profile, each line is followed by the whole exchange the way {@code curl -v}
@@ -76,7 +76,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
     }
 
     private void log(HttpServletRequest request, HttpServletResponse response, int status, long duration) {
-        boolean compRoute = request.getRequestURI().matches("^/(css|js|_static)/.*");
+        boolean compRoute = request.getRequestURI().matches("^/(css|js|_static|assets)/.*");
         Level level = compRoute ? Level.DEBUG : Level.INFO;
         if (log.isEnabledForLevel(level)) {
             log.atLevel(level)
