@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api.admin;
 
-import fr.enimaloc.catapult.common.dto.admin.SteamAddKeyRequest;
-import fr.enimaloc.catapult.common.dto.admin.SteamDeleteKeyRequest;
-import fr.enimaloc.catapult.common.dto.admin.SteamKeyStatus;
+import fr.enimaloc.catapult.common.dto.admin.AddKeyRequest;
+import fr.enimaloc.catapult.common.dto.admin.DeleteKeyRequest;
+import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
@@ -43,13 +43,13 @@ public class ApiAdminSteamKeysController {
     }
 
     /** A shared key's id, masked value, owner and remaining rate-limit block. */
-    private static SteamKeyStatus status(SteamApiKeyEntry entry, Map<String, Long> blockedUntil, long now) {
+    private static KeyStatus status(SteamApiKeyEntry entry, Map<String, Long> blockedUntil, long now) {
         String key = entry.getApiKey();
         String owner = entry.getOwner() != null ? entry.getOwner().getTwitchUsername() : null;
         long until = blockedUntil.getOrDefault(key, 0L);
         boolean blocked = until > now;
         long remainingSec = blocked ? TimeUnit.MILLISECONDS.toSeconds(until - now) : 0L;
-        return new SteamKeyStatus(ApiKeyHasher.id(key), mask(key), owner, blocked, remainingSec);
+        return new KeyStatus(ApiKeyHasher.id(key), mask(key), owner, blocked, remainingSec);
     }
 
     private void refreshRotator() {
@@ -68,13 +68,13 @@ public class ApiAdminSteamKeysController {
         Map<String, Long> blockedUntil = rotator != null ? rotator.getKeyBlockedUntil() : Map.of();
         long now = System.currentTimeMillis();
 
-        List<SteamKeyStatus> keys = entries.stream().map(entry -> status(entry, blockedUntil, now)).toList();
+        List<KeyStatus> keys = entries.stream().map(entry -> status(entry, blockedUntil, now)).toList();
         return new SteamKeysPageData(keys, rotator != null);
     }
 
     @PostMapping("/add")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void add(@RequestBody SteamAddKeyRequest body) {
+    public void add(@RequestBody AddKeyRequest body) {
         String trimmed = body.apiKey().trim();
         if (!trimmed.matches("[0-9A-Fa-f]{32}")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid API key format");
@@ -84,14 +84,14 @@ public class ApiAdminSteamKeysController {
             refreshRotator();
             if (events != null) {
                 events.keyAdded(AdminEventPublisher.PROVIDER_STEAM,
-                        new SteamKeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
+                        new KeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
             }
         }
     }
 
     @PostMapping("/delete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@RequestBody SteamDeleteKeyRequest body) {
+    public void delete(@RequestBody DeleteKeyRequest body) {
         Optional<String> raw = repository.findByExclusiveFalse().stream()
             .map(SteamApiKeyEntry::getApiKey)
             .filter(k -> ApiKeyHasher.id(k).equals(body.keyId()))
