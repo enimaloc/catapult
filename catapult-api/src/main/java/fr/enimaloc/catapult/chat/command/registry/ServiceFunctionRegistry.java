@@ -43,6 +43,17 @@ public class ServiceFunctionRegistry {
         return functions.values();
     }
 
+    /**
+     * A copy holding only the functions that read: none of the {@link ServiceFunction#isAction()}
+     * ones, whose whole point is to change something (a ban, a message, the game, a setting). A
+     * command run with it calling one fails as on an unknown function.
+     */
+    public ServiceFunctionRegistry readOnly() {
+        ServiceFunctionRegistry copy = new ServiceFunctionRegistry();
+        functions.values().stream().filter(fn -> !fn.isAction()).forEach(copy::register);
+        return copy;
+    }
+
     private static String key(String namespace, String name) {
         return namespace + "#" + name;
     }
