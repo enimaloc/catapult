@@ -98,6 +98,8 @@ public interface ApiService {
     UserSettingsDto channelSettings(String username);
     /** The binding of the game the channel plays now (the OBS dock's); null when there is none or on failure. */
     BindingDto currentBinding(String username);
+    /** The logged-in streamer's enabled chat commands, to move to another chat bot; empty on failure. */
+    java.util.List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto> enabledChatCommands();
     int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
                              boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
     int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);

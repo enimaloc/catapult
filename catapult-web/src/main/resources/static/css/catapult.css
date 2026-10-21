@@ -2243,3 +2243,57 @@ body.obs-dock-mode .footer {
     align-items: flex-start;
     gap: 8px;
 }
+
+/* The chat commands moving to another chat bot (pages/channel-tab/integrations.html). */
+.command-migration {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 16px;
+}
+
+.command-migration h3,
+.command-migration p {
+    margin: 0;
+}
+
+.command-migration-warning {
+    color: var(--catapult-text-secondary);
+    font-size: 0.875rem;
+}
+
+/* [active] only: a display of its own would show every tool's panel at once, mdui hiding the others with none. */
+.command-migration-panel[active] {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 12px;
+}
+
+.command-migration-steps {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.command-migration-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.command-migration-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.command-migration-line code {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgb(var(--mdui-color-surface-container-highest));
+    font-size: 0.8rem;
+}

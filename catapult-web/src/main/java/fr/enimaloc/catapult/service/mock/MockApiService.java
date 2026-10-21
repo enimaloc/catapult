@@ -506,6 +506,15 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto> enabledChatCommands() {
+        log.trace("enabledChatCommands()");
+        return List.of(
+                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!game", "VIEWERS", false, false),
+                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!setgame", "MODERATOR", true, true),
+                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!triggers", "SUBS", false, false));
+    }
+
+    @Override
     public int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
                                     boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
         log.trace("saveNoGameSettings({}, {}, {}, {}, {}, {}, {})", username, twitchGameId, twitchGameName,

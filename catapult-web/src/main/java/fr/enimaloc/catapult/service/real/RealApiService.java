@@ -109,6 +109,7 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<AdminPage<NotificationDto>> NOTIFICATIONS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DtddProposalDto>> DTDD_PROPOSALS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<GroupSummaryDto>> GROUPS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<AdminNotificationDto>> ADMIN_NOTIFICATIONS = new ParameterizedTypeReference<>() {};
 
@@ -297,6 +298,12 @@ public class RealApiService implements ApiService {
     @Override
     public BindingDto currentBinding(String username) {
         return client.get("/api/channels/{username}/bindings/current", BindingDto.class, username);
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto> enabledChatCommands() {
+        var commands = client.get("/api/chat-commands/enabled", ENABLED_COMMANDS);
+        return commands == null ? List.of() : commands;
     }
 
     @Override
