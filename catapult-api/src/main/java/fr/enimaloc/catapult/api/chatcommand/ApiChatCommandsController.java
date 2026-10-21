@@ -161,10 +161,7 @@ public class ApiChatCommandsController {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         return repository.findByUser(user).stream()
             .filter(ChatCommandDefinition::isEnabled)
-            .map(d -> new EnabledChatCommandDto(d.getName(), d.getPermission().name(),
-                serviceFunctionRegistry.namesAnAction(d.getTemplate())
-                    || serviceFunctionRegistry.namesAnAction(d.getEjectedJs()),
-                readsArgs(d.getTemplate()) || readsArgs(d.getEjectedJs())))
+            .map(d -> new EnabledChatCommandDto(d.getName(), d.getPermission().name(), d.getPresetKey()))
             .sorted(java.util.Comparator.comparing(EnabledChatCommandDto::name))
             .toList();
     }
@@ -247,11 +244,6 @@ public class ApiChatCommandsController {
         repository.delete(def);
         publishChanged(user);
         return ResponseEntity.noContent().build();
-    }
-
-    /** {@code list(args)} in the DSL, {@code ctx.list("args")} in JS: any mention counts, as for actions. */
-    private static boolean readsArgs(String source) {
-        return source != null && source.contains("args");
     }
 
     private void gate(UserAccount user) {

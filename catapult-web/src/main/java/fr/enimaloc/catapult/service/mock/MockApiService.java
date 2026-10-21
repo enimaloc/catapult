@@ -509,9 +509,10 @@ public class MockApiService implements ApiService {
     public List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto> enabledChatCommands() {
         log.trace("enabledChatCommands()");
         return List.of(
-                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!game", "VIEWERS", false, false),
-                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!setgame", "MODERATOR", true, true),
-                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!triggers", "SUBS", false, false));
+                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!game", "VIEWERS", "game"),
+                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!setgame", "MODERATOR", "setgame"),
+                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!triggers", "SUBS", "triggers"),
+                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!release", "VIEWERS", "release"));
     }
 
     @Override

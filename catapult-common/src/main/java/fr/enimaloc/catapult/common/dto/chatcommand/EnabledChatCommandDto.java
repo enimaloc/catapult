@@ -5,8 +5,7 @@ package fr.enimaloc.catapult.common.dto.chatcommand;
  *
  * @param name       the command, "!" included
  * @param permission who may run it in chat (a SenderRole name: VIEWERS ... BROADCASTER)
- * @param acts       whether it changes something (the game, a ban, a message...), which another
- *                   bot fetching its answer can't have it do
- * @param takesArgs  whether it reads what follows it in chat, which the other bot must then pass on
+ * @param presetKey  the preset it was made from ("game", "store"...), which says what the user API
+ *                   gives in its place; null for a command of the streamer's own
  */
-public record EnabledChatCommandDto(String name, String permission, boolean acts, boolean takesArgs) {}
+public record EnabledChatCommandDto(String name, String permission, String presetKey) {}

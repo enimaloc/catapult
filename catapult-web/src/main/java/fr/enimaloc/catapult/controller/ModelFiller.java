@@ -17,6 +17,7 @@ import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.MessageSource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.ui.Model;
@@ -234,7 +235,8 @@ public class ModelFiller {
                 }
             }
             model.addAttribute("commandMigration", CommandMigration.of(commands,
-                    token == null ? null : absoluteUrl("/api/user/command/" + token + "/")));
+                    token == null ? null : absoluteUrl("/api/user/summary/" + token),
+                    message("channel.commands.migration.empty", null, LocaleContextHolder.getLocale())));
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
             model.addAttribute("dangerZone",
                     DangerZoneView.of(apiService.accountInfo(), apiService.accountDeletionDelayDays()));

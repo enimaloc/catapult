@@ -9,66 +9,63 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CommandMigrationTest {
 
-    private static final String BASE = "https://catapult.test/api/user/command/tok/";
+    private static final String SUMMARY = "https://catapult.test/api/user/summary/tok";
 
-    private static CommandMigration.Tool tool(CommandMigration migration, String id) {
-        return migration.tools().stream().filter(t -> t.id().equals(id)).findFirst().orElseThrow();
+    private static CommandMigration of(EnabledChatCommandDto... commands) {
+        return CommandMigration.of(List.of(commands), SUMMARY, "Rien \"ici\"");
+    }
+
+    private static List<String> lines(CommandMigration migration, String tool) {
+        return migration.tools().stream().filter(t -> t.id().equals(tool)).findFirst().orElseThrow()
+                .rows().stream().flatMap(r -> r.lines().stream()).map(CommandMigration.Line::value).toList();
     }
 
     @Test
     void nothingToMove_noCard() {
-        assertThat(CommandMigration.of(List.of(), BASE)).isNull();
-        assertThat(CommandMigration.of(List.of(new EnabledChatCommandDto("!game", "VIEWERS", false, false)), null)).isNull();
+        assertThat(CommandMigration.of(List.of(), SUMMARY, "-")).isNull();
+        assertThat(CommandMigration.of(List.of(new EnabledChatCommandDto("!game", "VIEWERS", "game")), null, "-")).isNull();
     }
 
     @Test
-    void everyToolGetsItsOwnLine_withItsLimitAndPermission() {
-        var migration = CommandMigration.of(List.of(new EnabledChatCommandDto("!game", "MODERATOR", false, false)), BASE);
+    void theToolsThatReadJson_readTheSummary() {
+        var migration = of(new EnabledChatCommandDto("!store", "VIEWERS", "store"));
 
         assertThat(migration.tools()).extracting(CommandMigration.Tool::id)
-                .containsExactly("twitchat", "wizebot", "nightbot", "streamelements", "streamerbot");
-        assertThat(tool(migration, "nightbot").rows()).singleElement().satisfies(row -> {
-            assertThat(row.line()).isEqualTo("!commands add !game -ul=moderator $(urlfetch " + BASE + "game?max=399)");
-            assertThat(row.extra()).isNull();
-        });
-        assertThat(tool(migration, "streamelements").rows()).singleElement().satisfies(row -> {
-            assertThat(row.line()).isEqualTo("!command add !game $(customapi " + BASE + "game?max=400)");
-            assertThat(row.extra()).isEqualTo("!command options !game -level 500");
-        });
-        assertThat(tool(migration, "wizebot").rows().getFirst().line()).isEqualTo("$urlcall(" + BASE + "game?max=500,1)");
-        assertThat(tool(migration, "twitchat").rows().getFirst().line()).isEqualTo(BASE + "game?max=500");
-        assertThat(tool(migration, "streamerbot").rows().getFirst().role()).isEqualTo("MODERATOR");
+                .containsExactly("twitchat", "streamerbot", "nightbot", "streamelements", "wizebot");
+        assertThat(lines(migration, "twitchat")).containsExactly(SUMMARY, "$.storeUrl", "{STOREURL}");
+        assertThat(lines(migration, "streamerbot")).containsExactly(SUMMARY, "%catapult.storeUrl%");
+        assertThat(lines(migration, "nightbot")).containsExactly("!commands add !store -ul=everyone $(eval const r = "
+                + "$(urlfetch json " + SUMMARY + "); r.inGame && r.storeUrl || \"Rien \\\"ici\\\"\")");
+    }
+
+    /** StreamElements and Wizebot can't read JSON: they ask for the field alone. */
+    @Test
+    void theOthers_askForTheFieldAlone() {
+        var migration = of(new EnabledChatCommandDto("!game", "MODERATOR", "game"));
+
+        assertThat(lines(migration, "streamelements")).containsExactly(
+                "!command add !game $(customapi " + SUMMARY + "?f=name)", "!command options !game -level 500");
+        assertThat(lines(migration, "wizebot")).containsExactly("$urlcall(" + SUMMARY + "?f=name,1)");
+        assertThat(lines(migration, "nightbot").getFirst()).contains("-ul=moderator");
     }
 
     @Test
-    void everyoneOnStreamElements_needsNoPermissionLine() {
-        var migration = CommandMigration.of(List.of(new EnabledChatCommandDto("!game", "VIEWERS", false, false)), BASE);
+    void aNestedField_isReadStepByStep() {
+        var migration = of(new EnabledChatCommandDto("!release", "VIEWERS", "release"));
 
-        assertThat(tool(migration, "streamelements").rows().getFirst().extra()).isNull();
-        assertThat(tool(migration, "nightbot").rows().getFirst().line()).contains("-ul=everyone");
+        assertThat(lines(migration, "nightbot").getFirst())
+                .contains("r.inGame && r.releaseDate && r.releaseDate.releaseDate || ");
+        assertThat(lines(migration, "twitchat")).contains("$.releaseDate.releaseDate", "{RELEASEDATE_RELEASEDATE}");
+        assertThat(lines(migration, "wizebot").getFirst()).contains("?f=releaseDate.releaseDate");
     }
 
     @Test
-    void argumentsArePassedOn_byTheToolsThatCan() {
-        var migration = CommandMigration.of(List.of(new EnabledChatCommandDto("!hug", "VIEWERS", false, true)), BASE);
+    void aCommandTheApiHasNothingFor_isListedApart() {
+        var migration = of(new EnabledChatCommandDto("!game", "VIEWERS", "game"),
+                new EnabledChatCommandDto("!setgame", "MODERATOR", "setgame"),
+                new EnabledChatCommandDto("!mine", "VIEWERS", null));
 
-        assertThat(tool(migration, "nightbot").rows().getFirst().line()).contains("hug?max=399&args=$(querystring))");
-        assertThat(tool(migration, "streamelements").rows().getFirst().line()).contains("&args=$(queryescape $(1:)))");
-        assertThat(tool(migration, "streamerbot").rows().getFirst().line()).endsWith("&args=%rawInputUrlEncoded%");
-        assertThat(tool(migration, "twitchat").rows().getFirst()).satisfies(row -> {
-            assertThat(row.line()).isEqualTo(BASE + "hug?max=500");
-            assertThat(row.argsDropped()).isTrue();
-        });
-        assertThat(tool(migration, "nightbot").rows().getFirst().argsDropped()).isFalse();
-    }
-
-    @Test
-    void aCommandThatActs_isListedApart() {
-        var migration = CommandMigration.of(List.of(
-                new EnabledChatCommandDto("!game", "VIEWERS", false, false),
-                new EnabledChatCommandDto("!setgame", "MODERATOR", true, true)), BASE);
-
-        assertThat(migration.acting()).containsExactly("!setgame");
+        assertThat(migration.unmatched()).containsExactly("!setgame", "!mine");
         assertThat(migration.tools()).allSatisfy(t ->
                 assertThat(t.rows()).extracting(CommandMigration.Row::command).containsExactly("!game"));
     }
