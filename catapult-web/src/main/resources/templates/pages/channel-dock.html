@@ -20,9 +20,6 @@
                   th:text="${ch.currentGame().sourceName()}">Game</span>
             <span id="channel-no-game" class="obs-dock-muted" th:if="${ch.currentGame() == null}"
                   th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
-            <mdui-button-icon icon="refresh" th:if="${ch.isOwner()}" th:title="#{channel.dock.recheck}"
-                              th:attr="data-recheck-url=@{/channel/{u}/game/recheck(u=${ch.channelUsername()}),aria-label=#{channel.dock.recheck}}"
-                              id="channel-recheck-game"></mdui-button-icon>
         </div>
 
         <label class="obs-dock-row" th:if="${ch.isOwner()}">
@@ -86,8 +83,5 @@
                 </p>
             </mdui-card>
         </div>
-
-        <a class="obs-dock-full" th:href="@{/channel/{u}(u=${ch.channelUsername()},view='full')}"
-           th:text="#{channel.dock.full_page}">Page complète</a>
     </th:block>
 </section>
