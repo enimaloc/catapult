@@ -39,13 +39,22 @@ public class ApiAdminNotificationsController {
     private final NotificationService service;
     private final NotificationRepository repo;
     private final ApiUserResolver userResolver;
+    private final fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository commandRepository;
 
+    /**
+     * 201 with the notification; for {@link AdminNotificationCreateBody#CHAT_COMMANDS}, 201 with how
+     * many streamers were told (one notification each).
+     */
     @PostMapping
-    public ResponseEntity<NotificationDto> create(@RequestBody AdminNotificationCreateBody body, @AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<?> create(@RequestBody AdminNotificationCreateBody body, @AuthenticationPrincipal Jwt jwt) {
         UserAccount admin = userResolver.viewerByTwitchId(jwt);
         NotificationService.CreateRequest req = new NotificationService.CreateRequest(
                 body.title(), body.body(), body.severity(),
                 body.ctaUrl(), body.ctaLabel(), body.expiresAt(), body.targetUserId());
+        if (AdminNotificationCreateBody.CHAT_COMMANDS.equals(body.audience())) {
+            int sent = service.createForEach(req, admin, commandRepository.findActiveUsersWithEnabledCommands());
+            return ResponseEntity.status(HttpStatus.CREATED).body(java.util.Map.of("sent", sent));
+        }
         NotificationDto dto = service.create(req, admin);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }

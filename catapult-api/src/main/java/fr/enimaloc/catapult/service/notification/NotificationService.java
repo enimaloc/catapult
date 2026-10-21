@@ -57,6 +57,31 @@ public class NotificationService {
         } else {
             recipients = userRepo.findByStatus(UserAccount.Status.ACTIVE);
         }
+        return send(req, actor, recipients, req.targetUserId() == null);
+    }
+
+    /** What {@link CreateRequest#ctaUrl()} may carry, replaced by each recipient's channel by {@link #createForEach}. */
+    public static final String CHANNEL_PLACEHOLDER = "{channel}";
+
+    /**
+     * One notification per member of {@code recipients}, each targeted to them alone: its call to
+     * action may name their own channel ({@link #CHANNEL_PLACEHOLDER}, e.g. {@code
+     * https://…/channel/{channel}#integrations}). Returns how many were sent.
+     */
+    @Transactional
+    public int createForEach(CreateRequest req, UserAccount actor, List<UserAccount> recipients) {
+        validate(withChannel(req, "channel"));
+        recipients.forEach(user -> send(withChannel(req, user.getTwitchUsername()), actor, List.of(user), false));
+        return recipients.size();
+    }
+
+    private static CreateRequest withChannel(CreateRequest req, String channel) {
+        if (req.ctaUrl() == null) return req;
+        return new CreateRequest(req.title(), req.body(), req.severity(),
+                req.ctaUrl().replace(CHANNEL_PLACEHOLDER, channel), req.ctaLabel(), req.expiresAt(), req.targetUserId());
+    }
+
+    private NotificationDto send(CreateRequest req, UserAccount actor, List<UserAccount> recipients, boolean broadcast) {
         boolean hasCta = req.ctaUrl() != null && !req.ctaUrl().isBlank();
         Notification n = new Notification();
         n.setTitle(req.title());
@@ -67,7 +92,7 @@ public class NotificationService {
         n.setExpiresAt(req.expiresAt());
         n.setCreatedAt(Instant.now());
         n.setCreatedBy(actor.getId());
-        n.setAudience(req.targetUserId() == null ? Notification.Audience.BROADCAST : Notification.Audience.TARGETED);
+        n.setAudience(broadcast ? Notification.Audience.BROADCAST : Notification.Audience.TARGETED);
         notifRepo.save(n);
 
         List<NotificationRecipient> rows = new ArrayList<>(recipients.size());

@@ -56,6 +56,28 @@ class ApiAdminNotificationsControllerTest {
     @MockitoBean NotificationService service;
     @MockitoBean NotificationRepository repo;
     @MockitoBean UserAccountRepository userRepo;
+    @MockitoBean fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository commandRepository;
+
+    @Test
+    void create_forTheChatCommandsAudience_tellsEachStreamerWithAnEnabledCommand() throws Exception {
+        UserAccount admin = new UserAccount();
+        admin.setId(UUID.randomUUID());
+        when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(admin));
+        List<UserAccount> streamers = List.of(new UserAccount(), new UserAccount());
+        when(commandRepository.findActiveUsersWithEnabledCommands()).thenReturn(streamers);
+        when(service.createForEach(any(), any(), org.mockito.ArgumentMatchers.eq(streamers))).thenReturn(2);
+
+        mvc.perform(post("/api/admin/notifications")
+                        .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of(
+                                "title", "Commandes", "body", "Bientôt", "severity", "WARNING",
+                                "audience", "CHAT_COMMANDS"))))
+                .andExpect(status().isCreated())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sent").value(2));
+        org.mockito.Mockito.verify(service, org.mockito.Mockito.never()).create(any(), any());
+    }
 
     @Test
     void create_callsService() throws Exception {

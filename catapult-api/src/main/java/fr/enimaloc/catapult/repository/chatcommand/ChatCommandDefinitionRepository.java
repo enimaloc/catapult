@@ -13,4 +13,9 @@ public interface ChatCommandDefinitionRepository extends JpaRepository<ChatComma
     Optional<ChatCommandDefinition> findByUserAndName(UserAccount user, String name);
     Optional<ChatCommandDefinition> findByUserAndPresetKey(UserAccount user, String presetKey);
     boolean existsByUserAndName(UserAccount user, String name);
+
+    /** The active accounts with at least one enabled command: those to tell when the commands go. */
+    @org.springframework.data.jpa.repository.Query("select distinct d.user from ChatCommandDefinition d "
+        + "where d.enabled = true and d.user.status = fr.enimaloc.catapult.domain.account.UserAccount.Status.ACTIVE")
+    List<UserAccount> findActiveUsersWithEnabledCommands();
 }

@@ -80,6 +80,44 @@ class NotificationServiceTest {
         verify(publisher).publishEvent(any(NotificationCreatedEvent.class));
     }
 
+    /** The chat commands' end: each streamer told alone, the call to action naming their own channel. */
+    @Test
+    void createForEach_sendsOneTargetedNotificationPerRecipient_withTheirChannelInTheCta() {
+        UserAccount u1 = userWithStatus(UserAccount.Status.ACTIVE);
+        u1.setTwitchUsername("alice");
+        UserAccount u2 = userWithStatus(UserAccount.Status.ACTIVE);
+        u2.setTwitchUsername("bob");
+        List<Notification> saved = new java.util.ArrayList<>();
+        when(notifRepo.save(any())).thenAnswer(inv -> {
+            Notification n = inv.getArgument(0);
+            n.setId(UUID.randomUUID());
+            saved.add(n);
+            return n;
+        });
+
+        int sent = service.createForEach(new NotificationService.CreateRequest("T", "B", Severity.WARNING,
+                "https://catapult.test/channel/{channel}#integrations", "Voir", null, null), admin, List.of(u1, u2));
+
+        assertThat(sent).isEqualTo(2);
+        assertThat(saved).extracting(Notification::getCtaUrl).containsExactly(
+                "https://catapult.test/channel/alice#integrations", "https://catapult.test/channel/bob#integrations");
+        assertThat(saved).extracting(Notification::getAudience).containsOnly(Notification.Audience.TARGETED);
+        ArgumentCaptor<List<NotificationRecipient>> cap = ArgumentCaptor.forClass(List.class);
+        verify(recipientRepo, org.mockito.Mockito.times(2)).saveAll(cap.capture());
+        assertThat(cap.getAllValues()).extracting(rows -> rows.getFirst().getUser()).containsExactly(u1, u2);
+    }
+
+    @Test
+    void createForEach_refusesAnInvalidRequest_beforeSendingAny() {
+        UserAccount u1 = userWithStatus(UserAccount.Status.ACTIVE);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.createForEach(
+                        new NotificationService.CreateRequest("T", "B", Severity.INFO, "javascript:{channel}", "Voir", null, null),
+                        admin, List.of(u1)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verify(notifRepo, org.mockito.Mockito.never()).save(any());
+    }
+
     @Test
     void createBroadcast_savesAllActiveUsers() {
         UserAccount u1 = userWithStatus(UserAccount.Status.ACTIVE);
