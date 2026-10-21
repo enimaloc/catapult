@@ -50,6 +50,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 @WebMvcTest(
         controllers = UserApiV2Controller.class,
@@ -253,6 +255,73 @@ class UserApiV2ControllerTest {
                 .andExpect(jsonPath("$.inGame").value(true))
                 .andExpect(jsonPath("$.name").value("Halo"))
                 .andExpect(jsonPath("$.xbox").doesNotExist());
+    }
+
+    @Test
+    void summary_carriesTheStoreAndIgdbPages() throws Exception {
+        playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
+        when(steamStoreService.fetchData(any(), any())).thenReturn(Optional.of(VALHEIM));
+        when(steamStoreService.fetchIADisclosure(any(), any())).thenReturn(Optional.empty());
+        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "892970"))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+        IgdbGameDetails details = new IgdbGameDetails();
+        details.setSlug("valheim");
+        when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details));
+
+        mvc.perform(get("/api/user/summary/{uuid}", token))
+                .andExpect(jsonPath("$.storeUrl").value("https://store.steampowered.com/app/892970"))
+                .andExpect(jsonPath("$.igdbUrl").value("https://www.igdb.com/game/valheim"));
+    }
+
+    /** For the chat bots that can't read JSON: one field, as plain text. */
+    @Nested
+    class Field {
+        @Test
+        void answersTheField_asPlainText() throws Exception {
+            playing(GameBinding.SourceType.XBOX, "P", "Halo");
+            when(xboxStoreService.fetchProduct(any(), any())).thenReturn(Optional.of(xboxProduct("Halo")));
+
+            mvc.perform(get("/api/user/summary/{uuid}", token).param("f", "name"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "text/plain;charset=UTF-8"))
+                    .andExpect(content().string("Halo"));
+            mvc.perform(get("/api/user/summary/{uuid}", token).param("f", "storeUrl"))
+                    .andExpect(content().string("https://store/halo"));
+        }
+
+        @Test
+        void followsADottedPath_andJoinsAList() throws Exception {
+            playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
+            when(steamStoreService.fetchData(any(), any())).thenReturn(Optional.of(VALHEIM));
+            when(steamStoreService.fetchIADisclosure(any(), any())).thenReturn(Optional.empty());
+
+            mvc.perform(get("/api/user/game/{uuid}", token).param("f", "steam.developers"))
+                    .andExpect(content().string("Iron Gate"));
+            mvc.perform(get("/api/user/summary/{uuid}", token).param("f", "releaseDate.releaseDate"))
+                    .andExpect(content().string(org.hamcrest.Matchers.startsWith("2021-02-02")));
+        }
+
+        /** The summary's view holds: a field it leaves out is not reachable through it. */
+        @Test
+        void aMissingField_orOneOutsideTheView_isEmpty() throws Exception {
+            playing(GameBinding.SourceType.XBOX, "P", "Halo");
+            when(xboxStoreService.fetchProduct(any(), any())).thenReturn(Optional.of(xboxProduct("Halo")));
+
+            mvc.perform(get("/api/user/summary/{uuid}", token).param("f", "xbox.name"))
+                    .andExpect(status().isOk()).andExpect(content().string(""));
+            mvc.perform(get("/api/user/summary/{uuid}", token).param("f", "nope"))
+                    .andExpect(content().string(""));
+        }
+
+        @Test
+        void nothingPlayed_isEmpty_andAnUnknownToken_still404() throws Exception {
+            mvc.perform(get("/api/user/summary/{uuid}", token).param("f", "name"))
+                    .andExpect(status().isOk()).andExpect(content().string(""));
+            mvc.perform(get("/api/user/summary/{uuid}", token).param("f", "inGame"))
+                    .andExpect(content().string("false"));
+            mvc.perform(get("/api/user/summary/{uuid}", UUID.randomUUID()).param("f", "name"))
+                    .andExpect(status().isNotFound());
+        }
     }
 
     @Test

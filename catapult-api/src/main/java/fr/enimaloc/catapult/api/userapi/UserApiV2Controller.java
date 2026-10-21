@@ -29,9 +29,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import tools.jackson.databind.json.JsonMapper;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -46,6 +49,9 @@ import java.util.stream.Collectors;
         + "and version-neutral; omitting the header defaults to the latest version.")
 public class UserApiV2Controller {
 
+    private static final String FIELD_DESCRIPTION = "One field of the answer, as plain text instead of "
+            + "JSON: a dotted path (name, igdb.url, releaseDate.releaseDate). For chat bots that can't "
+            + "read JSON; a list is joined with \", \", a missing field is empty.";
     private static final String LANG_DESCRIPTION = "BCP 47 language tag used to localize/re-fetch "
             + "platform data (Steam store text and date format, trigger warning labels, Xbox "
             + "store text). Falls back to the Accept-Language request header, then English. For "
@@ -68,6 +74,7 @@ public class UserApiV2Controller {
     private final TwLabelService twLabelService;
     private final TwDtddTopicMappingRepository twDtddTopicMappingRepository;
     private final DevBackdoorResolver devBackdoorResolver;
+    private final JsonMapper jsonMapper;
 
     // DTDD support is conditional on "dtdd.enabled" (see DtddService) — injected as Optional so
     // this controller degrades to dtdd=null/404 rather than failing to start when it's off.
@@ -101,7 +108,7 @@ public class UserApiV2Controller {
     @ApiResponse(responseCode = "404", description = "Unknown widget token.", content = @Content)
     @CrossOrigin(origins = "*")
     @GetMapping("/game/{uuid}")
-    public ResponseEntity<GameInfoResponse> gameInfo(
+    public ResponseEntity<?> gameInfo(
             @Parameter(description = "Per-user widget token, or a dev/test backdoor UUID (see "
                     + "DevBackdoorResolver) — the sole access control for this public endpoint.",
                     in = ParameterIn.PATH, example = ApiV2.GENERIC_UUID_EXAMPLE,
@@ -110,8 +117,10 @@ public class UserApiV2Controller {
             @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
-            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        return gameInfoFor(uuid, RequestLocale.parse(lang, acceptLanguage));
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @Parameter(description = FIELD_DESCRIPTION, example = "igdb.url")
+            @RequestParam(name = "f", required = false) String field) {
+        return selected(gameInfoFor(uuid, RequestLocale.parse(lang, acceptLanguage)), null, field);
     }
 
     @Operation(summary = "Get a compact summary of the widget's currently-detected game",
@@ -126,7 +135,7 @@ public class UserApiV2Controller {
     @CrossOrigin(origins = "*")
     @GetMapping("/summary/{uuid}")
     @JsonView(GameInfoResponse.Summary.class)
-    public ResponseEntity<GameInfoResponse> summary(
+    public ResponseEntity<?> summary(
             @Parameter(description = "Per-user widget token, or a dev/test backdoor UUID (see "
                     + "DevBackdoorResolver) — the sole access control for this public endpoint.",
                     in = ParameterIn.PATH, example = ApiV2.GENERIC_UUID_EXAMPLE,
@@ -135,8 +144,21 @@ public class UserApiV2Controller {
             @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
-            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        return gameInfoFor(uuid, RequestLocale.parse(lang, acceptLanguage));
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @Parameter(description = FIELD_DESCRIPTION, example = "name")
+            @RequestParam(name = "f", required = false) String field) {
+        return selected(gameInfoFor(uuid, RequestLocale.parse(lang, acceptLanguage)), GameInfoResponse.Summary.class, field);
+    }
+
+    /**
+     * {@code info} as is, or its field {@code field} alone as plain text (see {@link FieldSelector}):
+     * for the chat bots that can't read JSON. A 404 stays one.
+     */
+    private ResponseEntity<?> selected(ResponseEntity<GameInfoResponse> info, Class<?> view, String field) {
+        if (field == null || field.isBlank() || info.getBody() == null) return info;
+        return ResponseEntity.status(info.getStatusCode())
+                .contentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8))
+                .body(FieldSelector.select(jsonMapper, info.getBody(), view, field.strip()));
     }
 
     /**
