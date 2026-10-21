@@ -2243,9 +2243,3 @@ body.obs-dock-mode .footer {
     align-items: flex-start;
     gap: 8px;
 }
-
-.obs-dock-full {
-    align-self: flex-end;
-    color: var(--catapult-text-secondary);
-    font-size: 0.8rem;
-}

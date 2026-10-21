@@ -698,7 +698,7 @@ class IndexControllerTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
         assertThat(html).contains("id=\"channel-current-game\"").contains("Valheim")
-                .contains("id=\"channel-recheck-game\"").contains("id=\"channel-bot-toggle\"")
+                .doesNotContain("id=\"channel-recheck-game\"").contains("id=\"channel-bot-toggle\"")
                 .contains("data-binding-id=\"b1\"").contains("data-game-id=\"508455\"")
                 .contains("id=\"obs-dock-ccl-enabled\"").contains("data-blocked=\"ccl-b\"")
                 .contains("id=\"obs-dock-binding-ccl-enabled\"").contains("id=\"obs-dock-binding-tw-enabled\"")
