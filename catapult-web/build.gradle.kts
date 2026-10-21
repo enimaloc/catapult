@@ -119,6 +119,11 @@ val npmInstall = tasks.register<Exec>("npmInstall") {
     commandLine("npm", "ci", "--no-fund", "--no-audit")
 }
 
+// VitestTest runs the suite from node_modules: a fresh checkout (CI) must install it first.
+tasks.named<Test>("test") {
+    dependsOn(npmInstall)
+}
+
 val jsTest = tasks.register<Exec>("jsTest") {
     description = "Runs the browser-script unit tests with coverage."
     group = "verification"
