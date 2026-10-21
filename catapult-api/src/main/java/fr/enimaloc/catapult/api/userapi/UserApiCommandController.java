@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -42,7 +43,7 @@ import java.util.regex.Pattern;
 @Tag(name = "User API v2")
 public class UserApiCommandController {
 
-    /** The bots' own limits are lower than Twitch's: the URL asks for theirs with {@code max}. */
+    /** The bots' own limits are lower than Twitch's: the URL asks for theirs with {@code max} (bytes). */
     static final int MIN_LENGTH = 20;
     private static final Pattern NAME = Pattern.compile("^[a-z][a-z0-9_]{0,30}$");
     private static final String ELLIPSIS = "…";
@@ -52,7 +53,7 @@ public class UserApiCommandController {
 
     @Operation(summary = "Run one of the streamer's chat commands, as plain text",
             description = "Answers what catapult's bot would reply to !{name} in chat, cut to "
-                    + "\"max\" characters on a word boundary. Commands that change something "
+                    + "\"max\" UTF-8 bytes on a word boundary. Commands that change something "
                     + "(the game, a ban, a message...) answer nothing here.")
     @ApiResponse(responseCode = "200", description = "The command's answer: empty when it had "
             + "none, or there is no such enabled command (a bot posts nothing then).")
@@ -68,7 +69,8 @@ public class UserApiCommandController {
             @PathVariable String name,
             @Parameter(description = "What followed the command in chat, space-separated.")
             @RequestParam(name = "args", required = false) String args,
-            @Parameter(description = "Longest answer the calling bot can post.")
+            @Parameter(description = "Longest answer the calling bot can post, in UTF-8 bytes "
+                    + "(Nightbot: under 400 characters, StreamElements: 400 bytes).")
             @RequestParam(name = "max", defaultValue = "" + ChatMessageSplitter.TWITCH_MAX_LEN) int max) {
         Optional<UserAccount> user = widgetTokenService.resolve(uuid);
         if (user.isEmpty()) return ResponseEntity.notFound().build();
@@ -85,11 +87,26 @@ public class UserApiCommandController {
         return Arrays.stream(args.strip().split("\\s+")).toList();
     }
 
-    /** {@code text} within {@code limit} characters, cut after its last whole word. */
+    /**
+     * {@code text} within {@code limit} UTF-8 bytes, cut after its last whole word. Bytes, not
+     * characters: StreamElements truncates there, and a text never has more characters than bytes.
+     */
     static String cut(String text, int limit) {
-        if (text.length() <= limit) return text;
-        int end = limit - ELLIPSIS.length();
+        if (utf8Length(text) <= limit) return text;
+        int budget = limit - utf8Length(ELLIPSIS);
+        int end = 0;
+        for (int used = 0; end < text.length(); ) {
+            int cp = text.codePointAt(end);
+            int size = utf8Length(Character.toString(cp));
+            if (used + size > budget) break;
+            used += size;
+            end += Character.charCount(cp);
+        }
         int space = text.lastIndexOf(' ', end);
         return text.substring(0, space > end / 2 ? space : end).strip() + ELLIPSIS;
+    }
+
+    private static int utf8Length(String text) {
+        return text.getBytes(StandardCharsets.UTF_8).length;
     }
 }

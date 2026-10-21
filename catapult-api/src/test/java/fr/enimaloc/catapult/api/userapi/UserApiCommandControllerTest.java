@@ -90,13 +90,22 @@ class UserApiCommandControllerTest {
         String body = mvc.perform(get("/api/user/command/{uuid}/game", token).queryParam("max", "100"))
                 .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
 
-        assertThat(body).hasSizeLessThanOrEqualTo(100).endsWith("x…");
+        assertThat(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)).hasSizeLessThanOrEqualTo(100);
+        assertThat(body).endsWith("x…");
     }
 
     @Test
     void cut_keepsWholeWords_andFallsBackToAHardCutOnALongWord() {
         assertThat(UserApiCommandController.cut("short", 20)).isEqualTo("short");
         assertThat(UserApiCommandController.cut("hello wonderful world", 18)).isEqualTo("hello wonderful…");
-        assertThat(UserApiCommandController.cut("a " + "z".repeat(40), 20)).isEqualTo("a " + "z".repeat(17) + "…");
+        assertThat(UserApiCommandController.cut("a " + "z".repeat(40), 20)).isEqualTo("a " + "z".repeat(15) + "…");
+    }
+
+    /** StreamElements cuts at 400 bytes: an accent takes two, the ellipsis three. */
+    @Test
+    void cut_countsUtf8Bytes() {
+        String cut = UserApiCommandController.cut("é".repeat(30), 20);
+        assertThat(cut).isEqualTo("é".repeat(8) + "…");
+        assertThat(cut.getBytes(java.nio.charset.StandardCharsets.UTF_8)).hasSizeLessThanOrEqualTo(20);
     }
 }
