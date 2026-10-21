@@ -41,6 +41,7 @@ window.CatapultAdminNotifications = (function () {
 
     function showAudience(form, audience) {
         form.querySelector(".admin-notifications-member").hidden = audience !== "ONE";
+        form.querySelector(".admin-notifications-chat-commands").hidden = audience !== "CHAT_COMMANDS";
     }
 
     /** The request's body, or null when a field is refused (told in the view's language). */
@@ -82,7 +83,8 @@ window.CatapultAdminNotifications = (function () {
             ctaUrl: ctaUrl || null,
             ctaLabel: ctaLabel || null,
             expiresAt,
-            targetUserId
+            targetUserId,
+            audience: fieldOf(form, "audience").value === "CHAT_COMMANDS" ? "CHAT_COMMANDS" : null
         };
     }
 
