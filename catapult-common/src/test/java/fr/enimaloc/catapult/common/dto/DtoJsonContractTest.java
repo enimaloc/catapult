@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.common.dto;
 
 
+import fr.enimaloc.catapult.common.event.ChannelEvents;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.ObjectMapper;
@@ -30,19 +31,27 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Every record in this package (and its sub-packages) crosses the api/web boundary as JSON. Builds one fully populated
+ * Every record in this package (and its sub-packages), and every {@link ChannelEvents} payload, crosses the api/web
+ * boundary as JSON. Builds one fully populated
  * instance of each through its canonical constructor and checks that Jackson 3 (what both
  * modules use) writes it and reads back an equal value — catching records that can't be
  * deserialized, or whose JSON shape silently loses a field.
  */
 class DtoJsonContractTest {
 
-    private static final String PACKAGE = DtoJsonContractTest.class.getPackageName();
-
     private final ObjectMapper json = JsonMapper.builder().build();
 
     static Stream<Class<?>> records() throws IOException, URISyntaxException {
-        URL root = AppConfigResponse.class.getResource("AppConfigResponse.class");
+        List<Class<?>> dtos = recordsBeside(AppConfigResponse.class);
+        assertThat(dtos).as("records found beside %s", AppConfigResponse.class.getName()).hasSizeGreaterThan(100);
+        List<Class<?>> events = recordsBeside(ChannelEvents.class);
+        assertThat(events).as("records found beside %s", ChannelEvents.class.getName()).isNotEmpty();
+        return Stream.concat(dtos.stream(), events.stream());
+    }
+
+    /** The records in {@code anchor}'s package and its sub-packages, sorted by name. */
+    private static List<Class<?>> recordsBeside(Class<?> anchor) throws IOException, URISyntaxException {
+        URL root = anchor.getResource(anchor.getSimpleName() + ".class");
         Path dir = Path.of(root.toURI()).getParent();
         List<Class<?>> records = new ArrayList<>();
         try (Stream<Path> files = Files.walk(dir)) {
@@ -51,13 +60,12 @@ class DtoJsonContractTest {
                 if (!relative.endsWith(".class")) continue;
                 String simpleName = relative.substring(0, relative.length() - ".class".length())
                     .replace(file.getFileSystem().getSeparator(), ".");
-                Class<?> type = load(PACKAGE + "." + simpleName);
+                Class<?> type = load(anchor.getPackageName() + "." + simpleName);
                 if (type.isRecord()) records.add(type);
             }
         }
         records.sort(Comparator.comparing(Class::getName));
-        assertThat(records).as("records found in %s", PACKAGE).hasSizeGreaterThan(100);
-        return records.stream();
+        return records;
     }
 
     @ParameterizedTest(name = "{0}")
