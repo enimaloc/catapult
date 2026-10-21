@@ -3,7 +3,7 @@
 <!--/*
   The notifications sent, newest first (the page swaps through the tab's sub-view pagination), and the
   dialog creating one: Markdown body with a preview rendered by catapult-api, severity, an optional
-  call to action and expiry, everyone or one member picked from the members listed. Driven by
+  call to action and expiry, everyone, one member picked from the members listed, or each streamer with an enabled chat command. Driven by
   admin-notifications.js, which checks the fields as catapult-api does before posting.
 */-->
 <div th:fragment="content" class="admin-view admin-notifications"
@@ -64,7 +64,9 @@
             <mdui-radio-group name="audience" value="ALL">
                 <mdui-radio value="ALL" th:text="#{admin.notifications.everyone}">All members</mdui-radio>
                 <mdui-radio value="ONE" th:text="#{admin.notifications.one-member}">One member</mdui-radio>
+                <mdui-radio value="CHAT_COMMANDS" th:text="#{admin.notifications.chat-commands}">Streamers with chat commands</mdui-radio>
             </mdui-radio-group>
+            <p class="admin-notifications-chat-commands" hidden th:text="#{admin.notifications.chat-commands.hint}">One notification each.</p>
             <div class="admin-notifications-member" hidden>
                 <mdui-text-field name="memberSearch" variant="outlined" clearable icon="search" th:attr="label=#{admin.notifications.member}"></mdui-text-field>
                 <div class="admin-notifications-members">

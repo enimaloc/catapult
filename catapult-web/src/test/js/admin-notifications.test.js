@@ -35,6 +35,7 @@ function page() {
                         <select name="severity"><option value="INFO">i</option><option value="WARNING">w</option></select>
                         <input name="ctaLabel"><input name="ctaUrl"><input name="expiresAt">
                         <div name="audience" value="ALL"></div>
+                        <p class="admin-notifications-chat-commands" hidden></p>
                         <div class="admin-notifications-member" hidden>
                             <input name="memberSearch">
                             <div class="admin-notifications-member-option" data-member-id="m1" data-login="alice" data-search="alice" hidden></div>
@@ -136,7 +137,7 @@ describe("admin-notifications", () => {
         await click(".admin-notifications-save");
         expect(posted.mock.calls).toEqual([["/admin/notifications", {
             title: "Maintenance", body: "**soon**", severity: "INFO",
-            ctaUrl: null, ctaLabel: null, expiresAt: null, targetUserId: null
+            ctaUrl: null, ctaLabel: null, expiresAt: null, targetUserId: null, audience: null
         }]]);
         expect(dialog().open).toBe(false);
         expect(CatapultAdminTabs.reload).toHaveBeenCalled();
@@ -173,6 +174,15 @@ describe("admin-notifications", () => {
         expect(field("memberSearch").value).toBe("alice");
         await click(".admin-notifications-save");
         expect(posted.mock.calls[0][1].targetUserId).toBe("m1");
+    });
+
+    it("tells each streamer with chat commands, saying how", async () => {
+        valid();
+        change("audience", "CHAT_COMMANDS");
+        expect(dialog().querySelector(".admin-notifications-chat-commands").hidden).toBe(false);
+        expect(dialog().querySelector(".admin-notifications-member").hidden).toBe(true);
+        await click(".admin-notifications-save");
+        expect(posted.mock.calls[0][1]).toMatchObject({ audience: "CHAT_COMMANDS", targetUserId: null });
     });
 
     it("forgets the chosen member when the search is typed over", async () => {
