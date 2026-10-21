@@ -1278,7 +1278,8 @@ a[data-link].active {
 
 /* Connections */
 
-#channel-connections {
+#channel-connections,
+.channel-commands {
     display: flex;
     flex-direction: column;
     gap: 12px;

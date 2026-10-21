@@ -19,48 +19,8 @@
             <th:block th:if="${integration.id() == 'obs' and widgetUrl != null}" th:insert="~{pages/channel-tab/integrations :: obs-widget}"></th:block>
             <p th:if="${integration.id() == 'obs' and widgetUrl == null and widgetUnavailable == true}" id="obs-widget-unavailable" th:text="#{channel.connections.obs.widget.link_unavailable}">Lien du widget indisponible.</p>
         </mdui-card>
-        <th:block th:if="${commandMigration != null}" th:insert="~{pages/channel-tab/integrations :: command-migration(${commandMigration})}"></th:block>
     </div>
 </mdui-tab-panel>
-
-<!--/* The chat commands moving to another chat bot (CommandMigration), laid out as a connection card:
-     a tool picked from the menu shows its steps, then what to paste per command, each in a read-only
-     field with its copy button; channel-command-migration.js switches the tool and copies. */-->
-<!--/*@thymesVar id="m" type="fr.enimaloc.catapult.controller.CommandMigration"*/-->
-<mdui-card th:fragment="command-migration(m)" id="command-migration" class="connection-card command-migration sentry-block" variant="outlined"
-           th:attr="data-label-copied=#{channel.commands.migration.copied},data-label-copy-failed=#{channel.commands.migration.copy_failed}">
-    <span th:text="#{channel.commands.migration.title}">Tes commandes de chat</span>
-    <mdui-chip th:text="#{channel.commands.migration.retiring}">Bientôt retirées</mdui-chip>
-    <p th:text="#{channel.commands.migration.intro}">Les commandes de chat de catapult vont être retirées.</p>
-    <p th:text="#{channel.commands.migration.overlap}">Deux réponses peuvent apparaître.</p>
-    <p th:text="#{channel.commands.migration.token}">Ces liens contiennent le jeton de ton widget.</p>
-    <div class="command-migration-tool">
-        <mdui-select id="command-migration-tool" variant="outlined" th:value="${m.tools()[0].id()}"
-                     th:attr="label=#{channel.commands.migration.tool}">
-            <mdui-menu-item th:each="tool : ${m.tools()}" th:value="${tool.id()}"
-                            th:text="#{|channel.commands.migration.${tool.id()}.name|}">Tool</mdui-menu-item>
-        </mdui-select>
-    </div>
-    <div th:each="tool, it : ${m.tools()}" class="command-migration-panel" th:classappend="${it.first} ? '' : 'hidden'"
-         th:attr="data-tool=${tool.id()}">
-        <ol class="command-migration-steps">
-            <li th:each="i : ${#numbers.sequence(1, tool.steps())}" th:text="#{|channel.commands.migration.${tool.id()}.step${i}|}">step</li>
-        </ol>
-        <section class="command-migration-row" th:each="row : ${tool.rows()}">
-            <div class="command-migration-head">
-                <span class="command-migration-name" th:text="${row.command()}">!game</span>
-                <mdui-chip th:text="#{|channel.commands.migration.role.${row.role()}|}">Tout le monde</mdui-chip>
-            </div>
-            <mdui-text-field th:each="line : ${row.lines()}" readonly variant="outlined"
-                             th:attr="label=#{|channel.commands.migration.line.${line.label()}|},value=${line.value()}">
-                <mdui-button-icon slot="end-icon" icon="content_copy" class="command-migration-copy"
-                                  th:attr="data-copy=${line.value()},aria-label=#{channel.commands.migration.copy}"></mdui-button-icon>
-            </mdui-text-field>
-        </section>
-    </div>
-    <p th:unless="${m.unmatched().isEmpty()}"
-       th:text="#{channel.commands.migration.unmatched(${#strings.listJoin(m.unmatched(), ', ')})}">!setgame n'a pas d'équivalent.</p>
-</mdui-card>
 
 <!--/* A Message as a <span>: its key resolved with its arguments, or its literal. */-->
 <span th:fragment="message(m)"
