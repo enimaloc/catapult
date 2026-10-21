@@ -64,6 +64,19 @@ public record GameInfoResponse(@JsonView(Summary.class) boolean inGame, IgdbObje
                 .findFirst().orElse(null);
     }
 
+    /** IGDB's page of the game, null when IGDB doesn't know it. */
+    @JsonView(Summary.class)
+    public String igdbUrl() {
+        return igdb == null || igdb.slug() == null ? null : igdb.url();
+    }
+
+    /** The store page of the game played: Steam's, else the Xbox Store's; null for any other. */
+    @JsonView(Summary.class)
+    public String storeUrl() {
+        if (steam != null && steam.appId() != null) return "https://store.steampowered.com/app/" + steam.appId();
+        return xbox == null ? null : xbox.storeUrl();
+    }
+
     @JsonView(Summary.class)
     public IaDisclosure ia() {
         return streamObjectsOf(HasIaDisclosure.class).map(HasIaDisclosure::ia)
