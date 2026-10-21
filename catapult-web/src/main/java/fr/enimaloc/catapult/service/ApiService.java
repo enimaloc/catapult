@@ -207,6 +207,10 @@ public interface ApiService {
     int markNotificationRead(UUID id);
     /** catapult-api's status (204), 502 when unreachable. */
     int markAllNotificationsRead();
+    /** The new features (NewFeatures keys) the logged-in user has opened; null when catapult-api fails. */
+    List<String> seenFeatures();
+    /** catapult-api's status (204; 400 malformed key), 502 when unreachable. */
+    int markFeatureSeen(String key);
     /** One page (20, newest first) of every notification sent; null when catapult-api fails. */
     AdminPage<AdminNotificationDto> adminNotifications(int page);
     /** catapult-api's status (201; 400 invalid), 502 when unreachable. */

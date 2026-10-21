@@ -14,11 +14,11 @@
              CatapultChannel.refresh() (which re-renders this whole fragment) lands back
              on the same tab instead of resetting to the overview. -->
         <mdui-tabs id="channel-tabs" class="channel-tabs" value="overview" placement="top" data-hash-tabs>
-            <mdui-tab value="overview" th:text="#{channel.tab.overview}">channel.tab.overview</mdui-tab>
-            <mdui-tab value="settings" th:text="#{channel.tab.settings}">channel.tab.settings</mdui-tab>
-            <mdui-tab value="integrations" th:if="${channelPage.isOwner()}" th:text="#{channel.tab.integrations}">channel.tab.integrations</mdui-tab>
-            <mdui-tab value="commands" th:if="${channelPage.isOwner() and commandMigration != null}" th:text="#{channel.tab.commands}">channel.tab.commands</mdui-tab>
-            <mdui-tab value="invitations" th:if="${channelPage.isOwner()}" th:text="#{channel.tab.invitations}">channel.tab.invitations</mdui-tab>
+            <mdui-tab value="overview"><th:block th:text="#{channel.tab.overview}">channel.tab.overview</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.overview')}"></th:block></mdui-tab>
+            <mdui-tab value="settings"><th:block th:text="#{channel.tab.settings}">channel.tab.settings</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.settings')}"></th:block></mdui-tab>
+            <mdui-tab value="integrations" th:if="${channelPage.isOwner()}"><th:block th:text="#{channel.tab.integrations}">channel.tab.integrations</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.integrations')}"></th:block></mdui-tab>
+            <mdui-tab value="commands" th:if="${channelPage.isOwner() and commandMigration != null}"><th:block th:text="#{channel.tab.commands}">channel.tab.commands</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.commands')}"></th:block></mdui-tab>
+            <mdui-tab value="invitations" th:if="${channelPage.isOwner()}"><th:block th:text="#{channel.tab.invitations}">channel.tab.invitations</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.invitations')}"></th:block></mdui-tab>
 
             <th:block th:replace="~{pages/channel-tab/overview::panel}"></th:block>
             <th:block th:replace="~{pages/channel-tab/settings::panel}"></th:block>

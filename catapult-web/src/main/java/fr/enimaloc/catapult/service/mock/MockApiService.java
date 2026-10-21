@@ -143,6 +143,8 @@ public class MockApiService implements ApiService {
     private final MockMembers members = new MockMembers();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
     private final MockTargetingStore targeting = new MockTargetingStore();
+    /** By account, as catapult-api's seen_feature: the new features each one has opened. */
+    private final Map<UUID, Set<String>> seenFeatures = new ConcurrentHashMap<>();
 
     /**
      * The members, the calling session's own account first; that account (and the channels it
@@ -960,6 +962,22 @@ public class MockApiService implements ApiService {
         log.trace("markAllNotificationsRead()");
         UUID account = currentUserId();
         return account == null ? 401 : notifications().markAllRead(account);
+    }
+
+    @Override
+    public List<String> seenFeatures() {
+        log.trace("seenFeatures()");
+        UUID account = currentUserId();
+        return account == null ? null : List.copyOf(seenFeatures.getOrDefault(account, Set.of()));
+    }
+
+    @Override
+    public int markFeatureSeen(String key) {
+        log.trace("markFeatureSeen({})", key);
+        UUID account = currentUserId();
+        if (account == null) return 401;
+        seenFeatures.computeIfAbsent(account, a -> ConcurrentHashMap.newKeySet()).add(key);
+        return 204;
     }
 
     @Override

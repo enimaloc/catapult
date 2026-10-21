@@ -158,11 +158,23 @@ document.addEventListener("catapult:render", function () {
         tabs.value = wanted;
     }
 
+    // The tab now shown loses its "new" dot (fragments/new-feature), and catapult-web keeps that
+    // per account so it stays gone on every device. Best effort: a failed call brings the dot
+    // back on the next render, nothing worse.
+    function markSeen() {
+        const dot = tabs.querySelector(`mdui-tab[value="${CSS.escape(tabs.value)}"] [data-new-feature]`);
+        if (!dot) return;
+        dot.remove();
+        CatapultCsrf.postJson(`/spa/seen-features/${encodeURIComponent(dot.dataset.newFeature)}`).catch(() => {});
+    }
+    markSeen();
+
     // mdui's change events bubble (composed): only the tabs' own is a tab switch, not one of a
     // field or select inside a panel, which would drop the sub-view from the hash.
     tabs.addEventListener("change", event => {
         if (event.target !== tabs) return;
         const hash = tabs.value === first ? "" : `#${tabs.value}`;
         history.replaceState(history.state, "", location.pathname + location.search + hash);
+        markSeen();
     });
 });

@@ -10,7 +10,7 @@
 
         <mdui-tabs id="admin-tabs" class="channel-tabs" value="members" placement="top" data-hash-tabs>
             <th:block th:each="tab : ${ {'members', 'ccl', 'caches', 'data', 'meta', 'notifications', 'dtdd-mapping', 'groups', 'whitelist', 'keys', 'tw', 'broadcast'} }">
-                <mdui-tab th:value="${tab}" th:text="#{|admin.tab.${tab}|}">admin.tab</mdui-tab>
+                <mdui-tab th:value="${tab}"><th:block th:text="#{|admin.tab.${tab}|}">admin.tab</th:block><th:block th:replace="~{fragments/new-feature :: dot(|admin.${tab}|)}"></th:block></mdui-tab>
             </th:block>
 
             <th:block th:replace="~{pages/admin-tab/members::panel}"></th:block>

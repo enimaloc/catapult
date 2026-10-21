@@ -104,6 +104,7 @@ public class RealApiService implements ApiService {
 
     private static final ParameterizedTypeReference<AdminPage<CacheEntryDto>> CACHE_ENTRIES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<WellKnownFileDto>> WELL_KNOWN_FILES = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<String>> FEATURE_KEYS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<Map<String, Object>>> DATA_ROWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<Map<String, Object>> DATA_ROW = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<NotificationDto>> NOTIFICATIONS = new ParameterizedTypeReference<>() {};
@@ -572,6 +573,16 @@ public class RealApiService implements ApiService {
     @Override
     public int markAllNotificationsRead() {
         return client.call(HttpMethod.POST, "/api/notifications/read-all", null, Void.class).status();
+    }
+
+    @Override
+    public List<String> seenFeatures() {
+        return client.get("/api/me/seen-features", FEATURE_KEYS);
+    }
+
+    @Override
+    public int markFeatureSeen(String key) {
+        return client.call(HttpMethod.PUT, "/api/me/seen-features/{key}", null, Void.class, key).status();
     }
 
     @Override
