@@ -1,0 +1,5 @@
+<!--/* The "new" dot a tab marked in NewFeatures carries until the member opens it (channel-page.js
+     then drops it and tells catapult-web). Goes inside the mdui-tab, in its badge slot. */-->
+<mdui-badge th:fragment="dot(key)" th:if="${newFeatures != null and newFeatures.contains(key)}"
+            slot="badge" variant="small" class="new-feature-dot"
+            th:attr="data-new-feature=${key},aria-label=#{tab.new}"></mdui-badge>

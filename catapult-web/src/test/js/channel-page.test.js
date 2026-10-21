@@ -260,6 +260,38 @@ describe("tab <-> location.hash", () => {
         expect(location.hash).toBe("#caches/igdb-game-cache");
     });
 
+    it("drops the new dot of the tab opened, and tells catapult-web once", () => {
+        html(`<mdui-tabs data-hash-tabs><mdui-tab value="overview"></mdui-tab>
+            <mdui-tab value="commands">Commands<mdui-badge slot="badge" data-new-feature="channel.commands"></mdui-badge></mdui-tab></mdui-tabs>`);
+        const el = document.querySelector("mdui-tabs");
+        el.value = "overview";
+        render();
+        expect(postJson).not.toHaveBeenCalled();
+
+        el.value = "commands";
+        el.dispatchEvent(new Event("change"));
+        el.value = "overview";
+        el.dispatchEvent(new Event("change"));
+        el.value = "commands";
+        el.dispatchEvent(new Event("change"));
+
+        expect(document.querySelector("[data-new-feature]")).toBeNull();
+        expect(postJson).toHaveBeenCalledTimes(1);
+        expect(postJson).toHaveBeenCalledWith("/spa/seen-features/channel.commands");
+    });
+
+    it("counts a new tab reached by its hash as opened", () => {
+        history.replaceState(null, "", "/channel/enimaloc#commands");
+        html(`<mdui-tabs data-hash-tabs><mdui-tab value="overview"></mdui-tab>
+            <mdui-tab value="commands"><mdui-badge slot="badge" data-new-feature="channel.commands"></mdui-badge></mdui-tab></mdui-tabs>`);
+        document.querySelector("mdui-tabs").value = "overview";
+
+        render();
+
+        expect(document.querySelector("[data-new-feature]")).toBeNull();
+        expect(postJson).toHaveBeenCalledWith("/spa/seen-features/channel.commands");
+    });
+
     it("does nothing on pages without tabs", () => {
         expect(() => render()).not.toThrow();
     });
