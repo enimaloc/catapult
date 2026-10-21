@@ -20,7 +20,43 @@
             <p th:if="${integration.id() == 'obs' and widgetUrl == null and widgetUnavailable == true}" id="obs-widget-unavailable" th:text="#{channel.connections.obs.widget.link_unavailable}">Lien du widget indisponible.</p>
         </mdui-card>
     </div>
+
+    <th:block th:if="${commandMigration != null}" th:insert="~{pages/channel-tab/integrations :: command-migration(${commandMigration})}"></th:block>
 </mdui-tab-panel>
+
+<!--/* The chat commands moving to another chat bot (CommandMigration): a tab per tool, its steps, then
+     what to paste per command; channel-command-migration.js copies a line. */-->
+<!--/*@thymesVar id="m" type="fr.enimaloc.catapult.controller.CommandMigration"*/-->
+<mdui-card th:fragment="command-migration(m)" id="command-migration" class="command-migration sentry-block" variant="outlined"
+           th:attr="data-label-copied=#{channel.commands.migration.copied},data-label-copy-failed=#{channel.commands.migration.copy_failed}">
+    <h3 th:text="#{channel.commands.migration.title}">Tes commandes de chat</h3>
+    <p th:text="#{channel.commands.migration.intro}">Les commandes de chat de catapult vont s'arrêter.</p>
+    <p class="command-migration-overlap" th:text="#{channel.commands.migration.overlap}">Tant qu'elles marchent encore, deux réponses peuvent apparaître.</p>
+    <p class="command-migration-warning" th:text="#{channel.commands.migration.token}">Ces liens contiennent le jeton de ton widget.</p>
+    <mdui-tabs th:value="${m.tools()[0].id()}" class="command-migration-tabs">
+        <mdui-tab th:each="tool : ${m.tools()}" th:value="${tool.id()}" th:text="#{|channel.commands.migration.${tool.id()}.name|}">Tool</mdui-tab>
+        <mdui-tab-panel slot="panel" th:each="tool : ${m.tools()}" th:value="${tool.id()}" class="command-migration-panel">
+            <ol class="command-migration-steps">
+                <li th:each="i : ${#numbers.sequence(1, 3)}" th:text="#{|channel.commands.migration.${tool.id()}.step${i}|}">step</li>
+            </ol>
+            <div class="command-migration-row" th:each="row : ${tool.rows()}">
+                <div class="command-migration-head">
+                    <strong th:text="${row.command()}">!game</strong>
+                    <mdui-chip th:text="#{|channel.commands.migration.role.${row.role()}|}">Tout le monde</mdui-chip>
+                </div>
+                <th:block th:each="line : ${row.extra() == null ? {row.line()} : {row.line(), row.extra()}}">
+                    <div class="command-migration-line">
+                        <code th:text="${line}">line</code>
+                        <mdui-button-icon icon="content_copy" class="command-migration-copy" th:attr="data-copy=${line},aria-label=#{channel.commands.migration.copy}"></mdui-button-icon>
+                    </div>
+                </th:block>
+                <p th:if="${row.argsDropped()}" class="command-migration-warning" th:text="#{channel.commands.migration.args_dropped}">Ce que tes spectateurs tapent après la commande ne lui sera pas transmis.</p>
+            </div>
+        </mdui-tab-panel>
+    </mdui-tabs>
+    <p th:unless="${m.acting().isEmpty()}" class="command-migration-warning"
+       th:text="#{channel.commands.migration.acting(${#strings.listJoin(m.acting(), ', ')})}">!setgame change quelque chose : aucun de ces outils ne peut la reprendre.</p>
+</mdui-card>
 
 <!--/* A Message as a <span>: its key resolved with its arguments, or its literal. */-->
 <span th:fragment="message(m)"

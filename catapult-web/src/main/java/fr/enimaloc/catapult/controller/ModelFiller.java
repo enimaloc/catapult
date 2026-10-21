@@ -221,15 +221,20 @@ public class ModelFiller {
         if (channelPage.isOwner()) {
             var twitchatEvents = channelPage.twitchat() == null ? Map.<String, List<TwitchatEventActionDto>>of()
                     : apiService.twitchatEvents(username);
+            // Only when there is something to put the token in: OBS, or commands to move.
+            var commands = apiService.enabledChatCommands();
+            var widget = channelPage.obs() != null || !commands.isEmpty() ? apiService.twitchatSettings(username) : null;
+            // The token is a capability: it goes in the links only, never in a log.
+            String token = widget == null ? null : widget.widgetToken();
             if (channelPage.obs() != null) {
-                var widget = apiService.twitchatSettings(username);
-                // The token is a capability: it goes in the link only, never in a log.
-                if (widget != null && widget.widgetToken() != null) {
-                    model.addAttribute("widgetUrl", absoluteUrl("/widget/obs/" + widget.widgetToken()));
+                if (token != null) {
+                    model.addAttribute("widgetUrl", absoluteUrl("/widget/obs/" + token));
                 } else {
                     model.addAttribute("widgetUnavailable", true);
                 }
             }
+            model.addAttribute("commandMigration", CommandMigration.of(commands,
+                    token == null ? null : absoluteUrl("/api/user/command/" + token + "/")));
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
             model.addAttribute("dangerZone",
                     DangerZoneView.of(apiService.accountInfo(), apiService.accountDeletionDelayDays()));
