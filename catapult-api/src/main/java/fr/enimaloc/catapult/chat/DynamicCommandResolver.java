@@ -87,6 +87,23 @@ public class DynamicCommandResolver {
             });
     }
 
+    /**
+     * What a streamer's enabled command answers, with the functions that only read (see {@link
+     * ServiceFunctionRegistry#readOnly()}): for the outside chat bots that fetch it over HTTP, where
+     * whoever holds the URL is not a viewer of a given role. Empty for an unknown or disabled
+     * command, a builtin backed by a static bean, or one that answered nothing.
+     */
+    public Optional<String> renderReadOnly(UserAccount user, String name, List<String> args) {
+        return repository.findByUserAndName(user, name)
+            .filter(ChatCommandDefinition::isEnabled)
+            .filter(def -> !staticByPresetKey.containsKey(def.getPresetKey()))
+            .map(def -> new DynamicChatCommand(
+                def, jsCompiler, sandboxExecutor, serviceFunctionRegistry.readOnly(),
+                gameContextService, placeholderResolver, resolveLocale(user), settingRepository,
+                repository, meterRegistry).execute(user, args))
+            .map(String::valueOf);
+    }
+
     private Locale resolveLocale(UserAccount user) {
         // No per-user locale is currently exposed on UserAccount/UserSettings.
         // Default to Locale.FRANCE as specified in the chat-commands plan.
