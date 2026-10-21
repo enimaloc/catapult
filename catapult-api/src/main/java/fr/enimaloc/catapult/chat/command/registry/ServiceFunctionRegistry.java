@@ -43,31 +43,6 @@ public class ServiceFunctionRegistry {
         return functions.values();
     }
 
-    /**
-     * A copy holding only the functions that read: none of the {@link ServiceFunction#isAction()}
-     * ones, whose whole point is to change something (a ban, a message, the game, a setting). A
-     * command run with it calling one fails as on an unknown function.
-     */
-    public ServiceFunctionRegistry readOnly() {
-        ServiceFunctionRegistry copy = new ServiceFunctionRegistry();
-        functions.values().stream().filter(fn -> !fn.isAction()).forEach(copy::register);
-        return copy;
-    }
-
-    /**
-     * Whether a command's source (its DSL template, or its ejected JS) names one of the {@link
-     * ServiceFunction#isAction()} functions, in any of the forms it can call one: {@code ns#fn} in
-     * the DSL, {@code ns.fn} or {@code ctx.call("ns", "fn")} in JS. A name in a string or a comment
-     * counts too: better to say a command may act than to miss one that does.
-     */
-    public boolean namesAnAction(String source) {
-        if (source == null || source.isBlank()) return false;
-        return functions.values().stream().filter(ServiceFunction::isAction).anyMatch(fn ->
-            source.contains(fn.namespace() + "#" + fn.name())
-                || source.contains(fn.namespace() + "." + fn.name())
-                || source.contains("\"" + fn.name() + "\""));
-    }
-
     private static String key(String namespace, String name) {
         return namespace + "#" + name;
     }
