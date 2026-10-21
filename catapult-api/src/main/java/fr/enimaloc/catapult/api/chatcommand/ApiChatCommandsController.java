@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.common.dto.chatcommand.BotModStatusDto;
+import fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto;
 import fr.enimaloc.catapult.common.dto.chatcommand.FallbackDto;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -151,6 +152,23 @@ public class ApiChatCommandsController {
         );
     }
 
+    /**
+     * The enabled commands, for the page moving them to another chat bot. Not behind the gate: it
+     * is the way out of these commands, and stays open once the experiment is wound down.
+     */
+    @GetMapping("/enabled")
+    public List<EnabledChatCommandDto> enabled(@AuthenticationPrincipal Jwt jwt) {
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
+        return repository.findByUser(user).stream()
+            .filter(ChatCommandDefinition::isEnabled)
+            .map(d -> new EnabledChatCommandDto(d.getName(), d.getPermission().name(),
+                serviceFunctionRegistry.namesAnAction(d.getTemplate())
+                    || serviceFunctionRegistry.namesAnAction(d.getEjectedJs()),
+                readsArgs(d.getTemplate()) || readsArgs(d.getEjectedJs())))
+            .sorted(java.util.Comparator.comparing(EnabledChatCommandDto::name))
+            .toList();
+    }
+
     @PostMapping("/presets/{presetKey}")
     @Transactional
     public ResponseEntity<CommandDto> instantiatePreset(
@@ -229,6 +247,11 @@ public class ApiChatCommandsController {
         repository.delete(def);
         publishChanged(user);
         return ResponseEntity.noContent().build();
+    }
+
+    /** {@code list(args)} in the DSL, {@code ctx.list("args")} in JS: any mention counts, as for actions. */
+    private static boolean readsArgs(String source) {
+        return source != null && source.contains("args");
     }
 
     private void gate(UserAccount user) {

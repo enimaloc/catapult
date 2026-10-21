@@ -100,6 +100,42 @@ class ApiChatCommandsControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    private static ChatCommandDefinition definition(String name, String template, boolean enabled) {
+        ChatCommandDefinition d = new ChatCommandDefinition();
+        d.setName(name);
+        d.setTemplate(template);
+        d.setEnabled(enabled);
+        d.setPermission(ChatCommandEvent.SenderRole.MODERATOR);
+        return d;
+    }
+
+    /** The way out of the commands: open without the experiment, enabled ones only. */
+    @Test
+    void enabled_listsTheEnabledCommands_evenOutsideTheExperiment_sayingWhichAct() throws Exception {
+        mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(false);
+        ChatCommandDefinition ejected = definition("!so", "{print 1}", true);
+        ejected.setEjectedJs("twitch.shoutout(ctx.list('args')[0]);");
+        when(repository.findByUser(any())).thenReturn(List.of(
+                definition("!store", "{print igdb#getCurrentGame().storeUrl}", true),
+                definition("!off", "x", false),
+                definition("!hug", "{twitch#shoutout(arr#join(list(args), \" \"))}", true),
+                ejected));
+
+        mvc.perform(withAdmin(get("/api/chat-commands/enabled")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].name").value("!hug"))
+                .andExpect(jsonPath("$[0].acts").value(true))
+                .andExpect(jsonPath("$[0].takesArgs").value(true))
+                .andExpect(jsonPath("$[1].name").value("!so"))
+                .andExpect(jsonPath("$[1].acts").value(true))
+                .andExpect(jsonPath("$[2].name").value("!store"))
+                .andExpect(jsonPath("$[2].acts").value(false))
+                .andExpect(jsonPath("$[2].takesArgs").value(false))
+                .andExpect(jsonPath("$[2].permission").value("MODERATOR"));
+    }
+
     @Test
     void get_returns_list_when_rolled_out() throws Exception {
         mockUser();
