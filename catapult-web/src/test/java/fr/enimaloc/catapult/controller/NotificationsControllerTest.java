@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
 import fr.enimaloc.catapult.common.dto.notification.Severity;
@@ -105,5 +106,32 @@ class NotificationsControllerTest {
         mvc.perform(post("/spa/notifications/read-all").with(csrf())).andExpect(status().isUnauthorized());
 
         verify(apiService, never()).markAllNotificationsRead();
+    }
+
+    @Test
+    void channels_relayTheChosenSet_andCatapultApisStatus() throws Exception {
+        when(apiService.saveNotificationChannels(java.util.Set.of(NotificationChannel.TWITCHAT))).thenReturn(204);
+
+        mvc.perform(post("/spa/notifications/channels").with(csrf()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")
+                        .contentType("application/json").content("{\"channels\":[\"TWITCHAT\"]}"))
+                .andExpect(status().isNoContent());
+        verify(apiService).saveNotificationChannels(java.util.Set.of(NotificationChannel.TWITCHAT));
+    }
+
+    @Test
+    void channels_reportAnApiFailure() throws Exception {
+        when(apiService.saveNotificationChannels(java.util.Set.of())).thenReturn(502);
+
+        mvc.perform(post("/spa/notifications/channels").with(csrf()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")
+                        .contentType("application/json").content("{\"channels\":[]}"))
+                .andExpect(status().isBadGateway());
+    }
+
+    @Test
+    void channels_areRefusedToAVisitor() throws Exception {
+        mvc.perform(post("/spa/notifications/channels").with(csrf()).contentType("application/json")
+                .content("{\"channels\":[\"TWITCHAT\"]}")).andExpect(status().isUnauthorized());
+
+        verify(apiService, never()).saveNotificationChannels(org.mockito.ArgumentMatchers.any());
     }
 }

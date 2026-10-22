@@ -79,7 +79,7 @@ public class WidgetObsController {
         if (owner == null) {
             return ResponseEntity.notFound().build();
         }
-        SseEmitter emitter = hub.subscribeWidget(owner, request.getRemoteAddr(), STREAM_TIMEOUT);
+        SseEmitter emitter = hub.subscribeWidget(owner, uuid, request.getRemoteAddr(), STREAM_TIMEOUT);
         return emitter == null ? ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build()
                 : ResponseEntity.ok().header("X-Accel-Buffering", "no").body(emitter);
     }

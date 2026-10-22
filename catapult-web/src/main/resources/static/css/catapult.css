@@ -2317,3 +2317,20 @@ mdui-dialog::part(description) { white-space: pre-line; }
     .admin-participants-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .admin-participants-actions { flex-wrap: wrap; justify-content: flex-start; grid-column: 1 / -1; }
 }
+
+/* The /notifications page's "also receive by" card: one muted line under each switch. */
+.notification-channel {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.notification-channel-hint {
+    margin: 0;
+    color: var(--catapult-text-muted);
+    font-size: 0.85rem;
+}
+
+.notification-channel .notification-channel-hint {
+    margin-inline-start: 52px;
+}

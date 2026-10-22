@@ -45,6 +45,8 @@ import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationPreviewDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationPreviewRequest;
@@ -593,6 +595,16 @@ public class RealApiService implements ApiService {
     @Override
     public int markAllNotificationsRead() {
         return client.call(HttpMethod.POST, "/api/notifications/read-all", null, Void.class).status();
+    }
+
+    @Override
+    public NotificationChannelsDto notificationChannels() {
+        return client.get("/api/me/notification-channels", NotificationChannelsDto.class);
+    }
+
+    @Override
+    public int saveNotificationChannels(java.util.Set<NotificationChannel> channels) {
+        return client.call(HttpMethod.PUT, "/api/me/notification-channels", new NotificationChannelsDto(channels), Void.class).status();
     }
 
     @Override
