@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.event.ChannelEvents;
 import fr.enimaloc.catapult.service.metrics.CatapultApiMetrics;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,7 @@ import java.util.UUID;
  *   <li>{@code catapult:events:global} — broadcast to every connected client</li>
  *   <li>{@code catapult:events:user:{uuid}} — targeted to a single user's sessions</li>
  *   <li>{@code catapult:events:admin} — broadcast restricted to admin role</li>
+ *   <li>{@code catapult:events:notification-delivery} — members with Twitchat notifications waiting</li>
  * </ul>
  */
 @Slf4j
@@ -67,6 +69,11 @@ public class RedisEventPublisher {
 
     public void publishTwitchat(UUID channelOwnerId, String name, Object data) {
         publish(CHANNEL_TWITCHAT_PREFIX + channelOwnerId, name, data);
+    }
+
+    /** Members whose Twitchat has notifications waiting: one channel for all of them (see ChannelEvents). */
+    public void publishNotificationDelivery(String name, Object data) {
+        publish(ChannelEvents.NOTIFICATION_DELIVERY_REDIS_CHANNEL, name, data);
     }
 
     private void publish(String channel, String name, Object data) {

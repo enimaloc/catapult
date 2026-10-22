@@ -43,6 +43,7 @@ public class NotificationService {
     private final UserAccountRepository userRepo;
     private final NotificationRenderer renderer;
     private final ApplicationEventPublisher publisher;
+    private final NotificationDeliveryService deliveries;
 
     @Autowired(required = false)
     private CatapultApiMetrics apiMetrics;
@@ -116,6 +117,8 @@ public class NotificationService {
             rows.add(r);
         }
         recipientRepo.saveAll(rows);
+        // Also through the channels the recipients opted in to: always after their rows, which it selects from
+        deliveries.createFor(n.getId());
 
         NotificationDto dto = toDto(n, false);
         List<UUID> ids = recipients.stream().map(UserAccount::getId).toList();
@@ -137,6 +140,7 @@ public class NotificationService {
         if (r.getReadAt() == null) {
             r.setReadAt(Instant.now());
         }
+        deliveries.cancel(userId, notificationId);
         long unread = recipientRepo.countByUserIdAndReadAtIsNull(userId);
         publisher.publishEvent(new NotificationReadEvent(userId, notificationId, unread));
         if (apiMetrics != null) apiMetrics.recordNotificationAction("read");
@@ -145,6 +149,7 @@ public class NotificationService {
     @Transactional
     public void markAllRead(UUID userId) {
         recipientRepo.markAllReadForUser(userId, Instant.now());
+        deliveries.cancelAll(userId);
         publisher.publishEvent(new NotificationAllReadEvent(userId));
         if (apiMetrics != null) apiMetrics.recordNotificationAction("markAllRead");
     }
@@ -153,6 +158,7 @@ public class NotificationService {
     public void delete(UUID userId, UUID notificationId) {
         recipientRepo.findById(new NotificationRecipientId(notificationId, userId))
                 .ifPresent(recipientRepo::delete);
+        deliveries.cancel(userId, notificationId);
         long unread = recipientRepo.countByUserIdAndReadAtIsNull(userId);
         publisher.publishEvent(new NotificationDeletedEvent(userId, notificationId, unread));
         if (apiMetrics != null) apiMetrics.recordNotificationAction("deleted");
