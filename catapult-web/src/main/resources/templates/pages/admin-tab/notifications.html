@@ -2,14 +2,16 @@
 <!--/*
   The notifications sent, newest first (the page swaps through the tab's sub-view pagination), and the
   dialog creating one: Markdown body with a preview rendered by catapult-api, severity, an optional
-  call to action and expiry, everyone, one member found by searching as the admin types, or each streamer with an enabled chat command. Driven by
+  call to action and expiry, everyone, one member found by searching as the admin types, each streamer with an enabled chat command, or the participants of an experiment (all of them or one variant's, with the count shown as the choice changes; `experiments` is null when catapult-api failed). Driven by
   admin-notifications.js, which checks the fields as catapult-api does before posting.
 */-->
 <div th:fragment="content" class="admin-view admin-notifications"
      th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
               data-label-invalid=#{admin.notifications.invalid},data-label-cta-pair=#{admin.notifications.cta-pair},
               data-label-past-expiry=#{admin.notifications.past-expiry},data-label-member-required=#{admin.notifications.member-required},data-label-unknown-member=#{admin.notifications.unknown-member},
-              data-label-unavailable=#{admin.notifications.unavailable},data-label-created=#{admin.notifications.created}">
+              data-label-unavailable=#{admin.notifications.unavailable},data-label-created=#{admin.notifications.created},
+              data-label-sent=#{admin.notifications.sent('{n}')},data-label-recipients=#{admin.notifications.recipients('{n}')},
+              data-label-variant-all=#{admin.notifications.variant.all},data-label-experiment-required=#{admin.notifications.experiment-required}">
     <div class="section-header">
         <h2 th:text="#{admin.tab.notifications}">Notifications</h2>
         <mdui-button id="admin-notifications-new" variant="tonal" icon="add" th:text="#{admin.notifications.new}">New</mdui-button>
@@ -64,8 +66,23 @@
                 <mdui-radio value="ALL" th:text="#{admin.notifications.everyone}">All members</mdui-radio>
                 <mdui-radio value="ONE" th:text="#{admin.notifications.one-member}">One member</mdui-radio>
                 <mdui-radio value="CHAT_COMMANDS" th:text="#{admin.notifications.chat-commands}">Streamers with chat commands</mdui-radio>
+                <mdui-radio value="EXPERIMENT" th:text="#{admin.notifications.experiment}">Experiment participants</mdui-radio>
             </mdui-radio-group>
             <p class="admin-notifications-chat-commands" hidden th:text="#{admin.notifications.chat-commands.hint}">One notification each.</p>
+            <div class="admin-notifications-experiment-audience" hidden>
+                <mdui-select name="experimentId" class="admin-notifications-experiment" variant="outlined" th:attr="label=#{admin.notifications.experiment.pick}">
+                    <mdui-menu-item th:each="e : ${experiments}" th:attr="value=${e.id()}"
+                                    th:text="${e.status().name() == 'ENDED' ? e.name() + ' (' + #messages.msg('admin.experiments.status.ENDED') + ')' : e.name()}">Experiment</mdui-menu-item>
+                </mdui-select>
+                <mdui-select name="variantId" class="admin-notifications-variant" variant="outlined" value="ALL" th:attr="label=#{admin.notifications.variant}">
+                    <mdui-menu-item value="ALL" th:text="#{admin.notifications.variant.all}">All variants</mdui-menu-item>
+                </mdui-select>
+                <p class="admin-notifications-count" hidden></p>
+                <!--/* each experiment's variants, read by the script to fill the variant select */-->
+                <div class="admin-notifications-variants-of" hidden th:each="e : ${experiments}" th:attr="data-experiment-id=${e.id()}">
+                    <span th:each="v : ${e.variants()}" th:attr="data-variant-id=${v.id()}" th:text="${v.name()}">variant</span>
+                </div>
+            </div>
             <div class="admin-notifications-member" hidden>
                 <mdui-text-field name="memberSearch" variant="outlined" clearable icon="search" th:attr="label=#{admin.notifications.member}"></mdui-text-field>
                 <div class="admin-notifications-members">

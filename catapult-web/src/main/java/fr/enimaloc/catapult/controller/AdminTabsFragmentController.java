@@ -251,6 +251,8 @@ public class AdminTabsFragmentController {
     String notifications(Model model, HttpServletResponse response, @RequestParam(defaultValue = "0") int page) {
         return guarded(model, response, () -> {
             model.addAttribute("notifications", apiService.adminNotifications(page));
+            // for the "experiment participants" audience; null (no experiment to pick) when catapult-api fails
+            model.addAttribute("experiments", apiService.adminExperiments());
             return "pages/admin-tab/notifications :: content";
         });
     }

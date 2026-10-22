@@ -248,6 +248,17 @@ class MockExperimentsStore {
     }
 
     /**
+     * The ids of the experiment's participants, narrowed to a variant; empty for an unknown experiment
+     * or a variant of another one (catapult-api's 404).
+     */
+    synchronized Optional<List<UUID>> participantIds(UUID id, UUID variantId) {
+        Experiment experiment = byId(id);
+        if (experiment == null || (variantId != null && !hasVariant(experiment, variantId))) return Optional.empty();
+        return Optional.of(experiment.participants.stream()
+                .filter(p -> variantId == null || p.variantId.equals(variantId)).map(p -> p.userId).toList());
+    }
+
+    /**
      * One page (20) of the experiment's participants by login, narrowed to a variant and to the logins
      * containing {@code q}; each variant's count ignores that narrowing. Empty for an unknown experiment
      * or a variant of another one (catapult-api's 404).

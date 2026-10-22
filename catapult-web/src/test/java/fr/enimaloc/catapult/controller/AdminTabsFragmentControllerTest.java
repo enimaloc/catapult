@@ -483,6 +483,29 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void notifications_offersTheExperimentsAndTheirVariantsAsAnAudience() throws Exception {
+        when(apiService.adminNotifications(0)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminPage<>(List.of(), 0, 0, 0));
+        when(apiService.adminExperiments()).thenReturn(List.of(
+                new ExperimentSummaryDto(EXP_ID, "dark-mode", "Dark mode", ExperimentStatus.ACTIVE, variants(), 0),
+                new ExperimentSummaryDto(UUID.randomUUID(), "old-one", "Old one", ExperimentStatus.ENDED, variants(), 0)));
+
+        String html = asAdmin("/spa/admin/notifications");
+
+        assertThat(html).contains("value=\"EXPERIMENT\"", "Experiment participants", "admin-notifications-experiment",
+                        "value=\"" + EXP_ID + "\"", "Dark mode", "Old one (Ended)", "admin-notifications-variant", "All variants",
+                        "admin-notifications-variants-of", "data-variant-id=\"" + ENABLED_ID + "\"", "Enabled", "admin-notifications-count", "data-label-sent=\"")
+                .contains("data-label-recipients=\"");
+    }
+
+    @Test
+    void notifications_stillRenderWhenTheExperimentsAreUnavailable() throws Exception {
+        when(apiService.adminNotifications(0)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminPage<>(List.of(), 0, 0, 0));
+        when(apiService.adminExperiments()).thenReturn(null);
+
+        assertThat(asAdmin("/spa/admin/notifications")).contains("id=\"admin-notifications-new\"", "admin-notifications-experiment");
+    }
+
+    @Test
     void notifications_saysSoWhenTheApiIsUnavailable() throws Exception {
         when(apiService.adminNotifications(0)).thenReturn(null);
 
