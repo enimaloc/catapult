@@ -210,7 +210,8 @@ public class MockData {
                 config.settings.cclFeatureEnabled, Set.copyOf(config.settings.blockedCcls),
                 null, null, Set.of(), false, false, false,
                 null, null, Set.of(),
-                AVAILABLE_CCLS, config.settings.twFeatureEnabled, Set.copyOf(config.settings.blockedTws), AVAILABLE_TWS);
+                AVAILABLE_CCLS, config.settings.twFeatureEnabled, Set.copyOf(config.settings.blockedTws), AVAILABLE_TWS,
+                null, false);
 
         MockConfig.Steam steam = config.steam;
         MockData data = new MockData(channel, List.of(binding), settings, List.of(),
@@ -754,7 +755,8 @@ public class MockData {
         UserSettingsDto build() {
             return new UserSettingsDto(cclEnabled, blockedCcls, noGameId, noGameName, noGameCcls,
                     applyOnStreamStart, applyOnNoGame, applyOnStreamEnd, fallbackId, fallbackName, fallbackCcls,
-                    from.availableCcls(), twEnabled, blockedTws, from.availableTws());
+                    from.availableCcls(), twEnabled, blockedTws, from.availableTws(),
+                    from.raidRestoreGameMinutes(), from.raidRestoreGameAvailable());
         }
     }
 }

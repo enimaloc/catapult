@@ -525,7 +525,8 @@ public class MockApiService implements ApiService {
                 new ChannelEvents.Settings.NoGame(s.noGameTwitchGameId(), s.noGameTwitchGameName(), s.noGameCcls(),
                         s.applyDefaultOnStreamStart(), s.applyDefaultOnNoGame(), s.applyDefaultOnStreamEnd()),
                 new ChannelEvents.Settings.IncompleteFallback(s.incompleteFallbackTwitchGameId(),
-                        s.incompleteFallbackTwitchGameName(), s.incompleteFallbackCcls()))));
+                        s.incompleteFallbackTwitchGameName(), s.incompleteFallbackCcls()),
+                new ChannelEvents.Settings.Raid(s.raidRestoreGameMinutes()))));
     }
 
     @Override

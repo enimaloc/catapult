@@ -18,5 +18,9 @@ public record UserSettingsDto(
         List<CclDto> availableCcls,
         boolean twFeatureEnabled,
         Set<String> blockedTws,
-        List<TwDto> availableTws
+        List<TwDto> availableTws,
+        // On an outgoing raid, how recent (minutes) a game is put back as the category; null: off
+        Integer raidRestoreGameMinutes,
+        // Whether the channel is offered that setting at all (experiment raid.restore-game)
+        boolean raidRestoreGameAvailable
 ) {}

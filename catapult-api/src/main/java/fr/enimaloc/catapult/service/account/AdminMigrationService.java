@@ -52,6 +52,7 @@ public class AdminMigrationService {
         tgt.setApplyDefaultOnStreamStart(src.isApplyDefaultOnStreamStart());
         tgt.setApplyDefaultOnNoGame(src.isApplyDefaultOnNoGame());
         tgt.setApplyDefaultOnStreamEnd(src.isApplyDefaultOnStreamEnd());
+        tgt.setRaidRestoreGameMinutes(src.getRaidRestoreGameMinutes());
         userSettingsRepository.save(tgt);
     }
 

@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
@@ -33,6 +34,8 @@ import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
@@ -90,6 +93,7 @@ public class ApiChannelActionsController {
     private final TwitchatEventActionService twitchatEventActionService;
     private final TwitchatEventDispatcher twitchatEventDispatcher;
     private final SteamProfileDiagnostics steamDiagnostics;
+    private final RaidRestoreGateService raidRestoreGate;
 
     @Autowired(required = false)
     private SteamApiKeyRotator rotator;
@@ -345,6 +349,28 @@ public class ApiChannelActionsController {
             s.setIncompleteFallbackTwitchGameName(body.twitchGameName());
             replace(s.getIncompleteFallbackCcls(), body.ccls());
         });
+        publishSettings(channelUser, settings);
+    }
+
+    /** 0 or null turns it off; refused (403) while the channel isn't in the {@value RaidRestoreGateService#EXPERIMENT_KEY} experiment. */
+    @PostMapping("/settings/raid")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveRaidSettings(
+            @PathVariable String username,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody RaidSettingsRequest body) {
+
+        UserAccount channelUser = userResolver.accessibleChannel(username, jwt);
+        if (!raidRestoreGate.isAvailableFor(channelUser)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Raid settings not available for this channel");
+        }
+        Integer minutes = body.restoreGameMinutes();
+        if (minutes != null && minutes != 0
+                && (minutes < RaidRestoreGameService.MIN_MINUTES || minutes > RaidRestoreGameService.MAX_MINUTES)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "restoreGameMinutes must be 1..120, or 0/null for off");
+        }
+        UserSettings settings = saveSettings(channelUser,
+                s -> s.setRaidRestoreGameMinutes(minutes == null || minutes == 0 ? null : minutes));
         publishSettings(channelUser, settings);
     }
 

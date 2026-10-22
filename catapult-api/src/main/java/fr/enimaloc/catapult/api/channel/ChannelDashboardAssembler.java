@@ -38,6 +38,7 @@ import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
@@ -86,6 +87,7 @@ public class ChannelDashboardAssembler {
     // Only present when minecraft.enabled (the service is @ConditionalOnBooleanProperty).
     private final Optional<MinecraftLinkStateService> minecraftLinkStates;
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
+    private final RaidRestoreGateService raidRestoreGate;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -245,7 +247,10 @@ public class ChannelDashboardAssembler {
                 availableCcls(),
                 settings.isTwFeatureEnabled(),
                 settings.getBlockedTws(),
-                availableTws());
+                availableTws(),
+                settings.getRaidRestoreGameMinutes(),
+                // Asked of the channel's owner, whose raids it acts on (and who it may enrol)
+                raidRestoreGate.isAvailableFor(channel));
     }
 
     // --- DTDD mapping ----------------------------------------------------------------------------

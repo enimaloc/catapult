@@ -344,10 +344,13 @@ class RealApiServiceTest {
         respond(HttpMethod.GET, "/api/channels/enimaloc/settings", """
                 {"cclFeatureEnabled":true,"blockedCcls":[],"noGameCcls":[],"applyDefaultOnStreamStart":false,
                  "applyDefaultOnNoGame":false,"applyDefaultOnStreamEnd":false,"incompleteFallbackCcls":[],
-                 "availableCcls":[],"twFeatureEnabled":false,"blockedTws":[],"availableTws":[]}""");
+                 "availableCcls":[],"twFeatureEnabled":false,"blockedTws":[],"availableTws":[],
+                 "raidRestoreGameMinutes":15,"raidRestoreGameAvailable":true}""");
 
         assertThat(service.channelSettings("enimaloc")).isInstanceOf(UserSettingsDto.class)
-                .extracting(UserSettingsDto::cclFeatureEnabled).isEqualTo(true);
+                .extracting(UserSettingsDto::cclFeatureEnabled, UserSettingsDto::raidRestoreGameMinutes,
+                        UserSettingsDto::raidRestoreGameAvailable)
+                .containsExactly(true, 15, true);
     }
 
     @Test

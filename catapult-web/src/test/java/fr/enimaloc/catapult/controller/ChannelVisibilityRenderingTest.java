@@ -57,7 +57,7 @@ class ChannelVisibilityRenderingTest {
     void stubSettingsAndDtddMapping() {
         lenient().when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
                 false, Set.of(), null, null, Set.of(), false, false, false,
-                null, null, Set.of(), List.of(), false, Set.of(), List.of()));
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, false));
         lenient().when(apiService.dtddMappingStatus(any())).thenReturn(new DtddMappingStatusDto(null, null, false, null));
     }
 

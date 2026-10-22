@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.twitch;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.event.ChannelRaidedOutEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -19,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -182,8 +184,70 @@ class TwitchEventSubServiceTest {
 
         service.handleMessage(user, token, message, false);
 
-        // One POST each for stream.online, stream.offline, channel.update
-        verify(restClient, times(3)).post();
+        // One POST each for stream.online, stream.offline, channel.update, channel.raid
+        verify(restClient, times(4)).post();
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_subscribesToTheStreamersOutgoingRaids() {
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        ArgumentCaptor<Object> bodies = ArgumentCaptor.forClass(Object.class);
+        verify(postBodySpec, atLeastOnce()).body(bodies.capture());
+        assertThat(bodies.getAllValues())
+            .map(body -> (Map<String, Object>) body)
+            .filteredOn(body -> "channel.raid".equals(body.get("type")))
+            .singleElement()
+            .satisfies(body -> {
+                assertThat(body.get("version")).isEqualTo("1");
+                assertThat(body.get("condition")).isEqualTo(Map.of("from_broadcaster_user_id", "broadcaster-123"));
+            });
+    }
+
+    @Test
+    void handleMessage_outgoingRaid_publishesItWithTheCurrentCategory() {
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "509658", "category_name": "Just Chatting", "content_classification_labels": [] } }
+            }
+            """, false);
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.raid" },
+              "payload": { "event": { "from_broadcaster_user_id": "broadcaster-123", "to_broadcaster_user_id": "999", "viewers": 12 } }
+            }
+            """, false);
+
+        ArgumentCaptor<ApplicationEvent> events = ArgumentCaptor.forClass(ApplicationEvent.class);
+        verify(eventPublisher, atLeastOnce()).publishEvent(events.capture());
+        assertThat(events.getAllValues()).filteredOn(ChannelRaidedOutEvent.class::isInstance)
+            .singleElement()
+            .satisfies(e -> {
+                ChannelRaidedOutEvent raid = (ChannelRaidedOutEvent) e;
+                assertThat(raid.getUser()).isEqualTo(user);
+                assertThat(raid.getCurrentCategoryId()).isEqualTo("509658");
+            });
+    }
+
+    @Test
+    void handleMessage_incomingRaid_isIgnored() {
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.raid" },
+              "payload": { "event": { "from_broadcaster_user_id": "999", "to_broadcaster_user_id": "broadcaster-123" } }
+            }
+            """, false);
+
+        verify(eventPublisher, never()).publishEvent(any(ChannelRaidedOutEvent.class));
     }
 
     @Test

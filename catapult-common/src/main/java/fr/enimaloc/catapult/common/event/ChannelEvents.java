@@ -92,7 +92,7 @@ public final class ChannelEvents {
                                Long ttlMinutes, boolean hasPersonalToken, boolean tokenShared) {}
 
     /** A channel's settings, one record per settings panel. */
-    public record Settings(Ccl ccl, Tw tw, NoGame noGame, IncompleteFallback incompleteFallback) {
+    public record Settings(Ccl ccl, Tw tw, NoGame noGame, IncompleteFallback incompleteFallback, Raid raid) {
 
         public record Ccl(boolean enabled, Set<String> blockedCcls) {}
 
@@ -102,5 +102,8 @@ public final class ChannelEvents {
                              boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {}
 
         public record IncompleteFallback(String twitchGameId, String twitchGameName, Set<String> ccls) {}
+
+        /** {@code restoreGameMinutes}: how recent a game an outgoing raid puts back; null when off. */
+        public record Raid(Integer restoreGameMinutes) {}
     }
 }

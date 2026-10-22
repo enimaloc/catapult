@@ -193,6 +193,57 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         }
 
         @Test
+        void raid_savesHowRecentAGameIsPutBack() throws Exception {
+            when(raidRestoreGate.isAvailableFor(owner)).thenReturn(true);
+
+            mvc.perform(postAs(moderator, "/settings/raid", "{\"restoreGameMinutes\":15}"))
+                    .andExpect(status().isNoContent());
+
+            UserSettings settings = saved();
+            assertThat(settings.getRaidRestoreGameMinutes()).isEqualTo(15);
+            verify(channelEventPublisher).settingsUpdated(owner.getId(), settings);
+        }
+
+        @Test
+        void raid_nullOrZeroTurnsItOff() throws Exception {
+            when(raidRestoreGate.isAvailableFor(owner)).thenReturn(true);
+            UserSettings existing = new UserSettings();
+            existing.setRaidRestoreGameMinutes(30);
+            when(userSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(existing));
+
+            mvc.perform(postAs(owner, "/settings/raid", "{\"restoreGameMinutes\":0}"))
+                    .andExpect(status().isNoContent());
+            assertThat(existing.getRaidRestoreGameMinutes()).isNull();
+
+            existing.setRaidRestoreGameMinutes(30);
+            mvc.perform(postAs(owner, "/settings/raid", "{\"restoreGameMinutes\":null}"))
+                    .andExpect(status().isNoContent());
+            assertThat(existing.getRaidRestoreGameMinutes()).isNull();
+        }
+
+        @Test
+        void raid_refusesADelayOutsideOneToHundredTwentyMinutes() throws Exception {
+            when(raidRestoreGate.isAvailableFor(owner)).thenReturn(true);
+
+            mvc.perform(postAs(owner, "/settings/raid", "{\"restoreGameMinutes\":121}"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(postAs(owner, "/settings/raid", "{\"restoreGameMinutes\":-5}"))
+                    .andExpect(status().isBadRequest());
+
+            verify(userSettingsRepository, never()).save(any());
+        }
+
+        @Test
+        void raid_refusedWhileTheExperimentIsOffForTheChannel() throws Exception {
+            when(raidRestoreGate.isAvailableFor(owner)).thenReturn(false);
+
+            mvc.perform(postAs(owner, "/settings/raid", "{\"restoreGameMinutes\":15}"))
+                    .andExpect(status().isForbidden());
+
+            verify(userSettingsRepository, never()).save(any());
+        }
+
+        @Test
         void incompleteFallback() throws Exception {
             mvc.perform(postAs(owner, "/settings/incomplete-fallback",
                             "{\"twitchGameId\":\"2\",\"twitchGameName\":\"Other\",\"ccls\":[\"Drugs\"]}"))

@@ -115,7 +115,7 @@ class TwitchEventSubServiceFlowsTest {
     }
 
     private void subscriptionsSucceed() {
-        for (int i = 0; i < 3; i++) helix.expect(requestTo(SUBSCRIPTIONS)).andRespond(withSuccess());
+        for (int i = 0; i < 4; i++) helix.expect(requestTo(SUBSCRIPTIONS)).andRespond(withSuccess());
     }
 
     private static String channelUpdate(String categoryId, String categoryName, String... ccls) {
@@ -206,6 +206,9 @@ class TwitchEventSubServiceFlowsTest {
                     .andRespond(withSuccess());
             helix.expect(requestTo(SUBSCRIPTIONS)).andExpect(content().json("{\"type\": \"channel.update\", \"version\": \"2\"}"))
                     .andRespond(withServerError());
+            helix.expect(requestTo(SUBSCRIPTIONS)).andExpect(content().json("{\"type\": \"channel.raid\", \"version\": \"1\","
+                            + " \"condition\": {\"from_broadcaster_user_id\": \"b-1\"}}"))
+                    .andRespond(withSuccess());
             json(CHANNELS, """
                     {"data": [{"game_id": "509658", "game_name": "Just Chatting", "content_classification_labels": [
                       {"id": "Gambling", "is_enabled": true}, {"id": "ProfanityVulgarity", "is_enabled": false}]}]}""");
@@ -231,6 +234,8 @@ class TwitchEventSubServiceFlowsTest {
             helix.expect(requestTo(SUBSCRIPTIONS)).andExpect(header("Authorization", "Bearer refreshed"))
                     .andRespond(withSuccess());
             helix.expect(requestTo(SUBSCRIPTIONS)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+            helix.expect(requestTo(SUBSCRIPTIONS)).andExpect(header("Authorization", "Bearer refreshed"))
+                    .andRespond(withSuccess());
             helix.expect(requestTo(CHANNELS)).andExpect(header("Authorization", "Bearer refreshed"))
                     .andRespond(withSuccess("{\"data\": []}", MediaType.APPLICATION_JSON));
             helix.expect(requestTo(STREAMS)).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));

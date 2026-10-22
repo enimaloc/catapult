@@ -114,12 +114,14 @@ class ChannelEventPublisherTest {
         settings.getBlockedCcls().clear();
         settings.getBlockedCcls().add("ccl1");
         settings.setNoGameTwitchGameName("Just Chatting");
+        settings.setRaidRestoreGameMinutes(20);
 
         publisher.settingsUpdated(ownerId, settings);
 
         ChannelEvents.SettingsUpdated payload = (ChannelEvents.SettingsUpdated) published(ChannelEvents.SETTINGS_UPDATED);
         assertThat(payload.settings().ccl()).isEqualTo(new ChannelEvents.Settings.Ccl(true, Set.of("ccl1")));
         assertThat(payload.settings().noGame().twitchGameName()).isEqualTo("Just Chatting");
+        assertThat(payload.settings().raid()).isEqualTo(new ChannelEvents.Settings.Raid(20));
     }
 
     @Test
