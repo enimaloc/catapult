@@ -111,6 +111,34 @@ public interface ExperimentAssignmentRepository extends JpaRepository<Experiment
     @Query("UPDATE ExperimentAssignment a SET a.variant = :variant WHERE a.id IN :ids")
     int moveToVariant(@Param("variant") ExperimentVariant variant, @Param("ids") Collection<UUID> ids);
 
+    // The three shapes below back the "forced by a tag or group override" lookup: DB-side EXISTS, user ids only.
+
+    /** Ids of the experiment's members holding the flag {@code flagKey}, whatever its value (null included). */
+    @Query("""
+        SELECT a.user.id FROM ExperimentAssignment a
+        WHERE a.experiment = :experiment
+          AND EXISTS (SELECT 1 FROM UserFlag f WHERE f.user = a.user AND f.flagKey = :flagKey)
+        """)
+    List<UUID> findUserIdsWithFlag(@Param("experiment") Experiment experiment, @Param("flagKey") String flagKey);
+
+    /** Ids of the experiment's members whose flag {@code flagKey} equals {@code flagValue}. */
+    @Query("""
+        SELECT a.user.id FROM ExperimentAssignment a
+        WHERE a.experiment = :experiment
+          AND EXISTS (SELECT 1 FROM UserFlag f
+                      WHERE f.user = a.user AND f.flagKey = :flagKey AND f.flagValue = :flagValue)
+        """)
+    List<UUID> findUserIdsWithFlagValue(@Param("experiment") Experiment experiment,
+                                        @Param("flagKey") String flagKey, @Param("flagValue") String flagValue);
+
+    /** Ids of the experiment's members belonging to the user group whose key is {@code groupKey}. */
+    @Query("""
+        SELECT a.user.id FROM ExperimentAssignment a
+        WHERE a.experiment = :experiment
+          AND EXISTS (SELECT 1 FROM UserGroup g JOIN g.members m WHERE g.key = :groupKey AND m.id = a.user.id)
+        """)
+    List<UUID> findUserIdsInGroup(@Param("experiment") Experiment experiment, @Param("groupKey") String groupKey);
+
     List<ExperimentAssignment> findAllByExperiment(Experiment experiment);
 
     @Modifying(clearAutomatically = true)

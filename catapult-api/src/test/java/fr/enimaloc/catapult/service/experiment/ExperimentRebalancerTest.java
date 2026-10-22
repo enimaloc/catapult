@@ -12,6 +12,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ExperimentRebalancerTest {
@@ -189,5 +195,30 @@ class ExperimentRebalancerTest {
 
         assertThat(plan.moves()).singleElement().satisfies(m ->
                 assertThat(m.assignmentIds()).extracting(userOf::get).containsExactlyInAnyOrder(5, 1, 4));
+    }
+
+    @Test
+    void plan_leavesTagAndGroupForcedMembersInPlaceAndOutOfTheCounts() {
+        ExperimentVariant control = variant(1, 90);
+        ExperimentVariant enabled = variant(2, 10);
+        Experiment experiment = new Experiment();
+        experiment.setKey("exp");
+        experiment.setVariants(List.of(control, enabled));
+        List<ExperimentAssignmentRef> free = members(control, 100);
+        List<ExperimentAssignmentRef> forced = members(control, 50); // forced by a tag or a group
+        ExperimentAssignmentRepository assignments = mock(ExperimentAssignmentRepository.class);
+        ForcedMembers forcedMembers = mock(ForcedMembers.class);
+        when(assignments.findRefsByExperiment(experiment)).thenReturn(concat(free, forced));
+        when(forcedMembers.userIds(experiment)).thenReturn(
+                forced.stream().map(ExperimentAssignmentRef::userId).collect(java.util.stream.Collectors.toSet()));
+
+        var plan = new ExperimentRebalancer(assignments, forcedMembers)
+                .plan(experiment, weights(control, 50, enabled, 50));
+
+        Set<UUID> moved = new HashSet<>();
+        plan.moves().forEach(m -> moved.addAll(m.assignmentIds()));
+        // 100 free members split 50/50: 50 leave, none of them forced.
+        assertThat(moved).hasSize(50);
+        assertThat(moved).doesNotContainAnyElementsOf(forced.stream().map(ExperimentAssignmentRef::id).toList());
     }
 }

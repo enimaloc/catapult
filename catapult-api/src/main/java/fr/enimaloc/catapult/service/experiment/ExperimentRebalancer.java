@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRef;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
-import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -24,9 +23,8 @@ import java.util.UUID;
  * Redistributes an experiment's members after a weight change, moving only those out of variants that are now
  * over their target and into variants under theirs.
  *
- * <p>Members pinned by a USER FORCE_VARIANT override never move and don't count. ATTRIBUTE FORCE_VARIANT
- * overrides are not evaluated here: {@code ExperimentService.applyForcedVariant} corrects those members on
- * their next evaluation anyway.
+ * <p>Members pinned by a FORCE_VARIANT override (a user, a tag or a group) never move and don't count; see
+ * {@link ForcedMembers}.
  */
 @Component
 @RequiredArgsConstructor
@@ -35,7 +33,7 @@ public class ExperimentRebalancer {
     private static final int CHUNK = 1000;
 
     private final ExperimentAssignmentRepository assignmentRepository;
-    private final ExperimentOverrideRepository overrideRepository;
+    private final ForcedMembers forcedMembers;
 
     /** The moves from {@code from} to {@code to}, with the assignments to update. */
     public record Move(UUID fromVariantId, UUID toVariantId, List<UUID> assignmentIds) {}
@@ -50,7 +48,7 @@ public class ExperimentRebalancer {
 
     /** Computes the plan for {@code weights} (by variant id; a variant not listed keeps its own weight). Writes nothing. */
     public Plan plan(Experiment experiment, Map<UUID, Integer> weights) {
-        Set<UUID> pinned = Set.copyOf(overrideRepository.findForcedUserIds(experiment));
+        Set<UUID> pinned = forcedMembers.userIds(experiment);
         List<ExperimentAssignmentRef> pool = withoutPinned(assignmentRepository.findRefsByExperiment(experiment), pinned);
         return compute(experiment.getKey(), experiment.getVariants(), weights, pool);
     }
