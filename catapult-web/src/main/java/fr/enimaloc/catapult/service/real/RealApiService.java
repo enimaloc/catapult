@@ -73,6 +73,7 @@ import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
@@ -335,6 +336,11 @@ public class RealApiService implements ApiService {
         return client.postVoid("/api/channels/{username}/settings/no-game",
                 new NoGameSettingsRequest(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd),
                 username);
+    }
+
+    @Override
+    public int saveRaidSettings(String username, Integer restoreGameMinutes) {
+        return client.postVoid("/api/channels/{username}/settings/raid", new RaidSettingsRequest(restoreGameMinutes), username);
     }
 
     @Override

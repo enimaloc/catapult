@@ -543,6 +543,15 @@ class RealApiServiceTest {
     }
 
     @Test
+    void saveRaidSettings() {
+        expectPost("/api/channels/enimaloc/settings/raid", "{\"restoreGameMinutes\":15}");
+        service.saveRaidSettings("enimaloc", 15);
+        api.reset();
+        expectPost("/api/channels/enimaloc/settings/raid", "{\"restoreGameMinutes\":null}");
+        service.saveRaidSettings("enimaloc", null);
+    }
+
+    @Test
     void saveIncompleteFallbackSettings() {
         expectPost("/api/channels/enimaloc/settings/incomplete-fallback",
                 "{\"twitchGameId\":null,\"twitchGameName\":null,\"ccls\":[\"Drugs\"]}");

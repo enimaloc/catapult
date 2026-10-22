@@ -466,6 +466,21 @@ class MockApiServiceTest {
     }
 
     @Test
+    void raidSettings_areOfferedInMock_savedPerChannel_andToldAsAnEvent() {
+        assertThat(data.getUserSettings().raidRestoreGameAvailable()).isTrue();
+
+        assertThat(service.saveRaidSettings(username, 20)).isEqualTo(204);
+        assertThat(data.getUserSettings().raidRestoreGameMinutes()).isEqualTo(20);
+        var settings = ((fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent) events.getLast()).settings();
+        assertThat(settings.raid().restoreGameMinutes()).isEqualTo(20);
+
+        service.saveRaidSettings(username, 0);
+        assertThat(data.getUserSettings().raidRestoreGameMinutes()).isNull();
+        assertThat(service.saveRaidSettings(username, 121)).isEqualTo(400);
+        assertThat(data.getUserSettings().raidRestoreGameMinutes()).isNull();
+    }
+
+    @Test
     void twitchatEvents_keepCatapultApisLimits() {
         TwitchatEventActionDto payload = new TwitchatEventActionDto("CUSTOM_CHAT_MESSAGE", "RAW", "{\"message\":\"hi\"}", true);
 
