@@ -2274,3 +2274,15 @@ body.obs-dock-mode .footer {
 .command-migration-name {
     font-weight: 650;
 }
+
+.admin-experiments-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) auto; gap: 12px; align-items: center; padding: 8px 0; cursor: pointer; }
+.admin-experiments-row + .admin-experiments-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.admin-experiments-chips { display: flex; gap: 8px; justify-content: flex-end; }
+.admin-experiments-actions, .admin-experiments-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.admin-experiments-form [hidden] { display: none; }
+.admin-experiments-weight { display: flex; gap: 8px; align-items: center; }
+.admin-experiments-rule-warning { display: flex; gap: 8px; align-items: center; }
+@media (max-width: 650px) {
+    .admin-experiments-row { grid-template-columns: minmax(0, 1fr); }
+    .admin-experiments-chips { justify-content: flex-start; }
+}

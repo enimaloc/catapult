@@ -13,6 +13,14 @@ import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminIgdbDescriptorDto;
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
+import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentStatus;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentVariantDto;
 import fr.enimaloc.catapult.config.I18nConfiguration;
 import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
@@ -59,7 +67,8 @@ class AdminTabsFragmentControllerTest {
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
                 "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
-                "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001")) {
+                "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001",
+                "/spa/admin/experiments", "/spa/admin/experiments/00000000-0000-0000-0000-000000000001")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
         }
@@ -84,6 +93,8 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminMembers();
         verify(apiService, never()).adminMember(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminMemberTargeting(org.mockito.ArgumentMatchers.any());
+        verify(apiService, never()).adminExperiments();
+        verify(apiService, never()).adminExperiment(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -856,5 +867,120 @@ class AdminTabsFragmentControllerTest {
                 .andExpect(status().isNotFound()).andReturn().getResponse().getContentAsString();
 
         assertThat(html).contains("admin-placeholder", "data-admin-back").doesNotContain("admin-tw-keyword-add");
+    }
+
+    private static final UUID EXP_ID = UUID.fromString("00000000-0000-0000-0000-0000000000e1");
+    private static final UUID CONTROL_ID = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+    private static final UUID ENABLED_ID = UUID.fromString("00000000-0000-0000-0000-0000000000c2");
+
+    private static List<ExperimentVariantDto> variants() {
+        return List.of(new ExperimentVariantDto(CONTROL_ID, "control", "Control", 0, true),
+                new ExperimentVariantDto(ENABLED_ID, "enabled", "Enabled", 100, false));
+    }
+
+    private ExperimentSettingsDto experiment(ExperimentStatus status, List<ExperimentRuleDto> rules,
+                                             List<ExperimentOverrideDto> overrides) {
+        var settings = new ExperimentSettingsDto(EXP_ID, "dark-mode", "Dark mode", "Try the dark theme", status,
+                variants(), rules, overrides);
+        when(apiService.adminExperiment(EXP_ID)).thenReturn(settings);
+        when(apiService.adminGroups()).thenReturn(List.of(new GroupSummaryDto(UUID.randomUUID(), "beta", "Beta", null, 2)));
+        when(apiService.adminFlagKeys()).thenReturn(List.of(new FlagKeyDto("beta", List.of("on"))));
+        return settings;
+    }
+
+    @Test
+    void experiments_listsEachOneWithItsWeights_andWarnsWhenNoRule() throws Exception {
+        when(apiService.adminExperiments()).thenReturn(List.of(
+                new ExperimentSummaryDto(EXP_ID, "dark-mode", "Dark mode", ExperimentStatus.ACTIVE, variants(), 0),
+                new ExperimentSummaryDto(UUID.randomUUID(), "invite", "Invite", ExperimentStatus.DRAFT, variants(), 2)));
+
+        String html = asAdmin("/spa/admin/experiments");
+
+        assertThat(html).contains("data-admin-open=\"" + EXP_ID + "\"", "dark-mode", "invite", "control 0 %", "enabled 100 %");
+        assertThat(html.split("admin-experiments-norule", -1)).hasSize(2);
+    }
+
+    @Test
+    void experiments_saysSo_whenCatapultApiFails() throws Exception {
+        when(apiService.adminExperiments()).thenReturn(null);
+
+        assertThat(asAdmin("/spa/admin/experiments")).contains("data-admin-retry").doesNotContain("data-admin-open");
+    }
+
+    @Test
+    void experimentDetail_ofADraft_offersOnlyToActivate() throws Exception {
+        experiment(ExperimentStatus.DRAFT, List.of(), List.of());
+
+        String html = asAdmin("/spa/admin/experiments/" + EXP_ID);
+
+        assertThat(html).contains("data-experiment=\"" + EXP_ID + "\"", "data-status=\"DRAFT\"", "data-admin-back",
+                "data-experiment-action=\"activate\"", "data-experiment-action=\"reassign\"",
+                "id=\"experiment-weights\"", "data-variant=\"" + ENABLED_ID + "\"", "id=\"experiment-rule-form\"",
+                "id=\"experiment-override-form\"", "experiment-rule-warning", "<datalist")
+                .doesNotContain("data-experiment-action=\"pause\"", "data-experiment-action=\"end\"");
+    }
+
+    @Test
+    void experimentDetail_ofAPausedOne_offersToReactivateAndEnd() throws Exception {
+        experiment(ExperimentStatus.PAUSED, List.of(), List.of());
+
+        assertThat(asAdmin("/spa/admin/experiments/" + EXP_ID)).contains("data-experiment-action=\"activate\"",
+                "data-experiment-action=\"end\"").doesNotContain("data-experiment-action=\"pause\"");
+    }
+
+    @Test
+    void experimentDetail_ofAnActiveOne_offersToPauseAndEnd() throws Exception {
+        experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
+
+        assertThat(asAdmin("/spa/admin/experiments/" + EXP_ID)).contains("data-experiment-action=\"pause\"",
+                "data-experiment-action=\"end\"").doesNotContain("data-experiment-action=\"activate\"");
+    }
+
+    @Test
+    void experimentDetail_ofAnEndedOne_isReadOnly() throws Exception {
+        var ruleId = UUID.randomUUID();
+        experiment(ExperimentStatus.ENDED, List.of(new ExperimentRuleDto(ruleId, "RANDOM", 100, null, null, null)), List.of());
+
+        String html = asAdmin("/spa/admin/experiments/" + EXP_ID);
+
+        assertThat(html).contains("data-status=\"ENDED\"", "Random 100 %")
+                .doesNotContain("data-experiment-action", "experiment-weights", "experiment-rule-form",
+                        "experiment-override-form", "data-rule-delete");
+    }
+
+    @Test
+    void experimentDetail_readsRulesAndOverridesInPlainWords() throws Exception {
+        var ruleIds = new UUID[5];
+        for (int i = 0; i < 5; i++) ruleIds[i] = UUID.randomUUID();
+        var overrideIds = new UUID[5];
+        for (int i = 0; i < 5; i++) overrideIds[i] = UUID.randomUUID();
+        experiment(ExperimentStatus.ACTIVE, List.of(
+                new ExperimentRuleDto(ruleIds[0], "RANDOM", 100, null, null, null),
+                new ExperimentRuleDto(ruleIds[1], "GROUP", null, "group", "in", "beta"),
+                new ExperimentRuleDto(ruleIds[2], "ATTRIBUTE", null, "flag:beta", "eq", "on"),
+                new ExperimentRuleDto(ruleIds[3], "EXPERIMENT", null, "other", "eq", "enabled"),
+                new ExperimentRuleDto(ruleIds[4], "MANUAL", null, null, null, null)), List.of(
+                new ExperimentOverrideDto(overrideIds[0], "USER", "FORCE_INCLUDE", 10, "enimaloc", null, null, null, null),
+                new ExperimentOverrideDto(overrideIds[1], "ATTRIBUTE", "FORCE_EXCLUDE", 20, null, "flag:beta", "exists", null, null),
+                new ExperimentOverrideDto(overrideIds[2], "ATTRIBUTE", "FORCE_EXCLUDE", 30, null, "flag:beta", "eq", "on", null),
+                new ExperimentOverrideDto(overrideIds[3], "ATTRIBUTE", "FORCE_VARIANT", 40, null, "group", "in", "beta", ENABLED_ID)));
+
+        String html = asAdmin("/spa/admin/experiments/" + EXP_ID);
+
+        assertThat(html).contains("Random 100 %", "Group beta", "Tag beta = on", "Experiment other = enabled", "Manual",
+                        "Account enimaloc", "Include", "Exclude", "Force \u00ab enabled \u00bb")
+                .contains("data-rule-delete=\"" + ruleIds[0] + "\"", "data-override-delete=\"" + overrideIds[3] + "\"")
+                .doesNotContain("experiment-rule-warning");
+        assertThat(html).containsSubsequence("Account enimaloc", "Tag beta", "Tag beta = on", "Group beta");
+    }
+
+    @Test
+    void experimentDetail_is404_whenTheExperimentIsUnknown() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+
+        String html = mvc.perform(get("/spa/admin/experiments/" + EXP_ID).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("data-admin-back").doesNotContain("data-experiment=");
     }
 }
