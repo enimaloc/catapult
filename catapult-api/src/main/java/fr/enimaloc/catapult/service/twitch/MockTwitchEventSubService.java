@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.twitch;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
 import fr.enimaloc.catapult.event.ChannelCclChangedEvent;
+import fr.enimaloc.catapult.event.ChannelRaidedOutEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -54,6 +55,12 @@ public class MockTwitchEventSubService implements EventSubService {
     public void setCcl(UserAccount user, List<String> cclIds) {
         eventPublisher.publishEvent(new ChannelCclChangedEvent(this, user, cclIds));
         log.info("[Mock Twitch] channel.update/ccl → user {} ccls={}", user.getId(), cclIds);
+    }
+
+    /** The streamer raids out; {@code currentCategoryId} is the category it leaves from (null: unknown). */
+    public void raidOut(UserAccount user, String currentCategoryId) {
+        eventPublisher.publishEvent(new ChannelRaidedOutEvent(this, user, currentCategoryId));
+        log.info("[Mock Twitch] channel.raid (outgoing) → user {} category={}", user.getId(), currentCategoryId);
     }
 
 }

@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
 import fr.enimaloc.catapult.event.ChannelCclChangedEvent;
+import fr.enimaloc.catapult.event.ChannelRaidedOutEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -154,6 +155,7 @@ public class TwitchEventSubService implements EventSubService {
                             eventPublisher.publishEvent(new StreamOfflineEvent(this, user));
                         }
                         case "channel.update" -> handleChannelUpdate(user, root.path("payload").path("event"));
+                        case "channel.raid" -> handleRaid(user, root.path("payload").path("event"));
                     }
                 }
                 case "session_keepalive" -> log.trace("EventSub keepalive for user {}", user.getId());
@@ -165,18 +167,23 @@ public class TwitchEventSubService implements EventSubService {
         }
     }
 
+    /** One EventSub subscription on the user's channel: {@code conditionKey} names the condition holding their id. */
+    private record Subscription(String type, String version, String conditionKey) {}
+
+    private static final List<Subscription> SUBSCRIPTIONS = List.of(
+        new Subscription("stream.online", "1", "broadcaster_user_id"),
+        new Subscription("stream.offline", "1", "broadcaster_user_id"),
+        new Subscription("channel.update", "2", "broadcaster_user_id"),
+        // The streamer's outgoing raids only (no scope needed)
+        new Subscription("channel.raid", "1", "from_broadcaster_user_id")
+    );
+
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
         String accessToken = twitchTokenService.resolveAccessToken(token, user);
-        var subscriptions = List.of(
-            Map.entry("stream.online", "1"),
-            Map.entry("stream.offline", "1"),
-            Map.entry("channel.update", "2")
-        );
-        for (var sub : subscriptions) {
-            String eventType = sub.getKey();
-            String version = sub.getValue();
+        for (Subscription sub : SUBSCRIPTIONS) {
+            String eventType = sub.type();
             try {
-                postSubscription(accessToken, eventType, version, user.getTwitchId(), sessionId);
+                postSubscription(accessToken, sub, user.getTwitchId(), sessionId);
                 log.debug("Subscribed to {} for user {}", eventType, user.getId());
             } catch (HttpClientErrorException.Unauthorized e) {
                 log.debug("Token expired for user {}, refreshing", user.getId());
@@ -184,7 +191,7 @@ public class TwitchEventSubService implements EventSubService {
                 if (refreshed != null) {
                     accessToken = refreshed;
                     try {
-                        postSubscription(refreshed, eventType, version, user.getTwitchId(), sessionId);
+                        postSubscription(refreshed, sub, user.getTwitchId(), sessionId);
                         log.debug("Subscribed to {} for user {} after token refresh", eventType, user.getId());
                     } catch (Exception retryEx) {
                         log.warn("Failed to subscribe to {} for user {} after refresh: {}", eventType, user.getId(), retryEx.getMessage());
@@ -225,6 +232,13 @@ public class TwitchEventSubService implements EventSubService {
         if (!newCcls.equals(previous.cclIds())) {
             eventPublisher.publishEvent(new ChannelCclChangedEvent(this, user, List.copyOf(newCcls)));
         }
+    }
+
+    /** An outgoing raid (the subscription only asks for those; an incoming one is ignored all the same). */
+    private void handleRaid(UserAccount user, JsonNode event) {
+        if (!event.path("from_broadcaster_user_id").asText().equals(user.getTwitchId())) return;
+        ChannelState state = channelStates.get(user.getId());
+        eventPublisher.publishEvent(new ChannelRaidedOutEvent(this, user, state == null ? null : state.categoryId()));
     }
 
     private void initChannelState(UserAccount user, String accessToken) {
@@ -275,16 +289,16 @@ public class TwitchEventSubService implements EventSubService {
         }
     }
 
-    private void postSubscription(String accessToken, String eventType, String version, String twitchId, String sessionId) {
+    private void postSubscription(String accessToken, Subscription sub, String twitchId, String sessionId) {
         restClient.post()
             .uri(EVENTSUB_API)
             .header("Authorization", "Bearer " + accessToken)
             .header("Client-ID", twitchClientId)
             .header("Content-Type", "application/json")
             .body(Map.of(
-                "type", eventType,
-                "version", version,
-                "condition", Map.of("broadcaster_user_id", twitchId),
+                "type", sub.type(),
+                "version", sub.version(),
+                "condition", Map.of(sub.conditionKey(), twitchId),
                 "transport", Map.of("method", "websocket", "session_id", sessionId)
             ))
             .retrieve()
