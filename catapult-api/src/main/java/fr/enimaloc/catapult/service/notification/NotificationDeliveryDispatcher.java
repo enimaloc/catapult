@@ -17,10 +17,12 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Sends the pending deliveries (NotificationDeliveryService) through their channel, oldest first,
- * deleting each once sent and the expired ones unsent: Twitchat ones when catapult-web flushes them
- * (it alone knows when the member's Twitchat page or OBS widget is connected), chat ones at the
- * member's next stream start. Each row goes in its own transaction, so a failure only keeps its own.
+ * Sends the pending deliveries (NotificationDeliveryService) through their channel, oldest first:
+ * Twitchat ones when catapult-web flushes them (it alone knows when the member's Twitchat page or
+ * OBS widget is connected), chat ones at the member's next stream start. Each is claimed (its row
+ * deleted, atomically) right before it is sent, so concurrent flushes, a repeated stream start or a
+ * read in between never send it twice or after the fact; a failed send puts it back. Expired ones
+ * are claimed and dropped unsent.
  */
 @Slf4j
 @Component
@@ -33,17 +35,20 @@ public class NotificationDeliveryDispatcher {
 
     private final NotificationDeliveryRepository deliveryRepo;
     private final TwitchatEventDispatcher twitchatDispatcher;
+    private final TwitchatWidgetSettingsService widgetSettings;
     private final TwitchChatService chatService;
     private final TaskScheduler scheduler;
     private final NotificationRenderer renderer;
 
     public NotificationDeliveryDispatcher(NotificationDeliveryRepository deliveryRepo,
                                           TwitchatEventDispatcher twitchatDispatcher,
+                                          TwitchatWidgetSettingsService widgetSettings,
                                           TwitchChatService chatService,
                                           TaskScheduler scheduler,
                                           NotificationRenderer renderer) {
         this.deliveryRepo = deliveryRepo;
         this.twitchatDispatcher = twitchatDispatcher;
+        this.widgetSettings = widgetSettings;
         this.chatService = chatService;
         this.scheduler = scheduler;
         this.renderer = renderer;
@@ -51,16 +56,18 @@ public class NotificationDeliveryDispatcher {
 
     /**
      * Publishes the member's pending Twitchat notifications and returns how many reached Twitchat.
-     * Each is deleted once handed over, even when the member has no enabled payload for it (it
-     * would never go out); a failed one stays for the next flush.
+     * With the Twitchat widget disabled nothing could reach it: they all stay pending. One the
+     * member has no enabled payload for is dropped (it would never go out).
      */
     public int flushTwitchat(UserAccount user) {
+        if (!widgetSettings.isEnabled(user)) {
+            return 0;
+        }
         Instant now = Instant.now();
         int delivered = 0;
         for (NotificationDelivery delivery : deliveryRepo.findPending(user.getId(), NotificationChannel.TWITCHAT)) {
             Notification n = delivery.getNotification();
-            if (expired(n, now)) {
-                deliveryRepo.deleteById(delivery.getId());
+            if (!claim(delivery) || expired(n, now)) {
                 continue;
             }
             try {
@@ -68,17 +75,18 @@ public class NotificationDeliveryDispatcher {
                         nullToEmpty(n.getCtaUrl()), nullToEmpty(n.getCtaLabel()))) {
                     delivered++;
                 }
-                deliveryRepo.deleteById(delivery.getId());
             } catch (RuntimeException e) {
                 log.warn("Twitchat notification {} not delivered to {}: {}", n.getId(), user.getId(), e.getMessage(), e);
+                restore(delivery);
             }
         }
         return delivered;
     }
 
     /**
-     * Posts the member's pending chat notifications, spaced out on the scheduler (never blocking the
-     * EventSub thread this runs on). With the bot disabled they stay pending for a later stream.
+     * Schedules the member's pending chat notifications, spaced out (never blocking the EventSub
+     * thread this runs on); each is claimed only when its turn comes. With the bot disabled they
+     * stay pending for a later stream.
      */
     @EventListener
     public void onStreamOnline(StreamOnlineEvent event) {
@@ -91,26 +99,48 @@ public class NotificationDeliveryDispatcher {
             Instant now = Instant.now();
             int slot = 0;
             for (NotificationDelivery delivery : pending) {
-                Notification n = delivery.getNotification();
-                if (expired(n, now)) {
-                    deliveryRepo.deleteById(delivery.getId());
+                if (expired(delivery.getNotification(), now)) {
+                    claim(delivery);
                     continue;
                 }
-                String text = chatText(n);
-                NotificationDeliveryId id = delivery.getId();
-                scheduler.schedule(() -> post(user, id, text), now.plusSeconds(CHAT_SPACING_SECONDS * slot++));
+                scheduler.schedule(() -> post(user, delivery), now.plusSeconds(CHAT_SPACING_SECONDS * slot++));
             }
         } catch (RuntimeException e) {
             log.warn("Stream-start notifications not posted for {}: {}", user.getId(), e.getMessage(), e);
         }
     }
 
-    private void post(UserAccount user, NotificationDeliveryId id, String text) {
+    private void post(UserAccount user, NotificationDelivery delivery) {
+        Notification n = delivery.getNotification();
         try {
-            chatService.sendMessage(user, text);
-            deliveryRepo.deleteById(id);
+            if (!claim(delivery) || expired(n, Instant.now())) {
+                return;
+            }
         } catch (RuntimeException e) {
-            log.warn("Notification {} not posted in {}'s chat: {}", id.getNotificationId(), user.getId(), e.getMessage(), e);
+            log.warn("Notification {} not claimed for {}'s chat: {}", n.getId(), user.getId(), e.getMessage(), e);
+            return;
+        }
+        try {
+            chatService.sendMessage(user, chatText(n));
+        } catch (RuntimeException e) {
+            log.warn("Notification {} not posted in {}'s chat: {}", n.getId(), user.getId(), e.getMessage(), e);
+            restore(delivery);
+        }
+    }
+
+    /** Whether this caller took the delivery: false when someone else did, or it was read or cancelled. */
+    private boolean claim(NotificationDelivery delivery) {
+        NotificationDeliveryId id = delivery.getId();
+        return deliveryRepo.claim(id.getNotificationId(), id.getUserId(), id.getChannel()) == 1;
+    }
+
+    private void restore(NotificationDelivery delivery) {
+        NotificationDeliveryId id = delivery.getId();
+        try {
+            deliveryRepo.restore(id.getNotificationId(), id.getUserId(), id.getChannel().name(), delivery.getCreatedAt());
+        } catch (RuntimeException e) {
+            log.warn("Notification {} could not be put back pending for {}: {}", id.getNotificationId(), id.getUserId(),
+                    e.getMessage(), e);
         }
     }
 

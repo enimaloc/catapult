@@ -92,6 +92,26 @@ class NotificationDeliveryRepositoryTest {
         assertThat(repository.findPending(b.getId(), TWITCHAT)).hasSize(2);
     }
 
+    /** The claim before a send: only one of two concurrent callers gets the row; a failed send puts it back. */
+    @Test
+    void claim_succeedsOnce_andRestorePutsTheRowBack() {
+        UserAccount a = user("a");
+        prefer(a, TWITCHAT);
+        Notification n = notification(Instant.now());
+        recipients(n, a);
+        Instant created = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        repository.createForNotification(n.getId(), created);
+
+        assertThat(repository.claim(n.getId(), a.getId(), TWITCHAT)).isEqualTo(1);
+        assertThat(repository.claim(n.getId(), a.getId(), TWITCHAT)).isZero();
+        assertThat(repository.findPending(a.getId(), TWITCHAT)).isEmpty();
+
+        repository.restore(n.getId(), a.getId(), TWITCHAT.name(), created);
+        em.clear();
+        assertThat(repository.findPending(a.getId(), TWITCHAT)).singleElement()
+                .satisfies(d -> assertThat(d.getCreatedAt()).isEqualTo(created));
+    }
+
     private UserAccount user(String login) {
         UserAccount user = new UserAccount();
         user.setTwitchUsername(login);

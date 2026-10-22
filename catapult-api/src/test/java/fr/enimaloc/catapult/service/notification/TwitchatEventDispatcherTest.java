@@ -351,4 +351,16 @@ class TwitchatEventDispatcherTest {
         assertThat(dispatcher.onNotification(user, "T", "B", "", "")).isFalse();
         verifyNoInteractions(channelEventPublisher);
     }
+
+    /** The default message ends with {{ctaUrl}}: without a call to action no dangling space is left. */
+    @Test
+    void onNotification_withoutCallToAction_leavesNoTrailingSpace() {
+        when(eventActionService.enabledActions(user, fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION))
+                .thenReturn(List.of(row("CUSTOM_CHAT_MESSAGE",
+                        "{\"message\":\"[Catapult] {{title}} — {{body}} {{ctaUrl}}\",\"actions\":[]}")));
+
+        dispatcher.onNotification(user, "Maintenance", "Ce soir", "", "");
+
+        assertThat(published().payloads().getFirst().data().get("message")).isEqualTo("[Catapult] Maintenance — Ce soir");
+    }
 }

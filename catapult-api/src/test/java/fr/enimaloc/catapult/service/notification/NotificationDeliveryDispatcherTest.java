@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.notification.Notification;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -42,6 +44,7 @@ class NotificationDeliveryDispatcherTest {
 
     @Mock NotificationDeliveryRepository deliveryRepo;
     @Mock TwitchatEventDispatcher twitchatDispatcher;
+    @Mock TwitchatWidgetSettingsService widgetSettings;
     @Mock TwitchChatService chatService;
     @Mock TaskScheduler scheduler;
 
@@ -52,11 +55,14 @@ class NotificationDeliveryDispatcherTest {
 
     @BeforeEach
     void setUp() {
-        dispatcher = new NotificationDeliveryDispatcher(deliveryRepo, twitchatDispatcher, chatService, scheduler,
-                new NotificationRenderer());
+        dispatcher = new NotificationDeliveryDispatcher(deliveryRepo, twitchatDispatcher, widgetSettings, chatService,
+                scheduler, new NotificationRenderer());
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setTwitchUsername("streamer");
+        lenient().when(widgetSettings.isEnabled(user)).thenReturn(true);
+        // Every row is there to claim unless a test says otherwise
+        lenient().when(deliveryRepo.claim(any(), any(), any())).thenReturn(1);
         lenient().when(scheduler.schedule(any(Runnable.class), any(Instant.class))).thenAnswer(inv -> {
             scheduled.add(inv.getArgument(0));
             scheduledAt.add(inv.getArgument(1));
@@ -64,8 +70,7 @@ class NotificationDeliveryDispatcherTest {
         });
     }
 
-    private NotificationDelivery delivery(String title, String body, String ctaUrl, Instant expiresAt,
-                                          fr.enimaloc.catapult.common.dto.notification.NotificationChannel channel) {
+    private NotificationDelivery delivery(String title, String body, String ctaUrl, Instant expiresAt, NotificationChannel channel) {
         Notification n = new Notification();
         n.setId(UUID.randomUUID());
         n.setTitle(title);
@@ -78,40 +83,66 @@ class NotificationDeliveryDispatcherTest {
         NotificationDelivery d = new NotificationDelivery();
         d.setId(new NotificationDeliveryId(n.getId(), user.getId(), channel));
         d.setNotification(n);
-        d.setCreatedAt(Instant.now());
+        d.setCreatedAt(Instant.parse("2026-10-22T10:00:00Z"));
         return d;
     }
 
+    private void verifyClaimed(NotificationDelivery d) {
+        verify(deliveryRepo).claim(d.getId().getNotificationId(), d.getId().getUserId(), d.getId().getChannel());
+    }
+
+    private void verifyRestored(NotificationDelivery d) {
+        verify(deliveryRepo).restore(d.getId().getNotificationId(), d.getId().getUserId(), d.getId().getChannel().name(),
+                d.getCreatedAt());
+    }
+
+    // --- Twitchat flush --------------------------------------------------------------------------
+
     @Test
-    void flushTwitchat_dispatchesEachPendingOne_oldestFirst_withAPlainBody_andDeletesThem() {
+    void flushTwitchat_claimsThenDispatchesEachPendingOne_oldestFirst_withAPlainBody() {
         NotificationDelivery older = delivery("Old", "**bold** text", "https://x.test/a", null, TWITCHAT);
         NotificationDelivery newer = delivery("New", "plain", null, Instant.now().plusSeconds(3600), TWITCHAT);
         when(deliveryRepo.findPending(user.getId(), TWITCHAT)).thenReturn(List.of(older, newer));
         when(twitchatDispatcher.onNotification(eq(user), anyString(), anyString(), anyString(), anyString())).thenReturn(true);
 
-        int delivered = dispatcher.flushTwitchat(user);
+        assertThat(dispatcher.flushTwitchat(user)).isEqualTo(2);
 
-        assertThat(delivered).isEqualTo(2);
         InOrder order = inOrder(twitchatDispatcher, deliveryRepo);
+        order.verify(deliveryRepo).claim(older.getId().getNotificationId(), user.getId(), TWITCHAT);
         order.verify(twitchatDispatcher).onNotification(user, "Old", "bold text", "https://x.test/a", "Voir");
-        order.verify(deliveryRepo).deleteById(older.getId());
+        order.verify(deliveryRepo).claim(newer.getId().getNotificationId(), user.getId(), TWITCHAT);
         order.verify(twitchatDispatcher).onNotification(user, "New", "plain", "", "");
-        order.verify(deliveryRepo).deleteById(newer.getId());
+        verify(deliveryRepo, never()).restore(any(), any(), any(), any());
+    }
+
+    /** The owner's page and widget, or two web instances, flushing at once: each row goes out once. */
+    @Test
+    void concurrentFlushes_deliverEachRowOnce() {
+        NotificationDelivery d = delivery("T", "b", null, null, TWITCHAT);
+        when(deliveryRepo.findPending(user.getId(), TWITCHAT)).thenReturn(List.of(d));
+        when(deliveryRepo.claim(any(), any(), any())).thenReturn(1).thenReturn(0);
+        when(twitchatDispatcher.onNotification(any(), any(), any(), any(), any())).thenReturn(true);
+
+        int first = dispatcher.flushTwitchat(user);
+        int second = dispatcher.flushTwitchat(user);
+
+        assertThat(first + second).isEqualTo(1);
+        verify(twitchatDispatcher, times(1)).onNotification(any(), any(), any(), any(), any());
     }
 
     @Test
-    void flushTwitchat_expired_isDeletedWithoutBeingSent() {
+    void flushTwitchat_expired_isClaimedWithoutBeingSent() {
         NotificationDelivery expired = delivery("Gone", "b", null, Instant.now().minusSeconds(1), TWITCHAT);
         when(deliveryRepo.findPending(user.getId(), TWITCHAT)).thenReturn(List.of(expired));
 
         assertThat(dispatcher.flushTwitchat(user)).isZero();
 
-        verify(deliveryRepo).deleteById(expired.getId());
+        verifyClaimed(expired);
         verifyNoInteractions(twitchatDispatcher);
     }
 
     @Test
-    void flushTwitchat_aFailedDispatch_keepsItsRow_andGoesOn() {
+    void flushTwitchat_aFailedDispatch_putsItsRowBack_andGoesOn() {
         NotificationDelivery failing = delivery("A", "a", null, null, TWITCHAT);
         NotificationDelivery ok = delivery("B", "b", null, null, TWITCHAT);
         when(deliveryRepo.findPending(user.getId(), TWITCHAT)).thenReturn(List.of(failing, ok));
@@ -120,9 +151,21 @@ class NotificationDeliveryDispatcherTest {
 
         assertThat(dispatcher.flushTwitchat(user)).isEqualTo(1);
 
-        verify(deliveryRepo, never()).deleteById(failing.getId());
-        verify(deliveryRepo).deleteById(ok.getId());
+        verifyRestored(failing);
+        verify(deliveryRepo, never()).restore(eq(ok.getId().getNotificationId()), any(), any(), any());
     }
+
+    /** Nothing would reach Twitchat: kept for when the widget is enabled again. */
+    @Test
+    void flushTwitchat_widgetDisabled_keepsEveryRow() {
+        when(widgetSettings.isEnabled(user)).thenReturn(false);
+
+        assertThat(dispatcher.flushTwitchat(user)).isZero();
+
+        verifyNoInteractions(deliveryRepo, twitchatDispatcher);
+    }
+
+    // --- stream start ----------------------------------------------------------------------------
 
     @Test
     void streamStart_botDisabled_keepsThemPending() {
@@ -134,7 +177,7 @@ class NotificationDeliveryDispatcherTest {
     }
 
     @Test
-    void streamStart_postsEachOneInChat_threeSecondsApart_oldestFirst_deletingEachOnceSent() {
+    void streamStart_postsEachOneInChat_threeSecondsApart_oldestFirst_claimingEachWhenItsTurnComes() {
         user.setBotEnabled(true);
         NotificationDelivery first = delivery("Maintenance", "Ce **soir**", "https://x.test/m", null, STREAM_START_CHAT);
         NotificationDelivery second = delivery("Nouveauté", "Les commandes", null, null, STREAM_START_CHAT);
@@ -145,12 +188,56 @@ class NotificationDeliveryDispatcherTest {
         assertThat(scheduled).hasSize(2);
         assertThat(Duration.between(scheduledAt.get(0), scheduledAt.get(1))).isEqualTo(Duration.ofSeconds(3));
         verifyNoInteractions(chatService);
+        verify(deliveryRepo, never()).claim(any(), any(), any());
         scheduled.forEach(Runnable::run);
         InOrder order = inOrder(chatService, deliveryRepo);
+        order.verify(deliveryRepo).claim(first.getId().getNotificationId(), user.getId(), STREAM_START_CHAT);
         order.verify(chatService).sendMessage(user, "[Catapult] Maintenance — Ce soir https://x.test/m");
-        order.verify(deliveryRepo).deleteById(first.getId());
+        order.verify(deliveryRepo).claim(second.getId().getNotificationId(), user.getId(), STREAM_START_CHAT);
         order.verify(chatService).sendMessage(user, "[Catapult] Nouveauté — Les commandes");
-        order.verify(deliveryRepo).deleteById(second.getId());
+    }
+
+    /** EventSub redelivery, a restart or a second api instance: the same row is only posted once. */
+    @Test
+    void streamStartTwice_postsOnce() {
+        user.setBotEnabled(true);
+        NotificationDelivery d = delivery("T", "b", null, null, STREAM_START_CHAT);
+        when(deliveryRepo.findPending(user.getId(), STREAM_START_CHAT)).thenReturn(List.of(d));
+        when(deliveryRepo.claim(any(), any(), any())).thenReturn(1).thenReturn(0);
+
+        dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
+        dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
+        scheduled.forEach(Runnable::run);
+
+        verify(chatService, times(1)).sendMessage(any(), any());
+    }
+
+    @Test
+    void streamStart_aRowReadBetweenScheduleAndPost_isNotPosted() {
+        user.setBotEnabled(true);
+        NotificationDelivery d = delivery("T", "b", null, null, STREAM_START_CHAT);
+        when(deliveryRepo.findPending(user.getId(), STREAM_START_CHAT)).thenReturn(List.of(d));
+        when(deliveryRepo.claim(any(), any(), any())).thenReturn(0);
+
+        dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
+        scheduled.forEach(Runnable::run);
+
+        verifyNoInteractions(chatService);
+    }
+
+    @Test
+    void streamStart_aRowExpiredBetweenScheduleAndPost_isDroppedUnposted() {
+        user.setBotEnabled(true);
+        NotificationDelivery d = delivery("T", "b", null, Instant.now().plusMillis(50), STREAM_START_CHAT);
+        when(deliveryRepo.findPending(user.getId(), STREAM_START_CHAT)).thenReturn(List.of(d));
+
+        dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
+        d.getNotification().setExpiresAt(Instant.now().minusSeconds(1));
+        scheduled.forEach(Runnable::run);
+
+        verifyClaimed(d);
+        verifyNoInteractions(chatService);
+        verify(deliveryRepo, never()).restore(any(), any(), any(), any());
     }
 
     @Test
@@ -168,7 +255,7 @@ class NotificationDeliveryDispatcherTest {
     }
 
     @Test
-    void streamStart_aFailedPost_keepsItsRow() {
+    void streamStart_aFailedPost_putsItsRowBack() {
         user.setBotEnabled(true);
         NotificationDelivery d = delivery("T", "b", null, null, STREAM_START_CHAT);
         when(deliveryRepo.findPending(user.getId(), STREAM_START_CHAT)).thenReturn(List.of(d));
@@ -177,18 +264,19 @@ class NotificationDeliveryDispatcherTest {
         dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
         scheduled.forEach(Runnable::run);
 
-        verify(deliveryRepo, never()).deleteById(any());
+        verifyClaimed(d);
+        verifyRestored(d);
     }
 
     @Test
-    void streamStart_expired_isDeletedWithoutBeingPosted() {
+    void streamStart_expired_isClaimedWithoutBeingScheduled() {
         user.setBotEnabled(true);
         NotificationDelivery expired = delivery("T", "b", null, Instant.now().minusSeconds(5), STREAM_START_CHAT);
         when(deliveryRepo.findPending(user.getId(), STREAM_START_CHAT)).thenReturn(List.of(expired));
 
         dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(deliveryRepo).deleteById(expired.getId());
+        verifyClaimed(expired);
         assertThat(scheduled).isEmpty();
     }
 }

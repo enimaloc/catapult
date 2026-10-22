@@ -4,11 +4,9 @@ import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.notification.NotificationChannelPreference;
 import fr.enimaloc.catapult.domain.notification.NotificationChannelPreferenceId;
-import fr.enimaloc.catapult.event.NotificationDeliveryPendingEvent;
 import fr.enimaloc.catapult.repository.notification.NotificationChannelPreferenceRepository;
 import fr.enimaloc.catapult.repository.notification.NotificationDeliveryRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +29,6 @@ public class NotificationDeliveryService {
     private final NotificationChannelPreferenceRepository preferenceRepo;
     private final NotificationDeliveryRepository deliveryRepo;
     private final TwitchatEventActionService eventActionService;
-    private final ApplicationEventPublisher publisher;
 
     public Set<NotificationChannel> channels(UUID userId) {
         return preferenceRepo.findByIdUserId(userId).stream()
@@ -63,18 +60,15 @@ public class NotificationDeliveryService {
 
     /**
      * The pending deliveries of a notification whose recipients are saved: one per recipient and
-     * channel they opted in to, in one statement. The members with Twitchat ones are announced to
-     * catapult-web, which flushes those of the members it holds a Twitchat page or widget open for.
+     * channel they opted in to, in one statement. Returns the members with a Twitchat one, for the
+     * caller to announce to catapult-web (once per send, however many notifications it stores).
      */
     @Transactional
-    public void createFor(UUID notificationId) {
+    public List<UUID> createFor(UUID notificationId) {
         if (deliveryRepo.createForNotification(notificationId, Instant.now()) == 0) {
-            return;
+            return List.of();
         }
-        List<UUID> twitchat = deliveryRepo.findUserIdsByNotificationAndChannel(notificationId, NotificationChannel.TWITCHAT);
-        if (!twitchat.isEmpty()) {
-            publisher.publishEvent(new NotificationDeliveryPendingEvent(twitchat));
-        }
+        return deliveryRepo.findUserIdsByNotificationAndChannel(notificationId, NotificationChannel.TWITCHAT);
     }
 
     @Transactional
