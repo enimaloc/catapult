@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -82,15 +83,33 @@ class DtoJsonContractTest {
     // --- sample values ------------------------------------------------------------------------
 
     private static Object sample(Type type) {
+        return sample(type, Map.of());
+    }
+
+    /**
+     * {@code bindings}: the type arguments of the record being sampled, so that a parameterized
+     * record component ({@code AdminPage<ExperimentAssignmentDto> page}) gets its {@code T} sampled as
+     * the argument, not as its bound.
+     */
+    private static Object sample(Type type, Map<TypeVariable<?>, Type> bindings) {
         if (type instanceof ParameterizedType parameterized) {
             Class<?> raw = (Class<?>) parameterized.getRawType();
             Type[] args = parameterized.getActualTypeArguments();
-            if (List.class.isAssignableFrom(raw)) return List.of(sample(args[0]));
-            if (Set.class.isAssignableFrom(raw)) return Set.of(sample(args[0]));
-            if (Map.class.isAssignableFrom(raw)) return Map.of(sample(args[0]), sample(args[1]));
-            return sample(raw);
+            if (List.class.isAssignableFrom(raw)) return List.of(sample(args[0], bindings));
+            if (Set.class.isAssignableFrom(raw)) return Set.of(sample(args[0], bindings));
+            if (Map.class.isAssignableFrom(raw)) return Map.of(sample(args[0], bindings), sample(args[1], bindings));
+            if (raw.isRecord()) {
+                TypeVariable<?>[] params = raw.getTypeParameters();
+                Map<TypeVariable<?>, Type> bound = new HashMap<>();
+                for (int i = 0; i < params.length; i++) bound.put(params[i], resolve(args[i], bindings));
+                return sampleRecord(raw, bound);
+            }
+            return sample(raw, bindings);
         }
-        if (type instanceof TypeVariable<?> variable) return sample(variable.getBounds()[0]);
+        if (type instanceof TypeVariable<?> variable) {
+            Type argument = bindings.get(variable);
+            return sample(argument != null ? argument : variable.getBounds()[0], bindings);
+        }
         Class<?> cls = (Class<?>) type;
         if (cls == String.class) return "value";
         if (cls == int.class || cls == Integer.class) return 7;
@@ -105,24 +124,33 @@ class DtoJsonContractTest {
         if (cls.isEnum()) return cls.getEnumConstants()[0];
         if (cls.isArray()) {
             Object array = Array.newInstance(cls.getComponentType(), 1);
-            Array.set(array, 0, sample(cls.getComponentType()));
+            Array.set(array, 0, sample(cls.getComponentType(), bindings));
             return array;
         }
         if (List.class.isAssignableFrom(cls)) return Collections.emptyList();
         if (Map.class.isAssignableFrom(cls)) return Collections.emptyMap();
-        if (cls.isRecord()) return sample(cls);
-        if (cls.isSealed()) return sample(cls.getPermittedSubclasses()[0]);
+        if (cls.isRecord()) return sampleRecord(cls, Map.of());
+        if (cls.isSealed()) return sample(cls.getPermittedSubclasses()[0], bindings);
         throw new IllegalArgumentException("No sample value for " + cls.getName() + " — add one to DtoJsonContractTest");
     }
 
+    /** {@code type} with the enclosing record's type variables replaced by their arguments. */
+    private static Type resolve(Type type, Map<TypeVariable<?>, Type> bindings) {
+        return type instanceof TypeVariable<?> variable && bindings.containsKey(variable) ? bindings.get(variable) : type;
+    }
+
     private static Object sample(Class<?> record) {
-        if (!record.isRecord()) return sample((Type) record);
+        return sampleRecord(record, Map.of());
+    }
+
+    private static Object sampleRecord(Class<?> record, Map<TypeVariable<?>, Type> bindings) {
+        if (!record.isRecord()) return sample(record, bindings);
         RecordComponent[] components = record.getRecordComponents();
         Class<?>[] types = new Class<?>[components.length];
         Object[] values = new Object[components.length];
         for (int i = 0; i < components.length; i++) {
             types[i] = components[i].getType();
-            values[i] = sample(components[i].getGenericType());
+            values[i] = sample(components[i].getGenericType(), bindings);
         }
         try {
             var constructor = record.getDeclaredConstructor(types);
