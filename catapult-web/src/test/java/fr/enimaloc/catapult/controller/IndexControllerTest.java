@@ -520,6 +520,12 @@ class IndexControllerTest {
         return html.substring(start, html.indexOf("</mdui-top-app-bar>", start));
     }
 
+    private static String switchTag(String html, String channel) {
+        var matcher = java.util.regex.Pattern.compile("<mdui-switch[^>]*data-channel=\"" + channel + "\"[^>]*>").matcher(html);
+        assertThat(matcher.find()).as("switch " + channel).isTrue();
+        return matcher.group();
+    }
+
     private AdminPage<NotificationDto> notificationsPage(int number, int totalPages) {
         var n = new NotificationDto(UUID.randomUUID(), "Hello <b>", "<i>body</i>",
                 Severity.INFO, null, null, null, Instant.parse("2026-10-18T10:00:00Z"), false);
@@ -543,6 +549,31 @@ class IndexControllerTest {
                         "href=\"/notifications?page=0\"", "href=\"/notifications?page=2\"", "2 / 3",
                         // its own template for live items, should the bell's menu not have loaded
                         "<template id=\"notification-page-item-template\">", "class=\"notification-cta\"");
+    }
+
+    @Test
+    void notificationsFragment_showsTheChosenChannels_asCheckedSwitches() throws Exception {
+        when(apiService.notifications(0)).thenReturn(notificationsPage(0, 1));
+        when(apiService.notificationChannels()).thenReturn(new fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto(
+                java.util.Set.of(fr.enimaloc.catapult.common.dto.notification.NotificationChannel.STREAM_START_CHAT)));
+
+        String html = mvc.perform(get("/spa/notifications").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("id=\"notification-channels\"");
+        assertThat(switchTag(html, "TWITCHAT")).doesNotContain("checked");
+        assertThat(switchTag(html, "STREAM_START_CHAT")).contains("checked");
+    }
+
+    @Test
+    void notificationsFragment_hidesTheChannelCard_whenTheyCannotBeRead() throws Exception {
+        when(apiService.notifications(0)).thenReturn(notificationsPage(0, 1));
+        when(apiService.notificationChannels()).thenReturn(null);
+
+        String html = mvc.perform(get("/spa/notifications").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("id=\"notification-channels\"");
     }
 
     @Test

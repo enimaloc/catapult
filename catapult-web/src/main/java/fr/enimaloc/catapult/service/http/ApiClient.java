@@ -46,7 +46,8 @@ public class ApiClient {
                 .baseUrl(apiUrl)
                 .requestInterceptor((request, body, execution) -> {
                     boolean anonymous = request.getHeaders().remove(ANONYMOUS_HEADER) != null;
-                    String token = anonymous ? null : currentJwt();
+                    // A call made off the request thread brings its own bearer (see callAs).
+                    String token = anonymous || request.getHeaders().containsHeader(HttpHeaders.AUTHORIZATION) ? null : currentJwt();
                     if (token != null) request.getHeaders().setBearerAuth(token);
                     return execution.execute(request, body);
                 })
@@ -130,6 +131,34 @@ public class ApiClient {
                     return new Result<>(status, response.bodyTo(type));
                 } catch (Exception e) {
                     // The answer's body isn't a {@code type} (e.g. a ProblemDetail): the status still counts.
+                    return new Result<T>(status, null);
+                }
+            });
+        } catch (Exception e) {
+            logFailure(method, path, e);
+            return new Result<>(502, null);
+        }
+    }
+
+    /**
+     * {@code method} {@code path} on behalf of the holder of {@code jwt} (a session's, kept past its request: the
+     * calling thread has no session of its own), or anonymous when {@code jwt} is null; the status and the body
+     * read as {@code type}, 502 when unreachable.
+     */
+    public <T> Result<T> callAs(HttpMethod method, String path, String jwt, Class<T> type, Object... uriVars) {
+        try {
+            RestClient.RequestBodySpec spec = client.method(method).uri(path, uriVars);
+            if (jwt == null) spec.header(ANONYMOUS_HEADER, "1");
+            else spec.headers(headers -> headers.setBearerAuth(jwt));
+            return spec.exchange((request, response) -> {
+                int status = response.getStatusCode().value();
+                if (response.getStatusCode().isError()) {
+                    logError(response.getStatusCode(), request.getURI().getPath());
+                    return new Result<T>(status, null);
+                }
+                try {
+                    return new Result<>(status, response.bodyTo(type));
+                } catch (Exception e) {
                     return new Result<T>(status, null);
                 }
             });

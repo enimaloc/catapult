@@ -288,6 +288,7 @@ public class ModelFiller {
     /** The notifications page model: the member's page of history, null when catapult-api fails. */
     public void notifications(Model model, int page) {
         model.addAttribute("notifications", apiService.notifications(page));
+        model.addAttribute("notificationChannels", apiService.notificationChannels());
     }
 
     /** Error page model for the status the servlet container forwarded (500 when absent). */

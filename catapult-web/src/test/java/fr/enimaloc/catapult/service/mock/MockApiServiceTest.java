@@ -777,4 +777,27 @@ class MockApiServiceTest {
         assertThat(service.adminSendNotification(toExperiment(UUID.randomUUID(), null)).status()).isEqualTo(404);
         assertThat(service.adminNotificationAudienceCount(UUID.randomUUID(), null)).isNull();
     }
+
+    @Test
+    void notificationChannels_survivesASessionChange_andIsEmptyByDefault() {
+        assertThat(service.notificationChannels().channels()).isEmpty();
+
+        assertThat(service.saveNotificationChannels(Set.of(fr.enimaloc.catapult.common.dto.notification.NotificationChannel.TWITCHAT))).isEqualTo(204);
+        assertThat(service.notificationChannels().channels())
+                .containsExactly(fr.enimaloc.catapult.common.dto.notification.NotificationChannel.TWITCHAT);
+
+        RequestContextHolder.resetRequestAttributes();
+        loginAs("{}");
+        // Kept with the account, not the browser session.
+        assertThat(service.notificationChannels().channels())
+                .containsExactly(fr.enimaloc.catapult.common.dto.notification.NotificationChannel.TWITCHAT);
+    }
+
+    @Test
+    void notificationChannels_needASession() {
+        RequestContextHolder.resetRequestAttributes();
+
+        assertThat(service.notificationChannels()).isNull();
+        assertThat(service.saveNotificationChannels(Set.of())).isEqualTo(401);
+    }
 }
