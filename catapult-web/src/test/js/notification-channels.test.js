@@ -94,6 +94,41 @@ describe("notification-channels.js", () => {
         expect(posted().at(-1)).toEqual(["/spa/notifications/channels", { channels: ["TWITCHAT", "STREAM_START_CHAT"] }]);
     });
 
+    it("ends consistent with the server when an earlier request fails and a later intention was queued", async () => {
+        const answers = [];
+        window.fetch = fetched = vi.fn(() => new Promise(resolve => answers.push(status => resolve(response(status)))));
+        await boot();
+
+        const sw = toggle("tc", true);
+        toggle("tc", false);
+        await flush();
+        answers[0](502);
+        await flush();
+        // The queued "off" goes out as it was meant; the first failure does not put the switch back on meanwhile.
+        expect(fetched).toHaveBeenCalledTimes(2);
+        expect(posted().at(-1)).toEqual(["/spa/notifications/channels", { channels: [] }]);
+        answers[1](204);
+        await flush();
+
+        expect(sw.checked).toBe(false);
+    });
+
+    it("shows what the server has when the last request fails after an earlier one went through", async () => {
+        const answers = [];
+        window.fetch = fetched = vi.fn(() => new Promise(resolve => answers.push(status => resolve(response(status)))));
+        await boot();
+
+        const sw = toggle("tc", true);
+        toggle("tc", false);
+        await flush();
+        answers[0](204);
+        await flush();
+        answers[1](502);
+        await flush();
+
+        expect(sw.checked).toBe(true);
+    });
+
     it("binds each switch once, however many times the page renders", async () => {
         await boot();
         render();

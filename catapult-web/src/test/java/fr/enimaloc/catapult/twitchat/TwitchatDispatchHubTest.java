@@ -205,4 +205,73 @@ class TwitchatDispatchHubTest {
 
         verifyNoInteractions(flusher);
     }
+
+    @Test
+    void flushesAskedWhileOneIsQueued_coalesceIntoOne() {
+        java.util.List<Runnable> queued = new java.util.ArrayList<>();
+        TwitchatDispatchHub async = new TwitchatDispatchHub(sse, flusher, queued::add);
+        UUID owner = UUID.randomUUID();
+        async.subscribe(owner, sessionWithJwt("j"));
+        async.flush(owner);
+        async.flush(owner);
+
+        assertThat(queued).hasSize(1);
+        queued.forEach(Runnable::run);
+        verify(flusher, org.mockito.Mockito.times(1)).flushPage("j");
+    }
+
+    @Test
+    void aFlushAskedWhileOneRuns_runsOnceMoreAfterIt_notInParallel() {
+        TwitchatDispatchHub[] holder = new TwitchatDispatchHub[1];
+        UUID owner = UUID.randomUUID();
+        int[] calls = {0};
+        when(flusher.flushPage("j")).thenAnswer(call -> {
+            if (calls[0]++ == 0) {
+                holder[0].flush(owner);
+                holder[0].flush(owner);
+                assertThat(calls[0]).isEqualTo(1);
+            }
+            return 200;
+        });
+        holder[0] = new TwitchatDispatchHub(sse, flusher, Runnable::run);
+
+        holder[0].subscribe(owner, sessionWithJwt("j"));
+
+        verify(flusher, org.mockito.Mockito.times(2)).flushPage("j");
+    }
+
+    @Test
+    void anOwnerWhoseFlushEnded_canFlushAgain() {
+        UUID owner = UUID.randomUUID();
+        hub.subscribe(owner, sessionWithJwt("j"));
+        hub.flush(owner);
+
+        verify(flusher, org.mockito.Mockito.times(2)).flushPage("j");
+    }
+
+    @Test
+    void flushesTalkToTheApi_atMostEightAtATime() throws Exception {
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newCachedThreadPool();
+        java.util.concurrent.atomic.AtomicInteger running = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicInteger peak = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(20);
+        when(flusher.flushPage(anyString())).thenAnswer(call -> {
+            peak.accumulateAndGet(running.incrementAndGet(), Math::max);
+            release.await();
+            running.decrementAndGet();
+            done.countDown();
+            return 200;
+        });
+        TwitchatDispatchHub capped = new TwitchatDispatchHub(sse, flusher, pool);
+        try {
+            for (int i = 0; i < 20; i++) capped.subscribe(UUID.randomUUID(), sessionWithJwt("j"));
+            Thread.sleep(300);
+            assertThat(peak.get()).isEqualTo(TwitchatDispatchHub.MAX_FLUSHES);
+            release.countDown();
+            assertThat(done.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        } finally {
+            pool.shutdownNow();
+        }
+    }
 }
