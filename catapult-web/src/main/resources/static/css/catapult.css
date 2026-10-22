@@ -2301,7 +2301,17 @@ body.obs-dock-mode .footer {
 .experiment-weight-swatch { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--variant-color); }
 #experiment-weights > .experiment-weight-bar { flex-basis: 100%; }
 .admin-experiments-rule-warning { display: flex; gap: 8px; align-items: center; }
+.admin-participants-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.admin-participants-chips .experiment-weight-swatch { margin-inline-start: 4px; }
+.admin-participants > .admin-search { display: block; margin-bottom: 12px; }
+.admin-participants-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 3fr); gap: 12px; align-items: center; padding: 8px 0; }
+.admin-participants-row + .admin-participants-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.admin-participants-variant { display: flex; gap: 8px; align-items: center; }
+.admin-participants-actions { display: flex; flex-wrap: nowrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.admin-participants-actions mdui-select { min-width: 180px; }
 @media (max-width: 650px) {
     .admin-experiments-row { grid-template-columns: minmax(0, 1fr); }
     .admin-experiments-chips { justify-content: flex-start; }
+    .admin-participants-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-participants-actions { flex-wrap: wrap; justify-content: flex-start; grid-column: 1 / -1; }
 }

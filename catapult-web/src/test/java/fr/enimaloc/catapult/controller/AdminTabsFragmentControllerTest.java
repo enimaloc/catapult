@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminIgdbDescriptorDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
@@ -68,7 +70,8 @@ class AdminTabsFragmentControllerTest {
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
                 "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001",
-                "/spa/admin/experiments", "/spa/admin/experiments/00000000-0000-0000-0000-000000000001")) {
+                "/spa/admin/experiments", "/spa/admin/experiments/00000000-0000-0000-0000-000000000001",
+                "/spa/admin/experiments/00000000-0000-0000-0000-000000000001/participants?variant=&q=x&page=1")) {
             mvc.perform(get(url)).andExpect(status().isUnauthorized());
             mvc.perform(get(url).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")).andExpect(status().isForbidden());
         }
@@ -95,6 +98,8 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminMemberTargeting(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminExperiments();
         verify(apiService, never()).adminExperiment(org.mockito.ArgumentMatchers.any());
+        verify(apiService, never()).adminExperimentAssignments(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt());
     }
 
     @Test
@@ -935,6 +940,96 @@ class AdminTabsFragmentControllerTest {
                 "data-segment=\"" + ENABLED_ID + "\"", "--variant-color: var(--catapult-variant-1)",
                 "role=\"slider\"", "data-handle=\"1\"", "aria-label=\"Between control and enabled\"");
         assertThat(html.split("data-handle=", -1)).hasSize(2);
+    }
+
+    private static final UUID USER_A = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+    private static final UUID USER_B = UUID.fromString("00000000-0000-0000-0000-0000000000a2");
+
+    private ExperimentAssignmentsDto participants(int page, int totalPages, ExperimentAssignmentDto... rows) {
+        return new ExperimentAssignmentsDto(new AdminPage<>(List.of(rows), page, totalPages, rows.length),
+                Map.of(CONTROL_ID, 3L, ENABLED_ID, 5L));
+    }
+
+    private static ExperimentAssignmentDto assignment(UUID user, String login, UUID variant, boolean forced) {
+        return new ExperimentAssignmentDto(user, login, variant, Instant.parse("2026-03-04T10:15:30Z"), forced);
+    }
+
+    @Test
+    void experimentDetail_listsTheParticipants_withCounts_aForcedChip_andAMoveToTheOtherVariants() throws Exception {
+        experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
+        when(apiService.adminExperimentAssignments(EXP_ID, null, null, 0)).thenReturn(participants(0, 1,
+                assignment(USER_A, "alice", CONTROL_ID, false), assignment(USER_B, "bob", ENABLED_ID, true)));
+
+        String html = asAdmin("/spa/admin/experiments/" + EXP_ID);
+
+        assertThat(html).contains("id=\"experiment-participants\"", "data-participants", "data-page=\"0\"",
+                "All (8)", "data-participants-variant=\"" + CONTROL_ID + "\"", "control (3)",
+                "data-participants-variant=\"" + ENABLED_ID + "\"", "enabled (5)",
+                "--variant-color: var(--catapult-variant-control)", "--variant-color: var(--catapult-variant-1)",
+                "data-participants-search", "alice", "bob", "03/04/2026", "id=\"experiment-overrides\"");
+        assertThat(html.split("admin-participants-forced", -1)).hasSize(2);
+        // each row offers the other variants only
+        String alice = html.substring(html.indexOf("data-participants-move=\"" + USER_A + "\""));
+        alice = alice.substring(0, alice.indexOf("</mdui-select>"));
+        assertThat(alice).contains("value=\"" + ENABLED_ID + "\"").doesNotContain("value=\"" + CONTROL_ID + "\"");
+        String bob = html.substring(html.indexOf("data-participants-move=\"" + USER_B + "\""));
+        bob = bob.substring(0, bob.indexOf("</mdui-select>"));
+        assertThat(bob).contains("value=\"" + CONTROL_ID + "\"").doesNotContain("value=\"" + ENABLED_ID + "\"");
+        assertThat(html).doesNotContain("data-participants-page");
+    }
+
+    @Test
+    void experimentDetail_ofAnEndedOne_listsTheParticipantsWithoutAMove() throws Exception {
+        var settings = new ExperimentSettingsDto(EXP_ID, "dark-mode", "Dark mode", null, ExperimentStatus.ENDED,
+                variants(), List.of(), List.of());
+        when(apiService.adminExperiment(EXP_ID)).thenReturn(settings);
+        when(apiService.adminExperimentAssignments(EXP_ID, null, null, 0))
+                .thenReturn(participants(0, 1, assignment(USER_A, "alice", CONTROL_ID, false)));
+
+        String html = asAdmin("/spa/admin/experiments/" + EXP_ID);
+
+        assertThat(html).contains("alice").doesNotContain("data-participants-move");
+    }
+
+    @Test
+    void experimentDetail_withNoParticipantAtAll_saysNobodyIsAssignedYet() throws Exception {
+        experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
+        when(apiService.adminExperimentAssignments(EXP_ID, null, null, 0)).thenReturn(new ExperimentAssignmentsDto(
+                new AdminPage<>(List.of(), 0, 0, 0), Map.of(CONTROL_ID, 0L, ENABLED_ID, 0L)));
+
+        assertThat(asAdmin("/spa/admin/experiments/" + EXP_ID)).contains("Nobody has been assigned yet")
+                .doesNotContain("No participant matches");
+    }
+
+    @Test
+    void participants_passTheVariantSearchAndPageToTheApi_andPageThroughTheResults() throws Exception {
+        experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
+        when(apiService.adminExperimentAssignments(EXP_ID, ENABLED_ID, "bo", 1))
+                .thenReturn(participants(1, 3, assignment(USER_B, "bob", ENABLED_ID, false)));
+
+        String html = asAdmin("/spa/admin/experiments/" + EXP_ID + "/participants?variant=" + ENABLED_ID + "&q=bo&page=1");
+
+        verify(apiService).adminExperimentAssignments(EXP_ID, ENABLED_ID, "bo", 1);
+        assertThat(html).contains("data-variant=\"" + ENABLED_ID + "\"", "data-q=\"bo\"", "data-page=\"1\"", "bob")
+                .contains("2 / 3", "data-participants-page=\"0\"", "data-participants-page=\"2\"")
+                .doesNotContain("data-admin-page", "id=\"experiment-overrides\"");
+    }
+
+    @Test
+    void participants_withoutAMatch_saysNoParticipantMatches() throws Exception {
+        experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
+        when(apiService.adminExperimentAssignments(EXP_ID, null, "zz", 0)).thenReturn(participants(0, 0));
+
+        assertThat(asAdmin("/spa/admin/experiments/" + EXP_ID + "/participants?q=zz"))
+                .contains("No participant matches").doesNotContain("Nobody has been assigned yet");
+    }
+
+    @Test
+    void participants_ofAnUnknownExperiment_isTheMissingFragment() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+
+        mvc.perform(get("/spa/admin/experiments/" + EXP_ID + "/participants").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

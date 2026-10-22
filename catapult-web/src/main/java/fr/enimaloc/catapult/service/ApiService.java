@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
@@ -268,6 +269,10 @@ public interface ApiService {
     int adminAddExperimentOverride(UUID id, ExperimentOverrideRequest override);
     /** catapult-api's status (204; 404 unknown experiment or override), 502 when unreachable. */
     int adminDeleteExperimentOverride(UUID id, UUID overrideId);
+    /** One page (20) of the experiment's participants, filtered by variant (null = all) and login substring (null/blank = all), with every variant's count; null when unknown or catapult-api fails. */
+    ExperimentAssignmentsDto adminExperimentAssignments(UUID id, UUID variantId, String q, int page);
+    /** catapult-api's status (204; 400, 404, 409), 502 when unreachable. */
+    int adminMoveExperimentAssignment(UUID id, UUID userId, UUID variantId);
 
     /** The whitelist, its entries, invitation settings and invites; null when catapult-api fails. */
     WhitelistPageDto adminWhitelist();

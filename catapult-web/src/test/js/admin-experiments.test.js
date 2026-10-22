@@ -3,7 +3,7 @@
  * Reassign ask first, the forms show only the fields of the chosen type/target, weights show their
  * live share, and every refusal is told by its status.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, response } from "./helpers.js";
 
 const EXP = "3f0c0000-0000-0000-0000-000000000001";
@@ -411,4 +411,132 @@ describe("admin-experiments weight bar", () => {
         expect(grow(V3)).toBe("150");
         expect(document.querySelector(`[data-segment="${V3}"] b`).textContent).toBe("75 %");
     });
+});
+
+describe("admin-experiments participants", () => {
+    const USER = "3f0c0000-0000-0000-0000-0000000000b1";
+    const base = `/spa/admin/experiments/${EXP}`;
+    let served;
+    let fetched;
+
+    const participants = (variant = "", q = "", page = 0, rows = "<div data-row>row</div>") => `
+        <div data-participants ${variant ? `data-variant="${variant}"` : ""} ${q ? `data-q="${q}"` : ""} data-page="${page}">
+            <div data-participants-chips>
+                <button data-participants-variant="" ${variant ? "" : "selected"}>all</button>
+                <button data-participants-variant="${V1}" ${variant === V1 ? "selected" : ""}>one</button>
+                <button data-participants-variant="${V2}" ${variant === V2 ? "selected" : ""}>two</button>
+            </div>
+            <input data-participants-search>
+            <div data-participants-list>${rows}
+                <button data-participants-page="${page + 1}"></button>
+                <select data-participants-move="${USER}"><option value=""></option><option value="${V2}">two</option></select>
+            </div>
+        </div>`;
+
+    const overridesCard = label => `<div id="experiment-overrides"><span data-fresh>${label}</span>
+        <form id="experiment-override-form"><input name="target" value="USER"><input name="action" value="FORCE_INCLUDE"><input name="variantId" value="${V2}"></form></div>`;
+
+    /** The detail fragment: just enough for the overrides card to be found in it. */
+    const detail = label => `<div class="admin-experiment-detail">${participants()}${overridesCard(label)}</div>`;
+
+    const urls = () => fetched.mock.calls.map(([url]) => url);
+
+    beforeEach(async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        served = {};
+        fetched = vi.fn(async url => response(200, url.includes("/participants")
+            ? (served[url] ?? participants()) : detail("fresh")));
+        window.fetch = fetched;
+        document.querySelector(".admin-experiment-detail").insertAdjacentHTML("beforeend", participants() + overridesCard("old"));
+    });
+
+    afterEach(() => vi.useRealTimers());
+
+    const settle = () => vi.advanceTimersByTimeAsync(0);
+
+    /** The user picking `value` in a move select. */
+    async function pick(select, value) {
+        select.value = value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        await settle();
+    }
+
+    it("reloads the list on a variant chip, from page 0 and with the search kept", async () => {
+        document.querySelector("[data-participants]").dataset.q = "al";
+        document.querySelector("[data-participants]").dataset.page = "2";
+
+        document.querySelector(`[data-participants-variant="${V1}"]`).click();
+        await settle();
+
+        expect(urls()).toEqual([`${base}/participants?variant=${V1}&q=al&page=0`]);
+    });
+
+    it("swaps the chips and the list in, keeps the search field, and takes the new state over", async () => {
+        served[`${base}/participants?variant=${V1}&q=&page=0`] = participants(V1, "", 0, "<div data-row>fresh row</div>");
+        const search = document.querySelector("[data-participants-search]");
+
+        document.querySelector(`[data-participants-variant="${V1}"]`).click();
+        await settle();
+
+        expect(document.querySelector("[data-participants-list]").textContent).toContain("fresh row");
+        expect(document.querySelector(`[data-participants-variant="${V1}"]`).hasAttribute("selected")).toBe(true);
+        expect(document.querySelector("[data-participants]").dataset.variant).toBe(V1);
+        expect(document.querySelector("[data-participants-search]")).toBe(search);
+    });
+
+    it("searches 300 ms after the last keystroke, from page 0, within the chosen variant", async () => {
+        document.querySelector("[data-participants]").dataset.variant = V2;
+        const search = document.querySelector("[data-participants-search]");
+
+        search.value = "b";
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(200);
+        search.value = "bo";
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(200);
+        expect(fetched).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(100);
+
+        expect(urls()).toEqual([`${base}/participants?variant=${V2}&q=bo&page=0`]);
+    });
+
+    it("goes to the page of a pager button, keeping the filter and the search", async () => {
+        const card = document.querySelector("[data-participants]");
+        card.dataset.variant = V1;
+        card.dataset.q = "al";
+
+        document.querySelector("[data-participants-page]").click();
+        await settle();
+
+        expect(urls()).toEqual([`${base}/participants?variant=${V1}&q=al&page=1`]);
+    });
+
+    it("posts the chosen variant, then refreshes the list in place and the overrides card", async () => {
+        const card = document.querySelector("[data-participants]");
+        card.dataset.variant = V1;
+        card.dataset.page = "1";
+        const select = document.querySelector("[data-participants-move]");
+
+        await pick(select, V2);
+
+        expect(posted).toHaveBeenCalledWith(`/admin/experiments/${EXP}/assignments/${USER}/variant`, { variantId: V2 });
+        expect(urls()).toEqual([`${base}/participants?variant=${V1}&q=&page=1`, base]);
+        expect(document.querySelector("#experiment-overrides [data-fresh]").textContent).toBe("fresh");
+        expect(window.mdui.snackbar).toHaveBeenCalledWith({ message: "Saved" });
+    });
+
+    it.each([[400, "Refused", false], [404, "Gone", true], [409, "Down", true], [502, "Down", false]])(
+        "tells a %i refusal, resets the select, and fetches nothing", async (status, message, reloads) => {
+            posted.mockResolvedValue(response(status));
+            const select = document.querySelector("[data-participants-move]");
+
+            await pick(select, V2);
+
+            expect(CatapultChannel.showError).toHaveBeenCalledWith(message);
+            expect(select.value).toBe("");
+            expect(select.disabled).toBe(false);
+            expect(fetched).not.toHaveBeenCalled();
+            expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(reloads ? 1 : 0);
+        });
 });

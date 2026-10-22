@@ -15,7 +15,9 @@ import fr.enimaloc.catapult.common.dto.admin.ImpersonateResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
+import fr.enimaloc.catapult.common.dto.experiment.MoveAssignmentRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
@@ -718,6 +720,18 @@ public class RealApiService implements ApiService {
     @Override
     public int adminDeleteExperimentOverride(UUID id, UUID overrideId) {
         return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/overrides/{overrideId}/delete", null, Void.class, id, overrideId).status();
+    }
+
+    @Override
+    public ExperimentAssignmentsDto adminExperimentAssignments(UUID id, UUID variantId, String q, int page) {
+        return client.get("/api/admin/experiments/{id}/assignments?variant={variant}&q={q}&page={page}",
+                ExperimentAssignmentsDto.class, id, variantId == null ? "" : variantId, q == null ? "" : q, page);
+    }
+
+    @Override
+    public int adminMoveExperimentAssignment(UUID id, UUID userId, UUID variantId) {
+        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/assignments/{userId}/variant",
+                new MoveAssignmentRequest(variantId), Void.class, id, userId).status();
     }
 
     @Override

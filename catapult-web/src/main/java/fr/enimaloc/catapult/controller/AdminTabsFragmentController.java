@@ -8,7 +8,9 @@ import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentStatus;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentVariantDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -329,8 +332,48 @@ public class AdminTabsFragmentController {
                     .collect(Collectors.toMap(ExperimentVariantDto::id, ExperimentVariantDto::key, (a, b) -> a)));
             model.addAttribute("groups", groups == null ? List.of() : groups);
             model.addAttribute("flagKeys", flagKeys == null ? List.of() : flagKeys);
+            participantsModel(model, experiment, null, "", 0);
             return "pages/admin-tab/experiments :: detail";
         });
+    }
+
+    /** The participants card's list, narrowed to a variant and a login search, for a page of it; 404 when the experiment is unknown. */
+    @GetMapping("/experiments/{id}/participants")
+    String experimentParticipants(Model model, HttpServletResponse response, @PathVariable UUID id,
+                                  @RequestParam(required = false) UUID variant,
+                                  @RequestParam(required = false, defaultValue = "") String q,
+                                  @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            ExperimentSettingsDto experiment = apiService.adminExperiment(id);
+            if (experiment == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/experiments :: missing";
+            }
+            participantsModel(model, experiment, variant, q, Math.max(0, page));
+            return "pages/admin-tab/experiments :: participants";
+        });
+    }
+
+    /**
+     * What the participants card shows: the page (null when catapult-api failed) and, per variant, the palette
+     * slot the weight bar uses (the control apart, the others numbered 1 to 4 in turn).
+     */
+    private void participantsModel(Model model, ExperimentSettingsDto experiment, UUID variant, String q, int page) {
+        ExperimentAssignmentsDto assignments = apiService.adminExperimentAssignments(
+                experiment.id(), variant, q.isBlank() ? null : q.trim(), page);
+        Map<UUID, String> colors = new HashMap<>();
+        int others = 0;
+        for (ExperimentVariantDto v : experiment.variants()) {
+            colors.put(v.id(), v.control() ? "control" : String.valueOf(others++ % 4 + 1));
+        }
+        model.addAttribute("experiment", experiment);
+        model.addAttribute("assignments", assignments);
+        model.addAttribute("selectedVariant", variant);
+        model.addAttribute("participantsQ", q);
+        model.addAttribute("variantColors", colors);
+        model.addAttribute("variantKeys", experiment.variants().stream()
+                .collect(Collectors.toMap(ExperimentVariantDto::id, ExperimentVariantDto::key, (a, b) -> a)));
+        model.addAttribute("editable", experiment.status() != ExperimentStatus.ENDED);
     }
 
     /** {@code view}'s fragment for an admin; the 401 / 403 error fragment for anyone else. */
