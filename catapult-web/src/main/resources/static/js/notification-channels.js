@@ -1,6 +1,7 @@
 /*
- * The "also receive by" switches of the /notifications page: each change sends the whole set chosen
- * at that moment (the site is always on), one request at a time so that none reaches catapult-api out
+ * The "also receive by" switches, on the /notifications page and in the owner's channel Settings tab:
+ * each change sends the whole set chosen at that moment (the site is always on), one request at a time
+ * so that none reaches catapult-api out
  * of order. The switches show what the server has again when a request fails and none is left waiting.
  * Bound on each render, as the page comes and goes with the SPA router.
  */
