@@ -25,6 +25,7 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentVariantRepository;
 import fr.enimaloc.catapult.service.StatisticsService;
+import fr.enimaloc.catapult.service.experiment.ExperimentRebalancer;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -64,9 +65,10 @@ class ApiAdminExperimentsControllerTest {
     private final ExperimentVariantRepository variants = mock(ExperimentVariantRepository.class);
     private final ExperimentService experimentService = mock(ExperimentService.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
+    private final ExperimentRebalancer rebalancer = mock(ExperimentRebalancer.class);
 
     private final ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments, events,
-            feedback, assignments, users, statistics, overrides, rules, variants, experimentService, publisher);
+            feedback, assignments, users, statistics, overrides, rules, variants, experimentService, publisher, rebalancer);
 
     private Experiment experiment;
     private ExperimentVariant control;
@@ -353,6 +355,59 @@ class ApiAdminExperimentsControllerTest {
         assertThat(treatment.getWeight()).isZero();
         verify(variants).save(treatment);
         verify(variants, never()).save(control);
+    }
+
+    @Test
+    void updateWeights_appliesThePlanComputedFromTheNewWeights() {
+        control.setWeight(90);
+        treatment.setWeight(10);
+        var plan = new ExperimentRebalancer.Plan(List.of(
+                new ExperimentRebalancer.Move(control.getId(), treatment.getId(), List.of(UUID.randomUUID()))));
+        when(rebalancer.plan(eq(experiment), any())).thenReturn(plan);
+
+        controller.updateWeights(experiment.getId(), Map.of(control.getId(), 80, treatment.getId(), 20));
+
+        ArgumentCaptor<Map<UUID, Integer>> used = ArgumentCaptor.forClass(Map.class);
+        verify(rebalancer).plan(eq(experiment), used.capture());
+        assertThat(used.getValue()).containsEntry(control.getId(), 80).containsEntry(treatment.getId(), 20);
+        verify(rebalancer).apply(experiment, plan);
+    }
+
+    @Test
+    void updateWeights_ofAnEndedExperiment_isRefusedAndTouchesNothing() {
+        experiment.setStatus(Experiment.Status.ENDED);
+
+        assertStatus(() -> controller.updateWeights(experiment.getId(), Map.of(control.getId(), 1)), HttpStatus.CONFLICT);
+
+        verify(variants, never()).save(any());
+        verify(rebalancer, never()).apply(any(), any());
+    }
+
+    @Test
+    void previewWeights_reportsTheMovesWithoutWritingAnything() {
+        control.setWeight(90);
+        treatment.setWeight(10);
+        var plan = new ExperimentRebalancer.Plan(List.of(new ExperimentRebalancer.Move(control.getId(),
+                treatment.getId(), List.of(UUID.randomUUID(), UUID.randomUUID()))));
+        when(rebalancer.plan(eq(experiment), any())).thenReturn(plan);
+
+        var dto = controller.previewWeights(experiment.getId(),
+                Map.of(control.getId(), 80, treatment.getId(), 20, UUID.randomUUID(), 5));
+
+        assertThat(dto.moves()).singleElement().isEqualTo(
+                new fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto.Move(control.getId(), treatment.getId(), 2));
+        ArgumentCaptor<Map<UUID, Integer>> used = ArgumentCaptor.forClass(Map.class);
+        verify(rebalancer).plan(eq(experiment), used.capture());
+        assertThat(used.getValue()).containsOnlyKeys(control.getId(), treatment.getId());
+        assertThat(control.getWeight()).isEqualTo(90);
+        assertThat(treatment.getWeight()).isEqualTo(10);
+        verify(variants, never()).save(any());
+        verify(rebalancer, never()).apply(any(), any());
+    }
+
+    @Test
+    void previewWeights_ofAnUnknownExperiment_isNotFound() {
+        assertStatus(() -> controller.previewWeights(UUID.randomUUID(), Map.of()), HttpStatus.NOT_FOUND);
     }
 
     @Nested
