@@ -33,6 +33,7 @@ import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.BOT_ENABLED;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_MANUALLY;
+import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NO_GAME_DETECTED;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.STREAM_STARTED;
 
@@ -117,6 +118,18 @@ public class TwitchatEventDispatcher {
                 Map.of(enabled ? TwitchatActionType.DISABLE_BOT : TwitchatActionType.ENABLE_BOT, Map.of())));
     }
 
+    /**
+     * A Catapult notification, for a member who opted in to Twitchat: {@code body} as plain text,
+     * {@code ctaUrl}/{@code ctaLabel} empty without a call to action. Unlike the other hooks it
+     * lets failures through and says whether anything was published, for its caller to count it
+     * or keep it pending.
+     */
+    public boolean onNotification(UserAccount user, String title, String body, String ctaUrl, String ctaLabel) {
+        Map<String, String> variables = Map.of("title", nullToEmpty(title), "body", nullToEmpty(body),
+                "ctaUrl", nullToEmpty(ctaUrl), "ctaLabel", nullToEmpty(ctaLabel));
+        return dispatch(user, NOTIFICATION, variables, Map.of());
+    }
+
     @EventListener
     public void onNoGameDetected(NoGameDetectedEvent event) {
         UserAccount user = event.getUser();
@@ -144,14 +157,15 @@ public class TwitchatEventDispatcher {
         publish(user, type, rendered);
     }
 
-    private void dispatch(UserAccount user, TwitchatNotificationEventType type, Map<String, String> eventVariables,
-                          Map<TwitchatActionType, Map<String, String>> applicable) {
+    /** Whether a dispatch was published: none without an enabled widget or payload. */
+    private boolean dispatch(UserAccount user, TwitchatNotificationEventType type, Map<String, String> eventVariables,
+                             Map<TwitchatActionType, Map<String, String>> applicable) {
         if (!widgetSettingsService.isEnabled(user)) {
-            return;
+            return false;
         }
         List<TwitchatEventAction> rows = eventActionService.enabledActions(user, type);
         if (rows.isEmpty()) {
-            return;
+            return false;
         }
         TwitchatPayloadRenderer renderer = new TwitchatPayloadRenderer(variables(user, eventVariables), applicable.keySet(),
                 action -> actionTokenService.generate(user.getId(), action, applicable.get(action)).toString());
@@ -169,13 +183,15 @@ public class TwitchatEventDispatcher {
             }
             renderer.render(row.getAction(), data).ifPresent(rendered::add);
         }
-        publish(user, type, rendered);
+        return publish(user, type, rendered);
     }
 
-    private void publish(UserAccount user, TwitchatNotificationEventType type, List<TwitchatPayload> payloads) {
-        if (!payloads.isEmpty()) {
-            channelEventPublisher.twitchatDispatch(user.getId(), new TwitchatDispatch(user.getTwitchUsername(), type.name(), payloads));
+    private boolean publish(UserAccount user, TwitchatNotificationEventType type, List<TwitchatPayload> payloads) {
+        if (payloads.isEmpty()) {
+            return false;
         }
+        channelEventPublisher.twitchatDispatch(user.getId(), new TwitchatDispatch(user.getTwitchUsername(), type.name(), payloads));
+        return true;
     }
 
     private Map<String, String> variables(UserAccount user, Map<String, String> eventVariables) {

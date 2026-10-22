@@ -42,13 +42,14 @@ class NotificationServiceTest {
     @Mock UserAccountRepository userRepo;
     @Mock ApplicationEventPublisher publisher;
     @Mock NotificationRenderer renderer;
+    @Mock NotificationDeliveryService deliveries;
 
     NotificationService service;
     UserAccount admin;
 
     @BeforeEach
     void setUp() {
-        service = new NotificationService(notifRepo, recipientRepo, userRepo, renderer, publisher);
+        service = new NotificationService(notifRepo, recipientRepo, userRepo, renderer, publisher, deliveries);
         admin = new UserAccount();
         admin.setId(UUID.randomUUID());
         lenient().when(renderer.render(any())).thenAnswer(inv -> "<p>" + inv.getArgument(0) + "</p>");
@@ -169,6 +170,50 @@ class NotificationServiceTest {
         ArgumentCaptor<List<NotificationRecipient>> cap = ArgumentCaptor.forClass(List.class);
         verify(recipientRepo).saveAll(cap.capture());
         assertThat(cap.getValue()).hasSize(2);
+    }
+
+    /** Every audience goes through send: its recipients' other channels get their pending deliveries, after the recipients. */
+    @Test
+    void send_createsThePendingDeliveries_onceTheRecipientsAreSaved() {
+        UserAccount u1 = userWithStatus(UserAccount.Status.ACTIVE);
+        UUID id = UUID.randomUUID();
+        when(notifRepo.save(any())).thenAnswer(inv -> {
+            Notification n = inv.getArgument(0);
+            n.setId(id);
+            return n;
+        });
+
+        service.createForAll(new NotificationService.CreateRequest("T", "B", Severity.INFO, null, null, null, null),
+                admin, List.of(u1));
+
+        var order = inOrder(recipientRepo, deliveries);
+        order.verify(recipientRepo).saveAll(any());
+        order.verify(deliveries).createFor(id);
+    }
+
+    @Test
+    void markRead_cancelsItsPendingDeliveries() {
+        UUID userId = UUID.randomUUID();
+        UUID notifId = UUID.randomUUID();
+        NotificationRecipient recipient = new NotificationRecipient();
+        recipient.setId(new NotificationRecipientId(notifId, userId));
+        when(recipientRepo.findById(new NotificationRecipientId(notifId, userId))).thenReturn(Optional.of(recipient));
+
+        service.markRead(userId, notifId);
+
+        verify(deliveries).cancel(userId, notifId);
+    }
+
+    @Test
+    void markAllRead_andDelete_cancelThePendingDeliveries() {
+        UUID userId = UUID.randomUUID();
+        UUID notifId = UUID.randomUUID();
+
+        service.markAllRead(userId);
+        service.delete(userId, notifId);
+
+        verify(deliveries).cancelAll(userId);
+        verify(deliveries).cancel(userId, notifId);
     }
 
     @Test

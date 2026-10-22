@@ -1,11 +1,13 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
+import fr.enimaloc.catapult.common.dto.notification.NotificationFlushResultDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
+import fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +25,7 @@ public class ApiTwitchatWidgetController {
     private final WidgetTokenService widgetTokenService;
     private final TokenEncryptionService tokenEncryptionService;
     private final TwitchatActionExecutor actionExecutor;
+    private final NotificationDeliveryDispatcher deliveryDispatcher;
 
     @GetMapping("/widget/{uuid}/access")
     public ResponseEntity<TwitchatWidgetAccessResponse> access(@PathVariable UUID uuid) {
@@ -42,6 +45,14 @@ public class ApiTwitchatWidgetController {
                 .map(s -> ResponseEntity.ok(new ConfigResponse(s.getObsHost(), s.getObsPort(),
                         s.getObsPasswordEncrypted() == null ? null : tokenEncryptionService.decrypt(s.getObsPasswordEncrypted()),
                         s.getTwitchatBranch())))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /** The widget's owner's pending Twitchat notifications, sent once catapult-web has the OBS widget connected. */
+    @PostMapping("/widget/{uuid}/notifications/flush")
+    public ResponseEntity<NotificationFlushResultDto> flushNotifications(@PathVariable UUID uuid) {
+        return widgetTokenService.resolve(uuid)
+                .map(owner -> ResponseEntity.ok(new NotificationFlushResultDto(deliveryDispatcher.flushTwitchat(owner))))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 

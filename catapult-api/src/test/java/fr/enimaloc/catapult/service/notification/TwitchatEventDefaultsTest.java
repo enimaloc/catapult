@@ -7,14 +7,26 @@ import java.util.Map;
 
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NO_GAME_DETECTED;
+import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.STREAM_STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TwitchatEventDefaultsTest {
 
     @Test
-    void seedsEveryHistoricalEvent_butNotNoGameDetected() {
-        assertThat(TwitchatEventDefaults.SEEDED).hasSize(5).doesNotContain(NO_GAME_DETECTED);
+    void seedsEveryHistoricalEvent_andNotifications_butNotNoGameDetected() {
+        assertThat(TwitchatEventDefaults.SEEDED).hasSize(6).contains(NOTIFICATION).doesNotContain(NO_GAME_DETECTED);
+    }
+
+    /** Only sent to members who opted in to Twitchat: it shows the notification, its call to action as a link. */
+    @Test
+    void notificationChatMessage_showsTitleBodyAndLink() {
+        assertThat(TwitchatEventDefaults.chatMessage(NOTIFICATION)).isEqualTo(Map.of(
+                "message", "[Catapult] {{title}} — {{body}} {{ctaUrl}}",
+                "style", "message",
+                "icon", "info",
+                "user", Map.of("name", "Catapult"),
+                "actions", List.of()));
     }
 
     @Test

@@ -2,7 +2,9 @@ package fr.enimaloc.catapult.common.event;
 
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 
+import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * The wire contract of catapult-api's per-channel events: published on {@code catapult:events:channel:{ownerId}}
@@ -29,6 +31,13 @@ public final class ChannelEvents {
     public static final String CONNECTION_CHANGED = "connection.changed";
     public static final String DTDD_MAPPING_CHANGED = "dtdd.mapping.changed";
     public static final String MINECRAFT_LINK_CHANGED = "minecraft.link.changed";
+
+    /**
+     * Not a per-channel event: {@link NotificationDeliveryPending} names many members at once, so it has its
+     * own Redis channel (same envelope) instead of one {@code catapult:events:channel:{ownerId}} each.
+     */
+    public static final String NOTIFICATION_DELIVERY_REDIS_CHANNEL = "catapult:events:notification-delivery";
+    public static final String NOTIFICATION_DELIVERY_PENDING = "notification.delivery.pending";
 
     private ChannelEvents() {
     }
@@ -70,6 +79,13 @@ public final class ChannelEvents {
 
     /** The channel's Minecraft link changed: its status ({@code NONE} once gone) and player name. */
     public record MinecraftLinkChanged(String channelId, String channelLogin, String status, String minecraftName) {}
+
+    /**
+     * New notifications wait to be sent to these members' Twitchat: whichever catapult-web instance holds one
+     * of their Twitchat pages or OBS widgets open asks catapult-api to flush them. Published on
+     * {@link #NOTIFICATION_DELIVERY_REDIS_CHANNEL}, at most a few hundred ids per message.
+     */
+    public record NotificationDeliveryPending(List<UUID> userIds) {}
 
     /** A channel's Steam profile state, as the dashboard shows it. */
     public record SteamProfile(boolean hasSteam, boolean profilePrivate, boolean offlineMode, boolean rateLimited,

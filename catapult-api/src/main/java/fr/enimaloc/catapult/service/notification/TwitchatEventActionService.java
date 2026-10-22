@@ -158,6 +158,23 @@ public class TwitchatEventActionService {
         widgetSettingsRepository.save(settings);
     }
 
+    /**
+     * Gives an account opting in to notifications in Twitchat the NOTIFICATION payload, when it
+     * has none: accounts initialized before that event existed never got it. One not initialized
+     * yet gets it with the others from {@link #ensureInitialized}.
+     */
+    @Transactional
+    public void ensureNotificationPayload(UserAccount user) {
+        TwitchatWidgetSettings settings = widgetSettingsRepository.findById(user.getId()).orElse(null);
+        if (settings == null || !settings.isEventActionsInitialized()
+                || repository.existsByUserAndEventType(user, TwitchatNotificationEventType.NOTIFICATION)) {
+            return;
+        }
+        repository.save(newAction(user, TwitchatNotificationEventType.NOTIFICATION, 0, TwitchatPayloadRenderer.CHAT_MESSAGE,
+                TwitchatPayloadMode.FORM, JSON.writeValueAsString(TwitchatEventDefaults.chatMessage(TwitchatNotificationEventType.NOTIFICATION)),
+                true, Instant.now()));
+    }
+
     private Map<TwitchatNotificationEventType, String> activePresets(UUID userId) {
         Map<TwitchatNotificationEventType, String> presets = new EnumMap<>(TwitchatNotificationEventType.class);
         try {

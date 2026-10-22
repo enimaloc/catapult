@@ -137,7 +137,8 @@ class CommonDtoContractTest {
         when(tokens.resolve(token)).thenReturn(Optional.of(owner));
         when(settingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
         ApiTwitchatWidgetController controller = new ApiTwitchatWidgetController(settingsRepository, tokens,
-                mock(TokenEncryptionService.class), mock(TwitchatActionExecutor.class));
+                mock(TokenEncryptionService.class), mock(TwitchatActionExecutor.class),
+                mock(fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher.class));
 
         ConfigResponse produced = controller.config(token).getBody();
 
