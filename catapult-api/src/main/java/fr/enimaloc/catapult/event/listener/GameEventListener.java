@@ -128,6 +128,11 @@ public class GameEventListener {
                 fallbackBinding.setTwitchGameId(settings.getNoGameTwitchGameId());
                 fallbackBinding.setTwitchGameName(settings.getNoGameTwitchGameName());
                 fallbackBinding.setStatus(GameBinding.Status.MANUAL);
+                // Checked again right before the PATCH: a raid may have taken the hold since the check above
+                if (raidRestoreGameService.isHoldingNoGameFallback(user)) {
+                    log.debug("User {} raided out meanwhile — skipping no-game fallback", user.getId());
+                    return;
+                }
                 twitchService.updateChannel(user, fallbackBinding);
             }
         });

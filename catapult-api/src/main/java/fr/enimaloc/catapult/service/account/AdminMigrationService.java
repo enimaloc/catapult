@@ -52,6 +52,8 @@ public class AdminMigrationService {
         tgt.setApplyDefaultOnStreamStart(src.isApplyDefaultOnStreamStart());
         tgt.setApplyDefaultOnNoGame(src.isApplyDefaultOnNoGame());
         tgt.setApplyDefaultOnStreamEnd(src.isApplyDefaultOnStreamEnd());
+        // The raid.restore-game experiment assignment isn't copied: the gate is evaluated for the target
+        // the next time its settings are opened, and the delay only acts once it is on.
         tgt.setRaidRestoreGameMinutes(src.getRaidRestoreGameMinutes());
         userSettingsRepository.save(tgt);
     }

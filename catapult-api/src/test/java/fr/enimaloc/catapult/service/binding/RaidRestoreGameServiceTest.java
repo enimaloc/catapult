@@ -12,8 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -21,12 +19,14 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class RaidRestoreGameServiceTest {
 
     @Mock private UserSettingsRepository userSettingsRepository;
@@ -50,8 +50,9 @@ class RaidRestoreGameServiceTest {
         settings = new UserSettings();
         settings.setRaidRestoreGameMinutes(15);
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
-        when(gate.isAvailableReadOnly(user)).thenReturn(true);
-        when(gameStateService.recentlyDetectedGame(user, Duration.ofMinutes(15))).thenReturn(Optional.of(doom));
+        // Not reached by the tests that stop at an earlier check
+        lenient().when(gate.isAvailableReadOnly(user)).thenReturn(true);
+        lenient().when(gameStateService.recentlyDetectedGame(user, Duration.ofMinutes(15))).thenReturn(Optional.of(doom));
 
         binding = new GameBinding();
         binding.setId(UUID.randomUUID());
@@ -62,7 +63,7 @@ class RaidRestoreGameServiceTest {
         binding.setTwitchGameId("517");
         binding.setTwitchGameName("DOOM");
         binding.setStatus(GameBinding.Status.AUTO);
-        when(bindingService.findBinding(user, doom)).thenReturn(Optional.of(binding));
+        lenient().when(bindingService.findBinding(user, doom)).thenReturn(Optional.of(binding));
     }
 
     private void raid(String currentCategoryId) {
@@ -126,10 +127,30 @@ class RaidRestoreGameServiceTest {
     }
 
     @Test
-    void doesNothingWhenAlreadyOnThatGame() {
+    void alreadyOnThatGame_changesNothingButStillHoldsTheNoGameFallback() {
         raid("517");
 
         verify(twitchService, never()).updateChannel(any(), any());
+        assertThat(service.isHoldingNoGameFallback(user)).isTrue();
+    }
+
+    @Test
+    void theHoldIsTakenBeforeTheCategoryIsChanged() {
+        boolean[] holdingDuringTheChange = new boolean[1];
+        doAnswer(invocation -> holdingDuringTheChange[0] = service.isHoldingNoGameFallback(user))
+                .when(twitchService).updateChannel(user, binding);
+
+        raid("509658");
+
+        assertThat(holdingDuringTheChange[0]).isTrue();
+    }
+
+    @Test
+    void aFailedRestoreReleasesTheHold() {
+        doThrow(new IllegalStateException("Twitch down")).when(twitchService).updateChannel(user, binding);
+
+        raid("509658");
+
         assertThat(service.isHoldingNoGameFallback(user)).isFalse();
     }
 

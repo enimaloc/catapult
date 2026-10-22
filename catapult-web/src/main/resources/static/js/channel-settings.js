@@ -59,6 +59,7 @@ window.CatapultSettings = (function () {
         const typed = byId("raid-restore-minutes")?.value ?? "";
         const minutes = Math.round(Number(typed));
         if (typed === "" || !Number.isFinite(minutes)) return RAID_DEFAULT_MINUTES;
+        // A typed 0 is kept at 1 rather than sent as "off": the switch is the off control.
         return Math.min(RAID_MAX_MINUTES, Math.max(RAID_MIN_MINUTES, minutes));
     }
 

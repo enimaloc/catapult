@@ -22,8 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * A streamer who closes their game gets the "no game" category; raiding out minutes later would then
  * leave from it. With the channel's {@link UserSettings#getRaidRestoreGameMinutes() delay} set (and the
  * {@value RaidRestoreGateService#EXPERIMENT_KEY} gate on), an outgoing raid puts the game detected within
- * that delay back, and the "no game" fallback then holds off until the stream ends or a new game is
- * detected, so the next detection doesn't undo it.
+ * that delay back (unless the channel is already on it), and the "no game" fallback then holds off until the
+ * stream ends or a new game is detected, so a later detection doesn't undo it.
  */
 @Slf4j
 @Service
@@ -60,14 +60,22 @@ public class RaidRestoreGameService {
             log.debug("Raid by user {}: no game detected within {} min to put back", user.getId(), minutes);
             return;
         }
+        // Held first, so a detection tick running meanwhile can't put the "no game" category back after us;
+        // also when already on the game, which may still be closed before the stream ends.
+        holdingNoGameFallback.add(user.getId());
         if (binding.get().getTwitchGameId().equals(event.getCurrentCategoryId())) {
             log.debug("Raid by user {}: already on {}", user.getId(), binding.get().getTwitchGameName());
             return;
         }
         log.info("Raid by user {}: putting {} back as the category", user.getId(), binding.get().getTwitchGameName());
-        // updateChannel records Catapult's own change, so the channel.update isn't taken for a manual one
-        twitchService.updateChannel(user, binding.get());
-        holdingNoGameFallback.add(user.getId());
+        try {
+            // updateChannel records Catapult's own change, so the channel.update isn't taken for a manual one
+            twitchService.updateChannel(user, binding.get());
+        } catch (RuntimeException e) {
+            holdingNoGameFallback.remove(user.getId());
+            log.warn("Raid by user {}: could not put {} back: {}", user.getId(),
+                    binding.get().getTwitchGameName(), e.getMessage());
+        }
     }
 
     /** True while a raid's restored game must not be replaced by the "no game" category. */
