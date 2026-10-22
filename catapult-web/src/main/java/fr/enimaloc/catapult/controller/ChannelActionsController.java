@@ -164,6 +164,12 @@ public class ChannelActionsController {
         return ApiStatus.answer(apiService.minecraftDisconnect(username));
     }
 
+    @PostMapping("/channel/{username}/xbox/disconnect")
+    public ResponseEntity<Void> xboxDisconnect(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ApiStatus.answer(apiService.xboxDisconnect(username));
+    }
+
     /** Whether {@code username} is the logged-in member's own channel. */
     private static boolean ownChannel(String username) {
         String login = ApiClient.currentLogin();

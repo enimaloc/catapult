@@ -71,6 +71,8 @@ public interface ApiService {
     int minecraftEnroll(String username, String name);
     int minecraftSync(String username);
     int minecraftDisconnect(String username);
+    /** Unlinks the channel's Xbox account; catapult-api's status (204; 403 not the owner), 502 when unreachable. */
+    int xboxDisconnect(String username);
     /** The logged-in user's OBS connection; null when logged out or OBS isn't enabled. */
     TwitchatWidgetConfig obsConnection();
     /**

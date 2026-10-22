@@ -235,6 +235,11 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public int xboxDisconnect(String username) {
+        return client.postVoid("/api/channels/{username}/settings/disconnect", Map.of("provider", "XBOX"), username);
+    }
+
+    @Override
     public TwitchatWidgetConfig obsConnection() {
         return client.get("/api/me/obs", TwitchatWidgetConfig.class);
     }
