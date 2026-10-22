@@ -42,7 +42,8 @@
         data-label-account-unknown=#{admin.experiments.account-unknown},
         data-label-unavailable=#{admin.experiments.unavailable},data-label-saved=#{admin.experiments.saved},
         data-label-end-confirm=#{admin.experiments.end-confirm(${experiment.key()})},
-        data-label-reassign-confirm=#{admin.experiments.reassign-confirm(${experiment.key()})}">
+        data-label-reassign-confirm=#{admin.experiments.reassign-confirm(${experiment.key()})},
+        data-label-rebalance-confirm=#{admin.experiments.rebalance-confirm},data-label-rebalance-move=#{admin.experiments.rebalance-move}">
     <div class="section-header admin-subheader">
         <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
         <h2 th:text="${experiment.key()}">key</h2>
@@ -78,7 +79,7 @@
                 <span class="experiment-weight-swatch" aria-hidden="true"
                       th:style="|--variant-color: var(--catapult-variant-${v.control() ? 'control' : (it.index - experiment.variants().subList(0, it.index).?[control()].size()) % 4 + 1})|"></span>
                 <mdui-text-field type="number" min="0" variant="outlined" required th:value="${v.weight()}"
-                                 th:attr="data-variant=${v.id()},name=${'weight-' + v.key()},
+                                 th:attr="data-variant=${v.id()},data-variant-key=${v.key()},name=${'weight-' + v.key()},
                                           label=${v.control() ? #messages.msg('admin.experiments.weights.control', v.key()) : v.key()}"></mdui-text-field>
                 <span class="admin-cell-muted" data-weight-share></span>
             </div>

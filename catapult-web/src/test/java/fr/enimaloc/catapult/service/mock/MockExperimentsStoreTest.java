@@ -87,6 +87,45 @@ class MockExperimentsStoreTest {
     }
 
     @Test
+    void weightsPreview_movesOnlyFromTheVariantsNowOverTarget() {
+        ExperimentSettingsDto exp = settings("new-dashboard");
+        UUID control = exp.variants().get(0).id();
+        UUID other = exp.variants().get(1).id();
+
+        // 45 members, 30 in control and 15 in the new one; 80/20 puts 36 in control: 6 move to it
+        var preview = store.previewWeights(exp.id(), Map.of(control, 80, other, 20)).orElseThrow();
+
+        assertThat(preview.moves()).hasSize(1);
+        assertThat(preview.moves().get(0).fromVariantId()).isEqualTo(other);
+        assertThat(preview.moves().get(0).toVariantId()).isEqualTo(control);
+        assertThat(preview.moves().get(0).count()).isEqualTo(6);
+        assertThat(store.assignments(exp.id(), null, null, 0).orElseThrow().counts()).containsEntry(control, 30L);
+        // nothing written by a preview; the 30/15 split already is 2:1
+        assertThat(settings("new-dashboard").variants()).extracting("weight").containsExactly(50, 50);
+        assertThat(store.previewWeights(exp.id(), Map.of(control, 2, other, 1)).orElseThrow().moves()).isEmpty();
+        assertThat(store.previewWeights(UUID.randomUUID(), Map.of())).isEmpty();
+    }
+
+    @Test
+    void weights_saveMovesTheMembers_andForcedOnesStay() {
+        ExperimentSettingsDto exp = settings("new-dashboard");
+        UUID control = exp.variants().get(0).id();
+        UUID other = exp.variants().get(1).id();
+        // everyone in the new variant is forced there but viewer_03: nobody can leave but them
+        var inOther = store.assignments(exp.id(), other, null, 0).orElseThrow().page().content();
+        inOther.stream().filter(p -> !p.twitchUsername().equals("viewer_03"))
+                .forEach(p -> assertThat(store.move(exp.id(), p.userId(), other)).isEqualTo(204));
+
+        var preview = store.previewWeights(exp.id(), Map.of(control, 100, other, 0)).orElseThrow();
+        assertThat(preview.moves()).hasSize(1);
+        assertThat(preview.moves().get(0).count()).isEqualTo(1);
+
+        assertThat(store.setWeights(exp.id(), Map.of(control, 100, other, 0))).isEqualTo(204);
+        assertThat(store.assignments(exp.id(), other, null, 0).orElseThrow().page().content()).hasSize(inOther.size() - 1);
+        assertThat(store.previewWeights(exp.id(), Map.of(control, 100, other, 0)).orElseThrow().moves()).isEmpty();
+    }
+
+    @Test
     void rules_areAddedAndDeleted() {
         ExperimentSettingsDto exp = settings("new-dashboard");
 

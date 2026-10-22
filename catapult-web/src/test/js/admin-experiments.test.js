@@ -22,14 +22,15 @@ function page() {
         <mdui-tab-panel value="experiments">
             <div class="admin-experiment-detail" data-experiment="${EXP}" data-confirm-text="OK" data-cancel-text="No"
                  data-label-invalid="Refused" data-label-unknown="Gone" data-label-account-unknown="No such account" data-label-unavailable="Down" data-label-saved="Saved"
-                 data-label-end-confirm="End it?" data-label-reassign-confirm="Reassign?">
+                 data-label-end-confirm="End it?" data-label-reassign-confirm="Reassign?"
+                 data-label-rebalance-confirm="Rebalance?" data-label-rebalance-move="{count} move from {from} to {to}">
                 <button data-experiment-action="activate"></button>
                 <button data-experiment-action="end"></button>
                 <button data-experiment-action="reassign"></button>
 
                 <form id="experiment-weights">
-                    <div><input data-variant="${V1}" name="weight-control" value="50"><span data-weight-share></span></div>
-                    <div><input data-variant="${V2}" name="weight-enabled" value="50"><span data-weight-share></span></div>
+                    <div><input data-variant="${V1}" data-variant-key="control" name="weight-control" value="50"><span data-weight-share></span></div>
+                    <div><input data-variant="${V2}" data-variant-key="enabled" name="weight-enabled" value="50"><span data-weight-share></span></div>
                     <button type="submit" id="weights-save"></button>
                 </form>
 
@@ -91,7 +92,7 @@ async function set(element, value, type = "input") {
 
 beforeEach(async () => {
     confirmAnswer = true;
-    posted = vi.fn(async () => response(204));
+    posted = vi.fn(async url => url.endsWith("/weights/preview") ? response(200, { moves: [] }) : response(204));
     window.CatapultCsrf = { postJson: posted };
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())), snackbar: vi.fn() };
     await load("admin-tabs", "admin-experiments");
@@ -132,8 +133,62 @@ describe("admin-experiments", () => {
         expect(shares()).toEqual(["75 %", "25 %"]);
 
         await submit("weights-save");
-        expect(posted).toHaveBeenCalledWith(`/admin/experiments/${EXP}/weights`, { [V1]: 30, [V2]: 10 });
+        expect(posted).toHaveBeenCalledWith(`/admin/experiments/${EXP}/weights/preview`, { [V1]: 30, [V2]: 10 });
+        expect(posted).toHaveBeenLastCalledWith(`/admin/experiments/${EXP}/weights`, { [V1]: 30, [V2]: 10 });
         expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+    });
+
+    describe("saving weights previews who moves", () => {
+        const WEIGHTS = { [V1]: 30, [V2]: 10 };
+        const previewing = moves => {
+            posted.mockImplementation(async url => url.endsWith("/preview") ? response(200, { moves }) : response(204));
+        };
+        const save = async () => {
+            await set(document.querySelector(`[data-variant="${V1}"]`), "30");
+            await set(document.querySelector(`[data-variant="${V2}"]`), "10");
+            await submit("weights-save");
+        };
+
+        it("lists each move by variant key in the confirmation, then saves once confirmed", async () => {
+            previewing([{ fromVariantId: V1, toVariantId: V2, count: 6 }, { fromVariantId: V2, toVariantId: V1, count: 1 }]);
+            await save();
+
+            expect(window.mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({
+                headline: "Rebalance?",
+                description: "6 move from control to enabled\n1 move from enabled to control"
+            }));
+            expect(posted).toHaveBeenLastCalledWith(`/admin/experiments/${EXP}/weights`, WEIGHTS);
+            expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        });
+
+        it("posts nothing more when the confirmation is cancelled", async () => {
+            previewing([{ fromVariantId: V1, toVariantId: V2, count: 6 }]);
+            confirmAnswer = false;
+            await save();
+
+            expect(posted).toHaveBeenCalledTimes(1);
+            expect(posted).toHaveBeenCalledWith(`/admin/experiments/${EXP}/weights/preview`, WEIGHTS);
+            expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+            expect(document.getElementById("weights-save").disabled).toBe(false);
+        });
+
+        it("saves straight away, without a dialog, when nobody moves", async () => {
+            previewing([]);
+            await save();
+
+            expect(window.mdui.confirm).not.toHaveBeenCalled();
+            expect(posted).toHaveBeenLastCalledWith(`/admin/experiments/${EXP}/weights`, WEIGHTS);
+        });
+
+        it("tells the refusal and saves nothing when the preview is refused", async () => {
+            posted.mockImplementation(async () => response(502));
+            await save();
+
+            expect(CatapultChannel.showError).toHaveBeenCalledWith("Down");
+            expect(posted).toHaveBeenCalledTimes(1);
+            expect(window.mdui.confirm).not.toHaveBeenCalled();
+            expect(document.getElementById("weights-save").disabled).toBe(false);
+        });
     });
 
     it("refuses a blank weight without posting", async () => {
@@ -376,7 +431,7 @@ describe("admin-experiments weight bar", () => {
         expect(values()).toEqual(["40", "10", "50"]);
         expect(grow(V1)).toBe("40");
         await submit("weights-save");
-        expect(posted).toHaveBeenCalledWith(`/admin/experiments/${EXP}/weights`, { [V1]: 40, [V2]: 10, [V3]: 50 });
+        expect(posted).toHaveBeenLastCalledWith(`/admin/experiments/${EXP}/weights`, { [V1]: 40, [V2]: 10, [V3]: 50 });
     });
 
     it("stops a handle at its neighbours' edges", async () => {

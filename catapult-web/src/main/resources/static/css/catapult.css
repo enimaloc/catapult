@@ -2288,6 +2288,8 @@ body.obs-dock-mode .footer {
 .admin-experiments-actions, .admin-experiments-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
 .admin-experiments-form [hidden] { display: none; }
 .admin-experiments-weight { display: flex; gap: 8px; align-items: center; }
+/* A confirmation's description with one line per item (the rebalance preview) */
+mdui-dialog::part(description) { white-space: pre-line; }
 .experiment-weight-bar { position: relative; display: flex; width: 100%; height: 40px; border-radius: 12px; overflow: hidden; background: var(--catapult-surface-elevated); border: 1px solid var(--catapult-border); }
 .experiment-weight-bar.is-mini { height: 10px; border-radius: 5px; min-width: 120px; }
 .experiment-weight-segment { flex: 0 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; background: var(--variant-color); color: #fff; font-size: 0.8125rem; white-space: nowrap; overflow: hidden; transition: flex-grow 0.12s ease; }

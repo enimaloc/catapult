@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import lombok.RequiredArgsConstructor;
@@ -49,13 +50,21 @@ public class AdminExperimentsController {
 
     @PostMapping("/{id}/weights")
     public ResponseEntity<Void> weights(@PathVariable UUID id, @RequestBody Map<UUID, Integer> weights) {
-        boolean negative = weights.values().stream().anyMatch(w -> w == null || w < 0);
-        // a long: a few large weights must not wrap around to a valid-looking sum
-        long sum = negative ? 0 : weights.values().stream().mapToLong(Integer::longValue).sum();
-        if (negative || sum == 0) {
+        if (!validWeights(weights)) {
             return invalid();
         }
         return AdminAccess.relay(filler, () -> apiService.adminExperimentWeights(id, weights));
+    }
+
+    /** What saving these weights would move, for the confirmation; 502 when catapult-api can't tell. */
+    @PostMapping("/{id}/weights/preview")
+    public ResponseEntity<ExperimentRebalanceDto> weightsPreview(@PathVariable UUID id, @RequestBody Map<UUID, Integer> weights) {
+        AdminAccess.require(filler);
+        if (!validWeights(weights)) {
+            return ResponseEntity.badRequest().build();
+        }
+        ExperimentRebalanceDto preview = apiService.adminExperimentWeightsPreview(id, weights);
+        return preview == null ? ResponseEntity.status(502).build() : ResponseEntity.ok(preview);
     }
 
     @PostMapping("/{id}/rules")
@@ -96,6 +105,12 @@ public class AdminExperimentsController {
     }
 
     /** A refused body is still only answered to an admin, as for every other local answer. */
+    /** No negative weight and a positive sum (a long: a few large weights must not wrap around to a valid-looking sum). */
+    private static boolean validWeights(Map<UUID, Integer> weights) {
+        if (weights.values().stream().anyMatch(w -> w == null || w < 0)) return false;
+        return weights.values().stream().mapToLong(Integer::longValue).sum() > 0;
+    }
+
     private ResponseEntity<Void> invalid() {
         AdminAccess.require(filler);
         return ResponseEntity.badRequest().build();

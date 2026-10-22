@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
@@ -261,6 +262,9 @@ public interface ApiService {
     int adminExperimentAction(UUID id, String action);
     /** Sets the variants' weights by variant id; catapult-api's status (204; 404 unknown), 502 when unreachable. */
     int adminExperimentWeights(UUID id, Map<UUID, Integer> weights);
+
+    /** What saving these weights would move; null when catapult-api fails. */
+    ExperimentRebalanceDto adminExperimentWeightsPreview(UUID id, Map<UUID, Integer> weights);
     /** catapult-api's status (204; 404 unknown experiment), 502 when unreachable. */
     int adminAddExperimentRule(UUID id, ExperimentRuleRequest rule);
     /** catapult-api's status (204; 404 unknown experiment or rule), 502 when unreachable. */
