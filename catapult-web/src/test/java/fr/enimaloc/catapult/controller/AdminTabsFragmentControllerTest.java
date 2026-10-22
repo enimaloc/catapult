@@ -901,6 +901,37 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void experiments_showTheWeightsAsSharesOfTheirTotal() throws Exception {
+        var shares = List.of(new ExperimentVariantDto(CONTROL_ID, "control", "Control", 1, true),
+                new ExperimentVariantDto(ENABLED_ID, "enabled", "Enabled", 3, false));
+        when(apiService.adminExperiments()).thenReturn(List.of(
+                new ExperimentSummaryDto(EXP_ID, "dark-mode", "Dark mode", ExperimentStatus.ACTIVE, shares, 1),
+                new ExperimentSummaryDto(UUID.randomUUID(), "invite", "Invite", ExperimentStatus.DRAFT,
+                        List.of(new ExperimentVariantDto(UUID.randomUUID(), "off", "Off", 0, true)), 1)));
+
+        assertThat(asAdmin("/spa/admin/experiments")).contains("control 25 %", "enabled 75 %", "off 0 %");
+    }
+
+    @Test
+    void experimentDetail_ofAnEndedOne_showsTheWeightsAsShares() throws Exception {
+        var settings = new ExperimentSettingsDto(EXP_ID, "dark-mode", "Dark mode", null, ExperimentStatus.ENDED,
+                List.of(new ExperimentVariantDto(CONTROL_ID, "control", "Control", 1, true),
+                        new ExperimentVariantDto(ENABLED_ID, "enabled", "Enabled", 3, false)), List.of(), List.of());
+        when(apiService.adminExperiment(EXP_ID)).thenReturn(settings);
+        when(apiService.adminGroups()).thenReturn(List.of());
+        when(apiService.adminFlagKeys()).thenReturn(List.of());
+
+        assertThat(asAdmin("/spa/admin/experiments/" + EXP_ID)).contains(">25 %<", ">75 %<");
+    }
+
+    @Test
+    void experimentDetail_explainsThePriorityDirection() throws Exception {
+        experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
+
+        assertThat(asAdmin("/spa/admin/experiments/" + EXP_ID)).contains("Lower wins");
+    }
+
+    @Test
     void experiments_saysSo_whenCatapultApiFails() throws Exception {
         when(apiService.adminExperiments()).thenReturn(null);
 
@@ -914,10 +945,11 @@ class AdminTabsFragmentControllerTest {
         String html = asAdmin("/spa/admin/experiments/" + EXP_ID);
 
         assertThat(html).contains("data-experiment=\"" + EXP_ID + "\"", "data-status=\"DRAFT\"", "data-admin-back",
-                "data-experiment-action=\"activate\"", "data-experiment-action=\"reassign\"",
+                "data-experiment-action=\"activate\"",
                 "id=\"experiment-weights\"", "data-variant=\"" + ENABLED_ID + "\"", "id=\"experiment-rule-form\"",
                 "id=\"experiment-override-form\"", "experiment-rule-warning", "<datalist")
-                .doesNotContain("data-experiment-action=\"pause\"", "data-experiment-action=\"end\"");
+                .doesNotContain("data-experiment-action=\"pause\"", "data-experiment-action=\"end\"",
+                        "data-experiment-action=\"reassign\"");
     }
 
     @Test
@@ -925,7 +957,7 @@ class AdminTabsFragmentControllerTest {
         experiment(ExperimentStatus.PAUSED, List.of(), List.of());
 
         assertThat(asAdmin("/spa/admin/experiments/" + EXP_ID)).contains("data-experiment-action=\"activate\"",
-                "data-experiment-action=\"end\"").doesNotContain("data-experiment-action=\"pause\"");
+                "data-experiment-action=\"end\"").doesNotContain("data-experiment-action=\"pause\"", "data-experiment-action=\"reassign\"");
     }
 
     @Test
@@ -933,7 +965,7 @@ class AdminTabsFragmentControllerTest {
         experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
 
         assertThat(asAdmin("/spa/admin/experiments/" + EXP_ID)).contains("data-experiment-action=\"pause\"",
-                "data-experiment-action=\"end\"").doesNotContain("data-experiment-action=\"activate\"");
+                "data-experiment-action=\"end\"", "data-experiment-action=\"reassign\"").doesNotContain("data-experiment-action=\"activate\"");
     }
 
     @Test

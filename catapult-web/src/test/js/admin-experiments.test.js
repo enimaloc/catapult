@@ -250,7 +250,7 @@ describe("admin-experiments", () => {
         expect(posted).toHaveBeenLastCalledWith(`/admin/experiments/${EXP}/overrides/ov-1/delete`, {});
     });
 
-    it("tells a 400, a 404 (and reloads), and an unreachable api", async () => {
+    it("tells a 400, a 404 and a 409 (both reload), and an unreachable api", async () => {
         posted.mockResolvedValueOnce(response(400));
         await click('[data-experiment-action="activate"]');
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Refused");
@@ -261,9 +261,15 @@ describe("admin-experiments", () => {
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
         expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
 
+        posted.mockResolvedValueOnce(response(409));
+        await click('[data-experiment-action="activate"]');
+        expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
+        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(2);
+
         posted.mockResolvedValueOnce(response(502));
         await click('[data-experiment-action="activate"]');
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
+        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(2);
 
         posted.mockRejectedValueOnce(new Error("offline"));
         await click('[data-experiment-action="activate"]');
