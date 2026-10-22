@@ -773,4 +773,34 @@ class MockApiServiceTest {
         assertThat(service.adminExperimentAssignments(UUID.randomUUID(), null, "", 0)).isNull();
         assertThat(service.adminMoveExperimentAssignment(id, UUID.randomUUID(), variant)).isEqualTo(404);
     }
+
+    private static fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody toExperiment(UUID experiment, UUID variant) {
+        return new fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody("T", "B",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null,
+                fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody.EXPERIMENT, experiment, variant);
+    }
+
+    @Test
+    void sendNotification_toAnExperimentsParticipants_reportsHowManyWereTold() {
+        var dashboard = service.adminExperiments().stream().filter(e -> e.key().equals("new-dashboard")).findFirst().orElseThrow();
+        UUID variant = dashboard.variants().get(1).id();
+        long all = service.adminNotificationAudienceCount(dashboard.id(), null);
+        long one = service.adminNotificationAudienceCount(dashboard.id(), variant);
+
+        var everyone = service.adminSendNotification(toExperiment(dashboard.id(), null));
+        var narrowed = service.adminSendNotification(toExperiment(dashboard.id(), variant));
+
+        assertThat(everyone.status()).isEqualTo(201);
+        assertThat(everyone.body()).isEqualTo((int) all);
+        assertThat(narrowed.body()).isEqualTo((int) one);
+        assertThat(one).isPositive().isLessThan(all);
+        assertThat(service.adminCreateNotification(toExperiment(dashboard.id(), null))).isEqualTo(201);
+    }
+
+    @Test
+    void sendNotification_toAnExperiment_refusesAMissingOrUnknownOne() {
+        assertThat(service.adminSendNotification(toExperiment(null, null)).status()).isEqualTo(400);
+        assertThat(service.adminSendNotification(toExperiment(UUID.randomUUID(), null)).status()).isEqualTo(404);
+        assertThat(service.adminNotificationAudienceCount(UUID.randomUUID(), null)).isNull();
+    }
 }
