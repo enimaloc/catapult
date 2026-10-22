@@ -400,7 +400,11 @@ window.CatapultAdminExperiments = (function () {
         const status = await post(null, urlOf(root, `assignments/${encodeURIComponent(select.dataset.participantsMove)}/variant`), { variantId });
         if (ok(status)) {
             window.mdui?.snackbar?.({ message: root.dataset.labelSaved });
-            await Promise.all([loadParticipants(root), refreshOverrides(root)]);
+            try {
+                await Promise.all([loadParticipants(root), refreshOverrides(root)]);
+            } finally {
+                select.disabled = false; // still there when the refresh failed or was superseded
+            }
             return;
         }
         select.disabled = false;

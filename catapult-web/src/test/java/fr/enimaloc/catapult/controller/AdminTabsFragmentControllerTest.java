@@ -1016,6 +1016,19 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void participants_pastTheLastPage_landOnTheLastOneLeft() throws Exception {
+        experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
+        when(apiService.adminExperimentAssignments(EXP_ID, ENABLED_ID, null, 2))
+                .thenReturn(new ExperimentAssignmentsDto(new AdminPage<>(List.of(), 2, 2, 20), Map.of()));
+        when(apiService.adminExperimentAssignments(EXP_ID, ENABLED_ID, null, 1))
+                .thenReturn(participants(1, 2, assignment(USER_B, "bob", ENABLED_ID, false)));
+
+        String html = asAdmin("/spa/admin/experiments/" + EXP_ID + "/participants?variant=" + ENABLED_ID + "&page=2");
+
+        assertThat(html).contains("bob", "data-page=\"1\"", "2 / 2").doesNotContain("No participant matches");
+    }
+
+    @Test
     void participants_withoutAMatch_saysNoParticipantMatches() throws Exception {
         experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
         when(apiService.adminExperimentAssignments(EXP_ID, null, "zz", 0)).thenReturn(participants(0, 0));
