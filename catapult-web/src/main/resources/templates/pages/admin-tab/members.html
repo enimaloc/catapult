@@ -12,8 +12,13 @@
     <div class="section-header">
         <h2 th:text="#{admin.tab.members}">Membres</h2>
         <span class="eyebrow" th:if="${page != null}"
-              th:text="#{admin.members.count(${page.members().size()})}">0 membres</span>
+              th:text="#{admin.members.count(${page.totalElements()})}">0 membres</span>
+        <mdui-text-field class="admin-search" data-admin-search variant="outlined" clearable icon="search"
+                         th:attr="label=#{admin.search},value=${q}"></mdui-text-field>
     </div>
+
+    <!--/* Swapped by admin-tabs.js with each search and page: the list, its dialog and its pagination. */-->
+    <div data-admin-results>
 
     <mdui-card th:if="${page == null}" class="settings-card admin-placeholder" variant="outlined">
         <mdui-icon name="error_outline"></mdui-icon>
@@ -22,7 +27,7 @@
 
     <mdui-card th:if="${page != null and page.members().isEmpty()}" class="settings-card admin-placeholder" variant="outlined">
         <mdui-icon name="group_off"></mdui-icon>
-        <span th:text="#{admin.members.empty}">admin.members.empty</span>
+        <span th:text="${#strings.isEmpty(q)} ? #{admin.members.empty} : #{admin.no_match}">admin.members.empty</span>
     </mdui-card>
 
     <mdui-card id="admin-members" th:if="${page != null and !page.members().isEmpty()}" class="admin-members" variant="outlined"
@@ -115,11 +120,15 @@
         </div>
     </mdui-card>
 
+    <th:block th:if="${page != null}"><th:block th:replace="~{pages/admin-tab/common :: pagination(${page})}"></th:block></th:block>
+
     <!--/* Opened by the "migrate" action, on the member it was picked from. */-->
     <mdui-dialog id="admin-migrate-dialog" th:if="${page != null}" close-on-overlay-click
                  th:attr="data-headline=#{admin.members.migrate.title},data-incomplete=#{admin.members.migrate.incomplete}">
         <span slot="headline" id="admin-migrate-headline"></span>
         <div class="admin-migrate-form">
+            <mdui-text-field id="admin-migrate-search" variant="outlined" clearable icon="search"
+                             th:attr="label=#{admin.search}"></mdui-text-field>
             <mdui-select id="admin-migrate-target" th:attr="label=#{admin.members.migrate.target}" variant="outlined">
                 <mdui-menu-item th:each="m : ${page.members()}" th:unless="${m.systemAccount()}"
                                 th:value="${m.id()}" th:text="${m.twitchUsername() ?: m.id()}">member</mdui-menu-item>
@@ -132,6 +141,7 @@
         <mdui-button slot="action" variant="text" id="admin-migrate-cancel" th:text="#{admin.members.cancel}">Annuler</mdui-button>
         <mdui-button slot="action" id="admin-migrate-submit" th:text="#{admin.members.migrate.submit}">Migrer</mdui-button>
     </mdui-dialog>
+    </div>
 </th:block>
 </mdui-tab-panel>
 

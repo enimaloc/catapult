@@ -6,6 +6,8 @@
  * (400: data-label-invalid, 404: data-label-unknown-member, else data-label-unavailable) and leaves the dialog open, a success
  * closes it and reloads the tab. The Preview toggle renders the Markdown through the server
  * (catapult-api sanitizes it), shown as HTML in .notification-preview. Delete asks first.
+ * "One member" searches as the admin types (300 ms after the last key, /spa/admin/members/search, at
+ * most 20 matches listed as options); picking an option sets the recipient.
  * Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminNotifications = (function () {
@@ -31,7 +33,13 @@ window.CatapultAdminNotifications = (function () {
         delete form.dataset.member;
         showMode(form, "edit");
         showAudience(form, "ALL");
-        form.querySelectorAll(".admin-notifications-member-option").forEach(option => { option.hidden = true; });
+        clearMemberOptions(form);
+    }
+
+    function clearMemberOptions(form) {
+        searching++; // an answer still on its way is no longer wanted
+        clearTimeout(searchTimer);
+        form.querySelector(".admin-notifications-members").replaceChildren();
     }
 
     function showMode(form, mode) {
@@ -152,11 +160,42 @@ window.CatapultAdminNotifications = (function () {
         showMode(form, "preview");
     }
 
-    function filterMembers(form, query) {
-        const q = query.trim().toLowerCase();
-        form.querySelectorAll(".admin-notifications-member-option").forEach(option => {
-            option.hidden = q === "" || !option.dataset.search.includes(q);
-        });
+    const SEARCH_DELAY_MS = 300;
+    let searchTimer = null;
+    let searching = 0; // the latest member search asked: an older answer is dropped
+
+    /** Lists the members matching `query` as options; none for a blank query, and the list stays as it was when the search fails. */
+    async function searchMembers(form, query) {
+        const asked = ++searching;
+        const q = query.trim();
+        if (q === "") return clearMemberOptions(form);
+        let found = null;
+        try {
+            const response = await fetch(`/spa/admin/members/search?q=${encodeURIComponent(q)}`);
+            if (response.ok) found = await response.json();
+        } catch {
+            // not sent: told below
+        }
+        if (asked !== searching) return;
+        if (found === null) {
+            CatapultChannel.showError(rootOfForm(form).dataset.labelUnavailable);
+            return;
+        }
+        form.querySelector(".admin-notifications-members").replaceChildren(...found.map(member => {
+            const option = document.createElement("mdui-list-item");
+            option.className = "admin-notifications-member-option";
+            option.dataset.memberId = member.id;
+            option.dataset.login = member.login;
+            option.textContent = member.login;
+            return option;
+        }));
+    }
+
+    const rootOfForm = form => form.closest(".admin-notifications");
+
+    function scheduleSearch(form, query) {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => searchMembers(form, query), SEARCH_DELAY_MS);
     }
 
     function attach() {
@@ -185,7 +224,7 @@ window.CatapultAdminNotifications = (function () {
                 const form = formOf();
                 form.dataset.member = target.dataset.memberId;
                 fieldOf(form, "memberSearch").value = target.dataset.login;
-                filterMembers(form, "");
+                clearMemberOptions(form);
             }
         });
         panel.addEventListener("input", event => {
@@ -195,7 +234,7 @@ window.CatapultAdminNotifications = (function () {
             target.removeAttribute?.("invalid");
             if (target.matches('[name="memberSearch"]')) {
                 delete form.dataset.member; // typed over: the choice is to be made again
-                filterMembers(form, target.value ?? "");
+                scheduleSearch(form, target.value ?? "");
             }
         });
         panel.addEventListener("change", event => {

@@ -8,6 +8,8 @@ import { flush, html, load, render, response } from "./helpers.js";
 
 let posted;
 let confirmAnswer;
+let searched;
+let found;
 
 const dialog = () => document.getElementById("admin-notifications-dialog");
 const field = name => dialog().querySelector(`[name="${name}"]`);
@@ -38,8 +40,7 @@ function page() {
                         <p class="admin-notifications-chat-commands" hidden></p>
                         <div class="admin-notifications-member" hidden>
                             <input name="memberSearch">
-                            <div class="admin-notifications-member-option" data-member-id="m1" data-login="alice" data-search="alice" hidden></div>
-                            <div class="admin-notifications-member-option" data-member-id="m2" data-login="bob" data-search="bob" hidden></div>
+                            <div class="admin-notifications-members"></div>
                         </div>
                         <button class="admin-dialog-close"></button>
                         <button class="admin-notifications-save"></button>
@@ -65,6 +66,20 @@ function change(name, value) {
     field(name).dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+/** Types in the member search and lets its debounce run out and the answer arrive. */
+async function search(value) {
+    vi.useFakeTimers();
+    try {
+        type("memberSearch", value);
+        await vi.advanceTimersByTimeAsync(300);
+    } finally {
+        vi.useRealTimers();
+    }
+    await flush();
+}
+
+const options = () => dialog().querySelectorAll(".admin-notifications-member-option");
+
 const valid = () => {
     type("title", "Maintenance");
     type("body", "**soon**");
@@ -74,6 +89,9 @@ beforeEach(async () => {
     history.replaceState(null, "", "/admin#notifications");
     posted = vi.fn(async url => (url.endsWith("/preview") ? response(200, "<p><strong>soon</strong></p>") : response(201)));
     confirmAnswer = true;
+    found = [{ id: "m1", login: "alice" }];
+    searched = vi.fn(async () => response(200, found));
+    vi.stubGlobal("fetch", searched);
     window.CatapultCsrf = { postJson: posted };
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())), snackbar: vi.fn() };
     await load("admin-tabs", "admin-notifications");
@@ -166,14 +184,49 @@ describe("admin-notifications", () => {
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Pick one");
         expect(posted).not.toHaveBeenCalled();
 
-        type("memberSearch", "ali");
-        const [alice, bob] = dialog().querySelectorAll(".admin-notifications-member-option");
-        expect(alice.hidden).toBe(false);
-        expect(bob.hidden).toBe(true);
-        alice.click();
+        await search("ali");
+        expect(options()).toHaveLength(1);
+        expect(options()[0].textContent).toBe("alice");
+        options()[0].click();
+        expect(options()).toHaveLength(0);
         expect(field("memberSearch").value).toBe("alice");
         await click(".admin-notifications-save");
         expect(posted.mock.calls[0][1].targetUserId).toBe("m1");
+    });
+
+    it("searches the members 300 ms after the last key, not the members of a page", async () => {
+        change("audience", "ONE");
+        vi.useFakeTimers();
+        try {
+            type("memberSearch", "a");
+            await vi.advanceTimersByTimeAsync(200);
+            type("memberSearch", "al&i");
+            await vi.advanceTimersByTimeAsync(299);
+            expect(searched).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(1);
+        } finally {
+            vi.useRealTimers();
+        }
+        expect(searched).toHaveBeenCalledOnce();
+        expect(searched).toHaveBeenCalledWith("/spa/admin/members/search?q=al%26i");
+    });
+
+    it("lists no option for a blank search, and drops an answer older than the last search", async () => {
+        change("audience", "ONE");
+        await search("ali");
+        expect(options()).toHaveLength(1);
+        await search("  ");
+        expect(options()).toHaveLength(0);
+        expect(searched).toHaveBeenCalledOnce();
+    });
+
+    it("says so when the search fails, keeping the options it had", async () => {
+        change("audience", "ONE");
+        await search("ali");
+        searched.mockResolvedValue(response(503));
+        await search("alic");
+        expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
+        expect(options()).toHaveLength(1);
     });
 
     it("tells each streamer with chat commands, saying how", async () => {
@@ -188,9 +241,9 @@ describe("admin-notifications", () => {
     it("forgets the chosen member when the search is typed over", async () => {
         valid();
         change("audience", "ONE");
-        type("memberSearch", "ali");
+        await search("ali");
         dialog().querySelector('[data-member-id="m1"]').click();
-        type("memberSearch", "alic");
+        await search("alic");
         await click(".admin-notifications-save");
         expect(posted).not.toHaveBeenCalled();
     });

@@ -267,4 +267,49 @@ describe("admin-tabs", () => {
 
         expect(announced).toHaveBeenCalledWith("caches");
     });
+
+    describe("a prerendered tab's top-level list (Members)", () => {
+        const members = () => document.querySelector('mdui-tab-panel[value="members"]');
+
+        function prerendered() {
+            html(`
+                <mdui-tabs id="admin-tabs" data-hash-tabs>
+                    <mdui-tab value="members"></mdui-tab>
+                    <mdui-tab-panel value="members" data-admin-prerendered data-unavailable="Unavailable">
+                        <mdui-text-field data-admin-search></mdui-text-field>
+                        <div data-admin-results><span class="results">prerendered</span><button data-admin-page="1"></button></div>
+                    </mdui-tab-panel>
+                </mdui-tabs>`);
+            document.getElementById("admin-tabs").value = "members";
+            render();
+        }
+
+        it("pages its list without refetching the tab", async () => {
+            prerendered();
+            await flush();
+
+            members().querySelector('[data-admin-page="1"]').click();
+            await flush();
+
+            expect(urls()).toEqual(["/spa/admin/members?q=&page=1"]);
+            expect(members().querySelector(".results").textContent).toBe("/spa/admin/members?q=&page=1");
+        });
+
+        it("searches it from the first page, and keeps the search for the next page", async () => {
+            prerendered();
+            await flush();
+            const field = members().querySelector("[data-admin-search]");
+
+            vi.useFakeTimers();
+            field.value = "bob";
+            field.dispatchEvent(new Event("input", { bubbles: true }));
+            await vi.advanceTimersByTimeAsync(300);
+            vi.useRealTimers();
+            await flush();
+            members().querySelector('[data-admin-page="2"]').click();
+            await flush();
+
+            expect(urls()).toEqual(["/spa/admin/members?q=bob&page=0", "/spa/admin/members?q=bob&page=2"]);
+        });
+    });
 });

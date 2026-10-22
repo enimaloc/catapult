@@ -1,9 +1,8 @@
 <!--/*@thymesVar id="notifications" type="fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto>"*/-->
-<!--/*@thymesVar id="members" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.AdminMemberDto>"*/-->
 <!--/*
   The notifications sent, newest first (the page swaps through the tab's sub-view pagination), and the
   dialog creating one: Markdown body with a preview rendered by catapult-api, severity, an optional
-  call to action and expiry, everyone, one member picked from the members listed, or each streamer with an enabled chat command. Driven by
+  call to action and expiry, everyone, one member found by searching as the admin types, or each streamer with an enabled chat command. Driven by
   admin-notifications.js, which checks the fields as catapult-api does before posting.
 */-->
 <div th:fragment="content" class="admin-view admin-notifications"
@@ -70,10 +69,6 @@
             <div class="admin-notifications-member" hidden>
                 <mdui-text-field name="memberSearch" variant="outlined" clearable icon="search" th:attr="label=#{admin.notifications.member}"></mdui-text-field>
                 <div class="admin-notifications-members">
-                    <mdui-list-item class="admin-notifications-member-option" th:each="m : ${members}" hidden
-                                    th:if="${m.twitchUsername() != null}"
-                                    th:attr="data-member-id=${m.id()},data-login=${m.twitchUsername()},data-search=${#strings.toLowerCase(m.twitchUsername())}"
-                                    th:text="${m.twitchUsername()}">login</mdui-list-item>
                 </div>
             </div>
             <div class="admin-data-actions">

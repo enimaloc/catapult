@@ -598,18 +598,38 @@ class RealApiServiceTest {
 
     @Test
     void adminMembers_readsTheAccountsLeavingTheirSecretsOut() {
-        respond(HttpMethod.GET, "/api/admin/members", """
+        respond(HttpMethod.GET, "/api/admin/members?page=2&q=enim", """
                 {"members":[{"id":"00000000-0000-0000-0000-000000000001","twitchId":"1","twitchUsername":"enimaloc",
                   "profileImageUrl":"img","steamId":"765","steamPersonalToken":"secret","systemAccount":false,
                   "botEnabled":true,"status":"ACTIVE","createdAt":"2025-03-01T12:00:00Z"}],
-                 "liveStatus":{"00000000-0000-0000-0000-000000000001":true},"isMockProfile":false}""");
+                 "liveStatus":{"00000000-0000-0000-0000-000000000001":true},"isMockProfile":false,
+                 "number":2,"totalPages":3,"totalElements":101}""");
 
-        var page = service.adminMembers();
+        var page = service.adminMembers("enim", 2);
 
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
         assertThat(page.members()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
                 id, "1", "enimaloc", "img", "765", false, true, "ACTIVE", java.time.Instant.parse("2025-03-01T12:00:00Z")));
         assertThat(page.isLive(id)).isTrue();
+        assertThat(page.number()).isEqualTo(2);
+        assertThat(page.totalPages()).isEqualTo(3);
+        assertThat(page.totalElements()).isEqualTo(101);
+    }
+
+    @Test
+    void adminMembers_withoutASearch_asksForThePageAlone() {
+        respond(HttpMethod.GET, "/api/admin/members?page=0&q=", "{\"members\":[],\"liveStatus\":{},\"isMockProfile\":false,\"number\":0,\"totalPages\":0,\"totalElements\":0}");
+
+        assertThat(service.adminMembers(null, 0).members()).isEmpty();
+    }
+
+    @Test
+    void adminSearchMembers_readsTheMatchesAndEscapesTheQuery() {
+        respond(HttpMethod.GET, "/api/admin/members/search?q=a%26b%20c",
+                "[{\"id\":\"00000000-0000-0000-0000-000000000001\",\"twitchId\":\"1\",\"twitchUsername\":\"enimaloc\","
+                        + "\"systemAccount\":false,\"botEnabled\":true,\"status\":\"ACTIVE\"}]");
+
+        assertThat(service.adminSearchMembers("a&b c")).extracting(m -> m.twitchUsername()).containsExactly("enimaloc");
     }
 
     @Test

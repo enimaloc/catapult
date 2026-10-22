@@ -42,6 +42,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -68,7 +70,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
+                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments", "/spa/admin/experiments/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments/00000000-0000-0000-0000-000000000001/participants?variant=&q=x&page=1")) {
@@ -93,7 +95,7 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminApiKeys(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminTws();
         verify(apiService, never()).adminMinecraftAccounts();
-        verify(apiService, never()).adminMembers();
+        verify(apiService, never()).adminMembers(anyString(), anyInt());
         verify(apiService, never()).adminMember(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminMemberTargeting(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminExperiments();
@@ -464,28 +466,25 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
-    void notifications_rendersTheListTheDialogAndTheMembers() throws Exception {
+    void notifications_rendersTheListAndTheDialog_withoutLoadingTheMembers() throws Exception {
         when(apiService.adminNotifications(2)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminPage<>(
                 List.of(notification("BROADCAST", null, "y".repeat(200)), notification("TARGETED", "alice", "short")), 2, 3, 41));
-        when(apiService.adminMembers()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMembersPage(
-                List.of(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
-                        java.util.UUID.fromString("00000000-0000-0000-0000-000000000007"), "1", "bob", null, null, false, false,
-                        "ACTIVE", null)), java.util.Map.of(), false));
 
         String html = asAdmin("/spa/admin/notifications?page=2");
 
         assertThat(html).contains("admin-notifications", "id=\"admin-notifications-new\"", "data-delete=\"00000000-0000-0000-0000-000000000042\"",
                         "Maintenance &lt;b&gt;", "Everyone", "alice", "id=\"admin-notifications-dialog\"", "maxlength=\"255\"",
-                        "maxlength=\"64\"", "maxlength=\"512\"", "data-member-id=\"00000000-0000-0000-0000-000000000007\"", "bob",
+                        "maxlength=\"64\"", "maxlength=\"512\"", "admin-notifications-members",
                         "data-admin-results", "data-admin-page=\"1\"", "data-label-cta-pair=\"", "data-label-invalid=\"",
                         "data-label-unavailable=\"", "notification-preview")
-                .contains("y".repeat(120)).doesNotContain("y".repeat(121));
+                .contains("y".repeat(120)).doesNotContain("y".repeat(121)).doesNotContain("admin-notifications-member-option");
+        verify(apiService, never()).adminMembers(anyString(), anyInt());
+        verify(apiService, never()).adminSearchMembers(anyString());
     }
 
     @Test
-    void notifications_saysSoWhenTheApiIsUnavailable_andToleratesNoMembers() throws Exception {
+    void notifications_saysSoWhenTheApiIsUnavailable() throws Exception {
         when(apiService.adminNotifications(0)).thenReturn(null);
-        when(apiService.adminMembers()).thenReturn(null);
 
         assertThat(asAdmin("/spa/admin/notifications")).contains("admin-placeholder", "id=\"admin-notifications-new\"")
                 .doesNotContain("data-delete");
@@ -662,16 +661,70 @@ class AdminTabsFragmentControllerTest {
     void membersFragment_isThePanelContent_withTheTargetingItem() throws Exception {
         UUID other = UUID.fromString("00000000-0000-0000-0000-000000000002");
         when(apiService.currentUserId()).thenReturn(MEMBER);
-        when(apiService.adminMembers()).thenReturn(new AdminMembersPage(List.of(
+        when(apiService.adminMembers("", 0)).thenReturn(new AdminMembersPage(List.of(
                 new AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE",
                         Instant.parse("2025-03-01T12:00:00Z")),
                 new AdminMemberDto(MEMBER, "1", "catapult_bot", "img", null, true, true, "ACTIVE",
-                        Instant.parse("2025-03-01T12:00:00Z"))), Map.of(), false));
+                        Instant.parse("2025-03-01T12:00:00Z"))), Map.of(), false, 0, 1, 1));
 
         String html = asAdmin("/spa/admin/members");
 
         assertThat(html).doesNotContain("<mdui-tab-panel").contains("id=\"admin-members\"", "data-admin-open=\"" + other + "\"")
                 .doesNotContain("data-admin-open=\"" + MEMBER + "\"");
+    }
+
+    @Test
+    void membersFragment_passesThePageAndTheSearchThrough_andRendersThePaginationAndTheSearchField() throws Exception {
+        UUID other = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        when(apiService.adminMembers("vie", 1)).thenReturn(new AdminMembersPage(List.of(
+                new AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE",
+                        Instant.parse("2025-03-01T12:00:00Z"))), Map.of(), false, 1, 3, 101));
+
+        String html = asAdmin("/spa/admin/members?q=vie&page=1");
+
+        verify(apiService).adminMembers("vie", 1);
+        assertThat(html).contains("data-admin-results", "data-admin-search", "value=\"vie\"", "data-admin-page=\"0\"",
+                "data-admin-page=\"2\"", "2 / 3", "101", "data-admin-open=\"" + other + "\"");
+    }
+
+    @Test
+    void membersFragment_onASingleOrEmptyPage_hasNoPagination_andSaysNoMatchForASearch() throws Exception {
+        when(apiService.adminMembers("zzz", 0)).thenReturn(new AdminMembersPage(List.of(), Map.of(), false, 0, 0, 0));
+
+        String html = asAdmin("/spa/admin/members?q=zzz");
+
+        assertThat(html).contains("data-admin-results", "Nothing matches this search").doesNotContain("data-admin-page=");
+    }
+
+    @Test
+    void membersFragment_withoutParameters_isTheFirstPageOfEveryone() throws Exception {
+        when(apiService.adminMembers("", 0)).thenReturn(new AdminMembersPage(List.of(), Map.of(), false, 0, 0, 0));
+
+        asAdmin("/spa/admin/members");
+
+        verify(apiService).adminMembers("", 0);
+    }
+
+    @Test
+    void searchMembers_answersTheLoginsToPickFrom_skippingTheNamelessOnes() throws Exception {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        Instant at = Instant.parse("2025-03-01T12:00:00Z");
+        when(apiService.adminSearchMembers("vie")).thenReturn(List.of(
+                new AdminMemberDto(id, "2", "viewer", "img", null, false, true, "ACTIVE", at),
+                new AdminMemberDto(UUID.randomUUID(), null, null, null, null, false, false, "INACTIVE", at)));
+
+        String json = asAdmin("/spa/admin/members/search?q=vie");
+
+        assertThat(json).isEqualTo("[{\"id\":\"" + id + "\",\"login\":\"viewer\"}]");
+    }
+
+    @Test
+    void searchMembers_is503WhenTheApiFails() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminSearchMembers("vie")).thenReturn(null);
+
+        mvc.perform(get("/spa/admin/members/search?q=vie").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isServiceUnavailable());
     }
 
     /** Enabled only for another active member with a Twitch account; the system account has none. */
@@ -682,11 +735,11 @@ class AdminTabsFragmentControllerTest {
         UUID bot = UUID.fromString("00000000-0000-0000-0000-000000000004");
         Instant at = Instant.parse("2025-03-01T12:00:00Z");
         when(apiService.currentUserId()).thenReturn(MEMBER);
-        when(apiService.adminMembers()).thenReturn(new AdminMembersPage(List.of(
+        when(apiService.adminMembers("", 0)).thenReturn(new AdminMembersPage(List.of(
                 new AdminMemberDto(MEMBER, "1", "me", "img", null, false, true, "ACTIVE", at),
                 new AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE", at),
                 new AdminMemberDto(inactive, "3", "gone", "img", null, false, false, "INACTIVE", at),
-                new AdminMemberDto(bot, "4", "catapult_bot", "img", null, true, true, "ACTIVE", at)), Map.of(), false));
+                new AdminMemberDto(bot, "4", "catapult_bot", "img", null, true, true, "ACTIVE", at)), Map.of(), false, 0, 1, 1));
 
         String html = asAdmin("/spa/admin/members");
 
@@ -700,9 +753,9 @@ class AdminTabsFragmentControllerTest {
     @Test
     void systemAccount_getsOnlyEditSettings() throws Exception {
         when(apiService.currentUserId()).thenReturn(MEMBER);
-        when(apiService.adminMembers()).thenReturn(new AdminMembersPage(List.of(
+        when(apiService.adminMembers("", 0)).thenReturn(new AdminMembersPage(List.of(
                 new AdminMemberDto(MEMBER, "1", "catapult_bot", "img", null, true, true, "ACTIVE",
-                        Instant.parse("2025-03-01T12:00:00Z"))), Map.of(), false));
+                        Instant.parse("2025-03-01T12:00:00Z"))), Map.of(), false, 0, 1, 1));
 
         String html = asAdmin("/spa/admin/members");
 

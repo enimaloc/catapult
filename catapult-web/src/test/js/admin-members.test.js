@@ -26,6 +26,7 @@ function page() {
         </div>
         <div id="admin-migrate-dialog" data-headline="Migrate the data of {0}" data-incomplete="Pick">
             <span id="admin-migrate-headline"></span>
+            <input id="admin-migrate-search">
             <div id="admin-migrate-target">
                 <mdui-menu-item value="${ID}"></mdui-menu-item>
                 <mdui-menu-item value="${OTHER}"></mdui-menu-item>
@@ -114,6 +115,62 @@ describe("admin-members", () => {
         expect(posts()).toEqual([[`/admin/members/${ID}/migrate`,
             { targetId: OTHER, migrateSettings: false, migrateGetters: false, migrateBindings: true }]]);
         expect(dialog.open).toBe(false);
+    });
+
+    it("reloads the list as shown (same search, same page) rather than the page, inside the members tab", async () => {
+        page();
+        const panel = document.createElement("mdui-tab-panel");
+        panel.setAttribute("value", "members");
+        panel.append(...document.body.childNodes);
+        document.body.append(panel);
+        CatapultAdminTabs.reloadResults = vi.fn(async () => {});
+
+        await click('[data-action="delete"]');
+
+        expect(posts()).toEqual([[`/admin/members/${ID}/delete`, {}]]);
+        expect(CatapultAdminTabs.reloadResults).toHaveBeenCalledWith(panel);
+        expect(refreshed()).toBe(0);
+    });
+
+    describe("migrate target search", () => {
+        const typeSearch = async query => {
+            vi.useFakeTimers();
+            try {
+                const search = document.getElementById("admin-migrate-search");
+                search.value = query;
+                search.dispatchEvent(new Event("input"));
+                await vi.advanceTimersByTimeAsync(300);
+            } finally {
+                vi.useRealTimers();
+            }
+            await flush();
+        };
+
+        it("replaces the target options by the members found, 300 ms after the last key", async () => {
+            const fetched = vi.fn(async () => response(200, [{ id: OTHER, login: "bob" }, { id: ID, login: "enimaloc" }]));
+            vi.stubGlobal("fetch", fetched);
+            page();
+            await click('[data-action="migrate"]');
+
+            await typeSearch("b&o");
+
+            expect(fetched).toHaveBeenCalledWith("/spa/admin/members/search?q=b%26o");
+            const items = [...document.querySelectorAll("#admin-migrate-target mdui-menu-item")];
+            expect(items.map(item => item.textContent)).toEqual(["bob", "enimaloc"]);
+            expect(items.map(item => item.disabled)).toEqual([false, true]);
+        });
+
+        it("keeps the options when the search fails or is blank", async () => {
+            const fetched = vi.fn(async () => response(503));
+            vi.stubGlobal("fetch", fetched);
+            page();
+            await click('[data-action="migrate"]');
+
+            await typeSearch("bob");
+            await typeSearch(" ");
+
+            expect(document.querySelectorAll("#admin-migrate-target mdui-menu-item")).toHaveLength(2);
+        });
     });
 
     describe("impersonate", () => {

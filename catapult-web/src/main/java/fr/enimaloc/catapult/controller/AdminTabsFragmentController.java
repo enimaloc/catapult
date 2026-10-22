@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
-import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
@@ -51,13 +51,32 @@ public class AdminTabsFragmentController {
     private final ApiService apiService;
     private final BroadcastState broadcastState;
 
-    /** The members list, for the way back from a member's targeting; the page itself comes with it already. */
+    /**
+     * The members list, for the way back from a member's targeting (the page itself comes with its
+     * first page already) and, searched and paged by admin-tabs.js, one page of members matching {@code q}.
+     */
     @GetMapping("/members")
-    String members(Model model, HttpServletResponse response) {
+    String members(Model model, HttpServletResponse response, @RequestParam(required = false, defaultValue = "") String q,
+                   @RequestParam(defaultValue = "0") int page) {
         return guarded(model, response, () -> {
-            filler.admin(model);
+            filler.admin(model, q, Math.max(0, page));
             return "pages/admin-tab/members :: content";
         });
+    }
+
+    /** A member the notification picker offers: the id to send to and the login to show. */
+    record MemberOption(String id, String login) {}
+
+    /** Up to 20 members matching {@code q} for the notification picker; none for a blank one, 503 when catapult-api fails. */
+    @GetMapping(value = "/members/search", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    ResponseEntity<List<MemberOption>> searchMembers(@RequestParam(required = false, defaultValue = "") String q) {
+        int refused = AdminAccess.refusal(filler);
+        if (refused != 0) return ResponseEntity.status(refused).build();
+        List<AdminMemberDto> found = apiService.adminSearchMembers(q);
+        if (found == null) return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        return ResponseEntity.ok(found.stream().filter(m -> m.twitchUsername() != null)
+                .map(m -> new MemberOption(m.id().toString(), m.twitchUsername())).toList());
     }
 
     /** {@code targeting} with no flag nor group where catapult-api left them out; null stays null (unavailable). */
@@ -231,9 +250,7 @@ public class AdminTabsFragmentController {
     @GetMapping("/notifications")
     String notifications(Model model, HttpServletResponse response, @RequestParam(defaultValue = "0") int page) {
         return guarded(model, response, () -> {
-            AdminMembersPage members = apiService.adminMembers();
             model.addAttribute("notifications", apiService.adminNotifications(page));
-            model.addAttribute("members", members == null ? null : members.members());
             return "pages/admin-tab/notifications :: content";
         });
     }
