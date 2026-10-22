@@ -259,9 +259,9 @@ class ApiAdminNotificationsControllerTest {
     void list_returnsAdminDtosNewestFirstWithoutTheEntity() throws Exception {
         UUID target = UUID.randomUUID();
         AdminNotificationDto targeted = new AdminNotificationDto(UUID.randomUUID(), "T", "**b**", "<p><strong>b</strong></p>",
-                Severity.INFO, null, null, null, Instant.now(), "TARGETED", target, "someone");
+                Severity.INFO, null, null, null, Instant.now(), "TARGETED", target, "someone", 1);
         AdminNotificationDto broadcast = new AdminNotificationDto(UUID.randomUUID(), "B", "b", "<p>b</p>",
-                Severity.WARNING, null, null, null, Instant.now().minusSeconds(60), "BROADCAST", null, null);
+                Severity.WARNING, null, null, null, Instant.now().minusSeconds(60), "BROADCAST", null, null, 0);
         when(service.adminPage(any())).thenReturn(new PageImpl<>(List.of(targeted, broadcast)));
 
         mvc.perform(get("/api/admin/notifications")

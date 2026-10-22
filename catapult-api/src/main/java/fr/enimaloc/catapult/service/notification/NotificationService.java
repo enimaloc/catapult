@@ -185,10 +185,13 @@ public class NotificationService {
     private AdminNotificationDto toAdminDto(Notification n) {
         UUID targetId = null;
         String targetLogin = null;
+        long recipients = 0;
         if (n.getAudience() == Notification.Audience.TARGETED) {
-            // a targeted notification has exactly one recipient
-            UserAccount target = recipientRepo.findByIdNotificationId(n.getId()).stream()
-                    .findFirst().map(NotificationRecipient::getUser).orElse(null);
+            // counted, not loaded: a shared notification can have thousands of recipients; only a lone one is named
+            recipients = recipientRepo.countByIdNotificationId(n.getId());
+            UserAccount target = recipients == 1
+                    ? recipientRepo.findByIdNotificationId(n.getId()).stream().findFirst().map(NotificationRecipient::getUser).orElse(null)
+                    : null;
             if (target != null) {
                 targetId = target.getId();
                 targetLogin = target.getTwitchUsername();
@@ -196,7 +199,7 @@ public class NotificationService {
         }
         return new AdminNotificationDto(n.getId(), n.getTitle(), n.getBody(), renderer.render(n.getBody()),
                 n.getSeverity(), n.getCtaUrl(), n.getCtaLabel(), n.getExpiresAt(), n.getCreatedAt(),
-                n.getAudience().name(), targetId, targetLogin);
+                n.getAudience().name(), targetId, targetLogin, recipients);
     }
 
     private NotificationDto toDto(Notification n, boolean read) {
