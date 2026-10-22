@@ -119,6 +119,38 @@ class NotificationServiceTest {
     }
 
     @Test
+    void createForAll_storesOneTargetedNotificationSharedByEveryRecipient() {
+        UserAccount u1 = userWithStatus(UserAccount.Status.ACTIVE);
+        UserAccount u2 = userWithStatus(UserAccount.Status.ACTIVE);
+        when(notifRepo.save(any())).thenAnswer(inv -> {
+            Notification n = inv.getArgument(0);
+            n.setId(UUID.randomUUID());
+            return n;
+        });
+
+        int sent = service.createForAll(new NotificationService.CreateRequest("T", "B", Severity.INFO,
+                null, null, null, null), admin, List.of(u1, u2));
+
+        assertThat(sent).isEqualTo(2);
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notifRepo).save(saved.capture());
+        assertThat(saved.getValue().getAudience()).isEqualTo(Notification.Audience.TARGETED);
+        ArgumentCaptor<List<NotificationRecipient>> cap = ArgumentCaptor.forClass(List.class);
+        verify(recipientRepo).saveAll(cap.capture());
+        assertThat(cap.getValue()).extracting(NotificationRecipient::getUser).containsExactly(u1, u2);
+    }
+
+    @Test
+    void createForAll_withNoRecipient_storesNothing() {
+        int sent = service.createForAll(new NotificationService.CreateRequest("T", "B", Severity.INFO,
+                null, null, null, null), admin, List.of());
+
+        assertThat(sent).isZero();
+        verify(notifRepo, never()).save(any());
+        verify(publisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
     void createBroadcast_savesAllActiveUsers() {
         UserAccount u1 = userWithStatus(UserAccount.Status.ACTIVE);
         UserAccount u2 = userWithStatus(UserAccount.Status.ACTIVE);

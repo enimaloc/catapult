@@ -335,4 +335,66 @@ class ExperimentAssignmentRepositoryTest {
         em.flush();
         em.clear();
     }
+
+    /** An assigned member with the given status; {@code system} marks a built-in account. */
+    private UserAccount assignedMember(ExperimentVariant variant, String username, UserAccount.Status status, boolean system) {
+        UserAccount user = new UserAccount();
+        user.setTwitchUsername(username);
+        user.setStatus(status);
+        user.setSystemAccount(system);
+        em.persist(user);
+        ExperimentAssignment a = new ExperimentAssignment();
+        a.setExperiment(em.find(Experiment.class, experiment.getId()));
+        a.setVariant(em.find(ExperimentVariant.class, variant.getId()));
+        a.setUser(user);
+        em.persist(a);
+        em.flush();
+        return user;
+    }
+
+    private void notifiableFixture() {
+        assignedMember(control, "ctrl-active", UserAccount.Status.ACTIVE, false);
+        assignedMember(treatment, "treat-active", UserAccount.Status.ACTIVE, false);
+        assignedMember(treatment, "treat-active-2", UserAccount.Status.ACTIVE, false);
+        assignedMember(treatment, "treat-inactive", UserAccount.Status.INACTIVE, false);
+        assignedMember(control, "ctrl-deleting", UserAccount.Status.PENDING_DELETION, false);
+        assignedMember(control, "ctrl-system", UserAccount.Status.ACTIVE, true);
+        Experiment other = new Experiment();
+        other.setKey("other");
+        other.setName("Other");
+        em.persist(other);
+        ExperimentVariant otherVariant = variant(other, "x");
+        UserAccount stranger = new UserAccount();
+        stranger.setTwitchUsername("stranger");
+        em.persist(stranger);
+        ExperimentAssignment a = new ExperimentAssignment();
+        a.setExperiment(other);
+        a.setVariant(otherVariant);
+        a.setUser(stranger);
+        em.persist(a);
+        em.flush();
+        em.clear();
+    }
+
+    @Test
+    void notifiableRecipients_areTheActiveNonSystemMembersOfEveryVariant() {
+        notifiableFixture();
+
+        assertThat(repository.findNotifiableUsers(experiment))
+                .extracting(UserAccount::getTwitchUsername)
+                .containsExactlyInAnyOrder("ctrl-active", "treat-active", "treat-active-2");
+        assertThat(repository.countNotifiableUsers(experiment)).isEqualTo(3);
+    }
+
+    @Test
+    void notifiableRecipients_canBeNarrowedToOneVariant() {
+        notifiableFixture();
+
+        assertThat(repository.findNotifiableUsersByVariant(experiment, treatment.getId()))
+                .extracting(UserAccount::getTwitchUsername)
+                .containsExactlyInAnyOrder("treat-active", "treat-active-2");
+        assertThat(repository.countNotifiableUsersByVariant(experiment, treatment.getId())).isEqualTo(2);
+        assertThat(repository.findNotifiableUsersByVariant(experiment, empty.getId())).isEmpty();
+        assertThat(repository.countNotifiableUsersByVariant(experiment, empty.getId())).isZero();
+    }
 }
