@@ -41,7 +41,7 @@ class MetaTagRulesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"viewport", "Description", "OG:TITLE", "twitter:card", "sentry-trace", "baggage"})
+    @ValueSource(strings = {"viewport", "Description", "OG:TITLE", "twitter:card", "sentry-trace", "baggage", "DarkReader-Lock"})
     void aKeyTheSiteWritesItself_isReserved_whateverItsCase(String key) {
         assertThat(problem(PROPERTY, key, "x")).isEqualTo("Reserved key");
     }
