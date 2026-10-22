@@ -21,7 +21,9 @@ function page() {
         <mdui-tab-panel value="notifications">
             <div class="admin-view admin-notifications" data-confirm-text="OK" data-cancel-text="No"
                  data-label-invalid="Refused" data-label-cta-pair="Both" data-label-past-expiry="Past"
-                 data-label-member-required="Pick one" data-label-unknown-member="Gone" data-label-unavailable="Down" data-label-created="Sent">
+                 data-label-member-required="Pick one" data-label-unknown-member="Gone" data-label-unavailable="Down" data-label-created="Sent"
+                 data-label-sent="Sent to {n}" data-label-recipients="{n} recipients" data-label-variant-all="All variants"
+                 data-label-experiment-required="Pick an experiment">
                 <button id="admin-notifications-new"></button>
                 <div data-admin-results>
                     <div class="admin-notification-row" data-id="n1">
@@ -38,6 +40,17 @@ function page() {
                         <input name="ctaLabel"><input name="ctaUrl"><input name="expiresAt">
                         <div name="audience" value="ALL"></div>
                         <p class="admin-notifications-chat-commands" hidden></p>
+                        <div class="admin-notifications-experiment-audience" hidden>
+                            <div name="experimentId" class="admin-notifications-experiment" value=""></div>
+                            <div name="variantId" class="admin-notifications-variant" value="ALL"></div>
+                            <p class="admin-notifications-count" hidden></p>
+                            <div class="admin-notifications-variants-of" hidden data-experiment-id="e1">
+                                <span data-variant-id="v1">Control</span><span data-variant-id="v2">New</span>
+                            </div>
+                            <div class="admin-notifications-variants-of" hidden data-experiment-id="e2">
+                                <span data-variant-id="v3">Only</span>
+                            </div>
+                        </div>
                         <div class="admin-notifications-member" hidden>
                             <input name="memberSearch">
                             <div class="admin-notifications-members"></div>
@@ -87,7 +100,11 @@ const valid = () => {
 
 beforeEach(async () => {
     history.replaceState(null, "", "/admin#notifications");
-    posted = vi.fn(async url => (url.endsWith("/preview") ? response(200, "<p><strong>soon</strong></p>") : response(201)));
+    posted = vi.fn(async url => {
+        if (url.endsWith("/preview")) return response(200, "<p><strong>soon</strong></p>");
+        if (url.endsWith("/audience-count")) return response(200, { count: 3 });
+        return response(201);
+    });
     confirmAnswer = true;
     found = [{ id: "m1", login: "alice" }];
     searched = vi.fn(async () => response(200, found));
@@ -357,5 +374,106 @@ describe("admin-notifications", () => {
         expect(field("title").value).toBe("");
         expect(field("body").value).toBe("");
         expect(field("audience").value).toBe("ALL");
+    });
+
+    describe("experiment participants", () => {
+        const variantOptions = () => [...field("variantId").querySelectorAll("[data-variant-option]")].map(o => [o.value ?? o.getAttribute("value"), o.textContent]);
+        const countLine = () => dialog().querySelector(".admin-notifications-count");
+        const countCalls = () => posted.mock.calls.filter(([url]) => url.endsWith("/audience-count"));
+
+        it("shows the experiment and variant selects instead of the member search", () => {
+            const experiment = dialog().querySelector(".admin-notifications-experiment-audience");
+            expect(experiment.hidden).toBe(true);
+            change("audience", "EXPERIMENT");
+            expect(experiment.hidden).toBe(false);
+            expect(dialog().querySelector(".admin-notifications-member").hidden).toBe(true);
+            change("audience", "ALL");
+            expect(experiment.hidden).toBe(true);
+        });
+
+        it("lists all variants plus the chosen experiment's own, replaced when it changes", async () => {
+            change("audience", "EXPERIMENT");
+            change("experimentId", "e1");
+            await flush();
+            expect(variantOptions()).toEqual([["ALL", "All variants"], ["v1", "Control"], ["v2", "New"]]);
+            change("experimentId", "e2");
+            await flush();
+            expect(variantOptions()).toEqual([["ALL", "All variants"], ["v3", "Only"]]);
+            expect(field("variantId").value).toBe("ALL");
+        });
+
+        it("fetches the recipient count when the experiment or the variant changes", async () => {
+            change("audience", "EXPERIMENT");
+            expect(countLine().hidden).toBe(true);
+            change("experimentId", "e1");
+            await flush();
+            expect(countCalls()).toEqual([["/admin/notifications/audience-count",
+                { audience: "EXPERIMENT", experimentId: "e1", variantId: null }]]);
+            expect(countLine().hidden).toBe(false);
+            expect(countLine().textContent).toBe("3 recipients");
+
+            posted.mockImplementationOnce(async () => response(200, { count: 1 }));
+            change("variantId", "v2");
+            await flush();
+            expect(countCalls().at(-1)[1]).toEqual({ audience: "EXPERIMENT", experimentId: "e1", variantId: "v2" });
+            expect(countLine().textContent).toBe("1 recipients");
+        });
+
+        it("hides the count when it can't be fetched or no experiment is chosen", async () => {
+            change("audience", "EXPERIMENT");
+            posted.mockImplementationOnce(async () => response(503));
+            change("experimentId", "e1");
+            await flush();
+            expect(countLine().hidden).toBe(true);
+            change("experimentId", "");
+            await flush();
+            expect(countLine().hidden).toBe(true);
+            expect(countCalls()).toHaveLength(1);
+        });
+
+        it("refuses to send without an experiment, marking the select", async () => {
+            valid();
+            change("audience", "EXPERIMENT");
+            await click(".admin-notifications-save");
+            expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Pick an experiment");
+            expect(field("experimentId").hasAttribute("invalid")).toBe(true);
+            expect(posted).not.toHaveBeenCalled();
+        });
+
+        it("sends the experiment, and the variant when one is chosen", async () => {
+            valid();
+            change("audience", "EXPERIMENT");
+            change("experimentId", "e1");
+            await flush();
+            await click(".admin-notifications-save");
+            expect(posted.mock.calls.at(-1)[1]).toMatchObject({ audience: "EXPERIMENT", experimentId: "e1", variantId: null, targetUserId: null });
+
+            change("variantId", "v2");
+            await flush();
+            await click(".admin-notifications-save");
+            expect(posted.mock.calls.at(-1)[1]).toMatchObject({ audience: "EXPERIMENT", experimentId: "e1", variantId: "v2" });
+        });
+
+        it("reports how many members were told", async () => {
+            valid();
+            change("audience", "EXPERIMENT");
+            change("experimentId", "e1");
+            await flush();
+            posted.mockImplementationOnce(async () => response(201, { sent: 12 }));
+            await click(".admin-notifications-save");
+            expect(mdui.snackbar).toHaveBeenLastCalledWith({ message: "Sent to 12" });
+            expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        });
+
+        it("starts empty each time the dialog opens", async () => {
+            change("audience", "EXPERIMENT");
+            change("experimentId", "e1");
+            await flush();
+            await click("#admin-notifications-new");
+            expect(field("experimentId").value).toBe("");
+            expect(variantOptions()).toEqual([["ALL", "All variants"]]);
+            expect(countLine().hidden).toBe(true);
+            expect(dialog().querySelector(".admin-notifications-experiment-audience").hidden).toBe(true);
+        });
     });
 });

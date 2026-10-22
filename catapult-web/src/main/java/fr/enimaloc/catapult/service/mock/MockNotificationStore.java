@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashMap;
@@ -100,6 +101,26 @@ class MockNotificationStore {
         }
         sent.add(new AdminNotificationDto(id, title, body, html, severity, ctaUrl, ctaLabel, expiresAt, now,
                 target == null ? "BROADCAST" : "TARGETED", target, target == null ? null : memberLogin.apply(target)));
+        return 201;
+    }
+
+    /** One notification shared by {@code recipients} alone (accounts are seeded as needed); catapult-api's status. */
+    synchronized int createShared(String title, String body, Severity severity, String ctaUrl, String ctaLabel,
+                                  Instant expiresAt, Collection<UUID> recipients) {
+        if (!valid(title, body, severity, ctaUrl, ctaLabel, expiresAt)) return 400;
+        ctaUrl = blankToNull(ctaUrl);
+        ctaLabel = blankToNull(ctaLabel);
+        UUID id = UUID.randomUUID();
+        Instant now = clock.instant();
+        String html = html(body);
+        NotificationDto dto = new NotificationDto(id, title, html, severity, ctaUrl, ctaLabel, expiresAt, now, false);
+        for (UUID account : recipients) {
+            notifications(account).add(dto);
+            publish(account, NotificationStreamEvent.CREATED, dto);
+        }
+        UUID first = recipients.stream().findFirst().orElse(null);
+        sent.add(new AdminNotificationDto(id, title, body, html, severity, ctaUrl, ctaLabel, expiresAt, now,
+                "TARGETED", first, first == null ? null : memberLogin.apply(first)));
         return 201;
     }
 

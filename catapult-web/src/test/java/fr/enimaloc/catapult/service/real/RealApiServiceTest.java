@@ -931,6 +931,48 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminSendNotification_readsHowManyWereTold_andPassesTheExperimentIds() {
+        UUID experiment = UUID.randomUUID();
+        UUID variant = UUID.randomUUID();
+        var body = new fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody("t", "b",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null, "EXPERIMENT", experiment, variant);
+        expect(HttpMethod.POST, "/api/admin/notifications")
+                .andExpect(content().json("{\"audience\":\"EXPERIMENT\",\"experimentId\":\"" + experiment + "\",\"variantId\":\"" + variant + "\"}"))
+                .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON).body("{\"sent\":7}"));
+
+        var result = service.adminSendNotification(body);
+
+        assertThat(result.status()).isEqualTo(201);
+        assertThat(result.body()).isEqualTo(7);
+    }
+
+    @Test
+    void adminSendNotification_ofASingleNotification_hasNoCount() {
+        var body = new fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody("t", "b",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null);
+        expect(HttpMethod.POST, "/api/admin/notifications").andRespond(withStatus(HttpStatus.CREATED)
+                .contentType(MediaType.APPLICATION_JSON).body("{\"id\":\"" + NOTIF_ID + "\",\"title\":\"t\"}"));
+
+        var result = service.adminSendNotification(body);
+
+        assertThat(result.status()).isEqualTo(201);
+        assertThat(result.body()).isNull();
+    }
+
+    @Test
+    void adminNotificationAudienceCount_postsTheIds_andIsNullOnFailure() {
+        UUID experiment = UUID.randomUUID();
+        UUID variant = UUID.randomUUID();
+        expect(HttpMethod.POST, "/api/admin/notifications/audience-count")
+                .andExpect(content().json("{\"audience\":\"EXPERIMENT\",\"experimentId\":\"" + experiment + "\",\"variantId\":\"" + variant + "\"}"))
+                .andRespond(withSuccess("{\"count\":12}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/admin/notifications/audience-count").andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(service.adminNotificationAudienceCount(experiment, variant)).isEqualTo(12L);
+        assertThat(service.adminNotificationAudienceCount(experiment, null)).isNull();
+    }
+
+    @Test
     void adminDtddProposals_readsTheListOfTheStatus() {
         respond(HttpMethod.GET, "/api/admin/dtdd-mapping/proposals?status=APPROVED", "[{\"id\":\"" + NOTIF_ID
                 + "\",\"createdAt\":\"2026-10-18T10:00:00Z\",\"igdbId\":\"100\",\"proposedDtddId\":4521,"

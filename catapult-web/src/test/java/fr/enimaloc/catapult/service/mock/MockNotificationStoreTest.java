@@ -227,4 +227,22 @@ class MockNotificationStoreTest {
 
         assertThat(events).hasSize(10).allSatisfy(e -> assertThat(e).isEqualTo(new BroadcastStreamEvent("alert.info", alert.data())));
     }
+
+    @Test
+    void createForSeveralAccounts_storesOneNotificationReachingOnlyThem() {
+        store.snapshot(member);
+        UUID stranger = UUID.randomUUID();
+
+        assertThat(store.createShared("Titre", "Corps", Severity.INFO, null, null, null, List.of(a, b))).isEqualTo(201);
+
+        assertThat(store.snapshot(a).items()).extracting(NotificationDto::title).contains("Titre");
+        assertThat(store.snapshot(b).items()).extracting(NotificationDto::title).contains("Titre");
+        assertThat(store.snapshot(member).items()).extracting(NotificationDto::title).doesNotContain("Titre");
+        assertThat(store.snapshot(stranger).items()).hasSize(1);
+        assertThat(store.adminPage(0).content()).hasSize(1);
+        assertThat(store.adminPage(0).content().get(0).audience()).isEqualTo("TARGETED");
+        assertThat(streamEvents(NotificationStreamEvent.CREATED)).extracting(NotificationStreamEvent::accountId)
+                .containsExactlyInAnyOrder(a, b);
+        assertThat(store.createShared("", "Corps", Severity.INFO, null, null, null, List.of(a))).isEqualTo(400);
+    }
 }

@@ -44,12 +44,54 @@ class AdminNotificationsControllerTest {
     @Test
     void create_isForwardedForAnAdmin_andItsStatusRelayed() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminCreateNotification(any())).thenReturn(201);
+        when(apiService.adminSendNotification(any())).thenReturn(new ApiClient.Result<>(201, null));
 
-        mvc.perform(admin(post("/admin/notifications"), BODY)).andExpect(status().isCreated());
+        mvc.perform(admin(post("/admin/notifications"), BODY)).andExpect(status().isCreated())
+                .andExpect(content().string(""));
 
-        verify(apiService).adminCreateNotification(
+        verify(apiService).adminSendNotification(
                 new AdminNotificationCreateBody("Hi", "**x**", Severity.WARNING, null, null, null, null));
+    }
+
+    @Test
+    void create_forAnExperiment_relaysTheIds_andHowManyWereTold() throws Exception {
+        UUID experiment = UUID.randomUUID();
+        UUID variant = UUID.randomUUID();
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminSendNotification(any())).thenReturn(new ApiClient.Result<>(201, 12));
+
+        mvc.perform(admin(post("/admin/notifications"), "{\"title\":\"Hi\",\"body\":\"x\",\"severity\":\"INFO\","
+                        + "\"audience\":\"EXPERIMENT\",\"experimentId\":\"" + experiment + "\",\"variantId\":\"" + variant + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(content().json("{\"sent\":12}"));
+
+        verify(apiService).adminSendNotification(new AdminNotificationCreateBody("Hi", "x", Severity.INFO, null, null, null,
+                null, "EXPERIMENT", experiment, variant));
+    }
+
+    @Test
+    void audienceCount_isRelayedForAnAdmin_and503WhenTheApiFails() throws Exception {
+        UUID experiment = UUID.randomUUID();
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminNotificationAudienceCount(experiment, null)).thenReturn(12L);
+
+        mvc.perform(admin(post("/admin/notifications/audience-count"),
+                        "{\"audience\":\"EXPERIMENT\",\"experimentId\":\"" + experiment + "\"}"))
+                .andExpect(status().isOk()).andExpect(content().json("{\"count\":12}"));
+        UUID failing = UUID.randomUUID();
+        when(apiService.adminNotificationAudienceCount(failing, null)).thenReturn(null);
+        mvc.perform(admin(post("/admin/notifications/audience-count"),
+                        "{\"audience\":\"EXPERIMENT\",\"experimentId\":\"" + failing + "\"}"))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void audienceCount_isRefusedToAVisitorAndAMember() throws Exception {
+        String body = "{\"audience\":\"EXPERIMENT\",\"experimentId\":\"" + UUID.randomUUID() + "\"}";
+        mvc.perform(post("/admin/notifications/audience-count").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(admin(post("/admin/notifications/audience-count"), body)).andExpect(status().isForbidden());
+        verify(apiService, never()).adminNotificationAudienceCount(any(), any());
     }
 
     @Test
@@ -63,7 +105,7 @@ class AdminNotificationsControllerTest {
     @Test
     void failures_areRelayed() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminCreateNotification(any())).thenReturn(400);
+        when(apiService.adminSendNotification(any())).thenReturn(new ApiClient.Result<>(400, null));
         when(apiService.adminDeleteNotification(ID)).thenReturn(502);
         when(apiService.adminPreviewNotification("x")).thenReturn(new ApiClient.Result<>(502, null));
         // an older catapult-api without the route: its 404, not a 502 reported as a server error
@@ -94,7 +136,7 @@ class AdminNotificationsControllerTest {
                     .andExpect(status().isUnauthorized());
             mvc.perform(admin(post(url), BODY)).andExpect(status().isForbidden());
         }
-        verify(apiService, never()).adminCreateNotification(any());
+        verify(apiService, never()).adminSendNotification(any());
         verify(apiService, never()).adminDeleteNotification(any());
         verify(apiService, never()).adminPreviewNotification(any());
     }
