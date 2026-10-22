@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.service.notification;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.notification.NotificationChannelPreference;
 import fr.enimaloc.catapult.domain.notification.NotificationChannelPreferenceId;
-import fr.enimaloc.catapult.event.NotificationDeliveryPendingEvent;
 import fr.enimaloc.catapult.repository.notification.NotificationChannelPreferenceRepository;
 import fr.enimaloc.catapult.repository.notification.NotificationDeliveryRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,14 +33,13 @@ class NotificationDeliveryServiceTest {
     @Mock NotificationChannelPreferenceRepository preferenceRepo;
     @Mock NotificationDeliveryRepository deliveryRepo;
     @Mock TwitchatEventActionService eventActionService;
-    @Mock ApplicationEventPublisher publisher;
 
     NotificationDeliveryService service;
     UserAccount user;
 
     @BeforeEach
     void setUp() {
-        service = new NotificationDeliveryService(preferenceRepo, deliveryRepo, eventActionService, publisher);
+        service = new NotificationDeliveryService(preferenceRepo, deliveryRepo, eventActionService);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
@@ -92,26 +89,22 @@ class NotificationDeliveryServiceTest {
     }
 
     @Test
-    void createFor_createsTheDeliveriesInBulk_andTellsTheWebWhoseTwitchatHasSome() {
+    void createFor_createsTheDeliveriesInBulk_andReturnsWhoseTwitchatHasSome() {
         UUID notificationId = UUID.randomUUID();
         UUID waiting = UUID.randomUUID();
         when(deliveryRepo.createForNotification(eq(notificationId), any())).thenReturn(2);
         when(deliveryRepo.findUserIdsByNotificationAndChannel(notificationId, TWITCHAT)).thenReturn(List.of(waiting));
 
-        service.createFor(notificationId);
-
-        verify(publisher).publishEvent(new NotificationDeliveryPendingEvent(List.of(waiting)));
+        assertThat(service.createFor(notificationId)).containsExactly(waiting);
     }
 
     @Test
-    void createFor_onlyStreamStartDeliveries_tellsNobody() {
+    void createFor_onlyStreamStartDeliveries_returnsNobody() {
         UUID notificationId = UUID.randomUUID();
         when(deliveryRepo.createForNotification(eq(notificationId), any())).thenReturn(1);
         when(deliveryRepo.findUserIdsByNotificationAndChannel(notificationId, TWITCHAT)).thenReturn(List.of());
 
-        service.createFor(notificationId);
-
-        verify(publisher, never()).publishEvent(any(Object.class));
+        assertThat(service.createFor(notificationId)).isEmpty();
     }
 
     @Test
@@ -119,10 +112,8 @@ class NotificationDeliveryServiceTest {
         UUID notificationId = UUID.randomUUID();
         when(deliveryRepo.createForNotification(eq(notificationId), any())).thenReturn(0);
 
-        service.createFor(notificationId);
-
+        assertThat(service.createFor(notificationId)).isEmpty();
         verify(deliveryRepo, never()).findUserIdsByNotificationAndChannel(any(), any());
-        verify(publisher, never()).publishEvent(any(Object.class));
     }
 
     @Test

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -50,4 +51,26 @@ public interface NotificationDeliveryRepository extends JpaRepository<Notificati
     @Modifying
     @Query("delete from NotificationDelivery d where d.id.userId = :userId and d.id.channel in :channels")
     int deleteByUserAndChannels(@Param("userId") UUID userId, @Param("channels") List<NotificationChannel> channels);
+
+    /**
+     * Takes one delivery for sending, atomically: 1 for the caller that removed the row, 0 for any
+     * other (a concurrent flush, a second stream start, a read or a cancel got there first). Its own
+     * transaction, so it is visible to the others at once.
+     */
+    @Transactional
+    @Modifying
+    @Query("""
+            delete from NotificationDelivery d
+            where d.id.notificationId = :notificationId and d.id.userId = :userId and d.id.channel = :channel""")
+    int claim(@Param("notificationId") UUID notificationId, @Param("userId") UUID userId,
+              @Param("channel") NotificationChannel channel);
+
+    /** Puts back a claimed delivery whose send failed, as it was; none when its notification is gone meanwhile. */
+    @Transactional
+    @Modifying
+    @Query(value = """
+            INSERT INTO notification_delivery (notification_id, user_id, channel, created_at)
+            SELECT n.id, :userId, :channel, :createdAt FROM notification n WHERE n.id = :notificationId""", nativeQuery = true)
+    int restore(@Param("notificationId") UUID notificationId, @Param("userId") UUID userId,
+                @Param("channel") String channel, @Param("createdAt") Instant createdAt);
 }

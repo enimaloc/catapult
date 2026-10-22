@@ -183,6 +183,9 @@ public class TwitchatEventDispatcher {
             }
             renderer.render(row.getAction(), data).ifPresent(rendered::add);
         }
+        if (type == NOTIFICATION) {
+            rendered.replaceAll(TwitchatEventDispatcher::withoutTrailingSpace);
+        }
         return publish(user, type, rendered);
     }
 
@@ -199,6 +202,20 @@ public class TwitchatEventDispatcher {
         variables.put("baseUrl", stripTrailingSlash(publicWebUrl));
         variables.put("channel", nullToEmpty(user.getTwitchUsername()));
         return variables;
+    }
+
+    /**
+     * A chat message's text without trailing whitespace: a notification without a call to action
+     * leaves the default message's {@code {{ctaUrl}}} empty after its space.
+     */
+    private static TwitchatPayload withoutTrailingSpace(TwitchatPayload payload) {
+        if (!TwitchatPayloadRenderer.CHAT_MESSAGE.equals(payload.action())
+                || !(payload.data().get("message") instanceof String message)) {
+            return payload;
+        }
+        Map<String, Object> data = new LinkedHashMap<>(payload.data());
+        data.put("message", message.stripTrailing());
+        return new TwitchatPayload(payload.action(), data);
     }
 
     private static Map<String, String> games(String gameName, String previousGameName) {

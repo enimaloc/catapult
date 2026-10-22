@@ -55,11 +55,30 @@ class ApiTwitchatWidgetControllerTest {
         UserAccount owner = new UserAccount();
         owner.setId(UUID.randomUUID());
         when(widgetTokenService.resolve(token)).thenReturn(Optional.of(owner));
+        TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
+        settings.setEnabled(true);
+        when(widgetSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
         when(deliveryDispatcher.flushTwitchat(owner)).thenReturn(3);
 
         mvc.perform(post("/api/twitchat/widget/{uuid}/notifications/flush", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.delivered").value(3));
+    }
+
+    /** Like config(): a disabled widget is no widget, and its owner's deliveries stay pending. */
+    @Test
+    void flushNotifications_disabledWidget_returns404_withoutFlushing() throws Exception {
+        UUID token = UUID.randomUUID();
+        UserAccount owner = new UserAccount();
+        owner.setId(UUID.randomUUID());
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(owner));
+        TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
+        settings.setEnabled(false);
+        when(widgetSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
+
+        mvc.perform(post("/api/twitchat/widget/{uuid}/notifications/flush", token))
+                .andExpect(status().isNotFound());
+        org.mockito.Mockito.verifyNoInteractions(deliveryDispatcher);
     }
 
     @Test
