@@ -11,27 +11,7 @@
                          th:text="#{notifications.mark_all_read}">notifications.mark_all_read</mdui-button>
         </div>
 
-        <!--/* Where else notifications reach the member; notification-channels.js saves each switch. */-->
-        <mdui-card th:if="${notificationChannels != null}" id="notification-channels" class="settings-card" variant="outlined">
-            <h3 th:text="#{notifications.channels.title}">notifications.channels.title</h3>
-            <p class="notification-channel-hint" th:text="#{notifications.channels.site}">notifications.channels.site</p>
-            <div class="notification-channel">
-                <label>
-                    <mdui-switch data-channel="TWITCHAT"
-                                 th:checked="${notificationChannels.channels().contains(T(fr.enimaloc.catapult.common.dto.notification.NotificationChannel).TWITCHAT)}"></mdui-switch>
-                    <span th:text="#{notifications.channels.twitchat}">notifications.channels.twitchat</span>
-                </label>
-                <p class="notification-channel-hint" th:text="#{notifications.channels.twitchat.hint}">notifications.channels.twitchat.hint</p>
-            </div>
-            <div class="notification-channel">
-                <label>
-                    <mdui-switch data-channel="STREAM_START_CHAT"
-                                 th:checked="${notificationChannels.channels().contains(T(fr.enimaloc.catapult.common.dto.notification.NotificationChannel).STREAM_START_CHAT)}"></mdui-switch>
-                    <span th:text="#{notifications.channels.chat}">notifications.channels.chat</span>
-                </label>
-                <p class="notification-channel-hint" th:text="#{notifications.channels.chat.hint}">notifications.channels.chat.hint</p>
-            </div>
-        </mdui-card>
+        <mdui-card th:replace="~{fragments/notification-channels :: card(${notificationChannels})}"></mdui-card>
 
         <mdui-card th:if="${notifications == null}" id="notifications-page-unavailable" class="settings-card admin-placeholder" variant="outlined">
             <mdui-icon name="error_outline"></mdui-icon>
