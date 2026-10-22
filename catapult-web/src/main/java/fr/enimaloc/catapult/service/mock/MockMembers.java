@@ -24,7 +24,13 @@ import java.util.function.UnaryOperator;
 public class MockMembers {
     private static final Instant CREATED = Instant.parse("2025-03-01T12:00:00Z");
     /** The inactive account and the bot, listed after the accounts that logged in. */
-    private static final Set<UUID> SEEDED = Set.of(MockPresets.uuidOf("inactive"), MockPresets.uuidOf("catapult_bot"));
+    private static final Set<UUID> SEEDED = new HashSet<>(Set.of(MockPresets.uuidOf("inactive"), MockPresets.uuidOf("catapult_bot")));
+    /** Members per page, as catapult-api lists them. */
+    static final int PAGE_SIZE = 50;
+    /** Most matches the notification picker gets, as catapult-api. */
+    static final int SEARCH_LIMIT = 20;
+    /** Made-up members filling the listing so it has several pages to browse. */
+    private static final int FAKE_MEMBERS = 120;
 
     private final List<AdminMemberDto> members = new ArrayList<>();
     private final Map<UUID, Boolean> live = new LinkedHashMap<>();
@@ -36,6 +42,12 @@ public class MockMembers {
                 false, false, "INACTIVE", CREATED.minus(90, ChronoUnit.DAYS)));
         members.add(new AdminMemberDto(MockPresets.uuidOf("catapult_bot"), "99999999", "catapult_bot",
                 MockPresets.getDefaultAvatar(), null, true, true, "ACTIVE", CREATED.minus(365, ChronoUnit.DAYS)));
+        for (int i = 1; i <= FAKE_MEMBERS; i++) {
+            UUID id = MockPresets.uuidOf("viewer%03d".formatted(i));
+            SEEDED.add(id);
+            members.add(new AdminMemberDto(id, String.valueOf(5_000_000 + i), "viewer%03d".formatted(i),
+                    MockPresets.getDefaultAvatar(), null, false, true, "ACTIVE", CREATED.minus(i, ChronoUnit.DAYS)));
+        }
     }
 
     /** Lists {@code session}'s account and the channels it moderates, unless they already were. */
@@ -54,11 +66,47 @@ public class MockMembers {
         live.put(channel.id(), channel.live());
     }
 
-    /** The members, {@code self}'s account first. */
+    /**
+     * One page of the members matching {@code q} (blank: all), as catapult-api lists them: by
+     * username, nameless last, then id. Only that page's live statuses come with it.
+     */
+    public synchronized AdminMembersPage page(String q, int page) {
+        List<AdminMemberDto> matching = matching(q).stream().sorted(LISTING_ORDER).toList();
+        int number = Math.max(page, 0);
+        int from = Math.min(number * PAGE_SIZE, matching.size());
+        List<AdminMemberDto> shown = matching.subList(from, Math.min(from + PAGE_SIZE, matching.size()));
+        Map<UUID, Boolean> shownLive = new LinkedHashMap<>();
+        shown.forEach(m -> {
+            if (live.containsKey(m.id())) shownLive.put(m.id(), live.get(m.id()));
+        });
+        return new AdminMembersPage(List.copyOf(shown), shownLive, true, number,
+                (matching.size() + PAGE_SIZE - 1) / PAGE_SIZE, matching.size());
+    }
+
+    /** At most 20 members matching {@code q}; none for a blank one. */
+    public synchronized List<AdminMemberDto> search(String q) {
+        if (q == null || q.isBlank()) return List.of();
+        return matching(q).stream().sorted(LISTING_ORDER).limit(SEARCH_LIMIT).toList();
+    }
+
+    private static final Comparator<AdminMemberDto> LISTING_ORDER = Comparator
+            .comparing(AdminMemberDto::twitchUsername, Comparator.nullsLast(Comparator.<String>naturalOrder()))
+            .thenComparing(AdminMemberDto::id);
+
+    /** The members whose username contains {@code q} (any case) or whose twitch id is exactly it. */
+    private List<AdminMemberDto> matching(String q) {
+        String query = q == null ? "" : q.trim();
+        if (query.isEmpty()) return members;
+        String lower = query.toLowerCase(java.util.Locale.ROOT);
+        return members.stream().filter(m -> query.equals(m.twitchId())
+                || (m.twitchUsername() != null && m.twitchUsername().toLowerCase(java.util.Locale.ROOT).contains(lower))).toList();
+    }
+
+    /** Every member, {@code self}'s account first: what the mock's own lookups search. */
     public synchronized AdminMembersPage page(UUID self) {
         List<AdminMemberDto> sorted = new ArrayList<>(members);
         sorted.sort(Comparator.comparing(m -> !m.id().equals(self)));
-        return new AdminMembersPage(List.copyOf(sorted), Map.copyOf(live), true);
+        return new AdminMembersPage(List.copyOf(sorted), Map.copyOf(live), true, 0, 1, sorted.size());
     }
 
     public synchronized void toggleBot(UUID id) {

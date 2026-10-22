@@ -156,7 +156,7 @@ public class MockApiService implements ApiService {
     private final Map<UUID, Set<String>> seenFeatures = new ConcurrentHashMap<>();
 
     /**
-     * The members, the calling session's own account first; that account (and the channels it
+     * Every member (the whole list, not a page), the calling session's own account first; that account (and the channels it
      * moderates) is registered here too, for a session rebuilt by {@link #currentData} or given
      * a moderated channel by the mock admin page. Null without a session, as catapult-api's 401.
      */
@@ -826,9 +826,21 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public AdminMembersPage adminMembers() {
-        log.trace("adminMembers()");
-        return memberPage();
+    public AdminMembersPage adminMembers(String q, int page) {
+        log.trace("adminMembers({}, {})", q, page);
+        MockData current = currentData();
+        if (current == null) return null;
+        members.register(current);
+        return members.page(q, page);
+    }
+
+    @Override
+    public List<AdminMemberDto> adminSearchMembers(String q) {
+        log.trace("adminSearchMembers({})", q);
+        MockData current = currentData();
+        if (current == null) return null;
+        members.register(current);
+        return members.search(q);
     }
 
     @Override

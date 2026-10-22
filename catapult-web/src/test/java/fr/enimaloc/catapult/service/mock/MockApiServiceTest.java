@@ -281,7 +281,7 @@ class MockApiServiceTest {
     void groups_addMemberByLogin_404ForAnUnknownLoginOrGroup() {
         assertThat(service.adminCreateGroup("crew", "Crew", null)).isEqualTo(201);
         var group = service.adminGroups().stream().filter(g -> g.key().equals("crew")).findFirst().orElseThrow();
-        String login = service.adminMembers().members().getFirst().twitchUsername();
+        String login = allMembers().getFirst().twitchUsername();
 
         assertThat(service.adminAddGroupMember(group.id(), "nobody-here")).isEqualTo(404);
         assertThat(service.adminAddGroupMember(java.util.UUID.randomUUID(), login)).isEqualTo(404);
@@ -293,7 +293,7 @@ class MockApiServiceTest {
 
     @Test
     void targeting_flagsAndGroups_followTheActions() {
-        var member = service.adminMembers().members().getFirst();
+        var member = selfMember();
         var group = service.adminGroups().getFirst();
 
         assertThat(service.adminMember(member.id()).twitchUsername()).isEqualTo(member.twitchUsername());
@@ -559,11 +559,11 @@ class MockApiServiceTest {
     @Test
     void adminImpersonate_mintsATokenForTheMember_refusesSelfSystemAndUnknown() {
         data.addModeratedChannel();
-        var members = service.adminMembers().members();
-        var target = members.get(1);
+        var members = allMembers();
+        var target = members.stream().filter(m -> m.twitchUsername().equals("moderee_1")).findFirst().orElseThrow();
         assertThat(target.systemAccount()).isFalse();
 
-        assertThat(service.adminImpersonate(members.getFirst().twitchUsername())).isEqualTo(new ApiClient.Result<>(403, null));
+        assertThat(service.adminImpersonate(selfMember().twitchUsername())).isEqualTo(new ApiClient.Result<>(403, null));
         assertThat(service.adminImpersonate("catapult_bot")).isEqualTo(new ApiClient.Result<>(403, null));
         assertThat(service.adminImpersonate("nobody")).isEqualTo(new ApiClient.Result<>(404, null));
         var result = service.adminImpersonate(target.twitchUsername());
@@ -585,8 +585,8 @@ class MockApiServiceTest {
         String other = username;
         loginAs("1");
 
-        var members = service.adminMembers().members();
-        assertThat(members.getFirst().twitchUsername()).isEqualTo(username);
+        var members = allMembers();
+        assertThat(selfMember().twitchUsername()).isEqualTo(username);
         assertThat(members).extracting(m -> m.twitchUsername()).contains(other);
         assertThat(service.adminImpersonate(other).status()).isEqualTo(200);
     }
@@ -603,15 +603,53 @@ class MockApiServiceTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.getSession(true).setAttribute(ApiClient.SESSION_JWT_KEY, otherToken);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-        assertThat(service.adminMembers().members()).noneMatch(m -> m.id().equals(other));
+        assertThat(allMembers()).noneMatch(m -> m.id().equals(other));
+    }
+
+    /** Every member, page after page, as the admin tab would browse them. */
+    private java.util.List<fr.enimaloc.catapult.common.dto.admin.AdminMemberDto> allMembers() {
+        java.util.List<fr.enimaloc.catapult.common.dto.admin.AdminMemberDto> all = new java.util.ArrayList<>();
+        var first = service.adminMembers("", 0);
+        all.addAll(first.members());
+        for (int page = 1; page < first.totalPages(); page++) all.addAll(service.adminMembers("", page).members());
+        return all;
+    }
+
+    private fr.enimaloc.catapult.common.dto.admin.AdminMemberDto selfMember() {
+        return allMembers().stream().filter(m -> m.id().equals(service.currentUserId())).findFirst().orElseThrow();
     }
 
     @Test
-    void adminMembers_listsTheSessionsChannelFirst_thenTheSystemAccount() {
-        var members = service.adminMembers().members();
+    void adminMembers_pagesFiftyAtATime_byUsername_namelessLast() {
+        var first = service.adminMembers("", 0);
+        var last = service.adminMembers("", first.totalPages() - 1);
 
-        assertThat(members.getFirst().id()).isEqualTo(service.currentUserId());
-        assertThat(members).filteredOn(m -> m.systemAccount()).hasSize(1);
+        assertThat(first.members()).hasSize(50);
+        assertThat(first.number()).isZero();
+        assertThat(first.totalPages()).isGreaterThan(2);
+        assertThat(first.totalElements()).isGreaterThan(120);
+        assertThat(first.members()).extracting(m -> m.twitchUsername()).isSorted();
+        assertThat(last.members().getLast().twitchUsername()).isNull(); // the inactive account, nameless
+        assertThat(allMembers()).filteredOn(m -> m.systemAccount()).hasSize(1);
+        assertThat(allMembers()).extracting(m -> m.id()).contains(service.currentUserId());
+        assertThat(service.adminMembers("", 99).members()).isEmpty();
+    }
+
+    @Test
+    void adminMembers_filtersByUsernameSubstring_orExactTwitchId_andSearchesTwentyAtMost() {
+        assertThat(service.adminMembers("VIEWER05", 0).members()).extracting(m -> m.twitchUsername())
+                .containsExactly("viewer050", "viewer051", "viewer052", "viewer053", "viewer054", "viewer055",
+                        "viewer056", "viewer057", "viewer058", "viewer059");
+        assertThat(service.adminMembers("5000007", 0).members()).extracting(m -> m.twitchUsername()).containsExactly("viewer007");
+        assertThat(service.adminMembers("500000", 0).members()).isEmpty(); // an id is matched whole
+        assertThat(service.adminMembers("  ", 0).totalElements()).isGreaterThan(120);
+
+        assertThat(service.adminSearchMembers("viewer")).hasSize(20).extracting(m -> m.twitchUsername()).isSorted();
+        assertThat(service.adminSearchMembers("viewer10")).extracting(m -> m.twitchUsername())
+                .containsExactly("viewer100", "viewer101", "viewer102", "viewer103", "viewer104", "viewer105",
+                        "viewer106", "viewer107", "viewer108", "viewer109");
+        assertThat(service.adminSearchMembers("  ")).isEmpty();
+        assertThat(service.adminSearchMembers(null)).isEmpty();
     }
 
     @Test
@@ -620,20 +658,18 @@ class MockApiServiceTest {
 
         service.adminToggleMemberBot(self);
         service.adminUnlinkMemberSteam(self);
-        assertThat(service.adminMembers().members().getFirst())
-                .matches(m -> !m.botEnabled() && m.steamId() == null);
+        assertThat(selfMember()).matches(m -> !m.botEnabled() && m.steamId() == null);
 
         service.adminPromoteMemberToSystem(self);
-        assertThat(service.adminMembers().members()).filteredOn(m -> m.systemAccount())
+        assertThat(allMembers()).filteredOn(m -> m.systemAccount())
                 .extracting(m -> m.id()).containsExactly(self);
 
         service.adminUnlinkMemberTwitch(self);
-        assertThat(service.adminMembers().members().getFirst())
-                .matches(m -> m.twitchId() == null && "INACTIVE".equals(m.status()));
-        assertThat(service.adminMembers().isLive(self)).isFalse();
+        assertThat(selfMember()).matches(m -> m.twitchId() == null && "INACTIVE".equals(m.status()));
+        assertThat(service.adminMembers("", 0).isLive(self)).isFalse();
 
         service.adminDeleteMember(self);
-        assertThat(service.adminMembers().members()).noneMatch(m -> m.id().equals(self));
+        assertThat(allMembers()).noneMatch(m -> m.id().equals(self));
     }
 
     // --- admin: CCL, caches, data ---
@@ -722,7 +758,7 @@ class MockApiServiceTest {
         UUID rule = service.adminExperiment(id).rules().getFirst().id();
         assertThat(service.adminDeleteExperimentRule(id, rule)).isEqualTo(204);
 
-        String login = service.adminMembers().members().getFirst().twitchUsername();
+        String login = service.adminMembers("", 0).members().getFirst().twitchUsername();
         assertThat(service.adminAddExperimentOverride(id,
                 new fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest("USER", "EXCLUDE", 1, " " + login.toUpperCase() + " ",
                         null, null, null, null))).isEqualTo(204);
