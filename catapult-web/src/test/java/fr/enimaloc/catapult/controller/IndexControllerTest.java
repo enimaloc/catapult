@@ -472,12 +472,12 @@ class IndexControllerTest {
         java.util.UUID self = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
         java.util.UUID other = java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
         org.mockito.Mockito.when(apiService.currentUserId()).thenReturn(self);
-        org.mockito.Mockito.when(apiService.adminMembers()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMembersPage(List.of(
+        org.mockito.Mockito.when(apiService.adminMembers("", 0)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMembersPage(List.of(
                 new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(self, "1", "enimaloc", "img", null, false, true, "ACTIVE",
                         java.time.Instant.parse("2025-03-01T12:00:00Z")),
                 new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(other, "2", "viewer", "img", "765", false, false, "ACTIVE",
                         java.time.Instant.parse("2025-03-01T12:00:00Z"))),
-                java.util.Map.of(), false));
+                java.util.Map.of(), false, 0, 1, 2));
         String key = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
 
         for (String url : List.of("/admin", "/spa/admin")) {

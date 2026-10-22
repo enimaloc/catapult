@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.AppConfigResponse;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
@@ -116,6 +117,7 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<AdminPage<Map<String, Object>>> DATA_ROWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<Map<String, Object>> DATA_ROW = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<NotificationDto>> NOTIFICATIONS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<AdminMemberDto>> MEMBERS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DtddProposalDto>> DTDD_PROPOSALS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
@@ -392,8 +394,13 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public AdminMembersPage adminMembers() {
-        return client.get("/api/admin/members", AdminMembersPage.class);
+    public AdminMembersPage adminMembers(String q, int page) {
+        return client.get("/api/admin/members?page={page}&q={q}", AdminMembersPage.class, page, q == null ? "" : q);
+    }
+
+    @Override
+    public List<AdminMemberDto> adminSearchMembers(String q) {
+        return client.get("/api/admin/members/search?q={q}", MEMBERS, q == null ? "" : q);
     }
 
     @Override

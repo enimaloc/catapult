@@ -270,11 +270,17 @@ public class ModelFiller {
     }
 
     /**
-     * The admin page model: the members tab's accounts (null when catapult-api fails), the
+     * The admin page model: the members tab's first page of accounts (null when catapult-api fails), the
      * admin's own account id, which the tab won't let them delete, and the tabs' "new" dots.
      */
     public void admin(Model model) {
-        model.addAttribute("adminMembers", apiService.adminMembers());
+        admin(model, "", 0);
+    }
+
+    /** The admin model with the members tab on {@code page} of the members matching {@code q} (blank: all). */
+    public void admin(Model model, String q, int page) {
+        model.addAttribute("q", q);
+        model.addAttribute("adminMembers", apiService.adminMembers(q, page));
         model.addAttribute("currentUserId", apiService.currentUserId());
         model.addAttribute("newFeatures", NewFeatures.unseen(apiService));
     }
