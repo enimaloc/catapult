@@ -12,7 +12,12 @@ import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
@@ -244,6 +249,25 @@ public interface ApiService {
     int adminDeleteGroup(UUID id);
     /** catapult-api's status (204; 404 unknown group or Twitch username), 502 when unreachable. */
     int adminAddGroupMember(UUID id, String twitchUsername);
+
+    /** The experiments with their variants and rule counts; null when catapult-api fails. */
+    List<ExperimentSummaryDto> adminExperiments();
+    /** One experiment's variants, rules and overrides; null when unknown or catapult-api fails. */
+    ExperimentSettingsDto adminExperiment(UUID id);
+    /** The targeting tag keys members carry, with their values; null when catapult-api fails. */
+    List<FlagKeyDto> adminFlagKeys();
+    /** {@code action} is activate, pause, end or reassign; catapult-api's status (204; 404 unknown; 409 refused by the status), 502 when unreachable. */
+    int adminExperimentAction(UUID id, String action);
+    /** Sets the variants' weights by variant id; catapult-api's status (204; 404 unknown), 502 when unreachable. */
+    int adminExperimentWeights(UUID id, Map<UUID, Integer> weights);
+    /** catapult-api's status (204; 404 unknown experiment), 502 when unreachable. */
+    int adminAddExperimentRule(UUID id, ExperimentRuleRequest rule);
+    /** catapult-api's status (204; 404 unknown experiment or rule), 502 when unreachable. */
+    int adminDeleteExperimentRule(UUID id, UUID ruleId);
+    /** catapult-api's status (204; 404 unknown experiment, Twitch username or variant of another experiment), 502 when unreachable. */
+    int adminAddExperimentOverride(UUID id, ExperimentOverrideRequest override);
+    /** catapult-api's status (204; 404 unknown experiment or override), 502 when unreachable. */
+    int adminDeleteExperimentOverride(UUID id, UUID overrideId);
 
     /** The whitelist, its entries, invitation settings and invites; null when catapult-api fails. */
     WhitelistPageDto adminWhitelist();
