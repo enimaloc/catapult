@@ -39,4 +39,31 @@ class FlagResolverTest {
         when(flagRepository.findByUserAndFlagKey(user, "tier")).thenReturn(Optional.empty());
         assertThat(resolver.resolve(user, "flag:tier")).isEqualTo(AttributeValue.missing());
     }
+
+    @Test
+    void aFlagWithoutValue_isPresent() {
+        UserAccount user = new UserAccount();
+        UserFlag flag = new UserFlag();
+        flag.setFlagKey("beta");
+        flag.setFlagValue(null);
+        when(flagRepository.findByUserAndFlagKey(user, "beta")).thenReturn(Optional.of(flag));
+        assertThat(resolver.resolve(user, "flag:beta")).isEqualTo(AttributeValue.present());
+    }
+
+    @Test
+    void aFlagWithValue_isItsText() {
+        UserAccount user = new UserAccount();
+        UserFlag flag = new UserFlag();
+        flag.setFlagKey("beta");
+        flag.setFlagValue("beta");
+        when(flagRepository.findByUserAndFlagKey(user, "beta")).thenReturn(Optional.of(flag));
+        assertThat(resolver.resolve(user, "flag:beta")).isEqualTo(AttributeValue.text("beta"));
+    }
+
+    @Test
+    void anAbsentFlag_isMissing() {
+        UserAccount user = new UserAccount();
+        when(flagRepository.findByUserAndFlagKey(user, "beta")).thenReturn(Optional.empty());
+        assertThat(resolver.resolve(user, "flag:beta")).isEqualTo(AttributeValue.missing());
+    }
 }
