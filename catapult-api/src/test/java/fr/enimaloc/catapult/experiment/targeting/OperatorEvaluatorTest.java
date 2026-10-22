@@ -48,4 +48,19 @@ class OperatorEvaluatorTest {
     void invalidNumericExpectedIsFalse() {
         assertThat(evaluator.evaluate(AttributeValue.number(5), "gt", "abc")).isFalse();
     }
+
+    @Test
+    void exists_matchesAnyPresentValue() {
+        assertThat(evaluator.evaluate(AttributeValue.text("beta"), "exists", null)).isTrue();
+        assertThat(evaluator.evaluate(AttributeValue.present(), "exists", null)).isTrue();
+        assertThat(evaluator.evaluate(AttributeValue.multi(Set.of("a")), "exists", null)).isTrue();
+        assertThat(evaluator.evaluate(AttributeValue.number(3), "exists", null)).isTrue();
+        assertThat(evaluator.evaluate(AttributeValue.missing(), "exists", null)).isFalse();
+    }
+
+    @Test
+    void aValuelessFlag_matchesNothingButExists() {
+        assertThat(evaluator.evaluate(AttributeValue.present(), "eq", "x")).isFalse();
+        assertThat(evaluator.evaluate(AttributeValue.present(), "neq", "x")).isFalse();
+    }
 }

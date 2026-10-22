@@ -8,8 +8,13 @@ import org.springframework.stereotype.Component;
 public class OperatorEvaluator {
 
     public boolean evaluate(AttributeValue actual, String operator, String expected) {
+        if ("exists".equals(operator)) {
+            return !(actual instanceof AttributeValue.Missing);
+        }
         return switch (actual) {
             case AttributeValue.Missing ignored -> false;
+            // A value-less attribute has nothing to compare against.
+            case AttributeValue.Present ignored -> false;
             case AttributeValue.Number n        -> numeric(n.value(), operator, expected);
             case AttributeValue.Text t          -> text(t.value(), operator, expected);
             case AttributeValue.Multi m         -> multi(m.values(), operator, expected);
