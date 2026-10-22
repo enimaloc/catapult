@@ -33,6 +33,6 @@ public class TwitchatEventStreamController {
         HttpSession session = SessionStreams.loggedIn(request);
         UUID userId = session == null ? null : apiService.currentUserId();
         return userId == null ? ResponseEntity.noContent().build()
-                : ResponseEntity.ok().header("X-Accel-Buffering", "no").body(hub.subscribe(userId, session.getId()));
+                : ResponseEntity.ok().header("X-Accel-Buffering", "no").body(hub.subscribe(userId, session));
     }
 }

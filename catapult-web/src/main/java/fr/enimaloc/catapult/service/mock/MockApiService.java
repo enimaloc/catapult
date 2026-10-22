@@ -30,6 +30,8 @@ import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
@@ -152,6 +154,8 @@ public class MockApiService implements ApiService {
     private final MockMembers members = new MockMembers();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
     private final MockTargetingStore targeting = new MockTargetingStore();
+    /** By account, the channels each one also receives notifications through. */
+    private final Map<UUID, Set<NotificationChannel>> notificationChannels = new ConcurrentHashMap<>();
     /** By account, as catapult-api's seen_feature: the new features each one has opened. */
     private final Map<UUID, Set<String>> seenFeatures = new ConcurrentHashMap<>();
 
@@ -1062,6 +1066,22 @@ public class MockApiService implements ApiService {
         log.trace("markAllNotificationsRead()");
         UUID account = currentUserId();
         return account == null ? 401 : notifications().markAllRead(account);
+    }
+
+    @Override
+    public NotificationChannelsDto notificationChannels() {
+        log.trace("notificationChannels()");
+        UUID account = currentUserId();
+        return account == null ? null : new NotificationChannelsDto(notificationChannels.getOrDefault(account, Set.of()));
+    }
+
+    @Override
+    public int saveNotificationChannels(Set<NotificationChannel> channels) {
+        log.trace("saveNotificationChannels({})", channels);
+        UUID account = currentUserId();
+        if (account == null) return 401;
+        notificationChannels.put(account, new NotificationChannelsDto(channels).channels());
+        return 204;
     }
 
     @Override

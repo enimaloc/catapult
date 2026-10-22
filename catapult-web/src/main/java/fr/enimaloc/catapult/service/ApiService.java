@@ -33,6 +33,8 @@ import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
@@ -217,6 +219,10 @@ public interface ApiService {
     int markNotificationRead(UUID id);
     /** catapult-api's status (204), 502 when unreachable. */
     int markAllNotificationsRead();
+    /** The channels the logged-in member also receives notifications through, besides the site; null when catapult-api fails. */
+    NotificationChannelsDto notificationChannels();
+    /** Replaces those channels; catapult-api's status (204), 502 when unreachable. */
+    int saveNotificationChannels(java.util.Set<NotificationChannel> channels);
     /** The new features (NewFeatures keys) the logged-in user has opened; null when catapult-api fails. */
     List<String> seenFeatures();
     /** catapult-api's status (204; 400 malformed key), 502 when unreachable. */
