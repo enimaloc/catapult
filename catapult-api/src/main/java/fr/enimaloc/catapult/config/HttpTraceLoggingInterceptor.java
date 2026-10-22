@@ -1,20 +1,26 @@
 package fr.enimaloc.catapult.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpRequest;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
  * Logs every outbound HTTP call performed through a Spring {@link org.springframework.web.client.RestClient}
  * at {@code TRACE}. Captures method + URI + request body, then the status +
- * response body — the latter requires a buffering request factory so the body
- * stream is re-readable; this is wired in {@link WebClientConfig}.
+ * response body. Reading the body consumes it, so the caller gets a response
+ * replaying the bytes read: a client with its own unbuffered request factory
+ * (IanaWellKnownRegistry, SchemaStoreRegistry) would otherwise find its stream
+ * closed whenever TRACE is on.
  *
  * <p>Bodies are truncated past {@link #MAX_BODY_CHARS} so a single large
  * response (Steam app list, IGDB game JSON) can't swamp the log line. The
@@ -53,22 +59,52 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
         }
         if (log.isTraceEnabled()) {
             long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
-            byte[] respBody = readBodyQuietly(response);
+            byte[] respBody;
+            try (var in = response.getBody()) {
+                respBody = in.readAllBytes();
+            } catch (Exception e) {
+                // Unreadable to the caller as well: hand it the response as it came.
+                log.trace("HTTP res <- {} {} {} in {}ms body=<unreadable body: {}>",
+                        response.getStatusCode().value(), request.getMethod(), request.getURI(),
+                        elapsedMs, e.getMessage());
+                return response;
+            }
             log.trace("HTTP res <- {} {} {} in {}ms body={}",
                     response.getStatusCode().value(),
                     request.getMethod(),
                     request.getURI(),
                     elapsedMs,
                     truncate(respBody));
+            return new ReplayedResponse(response, respBody);
         }
         return response;
     }
 
-    private static byte[] readBodyQuietly(ClientHttpResponse response) {
-        try (var in = response.getBody()) {
-            return in.readAllBytes();
-        } catch (Exception e) {
-            return ("<unreadable body: " + e.getMessage() + ">").getBytes(StandardCharsets.UTF_8);
+    /** {@code response} with its body replaced by the bytes already read from it. */
+    private record ReplayedResponse(ClientHttpResponse response, byte[] body) implements ClientHttpResponse {
+        @Override
+        public HttpStatusCode getStatusCode() throws IOException {
+            return response.getStatusCode();
+        }
+
+        @Override
+        public String getStatusText() throws IOException {
+            return response.getStatusText();
+        }
+
+        @Override
+        public HttpHeaders getHeaders() {
+            return response.getHeaders();
+        }
+
+        @Override
+        public InputStream getBody() {
+            return new ByteArrayInputStream(body);
+        }
+
+        @Override
+        public void close() {
+            response.close();
         }
     }
 

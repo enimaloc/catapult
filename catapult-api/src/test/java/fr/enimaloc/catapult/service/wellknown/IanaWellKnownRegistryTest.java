@@ -98,4 +98,24 @@ class IanaWellKnownRegistryTest {
             assertThat(server.getRequestCount()).isEqualTo(3); // the redirect was never followed
         }
     }
+
+    /** Like every RestClient, the downloader's carries the trace interceptor: with TRACE on, the CSV still reaches it. */
+    @Test
+    void theDownloaderReadsTheAnswer_withTheTraceLogOn() throws Exception {
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(
+                fr.enimaloc.catapult.config.HttpTraceLoggingInterceptor.class);
+        var previous = logger.getLevel();
+        logger.setLevel(ch.qos.logback.classic.Level.TRACE);
+        try (okhttp3.mockwebserver.MockWebServer server = new okhttp3.mockwebserver.MockWebServer()) {
+            server.enqueue(new okhttp3.mockwebserver.MockResponse().setBody(CSV));
+            server.start();
+            var builder = org.springframework.web.client.RestClient.builder()
+                    .requestInterceptor(new fr.enimaloc.catapult.config.HttpTraceLoggingInterceptor());
+
+            assertThat(IanaWellKnownRegistry.downloader(builder, server.url("/registry.csv").toString()).get())
+                    .isEqualTo(CSV);
+        } finally {
+            logger.setLevel(previous);
+        }
+    }
 }
