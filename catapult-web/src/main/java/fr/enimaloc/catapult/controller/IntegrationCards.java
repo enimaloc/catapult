@@ -122,10 +122,18 @@ public final class IntegrationCards {
         return new Text(Attrs.cls("steam-diag-" + name).withState(state), true, text);
     }
 
-    // Xbox: no SSE event, so only the current state's chip is rendered.
+    // Xbox: no state event, channel-events.js re-renders the page on its connection's change, so
+    // only the current state's chip and button are shown. Linking goes through Microsoft's login
+    // (catapult-api's /oauth2/authorization/xbox), unlinking is a post: both channel-connections.js's.
 
     private static IntegrationDto xbox(XboxData xbox) {
-        return card("xbox", new Chip(Attrs.NONE, xbox.connected() ? CONNECTED : NOT_CONNECTED));
+        return card("xbox",
+                new Chip(Attrs.NONE, xbox.connected() ? CONNECTED : NOT_CONNECTED),
+                new Container(Attrs.id("xbox-link-actions").withClass("card-actions"), Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("xbox-connect-btn").hiddenIf(xbox.connected()), Button.Kind.FILLED,
+                                key(PREFIX + "xbox.connect")),
+                        new Button(Attrs.id("xbox-disconnect-btn").hiddenIf(!xbox.connected()), Button.Kind.TEXT,
+                                key(PREFIX + "xbox.disconnect")))));
     }
 
     // Minecraft: one sub-view and button per status, driven by the status field of

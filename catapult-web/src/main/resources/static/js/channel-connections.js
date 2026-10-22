@@ -51,6 +51,10 @@
         on("steam-refresh-cache-btn", "click", () =>
             postJson(`${baseUrl}/steam/refresh-profile-cache`, {}));
 
+        // Xbox. Linking leaves for Microsoft's login, which sends the member back to this tab.
+        on("xbox-connect-btn", "click", () => location.assign("/oauth2/authorization/xbox"));
+        on("xbox-disconnect-btn", "click", () => postJson(`${baseUrl}/xbox/disconnect`, {}));
+
         // Minecraft
         on("minecraft-enroll-btn", "click", () =>
             postJson(`${baseUrl}/minecraft/enroll`, { name: value("minecraft-name-input") }));

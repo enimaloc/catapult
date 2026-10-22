@@ -409,6 +409,28 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public int xboxDisconnect(String username) {
+        log.trace("xboxDisconnect({})", username);
+        currentData().xboxDisconnect();
+        eventPublisher.publishEvent(new ChannelConnectionChangedEvent(username, "XBOX", false));
+        return NO_CONTENT;
+    }
+
+    /**
+     * Links the member's Xbox account, standing in for Microsoft's login (MockAuthController); null
+     * without a session, else the member's channel login.
+     */
+    public String xboxConnect() {
+        log.trace("xboxConnect()");
+        MockData current = currentData();
+        if (current == null) return null;
+        current.xboxConnect();
+        String username = current.getChannelDto().twitchUsername();
+        eventPublisher.publishEvent(new ChannelConnectionChangedEvent(username, "XBOX", true));
+        return username;
+    }
+
+    @Override
     public TwitchatWidgetConfig obsConnection() {
         log.trace("obsConnection()");
         MockData current = currentData();

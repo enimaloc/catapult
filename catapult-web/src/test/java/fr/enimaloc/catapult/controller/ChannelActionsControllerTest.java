@@ -257,6 +257,22 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void xboxDisconnect_callsApiService() throws Exception {
+        mvc.perform(post("/channel/enimaloc/xbox/disconnect").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).xboxDisconnect("enimaloc");
+    }
+
+    @Test
+    void xboxDisconnect_onAnotherChannel_isForbidden() throws Exception {
+        mvc.perform(post("/channel/someone/xbox/disconnect").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isForbidden());
+
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).xboxDisconnect(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void saveObsSettings_callsApiServiceWithParsedBody() throws Exception {
         mvc.perform(post("/channel/enimaloc/settings/obs").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)

@@ -419,6 +419,15 @@ public class MockData {
         hasSteam = false;
     }
 
+    /** Links an Xbox account, as Microsoft's login sends the member back. */
+    public void xboxConnect() {
+        hasXbox = true;
+    }
+
+    public void xboxDisconnect() {
+        hasXbox = false;
+    }
+
     public void saveSteamToken(boolean shared) {
         hasSteamPersonalToken = true;
         steamTokenShared = shared;

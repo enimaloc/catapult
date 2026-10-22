@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller.mock;
 
+import fr.enimaloc.catapult.service.mock.MockApiService;
 import fr.enimaloc.catapult.service.mock.MockPresets;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
@@ -38,6 +39,7 @@ public class MockAuthController {
     );
 
     private final Environment environment;
+    private final MockApiService mockApiService;
 
     @GetMapping("/oauth2/authorization/twitch")
     public String authorize(Model model) {
@@ -45,6 +47,13 @@ public class MockAuthController {
             return "redirect:/auth/callback?code=" + QUICK_LOGINS.getFirst().code();
         }
         return loginPage(model);
+    }
+
+    /** Microsoft's login, linking the member's Xbox at once and sending them back as catapult-api does. */
+    @GetMapping("/oauth2/authorization/xbox")
+    public String authorizeXbox() {
+        String username = mockApiService.xboxConnect();
+        return username == null ? "redirect:/" : "redirect:/channel/" + username + "#integrations";
     }
 
     /** The account picker, reachable even when logging in skips it (the popout's "switch account"). */
