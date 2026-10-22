@@ -75,7 +75,7 @@ public class AdminTabsFragmentController {
         if (refused != 0) return ResponseEntity.status(refused).build();
         List<AdminMemberDto> found = apiService.adminSearchMembers(q);
         if (found == null) return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
-        return ResponseEntity.ok(found.stream().filter(m -> m.twitchUsername() != null)
+        return ResponseEntity.ok(found.stream().filter(m -> m.twitchUsername() != null && !m.systemAccount())
                 .map(m -> new MemberOption(m.id().toString(), m.twitchUsername())).toList());
     }
 

@@ -36,18 +36,25 @@ window.CatapultAdminMembers = (function () {
         }).then(() => true, () => false);
     }
 
+    function disableSelf(dialog, target) {
+        target.querySelectorAll("mdui-menu-item").forEach(item => {
+            item.disabled = item.getAttribute("value") === dialog.dataset.memberId;
+        });
+    }
+
     function openMigrate(dialog, row) {
+        // a search from a previous open must not replace this open's options
+        clearTimeout(migrateSearchTimer);
+        migrateSearching++;
         dialog.dataset.memberId = row.dataset.memberId;
         document.getElementById("admin-migrate-headline").textContent =
             dialog.dataset.headline.replace("{0}", row.dataset.memberName);
         const target = document.getElementById("admin-migrate-target");
-        target.value = "";
+        restoreTargets(target);
         const search = document.getElementById("admin-migrate-search");
         if (search) search.value = "";
         // A member can't be migrated onto themself.
-        target.querySelectorAll("mdui-menu-item").forEach(item => {
-            item.disabled = item.getAttribute("value") === row.dataset.memberId;
-        });
+        disableSelf(dialog, target);
         ["settings", "getters", "bindings"].forEach(part => {
             document.getElementById(`admin-migrate-${part}`).checked = false;
         });
@@ -58,10 +65,25 @@ window.CatapultAdminMembers = (function () {
     let migrateSearchTimer = null;
     let migrateSearching = 0; // the latest search asked: an older answer is dropped
 
-    /** Replaces the target select's options by the members matching `query` (none for a blank one: the page's own stay). */
+    /**
+     * Puts the select's options as rendered (the page's members) back, keeping them on the select
+     * the first time: the list re-rendering brings a new select, with its own.
+     */
+    function restoreTargets(target) {
+        target.initialOptions ??= [...target.children].map(item => item.cloneNode(true));
+        target.value = "";
+        target.replaceChildren(...target.initialOptions.map(item => item.cloneNode(true)));
+    }
+
+    /** Replaces the target select's options by the members matching `query` (a blank one puts the page's own back). */
     async function searchMigrateTargets(dialog, query) {
         const asked = ++migrateSearching;
         const target = document.getElementById("admin-migrate-target");
+        if (query.trim() === "") {
+            restoreTargets(target);
+            disableSelf(dialog, target);
+            return;
+        }
         let found = null;
         try {
             const response = await fetch(`/spa/admin/members/search?q=${encodeURIComponent(query.trim())}`);
@@ -256,7 +278,6 @@ window.CatapultAdminMembers = (function () {
         document.getElementById("admin-migrate-search")?.addEventListener("input", event => {
             clearTimeout(migrateSearchTimer);
             const query = event.target.value ?? "";
-            if (query.trim() === "") return;
             migrateSearchTimer = setTimeout(() => searchMigrateTargets(dialog, query), SEARCH_DELAY_MS);
         });
         document.getElementById("admin-migrate-cancel")?.addEventListener("click", () => { dialog.open = false; });

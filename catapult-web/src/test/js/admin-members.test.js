@@ -160,14 +160,51 @@ describe("admin-members", () => {
             expect(items.map(item => item.disabled)).toEqual([false, true]);
         });
 
-        it("keeps the options when the search fails or is blank", async () => {
+        it("puts the page's members back when the search is cleared", async () => {
+            vi.stubGlobal("fetch", vi.fn(async () => response(200, [{ id: OTHER, login: "bob" }])));
+            page();
+            await click('[data-action="migrate"]');
+
+            await typeSearch("bob");
+            expect(document.querySelectorAll("#admin-migrate-target mdui-menu-item")).toHaveLength(1);
+            await typeSearch("");
+
+            const items = [...document.querySelectorAll("#admin-migrate-target mdui-menu-item")];
+            expect(items.map(item => item.getAttribute("value"))).toEqual([ID, OTHER]);
+            expect(items.map(item => item.disabled)).toEqual([true, false]);
+        });
+
+        it("drops a search of a previous open: a pending one and one in flight", async () => {
+            let answer;
+            const fetched = vi.fn(() => new Promise(resolve => { answer = () => resolve(response(200, [{ id: OTHER, login: "bob" }])); }));
+            vi.stubGlobal("fetch", fetched);
+            page();
+            await click('[data-action="migrate"]');
+
+            vi.useFakeTimers();
+            const search = document.getElementById("admin-migrate-search");
+            search.value = "bob";
+            search.dispatchEvent(new Event("input"));
+            document.querySelector('[data-action="migrate"]').click(); // reopened before the delay ran out
+            await vi.advanceTimersByTimeAsync(300);
+            vi.useRealTimers();
+            expect(fetched).not.toHaveBeenCalled();
+
+            await typeSearch("bob"); // in flight...
+            document.querySelector('[data-action="migrate"]').click(); // ...when reopened
+            answer();
+            await flush();
+
+            expect(document.querySelectorAll("#admin-migrate-target mdui-menu-item")).toHaveLength(2);
+        });
+
+        it("keeps the options when the search fails", async () => {
             const fetched = vi.fn(async () => response(503));
             vi.stubGlobal("fetch", fetched);
             page();
             await click('[data-action="migrate"]');
 
             await typeSearch("bob");
-            await typeSearch(" ");
 
             expect(document.querySelectorAll("#admin-migrate-target mdui-menu-item")).toHaveLength(2);
         });
