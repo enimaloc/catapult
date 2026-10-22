@@ -144,10 +144,10 @@
                         <mdui-menu-item value="exists" th:text="#{admin.experiments.rules.operator.exists}">possède le tag</mdui-menu-item>
                         <mdui-menu-item value="eq" th:text="#{admin.experiments.rules.operator.eq}">a la valeur</mdui-menu-item>
                     </mdui-select>
-                    <mdui-text-field name="attributeValue" variant="outlined" maxlength="1000" th:attr="label=#{admin.experiments.rules.value}"></mdui-text-field>
+                    <mdui-text-field name="attributeValue" variant="outlined" maxlength="1024" th:attr="label=#{admin.experiments.rules.value}"></mdui-text-field>
                 </div>
                 <div data-rule-fields="EXPERIMENT" hidden>
-                    <mdui-text-field name="experimentKey" variant="outlined" maxlength="255" th:attr="label=#{admin.experiments.rules.experiment}"></mdui-text-field>
+                    <mdui-text-field name="experimentKey" variant="outlined" maxlength="100" th:attr="label=#{admin.experiments.rules.experiment}"></mdui-text-field>
                     <mdui-text-field name="variantKey" variant="outlined" maxlength="255" th:attr="label=#{admin.experiments.rules.variant}"></mdui-text-field>
                 </div>
                 <mdui-button variant="filled" type="submit" icon="add" th:text="#{admin.experiments.add}">Ajouter</mdui-button>
@@ -198,7 +198,7 @@
                 <div data-override-fields="TAG" hidden>
                     <mdui-text-field name="tagKey" variant="outlined" maxlength="255" data-list="experiment-flag-keys"
                                      th:attr="label=#{admin.experiments.overrides.tag-key}"></mdui-text-field>
-                    <mdui-text-field name="tagValue" variant="outlined" maxlength="1000"
+                    <mdui-text-field name="tagValue" variant="outlined" maxlength="1024"
                                      th:attr="label=#{admin.experiments.overrides.tag-value},helper=#{admin.experiments.overrides.tag-value-helper}"></mdui-text-field>
                     <datalist id="experiment-flag-keys">
                         <option th:each="f : ${flagKeys}" th:value="${f.key()}" th:attr="data-values=${#strings.listJoin(f.values(), ',')}"></option>

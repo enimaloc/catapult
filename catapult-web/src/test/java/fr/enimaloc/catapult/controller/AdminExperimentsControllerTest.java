@@ -73,6 +73,16 @@ class AdminExperimentsControllerTest {
     }
 
     @Test
+    void weights_summingPastIntRange_areNotMistakenForZero() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        // 2 * Integer.MAX_VALUE + 2 wraps to 0 as an int
+        UUID third = UUID.fromString("00000000-0000-0000-0000-000000000044");
+        when(apiService.adminExperimentWeights(ID, Map.of(ID, Integer.MAX_VALUE, OTHER, Integer.MAX_VALUE, third, 2))).thenReturn(204);
+        mvc.perform(admin(post(BASE + "/weights"), "{\"" + ID + "\":2147483647,\"" + OTHER + "\":2147483647,\"" + third + "\":2}"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void weights_negativeOrAllZero_are400() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
 
@@ -141,6 +151,9 @@ class AdminExperimentsControllerTest {
         mvc.perform(admin(post(BASE + "/rules"), "{\"type\":\"GROUP\"}")).andExpect(status().isBadRequest());
         mvc.perform(admin(post(BASE + "/rules"), "{\"type\":\"EXPERIMENT\",\"experimentKey\":\"a\"}")).andExpect(status().isBadRequest());
         mvc.perform(admin(post(BASE + "/rules"), "{\"type\":\"ATTRIBUTE\",\"attributeKey\":\"a\"}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE + "/rules"),
+                "{\"type\":\"ATTRIBUTE\",\"attributeKey\":\"a\",\"attributeOperator\":\"gt\",\"attributeValue\":\"1\"}"))
+                .andExpect(status().isBadRequest());
         mvc.perform(admin(post(BASE + "/rules"), "{\"type\":\"NOPE\"}")).andExpect(status().isBadRequest());
         mvc.perform(admin(post(BASE + "/rules"), "{}")).andExpect(status().isBadRequest());
         verify(apiService, never()).adminAddExperimentRule(any(), any());

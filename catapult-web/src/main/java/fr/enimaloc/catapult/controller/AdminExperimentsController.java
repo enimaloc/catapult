@@ -25,6 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminExperimentsController {
     private static final Set<String> ACTIONS = Set.of("activate", "pause", "end", "reassign");
+    private static final Set<String> TAG_OPERATORS = Set.of("exists", "eq");
     private static final Set<String> OVERRIDE_ACTIONS = Set.of("FORCE_INCLUDE", "FORCE_EXCLUDE", "FORCE_VARIANT");
 
     private final ApiService apiService;
@@ -47,7 +48,8 @@ public class AdminExperimentsController {
     @PostMapping("/{id}/weights")
     public ResponseEntity<Void> weights(@PathVariable UUID id, @RequestBody Map<UUID, Integer> weights) {
         boolean negative = weights.values().stream().anyMatch(w -> w == null || w < 0);
-        int sum = negative ? 0 : weights.values().stream().mapToInt(Integer::intValue).sum();
+        // a long: a few large weights must not wrap around to a valid-looking sum
+        long sum = negative ? 0 : weights.values().stream().mapToLong(Integer::longValue).sum();
         if (negative || sum == 0) {
             return invalid();
         }
@@ -108,7 +110,7 @@ public class AdminExperimentsController {
                 String value = trim(b.attributeValue());
                 // "exists" is the one operator that takes no value
                 boolean needsValue = !"exists".equals(op);
-                return key == null || op == null || (needsValue && value == null)
+                return key == null || op == null || !TAG_OPERATORS.contains(op) || (needsValue && value == null)
                         ? null : new ExperimentRuleRequest(type, 0, null, key, op, value);
             }
             case "EXPERIMENT": {
