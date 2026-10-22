@@ -347,9 +347,17 @@ public class ApiAdminExperimentsController {
         if (variant != null) {
             findVariantOf(exp, variant);
         }
+        PageRequest paging = PageRequest.of(Math.max(0, page), PARTICIPANTS_PAGE_SIZE);
         String needle = q == null ? "" : q.trim().toLowerCase(Locale.ROOT);
-        Page<ExperimentAssignment> found = assignmentRepository.search(exp, variant, needle,
-                PageRequest.of(Math.max(0, page), PARTICIPANTS_PAGE_SIZE));
+        Page<ExperimentAssignment> found;
+        if (needle.isEmpty()) {
+            found = variant == null ? assignmentRepository.searchAll(exp, paging)
+                    : assignmentRepository.searchByVariant(exp, variant, paging);
+        } else {
+            String pattern = "%" + needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+            found = variant == null ? assignmentRepository.searchByUsername(exp, pattern, paging)
+                    : assignmentRepository.searchByVariantAndUsername(exp, variant, pattern, paging);
+        }
 
         Set<UUID> forced = new HashSet<>();
         for (ExperimentOverride o : overrideRepository.findByExperimentOrderByPriorityAsc(exp)) {

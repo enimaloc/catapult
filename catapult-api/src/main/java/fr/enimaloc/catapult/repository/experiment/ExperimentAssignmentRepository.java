@@ -37,29 +37,62 @@ public interface ExperimentAssignmentRepository extends JpaRepository<Experiment
         countQuery = "SELECT COUNT(a) FROM ExperimentAssignment a WHERE a.experiment = :experiment")
     Page<ExperimentAssignment> findByExperiment(@Param("experiment") Experiment experiment, Pageable pageable);
 
-    /**
-     * One page of an experiment's participants, newest first, optionally narrowed to a variant and to
-     * usernames containing {@code q} (already lowercased; empty matches everyone).
-     */
+    // The four shapes below (all / one variant, with / without a username filter) exist so that no query
+    // binds a nullable parameter: PostgreSQL can't type an untyped null bind.
+
+    /** One page of an experiment's participants, newest first. */
+    @Query(value = """
+        SELECT a FROM ExperimentAssignment a
+        JOIN FETCH a.user
+        JOIN FETCH a.variant
+        WHERE a.experiment = :experiment
+        ORDER BY a.assignedAt DESC, a.id ASC
+        """,
+        countQuery = "SELECT COUNT(a) FROM ExperimentAssignment a WHERE a.experiment = :experiment")
+    Page<ExperimentAssignment> searchAll(@Param("experiment") Experiment experiment, Pageable pageable);
+
+    /** Like {@link #searchAll}, narrowed to one variant. */
+    @Query(value = """
+        SELECT a FROM ExperimentAssignment a
+        JOIN FETCH a.user
+        JOIN FETCH a.variant v
+        WHERE a.experiment = :experiment AND v.id = :variantId
+        ORDER BY a.assignedAt DESC, a.id ASC
+        """,
+        countQuery = "SELECT COUNT(a) FROM ExperimentAssignment a WHERE a.experiment = :experiment AND a.variant.id = :variantId")
+    Page<ExperimentAssignment> searchByVariant(@Param("experiment") Experiment experiment,
+                                               @Param("variantId") UUID variantId, Pageable pageable);
+
+    /** Like {@link #searchAll}, narrowed to usernames matching {@code pattern} (lowercase, LIKE-escaped with a backslash). */
+    @Query(value = """
+        SELECT a FROM ExperimentAssignment a
+        JOIN FETCH a.user u
+        JOIN FETCH a.variant
+        WHERE a.experiment = :experiment AND LOWER(u.twitchUsername) LIKE :pattern ESCAPE '\\'
+        ORDER BY a.assignedAt DESC, a.id ASC
+        """,
+        countQuery = """
+        SELECT COUNT(a) FROM ExperimentAssignment a JOIN a.user u
+        WHERE a.experiment = :experiment AND LOWER(u.twitchUsername) LIKE :pattern ESCAPE '\\'
+        """)
+    Page<ExperimentAssignment> searchByUsername(@Param("experiment") Experiment experiment,
+                                                @Param("pattern") String pattern, Pageable pageable);
+
+    /** Narrowed to one variant and to usernames matching {@code pattern}. */
     @Query(value = """
         SELECT a FROM ExperimentAssignment a
         JOIN FETCH a.user u
         JOIN FETCH a.variant v
-        WHERE a.experiment = :experiment
-          AND (:variantId IS NULL OR v.id = :variantId)
-          AND LOWER(u.twitchUsername) LIKE CONCAT('%', :q, '%')
+        WHERE a.experiment = :experiment AND v.id = :variantId AND LOWER(u.twitchUsername) LIKE :pattern ESCAPE '\\'
         ORDER BY a.assignedAt DESC, a.id ASC
         """,
         countQuery = """
-        SELECT COUNT(a) FROM ExperimentAssignment a
-        JOIN a.user u
-        WHERE a.experiment = :experiment
-          AND (:variantId IS NULL OR a.variant.id = :variantId)
-          AND LOWER(u.twitchUsername) LIKE CONCAT('%', :q, '%')
+        SELECT COUNT(a) FROM ExperimentAssignment a JOIN a.user u
+        WHERE a.experiment = :experiment AND a.variant.id = :variantId AND LOWER(u.twitchUsername) LIKE :pattern ESCAPE '\\'
         """)
-    Page<ExperimentAssignment> search(@Param("experiment") Experiment experiment,
-                                      @Param("variantId") UUID variantId,
-                                      @Param("q") String q, Pageable pageable);
+    Page<ExperimentAssignment> searchByVariantAndUsername(@Param("experiment") Experiment experiment,
+                                                          @Param("variantId") UUID variantId,
+                                                          @Param("pattern") String pattern, Pageable pageable);
 
     /** {@code [variantId, count]} rows; a variant nobody holds has no row. */
     @Query("SELECT a.variant.id, COUNT(a) FROM ExperimentAssignment a WHERE a.experiment = :experiment GROUP BY a.variant.id")

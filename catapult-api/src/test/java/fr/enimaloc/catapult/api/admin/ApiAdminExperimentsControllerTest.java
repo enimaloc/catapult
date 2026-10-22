@@ -496,6 +496,15 @@ class ApiAdminExperimentsControllerTest {
 
     @Nested
     class Participants {
+        @BeforeEach
+        void emptyPagesByDefault() {
+            PageImpl<ExperimentAssignment> none = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+            when(assignments.searchAll(any(), any())).thenReturn(none);
+            when(assignments.searchByVariant(any(), any(), any())).thenReturn(none);
+            when(assignments.searchByUsername(any(), any(), any())).thenReturn(none);
+            when(assignments.searchByVariantAndUsername(any(), any(), any(), any())).thenReturn(none);
+        }
+
         private UserAccount member(String name) {
             UserAccount user = new UserAccount();
             user.setId(UUID.randomUUID());
@@ -524,9 +533,13 @@ class ApiAdminExperimentsControllerTest {
             return o;
         }
 
-        private void stubSearch(UUID variantId, String q, List<ExperimentAssignment> content) {
-            when(assignments.search(eq(experiment), eq(variantId), eq(q), any()))
-                    .thenReturn(new PageImpl<>(content, PageRequest.of(0, 20), content.size()));
+        private void stubSearch(UUID variantId, List<ExperimentAssignment> content) {
+            PageImpl<ExperimentAssignment> page = new PageImpl<>(content, PageRequest.of(0, 20), content.size());
+            if (variantId == null) {
+                when(assignments.searchAll(eq(experiment), any())).thenReturn(page);
+            } else {
+                when(assignments.searchByVariant(eq(experiment), eq(variantId), any())).thenReturn(page);
+            }
         }
 
         @Test
@@ -534,23 +547,40 @@ class ApiAdminExperimentsControllerTest {
             treatment.setExperiment(experiment);
             when(variants.findById(treatment.getId())).thenReturn(Optional.of(treatment));
             UserAccount alice = member("alice");
-            stubSearch(treatment.getId(), "", List.of(assignment(alice, treatment)));
+            stubSearch(treatment.getId(), List.of(assignment(alice, treatment)));
 
             ExperimentAssignmentsDto result = controller.assignments(experiment.getId(), treatment.getId(), null, 0);
 
             assertThat(result.page().content()).containsExactly(new ExperimentAssignmentDto(alice.getId(), "alice",
                     treatment.getId(), Instant.parse("2026-10-22T10:00:00Z"), false));
             assertThat(result.page().totalElements()).isEqualTo(1);
-            verify(assignments).search(eq(experiment), eq(treatment.getId()), eq(""), eq(PageRequest.of(0, 20)));
+            verify(assignments).searchByVariant(experiment, treatment.getId(), PageRequest.of(0, 20));
         }
 
         @Test
         void list_trimsAndLowercasesTheSearch() {
-            stubSearch(null, "ali", List.of());
-
+            treatment.setExperiment(experiment);
+            when(variants.findById(treatment.getId())).thenReturn(Optional.of(treatment));
             controller.assignments(experiment.getId(), null, "  AlI ", 2);
+            verify(assignments).searchByUsername(experiment, "%ali%", PageRequest.of(2, 20));
 
-            verify(assignments).search(eq(experiment), eq(null), eq("ali"), eq(PageRequest.of(2, 20)));
+            controller.assignments(experiment.getId(), treatment.getId(), "ali", 0);
+            verify(assignments).searchByVariantAndUsername(experiment, treatment.getId(), "%ali%", PageRequest.of(0, 20));
+        }
+
+        @Test
+        void list_escapesLikeWildcardsInTheSearch() {
+            controller.assignments(experiment.getId(), null, "a_b%c\\d", 0);
+
+            verify(assignments).searchByUsername(experiment, "%a\\_b\\%c\\\\d%", PageRequest.of(0, 20));
+        }
+
+        @Test
+        void list_aBlankSearchDoesNotFilterOnTheUsername() {
+            controller.assignments(experiment.getId(), null, "   ", 0);
+
+            verify(assignments).searchAll(experiment, PageRequest.of(0, 20));
+            verify(assignments, never()).searchByUsername(any(), any(), any());
         }
 
         @Test
@@ -570,7 +600,7 @@ class ApiAdminExperimentsControllerTest {
         void list_countsIncludeEmptyVariants() {
             when(assignments.countByVariant(experiment)).thenReturn(java.util.Collections.singletonList(
                     new Object[] {control.getId(), 5L}));
-            stubSearch(null, "", List.of());
+            stubSearch(null, List.of());
 
             ExperimentAssignmentsDto result = controller.assignments(experiment.getId(), null, null, 0);
 
@@ -585,7 +615,7 @@ class ApiAdminExperimentsControllerTest {
             when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of(
                     userOverride(forced, ExperimentOverride.OverrideAction.FORCE_VARIANT, treatment),
                     userOverride(excluded, ExperimentOverride.OverrideAction.FORCE_EXCLUDE, null)));
-            stubSearch(null, "", List.of(assignment(forced, treatment), assignment(excluded, control),
+            stubSearch(null, List.of(assignment(forced, treatment), assignment(excluded, control),
                     assignment(plain, control)));
 
             ExperimentAssignmentsDto result = controller.assignments(experiment.getId(), null, null, 0);
