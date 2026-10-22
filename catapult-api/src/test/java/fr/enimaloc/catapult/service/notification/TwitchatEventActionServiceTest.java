@@ -151,7 +151,7 @@ class TwitchatEventActionServiceTest {
 
         ArgumentCaptor<TwitchatEventAction> saved = ArgumentCaptor.forClass(TwitchatEventAction.class);
         verify(repository, atLeastOnce()).save(saved.capture());
-        assertThat(saved.getAllValues()).hasSize(5)
+        assertThat(saved.getAllValues()).hasSize(6)
                 .allSatisfy(a -> assertThat(a.getAction()).isEqualTo("CUSTOM_CHAT_MESSAGE"));
         assertThat(saved.getAllValues()).filteredOn(a -> a.getEventType() == STREAM_STARTED)
                 .singleElement().satisfies(a -> assertThat(a.getDataJson()).contains("Custom live"));
@@ -167,7 +167,7 @@ class TwitchatEventActionServiceTest {
 
         service.ensureInitialized(user);
 
-        verify(repository, org.mockito.Mockito.times(5)).save(any());
+        verify(repository, org.mockito.Mockito.times(6)).save(any());
         verify(jdbc, never()).query(anyString(), any(RowCallbackHandler.class), eq(user.getId()));
     }
 
@@ -186,7 +186,7 @@ class TwitchatEventActionServiceTest {
 
         service.ensureInitialized(user);
 
-        verify(repository, org.mockito.Mockito.times(5)).save(any());
+        verify(repository, org.mockito.Mockito.times(6)).save(any());
         assertThat(settings.isEventActionsInitialized()).isTrue();
     }
 
@@ -225,5 +225,35 @@ class TwitchatEventActionServiceTest {
 
         verify(repository).deleteAllOfUser(user);
         verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
+
+    @Test
+    void ensureNotificationPayload_givesAnInitializedAccountWithoutOneTheDefault() {
+        settings.setEventActionsInitialized(true);
+        when(widgetSettingsRepository.findById(user.getId())).thenReturn(java.util.Optional.of(settings));
+        when(repository.existsByUserAndEventType(user, fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION))
+                .thenReturn(false);
+
+        service.ensureNotificationPayload(user);
+
+        ArgumentCaptor<TwitchatEventAction> saved = ArgumentCaptor.forClass(TwitchatEventAction.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getEventType()).isEqualTo(fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION);
+        assertThat(saved.getValue().isEnabled()).isTrue();
+        assertThat(saved.getValue().getDataJson()).contains("{{title}}");
+    }
+
+    @Test
+    void ensureNotificationPayload_keepsAnExistingOne_andLeavesUninitializedAccountsToTheirSeeding() {
+        settings.setEventActionsInitialized(true);
+        when(widgetSettingsRepository.findById(user.getId())).thenReturn(java.util.Optional.of(settings));
+        when(repository.existsByUserAndEventType(user, fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION))
+                .thenReturn(true);
+        service.ensureNotificationPayload(user);
+
+        settings.setEventActionsInitialized(false);
+        service.ensureNotificationPayload(user);
+
+        verify(repository, never()).save(any());
     }
 }

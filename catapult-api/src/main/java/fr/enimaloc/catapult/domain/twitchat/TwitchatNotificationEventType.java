@@ -6,5 +6,7 @@ public enum TwitchatNotificationEventType {
     STREAM_STARTED,
     BOT_ENABLED,
     BOT_DISABLED,
-    NO_GAME_DETECTED
+    NO_GAME_DETECTED,
+    /** A Catapult notification, for members who opted in to receiving them in Twitchat. */
+    NOTIFICATION
 }

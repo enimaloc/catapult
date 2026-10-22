@@ -20,6 +20,8 @@ public interface TwitchatEventActionRepository extends JpaRepository<TwitchatEve
 
     boolean existsByUser(UserAccount user);
 
+    boolean existsByUserAndEventType(UserAccount user, TwitchatNotificationEventType eventType);
+
     /**
      * A bulk delete, run right away: Hibernate flushes inserts before deletes, so deleting the
      * entities would make re-inserting the same positions hit uq_twitchat_event_action_position.

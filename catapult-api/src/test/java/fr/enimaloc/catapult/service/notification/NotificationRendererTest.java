@@ -44,4 +44,11 @@ class NotificationRendererTest {
         assertThat(NotificationRenderer.isValidCtaUrl("data:text/html,xx")).isFalse();
         assertThat(NotificationRenderer.isValidCtaUrl("ftp://x")).isFalse();
     }
+
+    @Test
+    void toPlainText_dropsTheMarkup_andJoinsTheBlocks() {
+        assertThat(new NotificationRenderer().toPlainText("**Hello** _you_\n\nSee [the page](https://x.test)"))
+                .isEqualTo("Hello you See the page");
+        assertThat(new NotificationRenderer().toPlainText(null)).isEmpty();
+    }
 }

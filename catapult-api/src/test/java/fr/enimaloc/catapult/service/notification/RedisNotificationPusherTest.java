@@ -74,4 +74,19 @@ class RedisNotificationPusherTest {
         verify(publisher).publishUser(userId, "notification.deleted",
                 Map.of("notificationId", notifId.toString(), "unreadCount", 2L));
     }
+
+    @Test
+    void onDeliveryPending_publishesTheIds_inChunksOf500() {
+        RedisNotificationPusher pusher = new RedisNotificationPusher(publisher);
+        List<UUID> ids = java.util.stream.Stream.generate(UUID::randomUUID).limit(1001).toList();
+
+        pusher.onDeliveryPending(new fr.enimaloc.catapult.event.NotificationDeliveryPendingEvent(ids));
+
+        verify(publisher).publishNotificationDelivery("notification.delivery.pending",
+                new fr.enimaloc.catapult.common.event.ChannelEvents.NotificationDeliveryPending(ids.subList(0, 500)));
+        verify(publisher).publishNotificationDelivery("notification.delivery.pending",
+                new fr.enimaloc.catapult.common.event.ChannelEvents.NotificationDeliveryPending(ids.subList(500, 1000)));
+        verify(publisher).publishNotificationDelivery("notification.delivery.pending",
+                new fr.enimaloc.catapult.common.event.ChannelEvents.NotificationDeliveryPending(ids.subList(1000, 1001)));
+    }
 }

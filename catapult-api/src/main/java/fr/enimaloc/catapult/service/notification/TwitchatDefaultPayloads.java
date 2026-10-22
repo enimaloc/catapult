@@ -41,6 +41,10 @@ public final class TwitchatDefaultPayloads {
                             new TwitchatActionDefault("Réactiver le bot", "secondary")))),
             Map.entry(TwitchatNotificationEventType.NO_GAME_DETECTED, new TwitchatDefaultPayload(
                     "Aucun jeu détecté.", "message", "info", "Catapult",
+                    new LinkedHashMap<>())),
+            // Plain text body; {{ctaUrl}} is empty for a notification without a call to action.
+            Map.entry(TwitchatNotificationEventType.NOTIFICATION, new TwitchatDefaultPayload(
+                    "[Catapult] {{title}} — {{body}} {{ctaUrl}}", "message", "info", "Catapult",
                     new LinkedHashMap<>()))
     );
 

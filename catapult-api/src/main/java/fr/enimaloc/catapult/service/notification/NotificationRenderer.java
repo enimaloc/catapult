@@ -21,6 +21,11 @@ public class NotificationRenderer {
         return Jsoup.clean(rawHtml, safelist);
     }
 
+    /** The body as plain text, for where no HTML shows (Twitchat, Twitch chat): markup dropped, blocks joined by a space. */
+    public String toPlainText(String markdown) {
+        return Jsoup.parse(render(markdown)).text();
+    }
+
     public static boolean isValidCtaUrl(String url) {
         if (url == null) return false;
         try {
