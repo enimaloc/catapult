@@ -279,6 +279,7 @@ class NotificationServiceTest {
         NotificationRecipient r = new NotificationRecipient();
         r.setUser(target);
         when(notifRepo.findAllByOrderByCreatedAtDesc(any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(n, all)));
+        when(recipientRepo.countByIdNotificationId(n.getId())).thenReturn(1L);
         when(recipientRepo.findByIdNotificationId(n.getId())).thenReturn(List.of(r));
 
         var page = service.adminPage(org.springframework.data.domain.Pageable.unpaged());
@@ -286,8 +287,28 @@ class NotificationServiceTest {
         assertThat(page.getContent().get(0).targetUserId()).isEqualTo(target.getId());
         assertThat(page.getContent().get(0).targetLogin()).isEqualTo("someone");
         assertThat(page.getContent().get(0).bodyHtml()).isEqualTo("<p>b</p>");
+        assertThat(page.getContent().get(0).recipientCount()).isEqualTo(1);
         assertThat(page.getContent().get(1).targetLogin()).isNull();
         verify(recipientRepo, never()).findByIdNotificationId(all.getId());
+        verify(recipientRepo, never()).countByIdNotificationId(all.getId());
+    }
+
+    @Test
+    void adminPageCountsASharedNotificationsRecipients_withoutLoadingThemOrNamingOne() {
+        Notification shared = new Notification();
+        shared.setId(UUID.randomUUID());
+        shared.setBody("b");
+        shared.setSeverity(Severity.INFO);
+        shared.setAudience(Notification.Audience.TARGETED);
+        when(notifRepo.findAllByOrderByCreatedAtDesc(any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(shared)));
+        when(recipientRepo.countByIdNotificationId(shared.getId())).thenReturn(3L);
+
+        var dto = service.adminPage(org.springframework.data.domain.Pageable.unpaged()).getContent().get(0);
+
+        assertThat(dto.recipientCount()).isEqualTo(3);
+        assertThat(dto.targetUserId()).isNull();
+        assertThat(dto.targetLogin()).isNull();
+        verify(recipientRepo, never()).findByIdNotificationId(shared.getId());
     }
 
     private UserAccount userWithStatus(UserAccount.Status s) {
