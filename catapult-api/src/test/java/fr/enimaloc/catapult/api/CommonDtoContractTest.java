@@ -254,4 +254,13 @@ class CommonDtoContractTest {
                 AdminNotificationCreateBody.EXPERIMENT, experiment, null);
         assertThat(roundTrip(body, AdminNotificationCreateBody.class)).isEqualTo(body);
     }
+
+    @Test
+    void adminNotification_readsBackWithItsRecipientCount() {
+        var produced = new fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto(UUID.randomUUID(), "T", "b", "<p>b</p>",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null,
+                Instant.parse("2026-10-22T10:00:00Z"), "TARGETED", null, null, 3);
+
+        assertThat(roundTrip(produced, fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto.class)).isEqualTo(produced);
+    }
 }
