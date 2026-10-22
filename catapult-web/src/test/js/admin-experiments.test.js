@@ -539,4 +539,14 @@ describe("admin-experiments participants", () => {
             expect(fetched).not.toHaveBeenCalled();
             expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(reloads ? 1 : 0);
         });
+
+    it("frees the move select when the refresh after a move fails", async () => {
+        fetched.mockRejectedValue(new Error("offline"));
+        const select = document.querySelector("[data-participants-move]");
+
+        await pick(select, V2);
+
+        expect(select.disabled).toBe(false);
+        expect(CatapultChannel.showError).toHaveBeenCalledWith("Down");
+    });
 });

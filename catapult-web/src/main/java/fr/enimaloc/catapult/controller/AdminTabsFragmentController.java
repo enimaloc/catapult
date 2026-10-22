@@ -361,6 +361,11 @@ public class AdminTabsFragmentController {
     private void participantsModel(Model model, ExperimentSettingsDto experiment, UUID variant, String q, int page) {
         ExperimentAssignmentsDto assignments = apiService.adminExperimentAssignments(
                 experiment.id(), variant, q.isBlank() ? null : q.trim(), page);
+        // a page the list has shrunk below (a move emptied the last one): land on the last one left
+        if (assignments != null && page > 0 && assignments.page().content().isEmpty()) {
+            assignments = apiService.adminExperimentAssignments(experiment.id(), variant, q.isBlank() ? null : q.trim(),
+                    Math.max(0, assignments.page().totalPages() - 1));
+        }
         Map<UUID, String> colors = new HashMap<>();
         int others = 0;
         for (ExperimentVariantDto v : experiment.variants()) {
