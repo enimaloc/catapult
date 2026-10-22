@@ -15,7 +15,7 @@ public final class MetaTagRules {
     private static final Pattern KEY = Pattern.compile("[A-Za-z][A-Za-z0-9:._-]*");
     /** Written by catapult-web's index.html itself (compared lowercased). */
     public static final Set<String> RESERVED = Set.of("viewport", "description", "robots", "og:type", "og:site_name",
-            "og:title", "og:description", "og:url", "twitter:card", "sentry-trace", "baggage");
+            "og:title", "og:description", "og:url", "twitter:card", "sentry-trace", "baggage", "darkreader-lock");
 
     private MetaTagRules() {
     }

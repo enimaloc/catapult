@@ -17,6 +17,7 @@
         <meta name="twitter:card" content="summary">
     </th:block>
     <meta th:unless="${seo.indexed}" name="robots" content="noindex">
+    <meta name="darkreader-lock">
     <!--/* The admin's own (Meta tab, see SiteMetaTags), on every page: site verifications, theme-color…
          The tags above can't be configured there (MetaTagRules.RESERVED, see IndexTemplateMetaTagsTest). */-->
     <meta th:each="tag : ${metaTags}" th:attr="__${tag.attribute().html()}__=${tag.key()}" th:content="${tag.content()}">
