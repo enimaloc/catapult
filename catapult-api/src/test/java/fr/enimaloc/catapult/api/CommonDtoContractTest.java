@@ -2,10 +2,12 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.api.admin.ApiAdminDtddMappingController;
 import fr.enimaloc.catapult.api.admin.ApiAdminExperimentsController;
+import fr.enimaloc.catapult.api.admin.ApiAdminFlagsController;
 import fr.enimaloc.catapult.api.admin.ApiAdminMembersController;
 import fr.enimaloc.catapult.api.channel.ApiTwitchatWidgetController;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
@@ -162,5 +164,17 @@ class CommonDtoContractTest {
                 .isEqualTo(summaries);
         assertThat(roundTrip(settings, ExperimentSettingsDto.class)).isEqualTo(settings);
         assertThat(settings.variants().getFirst().control()).isTrue();
+    }
+
+    @Test
+    void adminFlags_readAsFlagKeyDtos() {
+        UserFlagRepository flags = mock(UserFlagRepository.class);
+        when(flags.findDistinctKeyValues()).thenReturn(List.of(
+                new Object[] {"beta", "on"}, new Object[] {"tester", null}));
+
+        List<FlagKeyDto> produced = new ApiAdminFlagsController(flags).list();
+
+        assertThat(JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<List<FlagKeyDto>>() {}))
+                .containsExactly(new FlagKeyDto("beta", List.of("on")), new FlagKeyDto("tester", List.of()));
     }
 }
