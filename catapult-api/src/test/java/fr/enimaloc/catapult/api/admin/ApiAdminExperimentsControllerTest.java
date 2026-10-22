@@ -182,6 +182,27 @@ class ApiAdminExperimentsControllerTest {
         }
 
         @Test
+        void activate_resumesAPausedExperiment_keepingItsStart_unannounced() {
+            java.time.Instant started = java.time.Instant.parse("2026-10-01T00:00:00Z");
+            experiment.setStatus(Experiment.Status.PAUSED);
+            experiment.setStartedAt(started);
+
+            controller.activate(experiment.getId());
+
+            assertThat(experiment.getStatus()).isEqualTo(Experiment.Status.ACTIVE);
+            assertThat(experiment.getStartedAt()).isEqualTo(started);
+            verify(experiments).save(experiment);
+            verify(publisher, never()).publishEvent(any());
+        }
+
+        @Test
+        void activate_refusedOnceEnded() {
+            experiment.setStatus(Experiment.Status.ENDED);
+
+            assertStatus(() -> controller.activate(experiment.getId()), HttpStatus.CONFLICT);
+        }
+
+        @Test
         void pause_onlyWhileActive() {
             assertStatus(() -> controller.pause(experiment.getId()), HttpStatus.CONFLICT);
 
