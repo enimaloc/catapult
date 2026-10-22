@@ -6,7 +6,10 @@ import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentVariantDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
@@ -299,6 +302,34 @@ public class AdminTabsFragmentController {
         return guarded(model, response, () -> {
             model.addAttribute("maintenance", broadcastState.maintenance().orElse(null));
             return "pages/admin-tab/broadcast :: content";
+        });
+    }
+
+    @GetMapping("/experiments")
+    String experiments(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("experiments", apiService.adminExperiments());
+            return "pages/admin-tab/experiments :: content";
+        });
+    }
+
+    /** One experiment's settings; 404 when it is unknown (or catapult-api can't tell). */
+    @GetMapping("/experiments/{id}")
+    String experiment(Model model, HttpServletResponse response, @PathVariable UUID id) {
+        return guarded(model, response, () -> {
+            ExperimentSettingsDto experiment = apiService.adminExperiment(id);
+            if (experiment == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/experiments :: missing";
+            }
+            List<GroupSummaryDto> groups = apiService.adminGroups();
+            List<FlagKeyDto> flagKeys = apiService.adminFlagKeys();
+            model.addAttribute("experiment", experiment);
+            model.addAttribute("variantKeys", experiment.variants().stream()
+                    .collect(Collectors.toMap(ExperimentVariantDto::id, ExperimentVariantDto::key, (a, b) -> a)));
+            model.addAttribute("groups", groups == null ? List.of() : groups);
+            model.addAttribute("flagKeys", flagKeys == null ? List.of() : flagKeys);
+            return "pages/admin-tab/experiments :: detail";
         });
     }
 
