@@ -134,10 +134,14 @@ window.CatapultAdminTabs = (function () {
         return results(panel, q, page);
     }
 
-    /** Resolves to whether the admin confirmed `message`, in `root`'s data-confirm-text / data-cancel-text. */
-    function confirmed(root, message) {
+    /**
+     * Resolves to whether the admin confirmed `message` (with `description` under it, if any), in `root`'s
+     * data-confirm-text / data-cancel-text.
+     */
+    function confirmed(root, message, description) {
         return mdui.confirm({
             headline: message,
+            ...(description ? { description } : {}),
             confirmText: root.dataset.confirmText,
             cancelText: root.dataset.cancelText
         }).then(() => true, () => false);

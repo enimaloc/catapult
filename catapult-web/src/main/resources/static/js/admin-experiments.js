@@ -7,7 +7,8 @@
  * hold one block of fields per type/target and show only the chosen one (variantId only for
  * FORCE_VARIANT); weights show their live share of the total, and the weight bar above them (a
  * segment per variant) is dragged or arrowed by the handle between two neighbours, which moves points
- * from one to the other: the view opens on the weights as percentages summing to 100 so the bar and
+ * from one to the other: saving them first asks catapult-api who the new weights move and, if anyone, confirms with
+ * the list; the view opens on the weights as percentages summing to 100 so the bar and
  * the fields say the same thing. mdui-text-field can't bind a
  * <datalist> (shadow DOM), so the known tags and the chosen tag's values are offered as chips under
  * the tag fields. The Participants card reloads its chips and list from /spa/admin/experiments/{id}/participants
@@ -193,12 +194,48 @@ window.CatapultAdminExperiments = (function () {
         moveHandle(form, handle, Number(handle.getAttribute("aria-valuenow") ?? 0) + step * (event.shiftKey ? 10 : 1));
     }
 
-    function saveWeights(panel, root, form) {
+    /** The moves saving `weights` would make, or null (refusal told) when the preview couldn't be had. */
+    async function previewMoves(root, button, weights) {
+        button.disabled = true;
+        try {
+            const response = await CatapultCsrf.postJson(urlOf(root, "weights/preview"), weights);
+            if (ok(response.status)) return (await response.json()).moves ?? [];
+            CatapultChannel.showError(refusal(root, response.status, "labelUnknown"));
+        } catch {
+            CatapultChannel.showError(root.dataset.labelUnavailable);
+        } finally {
+            button.disabled = false;
+        }
+        return null;
+    }
+
+    /** One line per move, the variant ids told by their keys. */
+    function moveLines(root, form, moves) {
+        const keys = Object.fromEntries(weightFields(form).map(field => [field.dataset.variant, field.dataset.variantKey]));
+        return moves.map(move => root.dataset.labelRebalanceMove
+            .replace("{count}", move.count)
+            .replace("{from}", keys[move.fromVariantId] ?? move.fromVariantId)
+            .replace("{to}", keys[move.toVariantId] ?? move.toVariantId)).join("\n");
+    }
+
+    /** Saving moves members to match the new weights: the admin sees who moves and confirms first. */
+    async function saveWeights(panel, root, form) {
         const fields = weightFields(form);
         const bad = fields.filter(field => weightOf(field) === null);
         if (bad.length > 0) return bad.forEach(mark);
         const weights = Object.fromEntries(fields.map(field => [field.dataset.variant, weightOf(field)]));
-        return send(panel, root, form.querySelector('[type="submit"]'), urlOf(root, "weights"), weights);
+        const button = form.querySelector('[type="submit"]');
+        const moves = await previewMoves(root, button, weights);
+        if (moves === null) return;
+        if (moves.length > 0) {
+            button.disabled = true; // a second click must not open another dialog
+            try {
+                if (!await CatapultAdminTabs.confirmed(root, root.dataset.labelRebalanceConfirm, moveLines(root, form, moves))) return;
+            } finally {
+                button.disabled = false;
+            }
+        }
+        return send(panel, root, button, urlOf(root, "weights"), weights);
     }
 
     // ---- rules and overrides

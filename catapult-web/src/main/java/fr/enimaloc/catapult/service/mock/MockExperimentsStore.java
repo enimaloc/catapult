@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
@@ -14,9 +15,13 @@ import fr.enimaloc.catapult.common.dto.experiment.ExperimentVariantDto;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.List;
 import java.util.Map;
@@ -140,14 +145,73 @@ class MockExperimentsStore {
         return 204;
     }
 
-    /** A variant missing from the map keeps its weight. */
+    /** A variant missing from the map keeps its weight; the members then move as {@link #previewWeights} told. */
     synchronized int setWeights(UUID id, Map<UUID, Integer> weights) {
         Experiment experiment = byId(id);
         if (experiment == null) return 404;
+        List<Move> moves = plan(experiment, weights);
         experiment.variants.replaceAll(v -> weights.containsKey(v.id())
                 ? new ExperimentVariantDto(v.id(), v.key(), v.name(), weights.get(v.id()), v.control())
                 : v);
+        moves.forEach(move -> move.members.forEach(p -> p.variantId = move.to));
         return 204;
+    }
+
+    /**
+     * What {@link #setWeights} would move, as catapult-api does: only the variants now over their target give
+     * members, the ones now under it take them, and members forced by a USER FORCE_VARIANT override stay.
+     * Nothing is written. Empty for an unknown experiment.
+     */
+    synchronized Optional<ExperimentRebalanceDto> previewWeights(UUID id, Map<UUID, Integer> weights) {
+        Experiment experiment = byId(id);
+        if (experiment == null) return Optional.empty();
+        return Optional.of(new ExperimentRebalanceDto(plan(experiment, weights).stream()
+                .map(m -> new ExperimentRebalanceDto.Move(m.from, m.to, m.members.size())).toList()));
+    }
+
+    private record Move(UUID from, UUID to, List<Participant> members) {}
+
+    private static List<Move> plan(Experiment experiment, Map<UUID, Integer> weights) {
+        List<ExperimentVariantDto> variants = experiment.variants;
+        long[] weight = variants.stream().mapToLong(v -> Math.max(0, weights.getOrDefault(v.id(), v.weight()))).toArray();
+        long total = Arrays.stream(weight).sum();
+        List<Participant> pool = experiment.participants.stream().filter(p -> !isForced(experiment, p)).toList();
+        if (total == 0 || pool.isEmpty()) return List.of();
+
+        // largest-remainder targets: they sum to the pool
+        long[] target = new long[weight.length];
+        Integer[] byRemainder = new Integer[weight.length];
+        long assigned = 0;
+        for (int i = 0; i < weight.length; i++) {
+            target[i] = pool.size() * weight[i] / total;
+            assigned += target[i];
+            byRemainder[i] = i;
+        }
+        long[] remainder = new long[weight.length];
+        for (int i = 0; i < weight.length; i++) remainder[i] = pool.size() * weight[i] % total;
+        Arrays.sort(byRemainder, Comparator.comparingLong((Integer i) -> remainder[i]).reversed().thenComparingInt(i -> i));
+        for (int k = 0; k < pool.size() - assigned; k++) target[byRemainder[k]]++;
+
+        Deque<Participant> leavers = new ArrayDeque<>();
+        List<Move> moves = new ArrayList<>();
+        long[] deficit = new long[weight.length];
+        for (int i = 0; i < weight.length; i++) {
+            UUID variantId = variants.get(i).id();
+            List<Participant> members = pool.stream().filter(p -> p.variantId.equals(variantId)).toList();
+            long diff = members.size() - target[i];
+            if (diff > 0) members.subList((int) (members.size() - diff), members.size()).forEach(leavers::add);
+            else deficit[i] = -diff;
+        }
+        for (int i = 0; i < weight.length; i++) {
+            List<Participant> taken = new ArrayList<>();
+            for (long n = deficit[i]; n > 0 && !leavers.isEmpty(); n--) taken.add(leavers.poll());
+            // one move per source variant, as the API groups them
+            Map<UUID, List<Participant>> bySource = new LinkedHashMap<>();
+            taken.forEach(p -> bySource.computeIfAbsent(p.variantId, k -> new ArrayList<>()).add(p));
+            UUID to = variants.get(i).id();
+            bySource.forEach((from, members) -> moves.add(new Move(from, to, members)));
+        }
+        return moves;
     }
 
     synchronized int addRule(UUID id, ExperimentRuleRequest rule) {

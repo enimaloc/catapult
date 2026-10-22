@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
@@ -656,6 +657,12 @@ public class MockApiService implements ApiService {
     public int adminExperimentAction(UUID id, String action) {
         log.trace("adminExperimentAction({}, {})", id, action);
         return experiments.action(id, action);
+    }
+
+    @Override
+    public ExperimentRebalanceDto adminExperimentWeightsPreview(UUID id, Map<UUID, Integer> weights) {
+        log.trace("adminExperimentWeightsPreview({})", id);
+        return experiments.previewWeights(id, weights).orElse(null);
     }
 
     @Override

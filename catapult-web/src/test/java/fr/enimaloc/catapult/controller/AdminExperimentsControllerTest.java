@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
@@ -23,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = AdminExperimentsController.class)
@@ -89,6 +91,46 @@ class AdminExperimentsControllerTest {
         mvc.perform(admin(post(BASE + "/weights"), "{\"" + ID + "\":0,\"" + OTHER + "\":0}")).andExpect(status().isBadRequest());
         mvc.perform(admin(post(BASE + "/weights"), "{\"" + ID + "\":-1,\"" + OTHER + "\":5}")).andExpect(status().isBadRequest());
         verify(apiService, never()).adminExperimentWeights(any(), any());
+    }
+
+    @Test
+    void weightsPreview_relaysWhatWouldMove() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminExperimentWeightsPreview(ID, Map.of(ID, 30, OTHER, 70)))
+                .thenReturn(new ExperimentRebalanceDto(java.util.List.of(new ExperimentRebalanceDto.Move(ID, OTHER, 12))));
+
+        mvc.perform(admin(post(BASE + "/weights/preview"), "{\"" + ID + "\":30,\"" + OTHER + "\":70}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.moves[0].fromVariantId").value(ID.toString()))
+                .andExpect(jsonPath("$.moves[0].toVariantId").value(OTHER.toString()))
+                .andExpect(jsonPath("$.moves[0].count").value(12));
+    }
+
+    @Test
+    void weightsPreview_is502WhenTheApiFails() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminExperimentWeightsPreview(ID, Map.of(ID, 30, OTHER, 70))).thenReturn(null);
+
+        mvc.perform(admin(post(BASE + "/weights/preview"), "{\"" + ID + "\":30,\"" + OTHER + "\":70}"))
+                .andExpect(status().isBadGateway());
+    }
+
+    @Test
+    void weightsPreview_negativeOrAllZero_are400_andNotForwarded() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+
+        mvc.perform(admin(post(BASE + "/weights/preview"), "{\"" + ID + "\":0,\"" + OTHER + "\":0}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE + "/weights/preview"), "{\"" + ID + "\":-1,\"" + OTHER + "\":5}")).andExpect(status().isBadRequest());
+        verify(apiService, never()).adminExperimentWeightsPreview(any(), any());
+    }
+
+    @Test
+    void weightsPreview_isRefusedForANonAdmin() throws Exception {
+        when(apiService.isAdmin()).thenReturn(false);
+
+        mvc.perform(admin(post(BASE + "/weights/preview"), "{\"" + ID + "\":30,\"" + OTHER + "\":70}"))
+                .andExpect(status().is4xxClientError());
+        verify(apiService, never()).adminExperimentWeightsPreview(any(), any());
     }
 
     @Test

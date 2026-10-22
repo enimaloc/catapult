@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
 import fr.enimaloc.catapult.common.dto.experiment.MoveAssignmentRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
@@ -700,6 +701,13 @@ public class RealApiService implements ApiService {
     @Override
     public int adminExperimentWeights(UUID id, Map<UUID, Integer> weights) {
         return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/variants/weights", weights, Void.class, id).status();
+    }
+
+    @Override
+    public ExperimentRebalanceDto adminExperimentWeightsPreview(UUID id, Map<UUID, Integer> weights) {
+        ApiClient.Result<ExperimentRebalanceDto> result = client.call(HttpMethod.POST,
+                "/api/admin/experiments/{id}/variants/weights/preview", weights, ExperimentRebalanceDto.class, id);
+        return result.ok() ? result.body() : null;
     }
 
     @Override
