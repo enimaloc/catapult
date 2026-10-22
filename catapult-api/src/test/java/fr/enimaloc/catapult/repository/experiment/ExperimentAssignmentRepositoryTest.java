@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.repository.experiment;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserFlag;
+import fr.enimaloc.catapult.domain.account.UserGroup;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentOverride;
@@ -233,6 +235,92 @@ class ExperimentAssignmentRepositoryTest {
                 .createNativeQuery("SELECT weight FROM experiment_variants WHERE id = ?1")
                 .setParameter(1, control.getId()).getSingleResult();
         assertThat(stored.intValue()).isEqualTo(77);
+    }
+
+    private void flag(UserAccount user, String key, String value) {
+        UserFlag f = new UserFlag();
+        f.setUser(em.find(UserAccount.class, user.getId()));
+        f.setFlagKey(key);
+        f.setFlagValue(value);
+        em.persist(f);
+        em.flush();
+        em.clear();
+    }
+
+    private void group(String key, UserAccount... members) {
+        UserGroup g = new UserGroup();
+        g.setKey(key);
+        g.setName(key);
+        for (UserAccount m : members) g.getMembers().add(em.find(UserAccount.class, m.getId()));
+        em.persist(g);
+        em.flush();
+        em.clear();
+    }
+
+    @Test
+    void findUserIdsWithFlag_matchesAnyValueNullIncludedAndOnlyAssignedMembers() {
+        UserAccount withValue = assign(experiment, control, "alice", "2026-10-20T10:00:00Z").getUser();
+        UserAccount withNull = assign(experiment, control, "bob", "2026-10-21T10:00:00Z").getUser();
+        UserAccount otherFlag = assign(experiment, control, "carol", "2026-10-22T10:00:00Z").getUser();
+        UserAccount notAssigned = new UserAccount();
+        notAssigned.setTwitchUsername("dave");
+        em.persist(notAssigned);
+        flag(withValue, "beta", "yes");
+        flag(withNull, "beta", null);
+        flag(otherFlag, "other", "yes");
+        flag(notAssigned, "beta", "yes");
+
+        assertThat(repository.findUserIdsWithFlag(experiment, "beta"))
+                .containsExactlyInAnyOrder(withValue.getId(), withNull.getId());
+    }
+
+    @Test
+    void findUserIdsWithFlagValue_matchesTheExactValueOnly() {
+        UserAccount yes = assign(experiment, control, "alice", "2026-10-20T10:00:00Z").getUser();
+        UserAccount no = assign(experiment, control, "bob", "2026-10-21T10:00:00Z").getUser();
+        UserAccount nul = assign(experiment, control, "carol", "2026-10-22T10:00:00Z").getUser();
+        flag(yes, "beta", "yes");
+        flag(no, "beta", "no");
+        flag(nul, "beta", null);
+
+        assertThat(repository.findUserIdsWithFlagValue(experiment, "beta", "yes")).containsExactly(yes.getId());
+    }
+
+    @Test
+    void findUserIdsInGroup_returnsAssignedMembersOfThatGroupOnly() {
+        UserAccount in = assign(experiment, control, "alice", "2026-10-20T10:00:00Z").getUser();
+        UserAccount elsewhere = assign(experiment, control, "bob", "2026-10-21T10:00:00Z").getUser();
+        UserAccount notAssigned = new UserAccount();
+        notAssigned.setTwitchUsername("dave");
+        em.persist(notAssigned);
+        group("testers", in, notAssigned);
+        group("others", elsewhere);
+
+        assertThat(repository.findUserIdsInGroup(experiment, "testers")).containsExactly(in.getId());
+    }
+
+    @Test
+    void findAttributeForceVariants_skipsUserAndNonForceVariantOverrides() {
+        ExperimentAssignment a = assign(experiment, control, "alice", "2026-10-20T10:00:00Z");
+        override(a.getUser(), ExperimentOverride.OverrideAction.FORCE_VARIANT);
+        attributeOverride(ExperimentOverride.OverrideAction.FORCE_EXCLUDE, "group", "in", "x");
+        attributeOverride(ExperimentOverride.OverrideAction.FORCE_VARIANT, "group", "in", "testers");
+
+        assertThat(overrides.findAttributeForceVariants(experiment)).singleElement()
+                .satisfies(o -> assertThat(o.getAttributeVal()).isEqualTo("testers"));
+    }
+
+    private void attributeOverride(ExperimentOverride.OverrideAction action, String key, String op, String val) {
+        ExperimentOverride o = new ExperimentOverride();
+        o.setExperiment(em.find(Experiment.class, experiment.getId()));
+        o.setOverrideType(ExperimentOverride.OverrideType.ATTRIBUTE);
+        o.setAction(action);
+        o.setAttributeKey(key);
+        o.setAttributeOp(op);
+        o.setAttributeVal(val);
+        em.persist(o);
+        em.flush();
+        em.clear();
     }
 
     private void override(UserAccount user, ExperimentOverride.OverrideAction action) {

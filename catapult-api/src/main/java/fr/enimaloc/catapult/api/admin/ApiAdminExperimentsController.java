@@ -32,6 +32,7 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentVariantRepository;
 import fr.enimaloc.catapult.service.StatisticsService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.experiment.ExperimentRebalancer;
+import fr.enimaloc.catapult.service.experiment.ForcedMembers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -79,6 +80,7 @@ public class ApiAdminExperimentsController {
     private final ExperimentService experimentService;
     private final ApplicationEventPublisher eventPublisher;
     private final ExperimentRebalancer rebalancer;
+    private final ForcedMembers forcedMembers;
 
     @Transactional(readOnly = true)
     @GetMapping
@@ -385,13 +387,7 @@ public class ApiAdminExperimentsController {
                     : assignmentRepository.searchByVariantAndUsername(exp, variant, pattern, paging);
         }
 
-        Set<UUID> forced = new HashSet<>();
-        for (ExperimentOverride o : overrideRepository.findByExperimentOrderByPriorityAsc(exp)) {
-            if (o.getOverrideType() == ExperimentOverride.OverrideType.USER
-                    && o.getAction() == ExperimentOverride.OverrideAction.FORCE_VARIANT && o.getTargetUser() != null) {
-                forced.add(o.getTargetUser().getId());
-            }
-        }
+        Set<UUID> forced = forcedMembers.userIds(exp);
         List<ExperimentAssignmentDto> rows = found.getContent().stream()
                 .map(a -> new ExperimentAssignmentDto(a.getUser().getId(), a.getUser().getTwitchUsername(),
                         a.getVariant().getId(), a.getAssignedAt(), forced.contains(a.getUser().getId())))

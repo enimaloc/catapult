@@ -24,5 +24,14 @@ public interface ExperimentOverrideRepository extends JpaRepository<ExperimentOv
         """)
     List<UUID> findForcedUserIds(@Param("exp") Experiment exp);
 
+    /** The ATTRIBUTE FORCE_VARIANT overrides of this experiment. */
+    @Query("""
+        SELECT o FROM ExperimentOverride o
+        WHERE o.experiment = :exp
+          AND o.overrideType = fr.enimaloc.catapult.domain.experiment.ExperimentOverride.OverrideType.ATTRIBUTE
+          AND o.action = fr.enimaloc.catapult.domain.experiment.ExperimentOverride.OverrideAction.FORCE_VARIANT
+        """)
+    List<ExperimentOverride> findAttributeForceVariants(@Param("exp") Experiment exp);
+
     void deleteByTargetUser(UserAccount targetUser);
 }

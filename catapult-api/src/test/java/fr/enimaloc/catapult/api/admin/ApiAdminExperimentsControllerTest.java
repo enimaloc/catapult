@@ -26,6 +26,7 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentVariantRepository;
 import fr.enimaloc.catapult.service.StatisticsService;
 import fr.enimaloc.catapult.service.experiment.ExperimentRebalancer;
+import fr.enimaloc.catapult.service.experiment.ForcedMembers;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -66,9 +67,10 @@ class ApiAdminExperimentsControllerTest {
     private final ExperimentService experimentService = mock(ExperimentService.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final ExperimentRebalancer rebalancer = mock(ExperimentRebalancer.class);
+    private final ForcedMembers forcedMembers = mock(ForcedMembers.class);
 
     private final ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments, events,
-            feedback, assignments, users, statistics, overrides, rules, variants, experimentService, publisher, rebalancer);
+            feedback, assignments, users, statistics, overrides, rules, variants, experimentService, publisher, rebalancer, forcedMembers);
 
     private Experiment experiment;
     private ExperimentVariant control;
@@ -667,9 +669,8 @@ class ApiAdminExperimentsControllerTest {
             UserAccount forced = member("forced");
             UserAccount excluded = member("excluded");
             UserAccount plain = member("plain");
-            when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of(
-                    userOverride(forced, ExperimentOverride.OverrideAction.FORCE_VARIANT, treatment),
-                    userOverride(excluded, ExperimentOverride.OverrideAction.FORCE_EXCLUDE, null)));
+            // ForcedMembers resolves user, tag and group overrides: the controller only reads its ids.
+            when(forcedMembers.userIds(experiment)).thenReturn(java.util.Set.of(forced.getId()));
             stubSearch(null, List.of(assignment(forced, treatment), assignment(excluded, control),
                     assignment(plain, control)));
 
