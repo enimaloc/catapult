@@ -71,6 +71,15 @@ class HttpTraceLoggingInterceptorTest {
                 .doesNotContain("secret");
     }
 
+    /** A client with its own, unbuffered request factory (IanaWellKnownRegistry's) still gets the body logged. */
+    @Test
+    void theCallerStillReadsTheBody_withoutABufferingFactory() throws IOException {
+        ClientHttpResponse response = interceptor.intercept(request(), new byte[0], respondWith("{\"ok\":true}"));
+
+        assertThat(messages()).contains("body={\"ok\":true}");
+        assertThat(new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("{\"ok\":true}");
+    }
+
     @Test
     void reportsWhichCredentialKindWasSent() throws IOException {
         interceptor.intercept(request("Authorization"), new byte[0], respondWith(""));
