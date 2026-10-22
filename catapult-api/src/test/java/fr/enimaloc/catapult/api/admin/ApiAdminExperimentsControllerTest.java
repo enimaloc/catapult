@@ -2,7 +2,10 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AssignRequest;
 import fr.enimaloc.catapult.common.dto.admin.NpsStat;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideDto;
+import fr.enimaloc.catapult.common.dto.experiment.MoveAssignmentRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentStatus;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentVariantDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -29,9 +32,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -486,6 +491,227 @@ class ApiAdminExperimentsControllerTest {
 
             override.setExperiment(null);
             assertStatus(() -> controller.deleteOverride(experiment.getId(), overrideId), HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @Nested
+    class Participants {
+        private UserAccount member(String name) {
+            UserAccount user = new UserAccount();
+            user.setId(UUID.randomUUID());
+            user.setTwitchUsername(name);
+            return user;
+        }
+
+        private ExperimentAssignment assignment(UserAccount user, ExperimentVariant variant) {
+            ExperimentAssignment a = new ExperimentAssignment();
+            a.setExperiment(experiment);
+            a.setUser(user);
+            a.setVariant(variant);
+            a.setAssignedAt(Instant.parse("2026-10-22T10:00:00Z"));
+            return a;
+        }
+
+        private ExperimentOverride userOverride(UserAccount user, ExperimentOverride.OverrideAction action,
+                                                ExperimentVariant target) {
+            ExperimentOverride o = new ExperimentOverride();
+            o.setExperiment(experiment);
+            o.setOverrideType(ExperimentOverride.OverrideType.USER);
+            o.setAction(action);
+            o.setTargetUser(user);
+            o.setTargetVariant(target);
+            o.setPriority(3);
+            return o;
+        }
+
+        private void stubSearch(UUID variantId, String q, List<ExperimentAssignment> content) {
+            when(assignments.search(eq(experiment), eq(variantId), eq(q), any()))
+                    .thenReturn(new PageImpl<>(content, PageRequest.of(0, 20), content.size()));
+        }
+
+        @Test
+        void list_filtersOnAVariantAndMapsTheRows() {
+            treatment.setExperiment(experiment);
+            when(variants.findById(treatment.getId())).thenReturn(Optional.of(treatment));
+            UserAccount alice = member("alice");
+            stubSearch(treatment.getId(), "", List.of(assignment(alice, treatment)));
+
+            ExperimentAssignmentsDto result = controller.assignments(experiment.getId(), treatment.getId(), null, 0);
+
+            assertThat(result.page().content()).containsExactly(new ExperimentAssignmentDto(alice.getId(), "alice",
+                    treatment.getId(), Instant.parse("2026-10-22T10:00:00Z"), false));
+            assertThat(result.page().totalElements()).isEqualTo(1);
+            verify(assignments).search(eq(experiment), eq(treatment.getId()), eq(""), eq(PageRequest.of(0, 20)));
+        }
+
+        @Test
+        void list_trimsAndLowercasesTheSearch() {
+            stubSearch(null, "ali", List.of());
+
+            controller.assignments(experiment.getId(), null, "  AlI ", 2);
+
+            verify(assignments).search(eq(experiment), eq(null), eq("ali"), eq(PageRequest.of(2, 20)));
+        }
+
+        @Test
+        void list_aVariantOfAnotherExperimentIsNotFound() {
+            ExperimentVariant foreign = variant("x", false);
+            Experiment other = new Experiment();
+            other.setId(UUID.randomUUID());
+            foreign.setExperiment(other);
+            when(variants.findById(foreign.getId())).thenReturn(Optional.of(foreign));
+
+            assertStatus(() -> controller.assignments(experiment.getId(), foreign.getId(), null, 0), HttpStatus.NOT_FOUND);
+            assertStatus(() -> controller.assignments(experiment.getId(), UUID.randomUUID(), null, 0), HttpStatus.NOT_FOUND);
+            assertStatus(() -> controller.assignments(UUID.randomUUID(), null, null, 0), HttpStatus.NOT_FOUND);
+        }
+
+        @Test
+        void list_countsIncludeEmptyVariants() {
+            when(assignments.countByVariant(experiment)).thenReturn(java.util.Collections.singletonList(
+                    new Object[] {control.getId(), 5L}));
+            stubSearch(null, "", List.of());
+
+            ExperimentAssignmentsDto result = controller.assignments(experiment.getId(), null, null, 0);
+
+            assertThat(result.counts()).containsEntry(control.getId(), 5L).containsEntry(treatment.getId(), 0L);
+        }
+
+        @Test
+        void list_flagsTheMembersAForcedVariantTargets() {
+            UserAccount forced = member("forced");
+            UserAccount excluded = member("excluded");
+            UserAccount plain = member("plain");
+            when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of(
+                    userOverride(forced, ExperimentOverride.OverrideAction.FORCE_VARIANT, treatment),
+                    userOverride(excluded, ExperimentOverride.OverrideAction.FORCE_EXCLUDE, null)));
+            stubSearch(null, "", List.of(assignment(forced, treatment), assignment(excluded, control),
+                    assignment(plain, control)));
+
+            ExperimentAssignmentsDto result = controller.assignments(experiment.getId(), null, null, 0);
+
+            assertThat(result.page().content()).extracting(ExperimentAssignmentDto::forced)
+                    .containsExactly(true, false, false);
+        }
+
+        @Nested
+        class Move {
+            private UserAccount user;
+
+            @BeforeEach
+            void moveSetUp() {
+                user = member("alice");
+                treatment.setExperiment(experiment);
+                when(users.findById(user.getId())).thenReturn(Optional.of(user));
+                when(variants.findById(treatment.getId())).thenReturn(Optional.of(treatment));
+            }
+
+            private void move(UUID variantId) {
+                controller.moveAssignment(experiment.getId(), user.getId(), new MoveAssignmentRequest(variantId));
+            }
+
+            @Test
+            void createsAForceVariantOverrideAndMovesTheAssignment() {
+                ExperimentAssignment current = assignment(user, control);
+                when(assignments.findByExperimentAndUser(experiment, user)).thenReturn(Optional.of(current));
+
+                move(treatment.getId());
+
+                ArgumentCaptor<ExperimentOverride> captor = ArgumentCaptor.forClass(ExperimentOverride.class);
+                verify(overrides).save(captor.capture());
+                ExperimentOverride o = captor.getValue();
+                assertThat(o.getOverrideType()).isEqualTo(ExperimentOverride.OverrideType.USER);
+                assertThat(o.getAction()).isEqualTo(ExperimentOverride.OverrideAction.FORCE_VARIANT);
+                assertThat(o.getTargetUser()).isSameAs(user);
+                assertThat(o.getTargetVariant()).isSameAs(treatment);
+                assertThat(o.getExperiment()).isSameAs(experiment);
+                assertThat(o.getPriority()).isZero();
+                assertThat(current.getVariant()).isSameAs(treatment);
+                verify(assignments).save(current);
+            }
+
+            @Test
+            void createsTheAssignmentOfAMemberWithoutOne() {
+                when(assignments.findByExperimentAndUser(experiment, user)).thenReturn(Optional.empty());
+
+                move(treatment.getId());
+
+                ArgumentCaptor<ExperimentAssignment> captor = ArgumentCaptor.forClass(ExperimentAssignment.class);
+                verify(assignments).save(captor.capture());
+                assertThat(captor.getValue().getUser()).isSameAs(user);
+                assertThat(captor.getValue().getVariant()).isSameAs(treatment);
+                assertThat(captor.getValue().getExperiment()).isSameAs(experiment);
+            }
+
+            @Test
+            void replacesTheMembersExistingUserOverride() {
+                ExperimentOverride exclude = userOverride(user, ExperimentOverride.OverrideAction.FORCE_EXCLUDE, null);
+                ExperimentOverride earlier = userOverride(user, ExperimentOverride.OverrideAction.FORCE_VARIANT, control);
+                ExperimentOverride someoneElses = userOverride(member("bob"), ExperimentOverride.OverrideAction.FORCE_EXCLUDE, null);
+                when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of(exclude, earlier, someoneElses));
+                when(assignments.findByExperimentAndUser(experiment, user)).thenReturn(Optional.empty());
+
+                move(treatment.getId());
+
+                assertThat(earlier.getTargetVariant()).isSameAs(treatment);
+                assertThat(earlier.getPriority()).isZero();
+                verify(overrides).save(earlier);
+                verify(overrides).delete(exclude);
+                verify(overrides, never()).delete(someoneElses);
+                verify(overrides, never()).save(someoneElses);
+            }
+
+            @Test
+            void anIncludeOrExcludeOverrideBecomesTheForceVariantOne() {
+                ExperimentOverride exclude = userOverride(user, ExperimentOverride.OverrideAction.FORCE_EXCLUDE, null);
+                when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of(exclude));
+                when(assignments.findByExperimentAndUser(experiment, user)).thenReturn(Optional.empty());
+
+                move(treatment.getId());
+
+                assertThat(exclude.getAction()).isEqualTo(ExperimentOverride.OverrideAction.FORCE_VARIANT);
+                assertThat(exclude.getTargetVariant()).isSameAs(treatment);
+                verify(overrides).save(exclude);
+            }
+
+            @Test
+            void anEndedExperimentIsAConflict() {
+                experiment.setStatus(Experiment.Status.ENDED);
+
+                assertStatus(() -> move(treatment.getId()), HttpStatus.CONFLICT);
+                verify(overrides, never()).save(any());
+            }
+
+            @Test
+            void aVariantOfAnotherExperimentIsNotFound() {
+                ExperimentVariant foreign = variant("x", false);
+                Experiment other = new Experiment();
+                other.setId(UUID.randomUUID());
+                foreign.setExperiment(other);
+                when(variants.findById(foreign.getId())).thenReturn(Optional.of(foreign));
+
+                assertStatus(() -> move(foreign.getId()), HttpStatus.NOT_FOUND);
+                assertStatus(() -> move(UUID.randomUUID()), HttpStatus.NOT_FOUND);
+                verify(overrides, never()).save(any());
+            }
+
+            @Test
+            void anUnknownUserIsNotFound() {
+                assertStatus(() -> controller.moveAssignment(experiment.getId(), UUID.randomUUID(),
+                        new MoveAssignmentRequest(treatment.getId())), HttpStatus.NOT_FOUND);
+            }
+
+            @Test
+            void anUnknownExperimentIsNotFound() {
+                assertStatus(() -> controller.moveAssignment(UUID.randomUUID(), user.getId(),
+                        new MoveAssignmentRequest(treatment.getId())), HttpStatus.NOT_FOUND);
+            }
+
+            @Test
+            void aMissingVariantIsABadRequest() {
+                assertStatus(() -> move(null), HttpStatus.BAD_REQUEST);
+                assertStatus(() -> controller.moveAssignment(experiment.getId(), user.getId(), null), HttpStatus.BAD_REQUEST);
+            }
         }
     }
 }
