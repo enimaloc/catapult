@@ -491,6 +491,76 @@ describe("channel-settings", () => {
     });
 });
 
+describe("channel-settings raid card", () => {
+    const enabled = () => document.getElementById("raid-restore-enabled");
+    const minutes = () => document.getElementById("raid-restore-minutes");
+
+    function renderRaidCard({ on = false, value = "15", card = true } = {}) {
+        html(`
+            <div id="channel-ccl-settings-form"><button id="ccl-settings-save-btn"></button></div>
+            ${["no-game", "incomplete-fallback"].map(prefix => `
+              <div id="channel-${prefix}-settings-form">
+                <input id="${prefix}-game-input"><input type="hidden" id="${prefix}-game-id">
+                <ul id="${prefix}-game-results"></ul>
+              </div>`).join("")}
+            ${card ? `<div id="channel-raid-settings-form">
+              <input type="checkbox" id="raid-restore-enabled" ${on ? "checked" : ""}>
+              <input type="number" id="raid-restore-minutes" value="${value}" ${on ? "" : "disabled"}>
+              <button id="raid-settings-save-btn"></button>
+            </div>` : ""}`);
+        render();
+    }
+
+    it("switching it on suggests 15 minutes, and saves them", async () => {
+        renderRaidCard({ value: "" });
+
+        toggle(enabled(), true);
+        expect(minutes().value).toBe("15");
+        expect(minutes().disabled).toBe(false);
+        await click("#raid-settings-save-btn");
+
+        expect(posts()).toEqual([["/channel/enimaloc/settings/raid", { restoreGameMinutes: 15 }]]);
+        expect(refreshed()).toBe(0);
+    });
+
+    it("saves the delay typed, kept within 1..120 minutes", async () => {
+        renderRaidCard({ on: true, value: "30" });
+        await click("#raid-settings-save-btn");
+        minutes().value = "500";
+        await click("#raid-settings-save-btn");
+        minutes().value = "0";
+        await click("#raid-settings-save-btn");
+
+        expect(posts().map(([, body]) => body.restoreGameMinutes)).toEqual([30, 120, 1]);
+    });
+
+    it("switching it off saves it as off and greys the delay out", async () => {
+        renderRaidCard({ on: true, value: "30" });
+
+        toggle(enabled(), false);
+        expect(minutes().disabled).toBe(true);
+        await click("#raid-settings-save-btn");
+
+        expect(posts()).toEqual([["/channel/enimaloc/settings/raid", { restoreGameMinutes: null }]]);
+    });
+
+    it("follows the raid settings saved elsewhere", () => {
+        renderRaidCard();
+
+        CatapultSettings.apply({ raid: { restoreGameMinutes: 45 } });
+        expect([enabled().checked, minutes().value, minutes().disabled]).toEqual([true, "45", false]);
+
+        CatapultSettings.apply({ raid: { restoreGameMinutes: null } });
+        expect([enabled().checked, minutes().value, minutes().disabled]).toEqual([false, "45", true]);
+    });
+
+    it("leaves pages without the card alone", () => {
+        renderRaidCard({ card: false });
+
+        expect(() => CatapultSettings.apply({ raid: { restoreGameMinutes: 10 } })).not.toThrow();
+    });
+});
+
 describe("channel-dtdd", () => {
     beforeEach(() => {
         html(`

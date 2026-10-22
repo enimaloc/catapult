@@ -354,6 +354,28 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void saveRaidSettings_callsApiServiceWithParsedBody() throws Exception {
+        when(apiService.saveRaidSettings("enimaloc", 20)).thenReturn(204);
+
+        mvc.perform(post("/channel/enimaloc/settings/raid").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"restoreGameMinutes\":20}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveRaidSettings("enimaloc", 20);
+    }
+
+    @Test
+    void saveRaidSettings_passesCatapultApisRefusalOn() throws Exception {
+        when(apiService.saveRaidSettings("enimaloc", 500)).thenReturn(400);
+
+        mvc.perform(post("/channel/enimaloc/settings/raid").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"restoreGameMinutes\":500}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void saveIncompleteFallbackSettings_callsApiServiceWithParsedBody() throws Exception {
         mvc.perform(post("/channel/enimaloc/settings/incomplete-fallback").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)

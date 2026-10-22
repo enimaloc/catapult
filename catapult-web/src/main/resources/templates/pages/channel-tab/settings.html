@@ -68,6 +68,22 @@
                 'incomplete-fallback-ccl-checkbox', ${settings.incompleteFallbackCcls()}, 'name')}"></div>
         <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
     </mdui-card>
+
+    <!--/* Only while the channel is in the raid.restore-game experiment (catapult-api says so). Off: the delay
+         is greyed out, showing the 15 minutes suggested once switched on. */-->
+    <mdui-card id="channel-raid-settings-form" class="settings-card" variant="outlined"
+               th:if="${settings.raidRestoreGameAvailable()}">
+        <div class="title-row">
+            <h3 th:text="#{channel.settings.raid.title}">Raid</h3>
+        </div>
+        <label th:replace="~{fragments/controls :: labelledSwitch('raid-restore-enabled',
+                ${settings.raidRestoreGameMinutes() != null}, 'channel.settings.raid.restore_game', 'settings-master-toggle')}"></label>
+        <mdui-text-field id="raid-restore-minutes" type="number" min="1" max="120" variant="outlined"
+                         th:value="${settings.raidRestoreGameMinutes() ?: 15}"
+                         th:disabled="${settings.raidRestoreGameMinutes() == null}"
+                         th:attr="label=#{channel.settings.raid.minutes},helper=#{channel.settings.raid.minutes_helper}"></mdui-text-field>
+        <mdui-button id="raid-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+    </mdui-card>
     </th:block>
 
     <!--/* The owner's account preference, not the channel's: a moderator doesn't get it. */-->
