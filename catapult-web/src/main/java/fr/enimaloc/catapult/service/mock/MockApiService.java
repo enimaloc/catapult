@@ -563,6 +563,18 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
+    /** Validated like catapult-api: 1..120 minutes, null or 0 for off, else 400. */
+    @Override
+    public int saveRaidSettings(String username, Integer restoreGameMinutes) {
+        log.trace("saveRaidSettings({}, {})", username, restoreGameMinutes);
+        if (restoreGameMinutes != null && restoreGameMinutes != 0 && (restoreGameMinutes < 1 || restoreGameMinutes > 120)) {
+            return 400;
+        }
+        currentData().saveRaidSettings(restoreGameMinutes == null || restoreGameMinutes == 0 ? null : restoreGameMinutes);
+        publishSettings(username);
+        return NO_CONTENT;
+    }
+
     @Override
     public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
         log.trace("saveIncompleteFallbackSettings({}, {}, {}, {})", username, twitchGameId, twitchGameName, ccls);

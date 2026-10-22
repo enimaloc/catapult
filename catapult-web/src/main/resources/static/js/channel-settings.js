@@ -10,6 +10,10 @@ window.CatapultSettings = (function () {
     // The current render's game pickers, by card prefix.
     let games = {};
 
+    const RAID_DEFAULT_MINUTES = 15;
+    const RAID_MIN_MINUTES = 1;
+    const RAID_MAX_MINUTES = 120;
+
     const byId = id => document.getElementById(id);
 
     function setChecked(id, checked) {
@@ -35,10 +39,33 @@ window.CatapultSettings = (function () {
         }
     }
 
+    /**
+     * The raid card: its switch turns "put the last game back" on (a delay of `minutes`, the field
+     * filled with the suggested 15 when empty) or off (null, the field greyed out but kept).
+     */
+    function setRaid(minutes) {
+        const sw = byId("raid-restore-enabled");
+        const field = byId("raid-restore-minutes");
+        if (!sw || !field) return;
+        sw.checked = minutes != null;
+        if (minutes != null) field.value = String(minutes);
+        else if (!field.value) field.value = String(RAID_DEFAULT_MINUTES);
+        field.disabled = !sw.checked;
+    }
+
+    /** The raid delay to save: null when off, else the field's minutes kept within 1..120 (15 when unreadable). */
+    function raidMinutes() {
+        if (!byId("raid-restore-enabled")?.checked) return null;
+        const typed = byId("raid-restore-minutes")?.value ?? "";
+        const minutes = Math.round(Number(typed));
+        if (typed === "" || !Number.isFinite(minutes)) return RAID_DEFAULT_MINUTES;
+        return Math.min(RAID_MAX_MINUTES, Math.max(RAID_MIN_MINUTES, minutes));
+    }
+
     /** Sets every settings card to `settings` (ChannelEvents.Settings: one entry per card). */
     function apply(settings) {
         if (!settings || !byId("channel-ccl-settings-form")) return;
-        const { ccl, tw, noGame, incompleteFallback } = settings;
+        const { ccl, tw, noGame, incompleteFallback, raid } = settings;
         if (ccl) {
             setChecked("ccl-enabled-checkbox", ccl.enabled);
             setGrid("channel-ccl-settings-form", "ccl-block-checkbox", ccl.blockedCcls);
@@ -59,6 +86,7 @@ window.CatapultSettings = (function () {
             setGrid("channel-incomplete-fallback-settings-form", "incomplete-fallback-ccl-checkbox",
                 incompleteFallback.ccls);
         }
+        if (raid) setRaid(raid.restoreGameMinutes ?? null);
     }
 
     function track(prefix, game) {
@@ -69,7 +97,7 @@ window.CatapultSettings = (function () {
         games = {};
     }
 
-    return { apply, track, reset };
+    return { apply, track, reset, setRaid, raidMinutes, RAID_DEFAULT_MINUTES };
 })();
 
 document.addEventListener("catapult:render", function () {
@@ -83,6 +111,13 @@ document.addEventListener("catapult:render", function () {
     on("ccl-settings-save-btn", "click", () => postJson(`${baseUrl}/settings/ccl`, {
         cclEnabled: byId("ccl-enabled-checkbox").checked,
         blockedCcls: checkedValues(byId("channel-ccl-settings-form"), ".ccl-block-checkbox")
+    }));
+
+    // Only offered while the channel is in the raid.restore-game experiment: absent otherwise.
+    on("raid-restore-enabled", "change", event => CatapultSettings.setRaid(
+        event.target.checked ? (byId("raid-restore-minutes")?.value || CatapultSettings.RAID_DEFAULT_MINUTES) : null));
+    on("raid-settings-save-btn", "click", () => postJson(`${baseUrl}/settings/raid`, {
+        restoreGameMinutes: CatapultSettings.raidMinutes()
     }));
 
     on("tw-settings-save-btn", "click", () => postJson(`${baseUrl}/settings/tws`, {
