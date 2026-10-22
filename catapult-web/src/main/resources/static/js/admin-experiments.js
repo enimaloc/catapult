@@ -2,11 +2,12 @@
  * The admin Experiments detail view. Status actions, weights, rules and overrides post to
  * AdminExperimentsController with their button disabled meanwhile; a success reloads the view, a
  * refusal is told by its status (400 invalid, 404 gone and reloads, anything else unavailable; a 409
- * is a refused change too). End and Reassign, and deleting a rule or an override, confirm first. The
- * rule and override forms hold one block of fields per type/target and show only the chosen one
- * (variantId only for FORCE_VARIANT); weights show their live share of the total. mdui-text-field
- * can't bind a <datalist> (shadow DOM), so the known tags and the chosen tag's values are offered as
- * chips under the tag fields. Listeners are delegated to the document: the view comes and goes.
+ * is a refused change too). A 404 on an account override means an unknown Twitch login: it is told
+ * without reloading, so the form keeps what was typed. End and Reassign, and deleting a rule or an override, confirm first. The rule and override forms
+ * hold one block of fields per type/target and show only the chosen one (variantId only for
+ * FORCE_VARIANT); weights show their live share of the total. mdui-text-field can't bind a
+ * <datalist> (shadow DOM), so the known tags and the chosen tag's values are offered as chips under
+ * the tag fields. Listeners are delegated to the document: the view comes and goes.
  */
 window.CatapultAdminExperiments = (function () {
     const PANEL = 'mdui-tab-panel[value="experiments"]';
@@ -39,28 +40,32 @@ window.CatapultAdminExperiments = (function () {
         }
     }
 
-    function refusal(root, status) {
-        if (status === 404) return root.dataset.labelUnknown;
+    /** What to tell for a refused status; `notFound` names what a 404 means for the action. */
+    function refusal(root, status, notFound) {
+        if (status === 404) return root.dataset[notFound];
         return status === 400 || status === 409 ? root.dataset.labelInvalid : root.dataset.labelUnavailable;
     }
 
-    /** Tells the outcome of `status`: done (snackbar, reload) or refused; a vanished target also reloads. */
-    async function settle(panel, root, status) {
+    /**
+     * Tells the outcome of `status`: done (snackbar, reload) or refused. A vanished experiment also
+     * reloads; an unknown account keeps the form as typed.
+     */
+    async function settle(panel, root, status, notFound) {
         if (ok(status)) {
             window.mdui?.snackbar?.({ message: root.dataset.labelSaved });
             await CatapultAdminTabs.reload(panel);
             return;
         }
-        CatapultChannel.showError(refusal(root, status));
-        if (status === 404) await CatapultAdminTabs.reload(panel);
+        CatapultChannel.showError(refusal(root, status, notFound));
+        if (status === 404 && notFound === "labelUnknown") await CatapultAdminTabs.reload(panel);
     }
 
     /** Posts and settles; `button` stays busy until the view reloads. */
-    async function send(panel, root, button, url, body) {
+    async function send(panel, root, button, url, body, notFound = "labelUnknown") {
         const status = await post(button, url, body);
         if (button) button.disabled = true;
         try {
-            await settle(panel, root, status);
+            await settle(panel, root, status, notFound);
         } finally {
             if (button) button.disabled = false;
         }
@@ -193,7 +198,10 @@ window.CatapultAdminExperiments = (function () {
 
     function submitOverride(panel, root, form) {
         const body = overrideBody(form);
-        if (body) send(panel, root, form.querySelector('[type="submit"]'), urlOf(root, "overrides"), body);
+        if (body) {
+            const notFound = body.target === "account" ? "labelAccountUnknown" : "labelUnknown";
+            send(panel, root, form.querySelector('[type="submit"]'), urlOf(root, "overrides"), body, notFound);
+        }
     }
 
     // ---- tag suggestions
