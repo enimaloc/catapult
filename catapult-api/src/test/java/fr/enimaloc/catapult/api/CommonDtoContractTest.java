@@ -74,20 +74,23 @@ class CommonDtoContractTest {
         member.setSteamId("7656");
         member.setWidgetToken(UUID.randomUUID());
         member.setCreatedAt(Instant.parse("2026-10-16T10:00:00Z"));
-        when(accounts.findAll()).thenReturn(List.of(member));
+        when(accounts.findMembersPage(org.mockito.ArgumentMatchers.any())).thenReturn(new org.springframework.data.domain.PageImpl<>(
+                List.of(member), org.springframework.data.domain.PageRequest.of(0, 50), 1));
         when(streams.isLive(member)).thenReturn(true);
         when(environment.getActiveProfiles()).thenReturn(new String[0]);
         ApiAdminMembersController controller = new ApiAdminMembersController(accounts, streams,
                 mock(AccountService.class), mock(BotToggleService.class), mock(AdminMigrationService.class),
                 environment, mock(UserFlagRepository.class), mock(UserGroupRepository.class));
 
-        AdminMembersPage produced = controller.page();
+        AdminMembersPage produced = controller.page(0, null);
         String json = JSON.writeValueAsString(produced);
         AdminMembersPage read = JSON.readValue(json, AdminMembersPage.class);
 
         assertThat(read).isEqualTo(produced);
         assertThat(read.members().getFirst().twitchUsername()).isEqualTo("streamer");
         assertThat(read.isLive(member.getId())).isTrue();
+        assertThat(read.totalElements()).isEqualTo(1);
+        assertThat(read.totalPages()).isEqualTo(1);
         assertThat(json).doesNotContain(member.getWidgetToken().toString());
     }
 

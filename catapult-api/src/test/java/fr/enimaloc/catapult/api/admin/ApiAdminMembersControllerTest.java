@@ -96,22 +96,88 @@ class ApiAdminMembersControllerTest {
         assertStatus(() -> controller.deleteFlag(unknown, "k"), HttpStatus.NOT_FOUND);
     }
 
+    private static org.springframework.data.domain.Page<UserAccount> pageOf(List<UserAccount> content, int number,
+                                                                           long total) {
+        return new org.springframework.data.domain.PageImpl<>(content,
+                org.springframework.data.domain.PageRequest.of(number, 50), total);
+    }
+
     @Test
     void page_listsMembersWithLiveStatus_andTheMockProfile() {
-        when(accounts.findAll()).thenReturn(List.of(member));
+        when(accounts.findMembersPage(any())).thenReturn(pageOf(List.of(member), 0, 1));
         when(streamState.isLive(member)).thenReturn(true);
         when(environment.getActiveProfiles()).thenReturn(new String[]{"dev", "mock"});
 
         member.setSteamId("7656");
         member.setProfileImageUrl("https://img/member");
 
-        fr.enimaloc.catapult.common.dto.admin.AdminMembersPage page = controller.page();
+        fr.enimaloc.catapult.common.dto.admin.AdminMembersPage page = controller.page(0, null);
 
         assertThat(page.members()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
                 member.getId(), member.getTwitchId(), member.getTwitchUsername(), "https://img/member", "7656",
                 false, member.isBotEnabled(), "ACTIVE", member.getCreatedAt()));
         assertThat(page.liveStatus()).containsEntry(member.getId(), true);
         assertThat(page.isMockProfile()).isTrue();
+        assertThat(page.number()).isZero();
+        assertThat(page.totalPages()).isEqualTo(1);
+        assertThat(page.totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void page_asksForFiftyMembersOrderedInTheQuery_andLiveOnlyForThatPage() {
+        UserAccount other = account("other", "tw-other");
+        when(accounts.findMembersPage(any())).thenReturn(pageOf(List.of(member), 2, 101));
+
+        var page = controller.page(2, "  ");
+
+        ArgumentCaptor<org.springframework.data.domain.Pageable> request =
+                ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        verify(accounts).findMembersPage(request.capture());
+        assertThat(request.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(request.getValue().getPageSize()).isEqualTo(50);
+        verify(streamState).isLive(member);
+        verify(streamState, never()).isLive(other);
+        assertThat(page.number()).isEqualTo(2);
+        assertThat(page.totalPages()).isEqualTo(3);
+        assertThat(page.totalElements()).isEqualTo(101);
+        verify(accounts, never()).findAll();
+    }
+
+    @Test
+    void page_withAQuery_searchesWithTheTrimmedEscapedPatternAndExactId() {
+        when(accounts.searchMembersPage(anyString(), anyString(), any())).thenReturn(pageOf(List.of(member), 0, 1));
+
+        controller.page(-3, "  50%_Off ");
+
+        ArgumentCaptor<org.springframework.data.domain.Pageable> request =
+                ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        verify(accounts).searchMembersPage(org.mockito.ArgumentMatchers.eq("%50\\%\\_off%"),
+                org.mockito.ArgumentMatchers.eq("50%_Off"), request.capture());
+        assertThat(request.getValue().getPageNumber()).isZero();
+        verify(accounts, never()).findMembersPage(any());
+    }
+
+    @Test
+    void search_returnsAtMostTwentyMatches_withoutLiveStatus() {
+        when(accounts.searchMembers(anyString(), anyString(), any())).thenReturn(List.of(member));
+
+        var found = controller.search(" mem ");
+
+        ArgumentCaptor<org.springframework.data.domain.Pageable> request =
+                ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        verify(accounts).searchMembers(org.mockito.ArgumentMatchers.eq("%mem%"),
+                org.mockito.ArgumentMatchers.eq("mem"), request.capture());
+        assertThat(request.getValue().getPageSize()).isEqualTo(20);
+        assertThat(found).extracting(fr.enimaloc.catapult.common.dto.admin.AdminMemberDto::twitchUsername)
+                .containsExactly("member");
+        org.mockito.Mockito.verifyNoInteractions(streamState);
+    }
+
+    @Test
+    void search_withABlankQuery_isEmptyWithoutQuerying() {
+        assertThat(controller.search("   ")).isEmpty();
+        assertThat(controller.search(null)).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(accounts);
     }
 
     @Test
