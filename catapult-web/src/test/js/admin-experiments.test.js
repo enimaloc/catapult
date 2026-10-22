@@ -302,3 +302,113 @@ describe("admin-experiments", () => {
         expect(field(form, "tagValue").value).toBe("on");
     });
 });
+
+describe("admin-experiments weight bar", () => {
+    const V3 = "3f0c0000-0000-0000-0000-0000000000a3";
+    const ids = [V1, V2, V3];
+    const input = id => document.querySelector(`#experiment-weights [data-variant="${id}"]`);
+    const values = () => ids.map(id => input(id).value);
+    const grow = id => document.querySelector(`[data-segment="${id}"]`).style.flexGrow;
+    const handle = n => document.querySelector(`[data-handle="${n}"]`);
+
+    /** The detail with a three-variant bar 200px wide starting at x=100. */
+    function barPage(weights) {
+        html(`
+            <mdui-tab-panel value="experiments">
+                <div class="admin-experiment-detail" data-experiment="${EXP}"
+                     data-label-invalid="Refused" data-label-unknown="Gone" data-label-unavailable="Down">
+                    <form id="experiment-weights">
+                        <div class="experiment-weight-bar is-editable">
+                            <div class="experiment-weight-segment" data-segment="${V1}"><span class="experiment-weight-label"><span>a</span> <b></b></span></div>
+                            <span class="experiment-weight-handle" role="slider" tabindex="0" data-handle="1"></span>
+                            <div class="experiment-weight-segment" data-segment="${V2}"><span class="experiment-weight-label"><span>b</span> <b></b></span></div>
+                            <span class="experiment-weight-handle" role="slider" tabindex="0" data-handle="2"></span>
+                            <div class="experiment-weight-segment" data-segment="${V3}"><span class="experiment-weight-label"><span>c</span> <b></b></span></div>
+                        </div>
+                        ${ids.map((id, i) => `<div><input data-variant="${id}" value="${weights[i]}"><span data-weight-share></span></div>`).join("")}
+                        <button type="submit" id="weights-save"></button>
+                    </form>
+                </div>
+            </mdui-tab-panel>`);
+        document.querySelector(".experiment-weight-bar").getBoundingClientRect = () => ({ left: 100, width: 200 });
+        document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "experiments", panel: panel() } }));
+    }
+
+    async function drag(n, toX) {
+        const grip = handle(n);
+        grip.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, clientX: 0 }));
+        grip.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: toX }));
+        grip.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, clientX: toX }));
+        await flush();
+    }
+
+    async function key(n, name, shiftKey = false) {
+        handle(n).dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: name, shiftKey }));
+        await flush();
+    }
+
+    it("turns stored weights into percentages summing to 100, and sizes the segments by them", () => {
+        barPage([1, 3, 0]);
+
+        expect(values()).toEqual(["25", "75", "0"]);
+        expect([grow(V1), grow(V2), grow(V3)]).toEqual(["25", "75", "0"]);
+        expect(document.querySelector(`[data-segment="${V1}"] b`).textContent).toBe("25 %");
+    });
+
+    it("keeps the sum at 100 when rounding, the largest remainders taking the points", () => {
+        barPage([1, 1, 1]);
+
+        expect(values().map(Number).reduce((a, b) => a + b)).toBe(100);
+        expect(values()).toEqual(["34", "33", "33"]);
+    });
+
+    it("leaves weights that are all zero alone", () => {
+        barPage([0, 0, 0]);
+
+        expect(values()).toEqual(["0", "0", "0"]);
+    });
+
+    it("moves points between the two neighbours of the dragged handle only, then posts them", async () => {
+        barPage([20, 30, 50]);
+
+        await drag(1, 100 + 200 * 0.4); // the first boundary to 40 %
+
+        expect(values()).toEqual(["40", "10", "50"]);
+        expect(grow(V1)).toBe("40");
+        await submit("weights-save");
+        expect(posted).toHaveBeenCalledWith(`/admin/experiments/${EXP}/weights`, { [V1]: 40, [V2]: 10, [V3]: 50 });
+    });
+
+    it("stops a handle at its neighbours' edges", async () => {
+        barPage([20, 30, 50]);
+
+        await drag(2, 100 + 200 * 0.1); // left of the first boundary: the middle variant empties
+
+        expect(values()).toEqual(["20", "0", "80"]);
+
+        await drag(2, 100 + 200 * 1.5); // past the bar's end: the last variant empties
+
+        expect(values()).toEqual(["20", "80", "0"]);
+    });
+
+    it("moves a handle by 1 with the arrows and 10 with Shift, and tells its position", async () => {
+        barPage([20, 30, 50]);
+
+        await key(1, "ArrowRight");
+        expect(values()).toEqual(["21", "29", "50"]);
+
+        await key(1, "ArrowLeft", true);
+        expect(values()).toEqual(["11", "39", "50"]);
+        expect(handle(1).getAttribute("aria-valuenow")).toBe("11");
+        expect(handle(2).getAttribute("aria-valuenow")).toBe("50");
+    });
+
+    it("follows the number fields as they are typed", async () => {
+        barPage([20, 30, 50]);
+
+        await set(input(V3), "150");
+
+        expect(grow(V3)).toBe("150");
+        expect(document.querySelector(`[data-segment="${V3}"] b`).textContent).toBe("75 %");
+    });
+});

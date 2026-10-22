@@ -5,7 +5,10 @@
  * anything else unavailable). A 404 on an account override means an unknown Twitch login: it is told
  * without reloading, so the form keeps what was typed. End and Reassign, and deleting a rule or an override, confirm first. The rule and override forms
  * hold one block of fields per type/target and show only the chosen one (variantId only for
- * FORCE_VARIANT); weights show their live share of the total. mdui-text-field can't bind a
+ * FORCE_VARIANT); weights show their live share of the total, and the weight bar above them (a
+ * segment per variant) is dragged or arrowed by the handle between two neighbours, which moves points
+ * from one to the other: the view opens on the weights as percentages summing to 100 so the bar and
+ * the fields say the same thing. mdui-text-field can't bind a
  * <datalist> (shadow DOM), so the known tags and the chosen tag's values are offered as chips under
  * the tag fields. Listeners are delegated to the document: the view comes and goes.
  */
@@ -107,6 +110,85 @@ window.CatapultAdminExperiments = (function () {
             const share = field.parentElement.querySelector("[data-weight-share]");
             if (share) share.textContent = weight === null || total === 0 ? "" : `${Math.round(weight / total * 100)} %`;
         });
+    }
+
+    /** The bar's segments sized by the fields, labelled with their share, and its handles' positions. */
+    function showBar(form) {
+        const bar = form.querySelector(".experiment-weight-bar");
+        if (!bar) return;
+        const fields = weightFields(form);
+        const weights = fields.map(field => weightOf(field) ?? 0);
+        const total = weights.reduce((a, b) => a + b, 0);
+        fields.forEach((field, i) => {
+            const segment = bar.querySelector(`[data-segment="${CSS.escape(field.dataset.variant)}"]`);
+            if (!segment) return;
+            segment.style.flexGrow = String(weights[i]);
+            const label = segment.querySelector("b");
+            if (label) label.textContent = `${total === 0 ? 0 : Math.round(weights[i] / total * 100)} %`;
+        });
+        bar.querySelectorAll("[data-handle]").forEach(handle => {
+            const before = weights.slice(0, Number(handle.dataset.handle)).reduce((a, b) => a + b, 0);
+            handle.setAttribute("aria-valuenow", String(total === 0 ? 0 : Math.round(before / total * 100)));
+        });
+    }
+
+    /**
+     * Rewrites the weights as percentages summing to 100 (largest remainders take the rounding's
+     * points), so that a handle moves whole percents; all-zero weights stay as they are.
+     */
+    function asPercentages(form) {
+        const fields = weightFields(form);
+        const weights = fields.map(field => weightOf(field) ?? 0);
+        const total = weights.reduce((a, b) => a + b, 0);
+        if (total === 0 || total === 100) return;
+        const exact = weights.map(weight => weight * 100 / total);
+        const shares = exact.map(Math.floor);
+        const order = exact.map((value, i) => [value - shares[i], i]).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+        for (let k = 0; k < 100 - shares.reduce((a, b) => a + b, 0); k++) shares[order[k][1]]++;
+        fields.forEach((field, i) => { field.value = String(shares[i]); });
+    }
+
+    /** Puts the boundary of `handle` at `percent` of the bar, between its two neighbours only. */
+    function moveHandle(form, handle, percent) {
+        asPercentages(form);
+        const fields = weightFields(form);
+        const right = Number(handle.dataset.handle);
+        const weights = fields.map(field => weightOf(field) ?? 0);
+        const before = weights.slice(0, right - 1).reduce((a, b) => a + b, 0);
+        const pair = weights[right - 1] + weights[right];
+        const left = Math.min(pair, Math.max(0, Math.round(percent) - before));
+        fields[right - 1].value = String(left);
+        fields[right].value = String(pair - left);
+        sync(form);
+    }
+
+    function dragHandle(form, handle, event) {
+        const bar = handle.closest(".experiment-weight-bar");
+        const follow = moveEvent => {
+            const box = bar.getBoundingClientRect();
+            if (box.width > 0) moveHandle(form, handle, (moveEvent.clientX - box.left) / box.width * 100);
+        };
+        const stop = () => {
+            bar.classList.remove("is-dragging");
+            handle.removeEventListener("pointermove", follow);
+            handle.removeEventListener("pointerup", stop);
+            handle.removeEventListener("pointercancel", stop);
+        };
+        event.preventDefault();
+        handle.setPointerCapture?.(event.pointerId);
+        handle.focus?.();
+        bar.classList.add("is-dragging");
+        handle.addEventListener("pointermove", follow);
+        handle.addEventListener("pointerup", stop);
+        handle.addEventListener("pointercancel", stop);
+    }
+
+    function nudgeHandle(form, handle, event) {
+        const step = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        asPercentages(form);
+        moveHandle(form, handle, Number(handle.getAttribute("aria-valuenow") ?? 0) + step * (event.shiftKey ? 10 : 1));
     }
 
     function saveWeights(panel, root, form) {
@@ -257,12 +339,29 @@ window.CatapultAdminExperiments = (function () {
     function sync(form) {
         if (form.id === "experiment-rule-form") syncRule(form);
         else if (form.id === "experiment-override-form") syncOverride(form);
-        else if (form.id === "experiment-weights") showShares(form);
+        else if (form.id === "experiment-weights") {
+            showShares(form);
+            showBar(form);
+        }
     }
 
     document.addEventListener("catapult:admin-panel", event => {
         if (event.detail.tab !== "experiments") return;
+        event.detail.panel.querySelectorAll("#experiment-weights").forEach(asPercentages);
         event.detail.panel.querySelectorAll("#experiment-weights, #experiment-rule-form, #experiment-override-form").forEach(sync);
+    });
+
+    const handleOf = event => {
+        const handle = event.target.closest?.("#experiment-weights [data-handle]");
+        return handle && rootOf(handle) ? handle : null;
+    };
+    document.addEventListener("pointerdown", event => {
+        const handle = handleOf(event);
+        if (handle) dragHandle(handle.closest("form"), handle, event);
+    });
+    document.addEventListener("keydown", event => {
+        const handle = handleOf(event);
+        if (handle) nudgeHandle(handle.closest("form"), handle, event);
     });
 
     document.addEventListener("click", event => {

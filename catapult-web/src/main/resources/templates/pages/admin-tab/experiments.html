@@ -17,15 +17,12 @@
 
     <mdui-card class="admin-targeting-card" variant="outlined" th:if="${experiments != null and !experiments.isEmpty()}">
         <div class="admin-targeting-rows">
-            <div class="admin-experiments-row" th:each="e : ${experiments}" th:attr="data-admin-open=${e.id()}"
-                 th:with="total=${#aggregates.sum(e.variants().![weight]).longValue()}">
+            <div class="admin-experiments-row" th:each="e : ${experiments}" th:attr="data-admin-open=${e.id()}">
                 <div>
                     <strong class="admin-member-id" th:text="${e.key()}">key</strong>
                     <span class="admin-cell-muted" th:text="${e.name()}">name</span>
                 </div>
-                <span class="admin-cell-muted">
-                    <th:block th:each="v, it : ${e.variants()}"><th:block th:if="${!it.first}"> · </th:block><th:block th:text="|${v.key()} ${total == 0 ? 0 : (v.weight() * 200L + total) / (2 * total)} %|">control 0 %</th:block></th:block>
-                </span>
+                <div th:replace="~{pages/admin-tab/experiments :: weightBar(${e.variants()}, false, true)}"></div>
                 <span class="admin-experiments-chips">
                     <mdui-chip class="admin-experiments-norule" icon="warning" th:if="${e.ruleCount() == 0}"
                                th:text="#{admin.experiments.norule}">aucune règle</mdui-chip>
@@ -76,7 +73,10 @@
     <mdui-card class="admin-targeting-card" variant="outlined">
         <h3 th:text="#{admin.experiments.weights.title}">Poids</h3>
         <form id="experiment-weights" th:if="${editable}" class="admin-experiments-form">
-            <div class="admin-experiments-weight" th:each="v : ${experiment.variants()}">
+            <div th:replace="~{pages/admin-tab/experiments :: weightBar(${experiment.variants()}, true, false)}"></div>
+            <div class="admin-experiments-weight" th:each="v, it : ${experiment.variants()}">
+                <span class="experiment-weight-swatch" aria-hidden="true"
+                      th:style="|--variant-color: var(--catapult-variant-${v.control() ? 'control' : (it.index - experiment.variants().subList(0, it.index).?[control()].size()) % 4 + 1})|"></span>
                 <mdui-text-field type="number" min="0" variant="outlined" required th:value="${v.weight()}"
                                  th:attr="data-variant=${v.id()},name=${'weight-' + v.key()},
                                           label=${v.control() ? #messages.msg('admin.experiments.weights.control', v.key()) : v.key()}"></mdui-text-field>
@@ -84,14 +84,7 @@
             </div>
             <mdui-button variant="filled" type="submit" icon="save" th:text="#{admin.experiments.weights.save}">Enregistrer</mdui-button>
         </form>
-        <div class="admin-targeting-rows" th:unless="${editable}"
-             th:with="total=${#aggregates.sum(experiment.variants().![weight]).longValue()}">
-            <div class="admin-targeting-row" th:each="v : ${experiment.variants()}">
-                <span class="admin-member-id" th:text="${v.key()}">key</span>
-                <span th:text="|${total == 0 ? 0 : (v.weight() * 200L + total) / (2 * total)} %|">0 %</span>
-                <span></span>
-            </div>
-        </div>
+        <th:block th:unless="${editable}"><div th:replace="~{pages/admin-tab/experiments :: weightBar(${experiment.variants()}, false, false)}"></div></th:block>
     </mdui-card>
 
     <mdui-card class="admin-targeting-card" variant="outlined">
@@ -233,4 +226,25 @@
         <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
     </div>
     <p class="admin-placeholder" th:text="#{admin.experiments.missing}">Cette expérience n'existe plus.</p>
+</div>
+
+<!--/* The variants' weights as one bar, a segment per variant as wide as its share, coloured from the
+     brand's palette (the control in the muted grey: the feature is off for whoever lands there).
+     Editable: a slider handle between two neighbours moves points from one to the other
+     (admin-experiments.js keeps the segments and the number fields in step). Mini: the list's. */-->
+<div th:fragment="weightBar(variants, editable, mini)" class="experiment-weight-bar"
+     th:classappend="${editable ? 'is-editable' : (mini ? 'is-mini' : '')}"
+     th:with="total=${#aggregates.sum(variants.![weight]).longValue()}">
+    <th:block th:each="v, it : ${variants}"
+              th:with="share=${total == 0 ? 0 : (v.weight() * 200L + total) / (2 * total)},
+                       slot=${(it.index - variants.subList(0, it.index).?[control()].size()) % 4 + 1}">
+        <span th:if="${editable and !it.first}" class="experiment-weight-handle" role="slider" tabindex="0"
+              aria-valuemin="0" aria-valuemax="100"
+              th:attr="data-handle=${it.index},aria-label=#{admin.experiments.weights.handle(${variants[it.index - 1].key()}, ${v.key()})}"></span>
+        <div class="experiment-weight-segment"
+             th:style="|flex-grow: ${v.weight()}; --variant-color: var(--catapult-variant-${v.control() ? 'control' : slot})|"
+             th:attr="data-segment=${v.id()},title=|${v.key()} ${share} %|">
+            <span class="experiment-weight-label" th:unless="${mini}"><span th:text="${v.key()}">key</span> <b th:text="|${share} %|">0 %</b></span>
+        </div>
+    </th:block>
 </div>
