@@ -760,6 +760,18 @@ class MockApiServiceTest {
     }
 
     @Test
+    void sendNotification_toTheChatCommandsAudience_reportsItsCountLikeTheRealOne() {
+        var body = new fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody("T", "B",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null,
+                fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody.CHAT_COMMANDS);
+
+        var result = service.adminSendNotification(body);
+
+        assertThat(result.status()).isEqualTo(201);
+        assertThat(result.body()).isPositive();
+    }
+
+    @Test
     void sendNotification_toAnExperiment_refusesAMissingOrUnknownOne() {
         assertThat(service.adminSendNotification(toExperiment(null, null)).status()).isEqualTo(400);
         assertThat(service.adminSendNotification(toExperiment(UUID.randomUUID(), null)).status()).isEqualTo(404);

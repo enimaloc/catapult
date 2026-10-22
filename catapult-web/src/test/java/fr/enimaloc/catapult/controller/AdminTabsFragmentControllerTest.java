@@ -462,7 +462,7 @@ class AdminTabsFragmentControllerTest {
         return new fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto(
                 java.util.UUID.fromString("00000000-0000-0000-0000-000000000042"), "Maintenance <b>", body, "<p>x</p>",
                 fr.enimaloc.catapult.common.dto.notification.Severity.WARNING, null, null, null,
-                java.time.Instant.parse("2025-03-01T12:00:00Z"), audience, null, login);
+                java.time.Instant.parse("2025-03-01T12:00:00Z"), audience, null, login, "TARGETED".equals(audience) && login != null ? 1 : 0);
     }
 
     @Test
@@ -503,6 +503,18 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminExperiments()).thenReturn(null);
 
         assertThat(asAdmin("/spa/admin/notifications")).contains("id=\"admin-notifications-new\"", "admin-notifications-experiment");
+    }
+
+    @Test
+    void notifications_showHowManyMembersASharedNotificationReached() throws Exception {
+        var shared = new fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto(
+                java.util.UUID.randomUUID(), "Shared", "b", "<p>b</p>",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null,
+                java.time.Instant.parse("2025-03-01T12:00:00Z"), "TARGETED", null, null, 1200);
+        when(apiService.adminNotifications(0)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminPage<>(
+                List.of(shared, notification("TARGETED", "alice", "short")), 0, 1, 2));
+
+        assertThat(asAdmin("/spa/admin/notifications")).contains("1,200 members", "alice");
     }
 
     @Test

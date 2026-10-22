@@ -33,7 +33,7 @@
                     <div class="admin-cell-muted admin-notification-excerpt"
                          th:text="${#strings.length(n.body()) > 120 ? #strings.substring(n.body(), 0, 120) + '…' : n.body()}">body</div>
                 </div>
-                <span class="admin-notification-audience" th:text="${n.audience() == 'TARGETED' ? n.targetLogin() : #messages.msg('admin.notifications.everyone')}">audience</span>
+                <span class="admin-notification-audience" th:text="${n.audience() != 'TARGETED' ? #messages.msg('admin.notifications.everyone') : (n.recipientCount() > 1 ? #messages.msg('admin.notifications.members', n.recipientCount()) : n.targetLogin())}">audience</span>
                 <span class="admin-member-id" th:text="${#temporals.format(n.createdAt(), #messages.msg('format.date'))}">created</span>
                 <span class="admin-member-id" th:text="${n.expiresAt() == null ? #messages.msg('admin.notifications.expires-never') : #temporals.format(n.expiresAt(), #messages.msg('format.date'))}">expiry</span>
                 <mdui-button-icon icon="delete" class="admin-notification-delete" th:attr="data-delete=${n.id()},aria-label=#{admin.notifications.delete},

@@ -229,6 +229,15 @@ class MockNotificationStoreTest {
     }
 
     @Test
+    void createForOneAccountThroughTheSharedPath_namesIt() {
+        assertThat(store.createShared("Titre", "Corps", Severity.INFO, null, null, null, List.of(a))).isEqualTo(201);
+
+        var dto = store.adminPage(0).content().get(0);
+        assertThat(dto.recipientCount()).isEqualTo(1);
+        assertThat(dto.targetLogin()).isEqualTo("alice");
+    }
+
+    @Test
     void createForSeveralAccounts_storesOneNotificationReachingOnlyThem() {
         store.snapshot(member);
         UUID stranger = UUID.randomUUID();
@@ -241,6 +250,8 @@ class MockNotificationStoreTest {
         assertThat(store.snapshot(stranger).items()).hasSize(1);
         assertThat(store.adminPage(0).content()).hasSize(1);
         assertThat(store.adminPage(0).content().get(0).audience()).isEqualTo("TARGETED");
+        assertThat(store.adminPage(0).content().get(0).recipientCount()).isEqualTo(2);
+        assertThat(store.adminPage(0).content().get(0).targetLogin()).isNull();
         assertThat(streamEvents(NotificationStreamEvent.CREATED)).extracting(NotificationStreamEvent::accountId)
                 .containsExactlyInAnyOrder(a, b);
         assertThat(store.createShared("", "Corps", Severity.INFO, null, null, null, List.of(a))).isEqualTo(400);
