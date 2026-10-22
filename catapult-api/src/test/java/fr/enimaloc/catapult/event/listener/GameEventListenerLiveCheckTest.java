@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
@@ -33,6 +34,7 @@ class GameEventListenerLiveCheckTest {
     @Mock private StreamStateService streamStateService;
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private ChannelEventPublisher channelEventPublisher;
+    @Mock private RaidRestoreGameService raidRestoreGameService;
 
     @InjectMocks private GameEventListener listener;
 

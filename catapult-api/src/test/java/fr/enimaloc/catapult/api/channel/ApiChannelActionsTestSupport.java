@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
@@ -61,6 +62,7 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean TwitchatEventActionService twitchatEventActionService;
     @MockitoBean TwitchatEventDispatcher twitchatEventDispatcher;
     @MockitoBean SteamProfileDiagnostics steamProfileDiagnostics;
+    @MockitoBean RaidRestoreGateService raidRestoreGate;
 
     static RequestPostProcessor userJwt(UUID id) {
         return jwt().jwt(j -> j.subject(id.toString()).claim("twitchId", "123"))

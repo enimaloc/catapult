@@ -76,7 +76,7 @@ class IndexControllerTest {
         lenient().when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
         lenient().when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
                 false, java.util.Set.of(), null, null, java.util.Set.of(), false, false, false,
-                null, null, java.util.Set.of(), List.of(), false, java.util.Set.of(), List.of()));
+                null, null, java.util.Set.of(), List.of(), false, java.util.Set.of(), List.of(), null, false));
         lenient().when(apiService.dtddMappingStatus(any())).thenReturn(new DtddMappingStatusDto(null, null, false, null));
     }
 
@@ -723,7 +723,7 @@ class IndexControllerTest {
                 "508455", "Valheim", false, true, java.util.Set.of("ccl-a"), true, false, java.util.Set.of("tw-a")));
         when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
                 true, java.util.Set.of("ccl-b"), null, null, java.util.Set.of(), false, false, false,
-                null, null, java.util.Set.of(), List.of(), true, java.util.Set.of(), List.of()));
+                null, null, java.util.Set.of(), List.of(), true, java.util.Set.of(), List.of(), null, false));
 
         String html = mvc.perform(get("/spa/channel/enimaloc/dock").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
