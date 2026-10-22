@@ -37,6 +37,34 @@ public interface ExperimentAssignmentRepository extends JpaRepository<Experiment
         countQuery = "SELECT COUNT(a) FROM ExperimentAssignment a WHERE a.experiment = :experiment")
     Page<ExperimentAssignment> findByExperiment(@Param("experiment") Experiment experiment, Pageable pageable);
 
+    /**
+     * One page of an experiment's participants, newest first, optionally narrowed to a variant and to
+     * usernames containing {@code q} (already lowercased; empty matches everyone).
+     */
+    @Query(value = """
+        SELECT a FROM ExperimentAssignment a
+        JOIN FETCH a.user u
+        JOIN FETCH a.variant v
+        WHERE a.experiment = :experiment
+          AND (:variantId IS NULL OR v.id = :variantId)
+          AND LOWER(u.twitchUsername) LIKE CONCAT('%', :q, '%')
+        ORDER BY a.assignedAt DESC, a.id ASC
+        """,
+        countQuery = """
+        SELECT COUNT(a) FROM ExperimentAssignment a
+        JOIN a.user u
+        WHERE a.experiment = :experiment
+          AND (:variantId IS NULL OR a.variant.id = :variantId)
+          AND LOWER(u.twitchUsername) LIKE CONCAT('%', :q, '%')
+        """)
+    Page<ExperimentAssignment> search(@Param("experiment") Experiment experiment,
+                                      @Param("variantId") UUID variantId,
+                                      @Param("q") String q, Pageable pageable);
+
+    /** {@code [variantId, count]} rows; a variant nobody holds has no row. */
+    @Query("SELECT a.variant.id, COUNT(a) FROM ExperimentAssignment a WHERE a.experiment = :experiment GROUP BY a.variant.id")
+    List<Object[]> countByVariant(@Param("experiment") Experiment experiment);
+
     List<ExperimentAssignment> findAllByExperiment(Experiment experiment);
 
     @Modifying(clearAutomatically = true)

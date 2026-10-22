@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -176,5 +177,49 @@ class CommonDtoContractTest {
 
         assertThat(JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<List<FlagKeyDto>>() {}))
                 .containsExactly(new FlagKeyDto("beta", List.of("on")), new FlagKeyDto("tester", List.of()));
+    }
+
+    @Test
+    void experimentAssignments_readAsExperimentAssignmentsDto() {
+        Experiment experiment = new Experiment();
+        experiment.setId(UUID.randomUUID());
+        ExperimentVariant control = new ExperimentVariant();
+        control.setId(UUID.randomUUID());
+        control.setKey("old");
+        UserAccount member = new UserAccount();
+        member.setId(UUID.randomUUID());
+        member.setTwitchUsername("viewer");
+        fr.enimaloc.catapult.domain.experiment.ExperimentAssignment assignment =
+                new fr.enimaloc.catapult.domain.experiment.ExperimentAssignment();
+        assignment.setUser(member);
+        assignment.setVariant(control);
+        assignment.setAssignedAt(Instant.parse("2026-10-22T10:00:00Z"));
+        fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository assignments =
+                mock(fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository.class);
+        ExperimentRepository experiments = mock(ExperimentRepository.class);
+        ExperimentOverrideRepository overrides = mock(ExperimentOverrideRepository.class);
+        when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
+        when(assignments.search(org.mockito.ArgumentMatchers.eq(experiment), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(""), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(assignment),
+                        org.springframework.data.domain.PageRequest.of(0, 20), 41));
+        when(assignments.countByVariant(experiment)).thenReturn(java.util.Collections.singletonList(
+                new Object[] {control.getId(), 41L}));
+        experiment.setVariants(new java.util.ArrayList<>(List.of(control)));
+        when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
+        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments,
+                null, null, assignments, null, null, overrides, null, null, null, null);
+
+        ExperimentAssignmentsDto produced = controller.assignments(experiment.getId(), null, null, 0);
+
+        ExperimentAssignmentsDto read = roundTrip(produced, ExperimentAssignmentsDto.class);
+        assertThat(read).isEqualTo(produced);
+        assertThat(read.page().content()).singleElement().satisfies(a -> {
+            assertThat(a.twitchUsername()).isEqualTo("viewer");
+            assertThat(a.assignedAt()).isEqualTo(Instant.parse("2026-10-22T10:00:00Z"));
+        });
+        assertThat(read.page().totalElements()).isEqualTo(41);
+        assertThat(read.page().totalPages()).isEqualTo(3);
+        assertThat(read.counts()).containsEntry(control.getId(), 41L);
     }
 }
