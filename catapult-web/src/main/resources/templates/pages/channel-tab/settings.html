@@ -70,6 +70,11 @@
     </mdui-card>
     </th:block>
 
+    <!--/* The owner's account preference, not the channel's: a moderator doesn't get it. */-->
+    <th:block th:if="${channelPage.isOwner()}">
+        <mdui-card th:replace="~{fragments/notification-channels :: card(${notificationChannels})}"></mdui-card>
+    </th:block>
+
     <!--/* The owner's alone: catapult-api refuses anyone else, so the card isn't offered to a moderator. */-->
     <mdui-card id="channel-danger-zone" class="settings-card danger-zone-card" variant="outlined"
                th:if="${channelPage.isOwner() and dangerZone != null}" th:attr="data-username=${username},data-label-refused=#{channel.settings.danger.error.refused},data-label-unavailable=#{channel.settings.danger.error.unavailable}">

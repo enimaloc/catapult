@@ -239,6 +239,7 @@ public class ModelFiller {
                     token == null ? null : absoluteUrl("/api/user/summary/" + token),
                     message("channel.commands.migration.empty", null, LocaleContextHolder.getLocale())));
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
+            model.addAttribute("notificationChannels", apiService.notificationChannels());
             model.addAttribute("dangerZone",
                     DangerZoneView.of(apiService.accountInfo(), apiService.accountDeletionDelayDays()));
             model.addAttribute("invite", apiService.invitePage());
