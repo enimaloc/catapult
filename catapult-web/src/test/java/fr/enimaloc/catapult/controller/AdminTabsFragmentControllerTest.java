@@ -706,12 +706,13 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
-    void searchMembers_answersTheLoginsToPickFrom_skippingTheNamelessOnes() throws Exception {
+    void searchMembers_answersTheLoginsToPickFrom_skippingTheNamelessOnesAndTheSystemAccount() throws Exception {
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000002");
         Instant at = Instant.parse("2025-03-01T12:00:00Z");
         when(apiService.adminSearchMembers("vie")).thenReturn(List.of(
                 new AdminMemberDto(id, "2", "viewer", "img", null, false, true, "ACTIVE", at),
-                new AdminMemberDto(UUID.randomUUID(), null, null, null, null, false, false, "INACTIVE", at)));
+                new AdminMemberDto(UUID.randomUUID(), null, null, null, null, false, false, "INACTIVE", at),
+                new AdminMemberDto(UUID.randomUUID(), "99", "catapult_bot", "img", null, true, true, "ACTIVE", at)));
 
         String json = asAdmin("/spa/admin/members/search?q=vie");
 
