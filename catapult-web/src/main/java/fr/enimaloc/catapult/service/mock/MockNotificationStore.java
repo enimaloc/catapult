@@ -100,7 +100,8 @@ class MockNotificationStore {
             publish(account, NotificationStreamEvent.CREATED, dto);
         }
         sent.add(new AdminNotificationDto(id, title, body, html, severity, ctaUrl, ctaLabel, expiresAt, now,
-                target == null ? "BROADCAST" : "TARGETED", target, target == null ? null : memberLogin.apply(target)));
+                target == null ? "BROADCAST" : "TARGETED", target, target == null ? null : memberLogin.apply(target),
+                target == null ? 0 : 1));
         return 201;
     }
 
@@ -120,8 +121,14 @@ class MockNotificationStore {
         }
         UUID first = recipients.stream().findFirst().orElse(null);
         sent.add(new AdminNotificationDto(id, title, body, html, severity, ctaUrl, ctaLabel, expiresAt, now,
-                "TARGETED", first, first == null ? null : memberLogin.apply(first)));
+                "TARGETED", recipients.size() == 1 ? first : null,
+                recipients.size() == 1 ? memberLogin.apply(first) : null, recipients.size()));
         return 201;
+    }
+
+    /** How many accounts the mock has seen: whom a broadcast reaches. */
+    synchronized int accountCount() {
+        return byAccount.size();
     }
 
     synchronized int delete(UUID id) {

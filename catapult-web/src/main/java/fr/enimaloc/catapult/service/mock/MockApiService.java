@@ -1102,8 +1102,11 @@ public class MockApiService implements ApiService {
                     body.ctaLabel(), body.expiresAt(), recipients);
             return new ApiClient.Result<>(status, status == 201 ? recipients.size() : null);
         }
-        return new ApiClient.Result<>(notifications().create(body.title(), body.body(), body.severity(), body.ctaUrl(),
-                body.ctaLabel(), body.expiresAt(), body.targetUserId()), null);
+        int status = notifications().create(body.title(), body.body(), body.severity(), body.ctaUrl(),
+                body.ctaLabel(), body.expiresAt(), body.targetUserId());
+        // the mock has no chat commands: everyone it has seen stands for the streamers told
+        boolean counted = AdminNotificationCreateBody.CHAT_COMMANDS.equals(body.audience()) && status == 201;
+        return new ApiClient.Result<>(status, counted ? notifications().accountCount() : null);
     }
 
     @Override
