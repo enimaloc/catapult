@@ -13,6 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -48,6 +49,12 @@ public class TwitchatDispatchHub {
     private final NotificationFlusher flusher;
     private final Executor flushes;
     private final Map<SseEmitter, Credentials> credentials = new ConcurrentHashMap<>();
+    /** How many flushes talk to catapult-api at once. */
+    static final int MAX_FLUSHES = 8;
+    private final java.util.concurrent.Semaphore limit = new java.util.concurrent.Semaphore(MAX_FLUSHES);
+    /** The owners with a flush in flight, and those asked again meanwhile; guarded by {@code flushing}. */
+    private final java.util.Set<UUID> flushing = new java.util.HashSet<>();
+    private final java.util.Set<UUID> again = new java.util.HashSet<>();
 
     @Autowired
     public TwitchatDispatchHub(SseStreams sse, NotificationFlusher flusher) {
@@ -93,27 +100,58 @@ public class TwitchatDispatchHub {
     /**
      * Asks catapult-api, in the background, to send the owner's pending notifications to their Twitchat, as
      * their page (its session's JWT) or else their OBS widget (its token) is open here; nothing when neither
-     * is. Another instance may flush too for its own streams: what is delivered is deleted, so it is harmless.
+     * is. At most one flush per owner is in flight: one asked meanwhile makes it run once more when it ends,
+     * and at most {@link #MAX_FLUSHES} run at once. Another instance may flush too for its own streams: what
+     * is delivered is deleted, so it is harmless.
      */
     public void flush(UUID userId) {
-        List<SseEmitter> open = emitters.getOrDefault(userId, List.of());
-        List<Supplier<String>> jwts = open.stream().map(credentials::get).filter(c -> c != null && c.jwt() != null)
-                .map(Credentials::jwt).toList();
-        UUID widget = open.stream().map(credentials::get).filter(c -> c != null && c.widgetToken() != null)
-                .map(Credentials::widgetToken).findFirst().orElse(null);
-        if (jwts.isEmpty() && widget == null) return;
+        if (emitters.getOrDefault(userId, List.of()).isEmpty()) return;
+        synchronized (flushing) {
+            if (!flushing.add(userId)) {
+                again.add(userId);
+                return;
+            }
+        }
         try {
-            flushes.execute(() -> flushNow(userId, jwts, widget));
+            flushes.execute(() -> flushLoop(userId));
         } catch (RuntimeException e) {
+            synchronized (flushing) {
+                flushing.remove(userId);
+                again.remove(userId);
+            }
             log.warn("Could not schedule the notification flush of {}: {}", userId, e.toString());
         }
     }
 
-    private void flushNow(UUID userId, List<Supplier<String>> jwts, UUID widget) {
+    private void flushLoop(UUID userId) {
+        boolean more;
+        do {
+            limit.acquireUninterruptibly();
+            // Asked before it starts, a request is served by this very run.
+            synchronized (flushing) {
+                again.remove(userId);
+            }
+            try {
+                flushNow(userId);
+            } finally {
+                limit.release();
+            }
+            synchronized (flushing) {
+                more = again.remove(userId);
+                if (!more) flushing.remove(userId);
+            }
+        } while (more);
+    }
+
+    /** The owner's credentials as they are now: streams and sessions come and go while a flush waits. */
+    private void flushNow(UUID userId) {
         try {
+            List<SseEmitter> open = emitters.getOrDefault(userId, List.of());
+            List<Credentials> held = open.stream().map(credentials::get).filter(Objects::nonNull).toList();
+            UUID widget = held.stream().map(Credentials::widgetToken).filter(Objects::nonNull).findFirst().orElse(null);
             boolean done = false;
-            for (Supplier<String> jwt : jwts) {
-                String token = jwt.get();
+            for (Credentials c : held) {
+                String token = c.jwt() == null ? null : c.jwt().get();
                 if (token != null && ok(flusher.flushPage(token))) {
                     done = true;
                     break;

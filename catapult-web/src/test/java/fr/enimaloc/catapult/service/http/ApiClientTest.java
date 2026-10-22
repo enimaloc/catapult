@@ -341,6 +341,27 @@ class ApiClientTest {
         assertThat(request.getHeader("X-Catapult-Anonymous")).isNull();
     }
 
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    @Test
+    void aFailureOnAWidgetRoute_neverLogsTheWidgetToken(org.springframework.boot.test.system.CapturedOutput output) {
+        java.util.UUID token = java.util.UUID.randomUUID();
+        server.enqueue(new MockResponse().setResponseCode(404));
+        server.enqueue(new MockResponse().setResponseCode(500));
+
+        client.callAs(org.springframework.http.HttpMethod.POST, "/api/twitchat/widget/{token}/notifications/flush", null, Payload.class, token);
+        client.getAnonymous("/api/twitchat/widget/{token}/access", Payload.class, token);
+
+        assertThat(output.getAll()).contains("API returned 404").doesNotContain(token.toString());
+    }
+
+    @Test
+    void maskedHidesTheSegmentAfterWidget_inPathsAndMessages() {
+        assertThat(ApiClient.masked("/api/twitchat/widget/abc-123/access")).isEqualTo("/api/twitchat/widget/***/access");
+        assertThat(ApiClient.masked("I/O error on POST request for \"http://h:1/api/twitchat/widget/abc-123/x\": refused"))
+                .doesNotContain("abc-123");
+        assertThat(ApiClient.masked(null)).isNull();
+    }
+
     @Test
     void callAs_is502WhenUnreachable() throws IOException {
         server.shutdown();
