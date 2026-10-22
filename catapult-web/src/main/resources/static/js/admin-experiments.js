@@ -212,10 +212,11 @@ window.CatapultAdminExperiments = (function () {
     /** One line per move, the variant ids told by their keys. */
     function moveLines(root, form, moves) {
         const keys = Object.fromEntries(weightFields(form).map(field => [field.dataset.variant, field.dataset.variantKey]));
-        return moves.map(move => root.dataset.labelRebalanceMove
-            .replace("{count}", move.count)
-            .replace("{from}", keys[move.fromVariantId] ?? move.fromVariantId)
-            .replace("{to}", keys[move.toVariantId] ?? move.toVariantId)).join("\n");
+        // one pass with a function replacer: a key holding "$&" or "{to}" is shown as is, never re-expanded
+        return moves.map(move => {
+            const values = { count: move.count, from: keys[move.fromVariantId] ?? move.fromVariantId, to: keys[move.toVariantId] ?? move.toVariantId };
+            return root.dataset.labelRebalanceMove.replace(/\{(count|from|to)\}/g, (_, name) => String(values[name]));
+        }).join("\n");
     }
 
     /** Saving moves members to match the new weights: the admin sees who moves and confirms first. */

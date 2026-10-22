@@ -104,13 +104,13 @@ public class AdminExperimentsController {
         return AdminAccess.relay(filler, () -> apiService.adminMoveExperimentAssignment(id, userId, body.variantId()));
     }
 
-    /** A refused body is still only answered to an admin, as for every other local answer. */
     /** No negative weight and a positive sum (a long: a few large weights must not wrap around to a valid-looking sum). */
     private static boolean validWeights(Map<UUID, Integer> weights) {
         if (weights.values().stream().anyMatch(w -> w == null || w < 0)) return false;
         return weights.values().stream().mapToLong(Integer::longValue).sum() > 0;
     }
 
+    /** A refused body is still only answered to an admin, as for every other local answer. */
     private ResponseEntity<Void> invalid() {
         AdminAccess.require(filler);
         return ResponseEntity.badRequest().build();
