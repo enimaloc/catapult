@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.mock;
 
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 
 import java.util.ArrayList;
@@ -7,6 +8,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 
 /**
@@ -33,5 +36,15 @@ class MockTargetingStore {
         Map<String, String> own = flags.get(memberId);
         if (own != null) own.remove(key);
         return 204;
+    }
+
+    /** Every key some member carries, with the distinct non-null values it takes, both sorted. */
+    synchronized List<FlagKeyDto> flagKeys() {
+        Map<String, TreeSet<String>> byKey = new TreeMap<>();
+        flags.values().forEach(own -> own.forEach((key, value) -> {
+            TreeSet<String> values = byKey.computeIfAbsent(key, k -> new TreeSet<>());
+            if (value != null) values.add(value);
+        }));
+        return byKey.entrySet().stream().map(e -> new FlagKeyDto(e.getKey(), List.copyOf(e.getValue()))).toList();
     }
 }
