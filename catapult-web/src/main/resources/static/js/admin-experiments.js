@@ -1,8 +1,8 @@
 /**
  * The admin Experiments detail view. Status actions, weights, rules and overrides post to
  * AdminExperimentsController with their button disabled meanwhile; a success reloads the view, a
- * refusal is told by its status (400 invalid, 404 gone and reloads, anything else unavailable; a 409
- * is a refused change too). A 404 on an account override means an unknown Twitch login: it is told
+ * refusal is told by its status (400 invalid, 404 gone and reloads, 409 unavailable and reloads,
+ * anything else unavailable). A 404 on an account override means an unknown Twitch login: it is told
  * without reloading, so the form keeps what was typed. End and Reassign, and deleting a rule or an override, confirm first. The rule and override forms
  * hold one block of fields per type/target and show only the chosen one (variantId only for
  * FORCE_VARIANT); weights show their live share of the total. mdui-text-field can't bind a
@@ -43,12 +43,12 @@ window.CatapultAdminExperiments = (function () {
     /** What to tell for a refused status; `notFound` names what a 404 means for the action. */
     function refusal(root, status, notFound) {
         if (status === 404) return root.dataset[notFound];
-        return status === 400 || status === 409 ? root.dataset.labelInvalid : root.dataset.labelUnavailable;
+        return status === 400 ? root.dataset.labelInvalid : root.dataset.labelUnavailable;
     }
 
     /**
-     * Tells the outcome of `status`: done (snackbar, reload) or refused. A vanished experiment also
-     * reloads; an unknown account keeps the form as typed.
+     * Tells the outcome of `status`: done (snackbar, reload) or refused. A vanished (404) or
+     * since-changed (409) experiment also reloads; an unknown account keeps the form as typed.
      */
     async function settle(panel, root, status, notFound) {
         if (ok(status)) {
@@ -57,7 +57,7 @@ window.CatapultAdminExperiments = (function () {
             return;
         }
         CatapultChannel.showError(refusal(root, status, notFound));
-        if (status === 404 && notFound === "labelUnknown") await CatapultAdminTabs.reload(panel);
+        if ((status === 404 && notFound === "labelUnknown") || status === 409) await CatapultAdminTabs.reload(panel);
     }
 
     /** Posts and settles; `button` stays busy until the view reloads. */

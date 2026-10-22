@@ -17,13 +17,14 @@
 
     <mdui-card class="admin-targeting-card" variant="outlined" th:if="${experiments != null and !experiments.isEmpty()}">
         <div class="admin-targeting-rows">
-            <div class="admin-experiments-row" th:each="e : ${experiments}" th:attr="data-admin-open=${e.id()}">
+            <div class="admin-experiments-row" th:each="e : ${experiments}" th:attr="data-admin-open=${e.id()}"
+                 th:with="total=${#aggregates.sum(e.variants().![weight]).longValue()}">
                 <div>
                     <strong class="admin-member-id" th:text="${e.key()}">key</strong>
                     <span class="admin-cell-muted" th:text="${e.name()}">name</span>
                 </div>
                 <span class="admin-cell-muted">
-                    <th:block th:each="v, it : ${e.variants()}"><th:block th:if="${!it.first}"> · </th:block><th:block th:text="|${v.key()} ${v.weight()} %|">control 0 %</th:block></th:block>
+                    <th:block th:each="v, it : ${e.variants()}"><th:block th:if="${!it.first}"> · </th:block><th:block th:text="|${v.key()} ${total == 0 ? 0 : (v.weight() * 200L + total) / (2 * total)} %|">control 0 %</th:block></th:block>
                 </span>
                 <span class="admin-experiments-chips">
                     <mdui-chip class="admin-experiments-norule" icon="warning" th:if="${e.ruleCount() == 0}"
@@ -67,7 +68,7 @@
                          th:if="${status == 'ACTIVE'}" th:text="#{admin.experiments.action.pause}">Désactiver</mdui-button>
             <mdui-button variant="tonal" icon="stop" data-experiment-action="end"
                          th:if="${status == 'ACTIVE' or status == 'PAUSED'}" th:text="#{admin.experiments.action.end}">Terminer</mdui-button>
-            <mdui-button variant="outlined" icon="shuffle" data-experiment-action="reassign"
+            <mdui-button variant="outlined" icon="shuffle" data-experiment-action="reassign" th:if="${status == 'ACTIVE'}"
                          th:text="#{admin.experiments.action.reassign}">Réassigner tout le monde</mdui-button>
         </div>
     </mdui-card>
@@ -83,10 +84,11 @@
             </div>
             <mdui-button variant="filled" type="submit" icon="save" th:text="#{admin.experiments.weights.save}">Enregistrer</mdui-button>
         </form>
-        <div class="admin-targeting-rows" th:unless="${editable}">
+        <div class="admin-targeting-rows" th:unless="${editable}"
+             th:with="total=${#aggregates.sum(experiment.variants().![weight]).longValue()}">
             <div class="admin-targeting-row" th:each="v : ${experiment.variants()}">
                 <span class="admin-member-id" th:text="${v.key()}">key</span>
-                <span th:text="|${v.weight()} %|">0 %</span>
+                <span th:text="|${total == 0 ? 0 : (v.weight() * 200L + total) / (2 * total)} %|">0 %</span>
                 <span></span>
             </div>
         </div>
@@ -219,7 +221,7 @@
                     <mdui-menu-item th:each="v : ${experiment.variants()}" th:value="${v.id()}" th:text="${v.key()}">variant</mdui-menu-item>
                 </mdui-select>
                 <mdui-text-field type="number" name="priority" value="10" variant="outlined"
-                                 th:attr="label=#{admin.experiments.overrides.priority}"></mdui-text-field>
+                                 th:attr="label=#{admin.experiments.overrides.priority},helper=#{admin.experiments.overrides.priority-helper}"></mdui-text-field>
                 <mdui-button variant="filled" type="submit" icon="add" th:text="#{admin.experiments.add}">Ajouter</mdui-button>
             </form>
         </th:block>
