@@ -21,8 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -32,16 +30,21 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Once a raid put the last game back, the "no game" fallback waits for the stream's end or a new game. */
+/**
+ * Once the streamer raided out, the "no game" fallback waits for the stream's end or a new game. The real
+ * sequence: the game is still detected when the raid starts (the channel already on it, or the streamer
+ * having changed it since), then the game is closed and the scheduler reports no game.
+ */
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class GameEventListenerRaidHoldTest {
 
     private static final String NO_GAME_ID = "509658";
+    private static final String DOOM_ID = "517";
 
     @Mock private BindingService bindingService;
     @Mock private TwitchService twitchService;
@@ -71,9 +74,11 @@ class GameEventListenerRaidHoldTest {
         settings.setApplyDefaultOnNoGame(true);
         settings.setRaidRestoreGameMinutes(15);
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
-        when(streamStateService.isLive(user)).thenReturn(true);
         when(gate.isAvailableReadOnly(user)).thenReturn(true);
+        // Doom is still being played when the raid starts
         when(gameStateService.recentlyDetectedGame(eq(user), any(Duration.class))).thenReturn(Optional.of(doom));
+        // Only asked by the no-game fallback, which some tests never reach
+        lenient().when(streamStateService.isLive(user)).thenReturn(true);
 
         doomBinding = new GameBinding();
         doomBinding.setId(UUID.randomUUID());
@@ -81,13 +86,9 @@ class GameEventListenerRaidHoldTest {
         doomBinding.setSourceType(GameBinding.SourceType.STEAM);
         doomBinding.setSourceId("379720");
         doomBinding.setSourceName("DOOM");
-        doomBinding.setTwitchGameId("517");
+        doomBinding.setTwitchGameId(DOOM_ID);
         doomBinding.setStatus(GameBinding.Status.AUTO);
         when(bindingService.findBinding(user, doom)).thenReturn(Optional.of(doomBinding));
-
-        raidRestore.onRaidedOut(new ChannelRaidedOutEvent(this, user, NO_GAME_ID));
-        verify(twitchService).updateChannel(user, doomBinding);
-        clearInvocations(twitchService);
     }
 
     private static GameBinding noGameFallback() {
@@ -99,8 +100,25 @@ class GameEventListenerRaidHoldTest {
         else verify(twitchService, never()).updateChannel(eq(user), noGameFallback());
     }
 
+    /** The streamer raids out while still playing Doom, the channel already on it, then closes the game. */
+    private void raidWhilePlaying_thenCloseTheGame() {
+        raidRestore.onRaidedOut(new ChannelRaidedOutEvent(this, user, DOOM_ID));
+        verify(twitchService, never()).updateChannel(any(), any());
+        listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
+    }
+
     @Test
-    void noGameFallback_isSuppressedAfterTheRaid() {
+    void gameClosedAfterTheRaid_noGameFallbackIsSuppressed() {
+        raidWhilePlaying_thenCloseTheGame();
+
+        verifyNoGameFallbackApplied(false);
+    }
+
+    @Test
+    void categoryChangedSinceTheGameStarted_theRaidPutsTheCurrentGameBack_andHoldsItOnceClosed() {
+        raidRestore.onRaidedOut(new ChannelRaidedOutEvent(this, user, "12345"));
+        verify(twitchService).updateChannel(user, doomBinding);
+
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
         verifyNoGameFallbackApplied(false);
@@ -108,7 +126,9 @@ class GameEventListenerRaidHoldTest {
 
     @Test
     void noGameFallback_comesBackOnceTheStreamEnded() {
+        raidWhilePlaying_thenCloseTheGame();
         listener.onStreamOffline(new StreamOfflineEvent(this, user));
+        clearInvocations(twitchService);
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
@@ -117,15 +137,16 @@ class GameEventListenerRaidHoldTest {
 
     @Test
     void noGameFallback_comesBackOnceANewGameIsDetected() {
-        GameBinding other = new GameBinding();
-        other.setId(UUID.randomUUID());
-        other.setUser(user);
-        other.setSourceType(GameBinding.SourceType.STEAM);
-        other.setSourceName("Hades");
-        other.setTwitchGameId("888");
-        other.setStatus(GameBinding.Status.AUTO);
+        raidWhilePlaying_thenCloseTheGame();
+        GameBinding hadesBinding = new GameBinding();
+        hadesBinding.setId(UUID.randomUUID());
+        hadesBinding.setUser(user);
+        hadesBinding.setSourceType(GameBinding.SourceType.STEAM);
+        hadesBinding.setSourceName("Hades");
+        hadesBinding.setTwitchGameId("888");
+        hadesBinding.setStatus(GameBinding.Status.AUTO);
         DetectedGame hades = new DetectedGame("1145360", GameBinding.SourceType.STEAM, "Hades");
-        when(bindingService.resolveOrCreate(user, hades)).thenReturn(other);
+        when(bindingService.resolveOrCreate(user, hades)).thenReturn(hadesBinding);
         listener.onGameDetected(new GameDetectedEvent(this, user, hades));
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
