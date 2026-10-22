@@ -925,6 +925,38 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void experimentDetail_drawsTheWeightsAsABar_controlInGrey_withAHandleBetweenNeighbours() throws Exception {
+        experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
+
+        String html = asAdmin("/spa/admin/experiments/" + EXP_ID);
+
+        assertThat(html).contains("experiment-weight-bar is-editable",
+                "data-segment=\"" + CONTROL_ID + "\"", "--variant-color: var(--catapult-variant-control)",
+                "data-segment=\"" + ENABLED_ID + "\"", "--variant-color: var(--catapult-variant-1)",
+                "role=\"slider\"", "data-handle=\"1\"", "aria-label=\"Between control and enabled\"");
+        assertThat(html.split("data-handle=", -1)).hasSize(2);
+    }
+
+    @Test
+    void experimentDetail_ofAnEndedOne_drawsTheBarWithoutHandles() throws Exception {
+        experiment(ExperimentStatus.ENDED, List.of(), List.of());
+
+        String html = asAdmin("/spa/admin/experiments/" + EXP_ID);
+
+        assertThat(html).contains("experiment-weight-bar", "data-segment=\"" + ENABLED_ID + "\"")
+                .doesNotContain("is-editable", "data-handle");
+    }
+
+    @Test
+    void experiments_drawAMiniBarPerExperiment() throws Exception {
+        when(apiService.adminExperiments()).thenReturn(List.of(
+                new ExperimentSummaryDto(EXP_ID, "dark-mode", "Dark mode", ExperimentStatus.ACTIVE, variants(), 1)));
+
+        assertThat(asAdmin("/spa/admin/experiments")).contains("experiment-weight-bar is-mini", "flex-grow: 100")
+                .doesNotContain("data-handle");
+    }
+
+    @Test
     void experimentDetail_explainsThePriorityDirection() throws Exception {
         experiment(ExperimentStatus.ACTIVE, List.of(), List.of());
 
