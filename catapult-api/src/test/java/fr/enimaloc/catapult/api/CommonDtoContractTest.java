@@ -199,8 +199,7 @@ class CommonDtoContractTest {
         ExperimentRepository experiments = mock(ExperimentRepository.class);
         ExperimentOverrideRepository overrides = mock(ExperimentOverrideRepository.class);
         when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
-        when(assignments.search(org.mockito.ArgumentMatchers.eq(experiment), org.mockito.ArgumentMatchers.isNull(),
-                org.mockito.ArgumentMatchers.eq(""), org.mockito.ArgumentMatchers.any()))
+        when(assignments.searchAll(org.mockito.ArgumentMatchers.eq(experiment), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(assignment),
                         org.springframework.data.domain.PageRequest.of(0, 20), 41));
         when(assignments.countByVariant(experiment)).thenReturn(java.util.Collections.singletonList(

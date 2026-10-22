@@ -72,8 +72,16 @@ class ExperimentAssignmentRepositoryTest {
         return a;
     }
 
+    /** Picks the repository shape the controller would: no nullable bind, a LIKE-escaped pattern. */
     private Page<ExperimentAssignment> search(UUID variantId, String q, int page, int size) {
-        return repository.search(experiment, variantId, q, PageRequest.of(page, size));
+        PageRequest paging = PageRequest.of(page, size);
+        if (q.isEmpty()) {
+            return variantId == null ? repository.searchAll(experiment, paging)
+                    : repository.searchByVariant(experiment, variantId, paging);
+        }
+        String pattern = "%" + q.toLowerCase().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        return variantId == null ? repository.searchByUsername(experiment, pattern, paging)
+                : repository.searchByVariantAndUsername(experiment, variantId, pattern, paging);
     }
 
     @Test
@@ -109,6 +117,28 @@ class ExperimentAssignmentRepositoryTest {
 
         assertThat(page.getContent()).extracting(a -> a.getUser().getTwitchUsername()).containsExactly("Alice_Wonder");
         assertThat(page.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void search_blankKeepsAMemberWithoutAUsername() {
+        assign(experiment, control, null, "2026-10-20T10:00:00Z");
+        assign(experiment, control, "bob", "2026-10-21T10:00:00Z");
+
+        assertThat(search(null, "", 0, 20).getTotalElements()).isEqualTo(2);
+        assertThat(search(control.getId(), "", 0, 20).getTotalElements()).isEqualTo(2);
+        assertThat(search(null, "bob", 0, 20).getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void search_treatsLikeWildcardsLiterally() {
+        assign(experiment, control, "a_b", "2026-10-20T10:00:00Z");
+        assign(experiment, control, "axb", "2026-10-21T10:00:00Z");
+        assign(experiment, control, "100%", "2026-10-22T10:00:00Z");
+
+        assertThat(search(null, "a_b", 0, 20).getContent()).extracting(a -> a.getUser().getTwitchUsername())
+                .containsExactly("a_b");
+        assertThat(search(control.getId(), "%", 0, 20).getContent()).extracting(a -> a.getUser().getTwitchUsername())
+                .containsExactly("100%");
     }
 
     @Test
