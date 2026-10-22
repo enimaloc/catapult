@@ -7,7 +7,12 @@ import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationPreviewDto;
 import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import fr.enimaloc.catapult.domain.notification.Notification;
+import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentVariantRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.notification.NotificationRepository;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
@@ -57,6 +62,138 @@ class ApiAdminNotificationsControllerTest {
     @MockitoBean NotificationRepository repo;
     @MockitoBean UserAccountRepository userRepo;
     @MockitoBean fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository commandRepository;
+    @MockitoBean ExperimentRepository experimentRepository;
+    @MockitoBean ExperimentVariantRepository variantRepository;
+    @MockitoBean ExperimentAssignmentRepository assignmentRepository;
+
+    private Experiment experiment;
+    private ExperimentVariant variant;
+
+    private void experimentFixture() {
+        UserAccount admin = new UserAccount();
+        admin.setId(UUID.randomUUID());
+        when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(admin));
+        experiment = new Experiment();
+        experiment.setId(UUID.randomUUID());
+        variant = new ExperimentVariant();
+        variant.setId(UUID.randomUUID());
+        variant.setExperiment(experiment);
+        when(experimentRepository.findById(experiment.getId())).thenReturn(Optional.of(experiment));
+        when(variantRepository.findById(variant.getId())).thenReturn(Optional.of(variant));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions postJson(String path, Map<String, Object> body) throws Exception {
+        return mvc.perform(post(path)
+                .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(om.writeValueAsString(body)));
+    }
+
+    private Map<String, Object> experimentBody(Object experimentId, Object variantId) {
+        Map<String, Object> m = new java.util.HashMap<>(Map.of("title", "T", "body", "B", "severity", "INFO",
+                "audience", "EXPERIMENT"));
+        if (experimentId != null) m.put("experimentId", experimentId.toString());
+        if (variantId != null) m.put("variantId", variantId.toString());
+        return m;
+    }
+
+    @Test
+    void create_forAnExperiment_sendsOneSharedNotificationToEveryVariantsMembers() throws Exception {
+        experimentFixture();
+        List<UserAccount> members = List.of(new UserAccount(), new UserAccount(), new UserAccount());
+        when(assignmentRepository.findNotifiableUsers(experiment)).thenReturn(members);
+        when(service.createForAll(any(), any(), org.mockito.ArgumentMatchers.eq(members))).thenReturn(3);
+
+        postJson("/api/admin/notifications", experimentBody(experiment.getId(), null))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sent").value(3));
+
+        verify(service, org.mockito.Mockito.times(1)).createForAll(any(), any(), org.mockito.ArgumentMatchers.eq(members));
+        verify(service, org.mockito.Mockito.never()).create(any(), any());
+        verify(service, org.mockito.Mockito.never()).createForEach(any(), any(), any());
+    }
+
+    @Test
+    void create_forAnExperimentsVariant_sendsToThatVariantsMembersOnly() throws Exception {
+        experimentFixture();
+        List<UserAccount> members = List.of(new UserAccount());
+        when(assignmentRepository.findNotifiableUsersByVariant(experiment, variant.getId())).thenReturn(members);
+        when(service.createForAll(any(), any(), org.mockito.ArgumentMatchers.eq(members))).thenReturn(1);
+
+        postJson("/api/admin/notifications", experimentBody(experiment.getId(), variant.getId()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sent").value(1));
+
+        verify(assignmentRepository, org.mockito.Mockito.never()).findNotifiableUsers(any());
+    }
+
+    @Test
+    void create_forAnExperimentWithNobody_answers201WithZeroSent() throws Exception {
+        experimentFixture();
+        when(assignmentRepository.findNotifiableUsers(experiment)).thenReturn(List.of());
+        when(service.createForAll(any(), any(), org.mockito.ArgumentMatchers.eq(List.of()))).thenReturn(0);
+
+        postJson("/api/admin/notifications", experimentBody(experiment.getId(), null))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sent").value(0));
+    }
+
+    @Test
+    void create_forAVariantOfAnotherExperiment_is404() throws Exception {
+        experimentFixture();
+        Experiment other = new Experiment();
+        other.setId(UUID.randomUUID());
+        variant.setExperiment(other);
+
+        postJson("/api/admin/notifications", experimentBody(experiment.getId(), variant.getId()))
+                .andExpect(status().isNotFound());
+
+        verify(service, org.mockito.Mockito.never()).createForAll(any(), any(), any());
+    }
+
+    @Test
+    void create_forAnUnknownExperimentOrVariant_is404() throws Exception {
+        experimentFixture();
+
+        postJson("/api/admin/notifications", experimentBody(UUID.randomUUID(), null)).andExpect(status().isNotFound());
+        postJson("/api/admin/notifications", experimentBody(experiment.getId(), UUID.randomUUID())).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void create_forAnExperimentWithoutAnId_is400() throws Exception {
+        experimentFixture();
+
+        postJson("/api/admin/notifications", experimentBody(null, null)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void audienceCount_countsTheExperimentsNotifiableMembers() throws Exception {
+        experimentFixture();
+        when(assignmentRepository.countNotifiableUsers(experiment)).thenReturn(12L);
+        when(assignmentRepository.countNotifiableUsersByVariant(experiment, variant.getId())).thenReturn(5L);
+
+        postJson("/api/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT", "experimentId", experiment.getId().toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.count").value(12));
+        postJson("/api/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT",
+                "experimentId", experiment.getId().toString(), "variantId", variant.getId().toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.count").value(5));
+    }
+
+    @Test
+    void audienceCount_rejectsOtherAudiencesMissingOrUnknownExperimentsAndForeignVariants() throws Exception {
+        experimentFixture();
+        postJson("/api/admin/notifications/audience-count", Map.of("audience", "CHAT_COMMANDS")).andExpect(status().isBadRequest());
+        postJson("/api/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT")).andExpect(status().isBadRequest());
+        postJson("/api/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT",
+                "experimentId", UUID.randomUUID().toString())).andExpect(status().isNotFound());
+        Experiment other = new Experiment();
+        other.setId(UUID.randomUUID());
+        variant.setExperiment(other);
+        postJson("/api/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT",
+                "experimentId", experiment.getId().toString(), "variantId", variant.getId().toString()))
+                .andExpect(status().isNotFound());
+    }
 
     @Test
     void create_forTheChatCommandsAudience_tellsEachStreamerWithAnEnabledCommand() throws Exception {

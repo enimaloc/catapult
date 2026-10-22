@@ -81,6 +81,18 @@ public class NotificationService {
                 req.ctaUrl().replace(CHANNEL_PLACEHOLDER, channel), req.ctaLabel(), req.expiresAt(), req.targetUserId());
     }
 
+    /**
+     * One notification shared by every member of {@code recipients}, targeted to them (not a broadcast).
+     * Returns how many were told; none stores nothing.
+     */
+    @Transactional
+    public int createForAll(CreateRequest req, UserAccount actor, List<UserAccount> recipients) {
+        validate(req);
+        if (recipients.isEmpty()) return 0;
+        send(req, actor, recipients, false);
+        return recipients.size();
+    }
+
     private NotificationDto send(CreateRequest req, UserAccount actor, List<UserAccount> recipients, boolean broadcast) {
         boolean hasCta = req.ctaUrl() != null && !req.ctaUrl().isBlank();
         Notification n = new Notification();

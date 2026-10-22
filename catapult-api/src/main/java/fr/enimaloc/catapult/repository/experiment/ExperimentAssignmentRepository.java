@@ -139,6 +139,42 @@ public interface ExperimentAssignmentRepository extends JpaRepository<Experiment
         """)
     List<UUID> findUserIdsInGroup(@Param("experiment") Experiment experiment, @Param("groupKey") String groupKey);
 
+    // The four shapes below pick who a notification to an experiment's participants reaches: members that are
+    // active and not built-in accounts, all variants or one (again no nullable bind).
+
+    /** The active, non-system members assigned to the experiment. */
+    @Query("""
+        SELECT u FROM ExperimentAssignment a JOIN a.user u
+        WHERE a.experiment = :experiment
+          AND u.status = fr.enimaloc.catapult.domain.account.UserAccount.Status.ACTIVE AND u.systemAccount = false
+        """)
+    List<UserAccount> findNotifiableUsers(@Param("experiment") Experiment experiment);
+
+    /** Like {@link #findNotifiableUsers}, narrowed to one variant. */
+    @Query("""
+        SELECT u FROM ExperimentAssignment a JOIN a.user u
+        WHERE a.experiment = :experiment AND a.variant.id = :variantId
+          AND u.status = fr.enimaloc.catapult.domain.account.UserAccount.Status.ACTIVE AND u.systemAccount = false
+        """)
+    List<UserAccount> findNotifiableUsersByVariant(@Param("experiment") Experiment experiment,
+                                                   @Param("variantId") UUID variantId);
+
+    /** How many members {@link #findNotifiableUsers} returns. */
+    @Query("""
+        SELECT COUNT(a) FROM ExperimentAssignment a JOIN a.user u
+        WHERE a.experiment = :experiment
+          AND u.status = fr.enimaloc.catapult.domain.account.UserAccount.Status.ACTIVE AND u.systemAccount = false
+        """)
+    long countNotifiableUsers(@Param("experiment") Experiment experiment);
+
+    /** How many members {@link #findNotifiableUsersByVariant} returns. */
+    @Query("""
+        SELECT COUNT(a) FROM ExperimentAssignment a JOIN a.user u
+        WHERE a.experiment = :experiment AND a.variant.id = :variantId
+          AND u.status = fr.enimaloc.catapult.domain.account.UserAccount.Status.ACTIVE AND u.systemAccount = false
+        """)
+    long countNotifiableUsersByVariant(@Param("experiment") Experiment experiment, @Param("variantId") UUID variantId);
+
     List<ExperimentAssignment> findAllByExperiment(Experiment experiment);
 
     @Modifying(clearAutomatically = true)
