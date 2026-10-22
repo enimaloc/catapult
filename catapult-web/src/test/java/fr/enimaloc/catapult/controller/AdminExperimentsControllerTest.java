@@ -227,6 +227,36 @@ class AdminExperimentsControllerTest {
     }
 
     @Test
+    void moveAssignment_relaysTheVariant_andTheStatus() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminMoveExperimentAssignment(ID, OTHER, OTHER)).thenReturn(204);
+        when(apiService.adminMoveExperimentAssignment(ID, ID, OTHER)).thenReturn(404);
+
+        mvc.perform(admin(post(BASE + "/assignments/" + OTHER + "/variant"), "{\"variantId\":\"" + OTHER + "\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(admin(post(BASE + "/assignments/" + ID + "/variant"), "{\"variantId\":\"" + OTHER + "\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void moveAssignment_withoutAVariant_is400_withoutCallingTheApi() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+
+        mvc.perform(admin(post(BASE + "/assignments/" + OTHER + "/variant"), "{}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE + "/assignments/" + OTHER + "/variant"), "{\"variantId\":null}")).andExpect(status().isBadRequest());
+        verify(apiService, never()).adminMoveExperimentAssignment(any(), any(), any());
+    }
+
+    @Test
+    void moveAssignment_refusesVisitorsAndMembers_evenWithoutAVariant() throws Exception {
+        String url = BASE + "/assignments/" + OTHER + "/variant";
+        mvc.perform(post(url).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(admin(post(url), "{}")).andExpect(status().isForbidden());
+        verify(apiService, never()).adminMoveExperimentAssignment(any(), any(), any());
+    }
+
+    @Test
     void unreachable_is502() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminExperimentAction(ID, "pause")).thenReturn(502);

@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
@@ -692,6 +693,18 @@ public class MockApiService implements ApiService {
     public int adminDeleteExperimentOverride(UUID id, UUID overrideId) {
         log.trace("adminDeleteExperimentOverride({}, {})", id, overrideId);
         return experiments.deleteOverride(id, overrideId);
+    }
+
+    @Override
+    public ExperimentAssignmentsDto adminExperimentAssignments(UUID id, UUID variantId, String q, int page) {
+        log.trace("adminExperimentAssignments({}, {}, {}, {})", id, variantId, q, page);
+        return experiments.assignments(id, variantId, q, page).orElse(null);
+    }
+
+    @Override
+    public int adminMoveExperimentAssignment(UUID id, UUID userId, UUID variantId) {
+        log.trace("adminMoveExperimentAssignment({}, {}, {})", id, userId, variantId);
+        return experiments.move(id, userId, variantId);
     }
 
     @Override

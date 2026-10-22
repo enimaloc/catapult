@@ -10,7 +10,9 @@
  * from one to the other: the view opens on the weights as percentages summing to 100 so the bar and
  * the fields say the same thing. mdui-text-field can't bind a
  * <datalist> (shadow DOM), so the known tags and the chosen tag's values are offered as chips under
- * the tag fields. Listeners are delegated to the document: the view comes and goes.
+ * the tag fields. The Participants card reloads its chips and list from /spa/admin/experiments/{id}/participants
+ * on a variant chip, a (debounced) search or a page; moving a member posts the chosen variant, then
+ * refreshes the list and the Overrides card (the move adds an override). Listeners are delegated to the document: the view comes and goes.
  */
 window.CatapultAdminExperiments = (function () {
     const PANEL = 'mdui-tab-panel[value="experiments"]';
@@ -331,6 +333,105 @@ window.CatapultAdminExperiments = (function () {
             valueField.value = value;
         });
     }
+
+    // ---- participants
+
+    const SEARCH_DELAY_MS = 300;
+    const searchTimers = new WeakMap();
+    /** The url of each card's latest ask: an older answer arriving after it is dropped. */
+    const asked = new WeakMap();
+
+    const participantsOf = root => root.querySelector("[data-participants]");
+
+    /** The chips and list of `card`'s fragment swapped in, and its state (variant, q, page) taken over. */
+    function swapParticipants(card, fresh) {
+        for (const part of ["[data-participants-chips]", "[data-participants-list]"]) {
+            const current = card.querySelector(part);
+            const next = fresh.querySelector(part);
+            if (current && next) current.replaceWith(next);
+        }
+        for (const key of ["variant", "q", "page"]) {
+            if (fresh.dataset[key] === undefined) delete card.dataset[key];
+            else card.dataset[key] = fresh.dataset[key];
+        }
+    }
+
+    /** Fetches the participants for `want` (variant, q, page; the card's own where left out) and swaps them in. */
+    async function loadParticipants(root, want = {}) {
+        const card = participantsOf(root);
+        if (!card) return;
+        const params = new URLSearchParams({
+            variant: want.variant ?? card.dataset.variant ?? "",
+            q: want.q ?? card.dataset.q ?? "",
+            page: String(want.page ?? Number(card.dataset.page ?? 0)),
+        });
+        const url = `/spa/admin/experiments/${encodeURIComponent(root.dataset.experiment)}/participants?${params}`;
+        asked.set(card, url);
+        let html = null;
+        try {
+            html = await (await fetch(url)).text();
+        } catch { /* told below */ }
+        if (asked.get(card) !== url) return;
+        const fresh = html === null ? null : new DOMParser().parseFromString(html, "text/html").querySelector("[data-participants]");
+        if (!fresh) {
+            CatapultChannel.showError(root.dataset.labelUnavailable);
+            return;
+        }
+        swapParticipants(card, fresh);
+    }
+
+    /** The Overrides card as the server has it now: a move adds or replaces one. */
+    async function refreshOverrides(root) {
+        let html = null;
+        try {
+            html = await (await fetch(`/spa/admin/experiments/${encodeURIComponent(root.dataset.experiment)}`)).text();
+        } catch { /* the card stays as it was */ }
+        const fresh = html === null ? null : new DOMParser().parseFromString(html, "text/html").querySelector("#experiment-overrides");
+        const current = root.querySelector("#experiment-overrides");
+        if (!fresh || !current) return;
+        current.replaceWith(fresh);
+        fresh.querySelectorAll("form").forEach(sync);
+    }
+
+    async function moveParticipant(root, select) {
+        const variantId = select.value;
+        if (!variantId) return;
+        select.disabled = true;
+        const status = await post(null, urlOf(root, `assignments/${encodeURIComponent(select.dataset.participantsMove)}/variant`), { variantId });
+        if (ok(status)) {
+            window.mdui?.snackbar?.({ message: root.dataset.labelSaved });
+            await Promise.all([loadParticipants(root), refreshOverrides(root)]);
+            return;
+        }
+        select.disabled = false;
+        select.value = "";
+        CatapultChannel.showError(refusal(root, status, "labelUnknown"));
+        if (status === 404 || status === 409) await CatapultAdminTabs.reload(root.closest(PANEL));
+    }
+
+    document.addEventListener("click", event => {
+        const target = event.target.closest?.("[data-participants-variant], [data-participants-page]");
+        const root = target && rootOf(target);
+        if (!root || target.disabled) return;
+        if (target.dataset.participantsPage !== undefined) loadParticipants(root, { page: Number(target.dataset.participantsPage) });
+        else loadParticipants(root, { variant: target.dataset.participantsVariant, page: 0 });
+    });
+
+    const onSearch = event => {
+        const field = event.target.closest?.("[data-participants-search]");
+        const root = field && rootOf(field);
+        if (!root) return;
+        clearTimeout(searchTimers.get(field));
+        searchTimers.set(field, setTimeout(() => loadParticipants(root, { q: (field.value ?? "").trim(), page: 0 }), SEARCH_DELAY_MS));
+    };
+    document.addEventListener("input", onSearch);
+    document.addEventListener("clear", onSearch);
+
+    document.addEventListener("change", event => {
+        const select = event.target.closest?.("[data-participants-move]");
+        const root = select && rootOf(select);
+        if (root) moveParticipant(root, select);
+    });
 
     // ---- wiring
 

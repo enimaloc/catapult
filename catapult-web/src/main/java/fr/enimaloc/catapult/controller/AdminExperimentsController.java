@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * The admin Experiments tab's actions (lifecycle, weights, rules, overrides), forwarded to catapult-api
+ * The admin Experiments tab's actions (lifecycle, weights, rules, overrides, moving a participant), forwarded to catapult-api
  * with the session's JWT and answered with its status. The tab posts friendly bodies (a group key, a tag);
  * they are mapped here to the attribute-based requests catapult-api expects.
  */
@@ -35,6 +35,8 @@ public class AdminExperimentsController {
                            String attributeValue, String groupKey, String experimentKey, String variantKey) {}
     public record OverrideBody(String target, String twitchUsername, String tagKey, String tagValue,
                                String groupKey, String action, Integer priority, UUID variantId) {}
+
+    public record MoveBody(UUID variantId) {}
 
     @PostMapping("/{id}/{action}")
     public ResponseEntity<Void> action(@PathVariable UUID id, @PathVariable String action) {
@@ -82,6 +84,15 @@ public class AdminExperimentsController {
     @PostMapping("/{id}/overrides/{overrideId}/delete")
     public ResponseEntity<Void> deleteOverride(@PathVariable UUID id, @PathVariable UUID overrideId) {
         return AdminAccess.relay(filler, () -> apiService.adminDeleteExperimentOverride(id, overrideId));
+    }
+
+    /** Moves a participant to another variant; a body with no variant is refused here, once the caller is known to be an admin. */
+    @PostMapping("/{id}/assignments/{userId}/variant")
+    public ResponseEntity<Void> moveAssignment(@PathVariable UUID id, @PathVariable UUID userId, @RequestBody MoveBody body) {
+        if (body.variantId() == null) {
+            return invalid();
+        }
+        return AdminAccess.relay(filler, () -> apiService.adminMoveExperimentAssignment(id, userId, body.variantId()));
     }
 
     /** A refused body is still only answered to an admin, as for every other local answer. */

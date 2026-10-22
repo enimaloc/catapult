@@ -151,7 +151,12 @@
         </th:block>
     </mdui-card>
 
-    <mdui-card class="admin-targeting-card" variant="outlined">
+    <mdui-card id="experiment-participants" class="admin-targeting-card" variant="outlined">
+        <h3 th:text="#{admin.experiments.participants.title}">Participants</h3>
+        <div th:replace="~{pages/admin-tab/experiments :: participants}"></div>
+    </mdui-card>
+
+    <mdui-card id="experiment-overrides" class="admin-targeting-card" variant="outlined">
         <h3 th:text="#{admin.experiments.overrides.title}">Dérogations</h3>
         <p class="admin-cell-muted" th:if="${experiment.overrides().isEmpty()}" th:text="#{admin.experiments.overrides.empty}">Aucune dérogation.</p>
         <div class="admin-targeting-rows" th:unless="${experiment.overrides().isEmpty()}">
@@ -219,6 +224,68 @@
             </form>
         </th:block>
     </mdui-card>
+</div>
+
+<!--/* Who is assigned to which variant: the variants as filter chips (with how many each holds), a login search,
+     a page of rows (each with a select to move the member to another variant, unless the experiment has ended)
+     and the pager. The root carries the state admin-experiments.js reloads from; it swaps the chips and the
+     list only, so the search field keeps its focus. data-variant / data-q are absent (not empty) when there is no
+     filter / search: Thymeleaf drops an empty attribute. A variant's colour is the weight bar's (variantColors). */-->
+<div th:fragment="participants" data-participants class="admin-participants"
+     th:attr="data-variant=${selectedVariant != null ? selectedVariant : ''},data-q=${participantsQ},data-page=${assignments != null ? assignments.page().number() : 0}">
+    <div data-participants-chips class="admin-participants-chips" th:if="${assignments != null}"
+         th:with="total=${#aggregates.sum(assignments.counts().values()).longValue()}">
+        <mdui-chip variant="filter" data-participants-variant=""
+                   th:attr="selected=${selectedVariant == null ? '' : null},aria-pressed=${selectedVariant == null}"
+                   th:text="#{admin.experiments.participants.all(${total})}">Toutes</mdui-chip>
+        <mdui-chip variant="filter" th:each="v : ${experiment.variants()}"
+                   th:attr="data-participants-variant=${v.id()},selected=${v.id().equals(selectedVariant) ? '' : null},aria-pressed=${v.id().equals(selectedVariant)}">
+            <span slot="icon" class="experiment-weight-swatch" aria-hidden="true"
+                  th:style="|--variant-color: var(--catapult-variant-${variantColors.get(v.id())})|"></span>
+            <th:block th:text="|${v.key()} (${assignments.counts().getOrDefault(v.id(), 0L)})|">key (0)</th:block>
+        </mdui-chip>
+    </div>
+    <mdui-text-field class="admin-search" data-participants-search variant="outlined" clearable icon="search"
+                     th:attr="label=#{admin.search},value=${participantsQ}"></mdui-text-field>
+    <div data-participants-list>
+        <p class="admin-cell-muted" th:if="${assignments == null}" th:text="#{admin.unavailable}">Indisponible</p>
+        <th:block th:if="${assignments != null}">
+            <p class="admin-cell-muted" th:if="${assignments.page().content().isEmpty() and selectedVariant == null and participantsQ.isBlank()}"
+               th:text="#{admin.experiments.participants.none}">Personne n'a encore été assigné.</p>
+            <p class="admin-cell-muted" th:if="${assignments.page().content().isEmpty() and (selectedVariant != null or !participantsQ.isBlank())}"
+               th:text="#{admin.experiments.participants.nomatch}">Aucun participant ne correspond.</p>
+            <div class="admin-targeting-rows" th:unless="${assignments.page().content().isEmpty()}">
+                <div class="admin-targeting-row admin-participants-row" th:each="a : ${assignments.page().content()}"
+                     th:attr="data-participant=${a.userId()}">
+                    <strong class="admin-member-id" th:text="${a.twitchUsername()}">login</strong>
+                    <span class="admin-participants-variant">
+                        <span class="experiment-weight-swatch" aria-hidden="true"
+                              th:style="|--variant-color: var(--catapult-variant-${variantColors.get(a.variantId())})|"></span>
+                        <span th:text="${variantKeys.get(a.variantId())}">variant</span>
+                    </span>
+                    <span class="admin-cell-muted"
+                          th:text="${a.assignedAt() == null ? '—' : #temporals.format(a.assignedAt(), #messages.msg('format.date'))}">01/01/2025</span>
+                    <span class="admin-participants-actions">
+                        <mdui-chip class="admin-participants-forced" icon="lock" th:if="${a.forced()}"
+                                   th:text="#{admin.experiments.participants.forced}">forcé</mdui-chip>
+                        <mdui-select variant="outlined" th:if="${editable}"
+                                     th:attr="data-participants-move=${a.userId()},label=#{admin.experiments.participants.move}">
+                            <th:block th:each="v : ${experiment.variants()}">
+                                <mdui-menu-item th:unless="${v.id().equals(a.variantId())}" th:value="${v.id()}" th:text="${v.key()}">variant</mdui-menu-item>
+                            </th:block>
+                        </mdui-select>
+                    </span>
+                </div>
+            </div>
+            <div class="admin-pagination" th:if="${assignments.page().totalPages() > 1}" th:with="page=${assignments.page()}">
+                <mdui-button-icon icon="chevron_left" th:disabled="${page.first()}"
+                                  th:attr="data-participants-page=${page.number() - 1},aria-label=#{admin.pagination.previous}"></mdui-button-icon>
+                <span th:text="|${page.number() + 1} / ${page.totalPages()}|">1 / 1</span>
+                <mdui-button-icon icon="chevron_right" th:disabled="${page.last()}"
+                                  th:attr="data-participants-page=${page.number() + 1},aria-label=#{admin.pagination.next}"></mdui-button-icon>
+            </div>
+        </th:block>
+    </div>
 </div>
 
 <div th:fragment="missing" class="admin-view">
