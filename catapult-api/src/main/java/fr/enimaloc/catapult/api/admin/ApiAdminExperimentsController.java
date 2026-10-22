@@ -135,8 +135,15 @@ public class ApiAdminExperimentsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void activate(@PathVariable UUID id) {
         Experiment exp = findOrThrow(id);
+        if (exp.getStatus() == Experiment.Status.PAUSED) {
+            // Resuming is not a first start: keep startedAt and stay silent, as the activation listeners
+            // (metrics, mock data seeding) count and seed first starts only.
+            exp.setStatus(Experiment.Status.ACTIVE);
+            experimentRepository.save(exp);
+            return;
+        }
         if (exp.getStatus() != Experiment.Status.DRAFT) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Experiment not in DRAFT status");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Experiment not in DRAFT or PAUSED status");
         }
         exp.setStatus(Experiment.Status.ACTIVE);
         exp.setStartedAt(Instant.now());
