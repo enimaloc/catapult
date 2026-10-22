@@ -21,7 +21,7 @@ function page() {
     html(`
         <mdui-tab-panel value="experiments">
             <div class="admin-experiment-detail" data-experiment="${EXP}" data-confirm-text="OK" data-cancel-text="No"
-                 data-label-invalid="Refused" data-label-unknown="Gone" data-label-unavailable="Down" data-label-saved="Saved"
+                 data-label-invalid="Refused" data-label-unknown="Gone" data-label-account-unknown="No such account" data-label-unavailable="Down" data-label-saved="Saved"
                  data-label-end-confirm="End it?" data-label-reassign-confirm="Reassign?">
                 <button data-experiment-action="activate"></button>
                 <button data-experiment-action="end"></button>
@@ -268,6 +268,17 @@ describe("admin-experiments", () => {
         posted.mockRejectedValueOnce(new Error("offline"));
         await click('[data-experiment-action="activate"]');
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
+    });
+
+    it("tells an unknown account without reloading, so the form keeps what was typed", async () => {
+        const form = "experiment-override-form";
+        await set(field(form, "twitchUsername"), "ghost");
+        posted.mockResolvedValueOnce(response(404));
+        await submit("override-save");
+
+        expect(CatapultChannel.showError).toHaveBeenLastCalledWith("No such account");
+        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(field(form, "twitchUsername").value).toBe("ghost");
     });
 
     it("suggests the known tags and the chosen tag's values under the tag fields", async () => {
