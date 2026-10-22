@@ -191,6 +191,44 @@ class NotificationServiceTest {
         order.verify(deliveries).createFor(id);
     }
 
+    /** One announcement per call: a chat-commands send to thousands of members must not publish once each. */
+    @Test
+    void createForEach_announcesEveryPendingTwitchatDelivery_once() {
+        UserAccount u1 = userWithStatus(UserAccount.Status.ACTIVE);
+        u1.setTwitchUsername("alice");
+        UserAccount u2 = userWithStatus(UserAccount.Status.ACTIVE);
+        u2.setTwitchUsername("bob");
+        when(notifRepo.save(any())).thenAnswer(inv -> {
+            Notification n = inv.getArgument(0);
+            n.setId(UUID.randomUUID());
+            return n;
+        });
+        when(deliveries.createFor(any())).thenReturn(List.of(u1.getId())).thenReturn(List.of(u2.getId()));
+
+        service.createForEach(new NotificationService.CreateRequest("T", "B", Severity.INFO, null, null, null, null),
+                admin, List.of(u1, u2));
+
+        verify(publisher, times(1)).publishEvent(any(fr.enimaloc.catapult.event.NotificationDeliveryPendingEvent.class));
+        verify(publisher).publishEvent(new fr.enimaloc.catapult.event.NotificationDeliveryPendingEvent(List.of(u1.getId(), u2.getId())));
+    }
+
+    @Test
+    void createForAll_announcesItsPendingTwitchatDeliveries_noneWhenThereAreNone() {
+        UserAccount u1 = userWithStatus(UserAccount.Status.ACTIVE);
+        when(notifRepo.save(any())).thenAnswer(inv -> {
+            Notification n = inv.getArgument(0);
+            n.setId(UUID.randomUUID());
+            return n;
+        });
+        when(deliveries.createFor(any())).thenReturn(List.of(u1.getId())).thenReturn(List.of());
+        NotificationService.CreateRequest req = new NotificationService.CreateRequest("T", "B", Severity.INFO, null, null, null, null);
+
+        service.createForAll(req, admin, List.of(u1));
+        service.createForAll(req, admin, List.of(u1));
+
+        verify(publisher, times(1)).publishEvent(any(fr.enimaloc.catapult.event.NotificationDeliveryPendingEvent.class));
+    }
+
     @Test
     void markRead_cancelsItsPendingDeliveries() {
         UUID userId = UUID.randomUUID();

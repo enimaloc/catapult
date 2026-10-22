@@ -48,7 +48,15 @@ class NotificationRendererTest {
     @Test
     void toPlainText_dropsTheMarkup_andJoinsTheBlocks() {
         assertThat(new NotificationRenderer().toPlainText("**Hello** _you_\n\nSee [the page](https://x.test)"))
-                .isEqualTo("Hello you See the page");
+                .isEqualTo("Hello you See the page (https://x.test)");
         assertThat(new NotificationRenderer().toPlainText(null)).isEmpty();
+    }
+
+    /** Twitchat and Twitch chat show no link: its target goes in the text, once. */
+    @Test
+    void toPlainText_keepsLinkTargets() {
+        NotificationRenderer renderer = new NotificationRenderer();
+        assertThat(renderer.toPlainText("Go [there](https://x.test/a) or <https://x.test/b>"))
+                .isEqualTo("Go there (https://x.test/a) or https://x.test/b");
     }
 }

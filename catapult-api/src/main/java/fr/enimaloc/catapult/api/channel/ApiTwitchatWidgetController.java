@@ -51,7 +51,9 @@ public class ApiTwitchatWidgetController {
     /** The widget's owner's pending Twitchat notifications, sent once catapult-web has the OBS widget connected. */
     @PostMapping("/widget/{uuid}/notifications/flush")
     public ResponseEntity<NotificationFlushResultDto> flushNotifications(@PathVariable UUID uuid) {
+        // Like config(): a disabled widget is no widget, and its owner's deliveries stay pending
         return widgetTokenService.resolve(uuid)
+                .filter(owner -> widgetSettingsRepository.findById(owner.getId()).map(TwitchatWidgetSettings::isEnabled).orElse(false))
                 .map(owner -> ResponseEntity.ok(new NotificationFlushResultDto(deliveryDispatcher.flushTwitchat(owner))))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
