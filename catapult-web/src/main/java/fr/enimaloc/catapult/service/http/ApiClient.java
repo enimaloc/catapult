@@ -211,7 +211,8 @@ public class ApiClient {
      * An error answer, worth a warning unless it only says the session's JWT is no longer valid, or
      * is a 502 while catapult-api is still starting (expected).
      */
-    private static void logError(HttpStatusCode status, String path) {
+    private static void logError(HttpStatusCode status, String expandedPath) {
+        String path = masked(expandedPath);
         if (status.value() == HttpStatus.BAD_GATEWAY.value()) {
             log.debug("API returned {} for {}", status, path);
         } else if (status.value() != HttpStatus.UNAUTHORIZED.value() && !path.equals(AUTH_VALIDATE_PATH)) {
@@ -219,10 +220,17 @@ public class ApiClient {
         }
     }
 
+    private static final java.util.regex.Pattern WIDGET_TOKEN = java.util.regex.Pattern.compile("(/widget/)[^/\\s\"?]+");
+
+    /** {@code text} without any OBS widget token (a credential: the path segment after /widget/), for the logs. */
+    static String masked(String text) {
+        return text == null ? null : WIDGET_TOKEN.matcher(text).replaceAll("$1***");
+    }
+
     private static void logFailure(HttpMethod method, String path, Exception e) {
         // An error answer was logged when it came.
         if (!(e instanceof ApiErrorException)) {
-            log.warn("{} {} failed: {}", method, path, e.getMessage());
+            log.warn("{} {} failed: {}", method, masked(path), masked(e.getMessage()));
         }
     }
 
