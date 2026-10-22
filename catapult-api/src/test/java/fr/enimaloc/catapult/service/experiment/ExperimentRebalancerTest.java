@@ -73,7 +73,7 @@ class ExperimentRebalancerTest {
         ExperimentVariant c = variant(3, 25);
         List<ExperimentAssignmentRef> pool = concat(members(a, 500), members(b, 250), members(c, 250));
 
-        // a: 50 -> 30, b stays 25 share-wise only relative: new weights 30/25/45 => targets 300/250/450
+        // Weights 30/25/45 on 1000 members give targets 300/250/450: only a shrinks, only c grows.
         var plan = ExperimentRebalancer.compute("exp", List.of(a, b, c), weights(a, 30, b, 25, c, 45), pool);
 
         assertThat(plan.moves()).singleElement().satisfies(m -> {
@@ -168,5 +168,26 @@ class ExperimentRebalancerTest {
                 concat(members(a, 5), members(b, 5)));
 
         assertThat(plan.moves()).isEmpty();
+    }
+
+    @Test
+    void leavers_areTheHighestHashMembers() {
+        ExperimentVariant a = variant(1, 1);
+        ExperimentVariant b = variant(2, 1);
+        // FNV hashes of "<userId>:variant" for experiment "exp": 1 -> 1644285816, 2 -> 691766269,
+        // 3 -> 1446246190, 4 -> 1523157603, 5 -> 2134299044, 6 -> 401859705.
+        List<ExperimentAssignmentRef> pool = new ArrayList<>();
+        Map<UUID, Integer> userOf = new HashMap<>();
+        for (int i = 1; i <= 6; i++) {
+            UUID user = UUID.fromString("00000000-0000-0000-0000-00000000000" + i);
+            ExperimentAssignmentRef ref = new ExperimentAssignmentRef(UUID.randomUUID(), user, a.getId());
+            pool.add(ref);
+            userOf.put(ref.id(), i);
+        }
+
+        var plan = ExperimentRebalancer.compute("exp", List.of(a, b), weights(a, 1, b, 1), pool);
+
+        assertThat(plan.moves()).singleElement().satisfies(m ->
+                assertThat(m.assignmentIds()).extracting(userOf::get).containsExactlyInAnyOrder(5, 1, 4));
     }
 }

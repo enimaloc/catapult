@@ -220,6 +220,21 @@ class ExperimentAssignmentRepositoryTest {
         assertThat(overrides.findForcedUserIds(experiment)).containsExactly(pinned.getUser().getId());
     }
 
+    @Test
+    void moveToVariant_flushesAPendingWeightChangeFirst() {
+        assign(experiment, control, "alice", "2026-10-20T10:00:00Z");
+        ExperimentAssignment a = repository.findAllByExperiment(experiment).getFirst();
+        ExperimentVariant managed = em.find(ExperimentVariant.class, control.getId());
+        managed.setWeight(77); // dirty, not flushed
+
+        repository.moveToVariant(treatment, List.of(a.getId()));
+
+        Number stored = (Number) em.getEntityManager()
+                .createNativeQuery("SELECT weight FROM experiment_variants WHERE id = ?1")
+                .setParameter(1, control.getId()).getSingleResult();
+        assertThat(stored.intValue()).isEqualTo(77);
+    }
+
     private void override(UserAccount user, ExperimentOverride.OverrideAction action) {
         ExperimentOverride o = new ExperimentOverride();
         o.setExperiment(experiment);
