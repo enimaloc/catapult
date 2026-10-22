@@ -1,13 +1,20 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.api.admin.ApiAdminDtddMappingController;
+import fr.enimaloc.catapult.api.admin.ApiAdminExperimentsController;
 import fr.enimaloc.catapult.api.admin.ApiAdminMembersController;
 import fr.enimaloc.catapult.api.channel.ApiTwitchatWidgetController;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
+import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserFlagRepository;
@@ -126,5 +133,34 @@ class CommonDtoContractTest {
 
         assertThat(roundTrip(produced, ConfigResponse.class))
                 .isEqualTo(new ConfigResponse("127.0.0.1", 4455, null, "beta"));
+    }
+
+    @Test
+    void adminExperiments_readAsSummaryAndSettingsDtos() {
+        ExperimentRepository experiments = mock(ExperimentRepository.class);
+        ExperimentOverrideRepository overrides = mock(ExperimentOverrideRepository.class);
+        Experiment experiment = new Experiment();
+        experiment.setId(UUID.randomUUID());
+        experiment.setKey("new-dashboard");
+        experiment.setName("New dashboard");
+        ExperimentVariant control = new ExperimentVariant();
+        control.setId(UUID.randomUUID());
+        control.setKey("old");
+        control.setName("Old");
+        control.setControl(true);
+        experiment.setVariants(new java.util.ArrayList<>(List.of(control)));
+        when(experiments.findAll()).thenReturn(List.of(experiment));
+        when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
+        when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
+        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments,
+                null, null, null, null, null, overrides, null, null, null, null);
+
+        List<ExperimentSummaryDto> summaries = controller.list();
+        ExperimentSettingsDto settings = controller.settings(experiment.getId());
+
+        assertThat(JSON.readValue(JSON.writeValueAsString(summaries), new TypeReference<List<ExperimentSummaryDto>>() {}))
+                .isEqualTo(summaries);
+        assertThat(roundTrip(settings, ExperimentSettingsDto.class)).isEqualTo(settings);
+        assertThat(settings.variants().getFirst().control()).isTrue();
     }
 }

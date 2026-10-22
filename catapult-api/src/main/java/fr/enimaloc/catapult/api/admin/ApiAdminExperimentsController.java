@@ -2,6 +2,12 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AssignRequest;
 import fr.enimaloc.catapult.common.dto.admin.NpsStat;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentStatus;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentVariantDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
@@ -37,6 +43,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,14 +69,35 @@ public class ApiAdminExperimentsController {
 
     @Transactional(readOnly = true)
     @GetMapping
-    public List<Experiment> list() {
-        List<Experiment> all = experimentRepository.findAll();
-        // Force-load lazy collections inside the transaction so Jackson can serialize after it closes
-        all.forEach(e -> {
-            e.getRules().size();
-            e.getVariants().size();
-        });
-        return all;
+    public List<ExperimentSummaryDto> list() {
+        return experimentRepository.findAll().stream()
+                .sorted(Comparator.comparing(Experiment::getKey))
+                .map(e -> new ExperimentSummaryDto(e.getId(), e.getKey(), e.getName(),
+                        ExperimentStatus.valueOf(e.getStatus().name()), variantDtos(e), e.getRules().size()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    @GetMapping("/{id}/settings")
+    public ExperimentSettingsDto settings(@PathVariable UUID id) {
+        Experiment exp = findOrThrow(id);
+        return new ExperimentSettingsDto(exp.getId(), exp.getKey(), exp.getName(), exp.getDescription(),
+                ExperimentStatus.valueOf(exp.getStatus().name()), variantDtos(exp),
+                exp.getRules().stream().map(r -> new ExperimentRuleDto(r.getId(), r.getRuleType().name(),
+                        r.getPercentage(), r.getAttributeKey(), r.getAttributeOperator(), r.getAttributeValue())).toList(),
+                overrideRepository.findByExperimentOrderByPriorityAsc(exp).stream().map(o -> new ExperimentOverrideDto(
+                        o.getId(), o.getOverrideType().name(), o.getAction().name(), o.getPriority(),
+                        o.getTargetUser() == null ? null : o.getTargetUser().getTwitchUsername(),
+                        o.getAttributeKey(), o.getAttributeOp(), o.getAttributeVal(),
+                        o.getTargetVariant() == null ? null : o.getTargetVariant().getId())).toList());
+    }
+
+    /** Variants in creation order (internalId); the sort is stable, so ties keep the entity's order. */
+    private static List<ExperimentVariantDto> variantDtos(Experiment exp) {
+        return exp.getVariants().stream()
+                .sorted(Comparator.comparingInt(ExperimentVariant::getInternalId))
+                .map(v -> new ExperimentVariantDto(v.getId(), v.getKey(), v.getName(), v.getWeight(), v.isControl()))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -270,6 +298,10 @@ public class ApiAdminExperimentsController {
             }
             Optional<ExperimentVariant> tv = variantRepository.findById(body.targetVariantId());
             if (tv.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
+            }
+            // A variant of another experiment is as good as unknown: forcing it would leak across experiments.
+            if (tv.get().getExperiment() == null || !tv.get().getExperiment().getId().equals(exp.getId())) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
             }
             override.setTargetVariant(tv.get());

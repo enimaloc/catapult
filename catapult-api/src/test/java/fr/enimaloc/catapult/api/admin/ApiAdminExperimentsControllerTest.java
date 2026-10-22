@@ -2,6 +2,9 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AssignRequest;
 import fr.enimaloc.catapult.common.dto.admin.NpsStat;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentStatus;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentVariantDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
@@ -83,7 +86,9 @@ class ApiAdminExperimentsControllerTest {
         experiment.setId(UUID.randomUUID());
         experiment.setKey("new-dashboard");
         treatment = variant("new", false);
+        treatment.setInternalId(2);
         control = variant("old", true);
+        control.setInternalId(1);
         experiment.setVariants(new java.util.ArrayList<>(List.of(treatment, control)));
         when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
         when(feedback.findByExperiment(eq(experiment), any())).thenReturn(new PageImpl<>(List.of()));
@@ -97,10 +102,73 @@ class ApiAdminExperimentsControllerTest {
     }
 
     @Test
-    void list_returnsEveryExperiment() {
+    void list_summarisesEachExperiment() {
         when(experiments.findAll()).thenReturn(List.of(experiment));
 
-        assertThat(controller.list()).containsExactly(experiment);
+        assertThat(controller.list()).singleElement().satisfies(s -> {
+            assertThat(s.key()).isEqualTo("new-dashboard");
+            assertThat(s.status()).isEqualTo(ExperimentStatus.DRAFT);
+            assertThat(s.variants()).extracting(ExperimentVariantDto::key).containsExactly("old", "new");
+            assertThat(s.variants().getFirst().control()).isTrue();
+            assertThat(s.ruleCount()).isZero();
+        });
+    }
+
+    @Test
+    void list_isSortedByKey() {
+        Experiment another = new Experiment();
+        another.setId(UUID.randomUUID());
+        another.setKey("a-first");
+        when(experiments.findAll()).thenReturn(List.of(experiment, another));
+
+        assertThat(controller.list()).extracting(s -> s.key()).containsExactly("a-first", "new-dashboard");
+    }
+
+    @Test
+    void settings_carriesRulesAndOverrides() {
+        ExperimentAssignmentRule rule = new ExperimentAssignmentRule();
+        rule.setId(UUID.randomUUID());
+        rule.setRuleType(ExperimentAssignmentRule.RuleType.RANDOM);
+        rule.setPercentage(25);
+        experiment.setRules(new java.util.ArrayList<>(List.of(rule)));
+        UserAccount target = new UserAccount();
+        target.setTwitchUsername("viewer");
+        ExperimentOverride userOverride = new ExperimentOverride();
+        userOverride.setId(UUID.randomUUID());
+        userOverride.setOverrideType(ExperimentOverride.OverrideType.USER);
+        userOverride.setAction(ExperimentOverride.OverrideAction.FORCE_INCLUDE);
+        userOverride.setPriority(1);
+        userOverride.setTargetUser(target);
+        ExperimentOverride forced = new ExperimentOverride();
+        forced.setId(UUID.randomUUID());
+        forced.setOverrideType(ExperimentOverride.OverrideType.ATTRIBUTE);
+        forced.setAction(ExperimentOverride.OverrideAction.FORCE_VARIANT);
+        forced.setPriority(2);
+        forced.setAttributeKey("group");
+        forced.setAttributeOp("=");
+        forced.setAttributeVal("beta");
+        forced.setTargetVariant(treatment);
+        when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of(userOverride, forced));
+
+        var settings = controller.settings(experiment.getId());
+
+        assertThat(settings.key()).isEqualTo("new-dashboard");
+        assertThat(settings.variants()).extracting(ExperimentVariantDto::key).containsExactly("old", "new");
+        assertThat(settings.rules()).singleElement().satisfies(r -> {
+            assertThat(r.type()).isEqualTo("RANDOM");
+            assertThat(r.percentage()).isEqualTo(25);
+        });
+        assertThat(settings.overrides()).extracting(ExperimentOverrideDto::type, ExperimentOverrideDto::action,
+                        ExperimentOverrideDto::twitchUsername, ExperimentOverrideDto::targetVariantId)
+                .containsExactly(
+                        org.assertj.core.api.Assertions.tuple("USER", "FORCE_INCLUDE", "viewer", null),
+                        org.assertj.core.api.Assertions.tuple("ATTRIBUTE", "FORCE_VARIANT", null, treatment.getId()));
+        assertThat(settings.overrides().get(1).attributeVal()).isEqualTo("beta");
+    }
+
+    @Test
+    void settings_ofAnUnknownExperiment_isNotFound() {
+        assertStatus(() -> controller.settings(UUID.randomUUID()), HttpStatus.NOT_FOUND);
     }
 
     @Nested
@@ -374,6 +442,7 @@ class ApiAdminExperimentsControllerTest {
 
         @Test
         void attributeOverride_forcingAVariant() {
+            treatment.setExperiment(experiment);
             when(variants.findById(treatment.getId())).thenReturn(Optional.of(treatment));
 
             controller.addOverride(experiment.getId(), request(ExperimentOverride.OverrideType.ATTRIBUTE,
@@ -390,6 +459,19 @@ class ApiAdminExperimentsControllerTest {
                     ExperimentOverride.OverrideAction.FORCE_VARIANT, null, null)), HttpStatus.BAD_REQUEST);
             assertStatus(() -> controller.addOverride(experiment.getId(), request(ExperimentOverride.OverrideType.ATTRIBUTE,
                     ExperimentOverride.OverrideAction.FORCE_VARIANT, null, UUID.randomUUID())), HttpStatus.NOT_FOUND);
+        }
+
+        @Test
+        void forcingAVariantOfAnotherExperiment_isNotFound() {
+            ExperimentVariant foreign = variant("foreign", false);
+            Experiment other = new Experiment();
+            other.setId(UUID.randomUUID());
+            foreign.setExperiment(other);
+            when(variants.findById(foreign.getId())).thenReturn(Optional.of(foreign));
+
+            assertStatus(() -> controller.addOverride(experiment.getId(), request(ExperimentOverride.OverrideType.ATTRIBUTE,
+                    ExperimentOverride.OverrideAction.FORCE_VARIANT, null, foreign.getId())), HttpStatus.NOT_FOUND);
+            verify(overrides, never()).save(any());
         }
 
         @Test
