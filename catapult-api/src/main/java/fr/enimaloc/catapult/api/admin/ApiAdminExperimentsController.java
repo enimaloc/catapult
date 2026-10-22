@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideDto;
 import fr.enimaloc.catapult.common.dto.experiment.MoveAssignmentRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentStatus;
@@ -30,6 +31,7 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentVariantRepository;
 import fr.enimaloc.catapult.service.StatisticsService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import fr.enimaloc.catapult.service.experiment.ExperimentRebalancer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -76,6 +78,7 @@ public class ApiAdminExperimentsController {
     private final ExperimentVariantRepository variantRepository;
     private final ExperimentService experimentService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ExperimentRebalancer rebalancer;
 
     @Transactional(readOnly = true)
     @GetMapping
@@ -238,13 +241,36 @@ public class ApiAdminExperimentsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateWeights(@PathVariable UUID id, @RequestBody Map<UUID, Integer> weights) {
         Experiment exp = findOrThrow(id);
+        if (exp.getStatus() == Experiment.Status.ENDED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Experiment ended");
+        }
+        Map<UUID, Integer> effective = effectiveWeights(exp, weights);
         for (ExperimentVariant v : exp.getVariants()) {
-            Integer weight = weights.get(v.getId());
-            if (weight != null) {
-                v.setWeight(Math.max(0, weight));
+            if (weights.get(v.getId()) != null) {
+                v.setWeight(effective.get(v.getId()));
                 variantRepository.save(v);
             }
         }
+        // Same transaction: the members follow the new weights, moving only those a variant now has too many of.
+        rebalancer.apply(exp, rebalancer.plan(exp, effective));
+    }
+
+    /** What saving these weights would move, without saving or moving anything. */
+    @PostMapping("/{id}/variants/weights/preview")
+    @Transactional(readOnly = true)
+    public ExperimentRebalanceDto previewWeights(@PathVariable UUID id, @RequestBody Map<UUID, Integer> weights) {
+        Experiment exp = findOrThrow(id);
+        return rebalancer.plan(exp, effectiveWeights(exp, weights)).toDto();
+    }
+
+    /** Each variant's weight once {@code proposed} is applied: clamped at 0, unlisted variants unchanged. */
+    private static Map<UUID, Integer> effectiveWeights(Experiment exp, Map<UUID, Integer> proposed) {
+        Map<UUID, Integer> effective = new HashMap<>();
+        for (ExperimentVariant v : exp.getVariants()) {
+            Integer weight = proposed.get(v.getId());
+            effective.put(v.getId(), weight != null ? Math.max(0, weight) : v.getWeight());
+        }
+        return effective;
     }
 
     @PostMapping("/{id}/rules")

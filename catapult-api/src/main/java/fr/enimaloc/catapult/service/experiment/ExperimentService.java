@@ -278,12 +278,17 @@ public class ExperimentService {
     }
 
     private int fnvBucket(String part1, String part2) {
+        return fnvHash(part1, part2) % 100;
+    }
+
+    /** The non-negative FNV-1a hash behind every bucket; shared so the rebalancer ranks members the way the draw does. */
+    static int fnvHash(String part1, String part2) {
         byte[] bytes = (part1 + ":" + part2).getBytes(StandardCharsets.UTF_8);
         int h = 0x811c9dc5;
         for (byte b : bytes) {
             h ^= (b & 0xFF);
             h *= 0x01000193;
         }
-        return (h & Integer.MAX_VALUE) % 100;
+        return h & Integer.MAX_VALUE;
     }
 }

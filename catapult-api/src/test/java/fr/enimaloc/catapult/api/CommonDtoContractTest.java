@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -156,7 +157,7 @@ class CommonDtoContractTest {
         when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
         when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
         ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments,
-                null, null, null, null, null, overrides, null, null, null, null);
+                null, null, null, null, null, overrides, null, null, null, null, null);
 
         List<ExperimentSummaryDto> summaries = controller.list();
         ExperimentSettingsDto settings = controller.settings(experiment.getId());
@@ -207,7 +208,7 @@ class CommonDtoContractTest {
         experiment.setVariants(new java.util.ArrayList<>(List.of(control)));
         when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
         ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments,
-                null, null, assignments, null, null, overrides, null, null, null, null);
+                null, null, assignments, null, null, overrides, null, null, null, null, null);
 
         ExperimentAssignmentsDto produced = controller.assignments(experiment.getId(), null, null, 0);
 
@@ -220,5 +221,14 @@ class CommonDtoContractTest {
         assertThat(read.page().totalElements()).isEqualTo(41);
         assertThat(read.page().totalPages()).isEqualTo(3);
         assertThat(read.counts()).containsEntry(control.getId(), 41L);
+    }
+
+    @Test
+    void experimentRebalance_readsAsExperimentRebalanceDto() {
+        ExperimentRebalanceDto produced = new ExperimentRebalanceDto(List.of(
+                new ExperimentRebalanceDto.Move(UUID.randomUUID(), UUID.randomUUID(), 100)));
+
+        assertThat(roundTrip(produced, ExperimentRebalanceDto.class)).isEqualTo(produced);
+        assertThat(roundTrip(new ExperimentRebalanceDto(List.of()), ExperimentRebalanceDto.class).moves()).isEmpty();
     }
 }

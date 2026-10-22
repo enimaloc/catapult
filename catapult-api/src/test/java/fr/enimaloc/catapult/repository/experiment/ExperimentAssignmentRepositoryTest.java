@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.repository.experiment;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentOverride;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ class ExperimentAssignmentRepositoryTest {
 
     @Autowired ExperimentAssignmentRepository repository;
     @Autowired TestEntityManager em;
+    @Autowired ExperimentOverrideRepository overrides;
 
     private Experiment experiment;
     private ExperimentVariant control;
@@ -171,5 +173,63 @@ class ExperimentAssignmentRepositoryTest {
                 .containsExactlyInAnyOrder(org.assertj.core.groups.Tuple.tuple(control.getId(), 2L),
                         org.assertj.core.groups.Tuple.tuple(treatment.getId(), 1L));
         assertThat(rows).noneMatch(r -> r[0].equals(empty.getId()));
+    }
+
+    @Test
+    void findRefsByExperiment_projectsIdsOfThisExperimentOnly() {
+        ExperimentAssignment mine = assign(experiment, control, "alice", "2026-10-20T10:00:00Z");
+        Experiment other = new Experiment();
+        other.setKey("other");
+        other.setName("Other");
+        em.persist(other);
+        assign(other, variant(other, "x"), "stranger", "2026-10-22T10:00:00Z");
+
+        List<ExperimentAssignmentRef> refs = repository.findRefsByExperiment(experiment);
+
+        assertThat(refs).singleElement().satisfies(r -> {
+            assertThat(r.id()).isEqualTo(mine.getId());
+            assertThat(r.variantId()).isEqualTo(control.getId());
+            assertThat(r.userId()).isEqualTo(mine.getUser().getId());
+        });
+    }
+
+    @Test
+    void moveToVariant_updatesOnlyTheGivenAssignments() {
+        ExperimentAssignment a = assign(experiment, control, "alice", "2026-10-20T10:00:00Z");
+        ExperimentAssignment b = assign(experiment, control, "bob", "2026-10-21T10:00:00Z");
+        ExperimentAssignment c = assign(experiment, control, "carol", "2026-10-22T10:00:00Z");
+
+        int updated = repository.moveToVariant(treatment, List.of(a.getId(), c.getId()));
+
+        assertThat(updated).isEqualTo(2);
+        assertThat(repository.findRefsByExperiment(experiment))
+                .extracting(ExperimentAssignmentRef::id, ExperimentAssignmentRef::variantId)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(a.getId(), treatment.getId()),
+                        org.assertj.core.groups.Tuple.tuple(b.getId(), control.getId()),
+                        org.assertj.core.groups.Tuple.tuple(c.getId(), treatment.getId()));
+    }
+
+    @Test
+    void findForcedUserIds_listsOnlyUserForceVariantOverridesOfTheExperiment() {
+        ExperimentAssignment pinned = assign(experiment, control, "alice", "2026-10-20T10:00:00Z");
+        ExperimentAssignment excluded = assign(experiment, control, "bob", "2026-10-21T10:00:00Z");
+        override(pinned.getUser(), ExperimentOverride.OverrideAction.FORCE_VARIANT);
+        override(excluded.getUser(), ExperimentOverride.OverrideAction.FORCE_EXCLUDE);
+
+        assertThat(overrides.findForcedUserIds(experiment)).containsExactly(pinned.getUser().getId());
+    }
+
+    private void override(UserAccount user, ExperimentOverride.OverrideAction action) {
+        ExperimentOverride o = new ExperimentOverride();
+        o.setExperiment(experiment);
+        o.setOverrideType(ExperimentOverride.OverrideType.USER);
+        o.setAction(action);
+        o.setTargetUser(em.find(UserAccount.class, user.getId()));
+        o.setTargetVariant(action == ExperimentOverride.OverrideAction.FORCE_VARIANT
+                ? em.find(ExperimentVariant.class, treatment.getId()) : null);
+        em.persist(o);
+        em.flush();
+        em.clear();
     }
 }

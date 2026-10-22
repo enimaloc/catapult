@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -97,6 +98,18 @@ public interface ExperimentAssignmentRepository extends JpaRepository<Experiment
     /** {@code [variantId, count]} rows; a variant nobody holds has no row. */
     @Query("SELECT a.variant.id, COUNT(a) FROM ExperimentAssignment a WHERE a.experiment = :experiment GROUP BY a.variant.id")
     List<Object[]> countByVariant(@Param("experiment") Experiment experiment);
+
+    /** Every assignment of an experiment as a light projection: no user or variant entity is loaded. */
+    @Query("""
+        SELECT new fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRef(a.id, a.user.id, a.variant.id)
+        FROM ExperimentAssignment a WHERE a.experiment = :experiment
+        """)
+    List<ExperimentAssignmentRef> findRefsByExperiment(@Param("experiment") Experiment experiment);
+
+    /** Moves the given assignments to {@code variant} in one statement; callers chunk {@code ids}. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE ExperimentAssignment a SET a.variant = :variant WHERE a.id IN :ids")
+    int moveToVariant(@Param("variant") ExperimentVariant variant, @Param("ids") Collection<UUID> ids);
 
     List<ExperimentAssignment> findAllByExperiment(Experiment experiment);
 
