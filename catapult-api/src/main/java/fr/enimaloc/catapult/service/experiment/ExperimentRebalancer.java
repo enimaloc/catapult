@@ -91,11 +91,13 @@ public class ExperimentRebalancer {
             List<ExperimentAssignmentRef> members = byVariant.getOrDefault(v.getId(), List.of());
             long diff = members.size() - targets.get(i);
             if (diff > 0) {
+                // Hash each member once, then rank: highest hash leaves first, ties by user id.
                 members.stream()
-                        .sorted(Comparator.comparingInt((ExperimentAssignmentRef r) -> hashOf(r, experimentKey)).reversed()
-                                .thenComparing(ExperimentAssignmentRef::userId))
+                        .map(r -> new Ranked(r, hashOf(r, experimentKey)))
+                        .sorted(Comparator.comparingInt(Ranked::hash).reversed()
+                                .thenComparing(rk -> rk.ref().userId()))
                         .limit(diff)
-                        .forEach(r -> leavers.add(new Leaver(v.getId(), r.id())));
+                        .forEach(rk -> leavers.add(new Leaver(v.getId(), rk.ref().id())));
             } else if (diff < 0) {
                 deficits.put(v.getId(), -diff);
             }
@@ -141,6 +143,8 @@ public class ExperimentRebalancer {
     private static int hashOf(ExperimentAssignmentRef r, String experimentKey) {
         return ExperimentService.fnvHash(r.userId() + ":variant", experimentKey);
     }
+
+    private record Ranked(ExperimentAssignmentRef ref, int hash) {}
 
     private record Leaver(UUID from, UUID assignmentId) {}
 }
