@@ -215,7 +215,7 @@ class TwitchLoginSuccessHandlerTest {
 
         handler.onAuthenticationSuccess(request, response, authToken);
 
-        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/channels/jeb_");
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/channel/jeb_#integrations");
     }
 
     @Test

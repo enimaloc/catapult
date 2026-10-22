@@ -87,11 +87,13 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                 // Only the refresh token needs saving — no login event, no JWT re-issuance.
                 saveRefreshToken(request, authentication, catUser, "xbox", OAuthToken.Provider.XBOX);
 
-                // Send the user back to their channel settings on catapult-web, not the
-                // /dashboard default meant for the primary Twitch login on catapult-api itself.
+                // Send the user back to their channel's integrations tab on catapult-web, where
+                // they started, not the /dashboard default meant for the primary Twitch login on
+                // catapult-api itself.
                 if (webUrl != null && !webUrl.isBlank()) {
                     String channelUrl = UriComponentsBuilder.fromUriString(webUrl)
-                            .path("/channels/{username}")
+                            .path("/channel/{username}")
+                            .fragment("integrations")
                             .buildAndExpand(catUser.getUserAccount().getTwitchUsername())
                             .toUriString();
                     response.sendRedirect(channelUrl);
