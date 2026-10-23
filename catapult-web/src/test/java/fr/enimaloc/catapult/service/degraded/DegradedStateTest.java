@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.degraded;
 
+import fr.enimaloc.catapult.common.dto.DegradedEffectDto;
 import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.event.DegradedStateChangedEvent;
 import fr.enimaloc.catapult.service.ApiService;
@@ -11,6 +12,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,8 +26,11 @@ import static org.mockito.Mockito.when;
 
 class DegradedStateTest {
     private static final String PAGE = "https://s";
-    private static final DegradedStatusDto DEGRADED = new DegradedStatusDto(true, 60, 15);
-    private static final DegradedStatusDto HEALTHY = new DegradedStatusDto(false, null, null);
+    private static final List<DegradedEffectDto> EFFECTS = List.of(
+            new DegradedEffectDto("app.polling.interval-seconds", "60", "30"),
+            new DegradedEffectDto("minecraft.friends-sync-interval-ms", "900000", "300000"));
+    private static final DegradedStatusDto DEGRADED = new DegradedStatusDto(true, EFFECTS);
+    private static final DegradedStatusDto HEALTHY = new DegradedStatusDto(false, null);
 
     private final ApiService api = mock(ApiService.class);
     private final InstatusClient instatus = mock(InstatusClient.class);
@@ -54,13 +59,23 @@ class DegradedStateTest {
     }
 
     @Test
+    void degraded_carriesTheEffects() {
+        when(api.degradedStatus()).thenReturn(DEGRADED);
+        when(instatus.latestIncidentUrl(PAGE)).thenReturn(Optional.empty());
+
+        state.refresh();
+
+        assertThat(state.current().effects()).isEqualTo(DEGRADED.effects());
+    }
+
+    @Test
     void degraded_withIncident_linksTheIncident() {
         when(api.degradedStatus()).thenReturn(DEGRADED);
         when(instatus.latestIncidentUrl(PAGE)).thenReturn(Optional.of("https://s/inc"));
 
         state.refresh();
 
-        assertThat(state.current()).isEqualTo(new DegradedView(true, 60, 15, "https://s/inc", true));
+        assertThat(state.current()).isEqualTo(new DegradedView(true, EFFECTS, "https://s/inc", true));
     }
 
     @Test
@@ -70,7 +85,7 @@ class DegradedStateTest {
 
         state.refresh();
 
-        assertThat(state.current()).isEqualTo(new DegradedView(true, 60, 15, PAGE, false));
+        assertThat(state.current()).isEqualTo(new DegradedView(true, EFFECTS, PAGE, false));
     }
 
     @Test
@@ -80,7 +95,7 @@ class DegradedStateTest {
 
         state.refresh();
 
-        assertThat(state.current()).isEqualTo(new DegradedView(true, 60, 15, null, false));
+        assertThat(state.current()).isEqualTo(new DegradedView(true, EFFECTS, null, false));
         verify(instatus, never()).latestIncidentUrl(anyString());
     }
 
@@ -105,7 +120,7 @@ class DegradedStateTest {
         state.refresh();
 
         verify(publisher, times(1)).publishEvent(
-                new DegradedStateChangedEvent(new DegradedView(true, 60, 15, PAGE, false)));
+                new DegradedStateChangedEvent(new DegradedView(true, EFFECTS, PAGE, false)));
         verify(publisher, times(1)).publishEvent(org.mockito.ArgumentMatchers.any(DegradedStateChangedEvent.class));
     }
 

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.mock;
 
+import fr.enimaloc.catapult.common.dto.DegradedEffectDto;
 import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
@@ -1484,7 +1485,11 @@ public class MockApiService implements ApiService {
     @Override
     public DegradedStatusDto degradedStatus() {
         log.trace("degradedStatus()");
-        return degraded ? new DegradedStatusDto(true, 60, 15) : new DegradedStatusDto(false, null, null);
+        return degraded
+                ? new DegradedStatusDto(true, List.of(
+                        new DegradedEffectDto("app.polling.interval-seconds", "60", "30"),
+                        new DegradedEffectDto("minecraft.friends-sync-interval-ms", "900000", "300000")))
+                : new DegradedStatusDto(false, null);
     }
 
     /** The mock's catapult-api is always up. */
