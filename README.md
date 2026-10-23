@@ -73,11 +73,14 @@ toutes les 15 min, relance des données incomplètes et sondage des retours moin
 l'échantillonnage des traces Sentry à 10 % (clé `catapult.degraded.traces-sample-rate`, qui s'applique même si
 `SENTRY_TRACES_SAMPLE_RATE` est définie). Ses valeurs l'emportent sur les surcharges de configuration de l'admin. `catapult-web`
 affiche alors un bandeau repliable ; avec `INSTATUS_PAGE_URL`, il renvoie aussi vers l'incident en cours sur la page
-de statut. `GET /api/status/degraded` indique l'état courant et les intervalles appliqués ;
+de statut. `GET /api/status/degraded` indique l'état courant et les propriétés que le profil modifie, chacune avec sa valeur normale ;
 il n'est joignable que depuis le réseau interne (`catapult-api` n'est jamais exposée, `catapult-web` l'appelle).
 Une propriété ajoutée au profil `degraded` de `catapult-api` apparaît dans le bandeau dès qu'elle a un libellé
 `degraded.effect.<clé>` (FR et EN, dans `catapult-web/src/main/resources/lang/`), et seulement si sa valeur diffère
-de sa valeur normale.
+de sa valeur normale. Une ligne est aussi masquée quand `<premier segment de la clé>.enabled=false` (par exemple
+`minecraft.enabled` pour `minecraft.*`). La clé doit aussi être présente dans l'`application.properties` de
+`catapult-api` : une valeur normale qui n'existe que comme défaut dans le code (`${x:5}`) ne peut pas être comparée,
+la ligne n'apparaît jamais et un avertissement est journalisé au démarrage.
 
 ## Configuration
 
