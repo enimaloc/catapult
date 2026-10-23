@@ -75,6 +75,9 @@ l'échantillonnage des traces Sentry à 10 % (clé `catapult.degraded.traces-sam
 affiche alors un bandeau repliable ; avec `INSTATUS_PAGE_URL`, il renvoie aussi vers l'incident en cours sur la page
 de statut. `GET /api/status/degraded` indique l'état courant et les intervalles appliqués ;
 il n'est joignable que depuis le réseau interne (`catapult-api` n'est jamais exposée, `catapult-web` l'appelle).
+Une propriété ajoutée au profil `degraded` de `catapult-api` apparaît dans le bandeau dès qu'elle a un libellé
+`degraded.effect.<clé>` (FR et EN, dans `catapult-web/src/main/resources/lang/`), et seulement si sa valeur diffère
+de sa valeur normale.
 
 ## Configuration
 
