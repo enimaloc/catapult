@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.DegradedEffectDto;
 import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.config.DatabaseOverridePropertySource;
 import fr.enimaloc.catapult.config.DegradedMode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.env.PropertySource;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public class DegradedStatusService {
 
@@ -22,6 +24,8 @@ public class DegradedStatusService {
     private final boolean degraded;
     // Key -> value applied by the profile, captured at construction like the @Scheduled annotations they feed.
     private final Map<String, String> applied = new LinkedHashMap<>();
+    // Profile keys defined in no regular source (DB overrides are not loaded yet): never shown in the banner.
+    private final List<String> withoutNormalValue = new ArrayList<>();
 
     public DegradedStatusService(ConfigurableEnvironment env) {
         this.env = env;
@@ -34,7 +38,18 @@ public class DegradedStatusService {
                     }
                 }
             }
+            applied.keySet().stream()
+                    .filter(key -> regularValue(key).isEmpty())
+                    .forEach(withoutNormalValue::add);
+            withoutNormalValue.forEach(key -> log.warn(
+                    "Degraded profile key '{}' has no regular, non-degraded source: it will never be shown in the banner."
+                            + " Define it in application.properties too.", key));
         }
+    }
+
+    /** Profile keys with no normal value to compare against, hence never shown. */
+    List<String> keysWithoutNormalValue() {
+        return List.copyOf(withoutNormalValue);
     }
 
     public DegradedStatusDto status() {
@@ -64,6 +79,11 @@ public class DegradedStatusService {
         if (override.isPresent()) {
             return override.map(env::resolvePlaceholders);
         }
+        return regularValue(key);
+    }
+
+    /** The first regular source defining the key, ignoring the degraded profile and the database overrides. */
+    private Optional<String> regularValue(String key) {
         for (PropertySource<?> source : env.getPropertySources()) {
             // Only concrete origins count: Boot's aggregate source (not enumerable) sits first and
             // delegates to every other source, the degraded one included.
