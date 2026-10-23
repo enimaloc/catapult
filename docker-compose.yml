@@ -10,6 +10,8 @@ services:
       - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY}
       - APP_BASE_URL=${APP_BASE_URL}
       - APP_OWNER_ID=${APP_OWNER_ID}
+      # Empty = no profile; "degraded" on the backup server
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID}
       - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET}
       - STEAM_API_KEY=${STEAM_API_KEY}
@@ -48,6 +50,8 @@ services:
     environment:
       - CATAPULT_API_URL=${CATAPULT_API_URL:-http://catapult-api:8080}
       - REDIS_HOST=catapult-redis
+      # Empty = no profile; "degraded" on the backup server
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # Empty = Sentry off
       - SENTRY_DSN=${SENTRY_DSN:-}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-1.0}
