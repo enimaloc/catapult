@@ -39,9 +39,16 @@ public class SentryConfig {
     /**
      * A trace the browser started (it sends sentry-trace with its fetches) goes on as it decided;
      * other requests are traced at {@code sentry.traces-sample-rate}, but for the {@link #UNTRACED}.
+     * The degraded profile's {@code catapult.degraded.traces-sample-rate}, when set, caps that rate: it is a
+     * key of its own because {@code SENTRY_TRACES_SAMPLE_RATE}, which compose always sets, would win over a
+     * profile's {@code sentry.traces-sample-rate}.
      */
     @Bean
-    SentryOptions.TracesSamplerCallback tracesSampler(@Value("${sentry.traces-sample-rate:1.0}") double rate) {
+    SentryOptions.TracesSamplerCallback tracesSampler(
+            @Value("${sentry.traces-sample-rate:1.0}") double rate,
+            @Value("${catapult.degraded.traces-sample-rate:-1}") double degradedRate) {
+        // Negative = the degraded profile is off
+        double tracedRate = degradedRate >= 0 ? Math.min(rate, degradedRate) : rate;
         return context -> {
             if (context.getCustomSamplingContext() != null
                     && context.getCustomSamplingContext().get("request") instanceof HttpServletRequest request
@@ -49,7 +56,7 @@ public class SentryConfig {
                 return 0.0;
             }
             Boolean parentSampled = context.getTransactionContext().getParentSampled();
-            return parentSampled != null ? (parentSampled ? 1.0 : 0.0) : rate;
+            return parentSampled != null ? (parentSampled ? 1.0 : 0.0) : tracedRate;
         };
     }
 }
