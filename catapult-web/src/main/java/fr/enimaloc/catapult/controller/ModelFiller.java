@@ -8,6 +8,8 @@ import fr.enimaloc.catapult.dto.index.FeatureDto;
 import fr.enimaloc.catapult.dto.index.PlatformDto;
 import fr.enimaloc.catapult.dto.index.SpaPage;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.degraded.DegradedState;
+import fr.enimaloc.catapult.service.degraded.DegradedView;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
@@ -61,6 +63,7 @@ public class ModelFiller {
     private final ApiService apiService;
     private final TwitchatEventForms twitchatEventForms;
     private final ObjectProvider<SiteMetaTags> siteMetaTags;
+    private final ObjectProvider<DegradedState> degradedState;
 
     public void defaultAttr(Model model, String page) {
         model.addAttribute("app", APP_MODEL);
@@ -69,8 +72,8 @@ public class ModelFiller {
 
     /**
      * Full-page variant: also the head's {@link Seo} and admin-configured meta tags, the localized
-     * titles spa.js swaps in on client-side navigation, and the navbar's login and admin states (its
-     * channels come after, see {@link #navChannels(Model)}).
+     * titles spa.js swaps in on client-side navigation, the degraded banner's {@link DegradedView}, and the
+     * navbar's login and admin states (its channels come after, see {@link #navChannels(Model)}).
      */
     public void defaultAttr(Model model, String page, Locale locale) {
         defaultAttr(model, page);
@@ -78,9 +81,17 @@ public class ModelFiller {
         model.addAttribute("seo", seo(model, page == null ? "" : page, locale));
         SiteMetaTags metaTags = siteMetaTags.getIfAvailable();
         model.addAttribute("metaTags", metaTags == null ? List.of() : metaTags.tags());
+        model.addAttribute("degraded", degradedView());
         model.addAttribute("loggedIn", ApiClient.hasSession());
         model.addAttribute("admin", isAdmin());
         model.addAttribute("impersonatedLogin", impersonatedLogin());
+    }
+
+    /** What the degraded banner shows; not degraded without a {@link DegradedState} (or a view from it). */
+    private DegradedView degradedView() {
+        DegradedState state = degradedState.getIfAvailable();
+        DegradedView view = state == null ? null : state.current();
+        return view == null ? DegradedView.NONE : view;
     }
 
     /**

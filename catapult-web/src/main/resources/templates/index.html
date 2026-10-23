@@ -107,6 +107,7 @@
     </div>
 
     <div th:replace="~{fragments/broadcasts :: banner}"></div>
+    <div th:replace="~{fragments/degraded :: banner}"></div>
 
     <mdui-linear-progress id="nav-progress" hidden></mdui-linear-progress>
 
@@ -157,6 +158,7 @@
 <script src="/js/time.js"></script>
 <script src="/js/spa.js"></script>
 <script src="/js/broadcasts.js"></script>
+<script src="/js/degraded.js"></script>
 <script src="/js/help.js"></script>
 <script th:if="${loggedIn}" src="/js/notifications.js"></script>
 <script th:if="${loggedIn}" src="/js/notification-channels.js"></script>

@@ -1,0 +1,27 @@
+<!--/* catapult-api's degraded mode (DegradedState): folded to its title and where to read why, unfolded to what
+     runs slower. Rendered from the model, then kept up to date by degraded.js; its texts are labels, the JS has none. */-->
+<div id="degraded-banner" class="degraded-banner" th:fragment="banner" role="status"
+     th:hidden="${!degraded.degraded}"
+     th:attr="data-label-game=#{degraded.effect.game('{0}')},data-label-minecraft=#{degraded.effect.minecraft('{0}')},data-label-incident=#{degraded.link.incident},data-label-status=#{degraded.link.status}">
+    <details class="degraded-banner-details">
+        <summary>
+            <mdui-icon name="speed"></mdui-icon>
+            <strong th:text="#{degraded.title}">degraded.title</strong>
+            <span class="degraded-banner-toggle"><span th:text="#{degraded.details}">degraded.details</span>
+                <mdui-icon name="expand_more" class="degraded-banner-chevron"></mdui-icon></span>
+        </summary>
+        <ul class="degraded-banner-effects">
+            <li data-degraded-line="game" th:hidden="${degraded.gameDetectionIntervalSeconds == null}"
+                th:text="${degraded.gameDetectionIntervalSeconds == null} ? '' : #{degraded.effect.game(${degraded.gameDetectionIntervalSeconds})}"></li>
+            <li data-degraded-line="minecraft" th:hidden="${degraded.minecraftFriendsSyncMinutes == null}"
+                th:text="${degraded.minecraftFriendsSyncMinutes == null} ? '' : #{degraded.effect.minecraft(${degraded.minecraftFriendsSyncMinutes})}"></li>
+            <li data-degraded-line="rest" th:text="#{degraded.effect.rest}">degraded.effect.rest</li>
+        </ul>
+    </details>
+    <!--/* Out of the details, to be seen folded; out of the summary too, where it would also fold the banner. */-->
+    <a data-degraded-link class="degraded-banner-link" target="_blank" rel="noopener noreferrer"
+       th:attr="href=${degraded.link}" th:hidden="${degraded.link == null}"
+       th:text="${degraded.incident} ? #{degraded.link.incident} : #{degraded.link.status}">degraded.link.status</a>
+    <mdui-button-icon icon="close" data-degraded-dismiss
+                      th:attr="aria-label=#{degraded.dismiss}"></mdui-button-icon>
+</div>
