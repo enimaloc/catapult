@@ -65,11 +65,16 @@ INSTATUS_PAGE_URL=https://votre-page.instatus.com   # page de statut Instatus, o
 CATAPULT_WEB_REPLICAS=1                             # une seule instance de catapult-web
 ```
 
+`docker-compose.yml` transmet `SPRING_PROFILES_ACTIVE` et `INSTATUS_PAGE_URL` aux conteneurs (vides par défaut :
+aucun profil, pas de lien).
+
 Le profil espace les boucles de fond (détection de jeu toutes les 60 s, synchronisation des amis Minecraft
-toutes les 15 min, relance des données incomplètes et sondage des retours moins fréquents) et réduit
-l'échantillonnage Sentry. Ses valeurs l'emportent sur les surcharges de configuration de l'admin. `catapult-web`
+toutes les 15 min, relance des données incomplètes et sondage des retours moins fréquents) et plafonne
+l'échantillonnage des traces Sentry à 10 % (clé `catapult.degraded.traces-sample-rate`, qui s'applique même si
+`SENTRY_TRACES_SAMPLE_RATE` est définie). Ses valeurs l'emportent sur les surcharges de configuration de l'admin. `catapult-web`
 affiche alors un bandeau repliable ; avec `INSTATUS_PAGE_URL`, il renvoie aussi vers l'incident en cours sur la page
-de statut. `GET /api/status/degraded` indique l'état courant et les intervalles appliqués.
+de statut. `GET /api/status/degraded` indique l'état courant et les intervalles appliqués ;
+il n'est joignable que depuis le réseau interne (`catapult-api` n'est jamais exposée, `catapult-web` l'appelle).
 
 ## Configuration
 
