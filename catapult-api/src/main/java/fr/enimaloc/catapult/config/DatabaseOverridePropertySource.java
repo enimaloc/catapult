@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.config;
 import org.springframework.core.env.EnumerablePropertySource;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,6 +25,11 @@ public class DatabaseOverridePropertySource extends EnumerablePropertySource<Map
     @Override
     public Object getProperty(String name) {
         return pinned.contains(name) ? null : source.get(name);
+    }
+
+    /** The stored override for the key, whether a pinned profile value hides it or not. */
+    public Optional<String> override(String key) {
+        return Optional.ofNullable(source.get(key)).map(Object::toString);
     }
 
     public void put(String key, String value) {
