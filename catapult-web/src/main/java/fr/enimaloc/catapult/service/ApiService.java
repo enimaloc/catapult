@@ -417,6 +417,8 @@ public interface ApiService {
     int steamDisconnect();
     /** catapult-api's public changelog, newest version first; null when it can't give it. */
     List<fr.enimaloc.catapult.dto.changelog.ChangelogSection> changelog();
+    /** Whether catapult-api runs degraded, with the intervals it applies; null when it can't say. */
+    DegradedStatusDto degradedStatus();
     /** Whether catapult-api answers and reports itself up (its health, asked without the session's bearer). */
     boolean apiAvailable();
 }
