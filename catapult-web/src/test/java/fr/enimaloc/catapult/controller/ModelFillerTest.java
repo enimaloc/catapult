@@ -12,6 +12,8 @@ import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.twitchat.TwitchatCatalog;
 import fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.degraded.DegradedState;
+import fr.enimaloc.catapult.service.degraded.DegradedView;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,13 +50,17 @@ class ModelFillerTest {
     private final ApiService api = mock(ApiService.class);
     private final StaticMessageSource messages = new StaticMessageSource();
     private final SiteMetaTags siteMetaTags = mock(SiteMetaTags.class);
+    /** No DegradedState unless a test gives one (getIfAvailable answers null). */
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<DegradedState> degradedState = mock(ObjectProvider.class);
     private ExtendedModelMap model;
 
     private ModelFiller filler(Optional<BuildProperties> buildProperties) {
         @SuppressWarnings("unchecked")
         ObjectProvider<SiteMetaTags> metaTags = mock(ObjectProvider.class);
         when(metaTags.getIfAvailable()).thenReturn(siteMetaTags);
-        return new ModelFiller(buildProperties, messages, api, new TwitchatEventForms(TwitchatCatalog.load()), metaTags);
+        return new ModelFiller(buildProperties, messages, api, new TwitchatEventForms(TwitchatCatalog.load()), metaTags,
+                degradedState);
     }
 
     private ModelFiller filler() {
@@ -93,6 +99,22 @@ class ModelFillerTest {
 
         filler().defaultAttr(model, "", Locale.FRENCH);
         assertThat(model.get("metaTags")).isEqualTo(List.of(tag));
+    }
+
+    @Test
+    void defaultAttr_withLocale_addsTheDegradedView_notDegradedWithoutOne() {
+        filler().defaultAttr(model, "", Locale.FRENCH);
+        assertThat(model.get("degraded")).isEqualTo(DegradedView.NONE);
+
+        DegradedState state = mock(DegradedState.class);
+        when(degradedState.getIfAvailable()).thenReturn(state);
+        filler().defaultAttr(model, "", Locale.FRENCH);
+        assertThat(model.get("degraded")).as("a state without a view yet").isEqualTo(DegradedView.NONE);
+
+        DegradedView view = new DegradedView(true, 60, 15, null, false);
+        when(state.current()).thenReturn(view);
+        filler().defaultAttr(model, "", Locale.FRENCH);
+        assertThat(model.get("degraded")).isEqualTo(view);
     }
 
     @Test
