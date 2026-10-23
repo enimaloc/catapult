@@ -2,16 +2,20 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
+import fr.enimaloc.catapult.event.DegradedStateChangedEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
 import fr.enimaloc.catapult.event.notification.BroadcastStreamEvent;
 import fr.enimaloc.catapult.event.notification.NotificationStreamEvent;
 import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.degraded.DegradedState;
+import fr.enimaloc.catapult.service.degraded.DegradedView;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -56,6 +60,7 @@ class NavEventStreamControllerTest {
     @Autowired BroadcastState broadcastState;
     @Autowired SseStreams sse;
     @MockitoBean ApiService apiService;
+    @MockitoBean DegradedState degradedState;
 
     private static final Instant STARTS_AT = Instant.now().plus(Duration.ofHours(1));
 
@@ -116,6 +121,11 @@ class NavEventStreamControllerTest {
     /** The last stream opened can no longer be written to, as once its client has gone. */
     private void breakLastStream() throws IOException {
         doThrow(new IOException("gone")).when(spied.getLast()).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @BeforeEach
+    void notDegraded() {
+        when(degradedState.current()).thenReturn(DegradedView.NONE);
     }
 
     @AfterEach
@@ -322,9 +332,36 @@ class NavEventStreamControllerTest {
     }
 
     @Test
+    void aNewStream_getsTheDegradedState() throws Exception {
+        when(degradedState.current()).thenReturn(new DegradedView(true, 60, 15, "https://s/inc", true));
+
+        String sent = sent(anonymous("1.2.3.20"));
+
+        assertThat(sent).contains("event:Degraded").contains("\"link\":\"https://s/inc\"");
+    }
+
+    @Test
+    void aNewStream_getsTheDegradedState_evenWhenNotDegraded() throws Exception {
+        String sent = sent(memberStream(loggedIn(), UUID.randomUUID()));
+
+        assertThat(sent).contains("event:Degraded").contains("\"degraded\":false");
+    }
+
+    @Test
+    void aDegradedStateChange_reachesEveryStream() throws Exception {
+        MvcResult member = memberStream(loggedIn(), UUID.randomUUID());
+        MvcResult visitor = anonymous("1.2.3.21");
+
+        controller.onDegraded(new DegradedStateChangedEvent(new DegradedView(true, 60, 15, "https://s/inc", true)));
+
+        assertThat(sent(member)).contains("\"degraded\":true");
+        assertThat(sent(visitor)).contains("\"degraded\":true");
+    }
+
+    @Test
     void aNewStream_getsAHeartbeatAtOnce_soThatItsHeadersGoOutAndThePageSeesItOpen() throws Exception {
-        assertThat(sent(anonymous("1.2.3.12"))).isEqualTo(":open\n\n");
-        assertThat(sent(memberStream(loggedIn(), UUID.randomUUID()))).isEqualTo(":open\n\n");
+        assertThat(sent(anonymous("1.2.3.12"))).startsWith(":open\n\n");
+        assertThat(sent(memberStream(loggedIn(), UUID.randomUUID()))).startsWith(":open\n\n");
     }
 
     @Test
