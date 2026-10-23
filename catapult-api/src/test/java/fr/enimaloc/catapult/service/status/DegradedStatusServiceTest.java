@@ -77,6 +77,16 @@ class DegradedStatusServiceTest {
     }
 
     @Test
+    void keyWithoutRegularSource_isFlaggedAsNeverShown() {
+        Map<String, Object> profile = new LinkedHashMap<>();
+        profile.put("code.default-only", "60");
+        profile.put("in.base", "60");
+
+        assertThat(degraded(profile, Map.of("in.base", "30")).keysWithoutNormalValue())
+                .containsExactly("code.default-only");
+    }
+
+    @Test
     void unchangedValue_hidesTheEffect() {
         assertThat(degraded(Map.of("x", "5"), Map.of("x", "5")).status().effects()).isEmpty();
     }
