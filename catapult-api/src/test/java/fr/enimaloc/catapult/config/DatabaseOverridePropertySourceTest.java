@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.config;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,5 +68,18 @@ class DatabaseOverridePropertySourceTest {
         src.pin(Set.of("app.polling.interval-seconds"));
 
         assertThat(src.ignores("app.polling.interval-seconds")).isFalse();
+    }
+
+    @Test
+    void override_returnsTheRawValue_pinnedOrNot() {
+        DatabaseOverridePropertySource src = new DatabaseOverridePropertySource();
+        src.put("pinned", "30");
+        src.put("free", "40");
+        src.pin(Set.of("pinned"));
+
+        assertThat(src.override("pinned")).isEqualTo(Optional.of("30"));
+        assertThat(src.getProperty("pinned")).isNull();
+        assertThat(src.override("free")).isEqualTo(Optional.of("40"));
+        assertThat(src.override("missing")).isEmpty();
     }
 }
