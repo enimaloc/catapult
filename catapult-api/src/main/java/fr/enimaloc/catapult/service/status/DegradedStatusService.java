@@ -65,7 +65,11 @@ public class DegradedStatusService {
             return override.map(env::resolvePlaceholders);
         }
         for (PropertySource<?> source : env.getPropertySources()) {
-            if (DatabaseOverridePropertySource.NAME.equals(source.getName()) || DegradedMode.isDegradedSource(source.getName())) {
+            // Only concrete origins count: Boot's aggregate source (not enumerable) sits first and
+            // delegates to every other source, the degraded one included.
+            if (!(source instanceof EnumerablePropertySource<?>)
+                    || DatabaseOverridePropertySource.NAME.equals(source.getName())
+                    || DegradedMode.isDegradedSource(source.getName())) {
                 continue;
             }
             Object raw = source.getProperty(key);

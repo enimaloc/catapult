@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.config.DatabaseOverridePropertySource;
 import fr.enimaloc.catapult.config.DegradedMode;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
 
@@ -61,6 +62,18 @@ class DegradedStatusServiceTest {
         assertThat(degraded(Map.of("app.polling.interval-seconds", "60"), Map.of("app.polling.interval-seconds", "30"))
                 .status().effects())
                 .containsExactly(new DegradedEffectDto("app.polling.interval-seconds", "60", "30"));
+    }
+
+    @Test
+    void normalValue_ignoresSpringBootsAggregateSource() {
+        StandardEnvironment env = new StandardEnvironment();
+        env.getPropertySources().addFirst(new MapPropertySource(BASE_SOURCE, Map.of("k", "30")));
+        env.getPropertySources().addFirst(new MapPropertySource(PROFILE_SOURCE, Map.of("k", "60")));
+        env.setActiveProfiles(DegradedMode.PROFILE);
+        ConfigurationPropertySources.attach(env); // puts "configurationProperties" first, as a real boot does
+
+        assertThat(new DegradedStatusService(env).status().effects())
+                .containsExactly(new DegradedEffectDto("k", "60", "30"));
     }
 
     @Test
