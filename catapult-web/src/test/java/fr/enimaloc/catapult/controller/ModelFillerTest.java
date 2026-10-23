@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.twitchat.TwitchatCatalog;
 import fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.degraded.DegradedLabels;
 import fr.enimaloc.catapult.service.degraded.DegradedState;
 import fr.enimaloc.catapult.service.degraded.DegradedView;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -53,6 +54,9 @@ class ModelFillerTest {
     /** No DegradedState unless a test gives one (getIfAvailable answers null). */
     @SuppressWarnings("unchecked")
     private final ObjectProvider<DegradedState> degradedState = mock(ObjectProvider.class);
+    /** No DegradedLabels unless a test gives them (getIfAvailable answers null). */
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<DegradedLabels> degradedLabels = mock(ObjectProvider.class);
     private ExtendedModelMap model;
 
     private ModelFiller filler(Optional<BuildProperties> buildProperties) {
@@ -60,7 +64,7 @@ class ModelFillerTest {
         ObjectProvider<SiteMetaTags> metaTags = mock(ObjectProvider.class);
         when(metaTags.getIfAvailable()).thenReturn(siteMetaTags);
         return new ModelFiller(buildProperties, messages, api, new TwitchatEventForms(TwitchatCatalog.load()), metaTags,
-                degradedState);
+                degradedState, degradedLabels);
     }
 
     private ModelFiller filler() {
@@ -111,10 +115,21 @@ class ModelFillerTest {
         filler().defaultAttr(model, "", Locale.FRENCH);
         assertThat(model.get("degraded")).as("a state without a view yet").isEqualTo(DegradedView.NONE);
 
-        DegradedView view = new DegradedView(true, 60, 15, null, false);
+        DegradedView view = new DegradedView(true, List.of(), null, false);
         when(state.current()).thenReturn(view);
         filler().defaultAttr(model, "", Locale.FRENCH);
         assertThat(model.get("degraded")).isEqualTo(view);
+    }
+
+    @Test
+    void defaultAttr_withLocale_addsTheDegradedLabels_noneWithoutThem() {
+        filler().defaultAttr(model, "", Locale.FRENCH);
+        assertThat(model.get("degradedLabels")).isEqualTo(Map.of());
+
+        when(degradedLabels.getIfAvailable()).thenReturn(new DegradedLabels("lang/messages"));
+        filler().defaultAttr(model, "", Locale.FRENCH);
+        assertThat(model.get("degradedLabels")).asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("app.polling.interval-seconds", "Le changement de catégorie peut prendre jusqu'à {0}");
     }
 
     @Test

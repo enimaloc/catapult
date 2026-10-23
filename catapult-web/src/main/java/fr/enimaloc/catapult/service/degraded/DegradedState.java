@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.degraded;
 
+import fr.enimaloc.catapult.common.dto.DegradedEffectDto;
 import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.event.DegradedStateChangedEvent;
 import fr.enimaloc.catapult.service.ApiService;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Follows catapult-api's degraded mode in the background, and the Instatus incident that explains it.
@@ -82,8 +84,8 @@ public class DegradedState {
             }
         }
         String link = incidentUrl != null ? incidentUrl : hasPage ? pageUrl : null;
-        return new DegradedView(true, status.gameDetectionIntervalSeconds(), status.minecraftFriendsSyncMinutes(),
-                link, incidentUrl != null);
+        List<DegradedEffectDto> effects = status.effects() == null ? List.of() : status.effects();
+        return new DegradedView(true, effects, link, incidentUrl != null);
     }
 
     private DegradedView leaveDegraded() {
