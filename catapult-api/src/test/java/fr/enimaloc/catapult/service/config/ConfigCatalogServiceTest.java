@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.config;
 
+import fr.enimaloc.catapult.config.DatabaseOverridePropertySource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.env.MapPropertySource;
@@ -7,6 +8,7 @@ import org.springframework.mock.env.MockEnvironment;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -82,5 +84,20 @@ class ConfigCatalogServiceTest {
                         tuple("steam.api-keys", true),
                         tuple("app.gitlab-token", true)
                 );
+    }
+
+    @Test
+    void anOverrideIgnoredByTheProfile_isFlagged() {
+        DatabaseOverridePropertySource overrides = new DatabaseOverridePropertySource();
+        overrides.put("app.foo", "9");
+        overrides.pin(Set.of("app.foo"));
+        env.getPropertySources().addFirst(overrides);
+
+        ConfigEntry entry = service.catalog().stream()
+                .filter(e -> e.key().equals("app.foo")).findFirst().orElseThrow();
+
+        assertThat(entry.ignoredByProfile()).isTrue();
+        assertThat(entry.overridden()).isFalse();
+        assertThat(entry.value()).isEqualTo("1");
     }
 }
