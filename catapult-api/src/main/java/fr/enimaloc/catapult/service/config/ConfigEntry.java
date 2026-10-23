@@ -7,5 +7,6 @@ public record ConfigEntry(
         boolean restartRequired,
         boolean overridden,
         boolean taboo,
+        boolean ignoredByProfile,
         String source
 ) {}
