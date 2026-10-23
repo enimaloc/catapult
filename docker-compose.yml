@@ -51,6 +51,8 @@ services:
       # Empty = Sentry off
       - SENTRY_DSN=${SENTRY_DSN:-}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-1.0}
+      # Empty = no link to the status page in the degraded banner
+      - INSTATUS_PAGE_URL=${INSTATUS_PAGE_URL:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8092/actuator/health || exit 1"]
       interval: 10s
