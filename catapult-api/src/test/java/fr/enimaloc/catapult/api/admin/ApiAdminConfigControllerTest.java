@@ -60,7 +60,7 @@ class ApiAdminConfigControllerTest {
     @WithMockUser(roles = "ADMIN")
     void getCatalog_returnsEntries() throws Exception {
         when(catalogService.catalog()).thenReturn(List.of(
-                new ConfigEntry("app.foo", "1", false, false, false, false, "properties")
+                new ConfigEntry("app.foo", "1", false, false, false, false, false, "properties")
         ));
         mvc.perform(get("/api/admin/config"))
                 .andExpect(status().isOk())
