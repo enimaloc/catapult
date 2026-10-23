@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.real;
 
+import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.AppConfigResponse;
@@ -1049,6 +1050,12 @@ public class RealApiService implements ApiService {
     public List<ChangelogSection> changelog() {
         ApiClient.Result<ChangelogSection[]> result = client.getAnonymous("/api/changelog", ChangelogSection[].class);
         return result.ok() && result.body() != null ? List.of(result.body()) : null;
+    }
+
+    @Override
+    public DegradedStatusDto degradedStatus() {
+        ApiClient.Result<DegradedStatusDto> result = client.getAnonymous("/api/status/degraded", DegradedStatusDto.class);
+        return result.ok() ? result.body() : null;
     }
 
     @Override
