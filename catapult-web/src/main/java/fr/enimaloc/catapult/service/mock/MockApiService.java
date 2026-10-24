@@ -525,7 +525,8 @@ public class MockApiService implements ApiService {
                 new ChannelEvents.Settings.NoGame(s.noGameTwitchGameId(), s.noGameTwitchGameName(), s.noGameCcls(),
                         s.applyDefaultOnStreamStart(), s.applyDefaultOnNoGame(), s.applyDefaultOnStreamEnd()),
                 new ChannelEvents.Settings.IncompleteFallback(s.incompleteFallbackTwitchGameId(),
-                        s.incompleteFallbackTwitchGameName(), s.incompleteFallbackCcls()))));
+                        s.incompleteFallbackTwitchGameName(), s.incompleteFallbackCcls()),
+                new ChannelEvents.Settings.Raid(s.raidRestoreGameMinutes()))));
     }
 
     @Override
@@ -558,6 +559,18 @@ public class MockApiService implements ApiService {
         log.trace("saveNoGameSettings({}, {}, {}, {}, {}, {}, {})", username, twitchGameId, twitchGameName,
                 ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
         currentData().saveNoGameSettings(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
+        publishSettings(username);
+        return NO_CONTENT;
+    }
+
+    /** Validated like catapult-api: 1..120 minutes, null or 0 for off, else 400. */
+    @Override
+    public int saveRaidSettings(String username, Integer restoreGameMinutes) {
+        log.trace("saveRaidSettings({}, {})", username, restoreGameMinutes);
+        if (restoreGameMinutes != null && restoreGameMinutes != 0 && (restoreGameMinutes < 1 || restoreGameMinutes > 120)) {
+            return 400;
+        }
+        currentData().saveRaidSettings(restoreGameMinutes == null || restoreGameMinutes == 0 ? null : restoreGameMinutes);
         publishSettings(username);
         return NO_CONTENT;
     }

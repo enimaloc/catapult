@@ -210,7 +210,8 @@ public class MockData {
                 config.settings.cclFeatureEnabled, Set.copyOf(config.settings.blockedCcls),
                 null, null, Set.of(), false, false, false,
                 null, null, Set.of(),
-                AVAILABLE_CCLS, config.settings.twFeatureEnabled, Set.copyOf(config.settings.blockedTws), AVAILABLE_TWS);
+                AVAILABLE_CCLS, config.settings.twFeatureEnabled, Set.copyOf(config.settings.blockedTws), AVAILABLE_TWS,
+                null, true);
 
         MockConfig.Steam steam = config.steam;
         MockData data = new MockData(channel, List.of(binding), settings, List.of(),
@@ -383,6 +384,10 @@ public class MockData {
         userSettingsDto = SettingsCopy.of(userSettingsDto)
                 .noGame(twitchGameId, twitchGameName, Set.copyOf(ccls), applyOnStreamStart, applyOnNoGame, applyOnStreamEnd)
                 .build();
+    }
+
+    public void saveRaidSettings(Integer restoreGameMinutes) {
+        userSettingsDto = SettingsCopy.of(userSettingsDto).raid(restoreGameMinutes).build();
     }
 
     public void saveIncompleteFallbackSettings(String twitchGameId, String twitchGameName, Set<String> ccls) {
@@ -699,6 +704,7 @@ public class MockData {
         private Set<String> fallbackCcls;
         private boolean twEnabled;
         private Set<String> blockedTws;
+        private Integer raidMinutes;
 
         private SettingsCopy(UserSettingsDto from) {
             this.from = from;
@@ -715,6 +721,7 @@ public class MockData {
             this.fallbackCcls = from.incompleteFallbackCcls();
             this.twEnabled = from.twFeatureEnabled();
             this.blockedTws = from.blockedTws();
+            this.raidMinutes = from.raidRestoreGameMinutes();
         }
 
         static SettingsCopy of(UserSettingsDto from) {
@@ -744,6 +751,11 @@ public class MockData {
             return this;
         }
 
+        SettingsCopy raid(Integer minutes) {
+            this.raidMinutes = minutes;
+            return this;
+        }
+
         SettingsCopy incompleteFallback(String id, String name, Set<String> ccls) {
             this.fallbackId = id;
             this.fallbackName = name;
@@ -754,7 +766,8 @@ public class MockData {
         UserSettingsDto build() {
             return new UserSettingsDto(cclEnabled, blockedCcls, noGameId, noGameName, noGameCcls,
                     applyOnStreamStart, applyOnNoGame, applyOnStreamEnd, fallbackId, fallbackName, fallbackCcls,
-                    from.availableCcls(), twEnabled, blockedTws, from.availableTws());
+                    from.availableCcls(), twEnabled, blockedTws, from.availableTws(),
+                    raidMinutes, from.raidRestoreGameAvailable());
         }
     }
 }

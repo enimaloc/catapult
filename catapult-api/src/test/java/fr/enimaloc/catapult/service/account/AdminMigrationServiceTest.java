@@ -64,6 +64,7 @@ class AdminMigrationServiceTest {
         src.setApplyDefaultOnStreamStart(false);
         src.setApplyDefaultOnNoGame(false);
         src.setApplyDefaultOnStreamEnd(false);
+        src.setRaidRestoreGameMinutes(25);
 
         UserSettings tgt = new UserSettings();
         tgt.setUser(target);
@@ -86,6 +87,7 @@ class AdminMigrationServiceTest {
         assertThat(saved.isApplyDefaultOnStreamStart()).isFalse();
         assertThat(saved.isApplyDefaultOnNoGame()).isFalse();
         assertThat(saved.isApplyDefaultOnStreamEnd()).isFalse();
+        assertThat(saved.getRaidRestoreGameMinutes()).isEqualTo(25);
     }
 
     @Test

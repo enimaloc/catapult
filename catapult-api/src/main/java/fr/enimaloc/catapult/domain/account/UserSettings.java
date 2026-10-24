@@ -81,4 +81,11 @@ public class UserSettings {
 
     @Column(name = "apply_default_on_stream_end", nullable = false)
     private boolean applyDefaultOnStreamEnd = true;
+
+    /**
+     * On an outgoing raid, how recently (minutes, 1..120) a game must have been detected to be put back as
+     * the category, so the raid doesn't leave from the "no game" one; null: off.
+     */
+    @Column(name = "raid_restore_game_minutes")
+    private Integer raidRestoreGameMinutes;
 }

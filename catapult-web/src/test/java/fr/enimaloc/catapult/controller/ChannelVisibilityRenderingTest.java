@@ -57,7 +57,7 @@ class ChannelVisibilityRenderingTest {
     void stubSettingsAndDtddMapping() {
         lenient().when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
                 false, Set.of(), null, null, Set.of(), false, false, false,
-                null, null, Set.of(), List.of(), false, Set.of(), List.of()));
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, false));
         lenient().when(apiService.dtddMappingStatus(any())).thenReturn(new DtddMappingStatusDto(null, null, false, null));
     }
 
@@ -295,6 +295,43 @@ class ChannelVisibilityRenderingTest {
             assertThat(countOccurrences(html, "data-help=\"" + card + "\"")).as(card).isEqualTo(1);
         }
         assertThat(html).contains("icon=\"help_outline\"");
+    }
+
+    @Test
+    void raidCard_onlyWhenTheExperimentOffersIt() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(false));
+        when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
+                false, Set.of(), null, null, Set.of(), false, false, false,
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), 20, true));
+
+        String offered = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(offered).contains("id=\"channel-raid-settings-form\"", "id=\"raid-settings-save-btn\"");
+        assertThat(openingTagForId(offered, "raid-restore-enabled")).contains("checked");
+        assertThat(openingTagForId(offered, "raid-restore-minutes")).contains("value=\"20\"", "min=\"1\"", "max=\"120\"");
+
+        when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
+                false, Set.of(), null, null, Set.of(), false, false, false,
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), 20, false));
+        String hidden = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(hidden).contains("id=\"channel-ccl-settings-form\"").doesNotContain("channel-raid-settings-form");
+    }
+
+    @Test
+    void raidCard_offSuggestsFifteenMinutes() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(false));
+        when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
+                false, Set.of(), null, null, Set.of(), false, false, false,
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, true));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(openingTagForId(html, "raid-restore-enabled")).doesNotContain("checked");
+        assertThat(openingTagForId(html, "raid-restore-minutes")).contains("value=\"15\"", "disabled");
     }
 
     private ChannelPageData channelPageData(boolean isLive) {

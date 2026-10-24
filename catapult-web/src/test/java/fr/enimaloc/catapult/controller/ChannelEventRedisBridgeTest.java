@@ -114,7 +114,7 @@ class ChannelEventRedisBridgeTest {
                 new ChannelEvents.BindingDeleted(owner.toString(), "streamer", "b1"))))
                 .containsExactly(new BindingDeletedEvent("streamer", "b1"));
         ChannelEvents.Settings settings = new ChannelEvents.Settings(new ChannelEvents.Settings.Ccl(true, Set.of()),
-                new ChannelEvents.Settings.Tw(false, Set.of()), null, null);
+                new ChannelEvents.Settings.Tw(false, Set.of()), null, null, null);
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SETTINGS_UPDATED,
                 new ChannelEvents.SettingsUpdated(owner.toString(), "streamer", settings))))
                 .containsExactly(new ChannelSettingsUpdatedEvent("streamer", settings));

@@ -316,7 +316,7 @@ class MockDataTest {
             assertThat(settings).isEqualTo(new UserSettingsDto(false, Set.of("Gore"),
                     "1", "Just Chatting", Set.of("Drugs"), true, false, true,
                     "2", "Other", Set.of("Gambling"),
-                    MockPresets.AVAILABLE_CCLS, true, Set.of("spiders"), MockPresets.AVAILABLE_TWS));
+                    MockPresets.AVAILABLE_CCLS, true, Set.of("spiders"), MockPresets.AVAILABLE_TWS, null, true));
         }
     }
 

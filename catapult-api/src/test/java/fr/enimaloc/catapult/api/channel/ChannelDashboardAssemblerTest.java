@@ -36,6 +36,7 @@ import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
@@ -91,6 +92,7 @@ class ChannelDashboardAssemblerTest {
     private final MinecraftLinkStateService minecraftStates =
             new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
+    private final RaidRestoreGateService raidRestoreGate = mock(RaidRestoreGateService.class);
 
     private UserAccount owner;
     private UserAccount moderator;
@@ -101,7 +103,7 @@ class ChannelDashboardAssemblerTest {
         SteamProfileDiagnostics diagnostics = new SteamProfileDiagnostics(steamClient, Optional.of(keyRotator), encryption);
         ChannelDashboardAssembler assembler = new ChannelDashboardAssembler(bindings, settingsRepository, streamState,
                 gameState, ccls, tws, encryption, steamClient, diagnostics, igdb, dtddMappings, dtddCache,
-                dtddProposals, oauthTokens, backdoor, minecraftService, twitchat);
+                dtddProposals, oauthTokens, backdoor, minecraftService, twitchat, raidRestoreGate);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -532,6 +534,23 @@ class ChannelDashboardAssemblerTest {
 
             assertThat(dto.cclFeatureEnabled()).isEqualTo(defaults.isCclFeatureEnabled());
             assertThat(dto.twFeatureEnabled()).isEqualTo(defaults.isTwFeatureEnabled());
+            assertThat(dto.raidRestoreGameMinutes()).isNull();
+        }
+
+        @Test
+        void raidRestore_isOfferedOnlyWhileTheExperimentIsOnForTheChannel() {
+            UserSettings saved = new UserSettings();
+            saved.setRaidRestoreGameMinutes(15);
+            when(settingsRepository.findById(owner.getId())).thenReturn(Optional.of(saved));
+
+            when(raidRestoreGate.isAvailableFor(owner)).thenReturn(true);
+            UserSettingsDto on = assembler().settings(owner);
+            when(raidRestoreGate.isAvailableFor(owner)).thenReturn(false);
+            UserSettingsDto off = assembler().settings(owner);
+
+            assertThat(on.raidRestoreGameAvailable()).isTrue();
+            assertThat(on.raidRestoreGameMinutes()).isEqualTo(15);
+            assertThat(off.raidRestoreGameAvailable()).isFalse();
         }
     }
 

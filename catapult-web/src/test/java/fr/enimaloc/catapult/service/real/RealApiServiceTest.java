@@ -344,10 +344,13 @@ class RealApiServiceTest {
         respond(HttpMethod.GET, "/api/channels/enimaloc/settings", """
                 {"cclFeatureEnabled":true,"blockedCcls":[],"noGameCcls":[],"applyDefaultOnStreamStart":false,
                  "applyDefaultOnNoGame":false,"applyDefaultOnStreamEnd":false,"incompleteFallbackCcls":[],
-                 "availableCcls":[],"twFeatureEnabled":false,"blockedTws":[],"availableTws":[]}""");
+                 "availableCcls":[],"twFeatureEnabled":false,"blockedTws":[],"availableTws":[],
+                 "raidRestoreGameMinutes":15,"raidRestoreGameAvailable":true}""");
 
         assertThat(service.channelSettings("enimaloc")).isInstanceOf(UserSettingsDto.class)
-                .extracting(UserSettingsDto::cclFeatureEnabled).isEqualTo(true);
+                .extracting(UserSettingsDto::cclFeatureEnabled, UserSettingsDto::raidRestoreGameMinutes,
+                        UserSettingsDto::raidRestoreGameAvailable)
+                .containsExactly(true, 15, true);
     }
 
     @Test
@@ -537,6 +540,15 @@ class RealApiServiceTest {
                 {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":[],
                  "applyOnStreamStart":true,"applyOnNoGame":false,"applyOnStreamEnd":true}""");
         service.saveNoGameSettings("enimaloc", "1", "Just Chatting", Set.of(), true, false, true);
+    }
+
+    @Test
+    void saveRaidSettings() {
+        expectPost("/api/channels/enimaloc/settings/raid", "{\"restoreGameMinutes\":15}");
+        service.saveRaidSettings("enimaloc", 15);
+        api.reset();
+        expectPost("/api/channels/enimaloc/settings/raid", "{\"restoreGameMinutes\":null}");
+        service.saveRaidSettings("enimaloc", null);
     }
 
     @Test

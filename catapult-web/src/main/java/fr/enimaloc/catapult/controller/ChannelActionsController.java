@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
+import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
@@ -206,6 +207,11 @@ public class ChannelActionsController {
     public ResponseEntity<Void> saveNoGameSettings(@PathVariable String username, @RequestBody NoGameSettingsRequest body) {
         return ApiStatus.answer(apiService.saveNoGameSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls(),
                 body.applyOnStreamStart(), body.applyOnNoGame(), body.applyOnStreamEnd()));
+    }
+
+    @PostMapping("/channel/{username}/settings/raid")
+    public ResponseEntity<Void> saveRaidSettings(@PathVariable String username, @RequestBody RaidSettingsRequest body) {
+        return ApiStatus.answer(apiService.saveRaidSettings(username, body.restoreGameMinutes()));
     }
 
     @PostMapping("/channel/{username}/settings/incomplete-fallback")

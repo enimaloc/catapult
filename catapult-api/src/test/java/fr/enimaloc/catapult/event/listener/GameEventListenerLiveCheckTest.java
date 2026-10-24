@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
@@ -33,6 +34,7 @@ class GameEventListenerLiveCheckTest {
     @Mock private StreamStateService streamStateService;
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private ChannelEventPublisher channelEventPublisher;
+    @Mock private RaidRestoreGameService raidRestoreGameService;
 
     @InjectMocks private GameEventListener listener;
 
@@ -365,6 +367,21 @@ class GameEventListenerLiveCheckTest {
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.empty());
 
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
+
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void onNoGameDetected_raidHoldTakenWhileReadingTheSettings_noGameFallbackIsNotApplied() {
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnNoGame(true);
+        settings.setNoGameTwitchGameId("509658");
+        when(streamStateService.isLive(user)).thenReturn(true);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        // A raid takes the hold between the first check and the PATCH
+        when(raidRestoreGameService.isHoldingNoGameFallback(user)).thenReturn(false, true);
+
+        listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
         verify(twitchService, never()).updateChannel(any(), any());
     }

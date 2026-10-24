@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
@@ -28,11 +29,14 @@ public class GameEventListener {
     private final UserSettingsRepository userSettingsRepository;
     private final StreamStateService streamStateService;
     private final ChannelEventPublisher channelEventPublisher;
+    private final RaidRestoreGameService raidRestoreGameService;
 
     @EventListener
     public void onGameDetected(GameDetectedEvent event) {
         UserAccount user = event.getUser();
         log.debug("GameDetectedEvent for user {}: {}", user.getId(), event.getDetectedGame().getSourceName());
+        // A new game: a raid's restored game no longer has to be kept
+        raidRestoreGameService.releaseHold(user);
 
         GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
         // resolveOrCreate may have just inserted a new row (new game ever detected
@@ -94,6 +98,7 @@ public class GameEventListener {
         UserAccount user = event.getUser();
         log.debug("StreamOfflineEvent for user {}", user.getId());
         streamStateService.clearPending(user);
+        raidRestoreGameService.releaseHold(user);
         userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
             if (settings.isApplyDefaultOnStreamEnd()) {
                 twitchService.resetToDefault(user);
@@ -104,6 +109,10 @@ public class GameEventListener {
     private void applyNoGameFallback(UserAccount user) {
         if (!streamStateService.isLive(user)) {
             log.debug("User {} not live — skipping no-game fallback", user.getId());
+            return;
+        }
+        if (raidRestoreGameService.isHoldingNoGameFallback(user)) {
+            log.debug("User {} raided out with their last game put back — skipping no-game fallback", user.getId());
             return;
         }
         userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
@@ -119,6 +128,11 @@ public class GameEventListener {
                 fallbackBinding.setTwitchGameId(settings.getNoGameTwitchGameId());
                 fallbackBinding.setTwitchGameName(settings.getNoGameTwitchGameName());
                 fallbackBinding.setStatus(GameBinding.Status.MANUAL);
+                // Checked again right before the PATCH: a raid may have taken the hold since the check above
+                if (raidRestoreGameService.isHoldingNoGameFallback(user)) {
+                    log.debug("User {} raided out meanwhile — skipping no-game fallback", user.getId());
+                    return;
+                }
                 twitchService.updateChannel(user, fallbackBinding);
             }
         });

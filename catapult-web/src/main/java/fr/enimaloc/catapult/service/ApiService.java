@@ -115,6 +115,8 @@ public interface ApiService {
     int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
                              boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
     int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
+    /** How recent (1..120 minutes) a game an outgoing raid puts back, null or 0 for off; catapult-api's status, 502 when unreachable. */
+    int saveRaidSettings(String username, Integer restoreGameMinutes);
     DtddMappingStatusDto dtddMappingStatus(String username);
     SearchResponse dtddSearch(String q);
     int dtddValidate(String igdbId);
