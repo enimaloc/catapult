@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingActivationRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
@@ -37,6 +38,9 @@ class CustomBindingWiringTest {
             .withBean(BindingService.class)
             .withBean(GameStateService.class)
             .withBean(StreamStateService.class)
+            .withBean(RaidRestoreGameService.class)
+            .withBean(RaidRestoreGateService.class, () -> mock(RaidRestoreGateService.class))
+            .withBean(GameMappingRepository.class, () -> mock(GameMappingRepository.class))
             .withBean(CustomBindingRepository.class, () -> mock(CustomBindingRepository.class))
             .withBean(CustomBindingActivationRepository.class, () -> mock(CustomBindingActivationRepository.class))
             .withBean(GameBindingRepository.class, () -> mock(GameBindingRepository.class))

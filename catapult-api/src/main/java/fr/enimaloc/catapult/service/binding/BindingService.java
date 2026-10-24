@@ -36,6 +36,7 @@ public class BindingService {
     private final TwResolverService twResolverService;
     private final GameStateService gameStateService;
     private final GameMappingRepository gameMappingRepository;
+    private final CustomBindingActivations customBindingActivations;
 
     private boolean isActiveBinding(UserAccount user, GameBinding binding) {
         return gameStateService.getLastKnownGame(user)
@@ -46,13 +47,14 @@ public class BindingService {
 
     /**
      * Applies {@code change} to the user's binding (if it exists), saves it, and pushes it to
-     * Twitch right away when it is the game currently being played.
+     * Twitch right away when it is the game currently being played — unless a custom binding is active: then it
+     * is only saved, and applies when that binding is deactivated.
      */
     private void editBinding(UserAccount user, UUID bindingId, Consumer<GameBinding> change) {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             change.accept(binding);
             gameBindingRepository.save(binding);
-            if (isActiveBinding(user, binding)) {
+            if (isActiveBinding(user, binding) && customBindingActivations.active(user).isEmpty()) {
                 twitchService.updateChannel(user, binding);
             }
         });

@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.mockito.Mockito.mock;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -34,6 +35,7 @@ class RaidRestoreGameServiceTest {
     @Mock private GameStateService gameStateService;
     @Mock private BindingService bindingService;
     @Mock private TwitchService twitchService;
+    @Mock private CustomBindingActivations customBindingActivations;
 
     private RaidRestoreGameService service;
     private UserAccount user;
@@ -43,7 +45,8 @@ class RaidRestoreGameServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RaidRestoreGameService(userSettingsRepository, gate, gameStateService, bindingService, twitchService);
+        service = new RaidRestoreGameService(userSettingsRepository, gate, gameStateService, bindingService, twitchService,
+                customBindingActivations);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -78,6 +81,17 @@ class RaidRestoreGameServiceTest {
         // resulting channel.update is reported as Catapult's, never as a manual change.
         verify(twitchService).updateChannel(user, binding);
         assertThat(service.isHoldingNoGameFallback(user)).isTrue();
+    }
+
+    @Test
+    void doesNothingWhileACustomBindingIsActive() {
+        when(customBindingActivations.active(user))
+                .thenReturn(Optional.of(new fr.enimaloc.catapult.domain.binding.CustomBindingActivation()));
+
+        raid("509658");
+
+        verify(twitchService, never()).updateChannel(any(), any());
+        assertThat(service.isHoldingNoGameFallback(user)).isFalse();
     }
 
     @Test

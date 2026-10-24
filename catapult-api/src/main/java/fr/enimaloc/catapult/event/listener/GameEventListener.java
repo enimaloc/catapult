@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.event.listener;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
@@ -11,6 +12,7 @@ import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
@@ -33,6 +35,7 @@ public class GameEventListener {
     private final StreamStateService streamStateService;
     private final ChannelEventPublisher channelEventPublisher;
     private final RaidRestoreGameService raidRestoreGameService;
+    private final CustomBindingActivations customBindingActivations;
 
     @EventListener
     public void onGameDetected(GameDetectedEvent event) {
@@ -40,6 +43,19 @@ public class GameEventListener {
         log.debug("GameDetectedEvent for user {}: {}", user.getId(), event.getDetectedGame().getSourceName());
         // A new game: a raid's restored game no longer has to be kept
         raidRestoreGameService.releaseHold(user);
+        Optional<CustomBindingActivation> active = customBindingActivations.active(user);
+        if (active.isPresent()) {
+            if (active.get().getCustomBinding().isUninterruptible()) {
+                // Ignored: the game's binding is created or refreshed for the channel page, the channel left alone
+                GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
+                channelEventPublisher.bindingUpserted(user.getId(), binding);
+                log.debug("Uninterruptible custom binding active for user {} — detection not applied", user.getId());
+                return;
+            }
+            // Any detection after the activation interrupts an interruptible binding, the same game relaunched too
+            log.debug("Detection interrupts the custom binding of user {}", user.getId());
+            customBindingActivations.clear(user);
+        }
         applyDetectedGame(user, event.getDetectedGame());
     }
 
@@ -75,6 +91,11 @@ public class GameEventListener {
      *         (stream offline, bot disabled, no fallback configured for an INCOMPLETE binding...).
      */
     public ChannelUpdateOutcome applyBindingIfLive(UserAccount user, GameBinding binding) {
+        if (customBindingActivations.active(user).isPresent()) {
+            // Like an edit of the binding: only saved, it applies once the custom binding is deactivated
+            log.debug("Custom binding active for user {} — binding {} not applied", user.getId(), binding.getId());
+            return ChannelUpdateOutcome.SKIPPED;
+        }
         return apply(user, binding, false, b -> twitchService.updateChannelReporting(user, b));
     }
 
@@ -119,6 +140,11 @@ public class GameEventListener {
         UserAccount user = event.getUser();
         log.debug("NoGameDetectedEvent for user {}", user.getId());
         streamStateService.clearPending(user);
+        if (customBindingActivations.active(user).isPresent()) {
+            // Closing the game never interrupts a custom binding, and the "no game" category would overwrite it
+            log.debug("Custom binding active for user {} — skipping no-game fallback", user.getId());
+            return;
+        }
         applyNoGameFallback(user, updateChannel(user));
     }
 
@@ -126,6 +152,13 @@ public class GameEventListener {
     public void onStreamOnline(StreamOnlineEvent event) {
         UserAccount user = event.getUser();
         log.debug("StreamOnlineEvent for user {}", user.getId());
+        Optional<CustomBindingActivation> active = customBindingActivations.active(user);
+        if (active.isPresent()) {
+            // The prepared category wins over the default and the pending one; the pending one stays stored for
+            // when the binding is deactivated
+            twitchService.updateChannel(user, active.get().getCustomBinding().toGameBinding(user));
+            return;
+        }
         boolean applyDefault = userSettingsRepository.findById(user.getId())
             .map(UserSettings::isApplyDefaultOnStreamStart)
             .orElse(false);
@@ -145,6 +178,8 @@ public class GameEventListener {
     public void onStreamOffline(StreamOfflineEvent event) {
         UserAccount user = event.getUser();
         log.debug("StreamOfflineEvent for user {}", user.getId());
+        // A custom binding, interruptible or not, ends with the stream; then the usual end of stream
+        customBindingActivations.clear(user);
         streamStateService.clearPending(user);
         raidRestoreGameService.releaseHold(user);
         userSettingsRepository.findById(user.getId()).ifPresent(settings -> {

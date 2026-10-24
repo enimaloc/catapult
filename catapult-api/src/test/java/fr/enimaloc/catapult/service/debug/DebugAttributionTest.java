@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.chat.ChatCommandListener;
@@ -280,7 +281,7 @@ class DebugAttributionTest {
         });
         BindingService service = new BindingService(bindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), mock(TwitchService.class), mock(TwResolverService.class),
-                mock(GameStateService.class), mappings);
+                mock(GameStateService.class), mappings, mock(CustomBindingActivations.class));
 
         service.refreshIncompleteBindings();
 
@@ -386,7 +387,8 @@ class DebugAttributionTest {
             return Optional.of(new UserSettings());
         });
         RaidRestoreGameService service = new RaidRestoreGameService(settings, mock(RaidRestoreGateService.class),
-                mock(GameStateService.class), mock(BindingService.class), mock(TwitchService.class));
+                mock(GameStateService.class), mock(BindingService.class), mock(TwitchService.class),
+                mock(CustomBindingActivations.class));
 
         service.onRaidedOut(new ChannelRaidedOutEvent(this, user, "509658"));
 

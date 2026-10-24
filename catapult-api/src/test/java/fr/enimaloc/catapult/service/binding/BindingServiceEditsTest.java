@@ -38,7 +38,7 @@ class BindingServiceEditsTest {
     private final TwResolverService twResolver = mock(TwResolverService.class);
     private final GameStateService gameState = mock(GameStateService.class);
     private final GameMappingRepository mappings = mock(GameMappingRepository.class);
-    private final BindingService service = new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, gameState, mappings);
+    private final BindingService service = new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, gameState, mappings, mock(CustomBindingActivations.class));
 
     private UserAccount user;
     private GameBinding binding;

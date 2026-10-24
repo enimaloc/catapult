@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.event.listener;
 
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -26,6 +27,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -62,9 +64,10 @@ class GameEventListenerRaidHoldTest {
 
     @BeforeEach
     void setUp() {
-        raidRestore = new RaidRestoreGameService(userSettingsRepository, gate, gameStateService, bindingService, twitchService);
+        raidRestore = new RaidRestoreGameService(userSettingsRepository, gate, gameStateService, bindingService, twitchService,
+                mock(CustomBindingActivations.class));
         listener = new GameEventListener(bindingService, twitchService, userSettingsRepository, streamStateService,
-                channelEventPublisher, raidRestore);
+                channelEventPublisher, raidRestore, mock(CustomBindingActivations.class));
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
