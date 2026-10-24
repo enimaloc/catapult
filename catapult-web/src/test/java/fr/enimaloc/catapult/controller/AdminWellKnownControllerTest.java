@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = AdminWellKnownController.class)
-@Import({WebSecurityConfig.class, ModelFiller.class, WellKnownCache.class})
+@Import({WebSecurityConfig.class, ModelFiller.class, WellKnownCache.class, LocalInstanceBusConfig.class})
 class AdminWellKnownControllerTest {
     static final String BODY = "{\"location\":\"ROOT\",\"path\":\"riot.txt\",\"status\":200,\"headers\":[],\"contentType\":\"text/plain\",\"content\":\"x\"}";
     static final WellKnownFileRequest REQUEST = new WellKnownFileRequest(ROOT, "riot.txt", 200, List.of(), "text/plain", "x");

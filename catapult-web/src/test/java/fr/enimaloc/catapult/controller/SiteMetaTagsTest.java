@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.MutableClock;
+import fr.enimaloc.catapult.cluster.InstanceBus;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Instant;
 import java.util.List;
@@ -27,13 +27,10 @@ class SiteMetaTagsTest {
     SiteMetaTags tags;
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() {
         api = mock(ApiService.class);
-        ObjectProvider<ApiService> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(api);
         clock = new MutableClock(T0);
-        tags = new SiteMetaTags(provider, clock);
+        tags = new SiteMetaTags(api, clock, InstanceBus.local());
     }
 
     @Test

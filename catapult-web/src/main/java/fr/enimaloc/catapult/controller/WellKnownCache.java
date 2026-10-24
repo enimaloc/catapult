@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.cluster.InstanceBus;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
 import fr.enimaloc.catapult.service.WellKnownContent;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -34,22 +33,17 @@ public class WellKnownCache {
     /** Bumped by {@link #clear()}: an answer loaded before it may predate the change and isn't kept. */
     private final java.util.concurrent.atomic.AtomicLong generation = new java.util.concurrent.atomic.AtomicLong();
 
-    /** Null for a cache alone (a test): its clear only empties itself. */
     private final InstanceBus bus;
 
     @Autowired
-    public WellKnownCache(ObjectProvider<InstanceBus> bus) {
-        this(Clock.systemUTC(), bus.getIfAvailable());
-    }
-
-    WellKnownCache(Clock clock) {
-        this(clock, null);
+    public WellKnownCache(InstanceBus bus) {
+        this(Clock.systemUTC(), bus);
     }
 
     WellKnownCache(Clock clock, InstanceBus bus) {
         this.clock = clock;
         this.bus = bus;
-        if (bus != null) bus.on(CLEAR_TOPIC, ignored -> clearLocally());
+        bus.on(CLEAR_TOPIC, ignored -> clearLocally());
     }
 
     public WellKnownContent get(WellKnownLocation location, String path, Supplier<WellKnownContent> load) {

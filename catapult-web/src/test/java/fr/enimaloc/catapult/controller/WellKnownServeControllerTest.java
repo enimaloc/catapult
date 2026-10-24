@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = {WellKnownServeController.class, IndexController.class, SeoController.class})
-@Import({WebSecurityConfig.class, ModelFiller.class, WellKnownCache.class,
+@Import({WebSecurityConfig.class, ModelFiller.class, WellKnownCache.class, LocalInstanceBusConfig.class,
         fr.enimaloc.catapult.config.TwitchatCatalogConfig.class, fr.enimaloc.catapult.config.I18nConfiguration.class})
 class WellKnownServeControllerTest {
     @org.junit.jupiter.api.BeforeEach void reset() { cache.clear(); }

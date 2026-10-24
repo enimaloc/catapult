@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.cluster;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -33,8 +32,8 @@ public class InstanceBus {
     private final StringRedisTemplate redis;
 
     @Autowired
-    public InstanceBus(ObjectProvider<StringRedisTemplate> redis, Environment environment) {
-        this(environment.matchesProfiles("mock") ? null : redis.getIfAvailable());
+    public InstanceBus(StringRedisTemplate redis, Environment environment) {
+        this(environment.matchesProfiles("mock") ? null : redis);
     }
 
     InstanceBus(StringRedisTemplate redis) {

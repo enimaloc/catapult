@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.cluster.InstanceBus;
 import fr.enimaloc.catapult.service.ApiService;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -34,9 +33,8 @@ public class SiteMetaTags {
 
     static final String CLEAR_TOPIC = "meta-tags.clear";
 
-    private final ObjectProvider<ApiService> apiService;
+    private final ApiService apiService;
     private final Clock clock;
-    /** Null for a list alone (a test): its clear only marks itself stale. */
     private final InstanceBus bus;
     private final AtomicReference<Entry> entry = new AtomicReference<>(new Entry(List.of(), Instant.MIN));
     private final ReentrantLock loading = new ReentrantLock();
@@ -44,19 +42,15 @@ public class SiteMetaTags {
     private final AtomicLong generation = new AtomicLong();
 
     @Autowired
-    public SiteMetaTags(ObjectProvider<ApiService> apiService, ObjectProvider<InstanceBus> bus) {
-        this(apiService, Clock.systemUTC(), bus.getIfAvailable());
+    public SiteMetaTags(ApiService apiService, InstanceBus bus) {
+        this(apiService, Clock.systemUTC(), bus);
     }
 
-    SiteMetaTags(ObjectProvider<ApiService> apiService, Clock clock) {
-        this(apiService, clock, null);
-    }
-
-    SiteMetaTags(ObjectProvider<ApiService> apiService, Clock clock, InstanceBus bus) {
+    SiteMetaTags(ApiService apiService, Clock clock, InstanceBus bus) {
         this.apiService = apiService;
         this.clock = clock;
         this.bus = bus;
-        if (bus != null) bus.on(CLEAR_TOPIC, ignored -> clearLocally());
+        bus.on(CLEAR_TOPIC, ignored -> clearLocally());
     }
 
     public List<MetaTagDto> tags() {
@@ -67,8 +61,7 @@ public class SiteMetaTags {
             Instant now = clock.instant();
             if (now.isBefore(current.until())) return current.tags();
             long loadedAt = generation.get();
-            ApiService api = apiService.getIfAvailable();
-            List<MetaTagDto> tags = api == null ? null : api.metaTags();
+            List<MetaTagDto> tags = apiService.metaTags();
             Entry loaded = tags == null
                     ? new Entry(current.tags(), now.plus(RETRY))
                     : new Entry(List.copyOf(tags), now.plus(TTL));
@@ -83,11 +76,7 @@ public class SiteMetaTags {
 
     /** Marks the list stale on every instance: the admin's change shows on the next page wherever it is served. */
     public void clear() {
-        if (bus == null) {
-            clearLocally();
-        } else {
-            bus.publish(CLEAR_TOPIC, "");
-        }
+        bus.publish(CLEAR_TOPIC, "");
     }
 
     void clearLocally() {
