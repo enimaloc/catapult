@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -384,5 +386,46 @@ class GameEventListenerLiveCheckTest {
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
         verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void applyBindingIfLive_reportsTwitchsOutcome() {
+        when(streamStateService.isLive(user)).thenReturn(true);
+        when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.FAILED);
+
+        assertThat(listener.applyBindingIfLive(user, binding)).isEqualTo(ChannelUpdateOutcome.FAILED);
+        verify(twitchService, never()).updateChannel(any(), any());
+    }
+
+    @Test
+    void applyBindingIfLive_offline_isSkipped() {
+        when(streamStateService.isLive(user)).thenReturn(false);
+
+        assertThat(listener.applyBindingIfLive(user, binding)).isEqualTo(ChannelUpdateOutcome.SKIPPED);
+        verifyNoInteractions(twitchService);
+        verify(streamStateService, never()).storePending(any(), any());
+    }
+
+    @Test
+    void applyBindingIfLive_incompleteWithoutFallback_isSkipped() {
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        when(streamStateService.isLive(user)).thenReturn(true);
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(new UserSettings()));
+
+        assertThat(listener.applyBindingIfLive(user, binding)).isEqualTo(ChannelUpdateOutcome.SKIPPED);
+        verifyNoInteractions(twitchService);
+    }
+
+    @Test
+    void applyBindingIfLive_incompleteWithFallback_reportsTwitchsOutcome() {
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        when(streamStateService.isLive(user)).thenReturn(true);
+        UserSettings settings = new UserSettings();
+        settings.setIncompleteFallbackTwitchGameId("509658");
+        settings.setIncompleteFallbackTwitchGameName("Just Chatting");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.APPLIED);
+
+        assertThat(listener.applyBindingIfLive(user, binding)).isEqualTo(ChannelUpdateOutcome.APPLIED);
     }
 }

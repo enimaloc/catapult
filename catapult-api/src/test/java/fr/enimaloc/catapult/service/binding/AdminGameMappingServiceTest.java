@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -96,6 +97,7 @@ class AdminGameMappingServiceTest {
                 .findFirst());
         when(bindingRepo.save(any(GameBinding.class))).thenAnswer(inv -> inv.getArgument(0));
         when(gameStateService.lastKnownGames()).thenReturn(Map.of());
+        when(twitchService.updateChannelReporting(any(), any())).thenReturn(ChannelUpdateOutcome.APPLIED);
     }
 
     private static UserAccount user(String login) {
@@ -252,13 +254,13 @@ class AdminGameMappingServiceTest {
                 onIt.getId(), new DetectedGame("730", SourceType.STEAM, "CS2"),
                 offline.getId(), new DetectedGame("730", SourceType.STEAM, "CS2")));
         AtomicBoolean calledAfterCommit = new AtomicBoolean();
-        doAnswer(inv -> { calledAfterCommit.set(committed.get()); return null; })
-                .when(twitchService).updateChannel(any(), any());
+        doAnswer(inv -> { calledAfterCommit.set(committed.get()); return ChannelUpdateOutcome.APPLIED; })
+                .when(twitchService).updateChannelReporting(any(), any());
 
         GameMappingResult result = service.create(request("730", "32399", true), admin);
 
-        verify(twitchService).updateChannel(onIt, live);
-        verify(twitchService, never()).updateChannel(eq(offline), any());
+        verify(twitchService).updateChannelReporting(onIt, live);
+        verify(twitchService, never()).updateChannelReporting(eq(offline), any());
         assertThat(calledAfterCommit).isTrue();
         assertThat(result.liveChannelsUpdated()).isEqualTo(1);
         assertThat(result.liveChannelsFailed()).isZero();
@@ -272,7 +274,7 @@ class AdminGameMappingServiceTest {
 
         GameMappingResult result = service.create(request("730", "32399", true), admin);
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         assertThat(result.bindingsUpdated()).isEqualTo(1);
         assertThat(result.liveChannelsUpdated()).isZero();
     }
@@ -285,16 +287,16 @@ class AdminGameMappingServiceTest {
 
         GameMappingResult result = service.create(request("730", "32399", false), admin);
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         assertThat(result.liveChannelsUpdated()).isZero();
     }
 
     @Test
-    void liveFailure_isCountedNotRolledBack() {
+    void twitchRefusesTheUpdate_isCountedAsFailed_notRolledBack() {
         UserAccount onIt = user("on-it");
         bindingsOfTheGame(binding(onIt, "730", Status.AUTO));
         liveOn(onIt, "730");
-        doThrow(new IllegalStateException("Twitch down")).when(twitchService).updateChannel(any(), any());
+        when(twitchService.updateChannelReporting(any(), any())).thenReturn(ChannelUpdateOutcome.FAILED);
 
         GameMappingResult result = service.create(request("730", "32399", true), admin);
 
@@ -303,6 +305,66 @@ class AdminGameMappingServiceTest {
         assertThat(result.mapping()).isNotNull();
         assertThat(mappings).hasSize(1);
         verify(transactionManager, never()).rollback(any());
+    }
+
+    @Test
+    void twitchUpdateSkipped_isNeitherUpdatedNorFailed() {
+        // e.g. the streamer's bot is disabled: nothing was sent to Twitch.
+        UserAccount onIt = user("on-it");
+        bindingsOfTheGame(binding(onIt, "730", Status.AUTO));
+        liveOn(onIt, "730");
+        when(twitchService.updateChannelReporting(any(), any())).thenReturn(ChannelUpdateOutcome.SKIPPED);
+
+        GameMappingResult result = service.create(request("730", "32399", true), admin);
+
+        assertThat(result.bindingsUpdated()).isEqualTo(1);
+        assertThat(result.liveChannelsUpdated()).isZero();
+        assertThat(result.liveChannelsFailed()).isZero();
+    }
+
+    @Test
+    void unexpectedErrorPushingALiveChannel_isCountedAsFailed() {
+        UserAccount onIt = user("on-it");
+        bindingsOfTheGame(binding(onIt, "730", Status.AUTO));
+        liveOn(onIt, "730");
+        when(twitchService.updateChannelReporting(any(), any())).thenThrow(new IllegalStateException("boom"));
+
+        GameMappingResult result = service.create(request("730", "32399", true), admin);
+
+        assertThat(result.liveChannelsFailed()).isEqualTo(1);
+        assertThat(result.liveChannelsUpdated()).isZero();
+        verify(transactionManager, never()).rollback(any());
+    }
+
+    @Test
+    void incompleteAfterDelete_withoutFallback_isNeitherUpdatedNorFailed() {
+        UserAccount onIt = user("on-it");
+        GameMapping mapping = new GameMapping();
+        mapping.setId(UUID.randomUUID());
+        mapping.setSourceType(SourceType.STEAM);
+        mapping.setSourceId("730");
+        mapping.setTwitchGameId("32399");
+        mapping.setTwitchGameName("Counter-Strike");
+        mappings.put(mapping.getId(), mapping);
+        GameBinding mapped = binding(onIt, "730", Status.MAPPED);
+        bindingsOfTheGame(mapped);
+        liveOn(onIt, "730");
+        // Back to IGDB, which knows no category for it: INCOMPLETE, and the streamer set no incomplete fallback.
+        doAnswer(inv -> {
+            GameBinding b = inv.getArgument(0);
+            b.setStatus(Status.INCOMPLETE);
+            b.setTwitchGameId(null);
+            b.setTwitchGameName(null);
+            return b;
+        }).when(bindingService).resolveWithoutMapping(any());
+        when(userSettingsRepository.findById(onIt.getId())).thenReturn(Optional.empty());
+
+        GameMappingResult result = service.delete(mapping.getId(), true);
+
+        assertThat(result.bindingsUpdated()).isEqualTo(1);
+        assertThat(result.liveChannelsUpdated()).isZero();
+        assertThat(result.liveChannelsFailed()).isZero();
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -413,7 +475,7 @@ class AdminGameMappingServiceTest {
         assertThat(result.bindingsUpdated()).isEqualTo(1);
         assertThat(result.liveChannelsUpdated()).isZero();
         assertThat(result.liveChannelsFailed()).isZero();
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService, never()).storePending(any(), any());
     }
 }

@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -207,13 +208,25 @@ public class AdminGameMappingService {
         int failed = 0;
         for (GameBinding binding : written.live()) {
             UserAccount user = binding.getUser();
+            ChannelUpdateOutcome outcome;
             try {
-                // Offline since the transaction picked it: skipped, neither updated nor failed, never kept pending.
-                if (gameEventListener.applyBindingIfLive(user, binding)) updated++;
+                outcome = gameEventListener.applyBindingIfLive(user, binding);
             } catch (RuntimeException e) {
                 failed++;
                 log.warn("Live channel of user {} not updated after a game mapping change: {}",
                         user.getId(), e.getMessage(), e);
+                continue;
+            }
+            // Skipped (offline since the transaction picked it, bot disabled, no fallback for an INCOMPLETE binding):
+            // neither updated nor failed, never kept pending.
+            switch (outcome) {
+                case APPLIED -> updated++;
+                case FAILED -> {
+                    failed++;
+                    log.warn("Twitch did not update the live channel of user {} after a game mapping change",
+                            user.getId());
+                }
+                case SKIPPED -> { }
             }
         }
         return new GameMappingResult(written.mapping(), written.changed().size(), updated, failed);

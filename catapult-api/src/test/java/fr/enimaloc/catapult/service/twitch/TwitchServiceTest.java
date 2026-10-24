@@ -526,6 +526,82 @@ class TwitchServiceTest {
     }
 
     @Test
+    void updateChannelReporting_twitchAccepts_isApplied() {
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.APPLIED);
+    }
+
+    @Test
+    void updateChannelReporting_appliedAfterTokenRefresh() {
+        when(twitchTokenService.refreshAccessToken(any(OAuthToken.class), eq(user))).thenReturn("refreshed-token");
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED))
+            .doReturn(null)
+            .when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.APPLIED);
+    }
+
+    @Test
+    void updateChannelReporting_twitchError_isFailed() {
+        doThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST)).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.FAILED);
+    }
+
+    @Test
+    void updateChannelReporting_rateLimited_isFailed() {
+        doThrow(new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS)).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.FAILED);
+    }
+
+    @Test
+    void updateChannelReporting_tokenRefreshFails_isFailed() {
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED)).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.FAILED);
+    }
+
+    @Test
+    void updateChannelReporting_unexpectedError_isFailed() {
+        doThrow(new IllegalStateException("network down")).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.FAILED);
+    }
+
+    @Test
+    void updateChannelReporting_noTwitchToken_isFailed() {
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.FAILED);
+        verifyNoInteractions(restClient);
+    }
+
+    @Test
+    void updateChannelReporting_botDisabled_isSkipped() {
+        user.setBotEnabled(false);
+
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.SKIPPED);
+        verifyNoInteractions(restClient);
+    }
+
+    @Test
+    void updateChannelReporting_incompleteBinding_isSkipped() {
+        assertThat(twitchService.updateChannelReporting(user,
+                binding(GameBinding.Status.INCOMPLETE, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.SKIPPED);
+        verifyNoInteractions(restClient);
+    }
+
+    @Test
     void resetToDefault_botDisabled_doesNotCallHelix() {
         user.setBotEnabled(false);
 

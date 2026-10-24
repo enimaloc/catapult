@@ -32,6 +32,12 @@ public class MockTwitchService implements TwitchService {
     }
 
     @Override
+    public ChannelUpdateOutcome updateChannelReporting(UserAccount user, GameBinding binding) {
+        log.debug("[Mock Twitch] updateChannelReporting() — no-op for user {}", user.getId());
+        return ChannelUpdateOutcome.APPLIED;
+    }
+
+    @Override
     public void setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
         log.debug("[Mock Twitch] setCategory() — no-op for user {}", user.getId());
     }

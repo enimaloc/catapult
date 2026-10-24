@@ -50,22 +50,28 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public void updateChannel(UserAccount user, GameBinding binding) {
+        updateChannelReporting(user, binding);
+    }
+
+    @Override
+    public ChannelUpdateOutcome updateChannelReporting(UserAccount user, GameBinding binding) {
         if (!canActOnTwitch(user)) {
             log.debug("Skipping Twitch channel update for user {} — bot disabled or account not active", user.getId());
-            return;
+            return ChannelUpdateOutcome.SKIPPED;
         }
-        apiObservations.observeRun("twitch", "update_channel", () -> {
+        return apiObservations.observe("twitch", "update_channel", () -> {
             if (binding.getStatus() == GameBinding.Status.INCOMPLETE || binding.isIgnored()) {
                 log.debug("Skipping Twitch update for user {} — binding is {} or ignored",
                     user.getId(), binding.getStatus());
-                return;
+                return ChannelUpdateOutcome.SKIPPED;
             }
 
-            oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-                .ifPresentOrElse(
-                    token -> doUpdateChannel(user, binding, token),
-                    () -> log.warn("No Twitch token found for user {}", user.getId())
-                );
+            Optional<OAuthToken> token = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
+            if (token.isEmpty()) {
+                log.warn("No Twitch token found for user {}", user.getId());
+                return ChannelUpdateOutcome.FAILED;
+            }
+            return doUpdateChannel(user, binding, token.get());
         });
     }
 
@@ -116,7 +122,7 @@ public class TwitchServiceImpl implements TwitchService {
             .toBodilessEntity();
     }
 
-    private void doUpdateChannel(UserAccount user, GameBinding binding, OAuthToken token) {
+    private ChannelUpdateOutcome doUpdateChannel(UserAccount user, GameBinding binding, OAuthToken token) {
         String accessToken = twitchTokenService.resolveAccessToken(token, user);
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -137,30 +143,35 @@ public class TwitchServiceImpl implements TwitchService {
             // Marker only: the Twitchat notification is emitted once, from
             // TwitchEventSubService's channel.update handler, when Twitch confirms the change.
             categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId());
+            return ChannelUpdateOutcome.APPLIED;
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
                 String refreshed = twitchTokenService.refreshAccessToken(token, user);
                 if (refreshed == null) {
                     log.warn("Twitch token invalid for user {} — pausing bot", user.getId());
                     botToggleService.setBotEnabled(user, false);
-                    return;
+                    return ChannelUpdateOutcome.FAILED;
                 }
                 try {
                     patchChannel(user, refreshed, body);
                     log.info("Twitch channel updated for user {} after token refresh — game_id={}",
                         user.getId(), binding.getTwitchGameId());
                     categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId());
+                    return ChannelUpdateOutcome.APPLIED;
                 } catch (Exception retryEx) {
                     log.warn("Twitch channel update failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
                     botToggleService.setBotEnabled(user, false);
+                    return ChannelUpdateOutcome.FAILED;
                 }
             } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 log.warn("Twitch rate limit hit for user {} — will retry next cycle", user.getId());
             } else {
                 log.error("Twitch API error for user {}: {} {}", user.getId(), e.getStatusCode(), e.getMessage());
             }
+            return ChannelUpdateOutcome.FAILED;
         } catch (Exception e) {
             log.error("Unexpected error updating Twitch channel for user {}", user.getId(), e);
+            return ChannelUpdateOutcome.FAILED;
         }
     }
 
