@@ -39,6 +39,7 @@ class ApiAdminGroupsControllerTest {
 
     @MockitoBean UserGroupRepository groupRepository;
     @MockitoBean UserAccountRepository userAccountRepository;
+    @MockitoBean fr.enimaloc.catapult.service.notification.AdminEventPublisher events;
 
     @Test
     void createRejectsDuplicateKey() throws Exception {

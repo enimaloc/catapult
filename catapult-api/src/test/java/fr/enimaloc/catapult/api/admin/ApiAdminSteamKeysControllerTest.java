@@ -76,8 +76,8 @@ class ApiAdminSteamKeysControllerTest {
     }
 
     @Test
-    void withoutRotatorOrEvents_steamIsReportedDisabled_andEditsStillWork() {
-        ApiAdminSteamKeysController bare = new ApiAdminSteamKeysController(repository, null, null);
+    void withoutRotator_steamIsReportedDisabled_andEditsStillWork() {
+        ApiAdminSteamKeysController bare = new ApiAdminSteamKeysController(repository, null, events);
         when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of(entry(KEY, null)));
         when(repository.findByExclusiveFalse()).thenReturn(List.of(entry(KEY, null)));
 

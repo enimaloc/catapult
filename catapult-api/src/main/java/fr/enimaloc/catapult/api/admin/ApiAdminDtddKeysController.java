@@ -32,18 +32,9 @@ public class ApiAdminDtddKeysController {
     private final DtddApiKeyRotator rotator;
     private final AdminEventPublisher events;
 
-    public ApiAdminDtddKeysController(DtddApiKeyRepository repository) {
-        this(repository, null, null);
-    }
-
-    public ApiAdminDtddKeysController(DtddApiKeyRepository repository, DtddApiKeyRotator rotator) {
-        this(repository, rotator, null);
-    }
-
-    @Autowired
     public ApiAdminDtddKeysController(DtddApiKeyRepository repository,
                                       @Autowired(required = false) DtddApiKeyRotator rotator,
-                                      @Autowired(required = false) AdminEventPublisher events) {
+                                      AdminEventPublisher events) {
         this.repository = repository;
         this.rotator = rotator;
         this.events = events;
@@ -84,10 +75,8 @@ public class ApiAdminDtddKeysController {
         if (!repository.existsById(trimmed)) {
             repository.save(new DtddApiKeyEntry(trimmed));
             if (rotator != null) rotator.refreshKeys();
-            if (events != null) {
-                events.keyAdded(AdminEventPublisher.PROVIDER_DTDD,
-                        new KeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
-            }
+            events.keyAdded(AdminEventPublisher.PROVIDER_DTDD,
+                    new KeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
         }
     }
 
@@ -103,13 +92,13 @@ public class ApiAdminDtddKeysController {
         }
         repository.deleteById(raw.get());
         if (rotator != null) rotator.refreshKeys();
-        if (events != null) events.keyDeleted(AdminEventPublisher.PROVIDER_DTDD, body.keyId());
+        events.keyDeleted(AdminEventPublisher.PROVIDER_DTDD, body.keyId());
     }
 
     @PostMapping("/refresh")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void refresh() {
         if (rotator != null) rotator.refreshKeys();
-        if (events != null) events.keysRefreshed(AdminEventPublisher.PROVIDER_DTDD, page().keys());
+        events.keysRefreshed(AdminEventPublisher.PROVIDER_DTDD, page().keys());
     }
 }

@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,8 +28,7 @@ public class ApiAdminCclController {
 
     private final AdminCclService adminCclService;
 
-    @Autowired(required = false)
-    private AdminEventPublisher events;
+    private final AdminEventPublisher events;
 
     @GetMapping
     public CclPageData page() {
@@ -41,23 +39,19 @@ public class ApiAdminCclController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void refresh() {
         adminCclService.refreshFromApi();
-        if (events != null) {
-            events.cclRefreshed(
-                    adminCclService.getAllCcls().stream().map(ApiAdminCclController::cclView).toList(),
-                    adminCclService.getAllIgdbDescriptors().stream().map(ApiAdminCclController::descriptorView).toList());
-        }
+        events.cclRefreshed(
+                adminCclService.getAllCcls().stream().map(ApiAdminCclController::cclView).toList(),
+                adminCclService.getAllIgdbDescriptors().stream().map(ApiAdminCclController::descriptorView).toList());
     }
 
     @PostMapping("/{cclId}/mappings")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveMappings(@PathVariable String cclId, @RequestBody SaveMappingsRequest body) {
         adminCclService.saveMappings(cclId, body.igdbCategoryIds() == null ? Set.of() : body.igdbCategoryIds());
-        if (events != null) {
-            adminCclService.getAllCcls().stream()
-                    .filter(c -> cclId.equals(c.getId()))
-                    .findFirst()
-                    .ifPresent(c -> events.cclMappingsUpdated(cclView(c)));
-        }
+        adminCclService.getAllCcls().stream()
+                .filter(c -> cclId.equals(c.getId()))
+                .findFirst()
+                .ifPresent(c -> events.cclMappingsUpdated(cclView(c)));
     }
 
     /** Clean serialisable view of a CCL for events (avoids leaking JPA proxies). */

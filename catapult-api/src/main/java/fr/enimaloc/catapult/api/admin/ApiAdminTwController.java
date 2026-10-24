@@ -46,8 +46,7 @@ public class ApiAdminTwController {
     @Autowired(required = false)
     private TwBackfillService backfillService;
 
-    @Autowired(required = false)
-    private AdminEventPublisher events;
+    private final AdminEventPublisher events;
 
     @GetMapping
     public List<TwDefinition> list() {
@@ -63,13 +62,11 @@ public class ApiAdminTwController {
     public ResponseEntity<TwDefinition> create(@RequestBody AdminTwCreateBody b) {
         TwDefinition d = service.create(b.id(), b.label(), b.description(),
                 b.sortOrder() == null ? 0 : b.sortOrder());
-        if (events != null) {
-            events.twDefinitionAdded(Map.of(
-                    "id", d.getId(),
-                    "label", d.getLabel(),
-                    "enabled", d.isEnabled(),
-                    "sortOrder", d.getSortOrder()));
-        }
+        events.twDefinitionAdded(Map.of(
+                "id", d.getId(),
+                "label", d.getLabel(),
+                "enabled", d.isEnabled(),
+                "sortOrder", d.getSortOrder()));
         return ResponseEntity.status(201).body(d);
     }
 

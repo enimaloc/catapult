@@ -36,7 +36,7 @@ public class ApiAdminSteamKeysController {
     /** The rotator and the admin event stream only exist when Steam (resp. SSE notifications) are enabled. */
     public ApiAdminSteamKeysController(SteamApiKeyRepository repository,
                                        @Autowired(required = false) SteamApiKeyRotator rotator,
-                                       @Autowired(required = false) AdminEventPublisher events) {
+                                       AdminEventPublisher events) {
         this.repository = repository;
         this.rotator = rotator;
         this.events = events;
@@ -82,10 +82,8 @@ public class ApiAdminSteamKeysController {
         if (!repository.existsById(trimmed)) {
             repository.save(new SteamApiKeyEntry(trimmed));
             refreshRotator();
-            if (events != null) {
-                events.keyAdded(AdminEventPublisher.PROVIDER_STEAM,
-                        new KeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
-            }
+            events.keyAdded(AdminEventPublisher.PROVIDER_STEAM,
+                    new KeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
         }
     }
 
@@ -101,14 +99,14 @@ public class ApiAdminSteamKeysController {
         }
         repository.deleteById(raw.get());
         refreshRotator();
-        if (events != null) events.keyDeleted(AdminEventPublisher.PROVIDER_STEAM, body.keyId());
+        events.keyDeleted(AdminEventPublisher.PROVIDER_STEAM, body.keyId());
     }
 
     @PostMapping("/refresh")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void refresh() {
         refreshRotator();
-        if (events != null) events.keysRefreshed(AdminEventPublisher.PROVIDER_STEAM, page().keys());
+        events.keysRefreshed(AdminEventPublisher.PROVIDER_STEAM, page().keys());
     }
 
 }

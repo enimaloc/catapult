@@ -12,7 +12,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,8 +56,7 @@ public class ApiAdminBroadcastController {
     private final ActivityLogService activityLog;
     private final ApiUserResolver userResolver;
 
-    @Autowired(required = false)
-    private CatapultApiMetrics apiMetrics;
+    private final CatapultApiMetrics apiMetrics;
 
     @PostMapping
     public ResponseEntity<Void> broadcast(@Valid @RequestBody BroadcastRequestDto body,
@@ -71,18 +69,18 @@ public class ApiAdminBroadcastController {
         try {
             validator.validate(body);
         } catch (IllegalArgumentException ex) {
-            if (apiMetrics != null) apiMetrics.recordBroadcastAttempt(body.name(), false);
+            apiMetrics.recordBroadcastAttempt(body.name(), false);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
         }
 
         if (!rateLimiter.tryAcquire(admin.getId())) {
-            if (apiMetrics != null) apiMetrics.recordBroadcastAttempt(body.name(), false);
+            apiMetrics.recordBroadcastAttempt(body.name(), false);
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "broadcast rate limit exceeded (10/min)");
         }
 
         publishToBus(body);
-        if (apiMetrics != null) apiMetrics.recordBroadcastAttempt(body.name(), true);
+        apiMetrics.recordBroadcastAttempt(body.name(), true);
         auditBroadcast(admin, body, httpRequest);
 
         return ResponseEntity.accepted().build();
