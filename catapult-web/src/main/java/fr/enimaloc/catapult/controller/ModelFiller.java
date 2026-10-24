@@ -214,6 +214,7 @@ public class ModelFiller {
             return ApiClient.hasSession() ? HttpStatus.NOT_FOUND.value() : HttpStatus.UNAUTHORIZED.value();
         }
         model.addAttribute("channelPage", channelPage);
+        model.addAttribute("newFeatures", ApiClient.hasSession() ? NewFeatures.unseen(apiService) : Set.of());
         // Settings catapult-api failed to give: the settings tab says so, the rest of the page still shows.
         var settings = apiService.channelSettings(username);
         model.addAttribute("channelSettings", settings);
@@ -269,12 +270,13 @@ public class ModelFiller {
     }
 
     /**
-     * The admin page model: the members tab's accounts (null when catapult-api fails), and the
-     * admin's own account id, which the tab won't let them delete.
+     * The admin page model: the members tab's accounts (null when catapult-api fails), the
+     * admin's own account id, which the tab won't let them delete, and the tabs' "new" dots.
      */
     public void admin(Model model) {
         model.addAttribute("adminMembers", apiService.adminMembers());
         model.addAttribute("currentUserId", apiService.currentUserId());
+        model.addAttribute("newFeatures", NewFeatures.unseen(apiService));
     }
 
     /** The notifications page model: the member's page of history, null when catapult-api fails. */
