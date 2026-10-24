@@ -151,6 +151,21 @@ public interface ApiService {
     /** Makes the member the account posting chat command replies, in place of the previous one. */
     int adminPromoteMemberToSystem(java.util.UUID memberId);
     int adminDeleteMember(java.util.UUID memberId);
+    // --- admin: a member's debug mode ---
+    /** The member's debug mode; null when it was never on or catapult-api fails. */
+    fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto memberDebug(java.util.UUID memberId);
+    /** Turns the member's debug mode on; {@code revealSecrets} false masks the secrets in what is recorded. */
+    int enableMemberDebug(java.util.UUID memberId, boolean revealSecrets);
+    int disableMemberDebug(java.util.UUID memberId);
+    /** Deletes everything recorded for the member. */
+    int clearMemberDebug(java.util.UUID memberId);
+    /** One page of the member's recorded exchanges, newest first; null when catapult-api fails. */
+    AdminPage<fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto> memberDebugExchanges(java.util.UUID memberId, DebugExchangeFilter filter, int page);
+    fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto memberDebugExchange(java.util.UUID memberId, java.util.UUID exchangeId);
+    /** The services the member's exchanges were with, for the filter. */
+    List<String> memberDebugServices(java.util.UUID memberId);
+    /** Whether the logged-in member is in debug mode; false when catapult-api fails. */
+    boolean myDebugActive();
     /** Copies the chosen parts of a member's data onto another member. */
     int adminMigrateMember(java.util.UUID memberId, java.util.UUID targetId,
                             boolean settings, boolean getters, boolean bindings);

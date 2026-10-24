@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.monitoring;
 
+import fr.enimaloc.catapult.service.debug.DebugMembers;
 import io.sentry.CustomSamplingContext;
 import io.sentry.SamplingContext;
 import io.sentry.SentryOptions;
@@ -13,10 +14,11 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class SentryConfigTest {
 
-    private final SentryOptions.TracesSamplerCallback sampler = new SentryConfig().tracesSampler(0.25, -1);
+    private final SentryOptions.TracesSamplerCallback sampler = new SentryConfig().tracesSampler(0.25, -1, mock(DebugMembers.class));
 
     /** The sampling of a request to {@code uri}, its trace started by the browser as {@code parentSampled}. */
     private Double sample(String uri, Boolean parentSampled) {
@@ -57,10 +59,21 @@ class SentryConfigTest {
 
     @Test
     void theDegradedRate_capsTheConfiguredRate_butNeverRaisesIt() {
-        assertThat(sample(new SentryConfig().tracesSampler(1.0, 0.1), "/dashboard", null)).isEqualTo(0.1);
-        assertThat(sample(new SentryConfig().tracesSampler(0.2, 0.5), "/dashboard", null)).isEqualTo(0.2);
-        assertThat(sample(new SentryConfig().tracesSampler(1.0, 0.1), "/dashboard", true)).isEqualTo(1.0);
-        assertThat(sample(new SentryConfig().tracesSampler(1.0, 0.1), "/events/nav", null)).isZero();
+        assertThat(sample(new SentryConfig().tracesSampler(1.0, 0.1, mock(DebugMembers.class)), "/dashboard", null)).isEqualTo(0.1);
+        assertThat(sample(new SentryConfig().tracesSampler(0.2, 0.5, mock(DebugMembers.class)), "/dashboard", null)).isEqualTo(0.2);
+        assertThat(sample(new SentryConfig().tracesSampler(1.0, 0.1, mock(DebugMembers.class)), "/dashboard", true)).isEqualTo(1.0);
+        assertThat(sample(new SentryConfig().tracesSampler(1.0, 0.1, mock(DebugMembers.class)), "/events/nav", null)).isZero();
+    }
+
+    @Test
+    void aMemberInDebugMode_isTracedInFull_evenInDegradedMode_butNeverTheEndlessStreams() {
+        DebugMembers debug = mock(DebugMembers.class);
+        org.mockito.Mockito.when(debug.isCurrentActive()).thenReturn(true);
+        SentryOptions.TracesSamplerCallback degraded = new SentryConfig().tracesSampler(0.2, 0.1, debug);
+
+        assertThat(sample(degraded, "/dashboard", null)).isEqualTo(1.0);
+        assertThat(sample(degraded, "/dashboard", false)).isEqualTo(1.0);
+        assertThat(sample(degraded, "/events/nav", null)).isZero();
     }
 
     @Test

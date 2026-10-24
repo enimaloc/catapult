@@ -130,6 +130,8 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<Map<String, Object>> DATA_ROW = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<NotificationDto>> NOTIFICATIONS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<AdminMemberDto>> MEMBERS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto>> DEBUG_EXCHANGES = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<String>> DEBUG_SERVICES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<GameMappingDto>> GAME_MAPPINGS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<DetectedGameDto>> MISSING_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DetectedGameDto>> DETECTED_GAMES = new ParameterizedTypeReference<>() {};
@@ -422,6 +424,58 @@ public class RealApiService implements ApiService {
     @Override
     public List<AdminMemberDto> adminSearchMembers(String q) {
         return client.get("/api/admin/members/search?q={q}", MEMBERS, q == null ? "" : q);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto memberDebug(UUID memberId) {
+        return client.get("/api/admin/members/{id}/debug", fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto.class, memberId);
+    }
+
+    @Override
+    public int enableMemberDebug(UUID memberId, boolean revealSecrets) {
+        return client.postVoid("/api/admin/members/{id}/debug/enable",
+                new fr.enimaloc.catapult.common.dto.admin.DebugEnableRequest(revealSecrets), memberId);
+    }
+
+    @Override
+    public int disableMemberDebug(UUID memberId) {
+        return client.postVoid("/api/admin/members/{id}/debug/disable", null, memberId);
+    }
+
+    @Override
+    public int clearMemberDebug(UUID memberId) {
+        return client.postVoid("/api/admin/members/{id}/debug/clear", null, memberId);
+    }
+
+    @Override
+    public AdminPage<fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto> memberDebugExchanges(
+            UUID memberId, fr.enimaloc.catapult.service.DebugExchangeFilter filter, int page) {
+        // Unset filters go as empty values, which catapult-api reads as absent
+        return client.get("/api/admin/members/{id}/debug/exchanges?service={service}&direction={direction}&outcome={outcome}&from={from}&to={to}&page={page}&size=50",
+                DEBUG_EXCHANGES, memberId, text(filter.service()), text(filter.direction()), text(filter.outcome()),
+                filter.from() == null ? "" : filter.from().toString(), filter.to() == null ? "" : filter.to().toString(), page);
+    }
+
+    private static String text(String value) {
+        return value == null ? "" : value;
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto memberDebugExchange(UUID memberId, UUID exchangeId) {
+        return client.get("/api/admin/members/{id}/debug/exchanges/{exchangeId}",
+                fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto.class, memberId, exchangeId);
+    }
+
+    @Override
+    public List<String> memberDebugServices(UUID memberId) {
+        List<String> services = client.get("/api/admin/members/{id}/debug/services", DEBUG_SERVICES, memberId);
+        return services == null ? List.of() : services;
+    }
+
+    @Override
+    public boolean myDebugActive() {
+        fr.enimaloc.catapult.common.dto.MyDebugDto debug = client.get("/api/me/debug", fr.enimaloc.catapult.common.dto.MyDebugDto.class);
+        return debug != null && debug.active();
     }
 
     @Override
