@@ -137,7 +137,7 @@
 
     <!--/* The status is read by channel-custom-bindings.js (GET /me/api-token); the token only ever appears in #api-token-value, once. */-->
     <mdui-card id="channel-api-token-card" class="settings-card" variant="outlined"
-               th:attr="data-example-name=${bindings.isEmpty() ? 'Art' : bindings.get(0).name()},data-api-base=#{channel.api_token.api_base_placeholder},data-label-none=#{channel.api_token.none},data-label-since=#{channel.api_token.since('{0}')},data-label-generate=#{channel.api_token.generate},data-label-regenerate=#{channel.api_token.regenerate},data-label-copied=#{channel.api_token.copied},data-label-unavailable=#{channel.api_token.unavailable}">
+               th:attr="data-example-name=${bindings.isEmpty() ? 'Art' : bindings.get(0).name()},data-label-none=#{channel.api_token.none},data-label-since=#{channel.api_token.since('{0}')},data-label-generate=#{channel.api_token.generate},data-label-regenerate=#{channel.api_token.regenerate},data-label-copied=#{channel.api_token.copied},data-label-unavailable=#{channel.api_token.unavailable}">
         <div class="title-row">
             <h3 th:text="#{channel.api_token.title}">Jeton d'API</h3>
         </div>
