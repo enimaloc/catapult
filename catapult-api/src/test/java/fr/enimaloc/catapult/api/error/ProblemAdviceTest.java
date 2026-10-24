@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api.error;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -18,15 +19,21 @@ import fr.enimaloc.catapult.service.notification.TwitchatValidationException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -143,6 +150,42 @@ class ProblemAdviceTest {
     }
 
     @Test
+    void aCauseCycleAnswersAnInternalErrorWithoutHanging() {
+        // Called directly: Spring's own resolver recurses on a cause cycle before the advice is reached.
+        IllegalStateException a = new IllegalStateException("a");
+        IllegalArgumentException b = new IllegalArgumentException("b");
+        a.initCause(b);
+        b.initCause(a);
+
+        ResponseEntity<ProblemDetail> answer = assertTimeoutPreemptively(
+                Duration.ofSeconds(5),
+                () -> new ProblemAdvice()
+                        .unexpected(a, new MockHttpServletRequest("GET", "/api/probe/cycle"), new MockHttpServletResponse()));
+
+        assertThat(answer.getStatusCode().value()).isEqualTo(500);
+        assertThat(answer.getBody().getProperties()).containsEntry("code", "internal_error");
+        assertThat(logs.list).hasSize(1);
+    }
+
+    @Test
+    void wrappedAccessDeniedIsRethrownAsIs() {
+        assertThatThrownBy(() -> mvc.perform(get("/api/probe/wrapped-denied")))
+                .isInstanceOf(ServletException.class)
+                .cause()
+                .isSameAs(Probe.WRAPPED_DENIED);
+        assertThat(logs.list).isEmpty();
+    }
+
+    @Test
+    void wrappedAuthenticationFailureIsRethrownAsIs() {
+        assertThatThrownBy(() -> mvc.perform(get("/api/probe/wrapped-auth")))
+                .isInstanceOf(ServletException.class)
+                .cause()
+                .isSameAs(Probe.WRAPPED_AUTH);
+        assertThat(logs.list).isEmpty();
+    }
+
+    @Test
     void committedResponseIsRethrown() {
         assertThatThrownBy(() -> mvc.perform(get("/api/probe/committed")))
                 .isInstanceOf(ServletException.class)
@@ -204,6 +247,21 @@ class ProblemAdviceTest {
     @RestController
     @RequestMapping({"/api/probe", "/api/game/probe"})
     static class Probe {
+
+        static final IllegalStateException WRAPPED_DENIED =
+                new IllegalStateException("wrapper", new AuthorizationDeniedException("Access Denied"));
+        static final IllegalStateException WRAPPED_AUTH =
+                new IllegalStateException("wrapper", new BadCredentialsException("nope"));
+
+        @GetMapping("/wrapped-denied")
+        String wrappedDenied() {
+            throw WRAPPED_DENIED;
+        }
+
+        @GetMapping("/wrapped-auth")
+        String wrappedAuth() {
+            throw WRAPPED_AUTH;
+        }
 
         @GetMapping("/rse")
         String rse() {

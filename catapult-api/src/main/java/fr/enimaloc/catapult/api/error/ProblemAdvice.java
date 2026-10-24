@@ -6,6 +6,11 @@ import fr.enimaloc.catapult.service.notification.TwitchatValidationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -99,12 +104,14 @@ public class ProblemAdvice extends ResponseEntityExceptionHandler {
     @SneakyThrows
     public ResponseEntity<ProblemDetail> unexpected(
             Exception ex, HttpServletRequest request, HttpServletResponse response) {
+        List<Throwable> chain = causeChain(ex);
         if (FrozenRoutes.isFrozen(request)
                 || response.isCommitted()
-                || DisconnectedClientHelper.isClientDisconnectedException(ex)) {
+                || causedBySecurityFailure(chain)
+                || (!isCyclic(chain) && DisconnectedClientHelper.isClientDisconnectedException(ex))) {
             throw ex;
         }
-        ResponseEntity<ProblemDetail> declared = declaredStatus(ex);
+        ResponseEntity<ProblemDetail> declared = declaredStatus(chain);
         if (declared != null) {
             return declared;
         }
@@ -120,8 +127,8 @@ public class ProblemAdvice extends ResponseEntityExceptionHandler {
      * carries {@code @ResponseStatus}, or caused by one of those or by a {@link ResponseStatusException}. It is a
      * declared answer, not a failure, so it is not logged. {@code null} when nothing in the chain declares one.
      */
-    private static @Nullable ResponseEntity<ProblemDetail> declaredStatus(Throwable ex) {
-        for (Throwable current = ex; current != null; current = causeOf(current)) {
+    private static @Nullable ResponseEntity<ProblemDetail> declaredStatus(List<Throwable> chain) {
+        for (Throwable current : chain) {
             if (current instanceof ResponseStatusException rse) {
                 ErrorCode code = rse instanceof ApiProblem problem
                         ? problem.code()
@@ -138,8 +145,35 @@ public class ProblemAdvice extends ResponseEntityExceptionHandler {
         return null;
     }
 
-    private static @Nullable Throwable causeOf(Throwable ex) {
-        return ex.getCause() == ex ? null : ex.getCause();
+    /**
+     * A security failure wrapped in another exception: Spring Security's {@code ExceptionTranslationFilter} unwraps
+     * causes, so it must see the original exception to answer 401 or 403.
+     */
+    private static boolean causedBySecurityFailure(List<Throwable> chain) {
+        for (Throwable current : chain) {
+            if (current instanceof AccessDeniedException || current instanceof AuthenticationException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether the walk stopped on a cycle. Spring's own cause walkers ({@code DisconnectedClientHelper}) never end on
+     * one, and a client hang-up is never cyclic.
+     */
+    private static boolean isCyclic(List<Throwable> chain) {
+        return chain.get(chain.size() - 1).getCause() != null;
+    }
+
+    /** The exception then its causes, each once: a cause cycle ends the walk. */
+    private static List<Throwable> causeChain(Throwable ex) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        List<Throwable> chain = new ArrayList<>();
+        for (Throwable current = ex; current != null && seen.add(current); current = current.getCause()) {
+            chain.add(current);
+        }
+        return chain;
     }
 
     private static ResponseEntity<ProblemDetail> declared(
