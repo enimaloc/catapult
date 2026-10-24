@@ -87,9 +87,9 @@ class MockDebugStore {
         return 204;
     }
 
+    /** Deletes the member's exchanges; the mode itself is left as is, as catapult-api does. */
     synchronized int clear(UUID member) {
         exchanges.remove(member);
-        states.remove(member);
         return 204;
     }
 
