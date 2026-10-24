@@ -1,15 +1,187 @@
 <!--/*@thymesVar id="mappings" type="fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.admin.GameMappingDto>"*/-->
 <!--/*@thymesVar id="missing" type="fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.admin.DetectedGameDto>"*/-->
-<!--/* Placeholder: both lists, unstyled. The tab itself (form, paging, actions) replaces it. */-->
-<div th:fragment="content" class="admin-view admin-game-mappings">
-    <h2>Game mappings</h2>
-    <ul class="admin-game-mappings-list">
-        <li th:each="m : ${mappings?.content}"
-            th:text="${m.sourceType + ' ' + m.sourceId + ' ' + m.sourceName + ' -> ' + m.twitchGameName}">mapping</li>
-    </ul>
-    <h3>Missing</h3>
-    <ul class="admin-game-mappings-missing">
-        <li th:each="g : ${missing?.content}"
-            th:text="${g.sourceType + ' ' + g.sourceId + ' ' + g.sourceName + ' (' + g.streamerCount + ')'}">game</li>
-    </ul>
+<!--/*@thymesVar id="cclNames" type="java.util.Map<java.lang.String, java.lang.String>"*/-->
+<!--/*@thymesVar id="twLabels" type="java.util.Map<java.lang.String, java.lang.String>"*/-->
+<!--/*
+  The admin game mappings: a detected game (platform + its ID) set to a Twitch category for every streamer, its
+  CCLs and TWs IGDB's or the admin's. Two paged lists, each with its own page (data-page / data-missing-page, kept
+  for the reloads after an action): the mappings, edited or deleted from their row, and the detected games still
+  missing one, each a button opening the form filled with its platform and ID. The form and the deletion's
+  confirmation are dialogs outside [data-gm-lists], so a reload of the lists leaves an open one (and its result) as is.
+  Driven by admin-game-mappings.js.
+*/-->
+<div th:fragment="content" class="admin-view admin-game-mappings"
+     th:attr="data-page=${mappings == null ? 0 : mappings.number()},data-missing-page=${missing == null ? 0 : missing.number()},
+              data-label-create-title=#{admin.game-mappings.form.create-title},data-label-edit-title=#{admin.game-mappings.form.edit-title},
+              data-label-suggestion=#{admin.game-mappings.form.suggestion('{name}', '{id}', '{n}')},
+              data-label-result=#{admin.game-mappings.result('{bindings}', '{live}', '{failed}')},
+              data-label-deleted=#{admin.game-mappings.deleted},data-label-delete-title=#{admin.game-mappings.delete.title('{name}')},
+              data-label-error-400=#{admin.game-mappings.error.400},data-label-error-404=#{admin.game-mappings.error.404},
+              data-label-error-409=#{admin.game-mappings.error.409},data-label-error-id=#{admin.game-mappings.error.id},
+              data-label-error-category=#{admin.game-mappings.error.category},data-label-unavailable=#{admin.game-mappings.unavailable}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.game-mappings}">Game mappings</h2>
+        <mdui-button id="admin-gm-new" variant="tonal" icon="add" th:text="#{admin.game-mappings.new}">New mapping</mdui-button>
+    </div>
+    <p class="admin-cell-muted admin-gm-hint" th:text="#{admin.game-mappings.hint}">hint</p>
+
+    <div data-gm-lists>
+        <th:block th:if="${mappings == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+        <th:block th:if="${mappings != null and mappings.content().isEmpty()}">
+            <th:block th:replace="~{pages/admin-tab/common :: empty('sports_esports', #{admin.game-mappings.empty})}"></th:block>
+        </th:block>
+
+        <mdui-card class="admin-table admin-gm-mappings" variant="outlined" th:if="${mappings != null and !mappings.content().isEmpty()}">
+            <div class="admin-row admin-gm-row admin-row-head" aria-hidden="true">
+                <span th:text="#{admin.game-mappings.column.platform}">Platform</span>
+                <span th:text="#{admin.game-mappings.column.id}">ID</span>
+                <span th:text="#{admin.game-mappings.column.name}">Detected name</span>
+                <span th:text="#{admin.game-mappings.column.category}">Twitch category</span>
+                <span th:text="#{admin.game-mappings.column.ccls}">CCL</span>
+                <span th:text="#{admin.game-mappings.column.tws}">TW</span>
+                <span th:text="#{admin.game-mappings.column.bindings}">Bindings</span>
+                <span th:text="#{admin.game-mappings.column.updated}">Last change</span>
+                <span></span>
+            </div>
+            <div class="admin-row admin-gm-row" th:each="m : ${mappings.content()}"
+                 th:attr="data-id=${m.id()},data-source-type=${m.sourceType()},data-source-id=${m.sourceId()},
+                          data-source-name=${m.sourceName()},data-twitch-game-id=${m.twitchGameId()},
+                          data-twitch-game-name=${m.twitchGameName()},
+                          data-ccls-override=${m.ccls() == null ? null : 'true'},data-ccls=${m.ccls() == null ? null : #strings.setJoin(m.ccls(), ',')},
+                          data-tws-override=${m.tws() == null ? null : 'true'},data-tws=${m.tws() == null ? null : #strings.setJoin(m.tws(), ',')}">
+                <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.platform}"
+                      th:text="#{|admin.game-mappings.platform.${#strings.toLowerCase(m.sourceType())}|}">Steam</span>
+                <span class="admin-cell admin-member-id" th:attr="data-label=#{admin.game-mappings.column.id}" th:text="${m.sourceId()}">730</span>
+                <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.name}"
+                      th:text="${m.sourceName() == null ? #messages.msg('admin.game-mappings.never-detected') : m.sourceName()}">name</span>
+                <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.category}" th:text="${m.twitchGameName()}">category</span>
+                <span class="admin-gm-labels" th:attr="data-label=#{admin.game-mappings.column.ccls}">
+                    <span th:if="${m.ccls() == null}" class="admin-cell-muted" th:text="#{admin.game-mappings.igdb}">IGDB</span>
+                    <span th:if="${m.ccls() != null and m.ccls().isEmpty()}" th:text="#{admin.game-mappings.none}">None</span>
+                    <span th:if="${m.ccls() != null}" th:each="c, it : ${m.ccls()}"
+                          th:text="${(cclNames.get(c) ?: c) + (it.last ? '' : ', ')}">ccl</span>
+                </span>
+                <span class="admin-gm-labels" th:attr="data-label=#{admin.game-mappings.column.tws}">
+                    <span th:if="${m.tws() == null}" class="admin-cell-muted" th:text="#{admin.game-mappings.igdb}">IGDB</span>
+                    <span th:if="${m.tws() != null and m.tws().isEmpty()}" th:text="#{admin.game-mappings.none}">None</span>
+                    <span th:if="${m.tws() != null}" th:each="t, it : ${m.tws()}"
+                          th:text="${(twLabels.get(t) ?: t) + (it.last ? '' : ', ')}">tw</span>
+                </span>
+                <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.bindings}" th:text="${m.bindingCount()}">3</span>
+                <span class="admin-member-id" th:attr="data-label=#{admin.game-mappings.column.updated}">
+                    <span th:text="${m.updatedAt() == null ? '—' : #temporals.format(m.updatedAt(), #messages.msg('format.datetime'))}">when</span>
+                    <span class="admin-cell-muted" th:if="${m.updatedBy() != null}" th:text="#{admin.game-mappings.updated-by(${m.updatedBy()})}">by</span>
+                </span>
+                <span class="admin-row-actions">
+                    <mdui-button-icon icon="edit" th:attr="data-gm-edit=${m.id()},aria-label=#{admin.game-mappings.edit}"></mdui-button-icon>
+                    <mdui-button-icon icon="delete" th:attr="data-gm-delete=${m.id()},aria-label=#{admin.game-mappings.delete}"></mdui-button-icon>
+                </span>
+            </div>
+        </mdui-card>
+        <th:block th:if="${mappings != null}"><th:block th:replace="~{pages/admin-tab/game-mappings :: pager(${mappings}, 'data-gm-page')}"></th:block></th:block>
+
+        <div class="section-header admin-gm-missing-header">
+            <h3 th:text="#{admin.game-mappings.missing.title}">Missing mappings</h3>
+        </div>
+        <p class="admin-cell-muted admin-gm-hint" th:text="#{admin.game-mappings.missing.hint}">hint</p>
+        <th:block th:if="${missing == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+        <th:block th:if="${missing != null and missing.content().isEmpty()}">
+            <th:block th:replace="~{pages/admin-tab/common :: empty('task_alt', #{admin.game-mappings.missing.empty})}"></th:block>
+        </th:block>
+        <mdui-card class="admin-table admin-gm-missing" variant="outlined" th:if="${missing != null and !missing.content().isEmpty()}">
+            <div class="admin-row admin-gm-missing-row admin-row-head" aria-hidden="true">
+                <span th:text="#{admin.game-mappings.column.platform}">Platform</span>
+                <span th:text="#{admin.game-mappings.column.id}">ID</span>
+                <span th:text="#{admin.game-mappings.column.name}">Detected name</span>
+                <span th:text="#{admin.game-mappings.column.streamers}">Streamers</span>
+                <span></span>
+            </div>
+            <div class="admin-row admin-gm-missing-row" th:each="g : ${missing.content()}">
+                <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.platform}"
+                      th:text="#{|admin.game-mappings.platform.${#strings.toLowerCase(g.sourceType())}|}">Steam</span>
+                <span class="admin-cell admin-member-id" th:attr="data-label=#{admin.game-mappings.column.id}" th:text="${g.sourceId()}">730</span>
+                <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.name}" th:text="${g.sourceName()}">name</span>
+                <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.streamers}" th:text="${g.streamerCount()}">3</span>
+                <span class="admin-row-actions">
+                    <mdui-button variant="tonal" icon="add" data-gm-create th:attr="data-source-type=${g.sourceType()},data-source-id=${g.sourceId()},data-source-name=${g.sourceName()}"
+                                 th:text="#{admin.game-mappings.missing.create}">Create the mapping</mdui-button>
+                </span>
+            </div>
+        </mdui-card>
+        <th:block th:if="${missing != null}"><th:block th:replace="~{pages/admin-tab/game-mappings :: pager(${missing}, 'data-gm-missing-page')}"></th:block></th:block>
+    </div>
+
+    <mdui-dialog id="admin-gm-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-gm-form">
+            <h3 class="admin-gm-form-title" th:text="#{admin.game-mappings.form.create-title}">New game mapping</h3>
+            <mdui-select name="sourceType" variant="outlined" value="STEAM" th:attr="label=#{admin.game-mappings.form.platform}">
+                <mdui-menu-item th:each="p : ${ {'STEAM', 'XBOX', 'BATTLENET', 'MINECRAFT'} }" th:value="${p}"
+                                th:attr="data-format=#{|admin.game-mappings.form.format.${#strings.toLowerCase(p)}|}"
+                                th:text="#{|admin.game-mappings.platform.${#strings.toLowerCase(p)}|}">Steam</mdui-menu-item>
+            </mdui-select>
+            <div class="admin-gm-search">
+                <mdui-text-field name="sourceId" variant="outlined" autocomplete="off" maxlength="255"
+                                 th:attr="label=#{admin.game-mappings.form.game},helper=#{admin.game-mappings.form.format.steam}"></mdui-text-field>
+                <span class="admin-cell-muted admin-gm-game-name"></span>
+                <mdui-list class="admin-gm-suggestions"></mdui-list>
+            </div>
+            <div class="admin-gm-search">
+                <mdui-text-field name="category" variant="outlined" autocomplete="off" icon="search"
+                                 th:attr="label=#{admin.game-mappings.form.category}"></mdui-text-field>
+                <mdui-list class="admin-gm-category-results"></mdui-list>
+            </div>
+
+            <fieldset class="admin-gm-override" data-gm-override="ccls">
+                <legend th:text="#{admin.game-mappings.form.ccls}">CCL</legend>
+                <label class="admin-gm-switch">
+                    <mdui-switch class="admin-gm-override-switch"></mdui-switch>
+                    <span th:text="#{admin.game-mappings.form.override}">Replace IGDB's</span>
+                </label>
+                <div class="admin-gm-choices" hidden>
+                    <mdui-checkbox th:each="e : ${cclNames}" class="admin-gm-ccl" th:value="${e.key}" th:text="${e.value}">ccl</mdui-checkbox>
+                    <span class="admin-cell-muted" th:if="${cclNames.isEmpty()}" th:text="#{admin.game-mappings.form.no-choice}">none</span>
+                </div>
+            </fieldset>
+            <fieldset class="admin-gm-override" data-gm-override="tws">
+                <legend th:text="#{admin.game-mappings.form.tws}">TW</legend>
+                <label class="admin-gm-switch">
+                    <mdui-switch class="admin-gm-override-switch"></mdui-switch>
+                    <span th:text="#{admin.game-mappings.form.override}">Replace IGDB's</span>
+                </label>
+                <div class="admin-gm-choices" hidden>
+                    <mdui-checkbox th:each="e : ${twLabels}" class="admin-gm-tw" th:value="${e.key}" th:text="${e.value}">tw</mdui-checkbox>
+                    <span class="admin-cell-muted" th:if="${twLabels.isEmpty()}" th:text="#{admin.game-mappings.form.no-choice}">none</span>
+                </div>
+            </fieldset>
+
+            <mdui-checkbox name="applyLive" th:text="#{admin.game-mappings.form.apply-live}">Apply to the streams live now</mdui-checkbox>
+            <p class="admin-gm-error" role="alert" hidden></p>
+            <p class="admin-gm-result" role="status" hidden></p>
+            <div class="admin-data-actions">
+                <mdui-button variant="text" class="admin-gm-close" th:text="#{admin.game-mappings.form.close}">Close</mdui-button>
+                <mdui-button variant="filled" class="admin-gm-save" th:text="#{admin.game-mappings.form.save}">Save</mdui-button>
+            </div>
+        </div>
+    </mdui-dialog>
+
+    <mdui-dialog id="admin-gm-delete-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-gm-form">
+            <h3 class="admin-gm-delete-title">Delete</h3>
+            <p class="admin-cell-muted" th:text="#{admin.game-mappings.delete.description}">description</p>
+            <mdui-checkbox name="applyLive" th:text="#{admin.game-mappings.form.apply-live}">Apply to the streams live now</mdui-checkbox>
+            <div class="admin-data-actions">
+                <mdui-button variant="text" class="admin-gm-close" th:text="#{admin.cancel}">Cancel</mdui-button>
+                <mdui-button variant="filled" class="admin-gm-confirm-delete danger-zone-confirm" th:text="#{admin.game-mappings.delete}">Delete</mdui-button>
+            </div>
+        </div>
+    </mdui-dialog>
+</div>
+
+<!--/* ‹ n / N › for one of the two lists, `attr` naming the page it asks for (data-gm-page / data-gm-missing-page). */-->
+<div th:fragment="pager(page, attr)" class="admin-pagination" th:if="${page.totalPages() > 1}">
+    <mdui-button-icon icon="chevron_left" th:disabled="${page.first()}"
+                      th:attr="__${attr}__=${page.number() - 1},aria-label=#{admin.pagination.previous}"></mdui-button-icon>
+    <span th:text="|${page.number() + 1} / ${page.totalPages()}|">1 / 1</span>
+    <mdui-button-icon icon="chevron_right" th:disabled="${page.last()}"
+                      th:attr="__${attr}__=${page.number() + 1},aria-label=#{admin.pagination.next}"></mdui-button-icon>
 </div>
