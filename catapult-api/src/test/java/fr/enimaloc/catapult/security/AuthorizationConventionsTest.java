@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -22,7 +24,24 @@ import org.springframework.web.bind.annotation.RestController;
  */
 class AuthorizationConventionsTest {
 
-  private static final Pattern AUTHZ_CALL = Pattern.compile("^@authz\\.\\w+\\(.*\\)$");
+  /** One {@link Authz} call whose arguments are method parameters, and nothing else: no {@code or}, no second rule. */
+  private static final Pattern AUTHZ_CALL = Pattern.compile("^@authz\\.\\w+\\((#\\w+(\\s*,\\s*#\\w+)*)?\\)$");
+
+  @ParameterizedTest
+  @ValueSource(strings = {"@authz.ownsChannel(#username)", "@authz.canAccessChannel(#username)", "@authz.isAdmin()",
+      "@authz.check(#a, #b)"})
+  void aBareAuthzCallIsAccepted(String expression) {
+    assertThat(AUTHZ_CALL.matcher(expression).matches()).as(expression).isTrue();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"@authz.ownsChannel(#username) or isAuthenticated()",
+      "@authz.ownsChannel(#username) or hasIpAddress('::1')", "isAuthenticated() or @authz.ownsChannel(#username)",
+      "@authz.ownsChannel('matrix-owner')", "@authz.ownsChannel(#username) and @authz.isAdmin()",
+      "@authz.ownsChannel(#username.toString())", "permitAll()"})
+  void anythingButABareAuthzCallIsRejected(String expression) {
+    assertThat(AUTHZ_CALL.matcher(expression).matches()).as(expression).isFalse();
+  }
 
   @Test
   void preAuthorizeOnlyAsksAuthz() throws ClassNotFoundException {
