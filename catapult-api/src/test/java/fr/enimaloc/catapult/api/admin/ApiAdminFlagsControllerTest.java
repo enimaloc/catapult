@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @AutoConfigureMockMvc(addFilters = false) // the admin guard is ApiSecurityConfig's, tested with it
 class ApiAdminFlagsControllerTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
     @Autowired MockMvc mvc;
     @MockitoBean UserFlagRepository flags;
 

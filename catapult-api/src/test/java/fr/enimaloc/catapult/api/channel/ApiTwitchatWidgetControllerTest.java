@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(addFilters = false)
 @Import(I18nConfig.class)
 class ApiTwitchatWidgetControllerTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
 
     @Autowired MockMvc mvc;
 

@@ -61,6 +61,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(addFilters = false)
 @Import(I18nConfig.class)
 class UserApiV2ControllerTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String BASE = "http://localhost:8080/api/user";

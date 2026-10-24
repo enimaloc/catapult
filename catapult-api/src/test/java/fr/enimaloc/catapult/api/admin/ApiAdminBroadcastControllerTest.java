@@ -43,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import({BroadcastValidator.class, BroadcastRateLimiter.class, ApiUserResolver.class})
 class ApiAdminBroadcastControllerTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
     @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
