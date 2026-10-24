@@ -29,7 +29,7 @@ public enum ErrorCode {
 
     FEATURE_DISABLED(403),
 
-    // custom bindings (values of CustomBindingErrorDto, unchanged)
+    // custom bindings (the codes custom binding errors always had)
     TWITCH_UNAVAILABLE(409),
     BOT_DISABLED(409),
     TWITCH_FAILED(502),

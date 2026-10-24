@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ActivationOutcome;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.service.CustomBindingSave;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.Test;
@@ -71,13 +72,13 @@ class ChannelCustomBindingsControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(ID.toString()));
 
-        when(apiService.createCustomBinding(any(), any())).thenReturn(new CustomBindingSave<>(409, null, "limit_reached"));
+        when(apiService.createCustomBinding(any(), any())).thenReturn(new CustomBindingSave<>(409, null, ErrorCode.LIMIT_REACHED));
         mvc.perform(post("/channel/enimaloc/custom-bindings").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("limit_reached"));
 
-        when(apiService.createCustomBinding(any(), any())).thenReturn(new CustomBindingSave<>(409, null, "name_taken"));
+        when(apiService.createCustomBinding(any(), any())).thenReturn(new CustomBindingSave<>(409, null, ErrorCode.NAME_TAKEN));
         mvc.perform(post("/channel/enimaloc/custom-bindings").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(jsonPath("$.code").value("name_taken"));
@@ -93,7 +94,7 @@ class ChannelCustomBindingsControllerTest {
                 .andExpect(jsonPath("$.reapplyOutcome").value("bot_disabled"))
                 .andExpect(jsonPath("$.binding.name").value("Art"));
 
-        when(apiService.updateCustomBinding(any(), any(), any())).thenReturn(new CustomBindingSave<>(400, null, "invalid"));
+        when(apiService.updateCustomBinding(any(), any(), any())).thenReturn(new CustomBindingSave<>(400, null, ErrorCode.INVALID));
         mvc.perform(post("/channel/enimaloc/custom-bindings/" + ID).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isBadRequest())

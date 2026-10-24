@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service;
 
-import fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 
 /**
  * How catapult-api answered the activation of a custom binding, from its status and, for a 409, its error
@@ -10,9 +10,9 @@ public enum ActivationOutcome {
     /** The category is on Twitch and the binding is the active one. */
     APPLIED(204, null),
     /** 409: no Twitch token, or Twitch refused it: the member reconnects their account. */
-    TWITCH_UNAVAILABLE(409, CustomBindingErrorDto.TWITCH_UNAVAILABLE),
+    TWITCH_UNAVAILABLE(409, ErrorCode.TWITCH_UNAVAILABLE),
     /** 409: the bot is paused on the channel. */
-    BOT_DISABLED(409, CustomBindingErrorDto.BOT_DISABLED),
+    BOT_DISABLED(409, ErrorCode.BOT_DISABLED),
     /** The member may not use custom bindings (gate closed, not the owner). */
     FORBIDDEN(403, null),
     /** No such binding or channel. */
@@ -21,9 +21,9 @@ public enum ActivationOutcome {
     FAILED(502, null);
 
     private final int status;
-    private final String code;
+    private final ErrorCode code;
 
-    ActivationOutcome(int status, String code) {
+    ActivationOutcome(int status, ErrorCode code) {
         this.status = status;
         this.code = code;
     }
@@ -33,16 +33,16 @@ public enum ActivationOutcome {
     }
 
     /** The error code to tell the page, null when the status says it all. */
-    public String code() {
+    public ErrorCode code() {
         return code;
     }
 
     /** What catapult-api's {@code status} (and 409 {@code code}) means; anything unexpected is a failure. */
-    public static ActivationOutcome of(int status, String code) {
+    public static ActivationOutcome of(int status, ErrorCode code) {
         if (status >= 200 && status < 300) return APPLIED;
         return switch (status) {
-            case 409 -> CustomBindingErrorDto.BOT_DISABLED.equals(code) ? BOT_DISABLED
-                    : CustomBindingErrorDto.TWITCH_UNAVAILABLE.equals(code) ? TWITCH_UNAVAILABLE : FAILED;
+            case 409 -> code == ErrorCode.BOT_DISABLED ? BOT_DISABLED
+                    : code == ErrorCode.TWITCH_UNAVAILABLE ? TWITCH_UNAVAILABLE : FAILED;
             case 403 -> FORBIDDEN;
             case 404 -> NOT_FOUND;
             default -> FAILED;

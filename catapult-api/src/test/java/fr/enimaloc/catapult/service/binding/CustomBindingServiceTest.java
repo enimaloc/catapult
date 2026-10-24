@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -106,8 +107,8 @@ class CustomBindingServiceTest {
     }
 
     private static void assertCode(Executable call, String code) {
-        assertThatThrownBy(call::execute).isInstanceOfSatisfying(CustomBindingException.class,
-                e -> assertThat(e.code()).isEqualTo(code));
+        assertThatThrownBy(call::execute).isInstanceOfSatisfying(ApiProblem.class,
+                e -> assertThat(e.code().code()).isEqualTo(code));
     }
 
     @Test
