@@ -388,7 +388,7 @@ class AdminGameMappingServiceTest {
         when(bindingRepo.findGamesMissingAMapping(paging)).thenReturn(new PageImpl<>(List.of(
                 new Object[]{"STEAM", "730", 3L},
                 new Object[]{"XBOX", "x1", 1L}), paging, 2));
-        when(bindingRepo.countSourceNames(anyCollection())).thenReturn(List.of(
+        when(bindingRepo.countSourceNames(anyCollection(), anyCollection())).thenReturn(List.of(
                 new Object[]{SourceType.STEAM, "730", "CS2", 1L},
                 new Object[]{SourceType.STEAM, "730", "Counter-Strike 2", 2L},
                 new Object[]{SourceType.XBOX, "x1", "Halo", 1L},
@@ -400,13 +400,15 @@ class AdminGameMappingServiceTest {
         assertThat(missing).containsExactly(
                 new DetectedGameDto("STEAM", "730", "Counter-Strike 2", 3),
                 new DetectedGameDto("XBOX", "x1", "Halo", 1));
+        // Narrowed to the listed games' platforms, for the (source_type, source_id) index.
+        verify(bindingRepo).countSourceNames(Set.of(SourceType.STEAM, SourceType.XBOX), Set.of("730", "x1"));
     }
 
     @Test
     void detected_matchesIdPrefixOrNameAndCapsAt20() {
         when(bindingRepo.findDetectedGames(eq(SourceType.STEAM), any(), any(), any())).thenReturn(List.<Object[]>of(
                 new Object[]{SourceType.STEAM, "730", 4L}));
-        when(bindingRepo.countSourceNames(anyCollection())).thenReturn(List.<Object[]>of(
+        when(bindingRepo.countSourceNames(anyCollection(), anyCollection())).thenReturn(List.<Object[]>of(
                 new Object[]{SourceType.STEAM, "730", "Counter-Strike 2", 4L}));
 
         List<DetectedGameDto> found = service.detected("STEAM", " Co_ ");
@@ -444,7 +446,7 @@ class AdminGameMappingServiceTest {
     void igdbSuggestions_areResolvedBeforeTheTransaction() {
         GameBinding auto = binding(user("a"), "730", Status.AUTO);
         bindingsOfTheGame(auto);
-        when(bindingRepo.countSourceNames(anyCollection())).thenReturn(List.<Object[]>of(
+        when(bindingRepo.countSourceNames(anyCollection(), anyCollection())).thenReturn(List.<Object[]>of(
                 new Object[]{SourceType.STEAM, "730", "Counter-Strike 2", 1L}));
         when(igdbService.findByExternalAppId(SourceType.STEAM, "730"))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Counter-Strike 2")));
