@@ -134,8 +134,44 @@ class DebugSentryConfigTest {
     }
 
     @Test
-    void sampler_followsSampledParent() {
-        assertThat(sample(true, null)).isEqualTo(1.0);
+    void sampler_aSampledParent_isNotFollowed_forWorkThatIsNotADebuggedMembers() {
+        assertThat(sample(true, null)).isZero();
+        assertThat(DebugContext.callAs(other, () -> sample(true, null))).isZero();
+        CustomSamplingContext custom = new CustomSamplingContext();
+        custom.set(DebugSentryConfig.MEMBER_TAG, other);
+        assertThat(sample(true, custom)).isZero();
+    }
+
+    @Test
+    void sampler_aSampledParent_stillTracesADebuggedMember() {
+        assertThat(DebugContext.callAs(debugged, () -> sample(true, null))).isEqualTo(1.0);
+    }
+
+    @Test
+    void aRequestOfADebuggedMember_whoseParentWasSampled_isTracedInTheSameTrace_asTheMembersOwnTransaction() throws Exception {
+        RecordingSentry sentry = startSentry();
+        SentryId webTrace = new SentryId();
+        TransactionContext request = new TransactionContext(webTrace, new SpanId(), new SpanId(), null, null);
+        request.setName("GET /api/me");
+        request.setOperation("http.server");
+        request.setParentSampled(true);
+        TransactionOptions options = new TransactionOptions();
+        options.setBindToScope(true);
+        AtomicReference<String> traceInside = new AtomicReference<>();
+        try (ISentryLifecycleToken ignored = Sentry.forkedScopes("request").makeCurrent()) {
+            ITransaction tx = Sentry.startTransaction(request, options);
+            assertThat(tx.isSampled()).isFalse();
+            DebugContext.runAs(debugged, () -> traceInside.set(config.sentryTraceIds().currentTraceId()));
+            DebugContext.runAs(other, () -> { });
+            tx.finish();
+        }
+
+        var transactions = sentry.items(SentryItemType.Transaction);
+        assertThat(transactions).hasSize(1);
+        SentryTransaction sent = transactions.getFirst().getTransaction(sentry.options().getSerializer());
+        assertThat(sent.getContexts().getTrace().getTraceId()).isEqualTo(webTrace);
+        assertThat(sent.getTag(DebugSentryConfig.MEMBER_TAG)).isEqualTo(debugged.toString());
+        assertThat(traceInside.get()).isEqualTo(webTrace.toString());
     }
 
     // ---------------------------------------------------------------- errors

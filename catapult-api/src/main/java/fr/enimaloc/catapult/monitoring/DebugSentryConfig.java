@@ -89,15 +89,13 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
     }
 
     /**
-     * A trace catapult-web sampled goes on (whoever it is for: what is not a debugged member's is dropped before
-     * sending); otherwise only a debugged member's work is traced.
+     * Only a debugged member's work is traced, whether or not catapult-web sampled the trace it continues: a request
+     * transaction starts before its member is known, so it is not sampled, and the debugged member's work then runs
+     * in a transaction of its own in that same trace ({@link #enter}). No other member's request builds spans.
      */
     @Bean
     SentryOptions.TracesSamplerCallback tracesSampler() {
         return context -> {
-            if (Boolean.TRUE.equals(context.getTransactionContext().getParentSampled())) {
-                return 1.0;
-            }
             CustomSamplingContext custom = context.getCustomSamplingContext();
             Object member = custom == null ? null : custom.get(MEMBER_TAG);
             boolean debugged = currentMode().isPresent()
