@@ -41,4 +41,14 @@ class FrozenRoutesTest {
     void internal(String path) {
         assertThat(FrozenRoutes.isFrozen(new MockHttpServletRequest("GET", path))).isFalse();
     }
+
+    /**
+     * Unrouted paths (no handler answers them, so they are a 404 either way): they are under {@code /api/} and match
+     * no frozen pattern (a trailing slash matches no pattern), so they answer the problem.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"/api", "/api/", "/api/connect/steam/callback/"})
+    void unroutedEdgesAreInternal(String path) {
+        assertThat(FrozenRoutes.isFrozen(new MockHttpServletRequest("GET", path))).isFalse();
+    }
 }

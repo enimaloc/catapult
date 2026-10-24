@@ -87,6 +87,7 @@ class ProblemContractTest extends FullContextTestBase {
                 Map.of("Authorization", "Bearer " + memberJwt, "Accept", "text/event-stream"));
 
         assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(response.headers().firstValue("Content-Type")).hasValue(PROBLEM_JSON);
     }
 
     @Test

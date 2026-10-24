@@ -9,11 +9,15 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import fr.enimaloc.catapult.service.minecraft.MsaAuthClient;
+import fr.enimaloc.catapult.api.error.ProblemAdvice;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,6 +35,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** The admin's Minecraft service-account pool: device-code enrolment, re-auth, edits and removal. */
 class ApiAdminMinecraftAccountsFlowsTest {
@@ -73,6 +81,25 @@ class ApiAdminMinecraftAccountsFlowsTest {
     private static void assertStatus(Runnable call, HttpStatus status) {
         assertThatThrownBy(call::run).isInstanceOfSatisfying(ResponseStatusException.class,
                 e -> assertThat(e.getStatusCode()).isEqualTo(status));
+    }
+
+    /** admin-minecraft.js tells an expired device code by its 400: the advice must keep the declared status. */
+    @Test
+    void expiredDeviceCode_isA400Problem_onCreateAndReauth() throws Exception {
+        when(msa.pollDeviceCode("dc"))
+                .thenThrow(new MsaAuthClient.DeviceCodeExpiredException(new IllegalStateException("expired_token")));
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new ProblemAdvice())
+                .build();
+
+        for (String path : List.of("/api/admin/minecraft-accounts",
+                "/api/admin/minecraft-accounts/" + account.getId() + "/reauth")) {
+            mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content("{\"deviceCode\":\"dc\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                    .andExpect(jsonPath("$.code").value("bad_request"))
+                    .andExpect(jsonPath("$.detail").value("Device code expired"));
+        }
     }
 
     @Test

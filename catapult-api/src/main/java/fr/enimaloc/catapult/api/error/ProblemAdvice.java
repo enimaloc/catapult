@@ -3,10 +3,12 @@ package fr.enimaloc.catapult.api.error;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -15,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.context.request.WebRequest;
@@ -71,11 +74,61 @@ public class ProblemAdvice extends ResponseEntityExceptionHandler {
                 || DisconnectedClientHelper.isClientDisconnectedException(ex)) {
             throw ex;
         }
+        ResponseEntity<ProblemDetail> declared = declaredStatus(ex);
+        if (declared != null) {
+            return declared;
+        }
         log.error("Unhandled {} on {} {}", ex.getClass().getName(), request.getMethod(), request.getRequestURI(), ex);
         ProblemDetail problem =
                 ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, INTERNAL_ERROR_DETAIL);
         problem.setProperty(ErrorCode.PROPERTY, ErrorCode.INTERNAL_ERROR.code());
         return ResponseEntity.internalServerError().body(problem);
+    }
+
+    /**
+     * The answer {@code ResponseStatusExceptionResolver} would have given, as a problem: an exception whose class
+     * carries {@code @ResponseStatus}, or caused by one of those or by a {@link ResponseStatusException}. It is a
+     * declared answer, not a failure, so it is not logged. {@code null} when nothing in the chain declares one.
+     */
+    private static @Nullable ResponseEntity<ProblemDetail> declaredStatus(Throwable ex) {
+        for (Throwable current = ex; current != null; current = causeOf(current)) {
+            if (current instanceof ResponseStatusException rse) {
+                ErrorCode code = rse instanceof ApiProblem problem
+                        ? problem.code()
+                        : ErrorCode.forStatus(rse.getStatusCode().value());
+                return declared(rse.getStatusCode(), rse.getReason(), code);
+            }
+            ResponseStatus annotation =
+                    AnnotatedElementUtils.findMergedAnnotation(current.getClass(), ResponseStatus.class);
+            if (annotation != null) {
+                HttpStatus status = annotation.code();
+                return declared(status, annotation.reason(), ErrorCode.forStatus(status.value()));
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable Throwable causeOf(Throwable ex) {
+        return ex.getCause() == ex ? null : ex.getCause();
+    }
+
+    private static ResponseEntity<ProblemDetail> declared(
+            HttpStatusCode status, @Nullable String reason, ErrorCode code) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, englishOr(reason, status));
+        problem.setProperty(ErrorCode.PROPERTY, code.code());
+        return ResponseEntity.status(status).body(problem);
+    }
+
+    /**
+     * {@code reason} when it can be shown as an English detail (set, plain ASCII: the French reasons carry
+     * accents), else the status's reason phrase.
+     */
+    private static @Nullable String englishOr(@Nullable String reason, HttpStatusCode status) {
+        if (reason != null && !reason.isBlank() && StandardCharsets.US_ASCII.newEncoder().canEncode(reason)) {
+            return reason;
+        }
+        HttpStatus known = HttpStatus.resolve(status.value());
+        return known == null ? null : known.getReasonPhrase();
     }
 
     private static ErrorCode codeOf(Exception ex, int status) {
