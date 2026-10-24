@@ -203,15 +203,7 @@ class CustomBindingApiSecurityTest {
 
     @Nested
     @ActiveProfiles("dev")
-    class DevChain extends Slice {
-        @Override
-        @Test
-        void personalToken_isUselessElsewhere() throws Exception {
-            // The dev chain lets every request through to the controllers; a personal token is no JWT there either
-            mvc.perform(get("/api/me/api-token").header("Authorization", "Bearer " + PERSONAL_TOKEN))
-                    .andExpect(status().isUnauthorized());
-        }
-    }
+    class DevChain extends Slice {}
 
     @TestConfiguration
     static class Keys {

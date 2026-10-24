@@ -97,28 +97,6 @@ public class ApiSecurityConfig {
 
     @Bean
     @Profile("dev")
-    public SecurityFilterChain devApiSecurityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .securityMatcher("/api/**")
-                // Required for @CrossOrigin (see ApiGameInfoController) to actually emit
-                // Access-Control-* headers — without this, Spring Security never delegates
-                // to the CorsConfigurationSource Spring MVC derives from it.
-                .cors(Customizer.withDefaults())
-                .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll()
-                )
-                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
-                        jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
-                // Not a bean: a Filter bean would also be registered on the servlet container, outside the chain
-                .addFilterAfter(new DebugSubjectFilter(), BearerTokenAuthenticationFilter.class)
-                .csrf(AbstractHttpConfigurer::disable);
-
-        return http.build();
-    }
-
-    @Bean
-    @Profile("dev")
     BearerTokenResolver bearerTokenResolver() {
         DefaultBearerTokenResolver resolver = new DefaultBearerTokenResolver();
 
@@ -132,7 +110,6 @@ public class ApiSecurityConfig {
     }
 
     @Bean
-    @Profile("!dev")
     public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .securityMatcher("/api/**")
