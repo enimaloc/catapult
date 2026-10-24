@@ -142,6 +142,11 @@ class AdminTabsFragmentControllerDebugTest {
         verify(apiService).memberDebugExchanges(ID,
                 new DebugExchangeFilter(null, null, null, Instant.parse("2026-10-24T08:00:00Z"), null), 0);
         assertThat(html).contains("data-iso=\"2026-10-24T08:00:00Z\"").doesNotContain("not-a-date");
+        // no filter: each select shows its "all" option, which mdui-select can only select by a non-blank value
+        assertThat(html).containsPattern("data-debug-filter=\"service\"[^>]*value=\"all\"")
+                .containsPattern("data-debug-filter=\"direction\"[^>]*value=\"all\"")
+                .containsPattern("data-debug-filter=\"outcome\"[^>]*value=\"all\"")
+                .doesNotContain("<mdui-menu-item value=\"\"");
     }
 
     @Test

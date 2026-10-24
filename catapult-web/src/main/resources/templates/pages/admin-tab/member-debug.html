@@ -6,7 +6,8 @@
 <!--/*
   A debugged member's recorded exchanges (#members/{id}/debug): the mode's state, the filters (service, direction,
   outcome, period), one page of exchanges, and a dialog an exchange opens in. The filters and the page travel in the
-  query string (admin-member-debug.js), only [data-debug-results] is swapped by them. The dialog's texts come
+  query string (admin-member-debug.js), only [data-debug-results] is swapped by them. A select's "all" is the value
+  "all": mdui-select never selects an item whose value is blank. The dialog's texts come
   from the exchange JSON, by textContent only. Driven by admin-member-debug.js.
 */-->
 <div th:fragment="content" class="admin-view admin-debug" th:with="name=${member.twitchUsername() ?: '—'}"
@@ -36,17 +37,17 @@
         </mdui-card>
 
         <div class="admin-debug-filters">
-            <mdui-select data-debug-filter="service" variant="outlined" th:attr="label=#{admin.debug.filter.service},value=${filter.service()}">
-                <mdui-menu-item value="" th:text="#{admin.debug.filter.all}">all</mdui-menu-item>
+            <mdui-select data-debug-filter="service" variant="outlined" th:attr="label=#{admin.debug.filter.service},value=${filter.service() ?: 'all'}">
+                <mdui-menu-item value="all" th:text="#{admin.debug.filter.all}">all</mdui-menu-item>
                 <mdui-menu-item th:each="s : ${services}" th:value="${s}" th:text="${s}">service</mdui-menu-item>
             </mdui-select>
-            <mdui-select data-debug-filter="direction" variant="outlined" th:attr="label=#{admin.debug.filter.direction},value=${filter.direction()}">
-                <mdui-menu-item value="" th:text="#{admin.debug.filter.all}">all</mdui-menu-item>
+            <mdui-select data-debug-filter="direction" variant="outlined" th:attr="label=#{admin.debug.filter.direction},value=${filter.direction() ?: 'all'}">
+                <mdui-menu-item value="all" th:text="#{admin.debug.filter.all}">all</mdui-menu-item>
                 <mdui-menu-item value="OUT" th:text="#{admin.debug.direction.out}">out</mdui-menu-item>
                 <mdui-menu-item value="IN" th:text="#{admin.debug.direction.in}">in</mdui-menu-item>
             </mdui-select>
-            <mdui-select data-debug-filter="outcome" variant="outlined" th:attr="label=#{admin.debug.filter.outcome},value=${filter.outcome()}">
-                <mdui-menu-item value="" th:text="#{admin.debug.filter.all}">all</mdui-menu-item>
+            <mdui-select data-debug-filter="outcome" variant="outlined" th:attr="label=#{admin.debug.filter.outcome},value=${filter.outcome() ?: 'all'}">
+                <mdui-menu-item value="all" th:text="#{admin.debug.filter.all}">all</mdui-menu-item>
                 <mdui-menu-item value="error" th:text="#{admin.debug.outcome.error}">errors</mdui-menu-item>
                 <mdui-menu-item value="success" th:text="#{admin.debug.outcome.success}">successes</mdui-menu-item>
             </mdui-select>
