@@ -4,7 +4,10 @@ import fr.enimaloc.catapult.service.debug.DebugMembers;
 import io.sentry.Sentry;
 import io.sentry.SentryOptions;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.servlet.filter.OrderedFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +28,16 @@ public class SentryConfig {
     private static final Pattern UNTRACED = Pattern.compile(
             "^/(events/|me/twitchat/events|widget/|up$|actuator/|css/|js/|_static/|assets/|favicon|monitoring/tunnel).*");
 
+    /** The name of the Sentry starter's registration of its tracing filter, which samples each request. */
+    static final String TRACING_FILTER = "sentryTracingFilter";
+    /**
+     * Where that filter runs: after Spring Session's filter (the session lives in Redis, the container's request
+     * has none) and Boot's request context filter ({@code OrderedRequestContextFilter}, at
+     * {@code REQUEST_WRAPPER_FILTER_MAX_ORDER - 105}), so that the sampler sees the member logged in; still before
+     * Spring Security's chain and every other filter of catapult-web.
+     */
+    static final int TRACING_FILTER_ORDER = OrderedFilter.REQUEST_WRAPPER_FILTER_MAX_ORDER - 104;
+
     /** {@code catapult-web@<commit>}, the commit catapult-web was built from; the browser reports under it too. */
     public static Optional<String> release(Optional<BuildProperties> build) {
         return build.map(properties -> properties.get("git.commit"))
@@ -35,6 +48,23 @@ public class SentryConfig {
     @Bean
     Sentry.OptionsConfiguration<SentryOptions> sentryRelease(Optional<BuildProperties> build) {
         return options -> release(build).ifPresent(options::setRelease);
+    }
+
+    /**
+     * Moves Sentry's tracing filter to {@link #TRACING_FILTER_ORDER}; the starter puts it first of all, before
+     * the request has a session, so a member in debug mode could not be told from anyone else when sampling.
+     */
+    @Bean
+    static BeanPostProcessor sentryTracingFilterOrder() {
+        return new BeanPostProcessor() {
+            @Override
+            public Object postProcessBeforeInitialization(Object bean, String beanName) {
+                if (TRACING_FILTER.equals(beanName) && bean instanceof FilterRegistrationBean<?> registration) {
+                    registration.setOrder(TRACING_FILTER_ORDER);
+                }
+                return bean;
+            }
+        };
     }
 
     /**
@@ -52,13 +82,14 @@ public class SentryConfig {
         // Negative = the degraded profile is off
         double tracedRate = degradedRate >= 0 ? Math.min(rate, degradedRate) : rate;
         return context -> {
-            if (context.getCustomSamplingContext() != null
-                    && context.getCustomSamplingContext().get("request") instanceof HttpServletRequest request
-                    && UNTRACED.matcher(request.getRequestURI()).matches()) {
+            HttpServletRequest request = context.getCustomSamplingContext() != null
+                    && context.getCustomSamplingContext().get("request") instanceof HttpServletRequest r ? r : null;
+            if (request != null && UNTRACED.matcher(request.getRequestURI()).matches()) {
                 return 0.0;
             }
-            // A member in debug mode is traced in full, even when the degraded profile caps the rate
-            if (debugMembers.isCurrentActive()) {
+            // A member in debug mode is traced in full, even when the degraded profile caps the rate. The request
+            // is the one sampled: the member is read from its session, bound to the thread or not.
+            if (request != null ? debugMembers.isActiveOn(request) : debugMembers.isCurrentActive()) {
                 return 1.0;
             }
             Boolean parentSampled = context.getTransactionContext().getParentSampled();

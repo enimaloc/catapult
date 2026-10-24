@@ -1,11 +1,15 @@
 package fr.enimaloc.catapult.service.debug;
 
 import fr.enimaloc.catapult.service.ApiService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -71,6 +75,26 @@ public class DebugMembers {
             return api != null && isActive(api.currentUserId());
         } catch (RuntimeException e) {
             return false;
+        }
+    }
+
+    /**
+     * Whether the member logged in on {@code request} is in debug mode, even while that request is not yet bound to
+     * the thread (Sentry samples a request's trace before it is): the request is bound for the time of the question,
+     * so its session's JWT is read, and catapult-api asked on a cache miss, as for any page. False without a
+     * session, and on any failure.
+     */
+    public boolean isActiveOn(HttpServletRequest request) {
+        if (request == null) return false;
+        RequestAttributes bound = RequestContextHolder.getRequestAttributes();
+        try {
+            if (request.getSession(false) == null) return false;
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+            return isCurrentActive();
+        } catch (RuntimeException e) {
+            return false;
+        } finally {
+            RequestContextHolder.setRequestAttributes(bound);
         }
     }
 
