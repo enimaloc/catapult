@@ -244,6 +244,24 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         }
 
         @Test
+        void noGame_leavesTheCategoryAloneWhileACustomBindingIsActive() throws Exception {
+            fr.enimaloc.catapult.domain.binding.CustomBinding art = new fr.enimaloc.catapult.domain.binding.CustomBinding();
+            art.setId(UUID.randomUUID());
+            art.setName("Art");
+            when(customBindingActivations.active(owner)).thenReturn(Optional.of(
+                    new fr.enimaloc.catapult.domain.binding.CustomBindingActivation(owner.getId(), art,
+                            java.time.Instant.now())));
+
+            mvc.perform(postAs(owner, "/settings/no-game", """
+                            {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
+                             "applyOnStreamStart":false,"applyOnNoGame":true,"applyOnStreamEnd":false}"""))
+                    .andExpect(status().isNoContent());
+
+            assertThat(saved().getNoGameTwitchGameId()).isEqualTo("1");
+            verify(twitchService, never()).resetToDefault(any());
+        }
+
+        @Test
         void incompleteFallback() throws Exception {
             mvc.perform(postAs(owner, "/settings/incomplete-fallback",
                             "{\"twitchGameId\":\"2\",\"twitchGameName\":\"Other\",\"ccls\":[\"Drugs\"]}"))

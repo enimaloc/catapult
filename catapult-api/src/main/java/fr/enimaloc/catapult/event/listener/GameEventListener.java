@@ -156,6 +156,8 @@ public class GameEventListener {
         if (active.isPresent()) {
             // The prepared category wins over the default and the pending one; the pending one stays stored for
             // when the binding is deactivated
+            log.debug("Custom binding {} active for user {} — re-applied at stream start",
+                active.get().getCustomBinding().getId(), user.getId());
             twitchService.updateChannel(user, active.get().getCustomBinding().toGameBinding(user));
             return;
         }

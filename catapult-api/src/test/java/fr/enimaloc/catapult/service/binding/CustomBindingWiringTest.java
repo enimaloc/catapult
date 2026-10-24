@@ -1,6 +1,10 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.chat.command.registry.catapult.CatapultSetGameFunction;
 import fr.enimaloc.catapult.event.listener.GameEventListener;
+import fr.enimaloc.catapult.service.account.BotToggleService;
+import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
+import fr.enimaloc.catapult.service.notification.TwitchatActionTokenService;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
@@ -53,7 +57,12 @@ class CustomBindingWiringTest {
             .withBean(TwitchatEventDispatcher.class, () -> mock(TwitchatEventDispatcher.class))
             .withBean(IgdbService.class, () -> mock(IgdbService.class))
             .withBean(IgdbGameDetailsService.class, () -> mock(IgdbGameDetailsService.class))
-            .withBean(TwResolverService.class, () -> mock(TwResolverService.class));
+            .withBean(TwResolverService.class, () -> mock(TwResolverService.class))
+            // The manual category changes that end an activation
+            .withBean(CatapultSetGameFunction.class)
+            .withBean(TwitchatActionExecutor.class)
+            .withBean(TwitchatActionTokenService.class, () -> mock(TwitchatActionTokenService.class))
+            .withBean(BotToggleService.class, () -> mock(BotToggleService.class));
 
     @Test
     void theCustomBindingBeansAndTheDetectionPath_wireWithoutACycle() {
@@ -62,6 +71,8 @@ class CustomBindingWiringTest {
             assertThat(context).hasSingleBean(CustomBindingService.class);
             assertThat(context).hasSingleBean(CustomBindingActivations.class);
             assertThat(context).hasSingleBean(GameEventListener.class);
+            assertThat(context).hasSingleBean(CatapultSetGameFunction.class);
+            assertThat(context).hasSingleBean(TwitchatActionExecutor.class);
         });
     }
 
