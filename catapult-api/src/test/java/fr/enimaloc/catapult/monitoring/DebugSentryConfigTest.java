@@ -7,8 +7,18 @@ import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugMemberRegistry;
 import fr.enimaloc.catapult.service.debug.DebugMemberRegistry.DebugMode;
 import fr.enimaloc.catapult.service.debug.DebugRedactor;
+import fr.enimaloc.catapult.service.debug.OtherMemberMasker;
 import fr.enimaloc.catapult.service.debug.TraceIdSource;
+import io.sentry.Breadcrumb;
 import io.sentry.CustomSamplingContext;
+import io.sentry.SpanId;
+import io.sentry.SpanStatus;
+import io.sentry.protocol.Message;
+import io.sentry.protocol.SentryException;
+import io.sentry.protocol.SentrySpan;
+import io.sentry.SentryAttribute;
+import io.sentry.SentryAttributes;
+import io.sentry.logger.SentryLogParameters;
 import io.sentry.Hint;
 import io.sentry.ISentryLifecycleToken;
 import io.sentry.ITransaction;
@@ -47,6 +57,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -56,6 +67,10 @@ class DebugSentryConfigTest {
     private final UUID revealed = UUID.randomUUID();
     private final UUID other = UUID.randomUUID();
     private final DebugMemberRegistry registry = mock(DebugMemberRegistry.class);
+    /** Masks {@link #OTHER_STEAM_ID}, the identifier of another Catapult member. */
+    private final OtherMemberMasker masker = mock(OtherMemberMasker.class);
+    private static final String OTHER_STEAM_ID = "76561198000000042";
+    private static final String SECRET = "s3cr3t";
     private DebugSentryConfig config;
     private RecordingSentry sentry;
 
@@ -64,7 +79,9 @@ class DebugSentryConfigTest {
         when(registry.modeOf(any())).thenReturn(Optional.empty());
         when(registry.modeOf(debugged)).thenReturn(Optional.of(new DebugMode(debugged, false)));
         when(registry.modeOf(revealed)).thenReturn(Optional.of(new DebugMode(revealed, true)));
-        config = new DebugSentryConfig(registry, new DebugRedactor());
+        when(masker.mask(anyString(), any())).thenAnswer(inv -> ((String) inv.getArgument(0))
+                .replace(OTHER_STEAM_ID, "[membre]"));
+        config = new DebugSentryConfig(registry, new DebugRedactor(), masker);
     }
 
     @AfterEach
@@ -84,6 +101,7 @@ class DebugSentryConfigTest {
             options.setBeforeSendTransaction(config.beforeSendTransaction());
             options.getLogs().setBeforeSend(config.beforeSendLog());
             options.getMetrics().setBeforeSend(config.beforeSendMetric());
+            options.setBeforeBreadcrumb(config.beforeBreadcrumb());
         });
         config.afterPropertiesSet();
         return sentry;
@@ -224,14 +242,15 @@ class DebugSentryConfigTest {
     void beforeSendMetric_dropsMetricsOfNonDebuggedWork() {
         SentryMetricsEvent metric = new SentryMetricsEvent(new SentryId(), new SentryNanotimeDate(), "m", "counter", 1.0);
         assertThat(config.beforeSendMetric().execute(metric, new Hint())).isNull();
-        assertThat(DebugContext.callAs(debugged, () -> config.beforeSendMetric().execute(metric, new Hint())))
-                .isNotNull();
+        SentryMetricsEvent kept = DebugContext.callAs(debugged, () -> config.beforeSendMetric().execute(metric, new Hint()));
+        assertThat(kept).isNotNull();
+        assertThat(kept.getAttributes().get(DebugSentryConfig.MEMBER_TAG).getValue()).isEqualTo(debugged.toString());
     }
 
     // ---------------------------------------------------------------- end to end, through the SDK
 
     @Test
-    void logback_anErrorLogged_sendsNothing_unlessItIsADebuggedMembersWork() {
+    void logback_anErrorLogged_sendsNothing_unlessItIsADebuggedMembersWork() throws Exception {
         RecordingSentry sentry = startSentry();
         LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
         SentryAppender appender = new SentryAppender();
@@ -251,9 +270,18 @@ class DebugSentryConfigTest {
             });
             assertThat(sentry.items()).isEmpty();
 
-            DebugContext.runAs(debugged, () -> logger.error("boom", new IllegalStateException("debugged")));
-            assertThat(sentry.items(SentryItemType.Event)).hasSize(1);
+            DebugContext.runAs(revealed, () -> logger.info("another debugged member's info"));
+            DebugContext.runAs(debugged, () -> {
+                logger.info("the member's own info");
+                logger.error("boom", new IllegalStateException("debugged"));
+            });
+            var events = sentry.items(SentryItemType.Event);
+            assertThat(events).hasSize(1);
             assertThat(sentry.items(SentryItemType.Log)).isNotEmpty();
+            SentryEvent sent = events.getFirst().getEvent(sentry.options().getSerializer());
+            assertThat(sent.getBreadcrumbs()).extracting(Breadcrumb::getMessage)
+                    .contains("the member's own info")
+                    .doesNotContain("an info", "another debugged member's info");
         } finally {
             logger.detachAppender(appender);
             appender.stop();
@@ -340,7 +368,8 @@ class DebugSentryConfigTest {
                 .withConfiguration(AutoConfigurations.of(SentryAutoConfiguration.class))
                 .withUserConfiguration(DebugSentryConfig.class)
                 .withBean(DebugMemberRegistry.class, () -> registry)
-                .withBean(DebugRedactor.class, DebugRedactor::new);
+                .withBean(DebugRedactor.class, DebugRedactor::new)
+                .withBean(OtherMemberMasker.class, () -> masker);
     }
 
     @Test
@@ -365,11 +394,159 @@ class DebugSentryConfigTest {
                         assertThat(options.getLogs().getBeforeSend()).isNotNull();
                         assertThat(options.getMetrics().getBeforeSend()).isNotNull();
                         assertThat(options.getTracesSampler()).isNotNull();
+                        assertThat(options.getBeforeBreadcrumb()).isNotNull();
                         assertThat(options.isSendClientReports()).isFalse();
                         assertThat(options.getBeforeSend().execute(new SentryEvent(), new Hint())).isNull();
                     } finally {
                         Sentry.close();
                     }
                 });
+    }
+
+    // ---------------------------------------------------------------- scrubbing: secrets and other members
+
+    private static final String CALL = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=" + SECRET
+            + "&steamids=" + OTHER_STEAM_ID;
+
+    @Test
+    void beforeSend_scrubsTheMessageAndExceptions_ofSecretsUnlessRevealed_andOfOtherMembersAlways() {
+        SentryEvent masked = DebugContext.callAs(debugged,
+                () -> config.beforeSend().execute(eventWithText(), new Hint()));
+        assertThat(masked.getMessage().getFormatted()).doesNotContain(SECRET, OTHER_STEAM_ID).contains("key=[masqué]");
+        assertThat(masked.getMessage().getMessage()).doesNotContain(SECRET, OTHER_STEAM_ID);
+        assertThat(masked.getMessage().getParams()).allSatisfy(p -> assertThat(p).doesNotContain(SECRET, OTHER_STEAM_ID));
+        assertThat(masked.getExceptions().getFirst().getValue())
+                .doesNotContain(SECRET, OTHER_STEAM_ID).contains("key=[masqué]", "steamids=[membre]");
+
+        SentryEvent clear = DebugContext.callAs(revealed,
+                () -> config.beforeSend().execute(eventWithText(), new Hint()));
+        assertThat(clear.getExceptions().getFirst().getValue()).contains("key=" + SECRET).doesNotContain(OTHER_STEAM_ID);
+    }
+
+    private static SentryEvent eventWithText() {
+        SentryEvent event = new SentryEvent();
+        Message message = new Message();
+        message.setMessage("call to {} failed");
+        message.setParams(List.of(CALL));
+        message.setFormatted("call to " + CALL + " failed");
+        event.setMessage(message);
+        SentryException exception = new SentryException();
+        exception.setType("ResourceAccessException");
+        exception.setValue("I/O error on GET request for \"" + CALL + "\": timeout");
+        event.setExceptions(List.of(exception));
+        return event;
+    }
+
+    @Test
+    void beforeBreadcrumb_dropsNonDebuggedWork_andScrubsAndMarksTheMembersOwn() {
+        assertThat(config.beforeBreadcrumb().execute(Breadcrumb.http(CALL, "GET"), new Hint())).isNull();
+        assertThat(DebugContext.callAs(other,
+                () -> config.beforeBreadcrumb().execute(Breadcrumb.http(CALL, "GET"), new Hint()))).isNull();
+
+        Breadcrumb http = DebugContext.callAs(debugged,
+                () -> config.beforeBreadcrumb().execute(Breadcrumb.http(CALL, "GET", 200), new Hint()));
+        assertThat(http.getData().values()).allSatisfy(v -> assertThat(String.valueOf(v)).doesNotContain(SECRET, OTHER_STEAM_ID));
+        assertThat(http.getData("http.query")).isEqualTo("key=[masqué]&steamids=[membre]");
+        assertThat(http.getData(DebugSentryConfig.MEMBER_TAG)).isEqualTo(debugged.toString());
+
+        Breadcrumb log = DebugContext.callAs(debugged,
+                () -> config.beforeBreadcrumb().execute(Breadcrumb.info("calling " + CALL), new Hint()));
+        assertThat(log.getMessage()).doesNotContain(SECRET, OTHER_STEAM_ID);
+
+        Breadcrumb revealedCrumb = DebugContext.callAs(revealed,
+                () -> config.beforeBreadcrumb().execute(Breadcrumb.http(CALL, "GET"), new Hint()));
+        assertThat(revealedCrumb.getData("http.query")).isEqualTo("key=" + SECRET + "&steamids=[membre]");
+    }
+
+    @Test
+    void beforeSend_keepsOnlyTheBreadcrumbsOfTheMembersOwnWork() {
+        Breadcrumb own = Breadcrumb.info("own");
+        own.setData(DebugSentryConfig.MEMBER_TAG, debugged.toString());
+        Breadcrumb others = Breadcrumb.info("someone else's");
+        others.setData(DebugSentryConfig.MEMBER_TAG, revealed.toString());
+        Breadcrumb unmarked = Breadcrumb.info("unmarked");
+        SentryEvent event = new SentryEvent();
+        event.setBreadcrumbs(List.of(own, others, unmarked));
+
+        SentryEvent kept = DebugContext.callAs(debugged, () -> config.beforeSend().execute(event, new Hint()));
+
+        assertThat(kept.getBreadcrumbs()).extracting(Breadcrumb::getMessage).containsExactly("own");
+    }
+
+    @Test
+    void beforeSendLog_scrubsTheBodyAndTheMessageParameters() {
+        SentryLogEvent log = log();
+        log.setBody("calling " + CALL);
+        log.setAttribute("sentry.message.parameter.0", new io.sentry.SentryLogEventAttributeValue(
+                io.sentry.SentryAttributeType.STRING, CALL));
+
+        SentryLogEvent kept = DebugContext.callAs(debugged, () -> config.beforeSendLog().execute(log));
+
+        assertThat(kept.getBody()).doesNotContain(SECRET, OTHER_STEAM_ID).contains("key=[masqué]");
+        assertThat((String) kept.getAttributes().get("sentry.message.parameter.0").getValue())
+                .doesNotContain(SECRET, OTHER_STEAM_ID);
+    }
+
+    @Test
+    void beforeSendTransaction_scrubsTheSpansDescriptionsAndData() {
+        SentrySpan span = new SentrySpan(0.0, 1.0, new SentryId(), new SpanId(), new SpanId(), "http.client",
+                "GET " + CALL, SpanStatus.OK, "auto.http", Map.of(), Map.of(),
+                Map.of("url", CALL, "http.query", "key=" + SECRET + "&steamids=" + OTHER_STEAM_ID, "status", 200));
+        SentryTransaction tx = new SentryTransaction("GET /api/me", 0.0, 1.0, new java.util.ArrayList<>(List.of(span)),
+                Map.of(), new TransactionInfo("url"));
+        tx.setTag(DebugSentryConfig.MEMBER_TAG, debugged.toString());
+
+        SentryTransaction kept = config.beforeSendTransaction().execute(tx, new Hint());
+
+        SentrySpan sent = kept.getSpans().getFirst();
+        assertThat(sent.getDescription()).doesNotContain(SECRET, OTHER_STEAM_ID);
+        assertThat(sent.getData().get("http.query")).isEqualTo("key=[masqué]&steamids=[membre]");
+        assertThat((String) sent.getData().get("url")).doesNotContain(SECRET, OTHER_STEAM_ID);
+        assertThat(sent.getData().get("status")).isEqualTo(200);
+        assertThat(sent.getSpanId()).isEqualTo(span.getSpanId());
+    }
+
+    @Test
+    void endToEnd_aLoggedErrorWithASecretUrl_reachesSentryScrubbed() throws Exception {
+        RecordingSentry sentry = startSentry();
+        DebugContext.runAs(debugged, () -> {
+            Sentry.addBreadcrumb(Breadcrumb.http(CALL, "GET", 500));
+            Sentry.captureException(new IllegalStateException("I/O error on GET request for \"" + CALL + "\""));
+            Sentry.logger().log(SentryLogLevel.WARN, SentryLogParameters.create(SentryAttributes.of(
+                    SentryAttribute.stringAttribute("call", CALL))), "calling %s", CALL);
+        });
+        var items = sentry.items();
+        assertThat(items).isNotEmpty();
+        for (var item : items) {
+            assertThat(new String(item.getData(), java.nio.charset.StandardCharsets.UTF_8))
+                    .doesNotContain(SECRET, OTHER_STEAM_ID);
+        }
+    }
+
+    // ---------------------------------------------------------------- unsampled requests
+
+    @Test
+    void anUnsampledRequestOfADebuggedMember_isTracedInItsTrace_asTheMembersOwnTransaction() throws Exception {
+        RecordingSentry sentry = startSentry();
+        TransactionContext request = new TransactionContext("GET /api/me", "http.server");
+        TransactionOptions options = new TransactionOptions();
+        options.setBindToScope(true);
+        AtomicReference<String> traceInside = new AtomicReference<>();
+        String requestTrace;
+        try (ISentryLifecycleToken ignored = Sentry.forkedScopes("request").makeCurrent()) {
+            ITransaction tx = Sentry.startTransaction(request, options);
+            assertThat(tx.isSampled()).isFalse();
+            requestTrace = tx.getSpanContext().getTraceId().toString();
+            DebugContext.runAs(debugged, () -> traceInside.set(config.sentryTraceIds().currentTraceId()));
+            tx.finish();
+        }
+
+        var transactions = sentry.items(SentryItemType.Transaction);
+        assertThat(transactions).hasSize(1);
+        SentryTransaction sent = transactions.getFirst().getTransaction(sentry.options().getSerializer());
+        assertThat(sent.getTransaction()).isEqualTo("GET /api/me");
+        assertThat(sent.getContexts().getTrace().getTraceId().toString()).isEqualTo(requestTrace);
+        assertThat(sent.getTag(DebugSentryConfig.MEMBER_TAG)).isEqualTo(debugged.toString());
+        assertThat(traceInside.get()).isEqualTo(requestTrace);
     }
 }
