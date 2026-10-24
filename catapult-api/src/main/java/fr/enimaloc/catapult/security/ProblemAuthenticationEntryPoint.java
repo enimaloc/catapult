@@ -22,6 +22,7 @@ import tools.jackson.databind.json.JsonMapper;
 public final class ProblemAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     static final String DETAIL = "Authentication required";
+    static final String BAD_REQUEST_DETAIL = "Invalid request";
 
     private final AuthenticationEntryPoint delegate;
     private final JsonMapper json;
@@ -36,7 +37,9 @@ public final class ProblemAuthenticationEntryPoint implements AuthenticationEntr
     public void commence(HttpServletRequest request, HttpServletResponse response,
             AuthenticationException authException) throws IOException, ServletException {
         delegate.commence(request, response, authException);
-        writeProblem(request, response, json, DETAIL);
+        // A 401 asks for credentials; any other status (the bearer handler's 400 invalid_request) is a malformed request
+        writeProblem(request, response, json,
+                response.getStatus() == HttpServletResponse.SC_UNAUTHORIZED ? DETAIL : BAD_REQUEST_DETAIL);
     }
 
     /**
