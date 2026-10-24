@@ -699,4 +699,42 @@ class MockApiServiceTest {
 
         assertThat(service.adminDeleteDataRow("igdb-rating-descriptor", mapped)).isEqualTo(409);
     }
+
+    @Test
+    void experiments_areSharedAndEditableThroughTheService() {
+        loginAs("exp");
+        var list = service.adminExperiments();
+        assertThat(list).extracting("key").contains("new-dashboard");
+        UUID id = list.stream().filter(e -> e.key().equals("new-dashboard")).findFirst().orElseThrow().id();
+        var settings = service.adminExperiment(id);
+        UUID variant = settings.variants().get(1).id();
+        assertThat(service.adminExperiment(UUID.randomUUID())).isNull();
+        assertThat(service.adminFlagKeys()).isNotNull();
+
+        assertThat(service.adminExperimentAction(id, "reassign")).isEqualTo(204);
+        assertThat(service.adminExperimentWeightsPreview(id, Map.of(settings.variants().get(0).id(), 50, variant, 50))).isNotNull();
+        assertThat(service.adminExperimentWeightsPreview(UUID.randomUUID(), Map.of())).isNull();
+        assertThat(service.adminExperimentWeights(id, Map.of(settings.variants().get(0).id(), 50, variant, 50))).isEqualTo(204);
+
+        assertThat(service.adminAddExperimentRule(id,
+                new fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest("RANDOM", 1, 50, null, null, null)))
+                .isEqualTo(204);
+        UUID rule = service.adminExperiment(id).rules().getFirst().id();
+        assertThat(service.adminDeleteExperimentRule(id, rule)).isEqualTo(204);
+
+        String login = service.adminMembers().members().getFirst().twitchUsername();
+        assertThat(service.adminAddExperimentOverride(id,
+                new fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest("USER", "EXCLUDE", 1, " " + login.toUpperCase() + " ",
+                        null, null, null, null))).isEqualTo(204);
+        assertThat(service.adminAddExperimentOverride(id,
+                new fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest("USER", "EXCLUDE", 1, "nobody-here",
+                        null, null, null, null))).isEqualTo(404);
+        UUID override = service.adminExperiment(id).overrides().getFirst().id();
+        assertThat(service.adminDeleteExperimentOverride(id, override)).isEqualTo(204);
+
+        var assignments = service.adminExperimentAssignments(id, null, "", 0);
+        assertThat(assignments).isNotNull();
+        assertThat(service.adminExperimentAssignments(UUID.randomUUID(), null, "", 0)).isNull();
+        assertThat(service.adminMoveExperimentAssignment(id, UUID.randomUUID(), variant)).isEqualTo(404);
+    }
 }
