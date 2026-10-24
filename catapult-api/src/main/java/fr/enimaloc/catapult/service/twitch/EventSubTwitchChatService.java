@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
@@ -129,6 +130,10 @@ public class EventSubTwitchChatService implements TwitchChatService {
     }
 
     void handleMessage(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {
+        DebugContext.runAs(user.getId(), () -> dispatch(user, token, message, reconnectSession));
+    }
+
+    private void dispatch(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {
         try {
             JsonNode root = objectMapper.readTree(message);
             String messageType = root.path("metadata").path("message_type").asText();

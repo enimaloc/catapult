@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -44,6 +45,10 @@ public class RaidRestoreGameService {
 
     @EventListener
     public void onRaidedOut(ChannelRaidedOutEvent event) {
+        DebugContext.runAs(event.getUser().getId(), () -> restore(event));
+    }
+
+    private void restore(ChannelRaidedOutEvent event) {
         UserAccount user = event.getUser();
         Integer minutes = userSettingsRepository.findById(user.getId())
                 .map(UserSettings::getRaidRestoreGameMinutes)
