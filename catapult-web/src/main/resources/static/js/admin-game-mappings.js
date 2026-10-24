@@ -124,8 +124,10 @@ window.CatapultAdminGameMappings = (function () {
         wireSuggestions(form);
         form.platform.addEventListener("change", () => {
             showFormat(form);
-            form.suggestions.replaceChildren();
             if (form.platform.value === "MINECRAFT" && form.sourceId.value.trim() === "") form.sourceId.value = "minecraft";
+            // The suggestions shown, waiting or on their way are the old platform's: dropped, then looked up again.
+            form.dropSuggestions();
+            form.searchGames();
         });
         Object.values(form.overrides).forEach(fieldset => {
             fieldset.querySelector(".admin-gm-override-switch").addEventListener("change", () => showChoices(fieldset));
@@ -134,11 +136,20 @@ window.CatapultAdminGameMappings = (function () {
         return form;
     }
 
-    /** The game field's suggestions: the platform's detected games matching what is typed, the latest answer only. */
+    /**
+     * The game field's suggestions: the platform's detected games matching what is typed, the latest answer only.
+     * Sets `form.searchGames` (looks the typed text up on the platform shown) and `form.dropSuggestions` (empties
+     * the list and drops any lookup waiting or in flight).
+     */
     function wireSuggestions(form) {
         let timer;
         let latest = 0;
-        form.sourceId.addEventListener("input", () => {
+        form.dropSuggestions = () => {
+            clearTimeout(timer);
+            latest++;
+            form.suggestions.replaceChildren();
+        };
+        form.searchGames = () => {
             clearTimeout(timer);
             const query = ++latest;
             const q = form.sourceId.value.trim();
@@ -147,8 +158,8 @@ window.CatapultAdminGameMappings = (function () {
                 form.suggestions.replaceChildren();
                 return;
             }
+            const sourceType = form.platform.value;
             timer = setTimeout(async () => {
-                const sourceType = form.platform.value;
                 let games = null;
                 try {
                     const response = await fetch(`${BASE}/detected?sourceType=${encodeURIComponent(sourceType)}&q=${encodeURIComponent(q)}`);
@@ -162,15 +173,15 @@ window.CatapultAdminGameMappings = (function () {
                     item.textContent = fill(form.root.dataset.labelSuggestion,
                         { name: game.sourceName ?? game.sourceId, id: game.sourceId, n: game.streamerCount });
                     item.addEventListener("click", () => {
-                        latest++;
-                        form.suggestions.replaceChildren();
+                        form.dropSuggestions();
                         form.sourceId.value = game.sourceId;
                         form.gameName.textContent = game.sourceName ?? "";
                     });
                     return item;
                 }));
             }, DEBOUNCE_MS);
-        });
+        };
+        form.sourceId.addEventListener("input", form.searchGames);
     }
 
     function showFormat(form) {
@@ -219,7 +230,7 @@ window.CatapultAdminGameMappings = (function () {
         showFormat(form);
         form.sourceId.value = mapping.sourceId ?? "";
         form.gameName.textContent = mapping.sourceName ?? "";
-        form.suggestions.replaceChildren();
+        form.dropSuggestions();
         form.search.select(mapping.twitchGameId ? { id: mapping.twitchGameId, name: mapping.twitchGameName } : null);
         setOverride(form, "ccls", mapping.ccls ?? null);
         setOverride(form, "tws", mapping.tws ?? null);
