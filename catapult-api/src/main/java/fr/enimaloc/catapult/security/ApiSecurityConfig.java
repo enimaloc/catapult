@@ -27,7 +27,6 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -63,7 +62,7 @@ public class ApiSecurityConfig {
                 .securityMatcher(CUSTOM_BINDINGS_API, CUSTOM_BINDINGS_API + "/**")
                 // Answers the preflight before any authentication, and adds the headers to every answer, 401 included
                 .cors(cors -> cors.configurationSource(customBindingsCors()))
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth.anyRequest().access(Authz.personalToken()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
@@ -145,12 +144,8 @@ public class ApiSecurityConfig {
                         .requestMatchers("/api/health", "/api/config/**", "/api/changelog", "/api/status/degraded", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/well-known/serve", "/api/meta-tags", "/api/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/auth/exchange").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
-                        .requestMatchers("/api/admin/**").access(new WebExpressionAuthorizationManager(
-                                "hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')"
-                        ))
-                        .anyRequest().access(new WebExpressionAuthorizationManager(
-                                "isAuthenticated() or hasIpAddress('127.0.0.1') or hasIpAddress('::1')"
-                        ))
+                        .requestMatchers("/api/admin/**").access(Authz.admin())
+                        .anyRequest().access(Authz.memberOrLoopback())
                 )
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
