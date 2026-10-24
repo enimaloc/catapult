@@ -72,8 +72,8 @@ public class AdminMembersController {
 
     /** The member's debug mode; {@code revealSecrets} (default false) unmasks the secrets in what is recorded. */
     @PostMapping("/debug/enable")
-    public ResponseEntity<Void> enableDebug(@PathVariable UUID id, @RequestBody DebugEnableRequest body) {
-        return debugAction(id, () -> apiService.enableMemberDebug(id, body.revealSecrets()));
+    public ResponseEntity<Void> enableDebug(@PathVariable UUID id, @RequestBody(required = false) DebugEnableRequest body) {
+        return debugAction(id, () -> apiService.enableMemberDebug(id, body != null && body.revealSecrets()));
     }
 
     @PostMapping("/debug/disable")

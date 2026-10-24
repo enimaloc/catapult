@@ -473,9 +473,9 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public boolean myDebugActive() {
+    public Boolean myDebugActive() {
         fr.enimaloc.catapult.common.dto.MyDebugDto debug = client.get("/api/me/debug", fr.enimaloc.catapult.common.dto.MyDebugDto.class);
-        return debug != null && debug.active();
+        return debug == null ? null : debug.active();
     }
 
     @Override

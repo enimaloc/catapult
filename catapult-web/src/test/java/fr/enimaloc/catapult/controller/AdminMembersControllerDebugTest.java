@@ -53,6 +53,35 @@ class AdminMembersControllerDebugTest {
     }
 
     @Test
+    void anEmptyObjectOrNoBody_meansMasked() throws Exception {
+        when(apiService.enableMemberDebug(ID, false)).thenReturn(204);
+
+        mvc.perform(debugPost("enable", true).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(debugPost("enable", true)).andExpect(status().isNoContent());
+
+        verify(apiService, org.mockito.Mockito.times(2)).enableMemberDebug(ID, false);
+    }
+
+    @Test
+    void notFoundAndUnreachable_areRelayed() throws Exception {
+        when(apiService.enableMemberDebug(ID, false)).thenReturn(404);
+        when(apiService.disableMemberDebug(ID)).thenReturn(404);
+        when(apiService.clearMemberDebug(ID)).thenReturn(502);
+
+        mvc.perform(debugPost("enable", true).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(debugPost("disable", true)).andExpect(status().isNotFound());
+        mvc.perform(debugPost("clear", true)).andExpect(status().isBadGateway());
+        when(apiService.enableMemberDebug(ID, false)).thenReturn(502);
+        when(apiService.disableMemberDebug(ID)).thenReturn(502);
+        mvc.perform(debugPost("enable", true)).andExpect(status().isBadGateway());
+        mvc.perform(debugPost("disable", true)).andExpect(status().isBadGateway());
+        when(apiService.clearMemberDebug(ID)).thenReturn(404);
+        mvc.perform(debugPost("clear", true)).andExpect(status().isNotFound());
+    }
+
+    @Test
     void disableAndClear_areForwarded_andTheMembersCachedStateForgotten() throws Exception {
         when(apiService.disableMemberDebug(ID)).thenReturn(204);
         when(apiService.clearMemberDebug(ID)).thenReturn(204);

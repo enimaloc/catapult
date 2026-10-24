@@ -70,6 +70,20 @@ class DebugMembersTest {
     }
 
     @Test
+    void anApiThatCouldNotTell_returnsNull_isNotDebugged_andIsRememberedOnlyBriefly() {
+        when(api.myDebugActive()).thenReturn(null);
+
+        assertThat(debug.isActive(MEMBER)).isFalse();
+        clock.advance(Duration.ofSeconds(4));
+        assertThat(debug.isActive(MEMBER)).isFalse();
+        verify(api, times(1)).myDebugActive();
+
+        when(api.myDebugActive()).thenReturn(true);
+        clock.advance(Duration.ofSeconds(2));
+        assertThat(debug.isActive(MEMBER)).isTrue();
+    }
+
+    @Test
     void nobody_isNotDebugged() {
         assertThat(debug.isActive(null)).isFalse();
     }
