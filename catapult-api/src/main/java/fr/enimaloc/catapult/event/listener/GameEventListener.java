@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
+import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
@@ -39,8 +40,16 @@ public class GameEventListener {
         log.debug("GameDetectedEvent for user {}: {}", user.getId(), event.getDetectedGame().getSourceName());
         // A new game: a raid's restored game no longer has to be kept
         raidRestoreGameService.releaseHold(user);
+        applyDetectedGame(user, event.getDetectedGame());
+    }
 
-        GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
+    /**
+     * What a detection of {@code game} does to the channel: its binding (or the ignored / incomplete fallback) is
+     * applied when live, stored pending otherwise. Also the path a custom binding's deactivation takes, so the game
+     * open at that moment takes over exactly as if it had just been detected.
+     */
+    public void applyDetectedGame(UserAccount user, DetectedGame game) {
+        GameBinding binding = bindingService.resolveOrCreate(user, game);
         // resolveOrCreate may have just inserted a new row (new game ever detected
         // for this user) or refreshed an INCOMPLETE one. Either way the channel
         // page needs to see it — ApiChannelActionsController only publishes for
@@ -143,6 +152,11 @@ public class GameEventListener {
                 twitchService.resetToDefault(user);
             }
         });
+    }
+
+    /** The usual "no game" category, applied when live and enabled in the streamer's settings. */
+    public void applyNoGameFallback(UserAccount user) {
+        applyNoGameFallback(user, updateChannel(user));
     }
 
     private ChannelUpdateOutcome applyNoGameFallback(UserAccount user,

@@ -31,6 +31,8 @@ public final class ChannelEvents {
     public static final String CONNECTION_CHANGED = "connection.changed";
     public static final String DTDD_MAPPING_CHANGED = "dtdd.mapping.changed";
     public static final String MINECRAFT_LINK_CHANGED = "minecraft.link.changed";
+    public static final String CUSTOM_BINDING_CHANGED = "custom.binding.changed";
+    public static final String CUSTOM_BINDINGS_UPDATED = "custom.bindings.updated";
 
     /**
      * Not a per-channel event: {@link NotificationDeliveryPending} names many members at once, so it has its
@@ -86,6 +88,12 @@ public final class ChannelEvents {
      * {@link #NOTIFICATION_DELIVERY_REDIS_CHANNEL}, at most a few hundred ids per message.
      */
     public record NotificationDeliveryPending(List<UUID> userIds) {}
+
+    /** The channel's active custom binding changed: {@code activeId} is the one now active, null once deactivated. */
+    public record CustomBindingChanged(String channelId, String channelLogin, String activeId) {}
+
+    /** The channel's custom bindings were created, changed or deleted: the dashboard reloads their list. */
+    public record CustomBindingsUpdated(String channelId, String channelLogin) {}
 
     /** A channel's Steam profile state, as the dashboard shows it. */
     public record SteamProfile(boolean hasSteam, boolean profilePrivate, boolean offlineMode, boolean rateLimited,

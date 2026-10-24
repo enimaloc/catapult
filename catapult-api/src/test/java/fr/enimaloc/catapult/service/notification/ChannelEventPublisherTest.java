@@ -147,4 +147,26 @@ class ChannelEventPublisherTest {
         assertThat(published(ChannelEvents.MINECRAFT_LINK_CHANGED)).isEqualTo(
                 new ChannelEvents.MinecraftLinkChanged(ownerId.toString(), "streamername", "PENDING", "jeb_"));
     }
+
+    @Test
+    void customBindingChanged_publishesTheActiveOne() {
+        UUID active = UUID.randomUUID();
+        publisher.customBindingChanged(ownerId, active);
+        assertThat(published(ChannelEvents.CUSTOM_BINDING_CHANGED)).isEqualTo(
+                new ChannelEvents.CustomBindingChanged(ownerId.toString(), "streamername", active.toString()));
+    }
+
+    @Test
+    void customBindingChanged_deactivated_publishesNull() {
+        publisher.customBindingChanged(ownerId, null);
+        assertThat(published(ChannelEvents.CUSTOM_BINDING_CHANGED)).isEqualTo(
+                new ChannelEvents.CustomBindingChanged(ownerId.toString(), "streamername", null));
+    }
+
+    @Test
+    void customBindingsUpdated_namesTheChannel() {
+        publisher.customBindingsUpdated(ownerId);
+        assertThat(published(ChannelEvents.CUSTOM_BINDINGS_UPDATED)).isEqualTo(
+                new ChannelEvents.CustomBindingsUpdated(ownerId.toString(), "streamername"));
+    }
 }
