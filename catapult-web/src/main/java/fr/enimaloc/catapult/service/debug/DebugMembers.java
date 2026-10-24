@@ -32,6 +32,8 @@ public class DebugMembers {
 
     private record Entry(boolean active, Instant expiresAt) {}
 
+    // Kept lazy on purpose: SentryConfig.tracesSampler -> DebugMembers -> RealApiService -> ApiClient -> Sentry
+    // RestClient customizer -> sentryHub is a cycle if ApiService is injected directly.
     private final ObjectProvider<ApiService> apiService;
     private final Clock clock;
     private final Map<UUID, Entry> cache = new ConcurrentHashMap<>();
