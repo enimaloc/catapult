@@ -965,7 +965,7 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public boolean myDebugActive() {
+    public Boolean myDebugActive() {
         UUID account = currentUserId();
         return account != null && members.debug().active(account);
     }

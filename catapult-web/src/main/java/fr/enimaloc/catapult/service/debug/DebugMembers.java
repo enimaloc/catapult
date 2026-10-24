@@ -53,7 +53,9 @@ public class DebugMembers {
         Entry fresh;
         try {
             ApiService api = apiService.getIfAvailable();
-            fresh = new Entry(api != null && api.myDebugActive(), now.plus(TTL));
+            Boolean active = api == null ? null : api.myDebugActive();
+            // null: catapult-api could not tell, which is remembered only briefly
+            fresh = active == null ? new Entry(false, now.plus(FAILURE_TTL)) : new Entry(active, now.plus(TTL));
         } catch (RuntimeException e) {
             log.debug("Could not tell whether {} is in debug mode: {}", member, e.toString());
             fresh = new Entry(false, now.plus(FAILURE_TTL));
