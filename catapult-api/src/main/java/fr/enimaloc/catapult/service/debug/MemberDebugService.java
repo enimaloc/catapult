@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
@@ -57,7 +59,7 @@ public class MemberDebugService {
         session.setEnabledAt(Instant.now(clock));
         session.setDisabledAt(null);
         MemberDebugSession saved = sessions.save(session);
-        registry.activate(userId, revealSecrets);
+        afterCommit(() -> registry.activate(userId, revealSecrets));
         return saved;
     }
 
@@ -69,13 +71,27 @@ public class MemberDebugService {
             s.setDisabledAt(Instant.now(clock));
             sessions.save(s);
         });
-        registry.deactivate(userId);
+        afterCommit(() -> registry.deactivate(userId));
     }
 
     /** Deletes every recorded exchange of the member; the mode itself is left as is. */
     @Transactional
     public void clear(UUID userId) {
         exchanges.deleteByUserId(userId);
+    }
+
+    /** Applies the registry change once the DB change is committed, so a rollback never leaves them disagreeing. */
+    private static void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 
     public Optional<MemberDebugSession> state(UUID userId) {
