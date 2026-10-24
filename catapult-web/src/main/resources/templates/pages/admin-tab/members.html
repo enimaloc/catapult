@@ -59,6 +59,8 @@
                     <div class="admin-member-badges">
                         <mdui-chip th:if="${isSelf}" th:text="#{admin.members.badge.you}">Vous</mdui-chip>
                         <mdui-chip th:if="${m.systemAccount()}" icon="smart_toy" th:text="#{admin.members.badge.system}">Système</mdui-chip>
+                        <mdui-chip th:if="${m.debug() != null and m.debug().active()}" icon="bug_report"
+                                   class="admin-member-debug-badge" th:text="#{admin.members.badge.debug}">Débug</mdui-chip>
                         <mdui-chip th:if="${page.isLive(m.id())}" class="admin-member-live" th:text="#{channel.status.live}">Live</mdui-chip>
                         <span class="admin-member-id" th:if="${m.twitchId() != null}" th:text="${m.twitchId()}">twitchId</span>
                     </div>
@@ -102,6 +104,16 @@
                                     th:text="#{admin.members.actions.twitch_unlink}">twitch</mdui-menu-item>
                     <mdui-menu-item icon="move_down" data-action="migrate"
                                     th:text="#{admin.members.actions.migrate}">migrate</mdui-menu-item>
+                    <!--/* The debug mode follows the member's recording: on, off but still kept (purge pending), or never on. */-->
+                    <mdui-menu-item icon="bug_report" data-action="debug-enable" th:unless="${m.debug() != null and m.debug().active()}"
+                                    th:text="#{admin.members.actions.debug_enable}">debug on</mdui-menu-item>
+                    <mdui-menu-item icon="bug_report" data-action="debug/disable" th:if="${m.debug() != null and m.debug().active()}"
+                                    th:text="#{admin.members.actions.debug_disable}">debug off</mdui-menu-item>
+                    <mdui-menu-item icon="manage_search" th:if="${m.debug() != null}" th:attr="data-admin-open=${m.id() + '/debug'}"
+                                    th:text="#{admin.members.actions.debug_view}">recording</mdui-menu-item>
+                    <mdui-menu-item icon="delete_sweep" data-action="debug/clear" th:if="${m.debug() != null}"
+                                    th:attr="data-confirm=#{admin.members.actions.debug_clear.confirm(${name})}"
+                                    th:text="#{admin.members.actions.debug_clear}">clear</mdui-menu-item>
                     <mdui-divider></mdui-divider>
                     <mdui-menu-item icon="delete" class="admin-member-delete" data-action="delete" th:disabled="${isSelf}"
                                     th:attr="data-confirm=#{admin.members.actions.delete.confirm(${name})}"
@@ -140,6 +152,19 @@
         </div>
         <mdui-button slot="action" variant="text" id="admin-migrate-cancel" th:text="#{admin.members.cancel}">Annuler</mdui-button>
         <mdui-button slot="action" id="admin-migrate-submit" th:text="#{admin.members.migrate.submit}">Migrer</mdui-button>
+    </mdui-dialog>
+
+    <!--/* Opened by the "turn on debug mode" action: the secrets stay masked unless the switch is turned on. */-->
+    <mdui-dialog id="admin-debug-dialog" th:if="${page != null}" close-on-overlay-click
+                 th:attr="data-headline=#{admin.members.debug.title('{0}')}">
+        <span slot="headline" id="admin-debug-headline"></span>
+        <div class="admin-migrate-form">
+            <p class="admin-cell-muted" th:text="#{admin.members.debug.hint}">hint</p>
+            <label><mdui-switch id="admin-debug-reveal"></mdui-switch><span th:text="#{admin.members.debug.reveal}">Secrets en clair</span></label>
+            <p id="admin-debug-warning" class="admin-debug-warning" hidden th:text="#{admin.members.debug.warning}">warning</p>
+        </div>
+        <mdui-button slot="action" variant="text" id="admin-debug-cancel" th:text="#{admin.members.cancel}">Annuler</mdui-button>
+        <mdui-button slot="action" id="admin-debug-submit" th:text="#{admin.members.debug.submit}">Activer</mdui-button>
     </mdui-dialog>
     </div>
 </th:block>

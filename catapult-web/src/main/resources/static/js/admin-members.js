@@ -10,6 +10,10 @@
  * refusal is told by its status (400, 404, else unavailable), never by catapult-api's message. Its
  * listeners are delegated to the panel: the sub-view comes and goes inside it.
  *
+ * Debug mode: "turn on" goes through its dialog (the secrets switch, off = masked, and the warning that comes with
+ * turning it on); "turn off" and the recording's deletion (confirmed) are plain actions. The exchanges page is
+ * admin-member-debug.js's.
+ *
  * "Impersonate" logs the admin in as a member and opens their channel (see impersonate()).
  */
 window.CatapultAdminMembers = (function () {
@@ -117,6 +121,24 @@ window.CatapultAdminMembers = (function () {
             return;
         }
         const response = await CatapultChannel.postJson(`/admin/members/${dialog.dataset.memberId}/migrate`, body);
+        if (response.ok) dialog.open = false;
+    }
+
+    // --- debug mode --------------------------------------------------------------------------
+
+    function openDebug(dialog, row) {
+        dialog.dataset.memberId = row.dataset.memberId;
+        document.getElementById("admin-debug-headline").textContent =
+            dialog.dataset.headline.replace("{0}", row.dataset.memberName);
+        // masked unless chosen otherwise, every time
+        document.getElementById("admin-debug-reveal").checked = false;
+        document.getElementById("admin-debug-warning").hidden = true;
+        dialog.open = true;
+    }
+
+    async function submitDebug(dialog, card) {
+        const revealSecrets = document.getElementById("admin-debug-reveal").checked;
+        const response = await postThenRefresh(card, `/admin/members/${dialog.dataset.memberId}/debug/enable`, { revealSecrets });
         if (response.ok) dialog.open = false;
     }
 
@@ -255,10 +277,22 @@ window.CatapultAdminMembers = (function () {
             sw.addEventListener("change", () => CatapultChannel.postSwitch(sw, memberUrl(rowOf(sw), "bot/toggle"), {}));
         });
 
+        const debugDialog = document.getElementById("admin-debug-dialog");
+        const reveal = document.getElementById("admin-debug-reveal");
+        reveal?.addEventListener("change", () => {
+            document.getElementById("admin-debug-warning").hidden = !reveal.checked;
+        });
+        document.getElementById("admin-debug-cancel")?.addEventListener("click", () => { debugDialog.open = false; });
+        document.getElementById("admin-debug-submit")?.addEventListener("click", () => submitDebug(debugDialog, card));
+
         card.querySelectorAll("mdui-menu-item[data-action]").forEach(item => {
             item.addEventListener("click", async () => {
                 if (item.disabled) return;
                 const row = rowOf(item);
+                if (item.dataset.action === "debug-enable") {
+                    openDebug(debugDialog, row);
+                    return;
+                }
                 if (item.dataset.action === "migrate") {
                     openMigrate(dialog, row);
                     return;

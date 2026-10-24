@@ -1058,7 +1058,69 @@ a[data-link].active {
     gap: 8px;
 }
 
+.admin-debug-warning {
+    margin: 0;
+    color: #ef4444;
+}
+
+.admin-debug-state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px;
+    margin-bottom: 16px;
+}
+
+.admin-debug-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.admin-debug-exchange {
+    cursor: pointer;
+}
+
+.admin-debug-exchange:hover, .admin-debug-exchange:focus-visible {
+    background: rgb(var(--mdui-color-surface-container-high));
+}
+
+.admin-debug-row {
+    grid-template-columns: 11rem 3.5rem 6rem 4rem minmax(0, 1fr) 3.5rem 5rem auto;
+}
+
+.admin-debug-badges {
+    display: flex;
+    gap: 4px;
+}
+
+.admin-debug-detail pre {
+    margin: 0 0 16px;
+    padding: 12px;
+    overflow: auto;
+    max-height: 40vh;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 0.8rem;
+    background: rgb(var(--mdui-color-surface-container-high));
+    border-radius: 8px;
+}
+
+.admin-debug-trace {
+    cursor: copy;
+}
+
 @media (max-width: 650px) {
+    .admin-debug-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .admin-debug-row.admin-row-head {
+        display: none;
+    }
+
     .admin-member-head {
         display: none;
     }

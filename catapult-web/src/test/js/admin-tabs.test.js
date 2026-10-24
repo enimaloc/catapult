@@ -79,6 +79,14 @@ describe("admin-tabs", () => {
         expect(urls()).toEqual(["/spa/admin/caches/igdb-game-cache"]);
     });
 
+    it("keeps the slash of a nested sub-view, and the page's query string for a debug page's filters", async () => {
+        history.replaceState(null, "", "/admin?service=steam&page=1#caches/abc%2Fdebug");
+        page();
+        await flush();
+
+        expect(urls()).toEqual(["/spa/admin/caches/abc/debug?service=steam&page=1"]);
+    });
+
     it("opens a sub-view as a new history entry, then goes back to the list", async () => {
         page("caches");
         await flush();

@@ -18,7 +18,11 @@ import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownHeader;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
+import fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto;
+import fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.DebugExchangeFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -32,6 +36,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -109,6 +115,67 @@ public class AdminTabsFragmentController {
                     : groups.stream().filter(g -> !targeting.groupKeys().contains(g.key())).toList());
             return "pages/admin-tab/members :: targeting";
         });
+    }
+
+    /**
+     * A member's debug mode and one page of what it recorded, narrowed by the filters of the query string (a blank or
+     * unreadable one is no filter; {@code from} and {@code to} are ISO instants); 404 when the member is unknown, the
+     * unavailable card when catapult-api can't tell the member's mode.
+     */
+    @GetMapping("/members/{id}/debug")
+    String memberDebug(Model model, HttpServletResponse response, @PathVariable UUID id,
+                       @RequestParam(required = false) String service, @RequestParam(required = false) String direction,
+                       @RequestParam(required = false) String outcome, @RequestParam(required = false) String from,
+                       @RequestParam(required = false) String to, @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            AdminMemberSummaryDto member = apiService.adminMember(id);
+            if (member == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/members :: missing";
+            }
+            MemberDebugStateDto state = apiService.memberDebug(id);
+            DebugExchangeFilter filter = new DebugExchangeFilter(blankToNull(service),
+                    oneOf(direction, "IN", "OUT"), oneOf(outcome, "error", "success"), instant(from), instant(to));
+            AdminPage<DebugExchangeSummaryDto> exchanges = state == null ? null
+                    : apiService.memberDebugExchanges(id, filter, Math.max(0, page));
+            List<String> services = state == null ? null : apiService.memberDebugServices(id);
+            model.addAttribute("member", member);
+            model.addAttribute("debugState", state);
+            model.addAttribute("exchanges", exchanges);
+            model.addAttribute("services", services == null ? List.of() : services);
+            model.addAttribute("filter", filter);
+            return "pages/admin-tab/member-debug :: content";
+        });
+    }
+
+    /** One recorded exchange in full, for the exchanges page's dialog; 404 when it isn't that member's. */
+    @GetMapping(value = "/members/{id}/debug/{exchangeId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    ResponseEntity<DebugExchangeDto> memberDebugExchange(@PathVariable UUID id, @PathVariable UUID exchangeId) {
+        int refused = AdminAccess.refusal(filler);
+        if (refused != 0) return ResponseEntity.status(refused).build();
+        DebugExchangeDto exchange = apiService.memberDebugExchange(id, exchangeId);
+        return exchange == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(exchange);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** {@code value} when it is one of {@code allowed}, else null. */
+    private static String oneOf(String value, String... allowed) {
+        String trimmed = blankToNull(value);
+        return trimmed != null && List.of(allowed).contains(trimmed) ? trimmed : null;
+    }
+
+    private static Instant instant(String value) {
+        String trimmed = blankToNull(value);
+        if (trimmed == null) return null;
+        try {
+            return Instant.parse(trimmed);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
     @GetMapping("/ccl")
