@@ -15,11 +15,15 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Stores the exchanges made for a member in debug mode. {@link #record} only hands the work to a dedicated virtual
- * thread executor: redaction, masking of other members, insertion and listener notification all happen there, as
+ * Stores the exchanges made for a member in debug mode. {@link #record} only hands the work to a small, bounded
+ * executor of its own (a full queue drops the exchange): redaction, masking of other members, insertion and listener notification all happen there, as
  * the member, and any failure is logged at warn and dropped — the recorded call never sees it.
  */
 @Slf4j
@@ -30,6 +34,14 @@ public class DebugExchangeRecorder {
     static final int OPERATION_MAX = 128;
     static final int METHOD_MAX = 16;
     static final int TRACE_ID_MAX = 64;
+    /** Few writers so that recording never competes much with request threads for DB connections. */
+    static final int WORKERS = 2;
+    /** Exchanges waiting beyond this are dropped rather than piling up bodies in memory. */
+    static final int QUEUE_CAPACITY = 1000;
+    private static final long DROP_WARN_INTERVAL_NANOS = TimeUnit.MINUTES.toNanos(1);
+
+    private final AtomicLong dropped = new AtomicLong();
+    private final AtomicLong lastDropWarn = new AtomicLong(Long.MIN_VALUE);
 
     private final DebugMemberRegistry registry;
     private final DebugRedactor redactor;
@@ -48,7 +60,7 @@ public class DebugExchangeRecorder {
         this(registry, redactor, masker, repository, services, listeners, () -> {
             TraceIdSource source = traceIds.getIfAvailable();
             return source == null ? null : source.currentTraceId();
-        }, Executors.newVirtualThreadPerTaskExecutor());
+        }, boundedExecutor(WORKERS, QUEUE_CAPACITY));
     }
 
     DebugExchangeRecorder(DebugMemberRegistry registry, DebugRedactor redactor, OtherMemberMasker masker,
@@ -80,9 +92,31 @@ public class DebugExchangeRecorder {
             String traceId = currentTraceId();
             executor.execute(() -> DebugContext.runAs(userId,
                     () -> store(userId, direction, raw, operation, filtered, traceId)));
+        } catch (RejectedExecutionException e) {
+            onDropped();
         } catch (RuntimeException e) {
             log.warn("Could not schedule the debug exchange of {}: {}", userId, e.toString());
         }
+    }
+
+    /** Counts a dropped exchange; warns on the first one, then at most once a minute. */
+    private void onDropped() {
+        long total = dropped.incrementAndGet();
+        long now = System.nanoTime();
+        long last = lastDropWarn.get();
+        if ((last == Long.MIN_VALUE || now - last >= DROP_WARN_INTERVAL_NANOS) && lastDropWarn.compareAndSet(last, now)) {
+            log.warn("Debug recording queue full: exchange dropped ({} dropped so far)", total);
+        }
+    }
+
+    /**
+     * {@code workers} virtual threads behind a queue of {@code capacity}: a full queue rejects at once (the caller
+     * never waits), and closing it lets the queued exchanges be written.
+     */
+    static ExecutorService boundedExecutor(int workers, int capacity) {
+        return new ThreadPoolExecutor(workers, workers, 0L, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(capacity), Thread.ofVirtual().name("debug-recorder-", 0).factory(),
+                new ThreadPoolExecutor.AbortPolicy());
     }
 
     private String currentTraceId() {
@@ -116,7 +150,7 @@ public class DebugExchangeRecorder {
             e.setStatus(raw.status());
             e.setResponseHeaders(mask(redactor.headers(raw.responseHeaders(), reveal), userId));
             e.setResponseBody(mask(redactor.body(raw.responseBody(), contentType(raw.responseHeaders()), reveal), userId));
-            e.setError(mask(raw.error(), userId));
+            e.setError(mask(redactor.text(raw.error(), reveal), userId));
             e.setDurationMs(raw.durationMs());
             e.setFiltered(filtered);
             e.setTraceId(traceId);

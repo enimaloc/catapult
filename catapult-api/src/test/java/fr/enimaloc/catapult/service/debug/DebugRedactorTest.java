@@ -84,4 +84,20 @@ class DebugRedactorTest {
         String out = redactor.body(b("a".repeat(70_000)), MediaType.TEXT_PLAIN, false);
         assertThat(out).isEqualTo("a".repeat(65_536) + "…(+4464 chars)");
     }
+
+    @Test
+    void freeText_secretParamsAndJsonFieldsAreMasked_unlessRevealed() {
+        String error = "IOException: GET https://x.test/a?access_token=tok&monkey=ok&key=K1 failed "
+                + "{\"client_secret\":\"xyz\"} openid.sig=SIG";
+        assertThat(redactor.text(error, false))
+                .isEqualTo("IOException: GET https://x.test/a?access_token=[masqué]&monkey=ok&key=[masqué] failed "
+                        + "{\"client_secret\":\"[masqué]\"} openid.sig=[masqué]");
+        assertThat(redactor.text(error, true)).isEqualTo(error);
+    }
+
+    @Test
+    void freeText_isTruncated_andNullStaysNull() {
+        assertThat(redactor.text("x".repeat(DebugRedactor.MAX_BODY_CHARS + 3), true)).endsWith("…(+3 chars)");
+        assertThat(redactor.text(null, false)).isNull();
+    }
 }
