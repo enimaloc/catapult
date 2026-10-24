@@ -96,7 +96,7 @@ class DtoBehaviourTest {
 
     @Test
     void adminMembersPage_withoutLiveStatuses_hasNobodyLive() {
-        AdminMembersPage page = new AdminMembersPage(null, null, false);
+        AdminMembersPage page = new AdminMembersPage(null, null, false, 0, 0, 0);
 
         assertThat(page.members()).isEmpty();
         assertThat(page.isLive(java.util.UUID.randomUUID())).isFalse();
@@ -106,10 +106,19 @@ class DtoBehaviourTest {
     @Test
     void adminMembersPage_tellsWhoIsLive() {
         java.util.UUID live = java.util.UUID.randomUUID();
-        AdminMembersPage page = new AdminMembersPage(List.of(), java.util.Map.of(live, true), false);
+        AdminMembersPage page = new AdminMembersPage(List.of(), java.util.Map.of(live, true), false, 0, 1, 0);
 
         assertThat(page.isLive(live)).isTrue();
         assertThat(page.isLive(java.util.UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void adminMembersPage_knowsItsFirstAndLastPage() {
+        assertThat(new AdminMembersPage(null, null, false, 0, 0, 0).first()).isTrue();
+        assertThat(new AdminMembersPage(null, null, false, 0, 0, 0).last()).isTrue();
+        assertThat(new AdminMembersPage(null, null, false, 0, 3, 120).last()).isFalse();
+        assertThat(new AdminMembersPage(null, null, false, 2, 3, 120).first()).isFalse();
+        assertThat(new AdminMembersPage(null, null, false, 2, 3, 120).last()).isTrue();
     }
 
     @Test

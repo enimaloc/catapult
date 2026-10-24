@@ -1,7 +1,9 @@
 /**
  * The admin page's members tab. Each action posts to AdminMembersController, then re-renders the
- * page: a deletion, a promotion or an unlink changes more than its own row (the previous system
- * account, the migrate dialog's targets). The bot switch alone only posts, it already shows its state.
+ * list (same search, same page: admin-tabs.js): a deletion, a promotion or an unlink changes more
+ * than its own row (the previous system account, the migrate dialog's targets). The bot switch alone
+ * only posts, it already shows its state. The list is one page of members; the migrate dialog's
+ * target select starts with that page's members and its search field looks the others up.
  *
  * A member's targeting sub-view (#members/{id}, loaded by admin-tabs.js) edits their custom flags and
  * groups: every button posts with itself disabled meanwhile and a success reloads the sub-view. A
@@ -16,9 +18,12 @@ window.CatapultAdminMembers = (function () {
     }
 
     // A failed post already shows its snackbar (CatapultChannel.postJson): the page stays as it was.
-    async function postThenRefresh(url, body) {
+    async function postThenRefresh(card, url, body) {
         const response = await CatapultChannel.postJson(url, body);
-        if (response.ok) await CatapultChannel.refresh();
+        if (!response.ok) return response;
+        const panel = card.closest("mdui-tab-panel");
+        if (panel) await CatapultAdminTabs.reloadResults(panel);
+        else await CatapultChannel.refresh();
         return response;
     }
 
@@ -31,20 +36,70 @@ window.CatapultAdminMembers = (function () {
         }).then(() => true, () => false);
     }
 
+    function disableSelf(dialog, target) {
+        target.querySelectorAll("mdui-menu-item").forEach(item => {
+            item.disabled = item.getAttribute("value") === dialog.dataset.memberId;
+        });
+    }
+
     function openMigrate(dialog, row) {
+        // a search from a previous open must not replace this open's options
+        clearTimeout(migrateSearchTimer);
+        migrateSearching++;
         dialog.dataset.memberId = row.dataset.memberId;
         document.getElementById("admin-migrate-headline").textContent =
             dialog.dataset.headline.replace("{0}", row.dataset.memberName);
         const target = document.getElementById("admin-migrate-target");
-        target.value = "";
+        restoreTargets(target);
+        const search = document.getElementById("admin-migrate-search");
+        if (search) search.value = "";
         // A member can't be migrated onto themself.
-        target.querySelectorAll("mdui-menu-item").forEach(item => {
-            item.disabled = item.getAttribute("value") === row.dataset.memberId;
-        });
+        disableSelf(dialog, target);
         ["settings", "getters", "bindings"].forEach(part => {
             document.getElementById(`admin-migrate-${part}`).checked = false;
         });
         dialog.open = true;
+    }
+
+    const SEARCH_DELAY_MS = 300;
+    let migrateSearchTimer = null;
+    let migrateSearching = 0; // the latest search asked: an older answer is dropped
+
+    /**
+     * Puts the select's options as rendered (the page's members) back, keeping them on the select
+     * the first time: the list re-rendering brings a new select, with its own.
+     */
+    function restoreTargets(target) {
+        target.initialOptions ??= [...target.children].map(item => item.cloneNode(true));
+        target.value = "";
+        target.replaceChildren(...target.initialOptions.map(item => item.cloneNode(true)));
+    }
+
+    /** Replaces the target select's options by the members matching `query` (a blank one puts the page's own back). */
+    async function searchMigrateTargets(dialog, query) {
+        const asked = ++migrateSearching;
+        const target = document.getElementById("admin-migrate-target");
+        if (query.trim() === "") {
+            restoreTargets(target);
+            disableSelf(dialog, target);
+            return;
+        }
+        let found = null;
+        try {
+            const response = await fetch(`/spa/admin/members/search?q=${encodeURIComponent(query.trim())}`);
+            if (response.ok) found = await response.json();
+        } catch {
+            // not found: the options stay as they were
+        }
+        if (asked !== migrateSearching || found === null) return;
+        target.value = "";
+        target.replaceChildren(...found.map(member => {
+            const item = document.createElement("mdui-menu-item");
+            item.setAttribute("value", member.id);
+            item.textContent = member.login;
+            item.disabled = member.id === dialog.dataset.memberId;
+            return item;
+        }));
     }
 
     async function submitMigrate(dialog) {
@@ -209,7 +264,7 @@ window.CatapultAdminMembers = (function () {
                     return;
                 }
                 if (item.dataset.confirm && !await confirmed(card, item.dataset.confirm)) return;
-                await postThenRefresh(memberUrl(row, item.dataset.action), {});
+                await postThenRefresh(card, memberUrl(row, item.dataset.action), {});
             });
         });
 
@@ -220,6 +275,11 @@ window.CatapultAdminMembers = (function () {
             });
         });
 
+        document.getElementById("admin-migrate-search")?.addEventListener("input", event => {
+            clearTimeout(migrateSearchTimer);
+            const query = event.target.value ?? "";
+            migrateSearchTimer = setTimeout(() => searchMigrateTargets(dialog, query), SEARCH_DELAY_MS);
+        });
         document.getElementById("admin-migrate-cancel")?.addEventListener("click", () => { dialog.open = false; });
         document.getElementById("admin-migrate-submit")?.addEventListener("click", () => submitMigrate(dialog));
     }

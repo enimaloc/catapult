@@ -21,6 +21,8 @@ import fr.enimaloc.catapult.service.binding.StreamStateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -31,6 +33,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -57,15 +60,39 @@ public class ApiAdminMembersController {
     private final UserFlagRepository userFlagRepository;
     private final UserGroupRepository userGroupRepository;
 
-    /** Every member as catapult-web's admin page reads them (not the entity: no tokens, no proxies). */
+    /** Members per page of the admin listing. */
+    static final int PAGE_SIZE = 50;
+    /** Most matches the notification picker gets. */
+    static final int SEARCH_LIMIT = 20;
+
+    /**
+     * One page of members as catapult-web's admin page reads them (not the entity: no tokens, no
+     * proxies), filtered by {@code q} when it isn't blank. Live status is asked for this page only.
+     */
     @GetMapping
-    public AdminMembersPage page() {
-        List<UserAccount> members = userAccountRepository.findAll();
-        Map<UUID, Boolean> liveStatus = members.stream()
+    public AdminMembersPage page(@RequestParam(defaultValue = "0") int page,
+                                 @RequestParam(required = false) String q) {
+        PageRequest request = PageRequest.of(Math.max(page, 0), PAGE_SIZE);
+        String query = q == null ? "" : q.trim();
+        Page<UserAccount> found = query.isEmpty()
+                ? userAccountRepository.findMembersPage(request)
+                : userAccountRepository.searchMembersPage(UserAccountRepository.likePattern(query), query, request);
+        Map<UUID, Boolean> liveStatus = found.getContent().stream()
                 .collect(Collectors.toMap(UserAccount::getId, streamStateService::isLive));
         boolean isMockProfile = Arrays.asList(environment.getActiveProfiles()).contains("mock");
-        return new AdminMembersPage(members.stream().map(ApiAdminMembersController::toDto).toList(),
-                liveStatus, isMockProfile);
+        return new AdminMembersPage(found.getContent().stream().map(ApiAdminMembersController::toDto).toList(),
+                liveStatus, isMockProfile, found.getNumber(), found.getTotalPages(), found.getTotalElements());
+    }
+
+    /** At most 20 members matching {@code q} like the listing does, for a picker; no live status. */
+    @GetMapping("/search")
+    public List<AdminMemberDto> search(@RequestParam(required = false) String q) {
+        String query = q == null ? "" : q.trim();
+        if (query.isEmpty()) {
+            return List.of();
+        }
+        return userAccountRepository.searchMembers(UserAccountRepository.likePattern(query), query,
+                PageRequest.of(0, SEARCH_LIMIT)).stream().map(ApiAdminMembersController::toDto).toList();
     }
 
     static AdminMemberDto toDto(UserAccount user) {

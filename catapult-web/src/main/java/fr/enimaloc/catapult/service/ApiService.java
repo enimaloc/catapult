@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.common.dto.*;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
@@ -130,8 +131,10 @@ public interface ApiService {
     boolean executeTwitchatAction(String token);
 
     // --- admin: members (catapult-api refuses them to anyone but an admin) ---
-    /** Every member, and whether each one is live. */
-    AdminMembersPage adminMembers();
+    /** One page (50) of the members matching {@code q} (blank: all), and whether each one is live. */
+    AdminMembersPage adminMembers(String q, int page);
+    /** Up to 20 members matching {@code q}, for a picker; none for a blank one, null when unavailable. */
+    List<AdminMemberDto> adminSearchMembers(String q);
     int adminToggleMemberBot(java.util.UUID memberId);
     int adminUnlinkMemberSteam(java.util.UUID memberId);
     /** Leaves the account inactive, without Twitch identity nor bot. */
