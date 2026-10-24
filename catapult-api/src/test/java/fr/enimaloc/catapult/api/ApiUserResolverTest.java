@@ -2,7 +2,6 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -14,15 +13,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ApiUserResolverTest {
 
     private final UserAccountRepository users = mock(UserAccountRepository.class);
-    private final ChannelAccessService access = mock(ChannelAccessService.class);
-    private final ApiUserResolver resolver = new ApiUserResolver(users, access);
+    private final ApiUserResolver resolver = new ApiUserResolver(users);
 
     private static UserAccount account(String username) {
         UserAccount account = new UserAccount();
@@ -68,49 +64,10 @@ class ApiUserResolverTest {
     void noTokenIsUnauthorized() {
         assertStatus(() -> resolver.viewer(null), HttpStatus.UNAUTHORIZED);
         assertStatus(() -> resolver.viewerByTwitchId(null), HttpStatus.UNAUTHORIZED);
-        assertStatus(() -> resolver.ownChannel("streamer", null), HttpStatus.UNAUTHORIZED);
     }
 
     @Test
     void channel_unknownIsNotFound() {
         assertStatus(() -> resolver.channel("nope"), HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    void accessibleChannel_requiresAccess() {
-        UserAccount viewer = account("mod");
-        UserAccount channel = account("streamer");
-        when(users.findByTwitchUsername("streamer")).thenReturn(Optional.of(channel));
-
-        when(access.canAccess(viewer, channel)).thenReturn(true);
-        assertThat(resolver.accessibleChannel("streamer", viewer)).isSameAs(channel);
-
-        when(access.canAccess(viewer, channel)).thenReturn(false);
-        assertStatus(() -> resolver.accessibleChannel("streamer", viewer), HttpStatus.FORBIDDEN);
-    }
-
-    @Test
-    void accessibleChannel_fromJwt() {
-        UserAccount viewer = account("mod");
-        UserAccount channel = account("streamer");
-        when(users.findById(viewer.getId())).thenReturn(Optional.of(viewer));
-        when(users.findByTwitchUsername("streamer")).thenReturn(Optional.of(channel));
-        when(access.canAccess(viewer, channel)).thenReturn(true);
-
-        assertThat(resolver.accessibleChannel("streamer", jwtFor(viewer))).isSameAs(channel);
-    }
-
-    @Test
-    void ownChannel_onlyForItsOwner_withoutAskingTwitchForModerators() {
-        UserAccount owner = account("streamer");
-        UserAccount mod = account("mod");
-        when(users.findById(owner.getId())).thenReturn(Optional.of(owner));
-        when(users.findById(mod.getId())).thenReturn(Optional.of(mod));
-        when(users.findByTwitchUsername("streamer")).thenReturn(Optional.of(owner));
-
-        assertThat(resolver.ownChannel("streamer", jwtFor(owner))).isSameAs(owner);
-        assertStatus(() -> resolver.ownChannel("streamer", jwtFor(mod)), HttpStatus.FORBIDDEN);
-        assertStatus(() -> resolver.ownChannel("nope", jwtFor(owner)), HttpStatus.NOT_FOUND);
-        verify(access, never()).canAccess(mod, owner);
     }
 }

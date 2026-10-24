@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.api.channel;
 import fr.enimaloc.catapult.common.dto.channel.ChannelAccessResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.account.ChannelAccessService;
+import fr.enimaloc.catapult.security.Authz;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -28,7 +28,7 @@ import java.util.UUID;
 public class ApiChannelAccessController {
 
     private final UserAccountRepository userAccountRepository;
-    private final ChannelAccessService channelAccessService;
+    private final Authz authz;
 
     @GetMapping("/api/users/{ownerId}/channel-access")
     public ChannelAccessResponse canAccess(@PathVariable String ownerId,
@@ -48,6 +48,6 @@ public class ApiChannelAccessController {
         UserAccount owner = userAccountRepository.findById(ownerUuid).orElse(null);
         if (viewer == null || owner == null) return new ChannelAccessResponse(false);
 
-        return new ChannelAccessResponse(channelAccessService.canAccess(viewer, owner));
+        return new ChannelAccessResponse(authz.canAccess(viewer, owner));
     }
 }

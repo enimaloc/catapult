@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
+import fr.enimaloc.catapult.security.Authz;
+import fr.enimaloc.catapult.security.MethodSecurityConfig;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
@@ -41,7 +43,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
         controllers = ApiChannelActionsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import(ApiUserResolver.class)
+@Import({ApiUserResolver.class, MethodSecurityConfig.class, Authz.class})
 abstract class ApiChannelActionsTestSupport {
 
     @Autowired MockMvc mvc;
