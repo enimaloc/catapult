@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
@@ -31,7 +32,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -268,13 +271,27 @@ public class AdminTabsFragmentController {
         });
     }
 
-    /** One page of the game mappings and one of the detected games still missing one, each with its own page number. */
+    /**
+     * One page of the game mappings and one of the detected games still missing one, each with its own page number,
+     * and what the form offers to replace IGDB's with: every CCL ({@code cclNames}, id to name) and every enabled TW
+     * ({@code twLabels}, id to label, in their order), as the streamers choose from; either empty when catapult-api failed.
+     */
     @GetMapping("/game-mappings")
     String gameMappings(Model model, HttpServletResponse response, @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "0") int missingPage) {
         return guarded(model, response, () -> {
             model.addAttribute("mappings", apiService.adminGameMappings(Math.max(0, page)));
             model.addAttribute("missing", apiService.adminMissingGameMappings(Math.max(0, missingPage)));
+            AdminCclPage ccl = apiService.adminCcl();
+            Map<String, String> cclNames = new LinkedHashMap<>();
+            if (ccl != null && ccl.ccls() != null) ccl.ccls().forEach(c -> cclNames.put(c.id(), c.name()));
+            List<TwDefinitionDto> tws = apiService.adminTws();
+            Map<String, String> twLabels = new LinkedHashMap<>();
+            if (tws != null) tws.stream().filter(TwDefinitionDto::enabled)
+                    .sorted(Comparator.comparingInt(TwDefinitionDto::sortOrder))
+                    .forEach(t -> twLabels.put(t.id(), t.label()));
+            model.addAttribute("cclNames", cclNames);
+            model.addAttribute("twLabels", twLabels);
             return "pages/admin-tab/game-mappings :: content";
         });
     }
