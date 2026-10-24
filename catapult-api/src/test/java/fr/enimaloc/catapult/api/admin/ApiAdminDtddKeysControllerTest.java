@@ -24,12 +24,13 @@ class ApiAdminDtddKeysControllerTest {
 
     @Mock DtddApiKeyRepository repository;
     @Mock DtddApiKeyRotator rotator;
+    @Mock fr.enimaloc.catapult.service.notification.AdminEventPublisher events;
 
     ApiAdminDtddKeysController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new ApiAdminDtddKeysController(repository, rotator);
+        controller = new ApiAdminDtddKeysController(repository, rotator, events);
     }
 
     @Test

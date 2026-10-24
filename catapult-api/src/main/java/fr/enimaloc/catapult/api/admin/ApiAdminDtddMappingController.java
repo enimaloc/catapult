@@ -13,7 +13,6 @@ import fr.enimaloc.catapult.repository.dtdd.DtddTopicsCacheRepository;
 import fr.enimaloc.catapult.service.dtdd.DtddMappingEvents;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -39,8 +38,7 @@ public class ApiAdminDtddMappingController {
     private final DtddMappingEvents mappingEvents;
     private final ApiUserResolver userResolver;
 
-    @Autowired(required = false)
-    private AdminEventPublisher events;
+    private final AdminEventPublisher events;
 
     /**
      * The proposals in {@code status}, oldest first, as catapult-web reads them (not the entities,
@@ -98,7 +96,7 @@ public class ApiAdminDtddMappingController {
         p.setResolver(admin);
         p.setResolvedAt(Instant.now());
         proposalRepo.save(p);
-        if (events != null) events.dtddProposalResolved(id.toString(), Status.APPROVED.name());
+        events.dtddProposalResolved(id.toString(), Status.APPROVED.name());
         mappingEvents.mappingChanged(p.getIgdbId());
     }
 
@@ -117,7 +115,7 @@ public class ApiAdminDtddMappingController {
         p.setResolver(admin);
         p.setResolvedAt(Instant.now());
         proposalRepo.save(p);
-        if (events != null) events.dtddProposalResolved(id.toString(), Status.REJECTED.name());
+        events.dtddProposalResolved(id.toString(), Status.REJECTED.name());
         mappingEvents.mappingChanged(p.getIgdbId());
     }
 }

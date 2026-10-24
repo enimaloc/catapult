@@ -29,6 +29,7 @@ class ApiAdminDtddMappingControllerTest {
     @Mock DtddTopicsCacheRepository topicsRepo;
     @Mock fr.enimaloc.catapult.service.dtdd.DtddMappingEvents mappingEvents;
     @Mock fr.enimaloc.catapult.api.ApiUserResolver userResolver;
+    @Mock fr.enimaloc.catapult.service.notification.AdminEventPublisher events;
     @Mock org.springframework.security.oauth2.jwt.Jwt jwt;
 
     ApiAdminDtddMappingController controller;
@@ -36,7 +37,7 @@ class ApiAdminDtddMappingControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new ApiAdminDtddMappingController(proposalRepo, mappingRepo, topicsRepo, mappingEvents, userResolver);
+        controller = new ApiAdminDtddMappingController(proposalRepo, mappingRepo, topicsRepo, mappingEvents, userResolver, events);
         admin = new UserAccount();
         admin.setId(UUID.randomUUID());
         lenient().when(userResolver.viewer(jwt)).thenReturn(admin);

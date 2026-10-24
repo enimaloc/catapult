@@ -51,6 +51,7 @@ class ApiAdminBroadcastControllerTest {
     @MockitoBean RedisEventPublisher publisher;
     @MockitoBean ActivityLogService activityLog;
     @MockitoBean UserAccountRepository userRepo;
+    @MockitoBean fr.enimaloc.catapult.service.metrics.CatapultApiMetrics apiMetrics;
 
     UserAccount admin;
 

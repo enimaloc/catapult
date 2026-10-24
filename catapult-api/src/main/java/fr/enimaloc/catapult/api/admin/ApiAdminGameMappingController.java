@@ -10,7 +10,6 @@ import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import fr.enimaloc.catapult.service.twitch.TwitchCategory;
 import fr.enimaloc.catapult.service.twitch.TwitchCategoryService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,8 +35,7 @@ public class ApiAdminGameMappingController {
     private final TwitchCategoryService categoryService;
     private final ApiUserResolver userResolver;
 
-    @Autowired(required = false)
-    private AdminEventPublisher events;
+    private final AdminEventPublisher events;
 
     /** The mappings, last changed first. */
     @GetMapping
@@ -50,7 +48,7 @@ public class ApiAdminGameMappingController {
     public ResponseEntity<GameMappingResult> create(@RequestBody(required = false) GameMappingRequest body,
                                                     @AuthenticationPrincipal Jwt jwt) {
         GameMappingResult result = service.create(body, userResolver.viewer(jwt));
-        if (events != null) events.gameMappingCreated(result.mapping());
+        events.gameMappingCreated(result.mapping());
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
@@ -58,14 +56,14 @@ public class ApiAdminGameMappingController {
     public GameMappingResult update(@PathVariable UUID id, @RequestBody(required = false) GameMappingRequest body,
                                     @AuthenticationPrincipal Jwt jwt) {
         GameMappingResult result = service.update(id, body, userResolver.viewer(jwt));
-        if (events != null) events.gameMappingUpdated(result.mapping());
+        events.gameMappingUpdated(result.mapping());
         return result;
     }
 
     @DeleteMapping("/{id}")
     public GameMappingResult delete(@PathVariable UUID id, @RequestParam(defaultValue = "false") boolean applyLive) {
         GameMappingResult result = service.delete(id, applyLive);
-        if (events != null) events.gameMappingDeleted(id.toString());
+        events.gameMappingDeleted(id.toString());
         return result;
     }
 

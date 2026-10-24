@@ -56,6 +56,7 @@ class ApiAdminGameMappingControllerTest {
     @Mock PlatformTransactionManager transactionManager;
     @Mock TwitchCategoryService categories;
     @Mock ApiUserResolver userResolver;
+    @Mock fr.enimaloc.catapult.service.notification.AdminEventPublisher events;
     @Mock Jwt jwt;
 
     ApiAdminGameMappingController controller;
@@ -66,7 +67,7 @@ class ApiAdminGameMappingControllerTest {
         AdminGameMappingService service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo,
                 bindingService, gameStateService, streamStateService, channelEventPublisher, gameEventListener,
                 transactionManager);
-        controller = new ApiAdminGameMappingController(service, categories, userResolver);
+        controller = new ApiAdminGameMappingController(service, categories, userResolver, events);
         admin = new UserAccount();
         admin.setId(UUID.randomUUID());
         when(userResolver.viewer(jwt)).thenReturn(admin);

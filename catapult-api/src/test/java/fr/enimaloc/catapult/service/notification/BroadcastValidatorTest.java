@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
 
@@ -9,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BroadcastValidatorTest {
 
-    private final BroadcastValidator validator = new BroadcastValidator();
+    private final BroadcastValidator validator = new BroadcastValidator(JsonMapper.builder().build());
 
     @Test
     void valid_maintenance_scheduled_passes() {
