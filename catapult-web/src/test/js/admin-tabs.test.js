@@ -320,4 +320,19 @@ describe("admin-tabs", () => {
             expect(urls()).toEqual(["/spa/admin/members?q=bob&page=0", "/spa/admin/members?q=bob&page=2"]);
         });
     });
+
+    it("drops the sub-view that answers after the admin went back to the list", async () => {
+        page("caches");
+        await flush();
+        let answerSub;
+        fetched.mockImplementationOnce(url => new Promise(resolve => { answerSub = () => resolve(response(200, fragment(url))); }));
+
+        await click("[data-admin-open]");
+        await click("[data-admin-back]");
+        answerSub();
+        await flush();
+
+        expect(shown()).toBe("/spa/admin/caches");
+        expect(location.hash).toBe("#caches");
+    });
 });
