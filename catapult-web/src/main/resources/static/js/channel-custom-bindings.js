@@ -11,7 +11,8 @@
  *   as the other settings cards (GameSearch).
  * - API token card: since when a token exists, generate/regenerate (regeneration confirmed: it
  *   invalidates the old token) and revoke. A generated token is shown once, in a read-only field with
- *   a copy button and a curl example; it is kept nowhere but that field.
+ *   a copy button and a curl example on the site's own address (catapult-web relays /api/v2/custom-bindings
+ *   to catapult-api); it is kept nowhere but that field.
  *
  * Every text goes in through textContent or a property, never as markup.
  */
@@ -200,7 +201,7 @@ window.CatapultCustomBindings = (function () {
         function showToken(token) {
             value.value = token;
             curl.textContent = `curl -X POST -H "Authorization: Bearer ${token}" `
-                + `${card.dataset.apiBase}/api/v2/custom-bindings/${encodeURIComponent(card.dataset.exampleName)}/activate`;
+                + `${window.location.origin}/api/v2/custom-bindings/${encodeURIComponent(card.dataset.exampleName)}/activate`;
             show(reveal, true);
         }
 

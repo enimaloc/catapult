@@ -24,8 +24,8 @@ import java.util.Set;
 
 /**
  * The paths of catapult-api a browser reaches itself, relayed from catapult-web's own origin: its Twitch
- * login ({@code /oauth2/}, {@code /login/oauth2/}), Steam's return, the public game and user APIs, and
- * Swagger. catapult-web is the site's only entry point: the login keeps its cookies and its callback
+ * login ({@code /oauth2/}, {@code /login/oauth2/}), Steam's return, the public game and user APIs, the custom
+ * bindings API (a Stream Deck or a script, authenticated by its personal token alone), and Swagger. catapult-web is the site's only entry point: the login keeps its cookies and its callback
  * URLs on the one public host.
  *
  * <p>What goes through is the request as the visitor sent it (cookies and authorization included), minus
@@ -47,6 +47,7 @@ public class ApiRelayController {
     public static final String[] PATHS = {
             "/oauth2/**", "/login/oauth2/**", "/api/connect/steam/callback", "/api/game/**", "/api/user/**",
             "/swagger-ui.html", "/swagger-ui/**", "/api/v3/api-docs", "/api/v3/api-docs/**",
+            "/api/v2/custom-bindings", "/api/v2/custom-bindings/**",
     };
     /** A relayed request's body is read whole: these endpoints only take small ones. */
     static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
@@ -82,6 +83,7 @@ public class ApiRelayController {
     @RequestMapping({
             "/oauth2/**", "/login/oauth2/**", "/api/connect/steam/callback", "/api/game/**", "/api/user/**",
             "/swagger-ui.html", "/swagger-ui/**", "/api/v3/api-docs", "/api/v3/api-docs/**",
+            "/api/v2/custom-bindings", "/api/v2/custom-bindings/**",
     })
     public void relay(HttpServletRequest request, HttpServletResponse response) throws IOException {
         byte[] body = request.getInputStream().readNBytes(MAX_BODY_BYTES + 1);

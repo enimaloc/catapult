@@ -70,7 +70,7 @@ function settings() {
 
 function tokenCard(example = "Art") {
     html(`
-        <mdui-card id="channel-api-token-card" data-example-name="${example}" data-api-base="https://API-HOST"
+        <mdui-card id="channel-api-token-card" data-example-name="${example}"
                    data-label-none="Aucun jeton" data-label-since="Généré le {0}"
                    data-label-generate="Générer" data-label-regenerate="Régénérer" data-label-copied="Copié">
             <span id="api-token-status"></span>
@@ -335,7 +335,7 @@ describe("personal API token card", () => {
         expect(byId("api-token-value").value).toBe("cat_SECRET");
         expect(byId("api-token-reveal").classList.contains("hidden")).toBe(false);
         expect(byId("api-token-curl").textContent).toBe(
-            'curl -X POST -H "Authorization: Bearer cat_SECRET" https://API-HOST/api/v2/custom-bindings/D%C3%A9veloppement/activate');
+            `curl -X POST -H "Authorization: Bearer cat_SECRET" ${window.location.origin}/api/v2/custom-bindings/D%C3%A9veloppement/activate`);
         expect(refresh).not.toHaveBeenCalled();
     });
 

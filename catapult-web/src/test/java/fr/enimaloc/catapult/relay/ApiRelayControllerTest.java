@@ -152,6 +152,33 @@ class ApiRelayControllerTest {
         }
     }
 
+    /**
+     * A Stream Deck or a script reaches the custom bindings API through the site: its token-only POST needs no
+     * CSRF token or session here (catapult-api's own chain authenticates the Bearer), and catapult-api's answer,
+     * a refusal included, comes back as is.
+     */
+    @Test
+    void relaysTheCustomBindingsApi_aTokenOnlyPostWithoutCsrf_andItsStatus() throws Exception {
+        answer = exchange -> respond(exchange, 204, "", Map.of());
+
+        mvc.perform(post("/api/v2/custom-bindings/Art/activate").header("Authorization", "Bearer cat_TOKEN"))
+                .andExpect(status().isNoContent());
+
+        Received received = RECEIVED.get();
+        assertThat(received.method()).isEqualTo("POST");
+        assertThat(received.uri()).isEqualTo("/api/v2/custom-bindings/Art/activate");
+        assertThat(received.header("Authorization")).isEqualTo("Bearer cat_TOKEN");
+
+        answer = exchange -> respond(exchange, 401, "", Map.of());
+        mvc.perform(post("/api/v2/custom-bindings/deactivate")).andExpect(status().isUnauthorized());
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/v2/custom-bindings/deactivate");
+
+        answer = exchange -> respond(exchange, 200, "{\"bindings\":[]}", Map.of("Content-Type", List.of("application/json")));
+        mvc.perform(get("/api/v2/custom-bindings").header("Authorization", "Bearer cat_TOKEN"))
+                .andExpect(status().isOk()).andExpect(content().string("{\"bindings\":[]}"));
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/v2/custom-bindings");
+    }
+
     @Test
     void passesCatapultApisErrorsThrough_asItsOwn() throws Exception {
         answer = exchange -> respond(exchange, 503, "{\"busy\":true}", Map.of("Content-Type", List.of("application/json")));
