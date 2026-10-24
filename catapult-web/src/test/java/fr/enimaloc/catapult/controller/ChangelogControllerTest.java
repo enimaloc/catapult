@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @WebMvcTest(controllers = ChangelogController.class)
-@Import({ModelFiller.class, SiteMetaTags.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
+@Import({ModelFiller.class, SiteMetaTags.class, LocalInstanceBusConfig.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
 class ChangelogControllerTest {
     static final ChangelogSection[] SECTIONS = {
             new ChangelogSection("0.3.7", List.of(

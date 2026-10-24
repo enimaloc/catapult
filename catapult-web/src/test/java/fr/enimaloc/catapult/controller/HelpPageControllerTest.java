@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @WebMvcTest(controllers = HelpPageController.class)
-@Import({ModelFiller.class, SiteMetaTags.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
+@Import({ModelFiller.class, SiteMetaTags.class, LocalInstanceBusConfig.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
 class HelpPageControllerTest {
 
     @Autowired MockMvc mvc;

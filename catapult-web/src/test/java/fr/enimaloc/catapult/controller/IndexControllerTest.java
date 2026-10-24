@@ -51,7 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = {IndexController.class, SpaFragmentController.class})
 // I18nConfiguration: titles like "{0} - #{app.brand}" need its message source, as in production.
-@Import({ModelFiller.class, SiteMetaTags.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
+@Import({ModelFiller.class, SiteMetaTags.class, LocalInstanceBusConfig.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
 class IndexControllerTest {
 
     @Autowired MockMvc mvc;

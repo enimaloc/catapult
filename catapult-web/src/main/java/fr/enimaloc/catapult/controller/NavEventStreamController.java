@@ -14,7 +14,6 @@ import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
@@ -102,19 +101,19 @@ public class NavEventStreamController {
     private final AnonymousStreams anonymousStreams;
     private final ApiService apiService;
     private final BroadcastState broadcastState;
-    /** Tells the other instances what a navbar lists; null alone (a test). */
+    /** Tells the other instances what a navbar lists. */
     private final InstanceBus bus;
-    /** Tells whether catapult runs degraded; null alone (a test). */
+    /** Tells whether catapult runs degraded. */
     private final DegradedState degradedState;
     /** Makes the streams, by timeout; tests swap it for one whose writes can be made to fail. */
     LongFunction<SseEmitter> emitters = SseEmitter::new;
 
     public NavEventStreamController(SseStreams sse, ApiService apiService, BroadcastState broadcastState,
-                                    ObjectProvider<InstanceBus> bus, ObjectProvider<DegradedState> degradedState) {
+                                    InstanceBus bus, DegradedState degradedState) {
         this.sse = sse;
-        this.bus = bus.getIfAvailable();
-        this.degradedState = degradedState.getIfAvailable();
-        if (this.bus != null) this.bus.on(REMEMBER_TOPIC, this::remembered);
+        this.bus = bus;
+        this.degradedState = degradedState;
+        this.bus.on(REMEMBER_TOPIC, this::remembered);
         streams = sse.sessionStreams("nav");
         anonymousStreams = sse.anonymousStreams(AnonymousStreams.STREAM);
         this.apiService = apiService;
@@ -132,7 +131,7 @@ public class NavEventStreamController {
         // page only sees the stream open (live.js's onOpen, lifting the restart veil) once they do.
         broadcastState.maintenance().ifPresent(maintenance ->
                 sse.send(emitter, BROADCAST, new Broadcast(BroadcastState.SCHEDULED, maintenance)));
-        DegradedView degraded = degradedState == null ? null : degradedState.current();
+        DegradedView degraded = degradedState.current();
         if (degraded != null) sse.send(emitter, DEGRADED, degraded);
         return ResponseEntity.ok().header("X-Accel-Buffering", "no").body(emitter);
     }
@@ -185,11 +184,7 @@ public class NavEventStreamController {
         } catch (IllegalStateException e) {
             return; // invalidated meanwhile
         }
-        if (bus == null) {
-            remembered(sessionId, List.copyOf(channels));
-        } else {
-            bus.publish(REMEMBER_TOPIC, JSON.writeValueAsString(new Remembered(sessionId, channels)));
-        }
+        bus.publish(REMEMBER_TOPIC, JSON.writeValueAsString(new Remembered(sessionId, channels)));
     }
 
     private void remembered(String message) {
