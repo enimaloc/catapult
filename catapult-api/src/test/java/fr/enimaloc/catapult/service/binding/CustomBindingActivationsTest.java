@@ -58,10 +58,20 @@ class CustomBindingActivationsTest {
 
     @Test
     void active_outsideTheExperiment_isNone_evenWithOneRecorded() {
+        when(repository.findById(user.getId()))
+                .thenReturn(Optional.of(new CustomBindingActivation(user.getId(), art, Instant.EPOCH)));
         when(experimentService.evaluateGate(user, "custom.bindings")).thenReturn(false);
 
         assertThat(activations.active(user)).isEmpty();
-        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void active_withNoneRecorded_neverEvaluatesTheGate() {
+        when(repository.findById(user.getId())).thenReturn(Optional.empty());
+
+        assertThat(activations.active(user)).isEmpty();
+        // Evaluating the gate enrols the streamer in the experiment
+        verifyNoInteractions(experimentService);
     }
 
     @Test

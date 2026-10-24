@@ -26,10 +26,14 @@ public class CustomBindingActivations {
     private final ExperimentService experimentService;
     private final ChannelEventPublisher channelEventPublisher;
 
-    /** The active custom binding; none while the streamer is outside the experiment, as if it did not exist. */
+    /**
+     * The active custom binding; none while the streamer is outside the experiment, as if it did not exist. The gate
+     * is evaluated only when a binding is active: evaluating it enrols the streamer in the experiment, which every
+     * detection would otherwise do.
+     */
     public Optional<CustomBindingActivation> active(UserAccount user) {
-        if (!experimentService.evaluateGate(user, CustomBindingService.EXPERIMENT_KEY)) return Optional.empty();
-        return repository.findById(user.getId());
+        return repository.findById(user.getId())
+                .filter(activation -> experimentService.evaluateGate(user, CustomBindingService.EXPERIMENT_KEY));
     }
 
     /** {@code binding} is now the active one, replacing any other. */
