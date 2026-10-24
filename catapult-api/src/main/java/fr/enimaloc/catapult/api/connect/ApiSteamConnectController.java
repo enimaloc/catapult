@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.common.dto.connect.SteamStartResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
@@ -95,7 +96,11 @@ public class ApiSteamConnectController {
             log.warn("Steam OpenID callback with unknown or expired nonce: {}", nonce);
             return closePopup("?error=nonce");
         }
+        // Steam's redirect carries no JWT: the nonce is what says which member this is for
+        return DebugContext.callAs(userId, () -> link(userId, params));
+    }
 
+    private ResponseEntity<Void> link(UUID userId, Map<String, String> params) {
         if (!"id_res".equals(params.get("openid.mode"))) {
             log.warn("Steam OpenID callback rejected: mode={}", params.get("openid.mode"));
             return closePopup("?error=rejected");

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
@@ -139,7 +140,12 @@ public class SchedulerService {
         }
     }
 
+    /** Runs as the member (prefetches stay outside: they are batched across members). */
     private void processUser(UserAccount user) {
+        DebugContext.runAs(user.getId(), () -> detect(user));
+    }
+
+    private void detect(UserAccount user) {
         Optional<DetectedGame> detected = gameGetterChain.resolve(user);
 
         if (detected.isPresent()) {

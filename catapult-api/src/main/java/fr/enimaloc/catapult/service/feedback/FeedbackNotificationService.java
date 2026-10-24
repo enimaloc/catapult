@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.feedback;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.domain.feedback.FeedbackSubmission;
 import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
@@ -25,24 +26,28 @@ public class FeedbackNotificationService {
     public void pollUpdates() {
         List<FeedbackSubmission> subscribed = repository.findBySubscribedTrue();
         for (FeedbackSubmission submission : subscribed) {
-            try {
-                GitLabClient.IssueState state = gitLabClient.getIssue(submission.getGitlabIssueIid());
+            DebugContext.runAs(submission.getUser().getId(), () -> poll(submission));
+        }
+    }
 
-                if (state.updatedAt().isAfter(submission.getLastKnownUpdatedAt())) {
-                    String message = buildNotificationMessage(submission, state);
-                    activityLogService.addEntry(submission.getUser().getId(), "INFO", message);
-                    submission.setLastKnownUpdatedAt(state.updatedAt());
-                    repository.save(submission);
-                }
+    private void poll(FeedbackSubmission submission) {
+        try {
+            GitLabClient.IssueState state = gitLabClient.getIssue(submission.getGitlabIssueIid());
 
-                if ("closed".equals(state.state())) {
-                    submission.setSubscribed(false);
-                    repository.save(submission);
-                }
-            } catch (Exception e) {
-                log.warn("Failed to poll GitLab issue #{} for user {}: {}",
-                    submission.getGitlabIssueIid(), submission.getUser().getId(), e.getMessage());
+            if (state.updatedAt().isAfter(submission.getLastKnownUpdatedAt())) {
+                String message = buildNotificationMessage(submission, state);
+                activityLogService.addEntry(submission.getUser().getId(), "INFO", message);
+                submission.setLastKnownUpdatedAt(state.updatedAt());
+                repository.save(submission);
             }
+
+            if ("closed".equals(state.state())) {
+                submission.setSubscribed(false);
+                repository.save(submission);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to poll GitLab issue #{} for user {}: {}",
+                submission.getGitlabIssueIid(), submission.getUser().getId(), e.getMessage());
         }
     }
 

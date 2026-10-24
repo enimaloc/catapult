@@ -200,4 +200,18 @@ class EventSubTwitchChatServiceTest {
     private Object connectionState(String field) {
         return ReflectionTestUtils.getField(ReflectionTestUtils.getField(service, "connections"), field);
     }
+
+    @Test
+    void handleMessage_runsAsTheChannelOwner() {
+        java.util.List<UUID> seen = new java.util.ArrayList<>();
+        when(restClient.post()).thenAnswer(inv -> {
+            seen.add(fr.enimaloc.catapult.service.debug.DebugContext.subject().orElse(null));
+            return postUriSpec;
+        });
+
+        service.handleMessage(user, token, WELCOME_MESSAGE, false);
+
+        assertThat(seen).isNotEmpty().containsOnly(user.getId());
+        assertThat(fr.enimaloc.catapult.service.debug.DebugContext.subject()).isEmpty();
+    }
 }

@@ -45,6 +45,16 @@ class DebugContextTest {
         assertThat(DebugContext.subject()).isEmpty();
     }
 
+    /** An entity not yet saved has no id: its work still runs, just unattributed (even inside another subject). */
+    @Test
+    void runAsNull_runsTheWorkWithoutASubject() {
+        AtomicReference<Optional<UUID>> inside = new AtomicReference<>();
+        DebugContext.runAs(a, () -> DebugContext.runAs(null, () -> inside.set(DebugContext.subject())));
+        assertThat(inside.get()).isEmpty();
+        assertThat(DebugContext.callAs(null, () -> 42)).isEqualTo(42);
+        assertThat(DebugContext.subject()).isEmpty();
+    }
+
     @Test
     void nestedRunAs_restoresTheOuterSubject() {
         AtomicReference<Optional<UUID>> afterInner = new AtomicReference<>();

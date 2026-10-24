@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.notification.Notification;
@@ -90,7 +91,10 @@ public class NotificationDeliveryDispatcher {
      */
     @EventListener
     public void onStreamOnline(StreamOnlineEvent event) {
-        UserAccount user = event.getUser();
+        DebugContext.runAs(event.getUser().getId(), () -> scheduleStreamStartChat(event.getUser()));
+    }
+
+    private void scheduleStreamStartChat(UserAccount user) {
         if (!user.isBotEnabled()) {
             return;
         }
@@ -103,7 +107,7 @@ public class NotificationDeliveryDispatcher {
                     claim(delivery);
                     continue;
                 }
-                scheduler.schedule(() -> post(user, delivery), now.plusSeconds(CHAT_SPACING_SECONDS * slot++));
+                scheduler.schedule(DebugContext.wrap(() -> post(user, delivery)), now.plusSeconds(CHAT_SPACING_SECONDS * slot++));
             }
         } catch (RuntimeException e) {
             log.warn("Stream-start notifications not posted for {}: {}", user.getId(), e.getMessage(), e);

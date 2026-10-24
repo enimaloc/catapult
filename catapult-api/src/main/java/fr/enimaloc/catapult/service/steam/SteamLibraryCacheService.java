@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.steam;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.getter.steam.SteamApiClient;
@@ -42,7 +43,7 @@ public class SteamLibraryCacheService {
 
         log.info("Pre-caching Steam libraries for {} user(s) at startup", users.size());
         List<CompletableFuture<Void>> futures = users.stream()
-            .map(this::cacheLibraryAsync)
+            .map(user -> DebugContext.callAs(user.getId(), () -> cacheLibraryAsync(user)))
             .toList();
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
@@ -52,7 +53,8 @@ public class SteamLibraryCacheService {
     @Async
     @EventListener
     public void onSteamLinked(SteamLinkedEvent event) {
-        cacheLibraryAsync(event.getUser()).join();
+        UserAccount user = event.getUser();
+        DebugContext.runAs(user.getId(), () -> cacheLibraryAsync(user).join());
         igdbService.prewarmCclCache();
     }
 

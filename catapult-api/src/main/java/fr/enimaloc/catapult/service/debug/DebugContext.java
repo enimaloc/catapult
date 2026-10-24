@@ -40,7 +40,11 @@ public final class DebugContext {
         });
     }
 
+    /** A {@code null} member (an entity not saved yet) runs the work without a subject rather than failing it. */
     public static <T> T callAs(UUID userId, Supplier<T> s) {
+        if (userId == null) {
+            return runWithoutSubject(s);
+        }
         UUID previous = SUBJECT.get();
         AutoCloseable scope = null;
         if (!userId.equals(previous)) {

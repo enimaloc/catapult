@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.tw;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.config.AppState;
@@ -175,6 +176,22 @@ public class TwBackfillService {
      * throttles. Returns {@code false} when interrupted during the throttle sleep.
      */
     private boolean remap(GameBinding b, String mode, Counts c, long sleepMs) {
+        if (b.getUser() != null) {
+            DebugContext.runAs(b.getUser().getId(), () -> resolveTws(b, mode, c));
+        } else {
+            resolveTws(b, mode, c);
+        }
+        try {
+            Thread.sleep(sleepMs);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        return true;
+    }
+
+    /** Re-resolves one binding's TW suggestions as its owner and records the outcome in {@code c}. */
+    private void resolveTws(GameBinding b, String mode, Counts c) {
         try {
             Optional<String> igdbId = igdbService.resolveIgdbIdForBinding(b);
             Set<Long> descIds = igdbId.map(igdbService::fetchDescriptorIds).orElse(Set.of());
@@ -192,12 +209,5 @@ public class TwBackfillService {
             c.failed++;
             meterRegistry.counter("catapult.tw." + mode + ".failed").increment();
         }
-        try {
-            Thread.sleep(sleepMs);
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
-        return true;
     }
 }

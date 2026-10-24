@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.chat;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
@@ -25,7 +26,10 @@ public class ChatCommandListener {
 
     @EventListener
     public void onChatCommand(ChatCommandEvent event) {
-        boolean dynamicAllowed = experimentService.evaluateGate(event.getUser(), EXPERIMENT_KEY);
-        commandRegistry.dispatch(event, dynamicAllowed);
+        // Also reached from the IRC transport's reader thread, which has no subject of its own
+        DebugContext.runAs(event.getUser().getId(), () -> {
+            boolean dynamicAllowed = experimentService.evaluateGate(event.getUser(), EXPERIMENT_KEY);
+            commandRegistry.dispatch(event, dynamicAllowed);
+        });
     }
 }
