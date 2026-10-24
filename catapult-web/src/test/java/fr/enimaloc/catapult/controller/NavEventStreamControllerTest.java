@@ -351,10 +351,10 @@ class NavEventStreamControllerTest {
     }
 
     @Test
-    void navStream_withoutDegradedState_sendsNoDegradedEvent() throws Exception {
+    void navStream_whenNoDegradedView_sendsNoDegradedEvent() throws Exception {
         when(degradedState.current()).thenReturn(null);
 
-        assertThat(sent(anonymous("1.2.3.21"))).doesNotContain("event:Degraded");
+        assertThat(sent(anonymous("1.2.3.22"))).doesNotContain("event:Degraded");
         assertThat(sent(memberStream(loggedIn(), UUID.randomUUID()))).doesNotContain("event:Degraded");
     }
 
