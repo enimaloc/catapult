@@ -72,4 +72,35 @@ class OtherMemberMaskerTest {
         assertThat(masker.mask(null, aId)).isNull();
         assertThat(masker.mask("", aId)).isEmpty();
     }
+
+    @Test
+    void underscoreIsPartOfAWord() {
+        assertThat(masker.mask("bobthebuilder_x x_bobthebuilder", aId)).isEqualTo("bobthebuilder_x x_bobthebuilder");
+    }
+
+    @Test
+    void collidingIdentifier_isMaskedUnlessOnlySubjectOwnsIt() {
+        UserAccountRepository users = mock(UserAccountRepository.class);
+        MinecraftFriendLinkRepository links = mock(MinecraftFriendLinkRepository.class);
+        UserAccount b = user(bId, "2222222", "shared_name", null);
+        UserAccount a = user(aId, "1111", "alice", null);
+        when(users.findAll()).thenReturn(List.of(a, b));
+        MinecraftFriendLink link = new MinecraftFriendLink();
+        link.setUser(a);
+        link.setMinecraftProfileId("069a79f4-44e9-4726-a5be-fca90e38aaf5");
+        link.setMinecraftName("Shared_Name");
+        when(links.findAll()).thenReturn(List.of(link));
+        OtherMemberMasker m = new OtherMemberMasker(users, links);
+        m.reload();
+        assertThat(m.mask("shared_name", aId)).isEqualTo("[membre]");
+    }
+
+    @Test
+    void accountCreatedListener_isAfterCommit() throws Exception {
+        var tel = OtherMemberMasker.class.getMethod("onAccountCreated", fr.enimaloc.catapult.event.AccountCreatedEvent.class)
+                .getAnnotation(org.springframework.transaction.event.TransactionalEventListener.class);
+        assertThat(tel).isNotNull();
+        assertThat(tel.phase()).isEqualTo(org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT);
+        assertThat(tel.fallbackExecution()).isTrue();
+    }
 }
