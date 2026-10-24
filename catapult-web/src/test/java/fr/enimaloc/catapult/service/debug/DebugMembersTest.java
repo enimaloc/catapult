@@ -99,4 +99,59 @@ class DebugMembersTest {
         @Override public Clock withZone(java.time.ZoneId zone) { return this; }
         @Override public Instant instant() { return now; }
     }
+
+    private static org.springframework.mock.web.MockHttpServletRequest sessionRequest() {
+        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.getSession(true);
+        return request;
+    }
+
+    @Test
+    void withoutAnApiService_nobodyIsDebugged() {
+        DebugMembers none = new DebugMembers(new StaticApplicationContext().getBeanProvider(ApiService.class), clock);
+
+        assertThat(none.isActive(MEMBER)).isFalse();
+        assertThat(none.isCurrentActive()).isFalse();
+    }
+
+    @Test
+    void isCurrentActive_asksAboutTheMemberOfTheRequest_andIsFalseWithoutOne() {
+        when(api.currentUserId()).thenReturn(MEMBER);
+        when(api.myDebugActive()).thenReturn(true);
+        assertThat(debug.isCurrentActive()).isTrue();
+
+        when(api.currentUserId()).thenReturn(null);
+        assertThat(debug.isCurrentActive()).isFalse();
+
+        when(api.currentUserId()).thenThrow(new IllegalStateException("no request"));
+        assertThat(debug.isCurrentActive()).isFalse();
+    }
+
+    @Test
+    void isActiveOn_readsTheSessionsMember_andRestoresWhatWasBound() {
+        when(api.currentUserId()).thenReturn(MEMBER);
+        when(api.myDebugActive()).thenReturn(true);
+        org.springframework.web.context.request.RequestAttributes before =
+                org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+
+        assertThat(debug.isActiveOn(sessionRequest())).isTrue();
+
+        assertThat(org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()).isSameAs(before);
+    }
+
+    @Test
+    void isActiveOn_isFalseWithoutARequestOrASession_andWithoutAskingTheApi() {
+        assertThat(debug.isActiveOn(null)).isFalse();
+        assertThat(debug.isActiveOn(new org.springframework.mock.web.MockHttpServletRequest())).isFalse();
+
+        verify(api, org.mockito.Mockito.never()).myDebugActive();
+    }
+
+    @Test
+    void isActiveOn_isFalseWhenTheRequestCannotBeRead() {
+        jakarta.servlet.http.HttpServletRequest broken = mock(jakarta.servlet.http.HttpServletRequest.class);
+        when(broken.getSession(false)).thenThrow(new IllegalStateException("recycled"));
+
+        assertThat(debug.isActiveOn(broken)).isFalse();
+    }
 }

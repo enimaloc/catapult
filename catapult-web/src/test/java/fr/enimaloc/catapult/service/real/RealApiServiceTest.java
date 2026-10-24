@@ -1477,4 +1477,83 @@ class RealApiServiceTest {
 
         assertThat(service.adminRemoveTwKeyword("violence", "gore/blood é")).isEqualTo(204);
     }
+
+    @Test
+    void memberDebug_readsTheState() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        respond(HttpMethod.GET, "/api/admin/members/" + id + "/debug",
+                "{\"active\":true,\"revealSecrets\":false,\"enabledAt\":\"2026-10-24T10:00:00Z\",\"exchangeCount\":4}");
+
+        var state = service.memberDebug(id);
+
+        assertThat(state.active()).isTrue();
+        assertThat(state.revealSecrets()).isFalse();
+        assertThat(state.exchangeCount()).isEqualTo(4);
+    }
+
+    @Test
+    void memberDebugActions_postToTheMemberAndRelayTheStatus() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        String base = "/api/admin/members/" + id + "/debug";
+        expectPost(base + "/enable", "{\"revealSecrets\":true}");
+        expectPost(base + "/disable");
+        expectPost(base + "/clear");
+
+        assertThat(service.enableMemberDebug(id, true)).isEqualTo(204);
+        assertThat(service.disableMemberDebug(id)).isEqualTo(204);
+        assertThat(service.clearMemberDebug(id)).isEqualTo(204);
+    }
+
+    @Test
+    void memberDebugExchanges_sendsEveryFilter_unsetOnesAsEmpty() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        String page = "{\"content\":[{\"id\":\"00000000-0000-0000-0000-0000000000e1\",\"direction\":\"OUT\",\"service\":\"steam\","
+                + "\"error\":true,\"durationMs\":12,\"filtered\":false}],\"number\":1,\"totalPages\":2,\"totalElements\":6}";
+        String base = "/api/admin/members/" + id + "/debug/exchanges?";
+        respond(HttpMethod.GET, base + "service=steam&direction=OUT&outcome=error&from=2026-10-24T08%3A00%3A00Z&to=2026-10-24T09%3A00%3A00Z&page=1&size=50", page);
+        respond(HttpMethod.GET, base + "service=&direction=&outcome=&from=&to=&page=0&size=50", page);
+
+        var full = service.memberDebugExchanges(id, new fr.enimaloc.catapult.service.DebugExchangeFilter("steam", "OUT", "error",
+                java.time.Instant.parse("2026-10-24T08:00:00Z"), java.time.Instant.parse("2026-10-24T09:00:00Z")), 1);
+        var unset = service.memberDebugExchanges(id, new fr.enimaloc.catapult.service.DebugExchangeFilter(null, null, null, null, null), 0);
+
+        assertThat(full.content()).singleElement().satisfies(e -> assertThat(e.service()).isEqualTo("steam"));
+        assertThat(full.totalElements()).isEqualTo(6);
+        assertThat(unset.totalPages()).isEqualTo(2);
+    }
+
+    @Test
+    void memberDebugExchange_readsOneExchangeInFull() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID exchange = UUID.fromString("00000000-0000-0000-0000-0000000000e1");
+        respond(HttpMethod.GET, "/api/admin/members/" + id + "/debug/exchanges/" + exchange,
+                "{\"id\":\"" + exchange + "\",\"occurredAt\":\"2026-10-24T10:00:00Z\",\"direction\":\"OUT\",\"service\":\"steam\","
+                        + "\"operation\":\"getOwnedGames\",\"method\":\"GET\",\"url\":\"https://x\",\"status\":500,\"error\":true,"
+                        + "\"durationMs\":12,\"filtered\":false,\"responseBody\":\"<html/>\",\"traceId\":\"abc\"}");
+
+        var e = service.memberDebugExchange(id, exchange);
+
+        assertThat(e.id()).isEqualTo(exchange);
+        assertThat(e.responseBody()).isEqualTo("<html/>");
+        assertThat(e.traceId()).isEqualTo("abc");
+    }
+
+    @Test
+    void memberDebugServices_listsThem_orNothingWhenTheApiCouldNotAnswer() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        respond(HttpMethod.GET, "/api/admin/members/" + id + "/debug/services", "[\"steam\",\"twitch\"]");
+        expect(HttpMethod.GET, "/api/admin/members/" + id + "/debug/services").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+
+        assertThat(service.memberDebugServices(id)).containsExactly("steam", "twitch");
+        assertThat(service.memberDebugServices(id)).isEmpty();
+    }
+
+    @Test
+    void myDebugActive_readsTheCallersMode_orNullWhenTheApiCouldNotTell() {
+        respond(HttpMethod.GET, "/api/me/debug", "{\"active\":true}");
+        expect(HttpMethod.GET, "/api/me/debug").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+
+        assertThat(service.myDebugActive()).isTrue();
+        assertThat(service.myDebugActive()).isNull();
+    }
 }
