@@ -47,6 +47,28 @@
         </div>
     </mdui-card>
 
+    <!--/* The owner's custom bindings, while the experiment is open to the channel (customBindings is null otherwise,
+         and for anyone but the owner): one button per binding, the active one highlighted. channel-custom-bindings.js. */-->
+    <mdui-card id="channel-custom-bindings-card" class="settings-card" variant="outlined"
+               th:if="${ch.customBindings() != null}"
+               th:attr="data-error-twitch-unavailable=#{channel.custom_bindings.error.twitch_unavailable},data-error-bot-disabled=#{channel.custom_bindings.error.bot_disabled},data-error-twitch-failed=#{channel.custom_bindings.error.twitch_failed}">
+        <div class="title-row">
+            <h3 th:text="#{channel.custom_bindings.title}">Bindings personnalisés</h3>
+        </div>
+        <p th:text="#{channel.custom_bindings.description}">Description</p>
+        <p th:if="${ch.customBindings().bindings().isEmpty()}" th:text="#{channel.custom_bindings.empty}">Aucun binding personnalisé.</p>
+        <div th:each="b : ${ch.customBindings().bindings()}" class="custom-binding-row"
+             th:with="active=${b.id() == ch.customBindings().activeId()}"
+             th:classappend="${active} ? 'is-active'" th:attr="data-custom-binding-id=${b.id()}">
+            <mdui-button class="custom-binding-trigger" th:attr="variant=${active} ? 'filled' : 'tonal'"
+                         th:text="${b.name()}">Binding</mdui-button>
+            <mdui-chip th:if="${b.uninterruptible()}" th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</mdui-chip>
+            <mdui-button class="custom-binding-stop" variant="text" th:classappend="${active} ? '' : 'hidden'"
+                         th:text="#{channel.custom_bindings.stop}">Désactiver</mdui-button>
+        </div>
+        <p id="custom-bindings-error" class="hidden" role="alert"></p>
+    </mdui-card>
+
     <mdui-card id="channel-dtdd-mapping-card" class="settings-card" variant="outlined"
                th:if="${dtddMapping != null and dtddMapping.igdbId() != null}"
                th:attr="data-igdb-id=${dtddMapping.igdbId()}">

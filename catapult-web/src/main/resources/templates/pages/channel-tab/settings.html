@@ -85,4 +85,83 @@
         <mdui-button id="raid-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
     </mdui-card>
     </th:block>
+
+    <!--/* The owner's custom bindings (null while the experiment is closed to the channel): the list, one form to create
+         or edit, and the personal API token that triggers them. channel-custom-bindings.js. */-->
+    <th:block th:if="${channelPage.isOwner() and channelPage.customBindings() != null}"
+              th:with="bindings=${channelPage.customBindings().bindings()}">
+    <mdui-card id="channel-custom-bindings-settings" class="settings-card" variant="outlined"
+               th:attr="data-error-twitch-unavailable=#{channel.custom_bindings.error.twitch_unavailable},data-error-bot-disabled=#{channel.custom_bindings.error.bot_disabled},data-error-twitch-failed=#{channel.custom_bindings.error.twitch_failed},data-error-name-taken=#{channel.custom_bindings.error.name_taken},data-error-limit-reached=#{channel.custom_bindings.error.limit_reached},data-error-invalid=#{channel.custom_bindings.error.invalid}">
+        <div class="title-row">
+            <h3 th:text="#{channel.custom_bindings.settings.title}">Bindings personnalisés</h3>
+        </div>
+        <p th:if="${bindings.isEmpty()}" th:text="#{channel.custom_bindings.empty}">Aucun binding personnalisé.</p>
+        <mdui-list>
+            <mdui-list-item th:each="b : ${bindings}" class="custom-binding-item"
+                            th:attr="data-custom-binding-id=${b.id()},data-name=${b.name()},data-game-id=${b.twitchGameId()},data-game-name=${b.twitchGameName()},data-ccls=${#strings.listJoin(b.ccls(), ',')},data-tws=${#strings.listJoin(b.tws(), ',')},data-uninterruptible=${b.uninterruptible()},description=${b.twitchGameName()}">
+                <span th:text="${b.name()}">Binding</span>
+                <mdui-chip th:if="${b.uninterruptible()}" th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</mdui-chip>
+                <mdui-chip class="custom-binding-active-chip" th:classappend="${b.id() == channelPage.customBindings().activeId()} ? '' : 'hidden'"
+                           th:text="#{channel.custom_bindings.active}">Actif</mdui-chip>
+                <mdui-button-icon slot="end-icon" icon="edit" class="custom-binding-edit"
+                                  th:attr="aria-label=#{channel.custom_bindings.settings.edit}"></mdui-button-icon>
+                <mdui-button-icon slot="end-icon" icon="delete" class="custom-binding-delete"
+                                  th:attr="aria-label=#{channel.custom_bindings.settings.delete}"></mdui-button-icon>
+            </mdui-list-item>
+        </mdui-list>
+
+        <mdui-text-field id="custom-binding-name" variant="outlined" maxlength="40" autocomplete="off"
+                         th:attr="label=#{channel.custom_bindings.settings.name}"></mdui-text-field>
+        <th:block th:replace="~{fragments/controls :: gamePicker('custom-binding', null, null)}"></th:block>
+        <span class="eyebrow" th:text="#{channel.custom_bindings.settings.ccl}"></span>
+        <div th:replace="~{fragments/controls :: switchGrid(${channelPage.availableCcls()}, 'custom-binding-ccl-checkbox',
+                ${ {} }, 'name')}"></div>
+        <span class="eyebrow" th:text="#{channel.custom_bindings.settings.tw}"></span>
+        <div th:replace="~{fragments/controls :: switchGrid(${channelPage.availableTws()}, 'custom-binding-tw-checkbox',
+                ${ {} }, 'label')}"></div>
+        <label th:replace="~{fragments/controls :: labelledSwitch('custom-binding-uninterruptible', false,
+                'channel.custom_bindings.settings.uninterruptible', null)}"></label>
+        <mdui-button id="custom-binding-save-btn" th:text="#{channel.custom_bindings.settings.save}">Enregistrer</mdui-button>
+        <mdui-button id="custom-binding-cancel-btn" class="hidden" variant="text"
+                     th:text="#{channel.custom_bindings.settings.cancel}">Annuler</mdui-button>
+
+        <mdui-dialog id="custom-binding-delete-dialog" close-on-overlay-click
+                     th:attr="headline=#{channel.custom_bindings.settings.delete.title}">
+            <p th:text="#{channel.custom_bindings.settings.delete.prompt}">Un binding actif est d'abord désactivé.</p>
+            <mdui-button slot="action" variant="text" class="custom-binding-delete-dismiss"
+                         th:text="#{channel.custom_bindings.settings.delete.dismiss}">Le garder</mdui-button>
+            <mdui-button slot="action" variant="filled" class="custom-binding-delete-confirm"
+                         th:text="#{channel.custom_bindings.settings.delete.confirm}">Supprimer</mdui-button>
+        </mdui-dialog>
+    </mdui-card>
+
+    <!--/* The status is read by channel-custom-bindings.js (GET /me/api-token); the token only ever appears in #api-token-value, once. */-->
+    <mdui-card id="channel-api-token-card" class="settings-card" variant="outlined"
+               th:attr="data-example-name=${bindings.isEmpty() ? 'Art' : bindings.get(0).name()},data-api-base=#{channel.api_token.api_base_placeholder},data-label-none=#{channel.api_token.none},data-label-since=#{channel.api_token.since('{0}')},data-label-generate=#{channel.api_token.generate},data-label-regenerate=#{channel.api_token.regenerate},data-label-copied=#{channel.api_token.copied},data-label-unavailable=#{channel.api_token.unavailable}">
+        <div class="title-row">
+            <h3 th:text="#{channel.api_token.title}">Jeton d'API</h3>
+        </div>
+        <p th:text="#{channel.api_token.description}">Description</p>
+        <p id="api-token-status"></p>
+        <mdui-button id="api-token-generate-btn" th:text="#{channel.api_token.generate}">Générer un jeton</mdui-button>
+        <mdui-button id="api-token-revoke-btn" class="hidden" variant="text" th:text="#{channel.api_token.revoke}">Révoquer</mdui-button>
+        <div id="api-token-reveal" class="hidden">
+            <p th:text="#{channel.api_token.once}">Copie-le maintenant.</p>
+            <mdui-text-field id="api-token-value" variant="outlined" readonly autocomplete="off"></mdui-text-field>
+            <mdui-button id="api-token-copy-btn" variant="tonal" th:text="#{channel.api_token.copy}">Copier</mdui-button>
+            <p th:text="#{channel.api_token.curl_hint}">Exemple :</p>
+            <pre id="api-token-curl"></pre>
+        </div>
+        <mdui-dialog id="api-token-confirm-dialog" close-on-overlay-click>
+            <p data-for="regenerate" class="hidden"><strong th:text="#{channel.api_token.confirm.regenerate.title}">Régénérer ?</strong>
+                <span th:text="#{channel.api_token.confirm.regenerate.body}">L'ancien jeton cesse de fonctionner.</span></p>
+            <p data-for="revoke" class="hidden"><strong th:text="#{channel.api_token.confirm.revoke.title}">Révoquer ?</strong>
+                <span th:text="#{channel.api_token.confirm.revoke.body}">Le jeton cesse de fonctionner.</span></p>
+            <mdui-button slot="action" variant="text" class="api-token-confirm-dismiss"
+                         th:text="#{channel.api_token.confirm.dismiss}">Annuler</mdui-button>
+            <mdui-button slot="action" variant="filled" class="api-token-confirm-ok"
+                         th:text="#{channel.api_token.confirm.ok}">Confirmer</mdui-button>
+        </mdui-dialog>
+    </mdui-card>
+    </th:block>
 </mdui-tab-panel>
