@@ -19,7 +19,9 @@ import org.springframework.stereotype.Component;
 /**
  * The one definition of the request-level access rules: who is a member, an admin, a loopback caller or a personal
  * API token holder. The filter chains and {@link DebugSubjectFilter} use these, so the rules cannot drift apart.
- * A relayed client ({@code X-Forwarded-For}) is never loopback: the remote address is the one of the connection.
+ * A relayed client ({@code X-Forwarded-For}) is never loopback: with {@code server.forward-headers-strategy=native}
+ * the server (Tomcat's {@code RemoteIpValve}) replaces the remote address with the client it resolves from
+ * {@code X-Forwarded-For}, so a request relayed by a local proxy carries that client's address, not the proxy's.
  * <p>
  * It also decides who reaches a channel, for {@code @PreAuthorize("@authz.canAccessChannel(#username)")} and
  * {@code @PreAuthorize("@authz.ownsChannel(#username)")}. Those keep the order every channel route answers in: 401 for
