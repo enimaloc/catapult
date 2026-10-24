@@ -189,6 +189,17 @@ class CustomBindingApiSecurityTest {
         }
 
         @Test
+        void aRefusalAnsweredByTheController_carriesTheCorsHeaders() throws Exception {
+            mvc.perform(post("/api/v2/custom-bindings/unknown/activate").header("Origin", ORIGIN)
+                            .header("Authorization", "Bearer " + PERSONAL_TOKEN))
+                    .andExpect(status().isNotFound())
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                    .andExpect(jsonPath("$.code").value("not_found"))
+                    .andExpect(header().string("Access-Control-Allow-Origin", "*"))
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
+        }
+
+        @Test
         void aSessionCookieAlone_is401() throws Exception {
             mvc.perform(post("/api/v2/custom-bindings/deactivate").header("Origin", ORIGIN)
                             .cookie(new Cookie("CATAPULT_API_SESSION", "s1"), new Cookie("JSESSIONID", "s2")))
