@@ -82,6 +82,41 @@ de sa valeur normale. Une ligne est aussi masquée quand `<premier segment de la
 `catapult-api` : une valeur normale qui n'existe que comme défaut dans le code (`${x:5}`) ne peut pas être comparée,
 la ligne n'apparaît jamais et un avertissement est journalisé au démarrage.
 
+### Mode débug d'un membre
+
+Pour comprendre un problème qu'on ne reproduit pas, l'admin peut enregistrer tout ce que Catapult fait pour un
+membre précis. Il s'active et se coupe depuis le menu d'actions du membre (page Membres de l'admin) ; un badge
+signale les membres en débug. Il reste actif jusqu'à ce que l'admin le coupe, sans expiration.
+
+Pendant le mode, pour ce membre seulement :
+
+- **sa session web** : replay Sentry de la session entière et traces à 100 %, à partir du prochain chargement de
+  page (les champs saisis restent masqués dans le replay) ;
+- **ses échanges avec les services externes** : chaque requête et réponse HTTP de `catapult-api` faite pour lui
+  (Twitch, Steam, IGDB, Xbox, Minecraft/MSA, DoesTheDogDie…), y compris en arrière-plan (détection de jeu, mise à
+  jour de catégorie, sync des amis…), ainsi que les messages entrants qui le concernent (notifications EventSub,
+  retours OAuth de ses liaisons de compte). Les corps sont tronqués à 65 536 caractères.
+
+L'admin relit ces échanges dans l'admin (filtrables par service, sens, période et erreur / succès, avec le détail
+de chacun) et, si Sentry est configuré, dans Sentry à côté du replay.
+
+- **Secrets** : à l'activation, l'admin choisit s'ils sont masqués (par défaut) ou en clair. Le choix couvre les
+  secrets du membre et ceux de l'application (tokens, clés d'API, client secrets), en base comme dans Sentry. Pour
+  le changer, couper puis réactiver.
+- **Autres membres** : un appel groupé n'est enregistré que pour la part du membre (requête comprise, l'échange est
+  marqué « filtré ») ; dans tout échange, les identifiants d'un autre membre Catapult sont remplacés par `[membre]`.
+  Les tiers qui ne sont pas membres restent tels quels.
+- **Conservation** : les échanges sont supprimés 30 jours après la coupure, ou tout de suite par la suppression
+  manuelle, qui efface tout l'enregistrement du membre. Une réactivation reprend avec ce qui reste.
+- **Le membre ne voit rien** : aucun bandeau ni indication dans son interface. Le mode se discute avec lui en dehors
+  de Catapult.
+- **Sentry de l'api** : `catapult-api` envoie à Sentry via `API_SENTRY_DSN` (vide : Sentry coupé côté api,
+  l'enregistrement en base marche quand même), et rien d'autre que les données des membres en débug.
+  `SENTRY_ENVIRONMENT` nomme l'environnement (`production` par défaut).
+
+Non couverts : le login Twitch (l'échange du code OAuth a lieu avant que le membre soit connu) et les appels faits
+sans membre identifiable (préchauffage du cache des catégories, CCL de l'admin, registres well-known).
+
 ## Configuration
 
 | Variable | Obligatoire | Description |
@@ -98,6 +133,8 @@ la ligne n'apparaît jamais et un avertissement est journalisé au démarrage.
 | `BATTLENET_CLIENT_SECRET` | Non | Client Secret Battle.net |
 | `IGDB_CLIENT_ID` | Non | Client ID IGDB (utilise `TWITCH_CLIENT_ID` si absent) |
 | `DTDD_ENABLED` | Non | Active l'intégration DoesTheDogDie (clés gérées dans l'admin `/admin/dtdd-keys`) |
+| `API_SENTRY_DSN` | Non | DSN Sentry de `catapult-api`, qui n'envoie que les membres en mode débug (vide : coupé) |
+| `SENTRY_ENVIRONMENT` | Non | Environnement Sentry de `catapult-api` (`production` par défaut) |
 
 > Le compte bot Twitch (utilisé pour répondre aux commandes chat) se configure depuis l'admin : page Membres → "Lier le Bot Twitch" sur le compte système (qui démarre un flow OAuth Twitch dédié, le token est stocké chiffré en base). Tant que cette liaison n'est pas faite, les réponses passent par le compte du streamer.
 
