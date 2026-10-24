@@ -47,7 +47,7 @@ class BindingServiceTest {
 
     @BeforeEach
     void setup() {
-        bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameStateService, gameMappingRepository, mock(CustomBindingActivations.class));
+        bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameStateService, gameMappingRepository, mock(CustomBindingActivations.class), new GameBindingLookup(gameBindingRepository));
 
         user = new UserAccount();
         bindingId = UUID.randomUUID();

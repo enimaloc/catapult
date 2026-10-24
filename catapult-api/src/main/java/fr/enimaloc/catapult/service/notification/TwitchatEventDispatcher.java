@@ -10,11 +10,10 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatEventAction;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
-import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -53,25 +52,23 @@ public class TwitchatEventDispatcher {
     private final TwitchatEventActionService eventActionService;
     private final ChannelEventPublisher channelEventPublisher;
     private final GameStateService gameStateService;
-    private final BindingService bindingService;
+    private final GameBindingLookup gameBindingLookup;
 
     @Value("${app.web-url:http://localhost:8081}")
     private String publicWebUrl;
 
-    // BindingService (transitively) depends back on TwitchServiceImpl, upstream of this
-    // dispatcher in the bean graph: @Lazy defers its resolution to first use.
     public TwitchatEventDispatcher(TwitchatWidgetSettingsService widgetSettingsService,
                                    TwitchatActionTokenService actionTokenService,
                                    TwitchatEventActionService eventActionService,
                                    ChannelEventPublisher channelEventPublisher,
                                    GameStateService gameStateService,
-                                   @Lazy BindingService bindingService) {
+                                   GameBindingLookup gameBindingLookup) {
         this.widgetSettingsService = widgetSettingsService;
         this.actionTokenService = actionTokenService;
         this.eventActionService = eventActionService;
         this.channelEventPublisher = channelEventPublisher;
         this.gameStateService = gameStateService;
-        this.bindingService = bindingService;
+        this.gameBindingLookup = gameBindingLookup;
     }
 
     public void onCategoryChangedByCatapult(UserAccount user, String newGameId, String newGameName,
@@ -93,7 +90,7 @@ public class TwitchatEventDispatcher {
             Map<TwitchatActionType, Map<String, String>> applicable = new LinkedHashMap<>();
             // Read-only lookup on purpose: composing a dispatch must never create a binding.
             Optional<GameBinding> existing = gameStateService.getLastKnownGame(user)
-                    .flatMap(detected -> bindingService.findBinding(user, detected));
+                    .flatMap(detected -> gameBindingLookup.findByDetectedGame(user, detected));
             if (existing.isPresent()) {
                 GameBinding binding = existing.get();
                 applicable.put(TwitchatActionType.BIND_GAME_CATEGORY, Map.of("bindingId", binding.getId().toString(),

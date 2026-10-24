@@ -24,6 +24,7 @@ import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -273,7 +274,7 @@ class CustomBindingDetectionTest {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
         BindingService realBindings = new BindingService(gameBindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), twitchService, mock(TwResolverService.class), gameStateService,
-                mock(GameMappingRepository.class), activations);
+                mock(GameMappingRepository.class), activations, new GameBindingLookup(gameBindings));
 
         realBindings.setTwitchGame(user, gameBinding.getId(), "1234", "Other");
 

@@ -32,6 +32,7 @@ import fr.enimaloc.catapult.security.DebugSubjectFilter;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
@@ -306,7 +307,8 @@ class DebugAttributionTest {
         });
         BindingService service = new BindingService(bindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), mock(TwitchService.class), mock(TwResolverService.class),
-                mock(GameStateService.class), mappings, mock(CustomBindingActivations.class));
+                mock(GameStateService.class), mappings, mock(CustomBindingActivations.class),
+                new GameBindingLookup(bindings));
 
         service.refreshIncompleteBindings();
 

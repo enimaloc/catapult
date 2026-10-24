@@ -9,7 +9,7 @@ import fr.enimaloc.catapult.domain.twitchat.TwitchatEventAction;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +51,7 @@ class TwitchatEventDispatcherTest {
     @Mock TwitchatEventActionService eventActionService;
     @Mock ChannelEventPublisher channelEventPublisher;
     @Mock GameStateService gameStateService;
-    @Mock BindingService bindingService;
+    @Mock GameBindingLookup gameBindingLookup;
 
     TwitchatEventDispatcher dispatcher;
     UserAccount user;
@@ -60,7 +60,7 @@ class TwitchatEventDispatcherTest {
     @BeforeEach
     void setUp() {
         dispatcher = new TwitchatEventDispatcher(widgetSettingsService, actionTokenService, eventActionService,
-                channelEventPublisher, gameStateService, bindingService);
+                channelEventPublisher, gameStateService, gameBindingLookup);
         ReflectionTestUtils.setField(dispatcher, "publicWebUrl", "https://catapult.test/");
         user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -153,7 +153,7 @@ class TwitchatEventDispatcherTest {
         binding.setTwitchGameId(appGameId);
         binding.setTwitchGameName("Old Game");
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
-        when(bindingService.findBinding(user, detected)).thenReturn(Optional.of(binding));
+        when(gameBindingLookup.findByDetectedGame(user, detected)).thenReturn(Optional.of(binding));
         return binding;
     }
 
@@ -205,7 +205,7 @@ class TwitchatEventDispatcherTest {
     void categoryChangedManually_detectedGameWithoutBinding_mintsNothing_andOnlyLooksUp() {
         DetectedGame detected = mock(DetectedGame.class);
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
-        when(bindingService.findBinding(user, detected)).thenReturn(Optional.empty());
+        when(gameBindingLookup.findByDetectedGame(user, detected)).thenReturn(Optional.empty());
         when(eventActionService.enabledActions(user, CATEGORY_CHANGED_MANUALLY)).thenReturn(List.of(
                 buttons(TwitchatActionType.BIND_GAME_CATEGORY, TwitchatActionType.REVERT_TO_APP_CATEGORY)));
 
@@ -213,8 +213,8 @@ class TwitchatEventDispatcherTest {
 
         assertThat(publishedButtons()).isEmpty();
         verifyNoInteractions(actionTokenService);
-        verify(bindingService).findBinding(user, detected);
-        verifyNoMoreInteractions(bindingService);
+        verify(gameBindingLookup).findByDetectedGame(user, detected);
+        verifyNoMoreInteractions(gameBindingLookup);
     }
 
     @Test
@@ -226,7 +226,7 @@ class TwitchatEventDispatcherTest {
         dispatcher.onCategoryChangedManually(user, "222", "New Game", "Old Game");
 
         assertThat(publishedButtons()).isEmpty();
-        verifyNoInteractions(actionTokenService, bindingService);
+        verifyNoInteractions(actionTokenService, gameBindingLookup);
     }
 
     @Test
