@@ -1,10 +1,14 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.service.account.UserApiTokenService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.Customizer;
@@ -22,6 +26,8 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenResolv
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 
 import javax.crypto.SecretKey;
@@ -38,6 +44,36 @@ import java.util.stream.Stream;
 @Order(1)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class ApiSecurityConfig {
+
+    /** Mount point of the custom bindings API, which only the personal API token opens. */
+    public static final String CUSTOM_BINDINGS_API = "/api/v2/custom-bindings";
+
+    /**
+     * {@value #CUSTOM_BINDINGS_API}/**, in every profile: ordered before the /api/** chains below (which would take
+     * its Bearer for a JWT, and let localhost through), stateless, no CSRF, authenticated by the personal API token
+     * only — a JWT, a widget token or nothing gets a 401.
+     */
+    @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    public SecurityFilterChain customBindingsApiSecurityFilterChain(
+            HttpSecurity http, ObjectProvider<UserApiTokenService> userApiTokenService) throws Exception {
+        http
+                .securityMatcher(CUSTOM_BINDINGS_API, CUSTOM_BINDINGS_API + "/**")
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(AbstractHttpConfigurer::disable)
+                .requestCache(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .exceptionHandling(e -> e
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                .addFilterBefore(new PersonalTokenAuthenticationFilter(userApiTokenService),
+                        AuthorizationFilter.class)
+                .addFilterAfter(new DebugSubjectFilter(), PersonalTokenAuthenticationFilter.class);
+
+        return http.build();
+    }
 
     @Bean
     @Profile("dev")

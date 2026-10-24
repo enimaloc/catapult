@@ -138,6 +138,31 @@ class DebugAttributionTest {
     }
 
     @Test
+    void request_withAPersonalApiToken_isAttributedToItsOwner() throws Exception {
+        UUID member = UUID.randomUUID();
+        SecurityContextHolder.getContext().setAuthentication(
+                org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(member,
+                        null, org.springframework.security.core.authority.AuthorityUtils.createAuthorityList(
+                                fr.enimaloc.catapult.security.PersonalTokenAuthenticationFilter.AUTHORITY)));
+
+        filter(new MockHttpServletRequest("POST", "/api/v2/custom-bindings/Art/activate"));
+
+        assertThat(seen).containsExactly(member);
+    }
+
+    @Test
+    void request_withAnotherUuidPrincipal_isNotAttributed() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+                        UUID.randomUUID(), null,
+                        org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("ROLE_USER")));
+
+        filter(new MockHttpServletRequest("GET", "/api/channel/settings"));
+
+        assertThat(seen).containsExactly((UUID) null);
+    }
+
+    @Test
     void request_isAttributedToTheJwtSubject() throws Exception {
         UUID member = UUID.randomUUID();
         authenticate(member.toString());
