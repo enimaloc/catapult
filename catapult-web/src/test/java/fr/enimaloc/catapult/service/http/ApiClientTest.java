@@ -12,6 +12,10 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
+
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 
 import java.io.IOException;
 import java.util.List;
@@ -392,5 +396,107 @@ class ApiClientTest {
 
         assertThat(client.call(org.springframework.http.HttpMethod.PUT, "/api/a", null, Payload[].class))
                 .isEqualTo(new ApiClient.Result<Payload[]>(403, null));
+    }
+
+    private static MockResponse problem(int status, String contentType, String body) {
+        return new MockResponse().setResponseCode(status).setHeader("Content-Type", contentType).setBody(body);
+    }
+
+    @Test
+    void call_readsTheProblemCode_whateverItsContentType() {
+        String body = "{\"code\":\"name_taken\",\"detail\":\"x\"}";
+        server.enqueue(problem(409, "application/problem+json", body));
+        server.enqueue(problem(409, "application/json", body));
+
+        for (int i = 0; i < 2; i++) {
+            ApiClient.Result<Payload> result = client.call(HttpMethod.POST, "/api/a", null, Payload.class);
+
+            assertThat(result.status()).isEqualTo(409);
+            assertThat(result.error()).isNotNull();
+            assertThat(result.error().code()).isEqualTo(ErrorCode.NAME_TAKEN);
+            assertThat(result.error().detail()).isEqualTo("x");
+        }
+    }
+
+    @Test
+    void call_errorWithoutAProblem_hasNoError() {
+        server.enqueue(new MockResponse().setResponseCode(404));
+        server.enqueue(problem(400, "application/json", "[{\"index\":0}]"));
+
+        ApiClient.Result<Payload> empty = client.call(HttpMethod.POST, "/api/a", null, Payload.class);
+        ApiClient.Result<TwitchatValidationError[]> list =
+                client.call(HttpMethod.POST, "/api/a", null, TwitchatValidationError[].class);
+
+        assertThat(empty).isEqualTo(new ApiClient.Result<Payload>(404, null));
+        assertThat(empty.error()).isNull();
+        assertThat(list.error()).isNull();
+        assertThat(list.body()).containsExactly(new TwitchatValidationError(0, null, null));
+    }
+
+    @Test
+    void call_unknownCode_keepsTheDetail() {
+        server.enqueue(problem(409, "application/problem+json", "{\"code\":\"from_the_future\",\"detail\":\"y\"}"));
+
+        ApiClient.Result<Payload> result = client.call(HttpMethod.POST, "/api/a", null, Payload.class);
+
+        assertThat(result.error()).isNotNull();
+        assertThat(result.error().code()).isNull();
+        assertThat(result.error().detail()).isEqualTo("y");
+    }
+
+    @Test
+    void call_readsAnExtension() {
+        server.enqueue(problem(502, "application/problem+json",
+                "{\"code\":\"minecraft_device_code_refused\",\"upstream\":\"AADSTS70002\"}"));
+
+        ApiClient.Result<Payload> result = client.call(HttpMethod.POST, "/api/a", null, Payload.class);
+
+        assertThat(result.error().code()).isEqualTo(ErrorCode.MINECRAFT_DEVICE_CODE_REFUSED);
+        assertThat(result.error().property("upstream", String.class)).isEqualTo("AADSTS70002");
+        assertThat(result.error().property("absent", String.class)).isNull();
+        assertThat(result.error().detail()).isNull();
+    }
+
+    @Test
+    void call_success_hasNoError() {
+        server.enqueue(problem(200, "application/json", "{\"name\":\"ok\",\"code\":\"name_taken\"}"));
+
+        ApiClient.Result<Payload> result = client.call(HttpMethod.POST, "/api/a", null, Payload.class);
+
+        assertThat(result).isEqualTo(new ApiClient.Result<>(200, new Payload("ok")));
+        assertThat(result.error()).isNull();
+    }
+
+    @Test
+    void parse_givesAnErrorOnlyForAnObjectWithATextualCode() {
+        assertThat(ApiError.parse(null)).isNull();
+        assertThat(ApiError.parse(new byte[0])).isNull();
+        assertThat(ApiError.parse("{oops".getBytes())).isNull();
+        assertThat(ApiError.parse("[]".getBytes())).isNull();
+        assertThat(ApiError.parse("{\"detail\":\"x\"}".getBytes())).isNull();
+        assertThat(ApiError.parse("{\"code\":42}".getBytes())).isNull();
+        assertThat(ApiError.parse("{\"code\":\"conflict\",\"detail\":7}".getBytes()))
+                .satisfies(error -> {
+                    assertThat(error.code()).isEqualTo(ErrorCode.CONFLICT);
+                    assertThat(error.detail()).isNull();
+                });
+    }
+
+    @Test
+    void property_isNullWhenItCannotBeReadAsTheType() {
+        ApiError error = ApiError.parse("{\"code\":\"conflict\",\"count\":\"many\",\"n\":3}".getBytes());
+
+        assertThat(error.property("count", Integer.class)).isNull();
+        assertThat(error.property("n", Integer.class)).isEqualTo(3);
+    }
+
+    @Test
+    void call_errorWhoseBodyIsCut_keepsTheStatus() {
+        server.enqueue(problem(409, "application/problem+json", "{\"code\":\"name_taken\",\"detail\":\"" + "x".repeat(4096) + "\"}")
+                .setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY));
+
+        ApiClient.Result<Payload> result = client.call(HttpMethod.POST, "/api/a", null, Payload.class);
+
+        assertThat(result).isEqualTo(new ApiClient.Result<Payload>(409, null));
     }
 }
