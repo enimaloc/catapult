@@ -290,7 +290,9 @@ public class MockData {
     /** The dashboard as {@code username} sees it, bindings filtered by status and/or source. */
     public ChannelPageData getPage(String username, String status, String source) {
         List<BindingDto> bindings = binding.stream()
-                .filter(b -> status == null || status.equalsIgnoreCase(b.status()))
+                // Like the API, the automatic filter also returns the bindings an admin mapping set.
+                .filter(b -> status == null || status.equalsIgnoreCase(b.status())
+                        || ("AUTO".equalsIgnoreCase(status) && "MAPPED".equals(b.status())))
                 .filter(b -> source == null || source.equalsIgnoreCase(b.sourceType()))
                 .toList();
         // A moderated channel shows as itself; its dashboard otherwise reuses the member's data.
