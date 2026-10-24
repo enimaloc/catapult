@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.api.admin;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.repository.account.UserFlagRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,7 +16,6 @@ import java.util.Map;
 /** The targeting tags members carry, for the admin page's override form to propose. */
 @RestController
 @RequestMapping("/api/admin/flags")
-@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
 @RequiredArgsConstructor
 public class ApiAdminFlagsController {
     private final UserFlagRepository flags;

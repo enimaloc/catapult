@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,7 +18,6 @@ import java.util.List;
 /** The admin page's well-known files (served publicly through {@link fr.enimaloc.catapult.api.ApiWellKnownController}). */
 @RestController
 @RequestMapping("/api/admin/well-known")
-@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
 @RequiredArgsConstructor
 public class ApiAdminWellKnownController {
     private final WellKnownFileService service;
