@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.service.ActivationOutcome;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.CustomBindingSave;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -39,13 +40,13 @@ public class ChannelCustomBindingsController {
     }
 
     @PostMapping("/channel/{username}/custom-bindings")
-    public ResponseEntity<CustomBindingDto> create(@PathVariable String username, @RequestBody CustomBindingRequest body) {
+    public ResponseEntity<?> create(@PathVariable String username, @RequestBody CustomBindingRequest body) {
         return relay(apiService.createCustomBinding(username, body));
     }
 
     /** The saved binding, and how re-applying it went when it is the active one. */
     @PostMapping("/channel/{username}/custom-bindings/{id}")
-    public ResponseEntity<CustomBindingSaveResult> update(@PathVariable String username, @PathVariable UUID id,
+    public ResponseEntity<?> update(@PathVariable String username, @PathVariable UUID id,
                                                           @RequestBody CustomBindingRequest body) {
         return relay(apiService.updateCustomBinding(username, id, body));
     }
@@ -79,7 +80,7 @@ public class ChannelCustomBindingsController {
     @PostMapping("/me/api-token")
     public ResponseEntity<ApiTokenCreatedDto> regenerateApiToken() {
         ApiClient.Result<ApiTokenCreatedDto> result = apiService.regenerateApiToken();
-        ResponseEntity.BodyBuilder response = ResponseEntity.status(status(result)).cacheControl(CacheControl.noStore());
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(status(result.status())).cacheControl(CacheControl.noStore());
         return result.ok() && result.body() != null ? response.body(result.body()) : response.build();
     }
 
@@ -92,13 +93,14 @@ public class ChannelCustomBindingsController {
         return body == null ? ResponseEntity.status(HttpStatus.BAD_GATEWAY).build() : ResponseEntity.ok(body);
     }
 
-    /** catapult-api's status, with its body when it took the action. */
-    private static <T> ResponseEntity<T> relay(ApiClient.Result<T> result) {
-        ResponseEntity.BodyBuilder response = ResponseEntity.status(status(result));
-        return result.ok() && result.body() != null ? response.body(result.body()) : response.build();
+    /** catapult-api's status, with its body when it took the save, else the {@code code} to translate when it told one. */
+    private static ResponseEntity<?> relay(CustomBindingSave<?> result) {
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(status(result.status()));
+        if (result.ok()) return result.body() != null ? response.body(result.body()) : response.build();
+        return result.code() == null ? response.build() : response.body(new CustomBindingErrorDto(result.code(), null));
     }
 
-    private static int status(ApiClient.Result<?> result) {
-        return result.status() >= 200 && result.status() < 600 ? result.status() : HttpStatus.BAD_GATEWAY.value();
+    private static int status(int status) {
+        return status >= 200 && status < 600 ? status : HttpStatus.BAD_GATEWAY.value();
     }
 }

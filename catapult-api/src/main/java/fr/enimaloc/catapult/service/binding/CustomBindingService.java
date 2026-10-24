@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -106,7 +107,7 @@ public class CustomBindingService {
         String name = validName(request);
         validCategory(request);
         if (bindings.countByUser(user) >= MAX_PER_STREAMER) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
+            throw new CustomBindingException(HttpStatus.CONFLICT, CustomBindingErrorDto.LIMIT_REACHED,
                     "At most " + MAX_PER_STREAMER + " custom bindings per channel");
         }
         if (bindings.findByUserAndNameIgnoreCase(user, name).isPresent()) {
@@ -279,7 +280,7 @@ public class CustomBindingService {
         binding.getCcls().addAll(cleaned(request.ccls()));
         Set<String> tws = cleaned(request.tws());
         if (tws.stream().anyMatch(tw -> tw.length() > MAX_TW_LENGTH)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new CustomBindingException(HttpStatus.BAD_REQUEST, CustomBindingErrorDto.INVALID,
                     "Tags are at most " + MAX_TW_LENGTH + " characters");
         }
         binding.getTws().clear();
@@ -290,7 +291,7 @@ public class CustomBindingService {
     private static String validName(CustomBindingRequest request) {
         String name = request.name() == null ? "" : request.name().trim();
         if (name.isEmpty() || name.length() > MAX_NAME_LENGTH) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new CustomBindingException(HttpStatus.BAD_REQUEST, CustomBindingErrorDto.INVALID,
                     "Name must be 1 to " + MAX_NAME_LENGTH + " characters");
         }
         return name;
@@ -299,7 +300,7 @@ public class CustomBindingService {
     private static void validCategory(CustomBindingRequest request) {
         if (request.twitchGameId() == null || request.twitchGameId().isBlank()
                 || request.twitchGameName() == null || request.twitchGameName().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A Twitch category is required");
+            throw new CustomBindingException(HttpStatus.BAD_REQUEST, CustomBindingErrorDto.INVALID, "A Twitch category is required");
         }
     }
 
@@ -321,7 +322,7 @@ public class CustomBindingService {
     }
 
     private static ResponseStatusException nameTaken() {
-        return new ResponseStatusException(HttpStatus.CONFLICT, "A custom binding already has that name");
+        return new CustomBindingException(HttpStatus.CONFLICT, CustomBindingErrorDto.NAME_TAKEN, "A custom binding already has that name");
     }
 
     private static ResponseStatusException notFound() {

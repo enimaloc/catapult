@@ -3,10 +3,11 @@ package fr.enimaloc.catapult.service.mock;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
-import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.CustomBindingSave;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -45,24 +46,24 @@ class MockCustomBindings {
         return new CustomBindingsStateDto(true, List.copyOf(bindings), activeId, activatedAt);
     }
 
-    synchronized ApiClient.Result<CustomBindingDto> create(CustomBindingRequest request) {
-        int invalid = invalid(request, null);
-        if (invalid != 0) return new ApiClient.Result<>(invalid, null);
-        if (bindings.size() >= MAX) return new ApiClient.Result<>(409, null);
+    synchronized CustomBindingSave<CustomBindingDto> create(CustomBindingRequest request) {
+        CustomBindingSave<CustomBindingDto> refused = refusal(request, null);
+        if (refused != null) return refused;
+        if (bindings.size() >= MAX) return new CustomBindingSave<>(409, null, CustomBindingErrorDto.LIMIT_REACHED);
         CustomBindingDto created = dto(UUID.randomUUID(), request);
         bindings.add(created);
-        return new ApiClient.Result<>(201, created);
+        return new CustomBindingSave<>(201, created, null);
     }
 
     /** Whether the edit re-applied is told for the active binding only. */
-    synchronized ApiClient.Result<CustomBindingSaveResult> update(UUID id, CustomBindingRequest request) {
+    synchronized CustomBindingSave<CustomBindingSaveResult> update(UUID id, CustomBindingRequest request) {
         int index = indexOf(id);
-        if (index < 0) return new ApiClient.Result<>(404, null);
-        int invalid = invalid(request, id);
-        if (invalid != 0) return new ApiClient.Result<>(invalid, null);
+        if (index < 0) return new CustomBindingSave<>(404, null, null);
+        CustomBindingSave<CustomBindingSaveResult> refused = refusal(request, id);
+        if (refused != null) return refused;
         CustomBindingDto saved = dto(id, request);
         bindings.set(index, saved);
-        return new ApiClient.Result<>(200, new CustomBindingSaveResult(saved, id.equals(activeId) ? CustomBindingSaveResult.APPLIED : null));
+        return new CustomBindingSave<>(200, new CustomBindingSaveResult(saved, id.equals(activeId) ? CustomBindingSaveResult.APPLIED : null), null);
     }
 
     /** 204, or 404 when unknown; the active binding is deactivated first. */
@@ -108,13 +109,14 @@ class MockCustomBindings {
         return -1;
     }
 
-    /** 400 for an invalid request, 409 for a name taken by another binding than {@code self}; 0 when fine. */
-    private int invalid(CustomBindingRequest request, UUID self) {
+    /** The refusal catapult-api would give: 400 invalid, or 409 name taken by another binding than {@code self}; else null. */
+    private <T> CustomBindingSave<T> refusal(CustomBindingRequest request, UUID self) {
         String name = request == null || request.name() == null ? "" : request.name().trim();
-        if (name.isEmpty() || name.length() > NAME_MAX) return 400;
-        if (blank(request.twitchGameId()) || blank(request.twitchGameName())) return 400;
+        if (name.isEmpty() || name.length() > NAME_MAX || blank(request.twitchGameId()) || blank(request.twitchGameName())) {
+            return new CustomBindingSave<>(400, null, CustomBindingErrorDto.INVALID);
+        }
         boolean taken = bindings.stream().anyMatch(b -> !b.id().equals(self) && b.name().toLowerCase(Locale.ROOT).equals(name.toLowerCase(Locale.ROOT)));
-        return taken ? 409 : 0;
+        return taken ? new CustomBindingSave<>(409, null, CustomBindingErrorDto.NAME_TAKEN) : null;
     }
 
     private static boolean blank(String value) {

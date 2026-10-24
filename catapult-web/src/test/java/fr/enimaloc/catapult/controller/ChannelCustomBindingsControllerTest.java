@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ActivationOutcome;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.CustomBindingSave;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,29 +65,41 @@ class ChannelCustomBindingsControllerTest {
 
     @Test
     void create_relaysTheBodyAndCatapultApisStatus() throws Exception {
-        when(apiService.createCustomBinding("enimaloc", REQUEST)).thenReturn(new ApiClient.Result<>(201, DTO));
+        when(apiService.createCustomBinding("enimaloc", REQUEST)).thenReturn(new CustomBindingSave<>(201, DTO, null));
         mvc.perform(post("/channel/enimaloc/custom-bindings").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(ID.toString()));
 
-        when(apiService.createCustomBinding(any(), any())).thenReturn(new ApiClient.Result<>(409, null));
+        when(apiService.createCustomBinding(any(), any())).thenReturn(new CustomBindingSave<>(409, null, "limit_reached"));
         mvc.perform(post("/channel/enimaloc/custom-bindings").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("limit_reached"));
+
+        when(apiService.createCustomBinding(any(), any())).thenReturn(new CustomBindingSave<>(409, null, "name_taken"));
+        mvc.perform(post("/channel/enimaloc/custom-bindings").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(jsonPath("$.code").value("name_taken"));
     }
 
     @Test
     void update_relaysHowReapplyingWent() throws Exception {
         when(apiService.updateCustomBinding("enimaloc", ID, REQUEST))
-                .thenReturn(new ApiClient.Result<>(200, new CustomBindingSaveResult(DTO, "bot_disabled")));
+                .thenReturn(new CustomBindingSave<>(200, new CustomBindingSaveResult(DTO, "bot_disabled"), null));
         mvc.perform(post("/channel/enimaloc/custom-bindings/" + ID).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reapplyOutcome").value("bot_disabled"))
                 .andExpect(jsonPath("$.binding.name").value("Art"));
 
-        when(apiService.updateCustomBinding(any(), any(), any())).thenReturn(new ApiClient.Result<>(404, null));
+        when(apiService.updateCustomBinding(any(), any(), any())).thenReturn(new CustomBindingSave<>(400, null, "invalid"));
+        mvc.perform(post("/channel/enimaloc/custom-bindings/" + ID).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid"));
+
+        when(apiService.updateCustomBinding(any(), any(), any())).thenReturn(new CustomBindingSave<>(404, null, null));
         mvc.perform(post("/channel/enimaloc/custom-bindings/" + ID).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isNotFound());

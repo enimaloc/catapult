@@ -105,6 +105,17 @@ class CustomBindingServiceTest {
                         e -> assertThat(e.getStatusCode()).isEqualTo(status));
     }
 
+    private static void assertCode(Executable call, String code) {
+        assertThatThrownBy(call::execute).isInstanceOfSatisfying(CustomBindingException.class,
+                e -> assertThat(e.code()).isEqualTo(code));
+    }
+
+    @Test
+    void aRefusedSave_carriesItsCode() {
+        assertCode(() -> service.create(user, request("   ")), "invalid");
+        assertCode(() -> service.create(user, new CustomBindingRequest("Art", " ", "Art", null, null, false)), "invalid");
+    }
+
     // ── CRUD ─────────────────────────────────────────────────────────────────
 
     @Test
