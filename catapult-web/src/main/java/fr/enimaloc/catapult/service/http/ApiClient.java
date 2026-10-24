@@ -35,7 +35,7 @@ import java.util.UUID;
 public class ApiClient {
     public static final String SESSION_JWT_KEY = "jwt";
 
-    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final JsonMapper JSON = ApiError.JSON;
     /** Marks a call that must go out without the session's bearer; the interceptor removes it. */
     private static final String ANONYMOUS_HEADER = "X-Catapult-Anonymous";
     private static final String AUTH_VALIDATE_PATH = "/api/auth/validate";

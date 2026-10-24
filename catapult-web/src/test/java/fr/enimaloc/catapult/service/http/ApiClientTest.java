@@ -499,4 +499,27 @@ class ApiClientTest {
 
         assertThat(result).isEqualTo(new ApiClient.Result<Payload>(409, null));
     }
+
+    @Test
+    void call_errorBodyWithAnUnknownField_isStillRead() {
+        server.enqueue(problem(400, "application/json", "{\"name\":\"bad\",\"extra\":1}"));
+        server.enqueue(problem(400, "application/json", "[{\"index\":0,\"field\":\"f\",\"message\":\"m\",\"extra\":true}]"));
+
+        assertThat(client.call(HttpMethod.PUT, "/api/a", null, Payload.class).body()).isEqualTo(new Payload("bad"));
+        assertThat(client.call(HttpMethod.PUT, "/api/a", null, TwitchatValidationError[].class).body())
+                .containsExactly(new TwitchatValidationError(0, "f", "m"));
+    }
+
+    @Test
+    void call_problemBody_readsAsACustomBindingError_keepingItsCode() {
+        server.enqueue(problem(409, "application/problem+json", "{\"type\":\"about:blank\",\"title\":\"Conflict\","
+                + "\"status\":409,\"detail\":\"Name taken\",\"instance\":\"/api/v2/custom-bindings\",\"code\":\"name_taken\"}"));
+
+        ApiClient.Result<fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto> result = client.call(HttpMethod.POST,
+                "/api/v2/custom-bindings", null, fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto.class);
+
+        assertThat(result.body()).isNotNull();
+        assertThat(result.body().code()).isEqualTo("name_taken");
+        assertThat(result.error().code()).isEqualTo(ErrorCode.NAME_TAKEN);
+    }
 }
