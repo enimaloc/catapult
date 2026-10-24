@@ -73,6 +73,7 @@ public final class DebugContext {
         return true;
     }
 
+    /** Work wrapped and handed to other threads must complete before {@code call} returns, or it is not captured. */
     public static <T> Captured<T> capture(Supplier<T> call) {
         List<RawExchange> previous = CAPTURE.get();
         List<RawExchange> list = new CopyOnWriteArrayList<>();
