@@ -8,15 +8,19 @@ import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,7 +34,7 @@ class ApiAdminDtddKeysControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new ApiAdminDtddKeysController(repository, rotator, events);
+        controller = new ApiAdminDtddKeysController(repository, Optional.of(rotator), events);
     }
 
     @Test
@@ -73,6 +77,38 @@ class ApiAdminDtddKeysControllerTest {
 
         verify(repository).deleteById("ABCDEFGHIJKLMNOP");
         verify(rotator).refreshKeys();
+    }
+
+    @Test
+    void page_withoutRotator_dtddIsReportedDisabled_andNothingIsBlocked() {
+        var bare = new ApiAdminDtddKeysController(repository, Optional.empty(), events);
+        when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of(
+            new DtddApiKeyEntry("ABCDEFGHIJKLMNOP")
+        ));
+
+        var page = bare.page();
+
+        assertThat(page.dtddEnabled()).isFalse();
+        assertThat(page.keys()).hasSize(1);
+        assertThat(page.keys().getFirst().blocked()).isFalse();
+    }
+
+    @Test
+    void editsWithoutRotator_stillWork_andAreAnnounced() {
+        var bare = new ApiAdminDtddKeysController(repository, Optional.empty(), events);
+        when(repository.existsById("ddd_abcdef1234567890ABCD")).thenReturn(false);
+        when(repository.findByExclusiveFalse()).thenReturn(List.of(new DtddApiKeyEntry("ABCDEFGHIJKLMNOP")));
+        when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of());
+
+        bare.add(new AddKeyRequest("ddd_abcdef1234567890ABCD"));
+        bare.delete(new DeleteKeyRequest(ApiKeyHasher.id("ABCDEFGHIJKLMNOP")));
+        bare.refresh();
+
+        verify(repository).save(any(DtddApiKeyEntry.class));
+        verify(repository).deleteById("ABCDEFGHIJKLMNOP");
+        verify(events).keyAdded(eq(AdminEventPublisher.PROVIDER_DTDD), any());
+        verify(events).keyDeleted(AdminEventPublisher.PROVIDER_DTDD, ApiKeyHasher.id("ABCDEFGHIJKLMNOP"));
+        verify(events).keysRefreshed(eq(AdminEventPublisher.PROVIDER_DTDD), anyList());
     }
 
     @Test

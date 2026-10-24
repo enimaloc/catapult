@@ -49,7 +49,6 @@ import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -68,6 +67,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -97,8 +97,7 @@ public class ApiChannelActionsController {
     private final RaidRestoreGateService raidRestoreGate;
     private final CustomBindingActivations customBindingActivations;
 
-    @Autowired(required = false)
-    private SteamApiKeyRotator rotator;
+    private final Optional<SteamApiKeyRotator> rotator;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -423,7 +422,7 @@ public class ApiChannelActionsController {
         channelUser.setSteamTokenShared(false);
         userAccountRepository.save(channelUser);
         steamApiKeyRepository.deleteByOwner(channelUser);
-        if (rotator != null) rotator.refreshKeys();
+        rotator.ifPresent(SteamApiKeyRotator::refreshKeys);
         channelEventPublisher.steamProfileChanged(channelUser.getId(), buildSteamProfile(channelUser));
     }
 
@@ -511,7 +510,7 @@ public class ApiChannelActionsController {
             entry.setExclusive(!shared);
             steamApiKeyRepository.save(entry);
         }
-        if (rotator != null) rotator.refreshKeys();
+        rotator.ifPresent(SteamApiKeyRotator::refreshKeys);
     }
 
 }

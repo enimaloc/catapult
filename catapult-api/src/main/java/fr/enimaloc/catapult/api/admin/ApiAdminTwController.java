@@ -13,9 +13,9 @@ import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import fr.enimaloc.catapult.service.tw.AdminTwService;
 import fr.enimaloc.catapult.service.tw.TwBackfillService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -41,10 +41,9 @@ public class ApiAdminTwController {
     private final AdminTwService service;
 
     // Optional so the controller still loads when tw.enabled=false disables
-    // the backfill bean — the rebuild endpoint then 404s rather than crashing
-    // wiring.
-    @Autowired(required = false)
-    private TwBackfillService backfillService;
+    // the backfill bean — the rebuild endpoints then answer 503 rather than
+    // crashing wiring.
+    private final Optional<TwBackfillService> backfillService;
 
     private final AdminEventPublisher events;
 
@@ -129,28 +128,31 @@ public class ApiAdminTwController {
 
     @PostMapping("/rebuild")
     public ResponseEntity<Void> rebuildNonOverriddenMappings() {
-        if (backfillService == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
-        }
-        backfillService.rebuildAllNonOverridden();
-        return ResponseEntity.accepted().build();
+        return backfillService
+                .map(backfill -> {
+                    backfill.rebuildAllNonOverridden();
+                    return ResponseEntity.accepted().<Void>build();
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build());
     }
 
     @PostMapping("/rebuild/force")
     public ResponseEntity<Void> rebuildMappings() {
-        if (backfillService == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
-        }
-        backfillService.rebuildAll();
-        return ResponseEntity.accepted().build();
+        return backfillService
+                .map(backfill -> {
+                    backfill.rebuildAll();
+                    return ResponseEntity.accepted().<Void>build();
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build());
     }
 
     @PostMapping("/rebuild/force-pinned")
     public ResponseEntity<Void> rebuildMappingsIncludingPinned() {
-        if (backfillService == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
-        }
-        backfillService.forceRebuildAllIncludingPinned();
-        return ResponseEntity.accepted().build();
+        return backfillService
+                .map(backfill -> {
+                    backfill.forceRebuildAllIncludingPinned();
+                    return ResponseEntity.accepted().<Void>build();
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build());
     }
 }
