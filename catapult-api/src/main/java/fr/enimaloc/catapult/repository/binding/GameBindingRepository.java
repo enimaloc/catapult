@@ -109,24 +109,30 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
                                      Pageable pageable);
 
     /**
-     * How many bindings carry each detected name of the games with these IDs (any platform), as rows
-     * {@code [sourceType, sourceId, sourceName, count]}: what picks a game's most frequent name.
+     * How many bindings carry each detected name of the games on these platforms with these IDs, as rows
+     * {@code [sourceType, sourceId, sourceName, count]}: what picks a game's most frequent name. Any platform / ID
+     * pair of the two collections may come back; the platform keeps the query on the (source_type, source_id) index.
      */
     @org.springframework.data.jpa.repository.Query("""
         SELECT b.sourceType, b.sourceId, b.sourceName, COUNT(b) FROM GameBinding b
-        WHERE b.sourceId IN :sourceIds
+        WHERE b.sourceType IN :sourceTypes AND b.sourceId IN :sourceIds
         GROUP BY b.sourceType, b.sourceId, b.sourceName
         """)
     List<Object[]> countSourceNames(
+        @org.springframework.data.repository.query.Param("sourceTypes") java.util.Collection<GameBinding.SourceType> sourceTypes,
         @org.springframework.data.repository.query.Param("sourceIds") java.util.Collection<String> sourceIds);
 
-    /** How many bindings of the games with these IDs (any platform) have the status, as rows {@code [sourceType, sourceId, count]}. */
+    /**
+     * How many bindings of the games on these platforms with these IDs have the status, as rows
+     * {@code [sourceType, sourceId, count]}; as {@link #countSourceNames}, any pair of the two collections may come back.
+     */
     @org.springframework.data.jpa.repository.Query("""
         SELECT b.sourceType, b.sourceId, COUNT(b) FROM GameBinding b
-        WHERE b.status = :status AND b.sourceId IN :sourceIds
+        WHERE b.sourceType IN :sourceTypes AND b.sourceId IN :sourceIds AND b.status = :status
         GROUP BY b.sourceType, b.sourceId
         """)
     List<Object[]> countByGameAndStatus(
+        @org.springframework.data.repository.query.Param("sourceTypes") java.util.Collection<GameBinding.SourceType> sourceTypes,
         @org.springframework.data.repository.query.Param("sourceIds") java.util.Collection<String> sourceIds,
         @org.springframework.data.repository.query.Param("status") GameBinding.Status status);
 

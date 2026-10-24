@@ -40,6 +40,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * The admin game mappings: an admin sets the Twitch category of a detected game (platform + its ID) for every
@@ -112,7 +113,7 @@ public class AdminGameMappingService {
     public Page<DetectedGameDto> missing(int page, int size) {
         Page<Object[]> rows = bindingRepository.findGamesMissingAMapping(
                 PageRequest.of(Math.max(page, 0), pageSize(size)));
-        Map<GameKey, String> names = mostFrequentNames(rows.getContent().stream().map(r -> (String) r[1]).toList());
+        Map<GameKey, String> names = mostFrequentNames(rows.getContent().stream().map(r -> GameKey.of(r[0], r[1])).toList());
         return rows.map(r -> detectedGame(r, names));
     }
 
@@ -125,7 +126,7 @@ public class AdminGameMappingService {
         String needle = escapeLike(q == null ? "" : q.trim().toLowerCase(Locale.ROOT));
         List<Object[]> rows = bindingRepository.findDetectedGames(platform, needle + "%", "%" + needle + "%",
                 PageRequest.of(0, DETECTED_LIMIT));
-        Map<GameKey, String> names = mostFrequentNames(rows.stream().map(r -> (String) r[1]).toList());
+        Map<GameKey, String> names = mostFrequentNames(rows.stream().map(r -> GameKey.of(r[0], r[1])).toList());
         return rows.stream().map(r -> detectedGame(r, names)).toList();
     }
 
@@ -256,8 +257,8 @@ public class AdminGameMappingService {
      */
     private BindingService.MappingSuggestions igdbSuggestions(Target target, GameMappingRequest request) {
         if (request.ccls() != null && request.tws() != null) return BindingService.MappingSuggestions.NONE;
-        String name = mostFrequentNames(List.of(target.sourceId()))
-                .get(GameKey.of(target.sourceType(), target.sourceId()));
+        GameKey game = GameKey.of(target.sourceType(), target.sourceId());
+        String name = mostFrequentNames(List.of(game)).get(game);
         return bindingService.igdbSuggestions(new DetectedGame(target.sourceId(), target.sourceType(), name),
                 request.ccls() == null, request.tws() == null);
     }
@@ -362,10 +363,10 @@ public class AdminGameMappingService {
     /** The list rows of these mappings; {@code admin}, when given, saves looking the acting admin up. */
     private List<GameMappingDto> toDtos(List<GameMapping> mappings, UserAccount admin) {
         if (mappings.isEmpty()) return List.of();
-        List<String> ids = mappings.stream().map(GameMapping::getSourceId).distinct().toList();
-        Map<GameKey, String> names = mostFrequentNames(ids);
+        List<GameKey> games = mappings.stream().map(m -> GameKey.of(m.getSourceType(), m.getSourceId())).toList();
+        Map<GameKey, String> names = mostFrequentNames(games);
         Map<GameKey, Long> followers = new HashMap<>();
-        for (Object[] row : bindingRepository.countByGameAndStatus(ids, Status.MAPPED)) {
+        for (Object[] row : bindingRepository.countByGameAndStatus(platforms(games), ids(games), Status.MAPPED)) {
             followers.put(GameKey.of(row[0], row[1]), ((Number) row[2]).longValue());
         }
         Map<UUID, String> logins = new HashMap<>();
@@ -392,12 +393,21 @@ public class AdminGameMappingService {
         return new DetectedGameDto(key.sourceType(), key.sourceId(), names.get(key), ((Number) row[2]).longValue());
     }
 
-    /** Each game's most detected name (the first alphabetically on a tie), for the games with these IDs. */
-    private Map<GameKey, String> mostFrequentNames(Collection<String> sourceIds) {
-        if (sourceIds.isEmpty()) return Map.of();
+    /** These games' platforms, for the aggregates to stay on the (source_type, source_id) index. */
+    private static Set<SourceType> platforms(Collection<GameKey> games) {
+        return games.stream().map(g -> SourceType.valueOf(g.sourceType())).collect(Collectors.toSet());
+    }
+
+    private static Set<String> ids(Collection<GameKey> games) {
+        return games.stream().map(GameKey::sourceId).collect(Collectors.toSet());
+    }
+
+    /** Each game's most detected name (the first alphabetically on a tie), for these games. */
+    private Map<GameKey, String> mostFrequentNames(Collection<GameKey> games) {
+        if (games.isEmpty()) return Map.of();
         Map<GameKey, String> names = new HashMap<>();
         Map<GameKey, Long> best = new HashMap<>();
-        for (Object[] row : bindingRepository.countSourceNames(sourceIds)) {
+        for (Object[] row : bindingRepository.countSourceNames(platforms(games), ids(games))) {
             GameKey key = GameKey.of(row[0], row[1]);
             String name = (String) row[2];
             long count = ((Number) row[3]).longValue();

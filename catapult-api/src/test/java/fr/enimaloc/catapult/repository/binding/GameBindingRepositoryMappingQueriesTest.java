@@ -110,14 +110,33 @@ class GameBindingRepositoryMappingQueriesTest {
         binding(a, SourceType.STEAM, "730", "CS2", Status.MAPPED);
         binding(b, SourceType.STEAM, "730", "Counter-Strike 2", Status.MAPPED);
         binding(c, SourceType.STEAM, "730", "Counter-Strike 2", Status.MANUAL);
+        // The same ID on another platform is another game.
+        binding(a, SourceType.XBOX, "730", "Halo", Status.MAPPED);
         em.flush();
 
-        List<Object[]> names = repository.countSourceNames(List.of("730"));
-        List<Object[]> mapped = repository.countByGameAndStatus(List.of("730"), Status.MAPPED);
+        List<Object[]> names = repository.countSourceNames(List.of(SourceType.STEAM), List.of("730"));
+        List<Object[]> mapped = repository.countByGameAndStatus(List.of(SourceType.STEAM), List.of("730"), Status.MAPPED);
 
-        assertThat(names).extracting(r -> r[2] + "=" + ((Number) r[3]).longValue())
-                .containsExactlyInAnyOrder("CS2=1", "Counter-Strike 2=2");
+        assertThat(names).extracting(r -> r[0] + ":" + r[2] + "=" + ((Number) r[3]).longValue())
+                .containsExactlyInAnyOrder("STEAM:CS2=1", "STEAM:Counter-Strike 2=2");
         assertThat(keys(mapped)).containsExactly("STEAM:730=2");
+    }
+
+    @Test
+    void sourceNamesAndStatusCounts_coverSeveralPlatforms() {
+        UserAccount a = streamer(), b = streamer();
+        binding(a, SourceType.STEAM, "730", "CS2", Status.MAPPED);
+        binding(b, SourceType.XBOX, "x1", "Halo", Status.MAPPED);
+        binding(b, SourceType.BATTLENET, "730", "Elsewhere", Status.MAPPED);
+        em.flush();
+
+        List<SourceType> platforms = List.of(SourceType.STEAM, SourceType.XBOX);
+        List<String> ids = List.of("730", "x1");
+
+        assertThat(repository.countSourceNames(platforms, ids)).extracting(r -> r[0] + ":" + r[1] + ":" + r[2])
+                .containsExactlyInAnyOrder("STEAM:730:CS2", "XBOX:x1:Halo");
+        assertThat(keys(repository.countByGameAndStatus(platforms, ids, Status.MAPPED)))
+                .containsExactlyInAnyOrder("STEAM:730=1", "XBOX:x1=1");
     }
 
     @Test
